@@ -19,7 +19,9 @@ from crate.ai.contracts import (
     LegacyProfileConfig,
     ModelCapabilities,
     ProfileConfig,
+    ReasoningConfig,
 )
+from crate.ai.default_model import derive_all
 from crate.ai.discovery import validate_endpoint
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories import ai_configuration as store
@@ -113,6 +115,12 @@ def _catalog_fingerprint(connection):
     )
 
 
+def _public_connection_id(row):
+    return (
+        f"env:{row['provider']}" if row["secret_source"] == "environment" else row["id"]
+    )
+
+
 def _public_connection(row, *, include_models=True):
     key = (
         _environment_key(row["provider"])
@@ -136,9 +144,7 @@ def _public_connection(row, *, include_models=True):
             "daily_tokens",
         )
     } | {
-        "id": f"env:{row['provider']}"
-        if row["secret_source"] == "environment"
-        else row["id"],
+        "id": _public_connection_id(row),
         "persistent_id": row["id"],
         "model_count": row.get("model_count", len(row.get("model_catalog", []))),
         "source": row["secret_source"],
@@ -152,6 +158,87 @@ def _public_connection(row, *, include_models=True):
     if include_models:
         result["model_catalog"] = row["model_catalog"]
     return result
+
+
+def _has_credential(connection):
+    if connection["provider"] == "ollama":
+        return True
+    if connection["secret_source"] == "environment":
+        return bool(_environment_key(connection["provider"]))
+    if connection["secret_source"] == "stored":
+        return bool(connection.get("has_secret"))
+    return False
+
+
+def _default_model_state(data):
+    """Build the snapshot's default_model section from one already-read scope."""
+    default_model = data["state"].get("default_model")
+    if default_model is None:
+        return None
+    connection = data.get("default_connection")
+    model_id = default_model["model_id"]
+    available = connection is not None and connection["enabled"]
+    error_code = None
+    model = None
+    if not available:
+        error_code = "AI_CONNECTION_UNAVAILABLE"
+    elif not _has_credential(connection):
+        available = False
+        error_code = "AI_CREDENTIAL_REQUIRED"
+    else:
+        model = next(
+            (m for m in connection["model_catalog"] if m["model_id"] == model_id),
+            None,
+        )
+        if model is None or not model.get("validated"):
+            available = False
+            error_code = "AI_MODEL_UNVALIDATED"
+    features = []
+    if available:
+        capabilities = ModelCapabilities.model_validate(model)
+        reasoning = ReasoningConfig.model_validate(default_model["reasoning"])
+        bindings = {b["action_id"]: b for b in data["bindings"]}
+        versions = {(v["profile_id"], v["version"]): v for v in data["versions"]}
+        for derived in derive_all(capabilities, reasoning):
+            if derived.config is None:
+                features.append(
+                    {
+                        "action_id": derived.action_id,
+                        "status": "incompatible",
+                        "reason": derived.reason,
+                    }
+                )
+                continue
+            expected_fingerprint = store.version_fingerprint(
+                connection["id"], model_id, derived.config.model_dump(mode="json")
+            )
+            binding = bindings.get(derived.action_id)
+            bound_version = (
+                versions.get((binding["profile_id"], binding["profile_version"]))
+                if binding
+                else None
+            )
+            status = (
+                "default"
+                if bound_version is not None
+                and bound_version["fingerprint"] == expected_fingerprint
+                else "override"
+            )
+            features.append(
+                {"action_id": derived.action_id, "status": status, "reason": None}
+            )
+    return {
+        "connection_id": (
+            _public_connection_id(connection)
+            if connection is not None
+            else default_model["connection_id"]
+        ),
+        "model_id": model_id,
+        "reasoning": default_model["reasoning"],
+        "available": available,
+        "error_code": error_code,
+        "features": features,
+    }
 
 
 def snapshot():
@@ -240,6 +327,7 @@ def snapshot():
             {**p, "versions": versions.get(p["id"], [])} for p in data["profiles"]
         ],
         "bindings": data["bindings"],
+        "default_model": _default_model_state(data),
     }
 
 
@@ -396,6 +484,7 @@ def _review_fingerprint(contexts, data):
                 (p["id"], p["current_version"]) for p in data["profiles"]
             ),
             "bindings": data["bindings"],
+            "default_model": data["state"].get("default_model"),
         }
     )
 

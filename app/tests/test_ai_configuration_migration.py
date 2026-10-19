@@ -5,6 +5,9 @@ from crate.db.schema_bootstrap import create_schema
 from crate.db.schema_sections.ai_configuration_v120 import (
     create_ai_configuration_v120_schema,
 )
+from crate.db.schema_sections.ai_configuration_v121 import (
+    create_ai_default_model_v121_schema,
+)
 from crate.db.tx import transaction_scope
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -62,6 +65,49 @@ def test_ai_migration_bootstrap_idempotency_and_roundtrip(pg_db, monkeypatch):
                 text("SELECT count(*) FROM ai_action_bindings")
             ).scalar_one()
             == 0
+        )
+
+
+def test_default_model_migration_is_idempotent_and_bootstrapped(pg_db, monkeypatch):
+    migration = import_module("crate.db.migrations.versions.121_ai_default_model")
+    migrated, section, bootstrap = (
+        RecordingExecutor(),
+        RecordingExecutor(),
+        RecordingExecutor(),
+    )
+    monkeypatch.setattr(migration, "op", migrated)
+    migration.upgrade()
+    create_ai_default_model_v121_schema(section)
+    create_schema(bootstrap)
+    assert migrated.statements == section.statements
+    assert all(statement in bootstrap.statements for statement in section.statements)
+    assert migration.down_revision == "120"
+
+    with transaction_scope() as session:
+        monkeypatch.setattr(migration, "op", SessionExecutor(session))
+        migration.upgrade()
+        migration.upgrade()
+        migration.downgrade()
+        assert (
+            session.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name='ai_configuration_state' AND column_name='default_model'"
+                )
+            ).first()
+            is None
+        )
+        migration.upgrade()
+        assert (
+            session.execute(
+                text("SELECT default_model FROM ai_configuration_state")
+            ).scalar_one()
+            is None
+        )
+
+    with pytest.raises(IntegrityError), transaction_scope() as session:
+        session.execute(
+            text("UPDATE ai_configuration_state SET default_model='[]'::jsonb")
         )
 
 

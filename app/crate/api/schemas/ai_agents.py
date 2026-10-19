@@ -13,6 +13,7 @@ from crate.ai.contracts import (
     ModelID,
     ProfileConfig,
     Provider,
+    ReasoningConfig,
     ShortText,
 )
 
@@ -193,6 +194,21 @@ class LegacyActionPreview(ClosedModel):
     effective_timeout_seconds: Annotated[int, Field(ge=1, le=300)] | None
 
 
+class DefaultModelFeature(ClosedModel):
+    action_id: ID
+    status: Literal["default", "override", "incompatible"]
+    reason: Code | None
+
+
+class DefaultModelState(ClosedModel):
+    connection_id: ID
+    model_id: ModelID
+    reasoning: ReasoningConfig
+    available: bool
+    error_code: Code | None
+    features: list[DefaultModelFeature] = Field(max_length=11)
+
+
 class Snapshot(ClosedModel):
     truncated: bool
     revision: Revision
@@ -204,6 +220,7 @@ class Snapshot(ClosedModel):
     connections: list[ConnectionMetadata] = Field(max_length=1003)
     profiles: list[ProfileWithVersions] = Field(max_length=1000)
     bindings: list[Binding] = Field(max_length=11)
+    default_model: DefaultModelState | None = None
 
 
 class ActivationResponse(ClosedModel):

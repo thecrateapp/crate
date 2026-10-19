@@ -197,6 +197,26 @@ def save_model_catalog(
         return _connection(row)
 
 
+def version_fingerprint(
+    connection_id: str, model_id: str, config: Mapping[str, Any]
+) -> str:
+    """Stable identity of a (connection, model, config) tuple; no SQL."""
+    config_type = (
+        LegacyProfileConfig
+        if config.get("kind") == "legacy_snapshot"
+        else ProfileConfig
+    )
+    normalized = config_type.model_validate(config).model_dump(mode="json")
+    content = {
+        "connection_id": str(connection_id),
+        "model_id": model_id,
+        "config": normalized,
+    }
+    return hashlib.sha256(
+        json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 def _version(s, id, version, data):
     config_data = data.get("config", {})
     config_type = (
@@ -205,14 +225,9 @@ def _version(s, id, version, data):
         else ProfileConfig
     )
     config = config_type.model_validate(config_data).model_dump(mode="json")
-    content = {
-        "connection_id": str(data["connection_id"]),
-        "model_id": data["model_id"],
-        "config": config,
-    }
-    fingerprint = hashlib.sha256(
-        json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
+    fingerprint = version_fingerprint(
+        data["connection_id"], data["model_id"], config_data
+    )
     return _json(
         s.execute(
             text("""INSERT INTO ai_profile_versions(profile_id,version,connection_id,model_id,config,fingerprint)
@@ -412,12 +427,33 @@ def activate_configuration(
             return _json(row)
 
 
+def set_default_model(value: dict | None, actor_id, *, session=None) -> bool:
+    """CAS write of the singleton default model choice; revision never changes."""
+    with optional_scope(session) as s:
+        row = (
+            s.execute(
+                text(
+                    "UPDATE ai_configuration_state SET default_model=CAST(:value AS jsonb) "
+                    "WHERE singleton AND default_model IS DISTINCT FROM CAST(:value AS jsonb) RETURNING *"
+                ),
+                {"value": json.dumps(value) if value is not None else None},
+            )
+            .mappings()
+            .first()
+        )
+        changed = row is not None
+        if changed:
+            _audit(s, "ai.default_model.update", "singleton", actor_id, row["revision"])
+        return changed
+
+
 __all__ = [
     "list_connections",
     "get_connection",
     "create_connection",
     "update_connection",
     "save_model_catalog",
+    "version_fingerprint",
     "create_profile",
     "create_profile_version",
     "list_profiles",
@@ -427,6 +463,7 @@ __all__ = [
     "apply_bindings",
     "configuration_state",
     "activate_configuration",
+    "set_default_model",
 ]
 
 
@@ -437,9 +474,16 @@ def configuration_snapshot(*, bounded=False, session=None) -> dict:
     Internal validation reads complete history so binding validation remains exact.
     """
     with _read(session) as s:
+        state = configuration_state(session=s)
+        default_model = state.get("default_model")
+        default_connection = (
+            get_connection(default_model["connection_id"], session=s)
+            if default_model
+            else None
+        )
         if not bounded:
             return {
-                "state": configuration_state(session=s),
+                "state": state,
                 "connections": list_connections(session=s),
                 "profiles": list_profiles(session=s),
                 "bindings": list_bindings(session=s),
@@ -451,9 +495,11 @@ def configuration_snapshot(*, bounded=False, session=None) -> dict:
                         )
                     ).mappings()
                 ],
+                "default_connection": default_connection,
             }
         return {
-            "state": configuration_state(session=s),
+            "state": state,
+            "default_connection": default_connection,
             "connections": [
                 _json(r)
                 for r in s.execute(

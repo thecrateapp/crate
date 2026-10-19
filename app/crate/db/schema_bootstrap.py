@@ -3,6 +3,9 @@
 from crate.db.schema_sections.ai_configuration_v120 import (
     create_ai_configuration_v120_schema,
 )
+from crate.db.schema_sections.ai_configuration_v121 import (
+    create_ai_default_model_v121_schema,
+)
 from crate.db.schema_sections.show_extraction_v119 import (
     create_show_extraction_v119_schema,
 )
@@ -96,3 +99,4 @@ def create_schema(cur):
         "CREATE INDEX IF NOT EXISTS idx_credential_secrets_expires ON credential_secrets(expires_at) WHERE expires_at IS NOT NULL"
     )
     create_ai_configuration_v120_schema(cur)
+    create_ai_default_model_v121_schema(cur)
