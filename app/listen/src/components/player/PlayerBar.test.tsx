@@ -1,3 +1,6 @@
+import { useMemo, useState } from "react";
+import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
+import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +14,7 @@ import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
 import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
+const trackReads = vi.hoisted(() => vi.fn());
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
 const likeTrackMock = vi.hoisted(() => vi.fn(async () => true));
@@ -55,7 +59,10 @@ vi.mock("@/hooks/use-track-info", () => ({
 }));
 
 vi.mock("@/hooks/use-track-playback", () => ({
-  useTrackPlayback: () => ({ resolution: null, loading: false }),
+  useTrackPlayback: () => {
+    trackReads();
+    return { resolution: null, loading: false };
+  },
 }));
 
 vi.mock("@/lib/crate-connect", () => ({
@@ -243,8 +250,8 @@ describe("PlayerBar mobile mini-player", () => {
 
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
-        expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+        expect(button.className).not.toContain("drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }
@@ -262,7 +269,7 @@ describe("PlayerBar mobile mini-player", () => {
       playerActions: { currentTrack: track, queue: [track] },
     });
 
-    const shell = container.querySelector(".listen-player-shell");
+    const shell = container.querySelector('[data-slot="player-chrome"]');
     const artwork = container.querySelector(".listen-player-artwork");
 
     expect(shell).toBeInTheDocument();
@@ -292,15 +299,11 @@ describe("PlayerBar mobile mini-player", () => {
       },
     });
 
-    const activeGlow = "drop-shadow-accent-action";
-
     expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
-      "text-accent-action",
-      activeGlow,
+      "aria-pressed:text-accent-action-hi",
     );
     expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
-      "text-accent-action",
-      activeGlow,
+      "aria-pressed:text-accent-action-hi",
     );
   });
 
@@ -320,8 +323,8 @@ describe("PlayerBar mobile mini-player", () => {
 
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
-        expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+        expect(button.className).not.toContain("drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }
@@ -500,7 +503,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("size-12"));
+      .find((button) => button.closest('[data-slot="mobile-transport"]'));
 
     expect(playButton).toBeDefined();
     expect(nextButton).toBeDefined();
@@ -542,7 +545,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("size-12"));
+      .find((button) => button.closest('[data-slot="mobile-transport"]'));
 
     fireEvent.click(playButton!);
     fireEvent.click(nextButton!);
@@ -661,4 +664,58 @@ describe("PlayerBar desktop track identity", () => {
       null,
     );
   });
+});
+
+it("updates the seek leaf without rerendering the bar controller on a clock pulse", () => {
+  useIsDesktopMock.mockReturnValue(true);
+  function ClockHarness() {
+    const actions = usePlayerActions(),
+      state = usePlayerState();
+    const [currentTime, setTime] = useState(10);
+    const child = useMemo(() => <PlayerBar />, []);
+    return (
+      <>
+        <button type="button" onClick={() => setTime(20)}>
+          Pulse clock
+        </button>
+        <PlayerProviderSurface
+          actionsValue={actions}
+          stateValue={state}
+          progressValue={{ currentTime, duration: 240 }}
+          playbackNeedsUserGesture={false}
+          currentTrack={actions.currentTrack}
+          resumeAfterUserGesture={() => {}}
+        >
+          {child}
+        </PlayerProviderSurface>
+      </>
+    );
+  }
+  renderWithListenProviders(<ClockHarness />, {
+    playerActions: {
+      currentTrack: createMockTrack({ title: "Clock track", duration: 240 }),
+    },
+  });
+  const reads = trackReads.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "Pulse clock" }));
+  expect(
+    screen.getByRole("slider", { name: "Seek track position" }),
+  ).toHaveAttribute("aria-valuenow", "20");
+  expect(trackReads.mock.calls.length).toBe(reads);
+});
+
+it("uses the shared reviewable solid player frame", () => {
+  useIsDesktopMock.mockReturnValue(true);
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: createMockTrack() },
+  });
+  expect(screen.getByTestId("player-bar-frame")).toHaveAttribute(
+    "data-position",
+    "dock",
+  );
+  const chrome = screen
+    .getByTestId("player-bar-frame")
+    .querySelector('[data-slot="player-chrome"]');
+  expect(chrome).toHaveClass("bg-surface-chrome");
+  expect(chrome?.className).not.toMatch(/blur|glass|shadow/);
 });

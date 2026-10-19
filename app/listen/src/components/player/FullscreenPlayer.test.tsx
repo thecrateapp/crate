@@ -378,11 +378,11 @@ describe("FullscreenPlayer", () => {
         container.querySelector(".fullscreen-player-handle"),
       ).toBeInTheDocument();
 
-      await user.click(screen.getByLabelText("Show album cover"));
+      await user.click(screen.getByLabelText("Cover mode"));
 
       await waitFor(() => {
         expect(
-          container.querySelector(".fullscreen-player-artwork-placeholder"),
+          container.querySelector(".bg-surface-placeholder"),
         ).toBeInTheDocument();
         expect(
           container.querySelector(".fullscreen-player-artwork-icon"),
@@ -484,8 +484,7 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1:00")).toBeInTheDocument();
-        expect(screen.getByText("-3:00")).toBeInTheDocument();
+        expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
       });
     });
 
@@ -506,7 +505,7 @@ describe("FullscreenPlayer", () => {
       });
 
       // Click surface mode toggle to switch to cover mode
-      await user.click(screen.getByLabelText("Show album cover"));
+      await user.click(screen.getByLabelText("Cover mode"));
 
       // SpinningDisc should be gone, replaced by cover image
       await waitFor(() => {
@@ -774,9 +773,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByLabelText("Equalizer"));
       const equalizerPanel = screen.getByTestId("equalizer-panel");
       expect(equalizerPanel).toBeInTheDocument();
-      expect(equalizerPanel.parentElement).toHaveClass(
-        "listen-mobile-eq-glass",
-      );
+      expect(equalizerPanel.parentElement).toHaveClass("bg-surface-popover");
 
       await user.click(screen.getByLabelText("Equalizer"));
       await waitFor(() => {
@@ -874,7 +871,7 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
+      const queueSwitch = await screen.findByRole("tab", { name: "Queue" });
 
       await user.click(queueSwitch);
 
@@ -950,23 +947,23 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
+      const queueSwitch = await screen.findByRole("tab", { name: "Queue" });
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
 
       await user.click(queueSwitch);
 
       await waitFor(() => {
         expect(screen.getByText("Nothing queued")).toBeInTheDocument();
       });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "true");
+      expect(queueSwitch).toHaveAttribute("aria-selected", "true");
 
-      await user.click(queueSwitch);
+      await user.click(screen.getByRole("tab", { name: "Now Playing" }));
 
       await waitFor(() => {
         expect(screen.queryByText("Nothing queued")).not.toBeInTheDocument();
         expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
       });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
     });
 
     it("uses semantic tokens for active panel and transport states", async () => {
@@ -987,31 +984,12 @@ describe("FullscreenPlayer", () => {
         name: "Disable shuffle",
       });
       const repeat = screen.getByRole("button", { name: "Repeat: one" });
-      expect(shuffle).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
-      expect(repeat).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
-
-      const queueSwitch = screen.getByRole("button", { name: "Queue" });
-      expect(queueSwitch).toHaveClass(
-        "text-text-muted",
-        "active:text-text-secondary",
-      );
-
+      expect(shuffle).toHaveAttribute("aria-pressed", "true");
+      expect(repeat).toHaveAttribute("aria-pressed", "true");
+      const queueSwitch = screen.getByRole("tab", { name: "Queue" });
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
       await user.click(queueSwitch);
-
-      expect(queueSwitch).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action-icon",
-      );
-      expect(queueSwitch.querySelector('[aria-hidden="true"]')).toHaveClass(
-        "bg-accent-action",
-        "shadow-accent-action-indicator-active",
-      );
+      expect(queueSwitch).toHaveAttribute("aria-selected", "true");
     });
   });
 
@@ -1372,7 +1350,7 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      await user.click(await screen.findByRole("button", { name: "Lyrics" }));
+      await user.click(await screen.findByRole("tab", { name: "Lyrics" }));
 
       const activeLine = await screen.findByRole("button", {
         name: "Picking petals",
@@ -1381,15 +1359,9 @@ describe("FullscreenPlayer", () => {
         name: "Do you love me? Do you love me not?",
       });
 
-      expect(activeLine).toHaveClass(
-        "text-[1.9rem]",
-        "font-extrabold",
-        "text-text-primary",
-        "lyrics-active-line",
-      );
-      expect(activeLine.className).not.toContain("rgba(");
-      expect(nextLine).toHaveClass("text-[1.55rem]");
-      expect(nextLine.className).toContain("blur-[0.35px]");
+      expect(activeLine).toHaveAttribute("aria-current", "true");
+      expect(activeLine).toHaveClass("listen-lyric-line");
+      expect(nextLine).toHaveAttribute("data-state", "future");
     });
   });
 
@@ -1414,7 +1386,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("renders three panel switches and no player tab", async () => {
+    it("renders associated text tabs including now playing", async () => {
       const track = makeTrack();
       renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
         playerActions: createMockPlayerActions({
@@ -1428,16 +1400,16 @@ describe("FullscreenPlayer", () => {
         expect(
           screen.queryByRole("button", { name: "Player" }),
         ).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Queue" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Queue" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
-        expect(screen.getByRole("button", { name: "Lyrics" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Lyrics" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
-        expect(screen.getByRole("button", { name: "Info" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Info" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
       });
@@ -1454,7 +1426,7 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Show album cover")).toBeInTheDocument();
+        expect(screen.getByLabelText("Cover mode")).toBeInTheDocument();
       });
     });
 
@@ -1485,24 +1457,15 @@ describe("FullscreenPlayer", () => {
 
       for (const button of [
         screen.getByLabelText("Equalizer"),
-        screen.getByLabelText("Show album cover"),
+        screen.getByLabelText("Cover mode"),
       ]) {
-        expect(button).toHaveClass(
-          "border-border-subtle",
-          "bg-surface-control",
-          "text-text-secondary",
-          "active:bg-surface-control-hover",
-          "active:text-text-primary",
-        );
+        expect(button).toHaveAttribute("data-size", "icon-lg");
         expect(button.className).not.toContain("white/");
       }
 
       const equalizer = screen.getByLabelText("Equalizer");
       await user.click(equalizer);
-      expect(equalizer).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
+      expect(equalizer).toHaveAttribute("aria-pressed", "true");
 
       expect(screen.getByTestId("player-track-menu")).toHaveClass(
         "border-border-subtle",

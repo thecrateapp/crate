@@ -5,7 +5,7 @@ import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 describe("PlayerVolumeControl", () => {
-  it("uses color and glow hover without drawing a hover frame", () => {
+  it("uses the canonical ghost action and exposes its popup state", () => {
     renderWithListenProviders(
       <PlayerVolumeControl
         volume={0.5}
@@ -13,14 +13,14 @@ describe("PlayerVolumeControl", () => {
         onOverlayChange={vi.fn()}
       />,
     );
-
     const button = screen.getByRole("button", { name: "Volume" });
-    expect(button.className).not.toContain("hover:bg");
-    expect(button.className).toContain("text-text-muted");
-    expect(button.className).toContain("hover:text-accent-action");
-    expect(button.className).toContain("hover:drop-shadow-accent-action");
-    expect(button.className).not.toContain("text-white/30");
-    expect(button.className).not.toContain("rgba(");
+    expect(button).toHaveAttribute("data-size", "icon-lg");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("slider", { name: "Volume" })).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(button).toHaveFocus();
   });
 
   it("localizes volume controls", () => {

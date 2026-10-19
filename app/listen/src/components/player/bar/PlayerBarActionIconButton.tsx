@@ -1,3 +1,4 @@
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import type { ReactNode } from "react";
 
 type PlayerBarActionIconButtonProps = {
@@ -18,17 +19,17 @@ export function PlayerBarActionIconButton({
   className,
 }: PlayerBarActionIconButtonProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={onPrepare}
-      onFocus={onPrepare}
-      aria-label={label}
-      className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${
-        active ? "text-accent-action" : "text-text-muted"
-      } ${className ?? ""}`}
-    >
-      {children}
-    </button>
+    <span className={className}>
+      <ActionButton
+        onClick={onClick}
+        onMouseEnter={onPrepare}
+        onFocus={onPrepare}
+        label={label}
+        aria-pressed={active}
+        aria-expanded={active}
+      >
+        {children}
+      </ActionButton>
+    </span>
   );
 }

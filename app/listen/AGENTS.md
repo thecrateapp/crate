@@ -32,7 +32,7 @@ test/             renderWithListenProviders, gesture helpers
   - `usePlayerActions()`: queue, current track, and stable callbacks (`play`, `playAll`, `next`, `seek`, ...). Default choice for anything that triggers playback.
   - `usePlayerState()`: `isPlaying`, `isBuffering`, `volume`, `analyserVersion`, `crossfadeTransition`.
   - `usePlayerProgress()`: `currentTime`, `duration`; changes every tick.
-  - `usePlayer()` merges all three and re-renders on every progress tick. Only full player surfaces use it (`ExtendedPlayer`, `FullscreenPlayer`, `usePlayerBarController`). Do not add it anywhere else.
+  - `usePlayer()` merges all three and re-renders on every progress tick. Player controllers use `usePlayerState` + `usePlayerActions` and a stable `usePlayerClock` ref; only small progress/disc/lyric leaves subscribe to ticks. Do not add aggregate subscribers to lists, controllers or pages.
 - Engines: `lib/playback-engine.ts` interface, `lib/playback-engine-factory.ts` picks `androidNativeEngine` (`lib/android-native-engine.ts`) or `GaplessWebEngine` (`lib/gapless-web-engine.ts`) -> `lib/gapless-player.ts` (module singleton wrapping Gapless-5), split into `gapless-player-{controls,queue,volume,equalizer,audio-recovery}.ts`.
 - Mobile audio (`lib/mobile-audio-mode.ts`): on iOS/Android runtimes the stable pipeline uses HTML5 audio with WebAudio off (1 decoded track) unless the user enabled "enhanced audio" at startup. `canUseWebAudioEffects` gates EQ/visualizer. Never assume an `AudioContext`/`AnalyserNode` exists.
 - Audio recovery (`gapless-player-audio-recovery.ts`) rebuilds the Tauri output after sleep/long absence; detection uses `document.documentElement.dataset.listenRuntime === "tauri"` (set by `app/listen-desktop/src/lib/tauri-init.ts`).
@@ -114,3 +114,20 @@ npm run test:listen-visual                       # Playwright, playwright.listen
 - Capacitor builds use `vite build --mode capacitor`; Capacitor plugins must be guarded by runtime flags so web and Tauri do not crash.
 - Service worker registers only on web (`shouldRegisterServiceWorker`).
 - Shared code in `app/shared/web` is also tested by Listen's Vitest config; breaking it breaks both apps.
+
+## Player reconciliation — local 1AZ
+
+PlayerBarFrame owns solid dock chrome and the 82px fine-pointer geometry; bar time/seek is one
+horizontal row. Coarse desktop/tablet uses104px via the shared Shell metric so two44px targets do
+not overlap or clip; clearances follow the same variable. PlayerStage keeps shorter viewports
+scrollable. Conventional player actions use ActionButton; specialized play aura/ring/disc and
+beam/head remain content effects. PlayerPanels uses actual text Tabs and associated panels.
+
+PlayerClock exposes latest progress to controller/event readers without tick subscriptions.
+Time/seek and CD leaves subscribe separately; SyncedLyrics keeps static rows and a small clock
+leaf changes active state/underline/line scrolling. Crossfade layers read one app-local CSS clock;
+they never animate independent positions/opacity clocks through large React trees. The bar canvas
+owns sampling and drawing in one loop through useAudioVisualizer manual mode; stable/native
+pipelines without an analyser show none. Preserve remote authority, Jam locks, authenticated
+artwork recovery and lazy player chunks. Both review hosts reuse these actual player views;
+app-local player components belong to Listen/Player, with no invented Admin consumer.

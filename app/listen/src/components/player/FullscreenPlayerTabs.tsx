@@ -3,8 +3,9 @@ import type { TFunction } from "i18next";
 
 import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArtwork";
 import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
-import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
-import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
+import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
+import { SyncedLyrics } from "./SyncedLyrics";
+import { PlayerStage } from "./PlayerStage";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import type {
   FullscreenPlayerViewProps,
@@ -14,8 +15,6 @@ import type {
 import type { FullscreenLyrics } from "@/components/player/fullscreen-player-types";
 import { InfoTab } from "@/components/player/extended/InfoTab";
 import { QueueTrackRow } from "@/components/player/QueueTrackRow";
-import { cn } from "@crate/ui/lib/cn";
-import { triggerHaptic } from "@/lib/haptics";
 
 function withStableDuplicateKeys<T>(
   items: T[],
@@ -46,56 +45,45 @@ export function FullscreenPlayerPlayerTab({
   markArtistPhotoFailed: () => void;
 }) {
   return (
-    <div
-      className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6"
-      style={{ paddingBottom: playerTabBottomClearance }}
-    >
-      <div className="relative z-10 mx-auto w-full max-w-[360px]">
+    <PlayerStage
+      bottomClearance={playerTabBottomClearance}
+      artwork={
         <FullscreenPlayerArtwork
           state={state}
           player={player}
           refs={refs}
           actions={actions}
         />
-      </div>
-      <div className="relative z-10 mt-5 w-full text-center">
-        <PlayerTrackIdentity
-          currentTrack={player.currentTrack}
-          crossfadeTransition={player.crossfadeTransition}
-          crossfadeProgress={player.crossfadeProgress}
-          sourceLabel={player.sourceLabel}
-          artistAvatarUrl={player.artistAvatarUrl}
-          onArtistAvatarError={markArtistPhotoFailed}
-          onArtistClick={actions.goToArtist}
-          artistClickable={Boolean(
-            player.resolvedArtist?.id != null ||
-              player.resolvedArtist?.globalArtistUid,
-          )}
-          titleClassName="text-lg"
-          albumClassName="text-xs"
-        />
-        <div className="mx-auto mt-4 w-full max-w-[360px]">
-          <div className="fullscreen-player-time mb-1.5 flex items-center justify-between text-xs font-medium tabular-nums">
-            <span>{formatPlayerTime(player.displayedTime)}</span>
-            <span>-{formatPlayerTime(player.effectiveRemainingTime)}</span>
-          </div>
-          <PlayerSeekBar
-            currentTime={player.displayedTime}
-            duration={player.displayedDuration}
-            onSeek={actions.seekWithFeedback}
-            disabled={state.jamQueueLocked}
-            thin
-            variant="glow"
-          />
-        </div>
-        <FullscreenPlayerControls
-          state={state}
-          player={player}
-          actions={actions}
-          t={t}
+      }
+    >
+      <PlayerTrackIdentity
+        currentTrack={player.currentTrack}
+        crossfadeTransition={player.crossfadeTransition}
+        crossfadeProgress={player.crossfadeProgress}
+        sourceLabel={player.sourceLabel}
+        artistAvatarUrl={player.artistAvatarUrl}
+        onArtistAvatarError={markArtistPhotoFailed}
+        onArtistClick={actions.goToArtist}
+        artistClickable={Boolean(
+          player.resolvedArtist?.id != null ||
+            player.resolvedArtist?.globalArtistUid,
+        )}
+      />
+      <div className="mx-auto mt-4 w-full max-w-[360px]">
+        <PlayerProgressLeaf
+          onSeek={actions.seekWithFeedback}
+          disabled={state.jamQueueLocked}
+          remaining
+          showTimes
         />
       </div>
-    </div>
+      <FullscreenPlayerControls
+        state={state}
+        player={player}
+        actions={actions}
+        t={t}
+      />
+    </PlayerStage>
   );
 }
 
@@ -153,7 +141,6 @@ export function FullscreenPlayerQueueTab({
 }
 
 export function FullscreenPlayerLyricsTab({
-  activeLyricIndex,
   lyrics,
   refs,
   seek,
@@ -167,16 +154,6 @@ export function FullscreenPlayerLyricsTab({
   t: TFunction;
   scrollTabBottomClearance: string;
 }) {
-  const syncedLyrics = lyrics?.synced;
-  const keyedLines = useMemo(
-    () =>
-      withStableDuplicateKeys(
-        syncedLyrics ?? [],
-        (line) => `${line.time}-${line.text}`,
-      ),
-    [syncedLyrics],
-  );
-
   return (
     <div
       ref={refs.lyricsContainerRef}
@@ -192,35 +169,11 @@ export function FullscreenPlayerLyricsTab({
           {t("player.lyrics.loading")}
         </p>
       ) : lyrics.synced ? (
-        <div className="relative z-10 mx-auto flex w-full max-w-[560px] flex-col items-start gap-3 py-8">
-          {keyedLines.map(({ item: line, key }, index) => {
-            const active = index === activeLyricIndex;
-            const past = index < activeLyricIndex;
-            return (
-              <button
-                key={key}
-                type="button"
-                ref={active ? refs.activeLyricRef : null}
-                onClick={() => {
-                  triggerHaptic("selection");
-                  seek(line.time);
-                }}
-                className={cn(
-                  "w-full rounded-xl px-1 py-1 text-left font-extrabold tracking-normal transition-[color,filter,opacity,transform] duration-500",
-                  active
-                    ? "lyrics-active-line text-[1.9rem] leading-[1.08] text-text-primary opacity-100"
-                    : past
-                      ? "text-[1.55rem] leading-[1.12] text-text-faint opacity-75 blur-[0.7px]"
-                      : "text-[1.55rem] leading-[1.12] text-text-subtle opacity-85 blur-[0.35px]",
-                )}
-              >
-                {line.text || "♪"}
-              </button>
-            );
-          })}
+        <div className="relative z-10 mx-auto w-full max-w-[560px]">
+          <SyncedLyrics lines={lyrics.synced} onSeek={seek} />
         </div>
       ) : lyrics.plain ? (
-        <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left text-[1.45rem] font-extrabold leading-[1.16] text-text-primary">
+        <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left font-sans text-sm leading-relaxed text-text-muted">
           {lyrics.plain}
         </pre>
       ) : (

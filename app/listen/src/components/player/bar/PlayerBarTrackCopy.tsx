@@ -40,17 +40,23 @@ export function PlayerBarTrackCopy({
           <>
             <div
               className="absolute inset-0"
-              style={{ opacity: 1 - crossfadeProgress }}
+              style={{
+                opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+              }}
             >
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayCrossfadeTransition.outgoing.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
                 {displayCrossfadeTransition.outgoing.artist}
               </p>
             </div>
-            <div style={{ opacity: crossfadeProgress }}>
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+            <div
+              style={{
+                opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+              }}
+            >
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayCrossfadeTransition.incoming.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
@@ -63,7 +69,7 @@ export function PlayerBarTrackCopy({
             {isDesktop && hasAlbum ? (
               <button
                 type="button"
-                className="link-meta block w-fit max-w-full truncate text-left text-caption font-semibold leading-tight text-text-primary"
+                className="link-meta block w-fit max-w-full truncate text-left text-base font-medium leading-tight text-text-primary"
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenAlbum();
@@ -72,7 +78,7 @@ export function PlayerBarTrackCopy({
                 {displayTrack.title}
               </button>
             ) : (
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayTrack.title}
               </p>
             )}

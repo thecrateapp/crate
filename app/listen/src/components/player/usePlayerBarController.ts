@@ -1,6 +1,7 @@
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { useState } from "react";
 
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
@@ -30,14 +31,14 @@ const SHOW_PLAYER_BAR_ANALYZER = true;
 
 export function usePlayerBarController() {
   const {
-    currentTime,
-    duration,
     isPlaying,
     isBuffering,
     volume,
     analyserVersion,
     crossfadeTransition,
-  } = usePlayer();
+  } = usePlayerState();
+  const clock = usePlayerClock();
+  const { currentTime, duration } = clock.current;
   const {
     currentTrack,
     jamQueueLocked,
@@ -106,11 +107,13 @@ export function usePlayerBarController() {
     },
   });
 
-  const { frequenciesDb, sampleRate } = useAudioVisualizer(
+  const { frequenciesDb, sampleRate, readFrame } = useAudioVisualizer(
     showPlayerBarAnalyzer && isPlaying && !isRemoteConnectActive,
     `${
       currentTrack ? getTrackCacheKey(currentTrack) : "none"
     }:${analyserVersion}`,
+    undefined,
+    true,
   );
 
   const [seekHover, setSeekHover] = useState<{
@@ -166,6 +169,7 @@ export function usePlayerBarController() {
     playbackTargetContext,
     progressPct,
   } = usePlayerBarComputedState({
+    progressClock: clock,
     activeConnectDeviceId,
     activeConnectSession,
     connect,
@@ -273,6 +277,7 @@ export function usePlayerBarController() {
     repeat,
     frequenciesDb,
     sampleRate,
+    readAudioFrame: readFrame,
     progressPct,
     seekHover,
     onSeekHoverChange: setSeekHover,

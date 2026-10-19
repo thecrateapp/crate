@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
-import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
+import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 
@@ -13,7 +13,6 @@ import { QueueTabUpcoming } from "./QueueTabUpcoming";
 
 export const QueueTab = memo(function QueueTab() {
   const { t } = useTranslation();
-  const { isPlaying } = usePlayerState();
   const {
     queue,
     currentIndex,
@@ -60,7 +59,8 @@ export const QueueTab = memo(function QueueTab() {
         <QueueTabCurrentTrack
           currentTrack={currentTrack}
           currentIndex={currentIndex}
-          isPlaying={isPlaying}
+          onJump={jumpTo}
+          locked={jamQueueLocked}
           onSave={() => void handleSaveAsPlaylist()}
         />
       ) : null}

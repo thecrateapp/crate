@@ -10,11 +10,19 @@ import type { SeekBarModel } from "./player-seek-bar-model";
 export function SeekBarTimes({
   displayedTime,
   safeDuration,
-}: Pick<SeekBarModel, "displayedTime" | "safeDuration">) {
+  remaining = false,
+}: Pick<SeekBarModel, "displayedTime" | "safeDuration"> & {
+  remaining?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between text-xs tabular-nums text-text-muted">
+    <div className="flex items-center justify-between font-mono text-xs tabular-nums text-text-muted">
       <span>{formatPlayerTime(displayedTime)}</span>
-      <span>{formatPlayerTime(safeDuration)}</span>
+      <span>
+        {remaining ? "-" : ""}
+        {formatPlayerTime(
+          remaining ? Math.max(0, safeDuration - displayedTime) : safeDuration,
+        )}
+      </span>
     </div>
   );
 }
@@ -40,12 +48,14 @@ export function SeekBarTooltip({
 function SeekBarFrame({
   className,
   showTimes,
+  remaining = false,
   disabled,
   model,
   children,
 }: {
   className: string;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
   children: React.ReactNode;
@@ -63,6 +73,7 @@ function SeekBarFrame({
     >
       {showTimes ? (
         <SeekBarTimes
+          remaining={remaining}
           displayedTime={model.displayedTime}
           safeDuration={model.safeDuration}
         />
@@ -99,8 +110,29 @@ function SeekInput({
       }
       disabled={disabled || model.safeDuration <= 0}
       aria-label={t("player.seek")}
+      aria-valuenow={
+        model.safeDuration > 0
+          ? Math.max(0, Math.min(model.displayedTime, model.safeDuration))
+          : 0
+      }
+      aria-valuetext={formatPlayerTime(model.displayedTime)}
       className={className}
       style={style}
+      onKeyDown={(event) => {
+        const changes: Record<string, number> = {
+          ArrowLeft: model.displayedTime - 5,
+          ArrowDown: model.displayedTime - 5,
+          ArrowRight: model.displayedTime + 5,
+          ArrowUp: model.displayedTime + 5,
+          Home: 0,
+          End: model.safeDuration,
+        };
+        const next = changes[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        model.commitSeek(Math.max(0, Math.min(model.safeDuration, next)));
+      }}
+      onPointerCancel={model.endScrubbing}
       onPointerDown={(event) => {
         model.stopPropagation(event);
         model.beginScrubbing();
@@ -121,18 +153,23 @@ function SeekInput({
 }
 
 export function GlowSeekBar({
+  compact = false,
   className,
   showTimes,
+  remaining = false,
   disabled,
   model,
 }: {
+  compact?: boolean;
   className: string;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
 }) {
   return (
     <SeekBarFrame
+      remaining={remaining}
       className={className}
       showTimes={showTimes}
       disabled={disabled}
@@ -140,6 +177,7 @@ export function GlowSeekBar({
     >
       <div
         ref={model.trackRef}
+        data-compact={compact || undefined}
         className="listen-player-progress group relative py-3"
         onPointerMove={model.handleHover}
         onPointerLeave={model.clearHover}
@@ -168,6 +206,7 @@ export function DefaultSeekBar({
   compact,
   thin,
   showTimes,
+  remaining = false,
   disabled,
   model,
 }: {
@@ -175,11 +214,13 @@ export function DefaultSeekBar({
   compact: boolean;
   thin: boolean;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
 }) {
   return (
     <SeekBarFrame
+      remaining={remaining}
       className={className}
       showTimes={showTimes}
       disabled={disabled}

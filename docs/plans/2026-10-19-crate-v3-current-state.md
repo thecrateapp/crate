@@ -4,21 +4,21 @@ Actualizado: 2026-10-19. Esta tabla es el punto de entrada para continuar el tra
 registros cronológicos de los otros planes conservan el estado que tenían en su fecha;
 sus stops locales anteriores quedan superados por las aprobaciones y publicaciones posteriores.
 
-| Concepto                | Estado vigente                                                                                                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AX aprobado y publicado: `5bc683d8`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local | **1AY aprobado por Diego**; autoriza commit/push y1AZ. Shell, búsqueda, colección y enmiendas aprobadas durante la iteración; detalle y validación al final |
-| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.           |
-| Revisión actual | `http://127.0.0.1:5186/review-1ay-shell.html`; misma escena real en Storybook `Reviews/1AY/Shell`; Listen vivo en5174 |
-| Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
-| Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook | `http://127.0.0.1:6006/?path=/story/reviews-1ay-shell--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes |
-| Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
-| Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
-| Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
-| Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | 1AX publicado5bc683d8. Parar en1AY para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Concepto                  | Estado vigente                                                                                                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace                 | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
+| Publicado                 | 1AY aprobado y publicado: `81665c5c`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
+| Checkpoint local          | **1AZ local para revisión**: reproductor, cola y relojes de UI; sin commit/push                                                                                             |
+| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.                           |
+| Revisión actual           | `http://127.0.0.1:5186/review-1az-player.html`; misma escena en Storybook `Reviews/1AZ/Player`; Listen vivo en5174                                                          |
+| Auditoría                 | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
+| Preview                   | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
+| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1az-player--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                        |
+| Próximo grupo de iconos   | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
+| Identidad y referencia    | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
+| Evidencia canónica        | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
+| Cierre pendiente          | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
+| Restricción               | 1AY publicado81665c5c. Parar en1AZ para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -413,7 +413,6 @@ Diego aprueba1AT y autoriza commit/push. Continúa1AU con PageHeader, SectionHea
 HeroActionBar y BackLink, usando el mockup como referencia y actualizando Storybook y la vista
 pequeña del checkpoint. Ambos previews permanecen activos;1AU se detiene antes de commit/push.
 
-
 ## 1AT publicado; 1AU — familia de cabeceras
 
 1AT publicado en `67486e4c7414d7c6bca7a6701b35c73440f0dfce`. 1AU completa PageHeader y su
@@ -441,7 +440,6 @@ las etiquetas largas pueden aumentar su altura.
 [plan/evidencia](2026-10-19-crate-v3-headers-reconciliation.md). Misma escena para ambos hosts;
 no se amplía el mockup histórico. El documento de próximos grupos sigue siendo una propuesta.
 Ambos previews activos; **parada1AU antes de commit/push**.
-
 
 Validación final1AU:158unitarias focalizadas (74shared,51Admin,33Listen),20browser de cabeceras
 más2del editor real,5typechecks y lint/builds/guarda33/93/120 verdes. Admin527180/532480Bgzip
@@ -565,7 +563,7 @@ reintento aislado1/1. No se cambió el control de seek para ese reintento. Se co
 de estabilidad del mockup grande; las escenas nuevas y el renderer real tienen evidencia propia.
 
 Builds Admin/Listen/Storybook/preview verdes; presupuestos bajo532480/307200Bgzip. La medida final
-se registra en los logs1aw-final-*-budget. Catálogo45/93/120,48pendientes. Revisión fuente independiente
+se registra en los logs1aw-final-\*-budget. Catálogo45/93/120,48pendientes. Revisión fuente independiente
 más regresiones de sus hallazgos cerradas. La auditoría de tamaños arbitrarios amplió la guarda
 y detectó ShowCard compacto18px: ahora48px, con el aumento de altura correspondiente en calendario.
 El mínimo de miniaturas tiene cobertura para marcos JSX y el tooltip HTML existente; no equivale
@@ -585,7 +583,6 @@ según el plan Listen aprobado. Mantener5186/6006/5174 activos y detener1AX ante
 La aprobación visual1AW no cierra QA nativa/AT ni los baselines pendientes.
 
 1AW publicado en5ff7296c21e4d91bb8d639e1e00e52b43939a2da. Alcance1AX: [plan local](2026-10-19-crate-v3-layers-feedback-navigation.md).
-
 
 ## Cierre local 1AX — pendiente de revisión de Diego
 
@@ -638,7 +635,6 @@ Diego aprueba 1AX y autoriza commit/push y continuar con 1AY (Shell, búsqueda y
 con el mockup aprobado como referencia, Storybook actualizado y las tres instancias activas.
 1AY se detiene para revisión antes de su commit/push. Se mantienen los límites de QA registrados.
 
-
 ## 1AY — Shell, búsqueda y colección, local para revisión
 
 1AX aprobado/publicado en5bc683d8. 1AY detiene su trabajo antes de commit/push.
@@ -668,20 +664,20 @@ Las guardas reducen presupuestos y siguen dueños reales; no se amplía el hover
 
 Validación focalizada, serial, con un worker:
 
-| Grupo | Resultado |
-| --- | --- |
-| Listen: Shell, ruta/foco, tabs/Library, búsqueda/TopBar y ArtistHero |95pruebas verdes |
-| Shared: Select/Tabs/FilterBar y recetas de forms |17pruebas verdes |
-| Listen: modelo de destinos y guardas afectadas |30pruebas verdes |
-| Shared: catálogo, preview, exports, tokens, hover, miniportadas y overlays |47pruebas verdes |
-| Admin: Select y helper de tabs |12pruebas verdes |
-| Desktop: título/arranque |26pruebas verdes |
-| Navegador: dos hosts desktop/mobile, portal bajo, controles liked, Select estable y motion/RTL/vertical |11casos distintos verdes |
-| Tipos |Listen, shared, Admin, Desktop y Storybook verdes |
-| ESLint y whitespace |archivos TypeScript cambiados,0warnings; diff-check verde |
-| Builds |Listen, Admin, Storybook y preview verdes |
-| Presupuestos JS inicial |Listen201569/307200Bgzip; Admin527207/532480Bgzip |
-| Catálogo |53documentadas/93entradas/120fuentes;40pendientes, sin refrescar deuda pendiente |
+| Grupo                                                                                                   | Resultado                                                                        |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Listen: Shell, ruta/foco, tabs/Library, búsqueda/TopBar y ArtistHero                                    | 95pruebas verdes                                                                 |
+| Shared: Select/Tabs/FilterBar y recetas de forms                                                        | 17pruebas verdes                                                                 |
+| Listen: modelo de destinos y guardas afectadas                                                          | 30pruebas verdes                                                                 |
+| Shared: catálogo, preview, exports, tokens, hover, miniportadas y overlays                              | 47pruebas verdes                                                                 |
+| Admin: Select y helper de tabs                                                                          | 12pruebas verdes                                                                 |
+| Desktop: título/arranque                                                                                | 26pruebas verdes                                                                 |
+| Navegador: dos hosts desktop/mobile, portal bajo, controles liked, Select estable y motion/RTL/vertical | 11casos distintos verdes                                                         |
+| Tipos                                                                                                   | Listen, shared, Admin, Desktop y Storybook verdes                                |
+| ESLint y whitespace                                                                                     | archivos TypeScript cambiados,0warnings; diff-check verde                        |
+| Builds                                                                                                  | Listen, Admin, Storybook y preview verdes                                        |
+| Presupuestos JS inicial                                                                                 | Listen201569/307200Bgzip; Admin527207/532480Bgzip                                |
+| Catálogo                                                                                                | 53documentadas/93entradas/120fuentes;40pendientes, sin refrescar deuda pendiente |
 
 Los11casos de navegador se consolidan de la pasada con9verdes y la repetición de los3casos de
 navegación/portal corregidos (uno era un caso ya verde). No se confunde suma de ejecuciones con
@@ -697,3 +693,74 @@ Album/native (1BA) o Smart Mix. No hay commit/push de1AY, PR, merge, rebase, dep
 
 Diego aprueba1AY y autoriza commit/push y continuar con1AZ (reproductor), actualizando Storybook,
 con el mockup como referencia y las tres instancias activas. Parar en1AZ antes de commit para revisión.
+
+## 1AZ local — reproductor, cola y relojes de UI
+
+1AY aprobado, commit/push `81665c5c` confirmado en origin/feat/crate_v3.1AZ queda sin publicar,
+con el mockup aprobado y las enmiendas de Diego como referencia. Plan: [1AZ](2026-10-19-crate-v3-player.md).
+
+- PlayerBarFrame sólido; controles secundarios ActionButton; tiempos/seek en una sola línea.
+  Regresión reportada: el bloque central había crecido a126px en un dock82px. Ahora son76px dentro
+  de82px, con el play a11px del borde superior en la instancia real. Anchos laterales reservan
+  espacio al transporte. En tablet/desktop táctil se reservan104px mediante la métrica canónica
+  de Shell, para dos filas44px sin solape; los clearances usan esa misma variable.
+- Fullscreen/Extended: text Tabs reales con paneles asociados, identidad Bricolage700 y metadata
+  mono, artwork sin sombra decorativa y marco fino. PlayerStage usa el espacio del contenedor y
+  permite scroll en pantallas cortas. Play64px, aura/ring, CD/jog y visualizador conservados.
+- Cola: estado/acciones reales, filas TrackRow también para la pista actual, count y suma de
+  duración locales, fuente sólo si existe. QualityBadge delega el tag y tono a InfoBadge.
+  Volumen con portal,44px de hit area, teclado y retorno del foco. Resume y sleep usan controles
+  canónicos; end-of-track conserva Cancel sin inventar una cuenta atrás de0:00.
+- B24: PlayerClock estable para lectores/eventos; sólo las hojas de seek/disco/letras reciben
+  progress. Analizador con arrays por ref y muestreo/dibujo en un loop del canvas. Crossfade con
+  un reloj CSS por runtime, inicializado antes del primer paint; fallback de tiempo transcurrido.
+  Letras estáticas con hoja de reloj para estado, underline y scroll sólo al cambiar de línea.
+  No se atribuye proveedor de letras sin metadata real. No cambia el motor ni la autoridad remota.
+- Listen/Player y Reviews/1AZ/Player documentan las piezas locales;5186 usa la misma escena.
+  Fixture sin llamadas API, preferencias persistidas ni analizador inventado. No se amplía el
+  mockup histórico ni se inventa un consumidor Admin para componentes de un solo producto.
+
+Revisión independiente: sin Critical; dos hallazgos inicialmente Minor. El estado end-of-track
+ya estaba en corrección por prueba propia; quedó verde. El primer paint del crossfade se trató
+como Important porque podía invertir visualmente cada transición natural; prueba RED→GREEN y
+una pasada de corrección. No se hizo una segunda revisión. Sin hallazgos menores pendientes.
+
+Decisiones y coste si se revisan:104px táctiles priorizan targets44px no solapados (otra composición
+puede sustituirlos manteniendo ese mínimo); no inventar atribución de letras deja su proveedor sin
+mostrar hasta que la API lo exponga. El stop autorizado conserva el trabajo sin commit y aplaza
+la QA completa de fase. Se inspeccionó el dock y Extended en Listen autenticado; no se certifica
+la geometría de toda la UI móvil de producción a partir de las composiciones simplificadas.
+
+Validación y evidencia: `.artifacts/review/1az-*`.163tests de Listen/guardas verdes en29archivos,
+4skips preexistentes de Fullscreen; resumen de cola añadido después, ver resultado final.26tests
+Desktop verdes.6casos de navegador verdes en ambos hosts: geometría, seek nativo ida/vuelta/teclado,
+beam/head en la misma lectura de layout, foco de volumen, tabs/cola0/30/locked, letras, resume/sleep,
+gap8px, móvil y tablet coarse. Cinco typechecks afectados verdes; ESLint0warnings en los archivos
+TS/TSX cambiados. Builds Listen, Storybook y preview y presupuesto inicial se registran al cierre.
+Catálogo53documentadas/93entradas/120fuentes;40pendientes, sin modificar hashes de deuda.
+
+Hubo un fallo transitorio de recarga en caliente durante la edición de contextos; una recarga
+limpia recuperó Listen con sesión, portadas, cola y dock. La inspección posterior fue correcta.
+No se provocó reproducción, transferencia, guardado ni cambios de preferencias en producción.
+
+Límites: QA nativa/AT/zoom y suites completas de fase pendientes.33PNG y manifest1M conservados.
+No certifica Smart Mix, todos los instrumentos EQ/H3 ni las páginas de1BA. Tres servicios activos:
+5186/6006/5174. Sin commit/push de1AZ, PR, merge, rebase, deploy o release. Esperar revisión de Diego.
+
+### Cierre de validación1AZ
+
+233pruebas distintas verdes:180Listen (163pasada final +1caso nuevo de count/duración de cola
++16guardas afectadas),27guardas shared/showcase y26Desktop. No se suman repeticiones de la misma
+prueba.6casos de navegador verdes,4skips preexistentes de Fullscreen conservados con TEST_GAP.
+Listen/shared/Admin/Desktop/Storybook types verdes; lint TS/TSX cambiado sin warnings y diff-check
+verde. Builds Listen/Storybook/preview verdes; preview build incluye explícitamente1AZ. Inicial
+Listen201516/307200Bgzip,25assets; chunks de visualizador/EQ conservan su frontera lazy. El build
+mantiene el aviso conocido de chunks grandes; no se amplía el presupuesto. Catálogo53/93 y120
+fuentes válido. Servicios5186/6006/5174 activos y HTTP200. Stop local1AZ sin commit/push confirmado.
+
+
+## 2026-10-19 — 1AZ aprobado; publicación autorizada
+
+Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
+Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
+las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.

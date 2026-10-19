@@ -4859,7 +4859,6 @@ controls use the same canonical component/size. No repair CSS or new main-mockup
 [requested future groups proposal](2026-10-19-crate-v3-component-checkpoint-groups.md).
 Both previews active; stop before1AT commit/push. Broader adoption and phase/native/canonical QA remain open.
 
-
 ## 1AT publication and 1AU header reconciliation — 2026-10-19
 
 1AT published `67486e4c7414d7c6bca7a6701b35c73440f0dfce`. 1AU completes the five header families
@@ -4944,7 +4943,6 @@ Diego aprueba 1AX y autoriza commit/push y continuar con 1AY (Shell, búsqueda y
 con el mockup aprobado como referencia, Storybook actualizado y las tres instancias activas.
 1AY se detiene para revisión antes de su commit/push. Se mantienen los límites de QA registrados.
 
-
 ### 1AY local para revisión — 2026-10-19
 
 1AX publicado5bc683d8. Shell, búsqueda y colección de1AY implementados usando las views reales
@@ -4964,3 +4962,20 @@ Mantener las tres instancias, el worktree, pin app/web@258bbaee,33PNG/manifest1M
 
 Diego aprueba1AY; autoriza commit/push y continuar con1AZ, reproductor, con mockup como referencia,
 Storybook actualizado y tres instancias activas. El próximo stop es1AZ antes de commit/push.
+
+## 2026-10-19 — 1AY publicado;1AZ local para revisión
+
+1AY aprobado y publicado en `81665c5c`.1AZ implementa el reproductor, cola y relojes de UI,
+conservando la esencia de play, imágenes autenticadas, estado remoto y límites nativos. El fallo
+de altura reportado por Diego queda corregido con progreso horizontal compacto en el dock.
+[Estado y validación actuales](2026-10-19-crate-v3-current-state.md), [plan1AZ](2026-10-19-crate-v3-player.md).
+Revisión pequeña `review-1az-player.html` y Storybook `Reviews/1AZ/Player`/`Listen/Player`, misma
+escena de componentes reales. Tres servicios activos.1AZ sin commit/push; parar para Diego.
+No continuar a1BA ni certificar QA móvil/nativa/AT completa con las escenas instrumentadas.
+
+
+## 2026-10-19 — 1AZ aprobado; publicación autorizada
+
+Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
+Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
+las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.

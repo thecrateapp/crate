@@ -9,7 +9,8 @@ import { useMusicVisualizer } from "@/components/player/visualizer/useMusicVisua
 import { useVisualizerConfig } from "@/components/player/visualizer/useVisualizerConfig";
 import { measureVisualizerCanvasRect } from "@/components/player/visualizer/canvas-layout";
 import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
   useCrossfadeAwareProgress,
@@ -34,17 +35,22 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const {
-    currentTrack,
-    currentTime,
-    duration,
     isPlaying,
     isBuffering,
     volume,
     analyserVersion,
     crossfadeTransition,
-  } = usePlayer();
-  const { pause, resume, playSource, queue, seek, jamQueueLocked } =
-    usePlayerActions();
+  } = usePlayerState();
+  const { currentTime, duration } = usePlayerClock().current;
+  const {
+    currentTrack,
+    pause,
+    resume,
+    playSource,
+    queue,
+    seek,
+    jamQueueLocked,
+  } = usePlayerActions();
   function toggleDiscPlay() {
     if (jamQueueLocked) return;
     if (isPlaying) pause();

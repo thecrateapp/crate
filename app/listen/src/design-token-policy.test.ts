@@ -24,28 +24,10 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "text-[0.68rem]": 1,
   },
   "components/home/HomeListeningHistory.tsx": { "tracking-[-0.035em]": 1 },
-  "components/player/ExtendedPlayerTabs.tsx": { "text-[0.75rem]": 1 },
-  "components/player/FullscreenPlayerTabs.tsx": {
-    "text-[1.45rem]": 1,
-    "text-[1.55rem]": 2,
-    "text-[1.9rem]": 1,
-  },
-  "components/player/LyricsPanel.tsx": {
-    "text-[0.875rem]": 3,
-    "text-[17px]": 1,
-  },
-  "components/player/PlayerTrackIdentity.tsx": { "text-[0.75rem]": 1 },
   "components/player/SpectrumPlayButton.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
-  "components/player/bar/PlayerBarView.tsx": { "rounded-t-[2rem]": 1 },
+  "components/player/bar/PlayerBarFrame.tsx": { "rounded-t-[2rem]": 1 },
   "components/player/extended/InfoTabPrimitives.tsx": { "text-[0.75rem]": 1 },
-  "components/player/extended/LyricsLine.tsx": {
-    "text-[0.875rem]": 2,
-    "text-[17px]": 1,
-  },
   "components/player/extended/LyricsTab.tsx": { "text-[0.875rem]": 1 },
-  "components/player/extended/QueueTabCurrentTrack.tsx": {
-    "text-[0.75rem]": 1,
-  },
   "components/player/extended/SuggestedTrackRow.tsx": { "text-[0.75rem]": 1 },
   "components/playlists/EditorialPlaylistArtwork.tsx": {
     "rounded-[3px]": 1,
@@ -69,8 +51,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/album/AlbumHero.tsx": { "64": 1 },
   "components/jam/JamRoomPlaybackSections.tsx": { "22": 1 },
   "components/player/FullscreenPlayerArtwork.tsx": { "64": 1 },
-  "components/player/FullscreenPlayerControls.tsx": { "26": 2 },
-  "components/player/FullscreenPlayerHeader.tsx": { "28": 1 },
   "components/player/SpinningDiscArtwork.tsx": { "88": 1 },
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
   "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },

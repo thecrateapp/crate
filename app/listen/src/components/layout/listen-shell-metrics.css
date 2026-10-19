@@ -48,3 +48,10 @@
   );
   --listen-mobile-fullscreen-eq-top: calc(var(--listen-safe-top) + 5.25rem);
 }
+
+/* Two non-overlapping 44px transport/seek rows on touch desktops/tablets. */
+@media (min-width: 768px) and (pointer: coarse) {
+  :root {
+    --listen-desktop-player-height: 6.5rem;
+  }
+}

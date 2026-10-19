@@ -1,3 +1,8 @@
+import type { PlayerProgressValue } from "./player-progress-context";
+export {
+  PlayerProgressContext,
+  type PlayerProgressValue,
+} from "./player-progress-context";
 import { createContext } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
@@ -19,11 +24,6 @@ export interface PlayerStateValue {
   volume: number;
   analyserVersion: number;
   crossfadeTransition: CrossfadeTransition | null;
-}
-
-export interface PlayerProgressValue {
-  currentTime: number;
-  duration: number;
 }
 
 export interface JamTransportControls {
@@ -117,9 +117,6 @@ export type PlayerContextValue = PlayerStateValue &
   PlayerActionsValue;
 
 export const PlayerStateContext = createContext<PlayerStateValue | null>(null);
-export const PlayerProgressContext = createContext<PlayerProgressValue | null>(
-  null,
-);
 export const PlayerActionsContext = createContext<PlayerActionsValue | null>(
   null,
 );

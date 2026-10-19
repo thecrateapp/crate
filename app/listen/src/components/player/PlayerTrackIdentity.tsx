@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { PlayerIdentityText } from "./PlayerIdentityText";
 import { cn } from "@crate/ui/lib/cn";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -16,8 +18,6 @@ interface PlayerTrackIdentityProps {
   artistClickable?: boolean;
   align?: "center" | "left";
   className?: string;
-  titleClassName?: string;
-  albumClassName?: string;
   sourceClassName?: string;
   badgeClassName?: string;
   badgeTextClassName?: string;
@@ -35,8 +35,6 @@ export function PlayerTrackIdentity({
   artistClickable = false,
   align = "center",
   className,
-  titleClassName,
-  albumClassName,
   sourceClassName,
   badgeClassName,
   badgeTextClassName,
@@ -48,14 +46,9 @@ export function PlayerTrackIdentity({
   return (
     <div className={cn(center ? "text-center" : "text-left", className)}>
       {sourceLabel ? (
-        <p
-          className={cn(
-            "mb-2 text-xs font-semibold uppercase tracking-eyebrow text-text-subtle",
-            sourceClassName,
-          )}
-        >
+        <MonoLabel className={cn("mb-2", sourceClassName)}>
           {t("player.playingFrom")} {sourceLabel}
-        </p>
+        </MonoLabel>
       ) : null}
 
       <div className="relative">
@@ -63,65 +56,32 @@ export function PlayerTrackIdentity({
           <>
             <div
               className="absolute inset-0"
-              style={{ opacity: 1 - crossfadeProgress }}
+              style={{
+                opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+              }}
             >
-              <h2
-                className={cn(
-                  "truncate font-bold text-text-primary",
-                  titleClassName,
-                )}
-              >
-                {crossfadeTransition.outgoing.title}
-              </h2>
-              {crossfadeTransition.outgoing.album ? (
-                <p
-                  className={cn(
-                    "mt-1 truncate text-text-muted",
-                    albumClassName,
-                  )}
-                >
-                  {crossfadeTransition.outgoing.album}
-                </p>
-              ) : null}
+              <PlayerIdentityText
+                title={crossfadeTransition.outgoing.title}
+                album={crossfadeTransition.outgoing.album}
+              />
             </div>
-            <div style={{ opacity: crossfadeProgress }}>
-              <h2
-                className={cn(
-                  "truncate font-bold text-text-primary",
-                  titleClassName,
-                )}
-              >
-                {crossfadeTransition.incoming.title}
-              </h2>
-              {crossfadeTransition.incoming.album ? (
-                <p
-                  className={cn(
-                    "mt-1 truncate text-text-muted",
-                    albumClassName,
-                  )}
-                >
-                  {crossfadeTransition.incoming.album}
-                </p>
-              ) : null}
+            <div
+              style={{
+                opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+              }}
+            >
+              <PlayerIdentityText
+                title={crossfadeTransition.incoming.title}
+                album={crossfadeTransition.incoming.album}
+              />
             </div>
           </>
         ) : (
           <>
-            <h2
-              className={cn(
-                "truncate font-bold text-text-primary",
-                titleClassName,
-              )}
-            >
-              {currentTrack.title}
-            </h2>
-            {currentTrack.album ? (
-              <p
-                className={cn("mt-1 truncate text-text-muted", albumClassName)}
-              >
-                {currentTrack.album}
-              </p>
-            ) : null}
+            <PlayerIdentityText
+              title={currentTrack.title}
+              album={currentTrack.album}
+            />
           </>
         )}
       </div>
@@ -156,7 +116,7 @@ export function PlayerTrackIdentity({
           )}
           <span
             className={cn(
-              "truncate text-[0.75rem] font-medium text-text-primary",
+              "truncate font-mono text-xs text-text-primary",
               badgeTextClassName,
               badgeMaxWidthClassName ?? "max-w-[240px]",
             )}

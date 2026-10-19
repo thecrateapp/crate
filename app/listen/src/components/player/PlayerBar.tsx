@@ -1,3 +1,4 @@
+import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 
@@ -43,6 +44,18 @@ export function PlayerBar() {
         shouldRenderExtendedPlayer: playerBar.shouldRenderExtendedPlayer,
         shouldRenderFullscreenPlayer: playerBar.shouldRenderFullscreenPlayer,
       }}
+      progressSlot={
+        <PlayerProgressLeaf
+          remote={playerBar.isRemoteConnectActive}
+          time={playerBar.effectiveDisplayedTime}
+          duration={playerBar.effectiveDisplayedDuration}
+          onSeek={playerBar.onSeek}
+          disabled={playerBar.jamQueueLocked}
+          compact
+          showTimes
+        />
+      }
+      readAudioFrame={playerBar.readAudioFrame}
       t={t}
       displayTrack={playerBar.displayTrack}
       displayCrossfadeTransition={playerBar.displayCrossfadeTransition}

@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 
 interface PlayerVolumeSliderProps {
+  id: string;
   handleWheel: (event: React.WheelEvent) => void;
   onVolumeChange: (volume: number) => void;
   onVolumeFromClientY: (clientY: number) => void;
@@ -19,6 +20,7 @@ interface PlayerVolumeSliderProps {
 }
 
 export function PlayerVolumeSlider({
+  id,
   handleWheel,
   onVolumeChange,
   onVolumeFromClientY,
@@ -32,7 +34,8 @@ export function PlayerVolumeSlider({
   return (
     <AppPopover
       ref={volumeRef}
-      className="fixed z-app-player-popover w-10 rounded-panel px-0 py-3"
+      id={id}
+      className="fixed z-app-player-popover w-12 px-0 py-3"
       style={{
         left: popoverPosition.left,
         bottom: popoverPosition.bottom,
@@ -47,7 +50,7 @@ export function PlayerVolumeSlider({
         aria-valuemax={100}
         aria-valuenow={Math.round(volumePct)}
         tabIndex={0}
-        className="listen-player-progress relative mx-auto h-28 w-6 cursor-pointer touch-none outline-none"
+        className="listen-player-progress relative mx-auto h-28 w-11 cursor-pointer touch-none crate-focus-inset"
         onWheel={handleWheel}
         onPointerDown={(event) => {
           event.preventDefault();

@@ -1,5 +1,5 @@
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { SpinningDisc } from "@/components/player/SpinningDisc";
+import { LiveSpinningDisc } from "./LiveSpinningDisc";
 import { ListMusic } from "@crate/ui/icons";
 
 import type {
@@ -26,7 +26,7 @@ export function FullscreenPlayerArtwork({
   return (
     <div ref={refs.coverRef} className="relative">
       {state.isCdMode ? (
-        <SpinningDisc
+        <LiveSpinningDisc
           albumCover={currentTrack.albumCover}
           className="w-full"
           crossfadeIncomingCover={crossfadeTransition?.incoming.albumCover}
@@ -45,23 +45,27 @@ export function FullscreenPlayerArtwork({
           onTogglePlay={actions.togglePlaybackWithFeedback}
         />
       ) : (
-        <div className="relative aspect-square overflow-hidden rounded-xl">
+        <div className="relative aspect-square overflow-hidden rounded-xl border border-border-quiet">
           {crossfadeTransition ? (
             <>
               {crossfadeTransition.outgoing.albumCover ? (
                 <CrateImage
                   src={crossfadeTransition.outgoing.albumCover}
                   alt=""
-                  className="fullscreen-player-artwork absolute inset-0 size-full object-cover"
-                  style={{ opacity: 1 - crossfadeProgress }}
+                  className="absolute inset-0 size-full object-cover"
+                  style={{
+                    opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+                  }}
                 />
               ) : null}
               {crossfadeTransition.incoming.albumCover ? (
                 <CrateImage
                   src={crossfadeTransition.incoming.albumCover}
                   alt=""
-                  className="fullscreen-player-artwork absolute inset-0 size-full object-cover"
-                  style={{ opacity: crossfadeProgress }}
+                  className="absolute inset-0 size-full object-cover"
+                  style={{
+                    opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+                  }}
                 />
               ) : null}
             </>
@@ -69,10 +73,10 @@ export function FullscreenPlayerArtwork({
             <CrateImage
               src={currentTrack.albumCover}
               alt=""
-              className="fullscreen-player-artwork size-full object-cover"
+              className="size-full object-cover"
             />
           ) : (
-            <div className="fullscreen-player-artwork-placeholder flex size-full items-center justify-center">
+            <div className="bg-surface-placeholder flex size-full items-center justify-center">
               <ListMusic size={64} className="fullscreen-player-artwork-icon" />
             </div>
           )}

@@ -271,48 +271,29 @@ describe("ExtendedPlayer", () => {
 
     const closeButton = screen.getByLabelText("Close player");
     const equalizerButton = screen.getByLabelText("Equalizer");
-    const visualizerSettingsButton = screen.getByLabelText(
-      "Visualizer settings",
-    );
+    const visualizerSettingsButton = screen.getByRole("button", {
+      name: "Visualizer settings",
+    });
     const activeTab = screen.getByRole("tab", { name: "Queue" });
     const inactiveTab = screen.getByRole("tab", { name: "Suggested" });
 
-    for (const button of [closeButton, equalizerButton]) {
-      expect(button).toHaveClass(
-        "bg-surface-control",
-        "text-text-secondary",
-        "hover:bg-surface-control-hover",
-        "hover:text-text-primary",
-      );
-      expect(button.className).not.toContain("black/");
-      expect(button.className).not.toContain("white/");
+    for (const button of [
+      closeButton,
+      equalizerButton,
+      visualizerSettingsButton,
+    ]) {
+      expect(button).toHaveAttribute("data-size", "icon-lg");
+      expect(button.className).not.toContain("backdrop-blur");
     }
-
-    expect(visualizerSettingsButton).toHaveClass(
-      "bg-surface-icon-control",
-      "text-text-faint",
-    );
-    expect(visualizerSettingsButton.className).not.toContain("black/");
-    expect(visualizerSettingsButton.className).not.toContain("white/");
-
+    expect(visualizerSettingsButton).toBeDisabled();
     expect(activeTab).toHaveAttribute("aria-selected", "true");
-    expect(activeTab).toHaveClass(
-      "data-[state=active]:bg-surface-control",
-      "data-[state=active]:text-text-primary",
+    expect(inactiveTab).toHaveAttribute("aria-selected", "false");
+    expect(activeTab).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("tabpanel").id,
     );
-    expect(inactiveTab).toHaveClass(
-      "data-[state=inactive]:text-text-muted",
-      "data-[state=inactive]:hover:text-text-secondary",
-    );
-    expect(activeTab.className).not.toContain("white/");
-    expect(inactiveTab.className).not.toContain("white/");
-
     await user.click(equalizerButton);
-    expect(equalizerButton).toHaveClass(
-      "bg-accent-action/18",
-      "text-accent-action",
-      "drop-shadow-accent-action",
-    );
+    expect(equalizerButton).toHaveAttribute("aria-pressed", "true");
   });
 
   it("uses semantic tokens for the artwork surface", () => {
@@ -340,10 +321,10 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(container.innerHTML).toContain("bg-accent-action/10");
-    expect(container.innerHTML).toContain("border-border-quiet");
+    expect(container.innerHTML).not.toContain("blur-3xl");
+
     expect(container.innerHTML).toContain("bg-surface-quiet-subtle");
-    expect(container.innerHTML).toContain("shadow-player-artwork");
+    expect(container.innerHTML).not.toContain("shadow-player-artwork");
     expect(container.innerHTML).toContain("text-text-muted");
     expect(container.innerHTML).not.toContain("bg-primary/10");
     expect(container.innerHTML).not.toContain("border-white/10");
@@ -352,7 +333,7 @@ describe("ExtendedPlayer", () => {
     expect(container.innerHTML).not.toContain("text-white/40");
   });
 
-  it("uses the layered semantic shadow for visible cover art", () => {
+  it("keeps visible cover art without decorative shadow", () => {
     useVisualizerConfigMock.mockReturnValue({
       surfaceMode: "cover",
       useAlbumPalette: false,
@@ -378,6 +359,6 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(container.innerHTML).toContain("shadow-player-artwork-layered");
+    expect(container.innerHTML).not.toContain("shadow-player-artwork-layered");
   });
 });

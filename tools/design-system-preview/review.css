@@ -29,3 +29,6 @@ body {
 @source "../../app/listen/src/pages/SearchTrackResultsView.tsx";
 @source "../../app/listen/src/pages/SearchAlbumResultsView.tsx";
 @source "../../app/listen/src/pages/SearchErrorState.tsx";
+
+@source "../../app/listen/src/components/player";
+@source "../../app/listen/src/components/settings/SleepTimerView.tsx";

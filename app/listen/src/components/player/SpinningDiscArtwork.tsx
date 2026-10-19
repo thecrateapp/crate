@@ -24,13 +24,17 @@ export function SpinningDiscArtwork({
           src={crossfadeOutgoingCover}
           alt=""
           className="absolute inset-0 size-full object-cover"
-          style={{ opacity: 1 - crossfadeProgress }}
+          style={{
+            opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+          }}
         />
         <CrateImage
           src={crossfadeIncomingCover}
           alt=""
           className="absolute inset-0 size-full object-cover"
-          style={{ opacity: crossfadeProgress }}
+          style={{
+            opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+          }}
         />
       </>
     );

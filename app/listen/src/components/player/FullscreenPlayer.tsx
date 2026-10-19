@@ -8,7 +8,8 @@ import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import { artistPagePath } from "@/lib/library-routes";
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import {
   useCrossfadeAwareProgress,
@@ -26,22 +27,17 @@ interface FullscreenPlayerProps {
 
 export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const { t } = useTranslation();
+  const { isBuffering, isPlaying, crossfadeTransition } = usePlayerState();
+  const { currentTime, duration } = usePlayerClock().current;
   const {
     currentTrack,
     queue,
     currentIndex,
-    currentTime,
-    duration,
-    isBuffering,
     seek,
     jumpTo,
-    isPlaying,
-    crossfadeTransition,
     playSource,
     shuffle,
     repeat,
-  } = usePlayer();
-  const {
     pause,
     resume,
     next,

@@ -1,32 +1,16 @@
-import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 
-import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
+import { usePlayerActions } from "@/contexts/PlayerContext";
 
-import { LyricsLine } from "./LyricsLine";
+import { SyncedLyrics } from "../SyncedLyrics";
 import { useLyrics } from "./use-lyrics";
 
 export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   void useAlbumPalette;
   const { t } = useTranslation();
-  const { currentTime } = usePlayerProgress();
   const { currentTrack, seek } = usePlayerActions();
   const { lyrics, loading } = useLyrics(currentTrack);
-  const activeRef = useRef<HTMLButtonElement | null>(null);
-
-  const activeIndex = useMemo(() => {
-    if (!lyrics?.synced) return -1;
-    for (let i = lyrics.synced.length - 1; i >= 0; i--) {
-      if (currentTime >= lyrics.synced[i]!.time) return i;
-    }
-    return -1;
-  }, [currentTime, lyrics?.synced]);
-
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [activeIndex]);
-
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -53,16 +37,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
           className="space-y-1 px-1"
           style={{ paddingTop: "34vh", paddingBottom: "34vh" }}
         >
-          {lyrics.synced.map((line, index) => (
-            <LyricsLine
-              key={[line.time, line.text].join(":")}
-              line={line}
-              index={index}
-              activeIndex={activeIndex}
-              activeRef={activeRef}
-              onSeek={seek}
-            />
-          ))}
+          <SyncedLyrics lines={lyrics.synced} onSeek={seek} />
         </div>
       ) : null}
 

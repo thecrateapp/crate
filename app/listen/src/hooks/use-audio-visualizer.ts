@@ -1,121 +1,102 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { getAnalyserNode } from "@/lib/gapless-player";
 import {
   isMotionBlocked,
   subscribeToMotionAvailability,
 } from "@/lib/motion-availability";
-
 const BAR_COUNT = 64;
-
-/**
- * Reuse Gapless-5's analyser directly so the visualizer always taps the
- * actual playback engine instead of an extra derived node.
- */
 export function createAnalyserNode(fftSize = 2048): AnalyserNode | null {
   const analyser = getAnalyserNode();
   if (!analyser) return null;
   try {
-    if (analyser.fftSize !== fftSize) {
-      analyser.fftSize = fftSize;
-    }
+    if (analyser.fftSize !== fftSize) analyser.fftSize = fftSize;
     return analyser;
   } catch {
     return null;
   }
 }
-
+/** Stable samples. A canvas may own sampling+painting in its one frame loop (manual=true). */
 export function useAudioVisualizer(
   enabled: boolean,
   trackKey?: string,
   analyserNode?: AnalyserNode | null,
+  manual = false,
 ) {
-  const [frequenciesDb, setFrequenciesDb] = useState<number[]>([]);
-  const [sampleRate, setSampleRate] = useState(44100);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number>(0);
-  const dataRef = useRef<Float32Array<ArrayBuffer> | null>(null);
-
-  const [waveform, setWaveform] = useState<number[]>([]);
-  const waveRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
-
-  const frameCountRef = useRef(0);
-
-  const tick = useCallback(() => {
-    if (isMotionBlocked()) {
-      rafRef.current = 0;
-      return;
+  const analyser = useRef<AnalyserNode | null>(null),
+    data = useRef<Float32Array<ArrayBuffer> | null>(null),
+    wave = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const samples = useRef({
+    frequenciesDb: [] as number[],
+    waveform: [] as number[],
+    sampleRate: 44100,
+  });
+  const readFrame = useCallback(() => {
+    if (
+      analyser.current &&
+      data.current &&
+      wave.current &&
+      !isMotionBlocked()
+    ) {
+      analyser.current.getFloatFrequencyData(data.current);
+      analyser.current.getByteTimeDomainData(wave.current);
+      for (let i = 0; i < data.current.length; i++)
+        samples.current.frequenciesDb[i] = data.current[i]!;
+      for (let i = 0; i < wave.current.length; i++)
+        samples.current.waveform[i] = (wave.current[i]! - 128) / 128;
     }
-    if (!analyserRef.current || !dataRef.current) return;
-    frameCountRef.current++;
-    // Throttle state updates to ~20fps (every 3rd frame at 60fps)
-    const shouldUpdate = frameCountRef.current % 3 === 0;
-
-    analyserRef.current.getFloatFrequencyData(dataRef.current);
-    if (shouldUpdate) {
-      const spectrum: number[] = [];
-      for (let i = 0; i < dataRef.current.length; i++) {
-        spectrum.push(dataRef.current[i]!);
-      }
-      setFrequenciesDb(spectrum);
-
-      if (waveRef.current) {
-        analyserRef.current.getByteTimeDomainData(waveRef.current);
-        const wave: number[] = [];
-        for (let i = 0; i < waveRef.current.length; i++) {
-          wave.push((waveRef.current[i]! - 128) / 128);
-        }
-        setWaveform(wave);
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(tick);
+    return samples.current;
   }, []);
-
   useEffect(() => {
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = 0;
-    analyserRef.current = null;
-    dataRef.current = null;
-    waveRef.current = null;
-    frameCountRef.current = 0;
-    setFrequenciesDb([]);
-    setWaveform([]);
-
-    if (!enabled) {
-      return;
-    }
-
+    samples.current = { frequenciesDb: [], waveform: [], sampleRate: 44100 };
+    analyser.current = null;
+    data.current = null;
+    wave.current = null;
+    if (!enabled) return;
     const node = analyserNode || getAnalyserNode();
     if (!node) return;
-
-    // Lower smoothing for more responsive peaks (default 0.8 flattens everything)
     node.smoothingTimeConstant = 0.55;
     node.minDecibels = -90;
     node.maxDecibels = -10;
-    analyserRef.current = node;
-    setSampleRate(node.context.sampleRate || 44100);
-    dataRef.current = new Float32Array(node.frequencyBinCount);
-    waveRef.current = new Uint8Array(node.fftSize);
-
-    const startSampling = () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
+    analyser.current = node;
+    data.current = new Float32Array(node.frequencyBinCount);
+    wave.current = new Uint8Array(node.fftSize);
+    samples.current.sampleRate = node.context.sampleRate || 44100;
+    let raf = 0;
+    const tick = () => {
+      raf = 0;
       if (isMotionBlocked()) return;
-      rafRef.current = requestAnimationFrame(tick);
+      readFrame();
+      raf = requestAnimationFrame(tick);
     };
-    const unsubscribeFromMotion = subscribeToMotionAvailability(startSampling);
-    startSampling();
-
+    const start = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      if (!manual && !isMotionBlocked()) raf = requestAnimationFrame(tick);
+    };
+    const unsubscribe = subscribeToMotionAvailability(start);
+    start();
     return () => {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
-      unsubscribeFromMotion();
-      analyserRef.current = null;
-      dataRef.current = null;
-      waveRef.current = null;
+      cancelAnimationFrame(raf);
+      unsubscribe();
+      analyser.current = null;
+      data.current = null;
+      wave.current = null;
     };
-  }, [analyserNode, enabled, tick, trackKey]);
-
-  return { frequenciesDb, waveform, barCount: BAR_COUNT, sampleRate };
+  }, [enabled, trackKey, analyserNode, manual, readFrame]);
+  return useMemo(
+    () => ({
+      readFrame,
+      barCount: BAR_COUNT,
+      get frequenciesDb() {
+        return samples.current.frequenciesDb;
+      },
+      get waveform() {
+        return samples.current.waveform;
+      },
+      get sampleRate() {
+        return samples.current.sampleRate;
+      },
+    }),
+    [readFrame],
+  );
 }

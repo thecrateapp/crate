@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CRATE_ICON_SIZE, Volume2, VolumeX } from "@crate/ui/icons";
 
 import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useTranslation } from "react-i18next";
-import { PlayerVolumeSlider } from "@/components/player/bar/PlayerVolumeSlider";
+import { PlayerVolumeSlider } from "./PlayerVolumeSlider";
 
 interface PlayerVolumeControlProps {
   volume: number;
@@ -18,6 +19,7 @@ export function PlayerVolumeControl({
   onVolumeChange,
   onOverlayChange,
 }: PlayerVolumeControlProps) {
+  const sliderId = useId();
   const [showVolume, setShowVolume] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState<{
     left: number;
@@ -37,7 +39,7 @@ export function PlayerVolumeControl({
     if (!button) return;
     const buttonRect = button.getBoundingClientRect();
     const anchorRect = icon?.getBoundingClientRect() ?? buttonRect;
-    const popoverWidth = 40;
+    const popoverWidth = 48;
     const desiredLeft = anchorRect.left + anchorRect.width / 2;
     setPopoverPosition({
       left: Math.max(
@@ -57,12 +59,16 @@ export function PlayerVolumeControl({
   useDismissibleLayer({
     active: showVolume,
     refs: [volumeRef, volumeButtonRef],
-    onDismiss: closeVolume,
+    onDismiss: () => {
+      closeVolume();
+      volumeButtonRef.current?.focus();
+    },
   });
 
   useEffect(() => {
     if (!showVolume) return;
     updatePopoverPosition();
+    volumeRef.current?.querySelector<HTMLElement>('[role="slider"]')?.focus();
     window.addEventListener("resize", updatePopoverPosition);
     window.addEventListener("scroll", updatePopoverPosition, true);
     return () => {
@@ -109,8 +115,7 @@ export function PlayerVolumeControl({
 
   return (
     <div className="relative flex items-center" onWheel={handleWheel}>
-      <button
-        type="button"
+      <ActionButton
         ref={volumeButtonRef}
         onClick={() => {
           const nextOpen = !showVolume;
@@ -118,10 +123,11 @@ export function PlayerVolumeControl({
           setShowVolume(nextOpen);
           onOverlayChange(nextOpen);
         }}
-        aria-label={
+        label={
           volume === 0 ? t("player.volume.unmute") : t("player.volume.label")
         }
-        className="rounded-md p-1.5 text-text-muted transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action"
+        aria-expanded={showVolume}
+        aria-controls={showVolume ? sliderId : undefined}
       >
         <span ref={volumeIconRef} className="block">
           {volume === 0 ? (
@@ -130,10 +136,11 @@ export function PlayerVolumeControl({
             <Volume2 size={CRATE_ICON_SIZE.md} />
           )}
         </span>
-      </button>
+      </ActionButton>
       {showVolume && popoverPosition
         ? createPortal(
             <PlayerVolumeSlider
+              id={sliderId}
               handleWheel={handleWheel}
               onVolumeChange={onVolumeChange}
               onVolumeFromClientY={setVolumeFromClientY}

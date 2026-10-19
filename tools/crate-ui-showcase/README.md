@@ -152,3 +152,12 @@ Collection counts use InfoBadge beside each tab, including0. FilterBar has an en
 stacked fields; Select owns a stable12rem default width. Tabs owns a single moving cyan indicator
 with spring-snappy450ms and reduced-motion fallbacks. Their live entries document these amendments.
 Player internals remain1AZ. Catalogue coverage and consumer adoption remain separate.
+
+## Listen player — local 1AZ
+
+Listen/Player documents the actual app-local frame, transport/seek, volume, quality, panels,
+identity, queue, static lyric rows/clock, resume and sleep form. Reviews/1AZ/Player and
+review-1az-player.html compose the same sources. Fixture callbacks never contact production or
+change saved player preferences; no synthetic analyser/loudness samples. Production controllers,
+engines, authority, authenticated images and native effects stay in Listen. Shared catalogue
+coverage is unchanged; this is not a fictitious second consumer or completion of pending PlayButton.

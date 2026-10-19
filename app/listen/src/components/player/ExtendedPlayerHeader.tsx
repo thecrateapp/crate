@@ -5,8 +5,8 @@ import {
   Settings,
   SlidersHorizontal,
 } from "@crate/ui/icons";
-import { cn } from "@crate/ui/lib/cn";
-import { IconButton } from "@crate/ui/primitives/IconButton";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { TFunction } from "i18next";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
@@ -38,13 +38,13 @@ export function ExtendedPlayerHeader({
   return (
     <>
       <div className="z-app-header absolute top-4 right-4 left-4 flex justify-between">
-        <IconButton
+        <ActionButton
           onClick={actions.closeWithFeedback}
           label={t("player.close")}
-          className="size-9 bg-surface-control text-text-secondary backdrop-blur-sm hover:translate-y-0 hover:drop-shadow-none hover:bg-surface-control-hover hover:text-text-primary"
         >
-          <ChevronDown size={CRATE_ICON_SIZE.lg} className="size-5" />
-        </IconButton>
+          <ChevronDown size={CRATE_ICON_SIZE.lg} />
+        </ActionButton>
+        <MonoLabel>{t("player.queue.nowPlaying")}</MonoLabel>
         <div className="flex items-center gap-2">
           <PlayerSurfaceModeSwitch
             allowVisualizer={state.visualizerAllowed}
@@ -52,42 +52,28 @@ export function ExtendedPlayerHeader({
             onChange={actions.onSurfaceModeChange}
           />
           {state.equalizerEnabled ? (
-            <button
-              type="button"
+            <ActionButton
               ref={refs.equalizerButtonRef}
               onClick={() => {
                 actions.setShowVizSettings(false);
                 actions.setShowEqualizer((value) => !value);
               }}
-              aria-label={t("player.equalizer")}
-              className={cn(
-                "rounded-full p-2 backdrop-blur-sm transition-colors",
-                state.showEqualizer
-                  ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
-                  : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
-              )}
+              label={t("player.equalizer")}
+              aria-pressed={state.showEqualizer}
             >
               <SlidersHorizontal size={CRATE_ICON_SIZE.md} />
-            </button>
+            </ActionButton>
           ) : null}
           {state.visualizerAllowed ? (
-            <button
-              type="button"
+            <ActionButton
               ref={refs.vizSettingsButtonRef}
               onClick={() => actions.setShowVizSettings((value) => !value)}
-              aria-label={t("player.visualizerSettings")}
+              label={t("player.visualizerSettings")}
+              aria-pressed={state.showVizSettings}
               disabled={state.vizCfg.surfaceMode !== "visualizer"}
-              className={cn(
-                "rounded-full p-2 backdrop-blur-sm transition-colors",
-                state.vizCfg.surfaceMode !== "visualizer"
-                  ? "bg-surface-icon-control text-text-faint"
-                  : state.showVizSettings
-                    ? "bg-accent-action/18 text-accent-action drop-shadow-accent-action"
-                    : "bg-surface-control text-text-secondary hover:bg-surface-control-hover hover:text-text-primary",
-              )}
             >
               <Settings size={CRATE_ICON_SIZE.md} />
-            </button>
+            </ActionButton>
           ) : null}
         </div>
       </div>

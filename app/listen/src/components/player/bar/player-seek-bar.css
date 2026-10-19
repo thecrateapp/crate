@@ -11,6 +11,12 @@
   transition: width var(--motion-duration-fast);
 }
 
+/* User scrubbing follows the native value immediately; beam and heads share one edge. */
+.listen-player-progress:active .listen-player-progress-position,
+.listen-player-progress:focus-within .listen-player-progress-position {
+  transition: none;
+}
+
 .listen-player-seek-input {
   accent-color: var(--accent-action);
   background: linear-gradient(
@@ -62,7 +68,12 @@
 }
 
 .listen-player-progress {
-  min-height: 40px;
+  min-height: 44px;
+}
+@media (pointer: fine) {
+  .listen-player-progress[data-compact] {
+    min-height: 24px;
+  }
 }
 .listen-player-progress-input {
   height: 100%;

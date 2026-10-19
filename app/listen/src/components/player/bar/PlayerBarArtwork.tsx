@@ -84,7 +84,9 @@ function PlayerBarArtworkImage({
             src={displayCrossfadeTransition.outgoing.albumCover}
             alt=""
             className="absolute inset-0 size-full object-cover"
-            style={{ opacity: 1 - crossfadeProgress }}
+            style={{
+              opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+            }}
           />
         ) : null}
         {displayCrossfadeTransition.incoming.albumCover ? (
@@ -92,7 +94,9 @@ function PlayerBarArtworkImage({
             src={displayCrossfadeTransition.incoming.albumCover}
             alt=""
             className="absolute inset-0 size-full object-cover"
-            style={{ opacity: crossfadeProgress }}
+            style={{
+              opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+            }}
           />
         ) : null}
       </>

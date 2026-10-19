@@ -1,109 +1,43 @@
 import type { TFunction } from "i18next";
-import { PlayerProgressBeam } from "./PlayerProgressBeam";
-import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
-
-export type PlayerSeekHover = {
-  pct: number;
-  time: string;
-};
-
+import { PlayerSeekBar } from "./PlayerSeekBar";
+import { formatPlayerTime } from "./player-bar-utils";
+export type PlayerSeekHover = { pct: number; time: string };
 interface PlayerBarProgressProps {
   effectiveDisplayedDuration: number;
   effectiveDisplayedTime: number;
   jamQueueLocked: boolean;
   onSeek: (time: number) => void;
-  onSeekHoverChange: (value: PlayerSeekHover | null) => void;
-  progressPct: number;
-  seekHover: PlayerSeekHover | null;
-  t: TFunction;
+  onSeekHoverChange?: (value: PlayerSeekHover | null) => void;
+  progressPct?: number;
+  seekHover?: PlayerSeekHover | null;
+  t?: TFunction;
 }
-
+/** Bar geometry: time and seek share one row; the native control owns draft, hover and keyboard. */
 export function PlayerBarProgress({
   effectiveDisplayedDuration,
   effectiveDisplayedTime,
   jamQueueLocked,
   onSeek,
-  onSeekHoverChange,
-  progressPct,
-  seekHover,
-  t,
 }: PlayerBarProgressProps) {
   return (
-    <div className="relative mt-2 flex w-full items-center gap-2">
-      <span className="w-9 text-right font-mono text-xs tabular-nums text-text-muted">
+    <div
+      data-slot="player-bar-progress"
+      className="flex w-full items-center gap-2"
+    >
+      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">
         {formatPlayerTime(effectiveDisplayedTime)}
       </span>
-      <div
-        className={`listen-player-progress group relative flex-1 py-2 ${
-          jamQueueLocked
-            ? "pointer-events-none grayscale opacity-40"
-            : "cursor-pointer"
-        }`}
-        role="slider"
-        tabIndex={jamQueueLocked ? -1 : 0}
-        aria-label={t("player.seek")}
-        aria-disabled={jamQueueLocked}
-        aria-valuemin={0}
-        aria-valuemax={effectiveDisplayedDuration}
-        aria-valuenow={effectiveDisplayedTime}
-        aria-valuetext={formatPlayerTime(effectiveDisplayedTime)}
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const pct = Math.max(
-            0,
-            Math.min(1, (event.clientX - rect.left) / rect.width),
-          );
-          onSeek(pct * effectiveDisplayedDuration);
-        }}
-        onPointerMove={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const pct = Math.max(
-            0,
-            Math.min(1, (event.clientX - rect.left) / rect.width),
-          );
-          onSeekHoverChange({
-            pct,
-            time: formatPlayerTime(pct * effectiveDisplayedDuration),
-          });
-        }}
-        onPointerLeave={() => onSeekHoverChange(null)}
-        onKeyDown={(event) => {
-          if (jamQueueLocked) return;
-
-          const step = 5;
-          let nextTime: number;
-          switch (event.key) {
-            case "ArrowLeft":
-              nextTime = effectiveDisplayedTime - step;
-              break;
-            case "ArrowRight":
-              nextTime = effectiveDisplayedTime + step;
-              break;
-            case "Home":
-              nextTime = 0;
-              break;
-            case "End":
-              nextTime = effectiveDisplayedDuration;
-              break;
-            default:
-              return;
-          }
-
-          event.preventDefault();
-          onSeek(Math.max(0, Math.min(effectiveDisplayedDuration, nextTime)));
-        }}
-      >
-        {seekHover && effectiveDisplayedDuration > 0 && (
-          <div
-            className="listen-player-progress-tooltip pointer-events-none absolute -top-6 -translate-x-1/2 rounded border px-1.5 py-0.5 text-xs tabular-nums"
-            style={{ left: `${seekHover.pct * 100}%` }}
-          >
-            {seekHover.time}
-          </div>
-        )}
-        <PlayerProgressBeam progressPercent={progressPct} />
-      </div>
-      <span className="w-9 font-mono text-xs tabular-nums text-text-muted">
+      <PlayerSeekBar
+        className="min-w-0 flex-1"
+        currentTime={effectiveDisplayedTime}
+        duration={effectiveDisplayedDuration}
+        onSeek={onSeek}
+        disabled={jamQueueLocked}
+        compact
+        thin
+        variant="glow"
+      />
+      <span className="w-9 shrink-0 font-mono text-xs tabular-nums text-text-muted">
         {formatPlayerTime(effectiveDisplayedDuration)}
       </span>
     </div>

@@ -102,7 +102,7 @@ export function PlayerBarTrackInfo({
   };
 
   return (
-    <div className="flex min-w-0 shrink-0 flex-1 items-center gap-3 md:w-[260px] md:flex-none lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
+    <div className="flex min-w-0 shrink-0 flex-1 items-center gap-3 md:w-[min(26vw,260px)] md:flex-none lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
       <div
         role={isDesktop ? undefined : "button"}
         tabIndex={isDesktop ? undefined : 0}

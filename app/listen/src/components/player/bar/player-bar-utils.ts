@@ -1,4 +1,4 @@
-import type { Track } from "@/contexts/PlayerContext";
+import type { Track } from "../../../contexts/player-types";
 
 export function formatPlayerTime(seconds: number): string {
   if (!seconds || !Number.isFinite(seconds)) return "0:00";

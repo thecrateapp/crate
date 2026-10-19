@@ -80,9 +80,11 @@ describe("QueuePanel", () => {
     });
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    const panel = screen.getByText("Queue").closest(".listen-glass-panel");
+    const panel = screen
+      .getByText("Queue")
+      .closest('[data-slot="player-queue"]');
     expect(panel).toHaveClass(
-      "listen-glass-panel--dock",
+      "bg-surface-canvas",
       "bottom-(--listen-desktop-player-clearance)",
     );
     expect(screen.getByText("Next").closest(".overflow-y-auto")).toHaveClass(
@@ -123,11 +125,13 @@ describe("QueuePanel", () => {
       },
     });
 
-    const panel = screen.getByText("Queue").closest(".listen-glass-panel");
+    const panel = screen
+      .getByText("Queue")
+      .closest('[data-slot="player-queue"]');
     const nextRow = screen.getByRole("row", { name: "Next" });
 
     expect(panel).toHaveClass("border-l", "border-border-quiet");
-    expect(screen.getByText("Queue")).toHaveClass("text-text-primary");
+    expect(screen.getByText("Queue")).toHaveClass("font-mono", "uppercase");
     expect(nextRow).toHaveClass("track-row");
     expect(nextRow).toHaveAttribute("data-density", "compact");
     expect(screen.getByText("Next")).toHaveClass("text-text-primary");
@@ -150,7 +154,9 @@ describe("QueuePanel", () => {
     );
 
     expect(useApi).not.toHaveBeenCalledWith("/api/playlists");
-    fireEvent.click(screen.getByRole("button", { name: "Más acciones" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Más acciones" })[1]!,
+    );
 
     await waitFor(() => {
       expect(useApi).toHaveBeenCalledWith("/api/playlists");
@@ -232,4 +238,19 @@ describe("QueuePanel", () => {
       screen.queryByRole("menuitem", { name: "Remove from queue" }),
     ).not.toBeInTheDocument();
   });
+});
+
+it("summarizes actual queue count and duration", () => {
+  isDesktop = true;
+  renderWithListenProviders(<QueuePanel open onClose={vi.fn()} />, {
+    playerActions: {
+      currentTrack: { ...currentTrack, duration: 120 },
+      queue: [
+        { ...currentTrack, duration: 120 },
+        { ...nextTrack, duration: 180 },
+      ],
+      currentIndex: 0,
+    },
+  });
+  expect(screen.getByText("2 tracks · 5:00")).toBeInTheDocument();
 });

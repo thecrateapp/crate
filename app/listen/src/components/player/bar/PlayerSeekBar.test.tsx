@@ -99,3 +99,23 @@ it.each([
     expect(onSeek).toHaveBeenCalledWith(60);
   },
 );
+
+it("keeps elapsed/remaining time and keyboard seeking in the canonical control", () => {
+  const seek = vi.fn();
+  renderWithListenProviders(
+    <PlayerSeekBar
+      currentTime={60}
+      duration={240}
+      onSeek={seek}
+      showTimes
+      remaining
+      variant="glow"
+    />,
+  );
+  expect(screen.getByText("1:00")).toBeInTheDocument();
+  expect(screen.getByText("-3:00")).toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowLeft" });
+  expect(seek).toHaveBeenLastCalledWith(55);
+  fireEvent.keyDown(screen.getByRole("slider"), { key: "End" });
+  expect(seek).toHaveBeenLastCalledWith(240);
+});
