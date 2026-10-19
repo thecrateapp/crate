@@ -635,7 +635,7 @@ describe("command palette helpers", () => {
   });
 });
 
-it("offers the AI Agents page to configuration readers", async () => {
+it("offers the AI models page to configuration readers", async () => {
   mockAuth(["ai.config.read"]);
   render(
     <MemoryRouter>
@@ -643,9 +643,9 @@ it("offers the AI Agents page to configuration readers", async () => {
     </MemoryRouter>,
   );
   fireEvent.keyDown(document, { key: "k", ctrlKey: true });
-  expect(await screen.findByText("AI Agents")).toBeVisible();
+  expect(await screen.findByText("AI models")).toBeVisible();
 });
-it("does not offer the AI Agents page without read capability", async () => {
+it("does not offer the AI models page without read capability", async () => {
   mockAuth(["settings.manage"]);
   render(
     <MemoryRouter>
@@ -654,7 +654,7 @@ it("does not offer the AI Agents page without read capability", async () => {
   );
   fireEvent.keyDown(document, { key: "k", ctrlKey: true });
   await screen.findByRole("dialog", { name: "Command palette" });
-  expect(screen.queryByText("AI Agents")).not.toBeInTheDocument();
+  expect(screen.queryByText("AI models")).not.toBeInTheDocument();
 });
 
 it("offers Agent approvals to plan reviewers", async () => {

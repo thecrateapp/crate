@@ -92,6 +92,9 @@ const DownloadPage = lazy(() =>
 const AiAgents = lazy(() =>
   import("@/pages/AiAgents").then((m) => ({ default: m.AiAgents })),
 );
+const AiModels = lazy(() =>
+  import("@/pages/AiModels").then((m) => ({ default: m.AiModels })),
+);
 const Settings = lazy(() =>
   import("@/pages/Settings").then((m) => ({ default: m.Settings })),
 );
@@ -178,6 +181,7 @@ function AdminIndex() {
   if (hasCapability("agents.plans.review"))
     return <Navigate to="/agents/approvals" replace />;
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
+  if (hasCapability("ai.config.read")) return <Navigate to="/ai" replace />;
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
       <p className="text-lg font-semibold text-foreground">
@@ -496,6 +500,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={["ai.config.read"]}>
                       <AiAgents />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="ai"
+                  element={
+                    <RequireCapabilities anyOf={["ai.config.read"]}>
+                      <AiModels />
                     </RequireCapabilities>
                   }
                 />

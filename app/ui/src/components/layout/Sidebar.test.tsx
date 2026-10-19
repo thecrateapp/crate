@@ -85,7 +85,7 @@ it("gates AI navigation by configuration read capability", () => {
     </MemoryRouter>,
   );
   expect(
-    screen.queryByRole("link", { name: /AI Agents/i }),
+    screen.queryByRole("link", { name: /AI models/i }),
   ).not.toBeInTheDocument();
   granted.add("ai.config.read");
   rerender(
@@ -93,8 +93,8 @@ it("gates AI navigation by configuration read capability", () => {
       <Sidebar />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("link", { name: /AI Agents/i })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: /AI models/i })).toHaveAttribute(
     "href",
-    "/ai-agents",
+    "/ai",
   );
 });

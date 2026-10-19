@@ -325,8 +325,8 @@ export function CommandPalette() {
       capabilities: ["library.view"],
     },
     {
-      label: "AI Agents",
-      path: "/ai-agents",
+      label: "AI models",
+      path: "/ai",
       icon: Sparkles,
       capabilities: ["ai.config.read"],
     },
