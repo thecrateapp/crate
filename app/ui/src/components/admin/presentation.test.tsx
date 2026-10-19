@@ -1,11 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+import { CopyButton } from "./CopyButton";
 import { RelativeTime } from "./RelativeTime";
 import { StatusBadge } from "./StatusBadge";
 import { StructuredValue } from "./StructuredValue";
@@ -37,6 +39,64 @@ describe("StatusBadge", () => {
     render(<StatusBadge tone="warning">Needs approval</StatusBadge>);
     const badge = screen.getByText("Needs approval");
     expect(badge).toHaveAttribute("data-tone", "warning");
+  });
+});
+
+describe("CopyButton", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("shows an error toast when the clipboard API is unavailable", async () => {
+    const user = userEvent.setup();
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
+
+    render(<CopyButton value="abc" label="Plan" />);
+    await user.click(screen.getByRole("button", { name: "Copy Plan" }));
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Could not copy. Select the text instead.",
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast when the clipboard write is rejected", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(<CopyButton value="abc" label="Plan" />);
+    await user.click(screen.getByRole("button", { name: "Copy Plan" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not copy. Select the text instead.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("shows a success toast when the clipboard write succeeds", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(<CopyButton value="abc" label="Plan" />);
+    await user.click(screen.getByRole("button", { name: "Copy Plan" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Copied"));
+    expect(writeText).toHaveBeenCalledWith("abc");
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 

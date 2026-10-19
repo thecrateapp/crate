@@ -133,8 +133,8 @@ export function impactChips(impact: Record<string, unknown>): string[] {
       chips.push(value ? "Visible to listeners" : "Not public");
       continue;
     }
-    if (key === "database" && value === true) {
-      chips.push("Changes the database");
+    if (key === "database" && typeof value === "boolean") {
+      chips.push(value ? "Changes the database" : "No database changes");
       continue;
     }
     if (key === "database_fields" && typeof value === "number") {
@@ -170,14 +170,20 @@ export function impactChips(impact: Record<string, unknown>): string[] {
   return chips;
 }
 
+function isRealId(value: unknown): value is number | string {
+  return (
+    typeof value === "number" || (typeof value === "string" && value !== "")
+  );
+}
+
 export function requesterText(
   plan: Pick<AgentPlan, "authorization_context" | "requester_name">,
 ): string | null {
   const context = plan.authorization_context;
   const name = plan.requester_name ?? null;
-  if (context.human_actor_id !== undefined)
+  if (isRealId(context.human_actor_id))
     return `Prepared in Admin by ${name ?? `user #${context.human_actor_id}`}`;
-  if (context.actor_user_id !== undefined)
+  if (isRealId(context.actor_user_id))
     return `Delegated by ${name ?? `user #${context.actor_user_id}`}`;
   return null;
 }

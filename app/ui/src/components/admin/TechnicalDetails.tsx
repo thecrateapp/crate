@@ -1,8 +1,6 @@
 import { useId, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
 import { CopyButton } from "./CopyButton";
 
 export function TechnicalDetails({
@@ -45,7 +43,7 @@ export function TechnicalDetails({
                 className="flex flex-wrap items-center gap-2"
               >
                 <dt className="text-muted-foreground">{item.label}</dt>
-                <dd className={cn("flex min-w-0 items-center gap-2")}>
+                <dd className="flex min-w-0 items-center gap-2">
                   {text ? (
                     <>
                       <code className="break-all">{text}</code>

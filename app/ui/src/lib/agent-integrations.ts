@@ -169,8 +169,8 @@ export interface AgentPlan
   conflicts?: Record<string, unknown>[];
   executable?: boolean;
   authorization_context: {
-    human_actor_id?: number;
-    actor_user_id?: number;
+    human_actor_id?: number | null;
+    actor_user_id?: number | null;
     client_id?: string;
     authorization_id?: string;
   };

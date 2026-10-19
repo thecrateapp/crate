@@ -185,6 +185,10 @@ describe("impactChips", () => {
       }),
     ).toEqual(["Changes the database"]);
   });
+
+  it("describes an unchanged database as no database changes", () => {
+    expect(impactChips({ database: false })).toEqual(["No database changes"]);
+  });
 });
 
 describe("requesterText", () => {
@@ -218,6 +222,24 @@ describe("requesterText", () => {
   it("returns null for a service-only authorization context", () => {
     expect(
       requesterText({ authorization_context: {}, requester_name: null }),
+    ).toBeNull();
+  });
+
+  it("falls through a null admin id to a real delegated id", () => {
+    expect(
+      requesterText({
+        authorization_context: { human_actor_id: null, actor_user_id: 7 },
+        requester_name: "Ana",
+      }),
+    ).toBe("Delegated by Ana");
+  });
+
+  it("returns null when the only id present is explicitly null", () => {
+    expect(
+      requesterText({
+        authorization_context: { human_actor_id: null },
+        requester_name: null,
+      }),
     ).toBeNull();
   });
 });
