@@ -6,8 +6,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from crate.agent_access import ALLOWED_GRANTS, SCOPE_CAPABILITIES, actions_enabled
+from crate.agent_access import actions_enabled
 from crate.agent_diagnostics import DiagnosticError
+from crate.agent_scope_catalog import SCOPE_GROUPS, SCOPE_PRESETS, scope_catalog
 from crate.api.agent_guards import require_agent_admin_session
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas import (
@@ -21,6 +22,7 @@ from crate.api.schemas import (
 )
 from crate.db.repositories import agent_integrations as store
 from crate.db.repositories.mcp_oauth import list_oauth_clients
+from crate.mcp.oauth_config import oauth_settings
 
 
 def private_response(response: Response):
@@ -55,6 +57,15 @@ def invoke(fn, *args, **kwargs):
         raise HTTPException(422, "Invalid integration configuration") from None
 
 
+def _public_mcp_url() -> str | None:
+    if not os.environ.get("CRATE_MCP_OAUTH_ISSUER"):
+        return None
+    try:
+        return oauth_settings().resource
+    except ValueError:
+        return None
+
+
 @router.get(
     "/catalog",
     response_model=dict[str, Any],
@@ -72,14 +83,20 @@ def integration_catalog(request: Request):
         "actions_enabled": actions_enabled(),
         "oauth_enabled": os.environ.get("CRATE_MCP_OAUTH_ENABLED", "false").lower()
         == "true",
-        "scopes": [
-            {
-                "scope": scope,
-                "capability": SCOPE_CAPABILITIES[scope],
-                "can_grant": SCOPE_CAPABILITIES[scope] in user["capabilities"],
-            }
-            for scope in sorted(ALLOWED_GRANTS)
+        "scopes": scope_catalog(set(user["capabilities"])),
+        "scope_groups": [
+            {"id": group_id, "label": label} for group_id, label in SCOPE_GROUPS
         ],
+        "presets": [
+            {
+                "id": preset.id,
+                "label": preset.label,
+                "description": preset.description,
+                "scopes": preset.scopes,
+            }
+            for preset in SCOPE_PRESETS
+        ],
+        "mcp_url": _public_mcp_url(),
         "tools": [
             {
                 "name": name,

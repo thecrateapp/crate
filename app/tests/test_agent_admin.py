@@ -378,6 +378,53 @@ def test_admin_http_provision_rotation_listing_and_conflict_contract(admin_clien
     assert resolve_credential(rotated.json()["token"]) is None
 
 
+def test_catalog_serves_permission_details_and_presets(admin_client):
+    base = "/api/admin/agent-integrations"
+    catalog = admin_client.get(f"{base}/catalog")
+    assert catalog.status_code == 200, catalog.text
+    body = catalog.json()
+
+    group_ids = {group["id"] for group in body["scope_groups"]}
+    for group in body["scope_groups"]:
+        assert set(group) == {"id", "label"}
+    for scope in body["scopes"]:
+        assert scope["label"]
+        assert scope["group"] in group_ids
+        assert scope["access"] in {"read", "change"}
+
+    by_scope = {scope["scope"]: scope for scope in body["scopes"]}
+    assert by_scope["curation.shows.read"]["label"] == "Read upcoming shows"
+
+    assert [preset["id"] for preset in body["presets"]] == [
+        "read_only",
+        "shows_curator",
+        "editorial_curator",
+        "library_maintainer",
+    ]
+    for preset in body["presets"]:
+        assert set(preset) == {"id", "label", "description", "scopes"}
+
+
+def test_catalog_mcp_url_comes_from_the_oauth_issuer(admin_client, monkeypatch):
+    base = "/api/admin/agent-integrations"
+    monkeypatch.delenv("CRATE_MCP_OAUTH_ALLOW_LOCALHOST", raising=False)
+
+    monkeypatch.setenv("CRATE_MCP_OAUTH_ISSUER", "https://api.example.test")
+    secure = admin_client.get(f"{base}/catalog")
+    assert secure.status_code == 200
+    assert secure.json()["mcp_url"] == "https://api.example.test/mcp"
+
+    monkeypatch.setenv("CRATE_MCP_OAUTH_ISSUER", "http://insecure.example.test")
+    insecure = admin_client.get(f"{base}/catalog")
+    assert insecure.status_code == 200
+    assert insecure.json()["mcp_url"] is None
+
+    monkeypatch.delenv("CRATE_MCP_OAUTH_ISSUER", raising=False)
+    unset = admin_client.get(f"{base}/catalog")
+    assert unset.status_code == 200
+    assert unset.json()["mcp_url"] is None
+
+
 @pytest.mark.parametrize(
     "mutation,expected",
     [
