@@ -14,7 +14,20 @@ from crate.db.repositories.agent_requests import _hash
 from crate.db.tx import optional_scope, read_scope
 
 
-def _document(row):
+def _document(row, *, identity=False):
+    # The three identity fields (who the connection is, who requested the plan) are
+    # Admin-only. Every agent-facing read (MCP tools, get_owned_plan and its callers)
+    # must keep returning exactly the keys it returned before plan identity existed,
+    # so identity defaults to False and only explicit Admin call sites opt in.
+    identity_fields = (
+        {
+            "integration_name": row.get("principal_name"),
+            "integration_kind": row.get("principal_kind"),
+            "requester_name": row.get("requester_name"),
+        }
+        if identity
+        else {}
+    )
     if row.get("document") is not None:
         content = {
             **row["document"],
@@ -38,9 +51,7 @@ def _document(row):
             "returned_count": count,
             "truncated": False,
             "result": row["result"],
-            "integration_name": row.get("principal_name"),
-            "integration_kind": row.get("principal_kind"),
-            "requester_name": row.get("requester_name"),
+            **identity_fields,
         }
     observation = row["observation"]
     content = {
@@ -85,9 +96,7 @@ def _document(row):
         "returned_count": 1,
         "truncated": False,
         "result": row["result"],
-        "integration_name": row.get("principal_name"),
-        "integration_kind": row.get("principal_kind"),
-        "requester_name": row.get("requester_name"),
+        **identity_fields,
         **content,
     }
 
@@ -137,10 +146,10 @@ def _get(current, plan_id, *, lock=False):
     return plan
 
 
-def get_plan(plan_id: str, *, session=None) -> dict:
+def get_plan(plan_id: str, *, session=None, identity: bool = False) -> dict:
     def _read(current):
         row = _get(current, plan_id)
-        document = _document(row)
+        document = _document(row, identity=identity)
         return (
             json.loads(json.dumps(document, default=str, allow_nan=False))
             if row.get("document") is not None
@@ -370,7 +379,9 @@ def decide_plan(
             session=current,
         )
         plan = _get(current, plan_id, lock=True)
-        document = _document(plan)
+        # decide_plan is only reached from the Admin approve/reject HTTP routes
+        # (crate.api.agent_plans), so its returned document carries plan identity.
+        document = _document(plan, identity=True)
         if decision == "approved" and document.get("executable") is False:
             raise DiagnosticError(
                 "NOT_EXECUTABLE",
@@ -492,7 +503,7 @@ def decide_plan(
                 ),
             },
         )
-        return get_plan(plan["id"], session=current)
+        return get_plan(plan["id"], session=current, identity=True)
 
 
 __all__ = [

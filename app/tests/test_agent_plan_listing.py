@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from crate.agent_access import authorization_context
 from crate.api.agent_plans import router
 from crate.api.permissions import ROLE_CAPABILITIES
 from crate.db.repositories import agent_plans as plans
@@ -232,8 +233,10 @@ def test_http_rejects_unknown_view(command_world, human_actor):
 
 
 def test_plan_document_names_connection_and_requester(command_world, human_actor):
+    # identity=True simulates the Admin detail route (GET /api/admin/agent-plans/{plan_id}),
+    # the only caller allowed to see who requested a plan.
     plan = pending_plan(command_world)
-    document = plans.get_plan(plan["plan_id"])
+    document = plans.get_plan(plan["plan_id"], identity=True)
     assert document["integration_name"] == "Command agent"
     assert document["integration_kind"] == "service"
     assert document["requester_name"] is None
@@ -246,7 +249,7 @@ def test_plan_document_names_connection_and_requester(command_world, human_actor
         {"uid": human_actor["id"], "id": plan["plan_id"]},
     )
 
-    updated = plans.get_plan(plan["plan_id"])
+    updated = plans.get_plan(plan["plan_id"], identity=True)
     assert updated["requester_name"] == "Operator"
 
 
@@ -256,7 +259,7 @@ def test_identity_fields_do_not_change_review_hashes(command_world):
         command_world, created_at=now, expires_at=now + timedelta(minutes=30)
     )
 
-    got = plans.get_plan(plan_id)
+    got = plans.get_plan(plan_id, identity=True)
     assert got["integration_name"] == "Command agent"
     assert got["integration_kind"] == "service"
     assert got["requester_name"] is None
@@ -269,3 +272,35 @@ def test_identity_fields_do_not_change_review_hashes(command_world):
             "expires_at": got["expires_at"],
         }
     )
+
+
+def test_agent_facing_plan_reads_do_not_expose_identity_fields(human_actor):
+    # A human-owned plan (the show-editor principal pattern used by
+    # app/crate/api/show_imports.py) is the realistic case where authorization_context
+    # names a human requester: agent_requests._authorize requires human_actor_id to
+    # belong to a genuine kind='human' principal (authorize_show_editor), so a plain
+    # service principal (e.g. command_world["principal"]) can never carry one. This
+    # exercises the same get_owned_plan() path used by every agent-facing MCP reader.
+    from crate.db.repositories.show_editor_access import get_show_editor_principal
+
+    change("UPDATE users SET name='Operator' WHERE id=:id", {"id": human_actor["id"]})
+    principal = get_show_editor_principal(human_actor["id"])
+
+    now = datetime.now(UTC)
+    plan_id = insert_plan(
+        {"principal": principal}, created_at=now, expires_at=now + timedelta(minutes=30)
+    )
+    change(
+        "UPDATE agent_repair_plans SET required_grants = ARRAY['curation.shows.write']::text[] WHERE id=:id",
+        {"id": plan_id},
+    )
+    change(
+        "UPDATE agent_repair_plans SET authorization_context = CAST(:context AS jsonb) WHERE id=:id",
+        {"context": json.dumps(authorization_context(principal)), "id": plan_id},
+    )
+
+    owned = plans.get_owned_plan(principal, plan_id)
+    assert "integration_name" not in owned
+    assert "integration_kind" not in owned
+    assert "requester_name" not in owned
+    assert "Operator" not in json.dumps(owned, default=str)

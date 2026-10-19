@@ -97,7 +97,7 @@ def plans_summary(request: Request):
 )
 def plan(request: Request, plan_id: UUID):
     actor = _reviewer(request)
-    document = invoke(store.get_plan, str(plan_id))
+    document = invoke(store.get_plan, str(plan_id), identity=True)
     capability = OPERATIONS.get(document["operation"], (None, "library.repair.run"))[1]
     if capability not in actor["capabilities"]:
         raise HTTPException(403, "Plan domain permission is required")
