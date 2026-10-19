@@ -88,10 +88,7 @@ describe("connectionStatus", () => {
 
   it("reports a disabled integration regardless of kind", () => {
     expect(
-      connectionStatus(
-        integration({ enabled: false, kind: "delegated" }),
-        now,
-      ),
+      connectionStatus(integration({ enabled: false, kind: "delegated" }), now),
     ).toEqual({ label: "Disabled", tone: "neutral" });
   });
 

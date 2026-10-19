@@ -23,8 +23,7 @@ export function connectionStatus(
     const active = (item.credentials ?? []).filter(
       (credential) => credential.revoked_at === null,
     );
-    if (active.length === 0)
-      return { label: "Token revoked", tone: "danger" };
+    if (active.length === 0) return { label: "Token revoked", tone: "danger" };
     const allExpired = active.every(
       (credential) => Date.parse(credential.expires_at) <= now,
     );
