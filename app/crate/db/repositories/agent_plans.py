@@ -1,6 +1,7 @@
 """One persisted plan model with exact human decisions and transactional reservation."""
 
 import json
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import text
@@ -175,40 +176,82 @@ def get_owned_analysis_references(
         return _read(current)
 
 
+_VISIBLE_PLANS_SQL = """
+    WITH visible AS (
+        SELECT p.id, p.principal_id, p.artist_uid, p.version, p.operation,
+               p.approval_required, p.created_at, p.expires_at, p.task_id,
+               CASE WHEN p.result IS NULL AND j.operation='apply_operation'
+                              AND t.status IN ('failed','cancelled','completed')
+                    THEN CASE WHEN j.effect_started_at IS NOT NULL THEN 'partial'
+                              WHEN t.status='cancelled' THEN 'cancelled' ELSE 'failed' END
+                    ELSE p.state END AS state,
+               pr.name AS integration_name, pr.kind AS integration_kind,
+               CASE WHEN p.document IS NULL THEN 1
+                    ELSE COALESCE(jsonb_array_length(p.document->'targets'), 0) END AS target_count,
+               COALESCE(p.document->>'risk', 'low') AS risk,
+               p.expires_at <= NOW() AS expired
+        FROM agent_repair_plans p LEFT JOIN agent_jobs j ON j.task_id=p.task_id
+        LEFT JOIN tasks t ON t.id=j.task_id
+        JOIN agent_principals pr ON pr.id = p.principal_id
+    )
+"""
+
+
 def list_plans(
-    *, state=None, limit=20, before=None, operations=None, session=None
+    *,
+    state: str | None = None,
+    view: Literal["pending", "history"] | None = None,
+    limit: int = 20,
+    before: str | None = None,
+    operations: list[str] | None = None,
+    session=None,
 ) -> list[dict]:
     def _read(current):
         return [
             dict(row)
             for row in current.execute(
-                text("""
-            WITH visible AS (
-                SELECT p.id, p.principal_id, p.artist_uid, p.version, p.operation,
-                       p.approval_required, p.created_at, p.expires_at, p.task_id,
-                       CASE WHEN p.result IS NULL AND j.operation='apply_operation'
-                                      AND t.status IN ('failed','cancelled','completed')
-                            THEN CASE WHEN j.effect_started_at IS NOT NULL THEN 'partial'
-                                      WHEN t.status='cancelled' THEN 'cancelled' ELSE 'failed' END
-                            ELSE p.state END AS state
-                FROM agent_repair_plans p LEFT JOIN agent_jobs j ON j.task_id=p.task_id
-                LEFT JOIN tasks t ON t.id=j.task_id
-            )
+                text(
+                    _VISIBLE_PLANS_SQL
+                    + """
             SELECT id::text AS plan_id, principal_id::text, artist_uid::text, version AS plan_version,
-                   state, operation, approval_required, created_at, expires_at, task_id AS job_id
+                   state, operation, approval_required, created_at, expires_at, task_id AS job_id,
+                   integration_name, integration_kind, target_count, risk, expired
             FROM visible WHERE (:state IS NULL OR state = :state)
               AND (:operations IS NULL OR operation=ANY(CAST(:operations AS text[])))
-              AND (:before IS NULL OR id < CAST(:before AS uuid))
-            ORDER BY id DESC LIMIT :limit
-        """),
+              AND (:view IS NULL OR (:view = 'pending') = (state = 'awaiting_approval' AND NOT expired))
+              AND (:before IS NULL OR (created_at, id) <
+                   (SELECT created_at, id FROM agent_repair_plans WHERE id = CAST(:before AS uuid)))
+            ORDER BY created_at DESC, id DESC LIMIT :limit
+        """
+                ),
                 {
                     "state": state,
+                    "view": view,
                     "before": before,
                     "operations": operations,
                     "limit": min(max(limit, 1), 101),
                 },
             ).mappings()
         ]
+
+    if session is not None:
+        return _read(session)
+    with read_scope() as current:
+        return _read(current)
+
+
+def count_pending_plans(*, operations: list[str] | None = None, session=None) -> int:
+    def _read(current):
+        return current.execute(
+            text(
+                _VISIBLE_PLANS_SQL
+                + """
+            SELECT COUNT(*) FROM visible WHERE state = 'awaiting_approval' AND NOT expired
+              AND (:operations IS NULL OR operation = ANY(CAST(:operations AS text[])))
+        """
+            ),
+            {"operations": operations},
+        ).scalar_one()
 
     if session is not None:
         return _read(session)
@@ -439,6 +482,7 @@ def decide_plan(
 
 
 __all__ = [
+    "count_pending_plans",
     "decide_plan",
     "get_plan",
     "get_owned_plan",
