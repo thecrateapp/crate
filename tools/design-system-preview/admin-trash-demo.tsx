@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -62,15 +64,13 @@ function Demo() {
           >
             Completar tarea de muestra
           </Button>
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          <FormField layout="inline" label="La siguiente tarea fallará">
+            <Checkbox
               checked={state.failNext}
               disabled={Boolean(state.pending)}
-              onChange={(event) => setTrashFailure(event.target.checked)}
+              onCheckedChange={(checked) => setTrashFailure(checked === true)}
             />
-            La siguiente tarea fallará
-          </label>
+          </FormField>
         </div>
         <p
           role="status"

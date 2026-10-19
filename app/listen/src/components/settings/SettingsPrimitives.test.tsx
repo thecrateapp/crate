@@ -70,4 +70,22 @@ describe("settings primitives", () => {
 
     expect(onChange).toHaveBeenCalledWith(true);
   });
+  it("disables the actual numeric range and associates its description", () => {
+    render(
+      <RangeRow
+        label="Crossfade"
+        description="Fade between tracks"
+        value={4}
+        min={0}
+        max={12}
+        step={0.5}
+        disabled
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("slider", { name: "Crossfade" })).toBeDisabled();
+    expect(screen.getByRole("slider")).toHaveAccessibleDescription(
+      "Fade between tracks",
+    );
+  });
 });

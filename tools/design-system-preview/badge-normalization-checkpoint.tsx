@@ -1,3 +1,6 @@
+import { Input } from "@crate/ui/shadcn/input";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useState } from "react";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
@@ -212,18 +215,12 @@ export function BadgeNormalizationCheckpoint() {
       </article>
       <article aria-label="Labels y valores" className="mt-8">
         <h3 className="font-display text-xl">Labels y valores</h3>
-        <label className="crate-form-field mt-4">
-          <span data-slot="form-field-label">Nombre de muestra</span>
-          <input
-            aria-label="Nombre de muestra"
-            defaultValue="First Song"
-            className="crate-form-control"
-          />
-        </label>
-        <label className="mt-4 flex items-center gap-3">
-          <input type="checkbox" />
-          <span data-slot="form-field-value">First Song · FLAC</span>
-        </label>
+        <FormField label="Nombre de muestra" className="mt-4">
+          <Input defaultValue="First Song" />
+        </FormField>
+        <FormField layout="inline" label="First Song · FLAC" className="mt-4">
+          <Checkbox />
+        </FormField>
       </article>
       <p role="status" className="mt-6 text-sm text-text-secondary">
         {feedback}

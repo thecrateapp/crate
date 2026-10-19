@@ -1,7 +1,13 @@
 import catalogue from "../catalogue.json";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Unstyled } from "@storybook/addon-docs/blocks";
-export function EntryDetails({ id }: { id: string }) {
+export function EntryDetails({
+  id,
+  review = "Visual reference approved · 1AQ",
+}: {
+  id: string;
+  review?: string;
+}) {
   const entry = catalogue.entries.find((e) => e.id === id);
   if (!entry) return <p>Missing entry: {id}</p>;
   return (
@@ -11,7 +17,7 @@ export function EntryDetails({ id }: { id: string }) {
           <InfoBadge>
             {entry.coverage === "documented" ? "Documented" : "Pending"}
           </InfoBadge>
-          <InfoBadge>Visual reference approved · 1AQ</InfoBadge>
+          <InfoBadge>{review}</InfoBadge>
           <InfoBadge>{entry.category}</InfoBadge>
         </div>
       </Unstyled>

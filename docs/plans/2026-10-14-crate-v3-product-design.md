@@ -4343,3 +4343,9 @@ Admin aún no adopta esa fila; el resto de R1–R4 sigue pendiente. Previews 600
 
 1AQ aprobado por Diego el 2026-10-19; commit/push autorizados. El siguiente bloque es FormField
 y roles tipográficos, con parada de revisión en 1AR. Prevalece el [estado vigente](2026-10-19-crate-v3-current-state.md).
+
+
+1AQ publicado como `da8a4358`. 1AR agrupa toda la familia de formularios y sus roles tipográficos,
+con ejemplos nuevos solo en Storybook. Las escenas existentes conservan sus callbacks y usan
+los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-current-state.md);
+[plan de 1AR](2026-10-19-crate-v3-forms-reconciliation.md). Parada local antes de commit/push.

@@ -117,7 +117,8 @@ describe("EqualizerPanel", () => {
 
     const punk = screen.getByRole("button", { name: "Punk" });
     expect(punk).toHaveAttribute("aria-pressed", "true");
-    expect(punk).toHaveClass("bg-accent-action-hi", "font-mono");
+    expect(punk).toHaveAttribute("data-state", "active");
+    expect(punk).toHaveClass("font-mono");
     expect(
       screen.getByRole("heading", { name: /Equalizer/ }),
     ).toHaveTextContent(/Equalizer.*Punk/);

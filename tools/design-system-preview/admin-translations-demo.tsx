@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nReview } from "../../app/ui/src/pages/I18nReview";
@@ -56,24 +58,23 @@ function Demo() {
           >
             Completar acción o lectura de muestra
           </Button>
-          <label className="flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
+          <FormField layout="inline" label="Fallar la siguiente acción">
+            <Checkbox
               checked={state.failNext}
               disabled={!!state.pending}
-              onChange={(e) => setFailure(e.target.checked)}
+              onCheckedChange={(checked) => setFailure(checked === true)}
             />
-            Fallar la siguiente acción
-          </label>
-          <label className="flex min-h-11 items-center gap-2">
-            <input
-              type="checkbox"
+          </FormField>
+          <FormField
+            layout="inline"
+            label="Catálogo JSON de muestra disponible"
+          >
+            <Checkbox
               checked={state.workspace}
               disabled={!!state.pending}
-              onChange={(e) => setWorkspace(e.target.checked)}
+              onCheckedChange={(checked) => setWorkspace(checked === true)}
             />
-            Catálogo JSON de muestra disponible
-          </label>
+          </FormField>
         </div>
         <p role="status" className="break-all font-mono text-xs">
           {state.action}

@@ -1,0 +1,30 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Input.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Input</DocHeading>
+<EntryDetails id="shadcn-input" review="Visual review pending · 1AR" />
+<DocHeading as="h2">Contract</DocHeading>
+
+- Native single-line field: text, number, password, email, URL, date, time and file use the same component.
+- Poppins 400 at 15/21 px; 40 px fine / 44 px coarse; 1 px quiet border. Values and placeholders retain case. Panel surface, warning state and keyboard outline belong to the common recipe.
+- Native date/file pickers keep platform behavior. Numeric bounds, inputMode, autocomplete, name/form submission and refs remain native. readonly and disabled have different semantics.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.ReadOnly} />
+
+<Canvas of={Stories.Invalid} />
+
+<Canvas of={Stories.NativeTypes} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

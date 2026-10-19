@@ -40,6 +40,17 @@ describe("Playlists smart rule composer", () => {
     });
   });
 
+  it("associates the identity captions with their native fields", async () => {
+    renderWithAdminProviders(<Playlists />, { route: "/playlists" });
+    await screen.findByText("No playlists for this view yet");
+    await userEvent.click(screen.getByRole("button", { name: "New smart" }));
+    const name = screen.getByRole("textbox", { name: "Name" });
+    const caption = screen.getByText("Name", { exact: true });
+    expect(caption.closest("label")).toHaveAttribute("for", name.id);
+    await userEvent.click(caption);
+    expect(name).toHaveFocus();
+  });
+
   it("keeps operator select focus across keyboard choices and submits the current rule", async () => {
     renderWithAdminProviders(<Playlists />, { route: "/playlists" });
     await screen.findByText("No playlists for this view yet");

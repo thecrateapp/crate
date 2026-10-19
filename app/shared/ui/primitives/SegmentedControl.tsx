@@ -1,4 +1,9 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type HTMLAttributes,
+} from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -15,7 +20,15 @@ export interface SegmentedControlItem<T extends string = string> {
   controls?: string;
 }
 
-export interface SegmentedControlProps<T extends string = string> {
+export interface SegmentedControlProps<T extends string = string>
+  extends Pick<
+    HTMLAttributes<HTMLDivElement>,
+    | "id"
+    | "aria-labelledby"
+    | "aria-describedby"
+    | "aria-invalid"
+    | "aria-required"
+  > {
   items: readonly SegmentedControlItem<T>[];
   value: T;
   onValueChange: (value: T) => void;
@@ -44,6 +57,7 @@ export function SegmentedControl<T extends string = string>({
   fullWidth = false,
   className,
   itemClassName,
+  ...groupProps
 }: SegmentedControlProps<T>) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = items.findIndex((item) => item.value === value);
@@ -99,6 +113,7 @@ export function SegmentedControl<T extends string = string>({
 
   return (
     <div
+      {...groupProps}
       role={isTabs ? "tablist" : "radiogroup"}
       aria-label={label}
       aria-orientation={isTabs ? "horizontal" : undefined}

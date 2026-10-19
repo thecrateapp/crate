@@ -1,0 +1,33 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Switch.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Switch</DocHeading>
+<EntryDetails id="primitives-switch" review="Visual review pending · 1AR" />
+<DocHeading as="h2">Contract</DocHeading>
+
+- Immediate binary setting, such as automatic playback. Do not use for mutually exclusive categorical choices.
+- Both existing size props retain the approved 32 × 18 px visual with a 14 px thumb; the coarse hit area is 44 × 44 px.
+- Space toggles; checked, disabled and warning states use the same identity as Checkbox. Forward native/Radix names, IDs and form/required semantics.
+- Use `FormField layout="inline"`: the control comes first and its label is to the right.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+The visible field caption uses the same MonoLabel as Input and Select. Inline placement does not change its typography, tracking or color.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Checked} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Invalid} />
+
+<Canvas of={Stories.Small} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

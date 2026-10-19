@@ -9,6 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
+import { FormField } from "../primitives/FormField";
 import { AdminSelect } from "./AdminSelect";
 
 const OPTIONS = [
@@ -327,4 +328,36 @@ describe("AdminSelect", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
+  it.each([false, true])(
+    "preserves FormField label, errors and required state (searchable=%s)",
+    async (searchable) => {
+      render(
+        <FormField
+          id="format"
+          label="Audio format"
+          hint="Choose a format"
+          error="Required"
+          required
+        >
+          {(control) => (
+            <AdminSelect
+              {...control}
+              options={OPTIONS}
+              placeholder="Choose"
+              value="jazz"
+              onChange={() => {}}
+              searchable={searchable}
+            />
+          )}
+        </FormField>,
+      );
+      const trigger = screen.getByRole("combobox", { name: "Audio format" });
+      expect(trigger).toHaveAttribute("id", "format");
+      expect(trigger).toHaveAccessibleDescription("Choose a format Required");
+      expect(trigger).toHaveAttribute("aria-invalid", "true");
+      expect(trigger).toHaveAttribute("aria-required", "true");
+      await userEvent.click(trigger);
+      expect(screen.getByRole("listbox")).toBeInTheDocument();
+    },
+  );
 });

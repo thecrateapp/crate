@@ -7,7 +7,7 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h1">Crate foundations</DocHeading>
 
-<EntryDetails id="fundamentals" />
+<EntryDetails id="fundamentals" review="Visual review pending · 1AR" />
 
 <DocHeading as="h2">Contract</DocHeading>
 
@@ -24,4 +24,12 @@ import { DocHeading } from "../components/DocHeading";
 <Canvas of={Stories.Layers} />
 <Canvas of={Stories.Motion} />
 
-Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+The 1AQ reference remains approved. This entry has 1AR changes pending review; consumer adoption and platform QA remain separate.
+
+<DocHeading as="h2">Form typography roles</DocHeading>
+
+All field captions use MonoLabel (Mono 400, uppercase, 11/15.4 px), including inline Checkbox, Switch and RadioGroup options. Inline is a layout choice, not a different typographic role. Helpers/errors use Mono 400 at 11.5/16.1 px. Editable controls and ordinary readonly output use the brand body face at 400, 15/21 px. Filters and segmented modes use Mono 400 at 12/16 px. Readout keeps its contextual Mono role; StatNumber uses display numerals and a normal-weight Mono caption. Surrounding headings or bold text must not change these defaults.
+
+Native brand-font exceptions remain resolved through the existing font variables. General form ranges now use Slider in both apps; playback and EQ retain specialized controls.
+
+Radio choices reserve their 44 px coarse hit areas without overlap. Long searchable options wrap inside the menu. FormField kind="group" provides the caption and ARIA association without a native label target on a non-labelable group. Existing preview fixture controls use these same components; no new mockup specimens are added.

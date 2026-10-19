@@ -1,3 +1,4 @@
+import { Slider } from "@crate/ui/primitives/Slider";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
@@ -295,7 +296,9 @@ function FieldRow({
 function StatusDot({ ok }: { ok: boolean }) {
   return (
     <div
-      className={`w-2 h-2 rounded-full ${ok ? "bg-accent-action" : "bg-state-warning"}`}
+      className={`w-2 h-2 rounded-full ${
+        ok ? "bg-accent-action" : "bg-state-warning"
+      }`}
     />
   );
 }
@@ -1446,8 +1449,8 @@ function EnrichmentSection({
             label="MB auto-apply"
             hint="Min match score to auto-apply tags"
           >
-            <input
-              type="range"
+            <Slider
+              aria-label="MB auto-apply"
               min={50}
               max={100}
               value={threshold}
@@ -1462,7 +1465,25 @@ function EnrichmentSection({
                   mb_auto_apply_threshold: threshold,
                 })
               }
-              className="w-32 accent-primary"
+              onKeyUp={(event) => {
+                if (
+                  [
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "Home",
+                    "End",
+                    "PageUp",
+                    "PageDown",
+                  ].includes(event.key)
+                ) {
+                  void saveSettingsSection("processing", {
+                    mb_auto_apply_threshold: Number(event.currentTarget.value),
+                  });
+                }
+              }}
+              className="w-32"
             />
             <span className="text-sm font-mono w-10 text-right">
               {threshold}%

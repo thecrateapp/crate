@@ -1,0 +1,17 @@
+@import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/jetbrains-mono.css";
+@import "../../app/shared/fonts/poppins.css";
+@import "../../app/shared/ui/tokens/index.css";
+@import "tailwindcss";
+@source "../../app/shared/ui";
+@source "../crate-ui-showcase/reviews";
+
+:root {
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-brand), sans-serif;
+}

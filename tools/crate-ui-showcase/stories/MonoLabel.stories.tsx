@@ -17,6 +17,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Base: Story = {};
+export const UppercaseContract: Story = {
+  render: () => (
+    <div className="showcase-stack">
+      {(["label", "eyebrow"] as const).flatMap((size) =>
+        ["normal-case", "lowercase", "capitalize"].map((className) => (
+          <MonoLabel
+            key={`${size}-${className}`}
+            size={size}
+            className={className}
+          >
+            Natural case {size} {className}
+          </MonoLabel>
+        )),
+      )}
+    </div>
+  ),
+};
 export const Hierarchy: Story = {
   render: () => (
     <div className="showcase-stack">

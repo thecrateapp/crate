@@ -32,7 +32,6 @@ import {
   GenreResolutionChip,
 } from "@/components/player/EqualizerAdaptiveReadouts";
 
-const PRESET_CHIP_CLASS_NAME = "px-3 py-1.5 text-label";
 const PANEL_CLOSE_BUTTON_CLASS_NAME =
   "size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
 const TRACK_PRESET_ACTION_CLASS_NAME =
@@ -83,7 +82,6 @@ function EqualizerHeader({
           <Checkbox
             checked={eq.enabled}
             onCheckedChange={(checked) => eq.toggleEnabled(checked === true)}
-            className="size-3.5"
           />
           {t("common.on")}
         </label>
@@ -153,7 +151,6 @@ function EqualizerPresetPicker({
       {EQ_PRESET_LABEL_ENTRIES.map(([name, labelKey]) => (
         <FilterChip
           key={name}
-          className={PRESET_CHIP_CLASS_NAME}
           active={
             eq.preset === name && !eq.smart && !eq.adaptive && !eq.genreAdaptive
           }

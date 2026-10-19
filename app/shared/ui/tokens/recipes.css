@@ -24,8 +24,7 @@
 }
 
 .artist-show-prep-surface {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 14%, transparent),
       transparent 40%
@@ -34,8 +33,7 @@
 }
 
 .upcoming-event-row-atmosphere {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 16% 20%,
       color-mix(in srgb, var(--accent-action) 22%, transparent),
       transparent 34%
@@ -48,8 +46,7 @@
 }
 
 .upcoming-event-row-scrim {
-  background:
-    linear-gradient(
+  background: linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 96%, transparent),
       color-mix(in srgb, var(--surface-canvas) 78%, transparent) 48%,
@@ -222,8 +219,7 @@
 }
 
 .server-setup-atmosphere {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 50% -10%,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 34%
@@ -236,8 +232,7 @@
 }
 
 .bandcamp-page-surface {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 18% 18%,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 34%
@@ -278,8 +273,7 @@
 }
 
 .lyrics-fullscreen-backdrop {
-  --_lyrics-fullscreen-backdrop:
-    radial-gradient(
+  --_lyrics-fullscreen-backdrop: radial-gradient(
       circle at 18% 20%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 32%
@@ -433,10 +427,6 @@
   background: color-mix(in srgb, var(--accent-action) 10%, transparent);
 }
 
-.settings-range {
-  accent-color: var(--accent-action);
-}
-
 .home-playback-panel,
 .home-replay-panel {
   border: 1px solid var(--border-quiet);
@@ -454,8 +444,7 @@
 
 .home-playback-empty-card {
   border: 1px solid var(--border-quiet);
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 18%, transparent),
       transparent 50%
@@ -469,8 +458,7 @@
 
 .home-replay-card {
   border: 1px solid var(--border-quiet);
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 14%, transparent),
       transparent 42%
@@ -508,8 +496,7 @@
 }
 
 .home-upcoming-feature-glow {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 18% 20%,
       color-mix(in srgb, var(--accent-action) 34%, transparent),
       transparent 35%
@@ -522,8 +509,7 @@
 }
 
 .home-upcoming-feature-overlay {
-  background:
-    linear-gradient(
+  background: linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 94%, transparent),
       color-mix(in srgb, var(--surface-canvas) 64%, transparent) 48%,
@@ -1085,8 +1071,7 @@
 }
 
 .radio-station-placeholder {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 30% 20%,
       var(--accent-action-glow-medium),
       transparent 34%
@@ -1140,8 +1125,7 @@
 }
 
 .radio-page-hero-glow {
-  --_radio-hero-glow:
-    radial-gradient(
+  --_radio-hero-glow: radial-gradient(
       circle at 16% 18%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 32%
@@ -1332,8 +1316,7 @@
     color-mix(in srgb, var(--text-primary) 3.5%, transparent) 45%,
     color-mix(in srgb, var(--stats-secondary-accent) 10%, transparent)
   );
-  box-shadow: 0 25px 50px -12px
-    color-mix(in srgb, var(--surface-canvas) 20%, transparent);
+  box-shadow: 0 25px 50px -12px color-mix(in srgb, var(--surface-canvas) 20%, transparent);
 }
 
 .stats-profile-track {
@@ -1354,8 +1337,7 @@
 }
 
 .stats-artist-placeholder {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 26% 18%,
       color-mix(in srgb, var(--accent-action) 28%, transparent),
       transparent 34%
@@ -1368,8 +1350,7 @@
 }
 
 .stats-artist-overlay {
-  background:
-    linear-gradient(
+  background: linear-gradient(
       90deg,
       color-mix(in srgb, var(--surface-canvas) 92%, transparent),
       color-mix(in srgb, var(--surface-canvas) 46%, transparent) 58%,
@@ -1488,8 +1469,7 @@
 }
 
 .profile-hover-glow {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 18% 12%,
       color-mix(in srgb, var(--accent-action) 20%, transparent),
       transparent 34%
@@ -1843,8 +1823,7 @@
 }
 
 .explore-feature-card-aura {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 18% 18%,
       color-mix(in srgb, var(--accent-action) 28%, transparent),
       transparent 38%
@@ -1908,8 +1887,7 @@ button.genre-pill:hover,
 }
 
 .explore-genre-card-overlay-placeholder {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at var(--explore-card-glow-position) 20%,
       color-mix(in srgb, var(--accent-action) 24%, transparent),
       transparent 36%
@@ -2332,8 +2310,7 @@ button.genre-pill:hover,
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, transparent 55%, var(--surface-card)),
+  background: linear-gradient(180deg, transparent 55%, var(--surface-card)),
     linear-gradient(
       180deg,
       transparent 45%,
@@ -2349,8 +2326,7 @@ button.genre-pill:hover,
 
 @media (min-width: 768px) {
   .stats-artist-of-period-photo::after {
-    background:
-      linear-gradient(90deg, transparent 60%, var(--surface-card)),
+    background: linear-gradient(90deg, transparent 60%, var(--surface-card)),
       linear-gradient(
         90deg,
         transparent 35%,
@@ -2673,8 +2649,7 @@ button.genre-pill:hover,
 }
 
 .stats-digging-chapter[data-tone="accent"] {
-  background:
-    radial-gradient(
+  background: radial-gradient(
       circle at 30% 20%,
       color-mix(in srgb, var(--accent-action) 55%, transparent),
       transparent 55%
@@ -2787,8 +2762,7 @@ button.genre-pill:hover,
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, transparent 30%, var(--surface-canvas)),
+  background: linear-gradient(180deg, transparent 30%, var(--surface-canvas)),
     linear-gradient(
       90deg,
       color-mix(in srgb, var(--accent-action) 35%, transparent),
@@ -3444,6 +3418,11 @@ label
 
 /* Shared form geometry; validation remains with the caller. */
 .crate-form-field {
+  overflow-wrap: anywhere;
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 400;
   display: grid;
   min-width: 0;
   align-content: start;
@@ -3451,6 +3430,7 @@ label
 }
 
 .crate-form-control {
+  font-weight: 400;
   height: 40px;
   min-width: 0;
   border: 1px solid var(--border-quiet);
@@ -3502,6 +3482,7 @@ label
 }
 
 .crate-form-helper {
+  font-weight: 400;
   margin: 0;
   color: var(--text-subtle);
   font-family: var(--font-mono-stack);
@@ -3525,7 +3506,8 @@ label
 }
 
 .crate-form-switch,
-.crate-form-checkbox {
+.crate-form-checkbox,
+.crate-form-radio {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
@@ -3539,7 +3521,8 @@ label
 }
 
 .crate-form-switch:disabled,
-.crate-form-checkbox:disabled {
+.crate-form-checkbox:disabled,
+.crate-form-radio:disabled {
   cursor: not-allowed;
 }
 
@@ -3581,11 +3564,14 @@ label
 }
 
 .crate-form-switch[aria-invalid="true"],
-.crate-form-checkbox[aria-invalid="true"] {
+.crate-form-checkbox[aria-invalid="true"],
+.crate-form-radio[aria-invalid="true"],
+.crate-form-radio-group[aria-invalid="true"] .crate-form-radio {
   border-color: var(--state-warning);
 }
 
 .crate-form-chip {
+  font-weight: 400;
   text-transform: none;
   min-height: 32px;
   transition:
@@ -3623,7 +3609,8 @@ label
     height: 44px;
   }
   .crate-form-switch::after,
-  .crate-form-checkbox::after {
+  .crate-form-checkbox::after,
+  .crate-form-radio::after {
     content: "";
     position: absolute;
     top: 50%;
@@ -3635,7 +3622,8 @@ label
   .crate-form-switch {
     margin-inline: 6px;
   }
-  .crate-form-checkbox {
+  .crate-form-checkbox,
+  .crate-form-radio {
     margin-inline: 13px;
   }
   .crate-form-chip {
@@ -4111,5 +4099,82 @@ label
     background: Canvas;
     color: CanvasText;
     border-color: CanvasText;
+  }
+}
+
+/* General form range: native behavior, thin visual rail, full input hit area. */
+.crate-form-radio {
+  width: 18px;
+  height: 18px;
+  justify-content: center;
+  border-radius: 50%;
+}
+.crate-form-radio[data-state="checked"] {
+  border-color: var(--accent-action-hi);
+}
+.crate-form-slider {
+  appearance: none;
+  display: block;
+  min-width: 0;
+  height: 40px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--accent-action-hi);
+}
+.crate-form-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--border-quiet);
+}
+.crate-form-slider::-moz-range-track {
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--border-quiet);
+}
+.crate-form-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  margin-top: -3px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-action-hi);
+}
+.crate-form-slider::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent-action-hi);
+}
+.crate-form-slider[aria-invalid="true"] {
+  accent-color: var(--state-warning);
+}
+.crate-form-slider[aria-invalid="true"]::-webkit-slider-thumb {
+  background: var(--state-warning);
+}
+.crate-form-slider[aria-invalid="true"]::-moz-range-thumb {
+  background: var(--state-warning);
+}
+@media (pointer: coarse) {
+  .crate-form-slider {
+    height: 44px;
+  }
+}
+
+.crate-form-field[data-layout="inline"] {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  min-height: 44px;
+}
+.crate-form-field[data-layout="inline"] > .crate-form-helper {
+  grid-column: 2;
+}
+
+@media (pointer: coarse) {
+  .crate-form-radio {
+    margin-block: 13px;
   }
 }

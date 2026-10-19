@@ -7,16 +7,17 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AQ aprobado por Diego y publicado en el commit de este estado; conserva el ancestro `53177736`                                                                                      |
-| Checkpoint local        | **1AQ aprobado**. Storybook R0 en inglés y primer contrato Hairline reconciliado; siguiente bloque: FormField y roles tipográficos (1AR)                  |
+| Publicado               | 1AQ publicado: `da8a43586e800164e3111ba74fa4d22c087c3eb1`; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AR aprobado por Diego**: familia completa de formularios y sus roles tipográficos; publicación autorizada                                                                        |
+| Revisión actual         | `http://127.0.0.1:5186/review-1ar-forms.html`; familia completa de formularios, misma escena en Storybook `Reviews/1AR/Forms`; URL anterior de etiquetas conservada         |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 10 entradas documentadas / 81 pendientes |
-| Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                                           |
-| Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                                                                                   |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 21 entradas documentadas / 71 pendientes                                       |
+| Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
+| Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | Publicación de 1AQ autorizada; 1AR se revisa antes de commit. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Restricción             | Publicación de 1AR autorizada; siguiente grupo de componentes se revisa antes de commit. Sin PR, merge, rebase, deploy ni release                                                                      |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -44,8 +45,9 @@ inventario original no son 528 errores ni una autorización para conservar cualq
 
 ## Límites que permanecen abiertos
 
-Los menores anteriores de sticky header de Users y asociación de label visible del Select
-compartido siguen registrados para sus consumidores. La presentación de error de lectura de
+El menor anterior de sticky header de Users sigue registrado para su consumidor. 1AR corrige
+la asociación del label de FormField con AdminSelect, tanto normal como searchable; la adopción
+de esos contratos en las páginas restantes sigue pendiente por fase. La presentación de error de lectura de
 Playlists y garantías de concurrencia no se han rediseñado. Las muestras y pruebas focalizadas
 no certifican backend vivo, imágenes autenticadas, AT, zoom, otros motores o runtime nativo.
 
@@ -156,17 +158,17 @@ focalizadas siguen abajo. Misma parada1AQ sin commit/push ni siguiente grupo; pr
 
 -307/307casos Vitest en30archivos afectados, serial `--maxWorkers=1`.
 -80casos de preview de cabeceras/Editor/Playlists cubiertos:79pasaron en el lote final; el caso
- de tooltip deshabilitado se corrigió para esperar la salida real de Radix y pasó en los3anchos
- con3repeticiones (9/9). Otros45casos de checkpoints afectados:40pasaron inicialmente y5/5tras
- corregir un selector de badges que incluía wrappers y la espera del iframe persistente.
+de tooltip deshabilitado se corrigió para esperar la salida real de Radix y pasó en los3anchos
+con3repeticiones (9/9). Otros45casos de checkpoints afectados:40pasaron inicialmente y5/5tras
+corregir un selector de badges que incluía wrappers y la espera del iframe persistente.
 -26/26casos sobre el build de Admin en7archivos seleccionados: rutas/capacidades, consultas,
- mutaciones, confirmaciones y contratos de creación/edición; Playwright `--workers=1`.
+mutaciones, confirmaciones y contratos de creación/edición; Playwright `--workers=1`.
 -Tipos estrictos de cambios/pruebas y lint focalizado verdes. Build/budget inicial de Admin:
- **526396Bgzip/532480**,8assets,margen6084B. AST18/18conserva código no visual, hooks/API,
- bindings nativos y gates previos. Hashes/anchors de18cabeceras y71sitios únicos verificados.
+**526396Bgzip/532480**,8assets,margen6084B. AST18/18conserva código no visual, hooks/API,
+bindings nativos y gates previos. Hashes/anchors de18cabeceras y71sitios únicos verificados.
 -Revisión independiente: tooltip de acciones disabled corregido con prueba RED→GREEN; trigger
- estable mantiene el mismo Button nativo y relación `aria-describedby`. Las10pruebas anteriores
- de Ops se conservan junto con las2nuevas. Sin hallazgos nuevos pendientes del pase.
+estable mantiene el mismo Button nativo y relación `aria-describedby`. Las10pruebas anteriores
+de Ops se conservan junto con las2nuevas. Sin hallazgos nuevos pendientes del pase.
 
 Rulings: Tasks/Insights/Genres conservan el default por quedar fuera de las18cabeceras
 inventariadas; esas3migraciones siguen pendientes en su fase. La evidencia focalizada no
@@ -177,7 +179,6 @@ Preview `crate-v3-preview.service` activo en5186. **Parada local1AQ para revisi�
 
 La discusión posterior de legibilidad de chips es una propuesta de diseño y no modifica el
 runtime. Véase el [inventario de familias](2026-10-19-crate-v3-badge-legibility-audit.md).
-
 
 ### Estado más reciente: normalización compartida y auditoría de filas
 
@@ -206,7 +207,6 @@ Listen aún no cubre todos los aliases/prefijos responsive: menor registrado, si
 prevención exhaustiva. La evidencia final de tipos/bundles/pruebas se refresca por alcance;
 los totales anteriores no certifican automáticamente las ampliaciones posteriores.
 
-
 ### Pausa solicitada: reconciliación global de componentes
 
 Diego amplía el análisis de filas al sistema completo: revisar lo existente y lo definido,
@@ -218,7 +218,6 @@ la propuesta de filas queda integrada. Inventario AST:1.069archivos,92módulos v
 HairlineRow sin ayuda tiene inset0; ejemplo1B compensa con12px/text-left desde CSS del mockup.
 Ni el catálogo ni la migración se consideran aprobados/implementados por existir estos docs.
 Previewactivo;1AQsin commit/push. No se avanza con retirada de iconos hasta resolver esta pausa.
-
 
 Evidencia de la ampliación previa1AQ conservada al iniciar la pausa:4typechecks de app/shared
 verdes; tipos de preview separados por contexto de alias Admin/Listen verdes.8archivos Admin
@@ -235,13 +234,11 @@ run diagnóstico de ese archivo, sin cambiar la regla del repositorio. El catál
 propuesta de filas están revisados y pendientes de decisión de Diego; ninguna nueva migración
 se implementó por esas propuestas.
 
-
 Requisito posterior de Diego: integrar un playbook/showcase mantenido en Git y la documentación
 viva del sistema de diseño en R0. Toda alta/modificación de componente actualiza su entrada.
 Propuesta de plataforma: Storybook React/Vite, aislado de las entradas y bundles de producción;
 sección final de la auditoría de reconciliación. No se ha instalado ni aprobado el diseño
 completo del tooling. Preview5186/checkpoints conservados;1AQsin commit/push.
-
 
 ### 1AQ — Storybook R0 y primera reconciliación de HairlineRow
 
@@ -281,14 +278,12 @@ No se certifica adopción completa, datos vivos, AT o runtime nativo. Se conserv
 33 PNG/manifest1M y todos los checkpoints; sin suites completas ni ejecución de CI.
 **1AQ permanece local para revisión, sin commit/push.**
 
-
 Validación final de esta primera R1: tipos shared/Listen/showcase y builds shared/Listen/Admin/
 Storybook verdes; lint focalizado verde. Admin **526383/532480 B gzip**, margen 6097 B, 9 assets;
 Listen **199948/307200 B**, 23 assets. Fixture TS2353 corregida con tipo de mapa explícito y sus
 2 pruebas verdes. Correspondencia de catálogo y aislamiento de runtime verificados; fuentes
 estáticas locales presentes en el build. Muestras de revisión en
 `.artifacts/review/checkpoint-1aq-hairline-reconciled.png`. Sigue la parada local1AQ sin commit.
-
 
 ### Fuente de verdad visual confirmada por Diego
 
@@ -302,7 +297,6 @@ siguen con mínimo 44 px en punteros coarse. El ajuste tipográfico posterior a 
 independiente está verificado con regresiones de estilos calculados y comparación visual/DOM
 entre ambos previews; no se atribuye al revisor del delta anterior.
 
-
 ### Aprobación y publicación de 1AQ — 2026-10-19
 
 Diego aprueba 1AQ y autoriza commit/push en feat/crate_v3. Se conserva todo el checkpoint,
@@ -311,3 +305,60 @@ a 12/18 px también en móvil. Los stops locales anteriores son registros histó
 por esta aprobación. Siguiente alcance autorizado: FormField y roles tipográficos, con el
 mockup aprobado como referencia; ambos previews activos y parada en 1AR antes de commit.
 No se reanuda la migración de pantallas ni se declara cerrada la QA de fase.
+
+### 1AR — familia completa de formularios (local, antes de commit)
+
+Diego amplió el bloque a todos los componentes de formulario juntos: FormField, Input,
+Textarea, SearchInput, Select, AdminSelect, Checkbox, Switch, RadioGroup, SegmentedControl,
+FilterChip y Slider general. Storybook contiene sus contratos, props reales, estados y ejemplos
+compuestos; Readout y la leyenda de StatNumber conservan sus roles explícitos. No se restilan
+cabeceras ni se migra toda la aplicación por esta entrega.
+
+El mockup sigue como referencia y no recibe nuevas secciones ni muestras. Diego detectó controles
+auxiliares nativos: se reemplazaron 18 checkboxes y un input ya existentes por componentes reales,
+conservando las acciones de sus fixtures. Hay una guarda AST que impide añadir controles nativos
+en esas escenas y 14 pruebas de navegador que comprueban los controles y callbacks compartidos.
+
+FormField incorpora layout horizontal para Checkbox/Switch: control primero, caption Poppins
+400 a 14/20 px a la derecha, siguiendo la muestra aprobada. El apilado mantiene Mono 400 y 8 px
+reales. Se corrigen asociación de grupos/AdminSelect, readonly/IME de SearchInput, peso heredado,
+radio con tono/área táctil comunes y opciones largas sin recorte. El Slider nativo se adopta en
+Settings de ambas apps; reproducción/EQ conservan sus controles especializados.
+
+Se preservan los checks completos de fase, QA nativa/AT, datos vivos y canónicas para su cierre
+correspondiente. [Plan y evidencia de 1AR](2026-10-19-crate-v3-forms-reconciliation.md).
+Ambos previews permanecen activos; **1AR no se publica antes de la revisión de Diego**.
+
+## 1AR — familia de formularios lista para revisión local
+
+Las12familias de formulario tienen entradas reales en Storybook: FormField, Input, Textarea, SearchInput, Select, AdminSelect, Checkbox, Switch, RadioGroup, SegmentedControl, FilterChip y Slider. Readout y los roles de valores/ayudas completan el bloque. Mockup aprobado y ajustes confirmados siguen siendo referencia; no se añadieron muestras al mockup. Sus18checkboxes y1input auxiliares ahora usan componentes compartidos, con guarda AST y14pruebas de escena. FormField ofrece stacked/inline y caption de grupo; los espaciados/roles viven en el componente/receta.
+
+Validación:207pruebas unitarias focalizadas y60casos browser distintos; tipos shared/Listen/Admin/Desktop/Storybook y builds shared/Listen/Admin/Storybook verdes; lint52archivos y guarda21/92/119verdes. Admin526410/532480Bgzip (6070Bde margen); Listen199942/307200B. Revisión independiente sin Critical/Important; un Minor de borde en radio checked+aria-invalid individual queda en el [plan1AR](2026-10-19-crate-v3-forms-reconciliation.md), con responsable y cierre. Invalid de grupo correcto.
+
+Ambos previews activos; composición en `http://127.0.0.1:6006/?path=/story/patterns-forms--complete`. La adopción global de páginas/cabeceras, QA de backend vivo/AT/nativa y comparación canónica permanecen pendientes.1AR sin commit/push, detenido para Diego.
+
+### Corrección de etiquetas de 1AR
+
+Diego confirmó que MonoLabel siempre va en mayúsculas y que las etiquetas de checkbox no son otra familia. Se elimina la excepción inicialPoppins14/20: FormField stacked/inline compone el mismo MonoLabel (Mono400uppercase11/15.4, caps tracking y color subtle). Inline solo cambia posición. Las3muestras antiguas de checkbox/switch en1O usan MonoLabel: los2checkboxes adoptan FormField y el switch conserva su posición original; sin añadir escenas. Esta corrección prevalece sobre cualquier nota anterior que describa una etiqueta lateral Poppins como aprobada.
+
+Tras esta corrección, las pruebas de tipografía comparan igualdad real de estilos entre etiquetas laterales y etiquetas de campos. Pasan 22 casos de Storybook, 15 de mockup y los consumidores afectados. Builds y guarda verdes. Bundle vigente: Admin **526402 / 532480 B gzip**, Listen **199955 / 307200 B**. Ambos previews activos; 1AR continúa sin commit/push.
+
+MonoLabel resuelve `uppercase` desde el componente, después de las clases del consumidor: `normal-case`, `lowercase` y `capitalize` no sustituyen ya su utilidad de mayúsculas. La transformación es CSS; conserva el texto original. Contrato y muestra en Storybook,27pruebas unitarias y7browser focalizadas verdes, tipos/lint/guarda verdes.1AR permanece local.
+
+### Regla vigente: una vista pequeña por paso
+
+Diego sustituye las revisiones acumulativas en el mockup grande por una página aislada en cada paso, limitada a lo que se está probando. Se conserva el mockup histórico como referencia, sin nuevos bloques. La escena se comparte con Storybook y usa componentes reales; el inventario/documentación sigue siendo obligatorio. Regla en los AGENTS de preview/showcase y en shared.
+
+Vista actual: `http://127.0.0.1:5186/review-1ar-labels.html`. El texto “First Song · FLAC” estaba marcado erróneamente como valor; se retira ese marcador de la etiqueta y se prueba la capitalización del texto visible. El input mantiene su valor mixto. Cinco casos browser focalizados y la guarda de componentes pasan; tipos, lint y ambos builds de herramientas pasan. No se cambian los valores reales ni las recetas de datos. Ambos previews activos,1AR local sin commit/push.
+
+### La vista aislada cubre el checkpoint completo de 1AR
+
+La vista anterior solo mostraba las etiquetas. Diego señaló que faltaban Slider y otros controles: el alcance aprobado de 1AR sigue siendo la familia completa de12formularios, con sus roles tipográficos. La revisión actual incorpora FormField, Input, Textarea, SearchInput, Select, AdminSelect, Checkbox, Switch, RadioGroup, SegmentedControl, FilterChip y Slider; añade estados disabled/readonly/invalid/indeterminate y los Readout/StatNumber revisados. No son migraciones de nuevas páginas.
+
+URL principal `http://127.0.0.1:5186/review-1ar-forms.html`; la URL anterior `review-1ar-labels.html` monta la misma vista. Scene única `reviews/FormsReview.tsx`, Storybook `Reviews/1AR/Forms`, conservando su meta.id anterior para mantener enlaces. Antes de compartir un paso se compara su inventario con todo el alcance aprobado del checkpoint.
+
+Regresión de cobertura: fallaba por ausencia del slider antes de ampliar. Pasan5casos browser (alias antiguo más página/Storybook × móvil/escritorio), con teclado de slider, búsqueda, portales y selección, filtros/modos, estados,8px de gap y40/44px. Guarda, tipos, lint y builds de herramientas verdes. El acceso visual manual de este turno fue rechazado por la política de navegador con motivo de protocolo no permitido; no se genera ni se atribuye una nueva captura. Las pruebas browser se completaron antes de ese rechazo. Ambos servicios activos;1AR continúa sin commit/push.
+
+### Aprobación de 1AR
+
+Diego aprueba la familia completa de formularios y autoriza commit/push de 1AR. La evidencia y los límites anteriores se conservan; no se repiten suites completas. El siguiente checkpoint será 1AS, acciones compartidas según el orden R1 de la reconciliación, con referencia en el mockup, actualización de Storybook y vista aislada. Ambos previews permanecen activos.

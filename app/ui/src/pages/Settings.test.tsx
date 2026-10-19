@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -168,5 +168,36 @@ describe("Settings", () => {
       );
     });
     expect(toast.info).toHaveBeenCalledWith("Library Scan is already queued");
+  });
+  it("names the processing range and preserves its numeric persistence on mouse release", async () => {
+    apiMock.mockResolvedValue({ ok: true });
+    render(<Settings />);
+    await userEvent.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+    const slider = screen.getByRole("slider", { name: "MB auto-apply" });
+    fireEvent.change(slider, { target: { value: "90" } });
+    fireEvent.mouseUp(slider);
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith("/api/settings/processing", "PUT", {
+        mb_auto_apply_threshold: 90,
+      }),
+    );
+  });
+
+  it("persists a processing range change committed with the keyboard", async () => {
+    apiMock.mockResolvedValue({ ok: true });
+    render(<Settings />);
+    await userEvent.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+    const slider = screen.getByRole("slider", { name: "MB auto-apply" });
+    fireEvent.change(slider, { target: { value: "96" } });
+    fireEvent.keyUp(slider, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith("/api/settings/processing", "PUT", {
+        mb_auto_apply_threshold: 96,
+      }),
+    );
   });
 });

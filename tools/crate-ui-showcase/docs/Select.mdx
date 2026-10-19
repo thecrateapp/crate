@@ -1,0 +1,34 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Select.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Select</DocHeading>
+<EntryDetails id="shadcn-select" review="Visual review pending · 1AR" />
+<DocHeading as="h2">Contract</DocHeading>
+
+- Categorical single choice, including short form lists. Use SelectTrigger as the actual FormField control through the render prop.
+- Same 40/44 px height and Poppins 400 15/21 px as Input. Options use the shared overlay surface, dropdown layer, portal, focus and scroll/collision behavior.
+- Arrow keys, Home/End, typeahead, Enter/Space and Escape follow Radix selection. Disabled options cannot be selected. Empty values show the placeholder; unknown persisted values remain unselected without inventing a replacement.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Placeholder} />
+
+<Canvas of={Stories.UnknownValue} />
+
+<Canvas of={Stories.Invalid} />
+
+<Canvas of={Stories.LongOption} />
+
+The long-option specimen lives inside a narrow scrolling scene: its real portal must escape that scene's clipping boundary. Invalid naming and descriptions come from FormField; an unknown persisted value selects no option.
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -106,24 +108,20 @@ function Demo() {
             >
               Enviar cambio SSE de muestra
             </Button>
-            <label className="flex min-h-11 items-center gap-2">
-              <input
-                type="checkbox"
+            <FormField layout="inline" label="Fallar la siguiente acción">
+              <Checkbox
                 checked={state.failNext}
                 disabled={state.pending}
-                onChange={(e) => setFailure(e.target.checked)}
+                onCheckedChange={(checked) => setFailure(checked === true)}
               />
-              Fallar la siguiente acción
-            </label>
-            <label className="flex min-h-11 items-center gap-2">
-              <input
-                type="checkbox"
+            </FormField>
+            <FormField layout="inline" label="IA disponible en muestra">
+              <Checkbox
                 checked={state.llm}
                 disabled={state.pending}
-                onChange={(e) => setLLM(e.target.checked)}
+                onCheckedChange={(checked) => setLLM(checked === true)}
               />
-              IA disponible en muestra
-            </label>
+            </FormField>
           </div>
           <p role="status" className="break-all font-mono text-xs">
             {state.action}

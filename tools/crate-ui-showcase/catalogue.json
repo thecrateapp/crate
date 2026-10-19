@@ -61,14 +61,14 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "b4d3a6163322aedb93f971e5bfe4cdd36ddf0cab3299fee5253d9a421cab2d99",
+        "app/shared/ui/tokens/recipes.css": "1b5b918e29db45b729ccd3e0d89af01786f3b8495d68ab2c1ad84d1135bd960c",
         "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "183c42a7aea8f9a14cbc2731547468c4aa66680b331725013151295f838ad6e3"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "a4c9a4536b84098ebad2ba7a52115c3d4c33e30b0a5401ae609a08a424dfba4b"
       },
       "category": "Foundations"
     },
@@ -86,9 +86,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/MonoLabel.tsx": "741d163115b06b90f43662a7e3b8b2b11f1d1780947a5c861031e601ac42adda",
-        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "5a66c7d1a2acfa6e81a9db785bc41d6aca7691f08140b1ab452698baacb7adc5",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "fd157f999f05e0b08d44041c67414419285312cdc52cfcedb680a29c6b6cfb9d"
+        "app/shared/ui/primitives/MonoLabel.tsx": "1ff67ba85f1955f2312d797a6680339e8b56b3e8d9fc947cd4a86865dbfa2f62",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "68fb231024277e8a40f261760aec0c26eac82c159780b4efc3860e61c0b76012",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "8c390dd33357d8001eef09441627f2c58c00e7220197d97bb3d544fd70fecf89"
       },
       "category": "Data Display"
     },
@@ -126,9 +126,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/StatNumber.tsx": "60abc91b5426e2c4759093a0b9886acf1a9d22fdeb842c032b16c4c54981954e",
+        "app/shared/ui/primitives/StatNumber.tsx": "56baeeb2bee3fe7741eba57ea533a04892fc1fddf5ab24fb432ea80f549a1e53",
         "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "ac8008b434f2712c7eebafb760702b9dbaeff23c10589bcc478c38d8cbf61e36",
-        "tools/crate-ui-showcase/docs/StatNumber.mdx": "2899aca7bd235fa994967a825c2758276e50ad7b17ffd716fb9793469a6d2139"
+        "tools/crate-ui-showcase/docs/StatNumber.mdx": "8b9ad2d0561a34e2bf952378eb1b36d1ce931634a277d3f499be06142ff3cf89"
       },
       "category": "Data Display"
     },
@@ -190,7 +190,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/FilterChip.tsx": "eff73b75e83767f3db4738fba6898ba6cc0bf5ed5e507bed380a57d249cf8ffb",
         "tools/crate-ui-showcase/stories/FilterChip.stories.tsx": "c27b8cf5ccdeeafbc218e88247963798407ad4a26320e8e33ef894e2d00a62b7",
-        "tools/crate-ui-showcase/docs/FilterChip.mdx": "fc7c64a1bdd900efbd720ca172f45db633a96b876ad8a5078ff3e830ec07c9e9"
+        "tools/crate-ui-showcase/docs/FilterChip.mdx": "5a69d1d4c71199869443a98ee3fa985c088cec4bda54f5418957ac9f95b25690"
       },
       "category": "Forms"
     },
@@ -206,13 +206,11 @@
       "sources": [
         "app/shared/ui/primitives/SegmentedControl.tsx"
       ],
-      "knownIssues": [
-        "The initial example covers radio mode. Real-prop controls and the tabs scenario are pending expansion."
-      ],
+      "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/SegmentedControl.tsx": "a1b4046fc7f65009e810d111916f5c316a2e71cd5cea0ddc541ed4f58f1d3d02",
-        "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx": "ce48dac92734091e34eab7621b256d1fbe1f04caeb34c33fca4a33631dae2828",
-        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "72d089a4a368f93aef87fbc61ac0fba93cd4f5b9bf73832f5df1962d2a3c0ef3"
+        "app/shared/ui/primitives/SegmentedControl.tsx": "dff469b97db4ffbefed556bad121078adff5e7e33ed0e8923d521640916bd9af",
+        "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx": "ac29972fa006ca9df6e85c3b0ba389a5061a89e0311eb0b93f4dde5cd7b6c9a8",
+        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "201e735f4f6b217bc88edd1511394a8f192325bcad10956f845f12fcc02239b7"
       },
       "category": "Forms"
     },
@@ -261,18 +259,20 @@
     {
       "id": "composites-adminselect",
       "name": "AdminSelect",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared AdminSelect form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-adminselect",
+      "story": "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AdminSelect.mdx",
       "sources": [
         "app/shared/ui/composites/AdminSelect.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/AdminSelect.tsx": "0f13b8cabf08fa10a57507e431ba633367f8055141d031f1c0129688808d0bec"
+        "app/shared/ui/composites/AdminSelect.tsx": "fe340f1220c67b7be6d23027dfc96b0d838667c33d6272daafa6fd93e78e01b5",
+        "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx": "b91b2ad48ee94ca2e88cc328cb09a82ac2342b237641d85edc8331cfa99f8194",
+        "tools/crate-ui-showcase/docs/AdminSelect.mdx": "33934c8b87b0bc577a2ef31377b075de176d37844c6be870f72fc8e8ba1751fe"
       },
       "category": "Forms"
     },
@@ -1035,18 +1035,20 @@
     {
       "id": "primitives-checkbox",
       "name": "Checkbox",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared Checkbox form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-checkbox",
+      "story": "tools/crate-ui-showcase/stories/Checkbox.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Checkbox.mdx",
       "sources": [
         "app/shared/ui/primitives/Checkbox.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416"
+        "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416",
+        "tools/crate-ui-showcase/stories/Checkbox.stories.tsx": "fd50b9cd8856f3f9a687eb0eca05264d9ee42bc3c1a9652f5fc28668e29b4496",
+        "tools/crate-ui-showcase/docs/Checkbox.mdx": "a98b8043488402a1afd80d5c5a2eda582cef08d0c80fb1b41f10bbb91238e911"
       },
       "category": "Forms"
     },
@@ -1089,18 +1091,20 @@
     {
       "id": "primitives-formfield",
       "name": "FormField",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Field caption, control association, help, error and stacked/inline layout.",
+      "coverage": "documented",
+      "adoption": "Listen forms and Admin playlist identity fields; full page adoption remains pending",
+      "storyId": "components-formfield",
+      "story": "tools/crate-ui-showcase/stories/FormField.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FormField.mdx",
       "sources": [
         "app/shared/ui/primitives/FormField.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/FormField.tsx": "cb021d82a71693a829c0e2b97fd85cc1a7cdeb54a78712380b766461a5d67b32"
+        "app/shared/ui/primitives/FormField.tsx": "51219738a5841395e79e9152fe3be4d419aa6c5b05f79baa78bccc463b1deced",
+        "tools/crate-ui-showcase/stories/FormField.stories.tsx": "d8d83921dff37e4e94fd92b81a89593ef12bb3866252f2aa9a8618769befeacc",
+        "tools/crate-ui-showcase/docs/FormField.mdx": "4bdeee7e3bb699361dcea268307d477cc560e71e656409f1bb99f61790a5516f"
       },
       "category": "Forms"
     },
@@ -1233,54 +1237,60 @@
     {
       "id": "primitives-radiogroup",
       "name": "RadioGroup",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared RadioGroup form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumers; direct Admin adoption pending",
+      "storyId": "components-radiogroup",
+      "story": "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/RadioGroup.mdx",
       "sources": [
         "app/shared/ui/primitives/RadioGroup.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/RadioGroup.tsx": "46520955d4705d046965f788042b1d3845f692cdc3d6d640974d5ec6126fa2f4"
+        "app/shared/ui/primitives/RadioGroup.tsx": "25ea47560430742f51ab7aed77d51d4b135001f8dddd40aa26e26997916c4c4f",
+        "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx": "b6bda01d491dbd1b29a4b90cf0e654d02b8d24e91a2fa2864ec2725d697432d9",
+        "tools/crate-ui-showcase/docs/RadioGroup.mdx": "b5b20e5b17999ce78316dd72c3d33075e4f70ea0ab693e1daa89678bbf00da8f"
       },
       "category": "Forms"
     },
     {
       "id": "primitives-readout",
       "name": "Readout",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Contextual Mono reading with a separate committed announcement.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-readout",
+      "story": "tools/crate-ui-showcase/stories/Readout.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Readout.mdx",
       "sources": [
         "app/shared/ui/primitives/Readout.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/Readout.tsx": "6dfa035788e0a54757dc8095a33d346cfc3b96ce3d7d8cf81064e2a5bb155f69"
+        "app/shared/ui/primitives/Readout.tsx": "877a73be30722a3096f74460d86485949807626dddf57ce07b0b14c20ff60a9f",
+        "tools/crate-ui-showcase/stories/Readout.stories.tsx": "4f9a168ec50ded5ca454e6669b3bed177d788ecf6ea78c04d71185d22ec0670b",
+        "tools/crate-ui-showcase/docs/Readout.mdx": "c3cc4154c365f5c825b9bc2a239099372e191b0201ac7ec036ddd2f6d2d135b2"
       },
       "category": "Data Display"
     },
     {
       "id": "primitives-searchinput",
       "name": "SearchInput",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared SearchInput form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-searchinput",
+      "story": "tools/crate-ui-showcase/stories/SearchInput.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SearchInput.mdx",
       "sources": [
         "app/shared/ui/primitives/SearchInput.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/SearchInput.tsx": "d21bdf9321c063bed8712199008bef3a6ffa2c05a10d971f27e298893c8faa7f"
+        "app/shared/ui/primitives/SearchInput.tsx": "4cc93dd710412e3594718bd66aa07510d8f910cc1d3ce8918bad294734351fa6",
+        "tools/crate-ui-showcase/stories/SearchInput.stories.tsx": "eaf42c873df434baa911eabd627c379523fa513821e819839fb055c00fe53005",
+        "tools/crate-ui-showcase/docs/SearchInput.mdx": "20e4dfb6ce440ea3f403c9d5fd03d0a0d8b621a8774bd9ea31a77a63b7a39401"
       },
       "category": "Forms"
     },
@@ -1341,18 +1351,20 @@
     {
       "id": "primitives-switch",
       "name": "Switch",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared Switch form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-switch",
+      "story": "tools/crate-ui-showcase/stories/Switch.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Switch.mdx",
       "sources": [
         "app/shared/ui/primitives/Switch.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b"
+        "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b",
+        "tools/crate-ui-showcase/stories/Switch.stories.tsx": "d62bcec0b12e968f9f349e78c8e66fec662246320d7ff0a4a164dcac2cc254aa",
+        "tools/crate-ui-showcase/docs/Switch.mdx": "52536c25348fb7550fab502a687cbf0be85ac9d8de57f36f706b50977a24d772"
       },
       "category": "Forms"
     },
@@ -1484,19 +1496,21 @@
     },
     {
       "id": "shadcn-input",
-      "name": "input",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Input",
+      "purpose": "Shared Input form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-input",
+      "story": "tools/crate-ui-showcase/stories/Input.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Input.mdx",
       "sources": [
         "app/shared/ui/shadcn/input.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda"
+        "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda",
+        "tools/crate-ui-showcase/stories/Input.stories.tsx": "cd1f45b1440a588c2fe953ee4ea018c48fc3cd4f97c53e8097756d9c0a759c81",
+        "tools/crate-ui-showcase/docs/Input.mdx": "6215d5f0d38a3291e2ebde37d53795411a7ef8ccb51333a383f046d1cdab9a22"
       },
       "category": "Forms"
     },
@@ -1574,19 +1588,21 @@
     },
     {
       "id": "shadcn-select",
-      "name": "select",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Select",
+      "purpose": "Shared Select form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-select",
+      "story": "tools/crate-ui-showcase/stories/Select.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Select.mdx",
       "sources": [
         "app/shared/ui/shadcn/select.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/select.tsx": "2668625e5e9cec7b58fedd851dab5f4cf5965982e6fd600f5e699f24aa273b14"
+        "app/shared/ui/shadcn/select.tsx": "2668625e5e9cec7b58fedd851dab5f4cf5965982e6fd600f5e699f24aa273b14",
+        "tools/crate-ui-showcase/stories/Select.stories.tsx": "015b9c0ab4d16d8a473a4522e230a9eee561165850a81498480ef9eea47e2316",
+        "tools/crate-ui-showcase/docs/Select.mdx": "47691c2c907f3e9a4ceac1a8ca8128f1ecf5308ffd6c2f8a599b708d13b044e0"
       },
       "category": "Forms"
     },
@@ -1682,19 +1698,21 @@
     },
     {
       "id": "shadcn-textarea",
-      "name": "textarea",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Textarea",
+      "purpose": "Shared Textarea form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-textarea",
+      "story": "tools/crate-ui-showcase/stories/Textarea.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Textarea.mdx",
       "sources": [
         "app/shared/ui/shadcn/textarea.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909"
+        "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909",
+        "tools/crate-ui-showcase/stories/Textarea.stories.tsx": "cace2303feab2e7c21deb1ad7ac063c3f1e602bd8d1a09ccdd10d854465f19da",
+        "tools/crate-ui-showcase/docs/Textarea.mdx": "0055322129f8ceb7273f10db551931a4c3faa7a6cb3bfae0bfe88b4595f2beaa"
       },
       "category": "Forms"
     },
@@ -1715,6 +1733,26 @@
         "app/shared/ui/shadcn/tooltip.tsx": "17d90cc8bda59262493ea876d357c9e80d2e793f8a3d29bd910d44ec499fcd99"
       },
       "category": "Overlays"
+    },
+    {
+      "id": "slider",
+      "name": "Slider",
+      "purpose": "General native numeric range with the shared thin rail and form target.",
+      "category": "Forms",
+      "coverage": "documented",
+      "adoption": "Admin processing threshold and Listen settings ranges; specialized player/EQ controls remain separate",
+      "storyId": "components-slider",
+      "story": "tools/crate-ui-showcase/stories/Slider.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Slider.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Slider.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Slider.tsx": "4a9191416f323f49132012745499cca868e8ca6ee80fe93a908956b4dfecc88c",
+        "tools/crate-ui-showcase/stories/Slider.stories.tsx": "6abf79cdd2552c32659d128f210499957f18692002100981c07202dac97f96bc",
+        "tools/crate-ui-showcase/docs/Slider.mdx": "4956274ab58ccdf59cf634b25885a2e4cc3cd9f3c3c2a977e469c7108d73efce"
+      }
     }
   ]
 }

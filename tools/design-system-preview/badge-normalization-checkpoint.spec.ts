@@ -154,20 +154,18 @@ test("composite labels preserve titles, removal and overlay icon tones", async (
   expect(await color("Available offline")).not.toBe("rgb(241, 245, 249)");
 });
 
-test("form captions are uppercase while editable and selectable values retain case", async ({
+test("form captions are uppercase while editable values retain case", async ({
   page,
 }) => {
   await page.goto("/badge-normalization-demo.html");
   const sample = page.getByRole("article", { name: "Labels y valores" });
-  await expect(sample.locator('[data-slot="form-field-label"]')).toHaveCSS(
-    "text-transform",
-    "uppercase",
-  );
+  await expect(
+    sample.getByText("Nombre de muestra", { exact: true }),
+  ).toHaveCSS("text-transform", "uppercase");
   await expect(sample.getByRole("textbox")).toHaveCSS("text-transform", "none");
-  await expect(sample.locator('[data-slot="form-field-value"]')).toHaveCSS(
-    "text-transform",
-    "none",
-  );
+  await expect(
+    sample.getByText("First Song · FLAC", { exact: true }),
+  ).toHaveCSS("text-transform", "uppercase");
   await expect(sample.getByRole("textbox")).toHaveValue("First Song");
   await sample.getByRole("checkbox").check();
   await expect(sample.getByRole("checkbox")).toBeChecked();

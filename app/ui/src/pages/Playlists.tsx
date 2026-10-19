@@ -1,3 +1,4 @@
+import { FormField } from "@crate/ui/primitives/FormField";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import {
@@ -618,7 +619,9 @@ export function Playlists() {
                       />
                     </PageHeaderAction>
                     <PageHeaderAction
-                      label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
+                      label={`${
+                        playlist.is_active ? "Deactivate" : "Activate"
+                      } ${playlist.name}`}
                       tooltip={playlist.is_active ? "Deactivate" : "Activate"}
                       onClick={() => {
                         void toggleActive(playlist);
@@ -759,14 +762,14 @@ function CreateStaticPlaylistPanel({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
-          <Field label="Name">
+          <FormField label="Name">
             <Input
               aria-label="Name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Playlist name"
             />
-          </Field>
+          </FormField>
           <Field label="Category">
             <AdminSelect
               placeholder="Category"
@@ -786,7 +789,7 @@ function CreateStaticPlaylistPanel({
               placeholder="Optional"
             />
           </Field>
-          <Field label="Description" className="lg:col-span-3">
+          <FormField label="Description" className="lg:col-span-3">
             <Textarea
               aria-label="Description"
               value={description}
@@ -794,7 +797,7 @@ function CreateStaticPlaylistPanel({
               placeholder="Short editorial description for listen"
               rows={4}
             />
-          </Field>
+          </FormField>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
@@ -1011,14 +1014,14 @@ function CreateSmartPlaylistPanel({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
-          <Field label="Name">
+          <FormField label="Name">
             <Input
               aria-label="Name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Playlist name"
             />
-          </Field>
+          </FormField>
           <Field label="Category">
             <AdminSelect
               placeholder="Category"
@@ -1038,7 +1041,7 @@ function CreateSmartPlaylistPanel({
               placeholder="Optional"
             />
           </Field>
-          <Field label="Description" className="lg:col-span-3">
+          <FormField label="Description" className="lg:col-span-3">
             <Textarea
               aria-label="Description"
               value={description}
@@ -1046,7 +1049,7 @@ function CreateSmartPlaylistPanel({
               placeholder="Editorial summary shown in listen"
               rows={4}
             />
-          </Field>
+          </FormField>
         </div>
 
         <div className="rounded-md border border-white/10 bg-black/10 p-4">

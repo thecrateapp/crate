@@ -7,10 +7,12 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h1">MonoLabel</DocHeading>
 
-<EntryDetails id="mono-label" />
+<EntryDetails id="mono-label" review="Visual review pending · 1AR" />
 
 <DocHeading as="h2">Contract</DocHeading>
 
+- Always uppercase, in both sizes and every layout. This includes the captions beside Checkbox, Switch and RadioGroup options; inline placement never creates a separate label style.
+- The component applies CSS text-transform; callers pass natural text. The original children and metadata strings are not uppercased in JavaScript. The component's uppercase utility wins over a caller's normal-case, lowercase or capitalize utility.
 - Use for labels and metadata, not body copy or highlighted metrics.
 - `size=label|eyebrow`, a semantic `as`, `accent` and `meta`. Consumers must preserve its font, weight and case.
 - Wrapping is supported. Scene wrappers constrain width without correcting component internals.
@@ -19,6 +21,8 @@ import { DocHeading } from "../components/DocHeading";
 
 <Canvas of={Stories.Base} />
 
+<Canvas of={Stories.UppercaseContract} />
+
 <Controls />
 
-Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+Diego approved the visual reference at 1AQ. The enforced case contract is part of the local 1AR review. Consumer adoption and platform QA remain separate statuses.

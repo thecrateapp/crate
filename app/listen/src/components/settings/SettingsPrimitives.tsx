@@ -1,5 +1,7 @@
 import { useId, type ReactNode } from "react";
 
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Slider } from "@crate/ui/primitives/Slider";
 import { Switch } from "@crate/ui/primitives/Switch";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 
@@ -44,31 +46,30 @@ export function RangeRow({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className={`crate-form-field ${disabled ? "opacity-50" : ""}`}>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-sm font-medium text-text-primary">{label}</div>
-          {description ? (
-            <p className="mt-1 text-xs leading-5 text-text-muted">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-full border border-border-quiet/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
-          {displayValue ?? value}
-        </div>
-      </div>
-      <input
-        type="range"
-        aria-label={label}
+    <FormField
+      label={
+        <span className="flex items-center justify-between gap-4">
+          <span>{label}</span>
+          <span
+            aria-hidden="true"
+            data-slot="form-field-value"
+            className="font-mono font-normal text-label normal-case"
+          >
+            {displayValue ?? value}
+          </span>
+        </span>
+      }
+      hint={description}
+    >
+      <Slider
         min={min}
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="settings-range w-full disabled:cursor-not-allowed"
       />
-    </div>
+    </FormField>
   );
 }
 

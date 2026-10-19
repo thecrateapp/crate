@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -22,7 +22,11 @@ export default defineConfig({
           )
         )
           return {
-            code: `import { EditorEventSource as EventSource } from ${JSON.stringify(fileURLToPath(new URL("admin-playlist-editor-fixtures.ts", import.meta.url)))};\n${code}`,
+            code: `import { EditorEventSource as EventSource } from ${JSON.stringify(
+              fileURLToPath(
+                new URL("admin-playlist-editor-fixtures.ts", import.meta.url),
+              ),
+            )};\n${code}`,
             map: null,
           };
       },
@@ -198,6 +202,12 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         main: fileURLToPath(new URL("index.html", import.meta.url)),
+        review1arLabels: fileURLToPath(
+          new URL("review-1ar-labels.html", import.meta.url),
+        ),
+        review1arForms: fileURLToPath(
+          new URL("review-1ar-forms.html", import.meta.url),
+        ),
         adminNavigation: fileURLToPath(
           new URL("admin-navigation-demo.html", import.meta.url),
         ),

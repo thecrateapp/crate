@@ -7,7 +7,7 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h1">SegmentedControl</DocHeading>
 
-<EntryDetails id="segmented-control" />
+<EntryDetails id="segmented-control" review="Visual review pending · 1AR" />
 
 <DocHeading as="h2">Contract</DocHeading>
 
@@ -18,9 +18,13 @@ import { DocHeading } from "../components/DocHeading";
 <DocHeading as="h2">Real component</DocHeading>
 
 <Canvas of={Stories.Keyboard} />
+<Canvas of={Stories.Tabs} />
+<Canvas of={Stories.Tonal} />
+<Canvas of={Stories.FullWidth} />
+<Controls of={Stories.Keyboard} />
 
-<Controls />
+Controls expose the actual shared props. Radio and tabs examples keep state in Storybook args; tabs include their matching panel.
 
-Coverage to expand: the current wrapper demonstrates radio mode. Real-prop controls and the tabs example are pending; consult the exported component type for the full API.
+The 1AQ reference remains approved. This entry has 1AR changes pending review; consumer adoption and platform QA remain separate.
 
-Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+The root forwards `id`, `aria-labelledby`, `aria-describedby`, `aria-invalid` and `aria-required` supplied by FormField. Use `FormField kind="group"` to associate the visible caption and help/error with this non-labelable group. Radio mode exposes `aria-checked`; tab mode exposes `aria-selected` and controls its panel. Both legacy visual variants share the V3 recipe.

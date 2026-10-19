@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -76,14 +78,12 @@ function Demo() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+            <FormField layout="inline" label="Permitir escaneo de muestra">
+              <Checkbox
                 checked={isAdmin}
-                onChange={(e) => setAdmin(e.target.checked)}
+                onCheckedChange={(checked) => setAdmin(checked === true)}
               />
-              Permitir escaneo de muestra
-            </label>
+            </FormField>
             <Button
               variant="outline"
               className="min-h-11"

@@ -4438,7 +4438,6 @@ Diego additionally requests an audit of any plan deviation, not just visual exam
 read-only findings will separate approved amendments, inherited/unmigrated scope, involuntary
 drift and outstanding QA. No further implementation or publication is authorized by that audit.
 
-
 ### 1AP final local stop and broad plan audit — 2026-10-19
 
 One fresh read-only review verified all 65 pre-repair pending paths, 58 source/asset hashes and
@@ -4468,24 +4467,22 @@ The audit does not silently repair earlier published checkpoints or start the ne
 commit/push, for Diego's review.** Canonical 1M images/manifest and pin 258bbaee remain intact.
 A20, phase 6.8, global 1b.8, full-phase CI and native/live QA remain pending.
 
-
 ### Executor rulings for behaviors the independent review did not certify
 
-| Behavior | Ruling | Concrete cost / limit |
-| --- | --- | --- |
-| Remaining PlaylistEditor icons and typography | Next bounded group; 1AP reviews only its changed operator/artwork/row contracts. | Editor remains partially migrated; no claim of page completion. |
-| Existing Playlists read-error presentation and concurrent mutations | Preserve existing handlers/state/requests; affected tests and AST show no introduced contract change. Future page-state adoption remains separate. | A read error can resemble empty data after its toast; no new concurrency guarantees. |
-| Earlier Users sticky header and shared Select visible-label association | Carry both known Minors without unrelated source changes. | Sticky overlap and complete combobox label/AT qualification remain unresolved. Native-input names sampled by the audit do not close the Select issue. |
-| Live image auth, retries and native transport | Existing helpers and delegation unchanged; shared/Admin/Listen consumer tests plus Desktop aliases pass. | Real authenticated media, runtime retries and native-device behavior remain uncertified locally. |
-| Full suites, CI, canonical/native/AT certification | Defer under Diego's scoped serial testing policy and documented phase-close procedure. | Forty diagnostic views and focused tests cannot qualify all data/states/devices. Canonical evidence remains 1M. |
-| Broad plan deviations and incomplete Smart Mix/A20/6.8/global 1b.8 | Execute a separate read-only audit and persist findings; do not turn it into another implementation group. | Confirmed historical typography/contrast/geometry and adoption debts remain listed until a correction iteration; no global completion claim. |
-| Inherited solid-surface/token drift beyond changed rendering | Additional row files are style-only; classify existing panels/utilities in the broad audit and assign later adoption. | Translucent/shadowed local ops surfaces and other legacy styles still diverge from the final target. |
+| Behavior                                                                | Ruling                                                                                                                                             | Concrete cost / limit                                                                                                                                 |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remaining PlaylistEditor icons and typography                           | Next bounded group; 1AP reviews only its changed operator/artwork/row contracts.                                                                   | Editor remains partially migrated; no claim of page completion.                                                                                       |
+| Existing Playlists read-error presentation and concurrent mutations     | Preserve existing handlers/state/requests; affected tests and AST show no introduced contract change. Future page-state adoption remains separate. | A read error can resemble empty data after its toast; no new concurrency guarantees.                                                                  |
+| Earlier Users sticky header and shared Select visible-label association | Carry both known Minors without unrelated source changes.                                                                                          | Sticky overlap and complete combobox label/AT qualification remain unresolved. Native-input names sampled by the audit do not close the Select issue. |
+| Live image auth, retries and native transport                           | Existing helpers and delegation unchanged; shared/Admin/Listen consumer tests plus Desktop aliases pass.                                           | Real authenticated media, runtime retries and native-device behavior remain uncertified locally.                                                      |
+| Full suites, CI, canonical/native/AT certification                      | Defer under Diego's scoped serial testing policy and documented phase-close procedure.                                                             | Forty diagnostic views and focused tests cannot qualify all data/states/devices. Canonical evidence remains 1M.                                       |
+| Broad plan deviations and incomplete Smart Mix/A20/6.8/global 1b.8      | Execute a separate read-only audit and persist findings; do not turn it into another implementation group.                                         | Confirmed historical typography/contrast/geometry and adoption debts remain listed until a correction iteration; no global completion claim.          |
+| Inherited solid-surface/token drift beyond changed rendering            | Additional row files are style-only; classify existing panels/utilities in the broad audit and assign later adoption.                              | Translucent/shadowed local ops surfaces and other legacy styles still diverge from the final target.                                                  |
 
 Executor also accepts the four Minor findings as real requirement gaps, fixes them in one scoped
 pass and stops without another review loop. The original reviewed snapshot is preserved; final
 post-repair hashes identify exactly what changed. This is local readiness for Diego's review,
 not approval to publish or a claim that the broad audit findings are already corrected.
-
 
 ### 1AP authorized audit reconciliation — local validation, 2026-10-19
 
@@ -4517,7 +4514,6 @@ regex escapes in the touched drift tool were removed after lint RED;17Node cases
 One fresh independent review of this new authorized amendment follows; the earlier reviewed
 1AP freeze remains historical. **Stop1AP without commit/push; preview stays active at :5186.**
 
-
 ### 1AP audit reconciliation — final local stop, 2026-10-19
 
 Fresh independent review verified86/86pendingpaths,77/77source/asset hashes and the22source-path
@@ -4539,22 +4535,21 @@ The persistent1AP section now links the eight affected real-page specimens. Prev
 
 #### Executor rulings on all behaviors set aside by the fresh review
 
-| Behavior | Ruling | Concrete cost / limit |
-| --- | --- | --- |
-| Full legacy panel/surface migration | A5 is ownership/phase assignment in this approved order; exact records and acceptance criteria exist. | Translucent/shadowed inherited panels remain until the owning page migration. |
-| Remaining PlaylistEditor icons, compact typography and tag overrides | Keep the next bounded group separate; changed operator/artwork/row contracts are covered here. | Editor remains partially migrated; this is no A20/6.8 completion claim. |
-| Existing Playlists read-error and concurrent mutations | Preserve actual handlers and API/state semantics, verified by affected tests/AST. | Read error may still look empty after the toast; no stronger concurrency guarantee. |
-| Users sticky header and shared Select visible-label association | Carry the two earlier known Minors to their consumer work. | Sticky overlap and complete combobox label/AT qualification remain unresolved. |
-| Every untouched element/unvisited contrast or typography state | Accept recorded representative computed tests only. | No whole-product conformance certificate; further states can still expose drift. |
+| Behavior                                                                     | Ruling                                                                                                                          | Concrete cost / limit                                                                                                                    |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Full legacy panel/surface migration                                          | A5 is ownership/phase assignment in this approved order; exact records and acceptance criteria exist.                           | Translucent/shadowed inherited panels remain until the owning page migration.                                                            |
+| Remaining PlaylistEditor icons, compact typography and tag overrides         | Keep the next bounded group separate; changed operator/artwork/row contracts are covered here.                                  | Editor remains partially migrated; this is no A20/6.8 completion claim.                                                                  |
+| Existing Playlists read-error and concurrent mutations                       | Preserve actual handlers and API/state semantics, verified by affected tests/AST.                                               | Read error may still look empty after the toast; no stronger concurrency guarantee.                                                      |
+| Users sticky header and shared Select visible-label association              | Carry the two earlier known Minors to their consumer work.                                                                      | Sticky overlap and complete combobox label/AT qualification remain unresolved.                                                           |
+| Every untouched element/unvisited contrast or typography state               | Accept recorded representative computed tests only.                                                                             | No whole-product conformance certificate; further states can still expose drift.                                                         |
 | Arbitrary runtime-generated classes and files outside registered guard scope | Static guard covers registered roles/literal branches and exact pending surfaces; dynamic classes remain outside its guarantee. | Runtime/unsampled file drift still requires consumer review. Ordinary variant and lexical-constant gaps inside the guarantee were fixed. |
-| Live backend, authenticated artwork and retries | Helpers/contracts unchanged; use fixtures/delegation tests locally. | Production service freshness, credentials and runtime retry behavior remain uncertified. |
-| Native/AT/zoom/other engines/canonical/fullsuite/CI | Follow Diego's phase-close procedure and scoped serial iteration policy. | Native accessibility, engines and full-phase qualification remain pending; canonical evidence stays1M. |
+| Live backend, authenticated artwork and retries                              | Helpers/contracts unchanged; use fixtures/delegation tests locally.                                                             | Production service freshness, credentials and runtime retry behavior remain uncertified.                                                 |
+| Native/AT/zoom/other engines/canonical/fullsuite/CI                          | Follow Diego's phase-close procedure and scoped serial iteration policy.                                                        | Native accessibility, engines and full-phase qualification remain pending; canonical evidence stays1M.                                   |
 
 Ruling: complete the two directly requested new-guard correctness gaps in the single repair
 pass rather than leave A6 partly effective under the generic Minor-defer guideline. Cost: the
 guard gains bounded parsing/binding logic and four focused tests; no second review or broad
 source repair. Both original reviewed packages and final repair freezes are retained.
-
 
 ### 1AP approved — publication preparation, 2026-10-19
 
@@ -4564,7 +4559,6 @@ before publication metadata changes. The persistent1AP label/footer now say publ
 its embedding expectation changes. Earlier1AP local stops are historical. The next checkpoint
 is1AQ, to stop uncommitted for Diego; no PR/merge/rebase/deploy/release or fullCI/baselines.
 The resulting verified publication SHA is recorded in the subsequent1AQ continuation record.
-
 
 ### 1AP published; 1AQ PlaylistEditor local — 2026-10-19
 
@@ -4608,7 +4602,6 @@ Final scoped evidence and reviewer rulings are recorded in the main handover/cur
 
 No full suites, full CI, baseline recording/comparison, native/live/AT certification, dependency
 or backend change. One fresh read-only review follows; **1AQ remains uncommitted**.
-
 
 ### 1AQ later steering — basic actions and form Selects, 2026-10-19
 
@@ -4664,17 +4657,17 @@ reviewer considers1AQ ready for Diego’s local review. This is not phase/releas
 
 Executor rulings on every behavior the reviewer declined:
 
-| Behavior | Ruling and reason | Cost / remaining acceptance |
-| --- | --- | --- |
-| Inherited panel opacity/shadows | Keep exact owned6.8/A20 surface debt; preserve bounded scope | Final solid-surface migration remains open |
-| Keyboard reorder | Preserve drag contracts; defer new interaction to6.8/A20 | Keyboard-only reorder remains unavailable; not covered by Select/action keyboard checks |
-| Read error/missing presentation | Preserve existing data handling | Failed reads can still look like missing data; phase/live QA remains |
-| Concurrent mutations / duplicate submissions | Preserve current callbacks/gates | Races remain possible; no new concurrency guarantee |
-| Refetch resets unsaved fields | Preserve existing initialization effect | Another draft may reset after a mutation; future state-contract work |
-| Stale simulation after rule edits | Preserve preview behavior | No automatic preview invalidation/freshness guarantee |
-| Wholesale artist/album text conversion | Keep body copy Poppins; scoped labels/readings use Mono400 | Investigate specific metadata role evidence in its consumer |
-| Shared Select visible-label association | Preserve shared implementation with descriptive accessible names | Earlier label activation/AT limitation remains; AT certification open |
-| Other action-icon locations | Keep23proposals/15owning-phase sites as inventory | Visual consistency across those sites awaits reviewed groups; global1b.8 stays open |
+| Behavior                                     | Ruling and reason                                                | Cost / remaining acceptance                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Inherited panel opacity/shadows              | Keep exact owned6.8/A20 surface debt; preserve bounded scope     | Final solid-surface migration remains open                                              |
+| Keyboard reorder                             | Preserve drag contracts; defer new interaction to6.8/A20         | Keyboard-only reorder remains unavailable; not covered by Select/action keyboard checks |
+| Read error/missing presentation              | Preserve existing data handling                                  | Failed reads can still look like missing data; phase/live QA remains                    |
+| Concurrent mutations / duplicate submissions | Preserve current callbacks/gates                                 | Races remain possible; no new concurrency guarantee                                     |
+| Refetch resets unsaved fields                | Preserve existing initialization effect                          | Another draft may reset after a mutation; future state-contract work                    |
+| Stale simulation after rule edits            | Preserve preview behavior                                        | No automatic preview invalidation/freshness guarantee                                   |
+| Wholesale artist/album text conversion       | Keep body copy Poppins; scoped labels/readings use Mono400       | Investigate specific metadata role evidence in its consumer                             |
+| Shared Select visible-label association      | Preserve shared implementation with descriptive accessible names | Earlier label activation/AT limitation remains; AT certification open                   |
+| Other action-icon locations                  | Keep23proposals/15owning-phase sites as inventory                | Visual consistency across those sites awaits reviewed groups; global1b.8 stays open     |
 
 Final evidence:69unit/policy cases,25browser cases across the documented final run and one
 embedding retest; scoped types/lint/AST/schema checks, Admin and22-entry preview builds. Initial
@@ -4775,17 +4768,17 @@ grupo; preview5186activo**. Evidencia final y límites: [estado vigente](2026-10
 
 -307/307casos Vitest en30archivos afectados, serial `--maxWorkers=1`.
 -80casos de preview de cabeceras/Editor/Playlists cubiertos:79pasaron en el lote final; el caso
- de tooltip deshabilitado se corrigió para esperar la salida real de Radix y pasó en los3anchos
- con3repeticiones (9/9). Otros45casos de checkpoints afectados:40pasaron inicialmente y5/5tras
- corregir un selector de badges que incluía wrappers y la espera del iframe persistente.
+de tooltip deshabilitado se corrigió para esperar la salida real de Radix y pasó en los3anchos
+con3repeticiones (9/9). Otros45casos de checkpoints afectados:40pasaron inicialmente y5/5tras
+corregir un selector de badges que incluía wrappers y la espera del iframe persistente.
 -26/26casos sobre el build de Admin en7archivos seleccionados: rutas/capacidades, consultas,
- mutaciones, confirmaciones y contratos de creación/edición; Playwright `--workers=1`.
+mutaciones, confirmaciones y contratos de creación/edición; Playwright `--workers=1`.
 -Tipos estrictos de cambios/pruebas y lint focalizado verdes. Build/budget inicial de Admin:
- **526396Bgzip/532480**,8assets,margen6084B. AST18/18conserva código no visual, hooks/API,
- bindings nativos y gates previos. Hashes/anchors de18cabeceras y71sitios únicos verificados.
+**526396Bgzip/532480**,8assets,margen6084B. AST18/18conserva código no visual, hooks/API,
+bindings nativos y gates previos. Hashes/anchors de18cabeceras y71sitios únicos verificados.
 -Revisión independiente: tooltip de acciones disabled corregido con prueba RED→GREEN; trigger
- estable mantiene el mismo Button nativo y relación `aria-describedby`. Las10pruebas anteriores
- de Ops se conservan junto con las2nuevas. Sin hallazgos nuevos pendientes del pase.
+estable mantiene el mismo Button nativo y relación `aria-describedby`. Las10pruebas anteriores
+de Ops se conservan junto con las2nuevas. Sin hallazgos nuevos pendientes del pase.
 
 Rulings: Tasks/Insights/Genres conservan el default por quedar fuera de las18cabeceras
 inventariadas; esas3migraciones siguen pendientes en su fase. La evidencia focalizada no
@@ -4796,7 +4789,6 @@ Preview `crate-v3-preview.service` activo en5186. **Parada local1AQ para revisi�
 
 La discusión posterior de legibilidad de chips es una propuesta de diseño y no modifica el
 runtime. Véase el [inventario de familias](2026-10-19-crate-v3-badge-legibility-audit.md).
-
 
 ### Enmienda local1AQ: colección compartida y propuesta de filas — 2026-10-19
 
@@ -4814,13 +4806,11 @@ iluminado de notas históricas; se conserva la prohibición aprobada de iluminar
 El [estado vigente](2026-10-19-crate-v3-current-state.md) prevalece sobre stops y propuestas
 históricos. Preview5186activo, pin258bbaee y33PNG/manifest1M conservados.
 
-
 Última instrucción de Diego: pausar migraciones visuales para reconciliar el sistema completo.
 [Auditoría y catálogo propuesto](2026-10-19-crate-v3-component-reconciliation-audit.md): revisar
 contratos/adopción/overrides y aprobar el set común antes de seguir por pantallas. La propuesta
 de filas se integra en ese trabajo. No se considera aprobada la implementación del catálogo.
 Se preservan1AQlocal,preview5186y todos los checkpoints, sin commit/push.
-
 
 ### 1AQ — Storybook y primera reconciliación (estado local vigente)
 
@@ -4834,13 +4824,20 @@ Admin aún no adopta esa fila; el resto de R1–R4 sigue pendiente. Previews 600
 [contrato Hairline](2026-10-19-crate-v3-hairline-reconciliation.md).
 **Misma parada local 1AQ, sin commit/push; no se cierra la fase ni su QA.**
 
-
 Enmienda de Diego en esta revisión: el mockup aprobado y sus ajustes confirmados son la fuente
 visual de verdad. Storybook/shared lo reproducen; dudas, drift o conflictos móviles se resuelven
 con Diego. HairlineRow queda Poppins40012/18también en móvil por su confirmación explícita,
 con mínimo táctil44px; se retiran los tamaños locales anteriores. Estado/evidencia en el enlace
 vigente anterior. El pin histórico258bbaee y los baselines canónicos se conservan.
 
-
 1AQ aprobado por Diego el 2026-10-19; commit/push autorizados. El siguiente bloque es FormField
 y roles tipográficos, con parada de revisión en 1AR. Prevalece el [estado vigente](2026-10-19-crate-v3-current-state.md).
+
+1AQ publicado como `da8a4358`. 1AR agrupa toda la familia de formularios y sus roles tipográficos,
+con ejemplos nuevos solo en Storybook. Las escenas existentes conservan sus callbacks y usan
+los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-current-state.md);
+[plan de 1AR](2026-10-19-crate-v3-forms-reconciliation.md). Parada local antes de commit/push.
+
+### 2026-10-19 — revisiones aisladas por paso
+
+Diego pide una página pequeña por paso, solo con el alcance en prueba, y dejar de ampliar el mockup grande. Se conserva como referencia. La escena se comparte con Storybook, cuyo inventario/documentación sigue siendo obligatorio. Primera vista: `http://127.0.0.1:5186/review-1ar-labels.html`, también `Reviews/1AR/Field labels`. Detalle/evidencia en el estado vigente y plan1AR; sin commit/push.

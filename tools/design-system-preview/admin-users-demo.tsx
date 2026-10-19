@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
@@ -112,24 +114,20 @@ function Demo() {
               >
                 Completar acción de muestra
               </Button>
-              <label className="flex min-h-11 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              <FormField layout="inline" label="Solo lectura">
+                <Checkbox
                   checked={viewOnly}
                   disabled={state.pending}
-                  onChange={(e) => setViewOnly(e.target.checked)}
+                  onCheckedChange={(checked) => setViewOnly(checked === true)}
                 />
-                Solo lectura
-              </label>
-              <label className="flex min-h-11 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              </FormField>
+              <FormField layout="inline" label="La siguiente acción fallará">
+                <Checkbox
                   checked={state.failNext}
                   disabled={state.pending}
-                  onChange={(e) => setFailure(e.target.checked)}
+                  onCheckedChange={(checked) => setFailure(checked === true)}
                 />
-                La siguiente acción fallará
-              </label>
+              </FormField>
             </div>
             <p
               role="status"

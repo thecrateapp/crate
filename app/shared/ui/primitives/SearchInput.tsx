@@ -40,17 +40,24 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       clearLabel = "Clear search",
       onClear,
       onChange,
+      onCompositionStart,
+      onCompositionEnd,
       className,
       containerClassName,
       disabled,
+      readOnly,
       ...props
     },
     ref,
   ) {
     const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
+    const [composing, setComposing] = useState(false);
     const isControlled = controlledValue !== undefined;
     const value = isControlled ? controlledValue : uncontrolledValue;
-    const pendingEmission = useMemo(() => ({ value }), [value]);
+    const pendingEmission = useMemo(
+      () => ({ value, composing }),
+      [value, composing],
+    );
     const debouncedEmission = useDebouncedValue(pendingEmission, debounceMs);
     const lastEmittedRef = useRef(value);
     const onDebouncedChangeRef = useRef(onDebouncedChange);
@@ -61,6 +68,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     }, [onDebouncedChange]);
 
     useEffect(() => {
+      if (debouncedEmission.composing) return;
       const next = debouncedEmission.value;
       if (next === lastEmittedRef.current) return;
       lastEmittedRef.current = next;
@@ -87,7 +95,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       innerRef.current?.focus();
     };
 
-    const showClear = clearable && value.length > 0 && !disabled;
+    const showClear = clearable && value.length > 0 && !disabled && !readOnly;
 
     return (
       <div
@@ -109,7 +117,16 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           aria-label={label}
           value={value}
           onChange={handleChange}
+          onCompositionStart={(event) => {
+            setComposing(true);
+            onCompositionStart?.(event);
+          }}
+          onCompositionEnd={(event) => {
+            setComposing(false);
+            onCompositionEnd?.(event);
+          }}
           disabled={disabled}
+          readOnly={readOnly}
           className={cn(
             "pl-10 [&::-webkit-search-cancel-button]:appearance-none",
             showClear && "pr-11 pointer-coarse:pr-12",

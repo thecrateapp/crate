@@ -4,6 +4,22 @@ import { describe, expect, it } from "vitest";
 import { MonoLabel } from "./MonoLabel";
 
 describe("MonoLabel", () => {
+  describe.each(["label", "eyebrow"] as const)("%s case contract", (size) => {
+    it.each(["normal-case", "lowercase", "capitalize"])(
+      "keeps uppercase when the caller supplies %s, without rewriting the content",
+      (className) => {
+        render(
+          <MonoLabel size={size} className={className}>
+            Natural case
+          </MonoLabel>,
+        );
+        const label = screen.getByText("Natural case");
+        expect(label).toHaveClass("uppercase");
+        expect(label).not.toHaveClass(className);
+        expect(label.textContent).toBe("Natural case");
+      },
+    );
+  });
   it("renders the accent key word before the metadata", () => {
     render(
       <MonoLabel accent="Upcoming show" meta={["Ticketmaster", "Last.fm"]} />,

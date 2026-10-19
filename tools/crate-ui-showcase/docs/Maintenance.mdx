@@ -50,6 +50,14 @@ The initial baseline explicitly records pre-existing 1AQ debt. Later additions m
 
 <DocHeading as="h2">Isolation and validation</DocHeading>
 
+Each review step uses a small standalone page on 5186 containing only that step's scope. Keep
+the scene in `reviews/` and reuse it in a Storybook review story. The historical main mockup
+stays a reference and receives no new sections. Match the full approved checkpoint scope before
+sharing. Current scope: all twelve form families plus the agreed states and typography roles,
+at `Reviews/1AR/Forms` and http://127.0.0.1:5186/review-1ar-forms.html. The earlier labels URL
+remains an alias. Component entries remain the maintained
+inventory; review pages do not replace their documentation or approval status.
+
 Storybook stays outside production entry folders. Do not import it from app runtime code or place stories under shared tsup entry folders. The preview at 5186 and the 33 canonical 1M captures are preserved.
 
 Automated accessibility checks help; visual review, real keyboard use and assistive technology/native QA have separate completion criteria. Do not run full suites or CI per entry, or regenerate canonical baselines during iteration.

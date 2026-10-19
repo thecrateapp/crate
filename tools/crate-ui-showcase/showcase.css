@@ -6,6 +6,7 @@
 @source '../../app/shared/ui';
 @source './stories';
 @source './components';
+@source './reviews';
 :root {
   color-scheme: dark;
   background: var(--surface-canvas);
@@ -83,4 +84,11 @@ h3.showcase-doc-heading {
 .showcase-code {
   overflow-wrap: anywhere;
   font-family: var(--font-mono-stack);
+}
+
+.showcase-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 24px;
+  min-width: 0;
 }

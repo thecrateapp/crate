@@ -142,21 +142,19 @@ export function FormsCheckpoint() {
               </p>
             </div>
             <div className="space-y-5">
-              <label className="flex min-h-11 items-center justify-between gap-5 text-sm text-text-primary">
-                Reproducción automática
+              <label className="flex min-h-11 items-center justify-between gap-5">
+                <MonoLabel as="span">Reproducción automática</MonoLabel>
                 <Switch checked={autoplay} onCheckedChange={setAutoplay} />
               </label>
-              <label className="flex min-h-11 items-center gap-4 text-sm text-text-primary">
+              <FormField layout="inline" label="Conservar la cola de muestra">
                 <Checkbox
                   checked={keepQueue}
                   onCheckedChange={(checked) => setKeepQueue(checked === true)}
                 />
-                Conservar la cola de muestra
-              </label>
-              <label className="flex min-h-11 items-center gap-4 text-sm text-text-primary">
+              </FormField>
+              <FormField layout="inline" label="Selección parcial">
                 <Checkbox checked="indeterminate" />
-                Selección parcial
-              </label>
+              </FormField>
             </div>
             <div className="crate-form-field">
               <MonoLabel>Grupo de chips</MonoLabel>

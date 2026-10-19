@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -54,17 +56,15 @@ function Demo() {
         <h2 className="font-mono text-xs uppercase tracking-wider">
           Asistencia
         </h2>
-        <label className="flex min-h-11 items-center gap-3 text-sm">
-          <input
-            type="checkbox"
+        <FormField layout="inline" label="Servicio de IA disponible">
+          <Checkbox
             checked={available}
-            onChange={(event) => {
-              setLlmAvailable(event.target.checked);
-              setAvailable(event.target.checked);
+            onCheckedChange={(checked) => {
+              setLlmAvailable(checked === true);
+              setAvailable(checked === true);
             }}
           />
-          Servicio de IA disponible
-        </label>
+        </FormField>
         <div className="flex flex-wrap items-center gap-4">
           <LLMStatusProvider key={String(available)}>
             <AIButton loading={busy} onClick={() => setBusy(true)}>

@@ -127,3 +127,32 @@ Run `npm run design-system:showcase:refresh -- ID`, `design-system:showcase:chec
 story/consumer tests. The staged hook and shared policy test enforce correspondence; semantic
 review remains required. Do not refresh pending hashes to bypass coverage. See the showcase
 README and AGENTS. Keep stories/docs outside shared tsup entry folders and app runtime imports.
+
+
+## Complete form family — local 1AR
+
+Each review step uses a small standalone page at5186 and a matching Storybook review story,
+sharing one scene from `tools/crate-ui-showcase/reviews`. Do not grow the historical main mockup.
+This supplements, rather than replaces, mandatory component entry maintenance in Storybook.
+The isolated review must cover the full approved checkpoint scope and agreed states; compare
+its inventory with the plan before handing it over. Current1AR includes all12form families.
+
+Use FormField stacked for ordinary fields (Mono 400 uppercase caption, 8 px actual gap), or
+layout="inline" for Checkbox/Switch (control first, the same MonoLabel to the right,
+16 px horizontal gap). Layout changes placement only: every caption, including radio options,
+uses MonoLabel (Mono 400 uppercase11/15.4, caps tracking and subtle color). Hint/error stay associated below the caption. Group controls use kind="group" so their caption does not point a native label at a div.
+Composite controls use the render prop and forward all supplied id/ARIA attributes to their actual trigger/group.
+AdminSelect now forwards these attributes in both plain and searchable modes.
+
+Input/Select use the existing 40/44 px recipe and Poppins 400 15/21. Input preserves native
+number/date/time/file controls; Textarea owns its multiline geometry. SearchInput clears only
+editable queries and waits for IME composition to finish before emitting a debounced query.
+Checkbox/Switch/RadioGroup share high accent/warning and 44 px coarse hit areas; radio choices
+reserve enough space to avoid overlapping targets. SegmentedControl and FilterChip remain
+12/16 Mono 400; categories use Select, filters/modes use their appropriate controls. Slider
+is a native general form range (2 px rail, 8 px thumb, 40/44 px target), used in both apps'
+settings. Preserve specialized player/EQ progress, beam and volume behavior.
+
+All twelve forms have live Storybook entries and Patterns/Forms composes them. New samples
+belong only in Storybook. Existing persistent mockup controls, including fixture helpers,
+must import these components; preview-component-policy.test.ts rejects raw form copies.

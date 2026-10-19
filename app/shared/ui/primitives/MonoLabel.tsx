@@ -36,11 +36,13 @@ export function MonoLabel({
     <Element
       {...props}
       className={cn(
-        "m-0 font-mono font-normal uppercase text-text-subtle tabular-nums",
+        "m-0 font-mono font-normal text-text-subtle tabular-nums",
         size === "eyebrow"
           ? "text-eyebrow tracking-kicker"
           : "text-label tracking-caps",
         className,
+        // Case belongs to the label role, not to a consumer variant.
+        "uppercase",
       )}
     >
       {accent ? (

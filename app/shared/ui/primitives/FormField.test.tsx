@@ -3,6 +3,10 @@ import { render, screen } from "@testing-library/react";
 
 import { Input } from "@crate/ui/shadcn/input";
 import { FormField } from "./FormField";
+import { RadioGroup, RadioGroupItem } from "./RadioGroup";
+import { SegmentedControl } from "./SegmentedControl";
+import { Checkbox } from "./Checkbox";
+import userEvent from "@testing-library/user-event";
 import { Switch } from "./Switch";
 
 describe("FormField", () => {
@@ -146,5 +150,69 @@ describe("FormField", () => {
       </FormField>,
     );
     expect(screen.getByRole("textbox")).toHaveAttribute("aria-invalid", "true");
+  });
+  it("names a non-labelable control through its visible caption", () => {
+    render(
+      <FormField label="Quality" hint="Select one">
+        <RadioGroup defaultValue="lossless">
+          <RadioGroupItem value="lossless" aria-label="Lossless" />
+        </RadioGroup>
+      </FormField>,
+    );
+    expect(
+      screen.getByRole("radiogroup", { name: "Quality" }),
+    ).toHaveAccessibleDescription("Select one");
+  });
+
+  it("places a checkbox before its inline label and keeps label activation and descriptions", async () => {
+    render(
+      <FormField
+        layout="inline"
+        label="Keep queue"
+        hint="Preserve playback"
+        error="Choose a setting"
+      >
+        <Checkbox />
+      </FormField>,
+    );
+    const checkbox = screen.getByRole("checkbox", { name: "Keep queue" });
+    const label = screen.getByText("Keep queue").closest("label")!;
+    expect(
+      checkbox.compareDocumentPosition(label) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await userEvent.click(label);
+    expect(checkbox).toBeChecked();
+    expect(checkbox).toHaveAccessibleDescription(
+      "Preserve playback Choose a setting",
+    );
+  });
+  it("uses a group caption without a false native label target and names a segmented group", () => {
+    render(
+      <FormField
+        kind="group"
+        label="Listening mode"
+        hint="Choose one mode"
+        error="Choose an available mode"
+        required
+      >
+        <SegmentedControl
+          as="radio"
+          label="Legacy name"
+          value="all"
+          onValueChange={() => {}}
+          items={[
+            { value: "all", label: "All" },
+            { value: "local", label: "Local" },
+          ]}
+        />
+      </FormField>,
+    );
+    const group = screen.getByRole("radiogroup", { name: "Listening mode" });
+    expect(group).toHaveAccessibleDescription(
+      "Choose one mode Choose an available mode",
+    );
+    expect(group).toHaveAttribute("aria-required", "true");
+    expect(screen.getByText("Listening mode").closest("label")).toBeNull();
   });
 });

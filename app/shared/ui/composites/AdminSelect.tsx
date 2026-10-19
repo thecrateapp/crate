@@ -1,4 +1,11 @@
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ComponentProps,
+} from "react";
 import { CRATE_ICON_SIZE, ChevronDown, Search } from "@crate/ui/icons";
 
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
@@ -25,7 +32,15 @@ export interface AdminSelectOption {
   searchText?: string;
 }
 
-interface AdminSelectProps {
+interface AdminSelectProps
+  extends Pick<
+    ComponentProps<"button">,
+    | "id"
+    | "aria-describedby"
+    | "aria-labelledby"
+    | "aria-invalid"
+    | "aria-required"
+  > {
   value: string;
   onChange: (value: string) => void;
   options: AdminSelectOption[];
@@ -53,10 +68,13 @@ export function AdminSelect({
   triggerClassName,
   menuClassName,
   disabled = false,
+  id,
+  ...triggerProps
 }: AdminSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const triggerId = useId();
+  const generatedTriggerId = useId();
+  const triggerId = id ?? generatedTriggerId;
   const listboxId = `${triggerId}-listbox`;
   const searchRef = useRef<HTMLInputElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -101,6 +119,8 @@ export function AdminSelect({
         }}
       >
         <SelectTrigger
+          {...triggerProps}
+          id={triggerId}
           aria-label={placeholder}
           className={cn(DEFAULT_TRIGGER_CLASS, triggerClassName)}
         >
@@ -132,7 +152,9 @@ export function AdminSelect({
               value={`option-${index}`}
               textValue={option.label}
             >
-              <span className="truncate">{option.label}</span>
+              <span className="min-w-0 flex-1 whitespace-normal break-words">
+                {option.label}
+              </span>
               {option.count != null ? (
                 <span
                   data-slot="admin-select-count"
@@ -196,6 +218,7 @@ export function AdminSelect({
     <Popover open={open && !disabled} onOpenChange={setMenuOpen}>
       <PopoverTrigger asChild>
         <button
+          {...triggerProps}
           id={triggerId}
           type="button"
           role="combobox"
@@ -294,7 +317,9 @@ export function AdminSelect({
               onKeyDown={(event) => handleOptionKeyDown(event, index)}
               className="crate-overlay-menu-item crate-focus-inset flex w-full items-center gap-2 px-3 text-left"
             >
-              <span className="truncate">{option.label}</span>
+              <span className="min-w-0 flex-1 whitespace-normal break-words">
+                {option.label}
+              </span>
               {option.count != null ? (
                 <span
                   data-slot="admin-select-count"

@@ -9,6 +9,10 @@ doubts, deviations and mobile sizing conflicts to Diego before choosing a differ
 
 - Import actual @crate/ui components, fonts and tokens. No replicated component markup or CSS
   selectors that compensate internals. Scene layout/context only; known defects stay explicit.
+- Every review step has a small standalone page on 5186, limited to that step. Keep its scene
+  in `reviews/` and reuse it in a CSF review story; standalone pages import the scene directly,
+  never CSF or Storybook runtime. Do not append more cases to the large historical mockup.
+  Match each view against the full approved checkpoint scope, including its families and states.
 - Every added/modified shared visual module updates its catalogue entry, docs/story and relevant
   checks in the same change. Run showcase:refresh for the specific documented id, then check.
   Never regenerate the pending baseline to hide source changes. Do not edit hashes alone.

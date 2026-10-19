@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -103,14 +105,12 @@ function Demo() {
             ]}
           />
         </div>
-        <label className="flex min-h-11 items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+        <FormField layout="inline" label="Permitir mantenimiento de muestra">
+          <Checkbox
             checked={isAdmin}
-            onChange={(event) => setIsAdmin(event.target.checked)}
+            onCheckedChange={(checked) => setIsAdmin(checked === true)}
           />
-          Permitir mantenimiento de muestra
-        </label>
+        </FormField>
         <output
           aria-label="Última acción de muestra"
           className="font-mono text-xs break-all"

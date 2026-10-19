@@ -25,7 +25,7 @@ export function Readout({
       <span
         ref={setWidth}
         aria-hidden="true"
-        className="crate-readout font-mono text-eyebrow tracking-wide text-text-muted"
+        className="crate-readout font-mono font-normal text-eyebrow tracking-wide text-text-muted"
       >
         {children}
       </span>
