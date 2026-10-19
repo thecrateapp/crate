@@ -716,6 +716,40 @@ class TestJamWebSocketAuth:
         with pytest.raises(HTTPException):
             jam._auth_ws(FakeWebSocket())
 
+    def test_rejects_access_token_media_ticket(self, monkeypatch):
+        from fastapi import HTTPException
+        from crate import media_access
+        from crate.api import jam
+
+        class FakeURL:
+            path = "/api/jam/rooms/room-1/ws"
+
+        class FakeWebSocket:
+            query_params = {"media_ticket": "token-ticket"}
+            headers = {}
+            cookies = {}
+            url = FakeURL()
+
+        monkeypatch.setattr(
+            media_access,
+            "validate_media_access_ticket",
+            lambda *args, **kwargs: media_access.ValidatedMediaAccessTicket(
+                user_id=42,
+                session_id=None,
+                access_token_id=7,
+                audience="ws",
+                path=FakeURL.path,
+            ),
+        )
+
+        def fail_get_session(session_id):
+            raise AssertionError("token tickets must not look up a session")
+
+        monkeypatch.setattr(jam, "get_session", fail_get_session)
+
+        with pytest.raises(HTTPException):
+            jam._auth_ws(FakeWebSocket())
+
 
 class TestJamSerialization:
     def test_json_payload_serializes_uuid_and_datetime(self):

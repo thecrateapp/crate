@@ -20,6 +20,10 @@ import {
   setCurrentServerId,
   waitForPendingSecureSessionWrites,
 } from "@/lib/server-store";
+import {
+  getNativeOAuthCallbackUrl,
+  getNativeOAuthScheme,
+} from "@/lib/mobile-build-config";
 
 const OAUTH_NEXT_KEY = "crate-oauth-next";
 const NATIVE_OAUTH_PENDING_CALLBACK_KEY = "crate.oauth.pending-callback";
@@ -27,7 +31,6 @@ const NATIVE_OAUTH_LINK_PENDING_CALLBACK_KEY =
   "crate.oauth.link.pending-callback";
 const NATIVE_OAUTH_LINK_GENERATION_KEY = "crate.oauth.link.generation";
 const NATIVE_OAUTH_PROVIDER_ERROR_KEY = "crate.oauth.provider-error-pending";
-const NATIVE_CALLBACK_URL = "cratemusic://oauth/callback";
 const OAUTH_RECORD_MAX_AGE_MS = 15 * 60 * 1000;
 const NATIVE_LINK_VALUE_RE = /^[A-Za-z0-9_-]{16,256}$/;
 const NATIVE_LINK_VERIFIER_RE = /^[A-Za-z0-9._~-]{43,128}$/;
@@ -408,7 +411,7 @@ export async function beginNativeOAuth(
       provider: string;
       login_url: string;
     }>(serverId, `/api/auth/oauth/${provider}/start`, "POST", {
-      return_to: NATIVE_CALLBACK_URL,
+      return_to: getNativeOAuthCallbackUrl(),
       invite_token: inviteToken,
       native_code_challenge: challenge,
       native_state: state,
@@ -583,7 +586,7 @@ export async function consumeOAuthCallbackUrl(
       parsed.hostname === "oauth" &&
       parsed.pathname === "/link-callback";
     const isNativeLoginCallback =
-      parsed.protocol === "cratemusic:" &&
+      parsed.protocol === `${getNativeOAuthScheme()}:` &&
       parsed.hostname === "oauth" &&
       parsed.pathname === "/callback";
 

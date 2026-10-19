@@ -1,6 +1,6 @@
 """Database queries for library_sync — filesystem to DB synchronization."""
 
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 from sqlalchemy import text
 
 
@@ -138,3 +138,10 @@ def get_all_album_paths() -> list[dict]:
             .all()
         )
         return [dict(row) for row in rows]
+
+
+def get_album_dir_mtimes() -> dict[str, float | None]:
+    """Return the stored tree mtime of every album, keyed by album path."""
+    with read_scope() as session:
+        rows = session.execute(text("SELECT path, dir_mtime FROM library_albums")).all()
+    return {row.path: row.dir_mtime for row in rows}

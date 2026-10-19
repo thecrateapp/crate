@@ -118,6 +118,10 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
+      # The VDJ pilot is enabled only in the local development stack.
+      - CRATE_VDJ_ENABLED=true
+      - CRATE_SMART_MIX_ENABLED=true
+      - CRATE_VDJ_AUTOMATION_ENABLED=false
       - CRATE_OPEN_SUBSONIC_ENGINE=${CRATE_OPEN_SUBSONIC_ENGINE:-v1}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - CRATE_LISTEN_PUBLIC_BASE_URL=${CRATE_LISTEN_PUBLIC_BASE_URL:-https://listen.dev.lespedants.org}

@@ -90,3 +90,101 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     )
 
     assert cache_store.get_cache("key", max_age_seconds=10) is None
+
+
+class _FakeRedisPipeline:
+    def __init__(self, redis: "_FakeRedis") -> None:
+        self.redis = redis
+        self.commands: list[tuple[str, int, str]] = []
+
+    def setex(self, key: str, ttl: int, value: str) -> None:
+        self.commands.append((key, ttl, value))
+
+    def execute(self) -> None:
+        self.redis.pipeline_executions += 1
+        for key, _ttl, value in self.commands:
+            self.redis.values[key] = value
+
+
+class _FakeRedis:
+    def __init__(self, values: dict[str, str] | None = None) -> None:
+        self.values = dict(values or {})
+        self.mget_calls: list[list[str]] = []
+        self.pipeline_executions = 0
+
+    def mget(self, keys: list[str]) -> list[str | None]:
+        self.mget_calls.append(list(keys))
+        return [self.values.get(key) for key in keys]
+
+    def pipeline(self, transaction: bool = True) -> _FakeRedisPipeline:
+        return _FakeRedisPipeline(self)
+
+
+def _forbid_postgres(monkeypatch, cache_store) -> None:
+    def fail(*_args, **_kwargs):
+        raise AssertionError("plan cache must not use PostgreSQL")
+
+    monkeypatch.setattr(cache_store, "read_scope", fail)
+    monkeypatch.setattr(cache_store, "transaction_scope", fail)
+
+
+def test_smart_mix_plan_caches_read_a_batch_in_one_redis_round_trip(monkeypatch):
+    import json
+    import uuid
+
+    from crate.db import cache_store
+
+    first, second, missing = (uuid.uuid4().hex for _ in range(3))
+    prefix = f"cache:{cache_store.SMART_MIX_PLAN_CACHE_PREFIX}"
+    redis = _FakeRedis(
+        {
+            f"{prefix}{first}": json.dumps({"mode": "adaptive"}),
+            f"{prefix}{second}": json.dumps({"mode": "beatmatch"}),
+        }
+    )
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    found = cache_store.get_smart_mix_plan_caches([first, second, missing])
+
+    assert found == {first: {"mode": "adaptive"}, second: {"mode": "beatmatch"}}
+    assert len(redis.mget_calls) == 1
+    assert cache_store.get_smart_mix_plan_caches([first, second]) == {
+        first: {"mode": "adaptive"},
+        second: {"mode": "beatmatch"},
+    }
+    assert len(redis.mget_calls) == 1
+
+
+def test_smart_mix_plan_caches_write_a_batch_in_one_pipeline(monkeypatch):
+    import json
+    import uuid
+
+    from crate.db import cache_store
+
+    first, second = (uuid.uuid4().hex for _ in range(2))
+    redis = _FakeRedis()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    cache_store.set_smart_mix_plan_caches(
+        {first: {"mode": "adaptive"}, second: {"mode": "beatmatch"}}
+    )
+
+    prefix = f"cache:{cache_store.SMART_MIX_PLAN_CACHE_PREFIX}"
+    assert redis.pipeline_executions == 1
+    assert json.loads(redis.values[f"{prefix}{second}"]) == {"mode": "beatmatch"}
+
+
+def test_smart_mix_plan_caches_skip_postgres_when_redis_is_down(monkeypatch):
+    import uuid
+
+    from crate.db import cache_store
+
+    key = uuid.uuid4().hex
+    monkeypatch.setattr(cache_store, "get_redis", lambda: None)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    assert cache_store.get_smart_mix_plan_caches([key]) == {}
+    cache_store.set_smart_mix_plan_caches({key: {"mode": "adaptive"}})
+    assert cache_store.get_smart_mix_plan_caches([key]) == {key: {"mode": "adaptive"}}

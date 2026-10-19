@@ -462,7 +462,7 @@ def _auth_ws(websocket: WebSocket) -> dict:
             audience="ws",
             request_path=websocket.url.path,
         )
-        if validated:
+        if validated and validated.session_id:
             session = get_session(validated.session_id)
             if _session_is_active_for_user(session, validated.user_id):
                 return {

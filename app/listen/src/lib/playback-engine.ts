@@ -34,6 +34,50 @@ export interface EngineTrack {
   eqGains?: number[];
 }
 
+export interface EngineTransitionPlan {
+  plannerVersion: number;
+  outgoingTrackId: string;
+  incomingTrackId: string;
+  mode: "gapless" | "adaptive" | "beatmatch";
+  durationMs: number;
+  outgoingCueMs?: number;
+  incomingCueMs?: number;
+  incomingTempoRatio?: number;
+  beatPhaseOffsetMs?: number;
+  handoffProgress: number;
+  outgoingGainDb: number;
+  incomingGainDb: number;
+  curve: "equal-power";
+  bassHandoff: "none" | "balanced";
+  confidence: number;
+  fallbackReason?: string;
+}
+
+export type EngineContinuationDescriptor =
+  | { kind: "shaped_radio"; sessionId: string }
+  | {
+      kind: "seeded_radio";
+      seedType: "artist" | "track" | "album" | "playlist" | "home_playlist";
+      seedId: string;
+    };
+
+export interface EngineContinuationContext {
+  source: string;
+  preferredDurationMs: number;
+  allowBeatmatch: boolean;
+  allowBassHandoff: boolean;
+  delivery: string;
+  descriptor: EngineContinuationDescriptor | null;
+}
+
+export interface EngineAppendedTrack {
+  sequence: number;
+  id: string;
+  entityUid: string;
+  durationMs: number;
+  source: Record<string, unknown>;
+}
+
 export interface EngineQueueSnapshot {
   revision: string;
   tracks: EngineTrack[];
@@ -43,6 +87,12 @@ export interface EngineQueueSnapshot {
   repeat: EngineRepeatMode;
   crossfadeMs: number;
   volume: number;
+  transitionPlans?: EngineTransitionPlan[];
+  pendingTransitionPlans?: Promise<EngineTransitionPlan[] | undefined>;
+  replanTransitionPlans?: (
+    currentIndex?: number,
+  ) => Promise<EngineTransitionPlan[] | undefined>;
+  continuation?: EngineContinuationContext;
 }
 
 export interface EngineState extends NativeEventMetadata {
@@ -93,6 +143,12 @@ export interface EngineErrorEvent extends NativeEventMetadata {
   httpStatus?: number;
 }
 
+export interface EngineTransitionCancelledEvent extends NativeEventMetadata {
+  revision: string;
+  reason: string;
+  afterHandoff: boolean;
+}
+
 export interface EngineEventMap {
   ready: EngineState;
   stateChanged: EngineState;
@@ -102,6 +158,7 @@ export interface EngineEventMap {
   transitionStarted: EngineTransitionEvent;
   transitionProgress: EngineTransitionEvent;
   transitionEnded: EngineTransitionEvent;
+  transitionCancelled: EngineTransitionCancelledEvent;
   bufferingChanged: NativeEventMetadata & {
     revision: string;
     isBuffering: boolean;

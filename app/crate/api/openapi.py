@@ -10,6 +10,7 @@ _HTTP_METHODS = {"get", "post", "put", "delete", "patch", "options", "head"}
 _SECURED_TAGS = {"radio", "genres"}
 _SECURED_PATHS = {
     "/api/artists/{artist_id}/radio",
+    "/api/playback/continuation-token",
 }
 _PUBLIC_AUTH_PATHS = {
     "/api/auth/login",

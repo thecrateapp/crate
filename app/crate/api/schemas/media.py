@@ -56,13 +56,19 @@ class TrackRefResponse(IdentityFieldsMixin):
     album: str
     path: str | None = None
     duration: float | int | None = None
+    year: str | int | None = None
+    genre: str | None = None
     bpm: float | None = None
     audio_key: str | None = None
     audio_scale: str | None = None
+    has_cover: bool | int | None = None
+    cover_url: str | None = None
     energy: float | None = None
     danceability: float | None = None
     valence: float | None = None
     bliss_vector: list[float] | None = None
+    camelot: str | None = None
+    analysis_required: bool | None = None
 
 
 class FederationSearchStatusResponse(BaseModel):
@@ -296,6 +302,7 @@ class PlaybackResolutionResponse(BaseModel):
     variant_status: str | None = None
     playback_session: str
     content_origin: Literal["local", "remote", "imported"]
+    entity_uid: str | None = None
 
 
 class PlaybackPrepareTrackRequest(BaseModel):

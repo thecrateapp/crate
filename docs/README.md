@@ -24,6 +24,11 @@ readers.
 
 ## Choose a path
 
+- **Continue Smart Mix, Android native crossfade or VirtualDJ:** use the
+  [unified design](technical/smart-mix-design.md) and
+  [continuation plan](technical/smart-mix-implementation-plan.md). These are
+  the only current feature guides; earlier plans and spikes are historical.
+
 - **Run Crate at home:** start with [Quickstart](technical/00-quickstart.md),
   then [Deployment profiles](technical/deployment-profiles.md) and
   [Operations](technical/operations.md).

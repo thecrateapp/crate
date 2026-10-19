@@ -27,6 +27,7 @@ from crate.db.repositories.library_sync_writes import upsert_scanned_album
 from crate.entity_ids import artist_entity_uid as build_artist_entity_uid
 from crate.db.jobs.sync import (
     delete_track_by_path,
+    get_album_dir_mtimes,
     get_album_id_by_path,
     get_album_track_count,
     get_all_album_paths,
@@ -37,6 +38,7 @@ from crate.db.jobs.sync import (
 )
 from crate.storage_layout import canonical_entity_uid, entity_uid_for
 from crate.utils import COVER_NAMES, PHOTO_NAMES, normalize_key, to_datetime
+from crate.smart_mix.source import smart_mix_source_revision_from_stat
 
 log = logging.getLogger(__name__)
 
@@ -230,7 +232,8 @@ class LibrarySync:
 
         total_artists = len(canonical_map)
 
-        # Pre-fetch all existing artists to avoid N+1 queries
+        # Pre-fetch all existing artists and album tree mtimes to avoid N+1 queries
+        album_mtimes = get_album_dir_mtimes()
         all_existing, _ = get_library_artists(per_page=100000)
         existing_by_name = {a["name"].lower(): a for a in all_existing}
         existing_by_folder = {
@@ -252,6 +255,7 @@ class LibrarySync:
                     existing
                     and isinstance(dir_mtime, (int, float))
                     and dir_mtime >= max_mtime
+                    and self._album_trees_unchanged(dirs, album_mtimes)
                 ):
                     tracks_total += existing.get("track_count", 0)
                     if progress_callback and i % 50 == 0:
@@ -328,6 +332,40 @@ class LibrarySync:
         if has_flac:
             all_audio = [f for f in all_audio if f.suffix.lower() != ".m4a"]
         return all_audio, latest_mtime
+
+    def _album_trees_unchanged(
+        self, artist_dirs: list[Path], album_mtimes: Mapping[str, float | None]
+    ) -> bool:
+        for album_dir in self._album_dirs(artist_dirs):
+            stored = album_mtimes.get(str(album_dir))
+            if not isinstance(stored, (int, float)):
+                return False
+            if self._album_tree_mtime(album_dir) > stored:
+                return False
+        return True
+
+    def _album_dirs(self, artist_dirs: list[Path]) -> list[Path]:
+        # Supports both 2-level (Artist/Album) and 3-level (Artist/Year/Album) structures
+        album_dirs = []
+        for artist_dir in artist_dirs:
+            for sub in sorted(artist_dir.iterdir()):
+                if not sub.is_dir() or sub.name.startswith("."):
+                    continue
+                # Check if this is a year subdirectory (contains album dirs, not audio files)
+                if sub.name.isdigit() and len(sub.name) == 4:
+                    # Year directory — collect album dirs inside it
+                    album_dirs.extend(
+                        sorted(
+                            [
+                                d
+                                for d in sub.iterdir()
+                                if d.is_dir() and not d.name.startswith(".")
+                            ]
+                        )
+                    )
+                else:
+                    album_dirs.append(sub)
+        return album_dirs
 
     def _iter_album_audio_files(self, album_dir: Path) -> list[Path]:
         all_audio, _latest_mtime = self._scan_album_tree(album_dir)
@@ -433,26 +471,7 @@ class LibrarySync:
             )
 
         # Collect album dirs from ALL folders for this artist
-        # Supports both 2-level (Artist/Album) and 3-level (Artist/Year/Album) structures
-        album_dirs = []
-        for artist_dir in artist_dirs:
-            for sub in sorted(artist_dir.iterdir()):
-                if not sub.is_dir() or sub.name.startswith("."):
-                    continue
-                # Check if this is a year subdirectory (contains album dirs, not audio files)
-                if sub.name.isdigit() and len(sub.name) == 4:
-                    # Year directory — collect album dirs inside it
-                    album_dirs.extend(
-                        sorted(
-                            [
-                                d
-                                for d in sub.iterdir()
-                                if d.is_dir() and not d.name.startswith(".")
-                            ]
-                        )
-                    )
-                else:
-                    album_dirs.append(sub)
+        album_dirs = self._album_dirs(artist_dirs)
 
         # Get existing albums for this artist to detect deletions
         existing_albums = get_library_albums(artist_name)
@@ -693,6 +712,9 @@ class LibrarySync:
                                 "bit_depth": bit_depth,
                                 "duration": duration,
                                 "size": fstat.st_size,
+                                "smart_mix_source_revision": smart_mix_source_revision_from_stat(
+                                    fstat
+                                ),
                                 "year": existing.get("year"),
                                 "genre": existing.get("genre"),
                                 "albumartist": existing.get("albumartist"),
@@ -759,6 +781,9 @@ class LibrarySync:
                     "bit_depth": bit_depth or None,
                     "duration": duration,
                     "size": fstat.st_size,
+                    "smart_mix_source_revision": smart_mix_source_revision_from_stat(
+                        fstat
+                    ),
                     "year": tags.get("date", "")[:4] if tags.get("date") else None,
                     "genre": tags.get("genre"),
                     "albumartist": tags.get("albumartist"),

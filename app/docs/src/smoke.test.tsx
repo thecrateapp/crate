@@ -50,6 +50,37 @@ describe("docs app", () => {
     ).toBe("/federation/federation-production-acceptance");
   });
 
+  it.each([
+    {
+      route: "/architecture/smart-mix",
+      heading:
+        "Smart Mix, crossfade Android nativo y VirtualDJ: diseño unificado",
+      linkName: "plan de implementación",
+      linkedRoute: "/developer/smart-mix-continuation",
+    },
+    {
+      route: "/developer/smart-mix-continuation",
+      heading: "Smart Mix, Android nativo y VirtualDJ: plan de continuación",
+      linkName: "diseño unificado",
+      linkedRoute: "/architecture/smart-mix",
+    },
+  ])(
+    "renders $route and resolves its reciprocal Markdown link",
+    async ({ route, heading, linkName, linkedRoute }) => {
+      window.history.pushState(null, "", route);
+      render(<App />);
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: heading }),
+      ).toBeTruthy();
+      expect(
+        (
+          screen.getByRole("link", { name: linkName }) as HTMLAnchorElement
+        ).getAttribute("href"),
+      ).toBe(linkedRoute);
+    },
+  );
+
   it("does not publish historical technical audit routes", () => {
     window.history.pushState(
       null,
