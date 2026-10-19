@@ -1685,6 +1685,37 @@ describe("AgentPlanDetail completeness", () => {
     ).toHaveTextContent(mbNew);
   });
 
+  it("points to Technical details when the only change is an identifier the record lacked", async () => {
+    const user = userEvent.setup();
+    const withoutTrackId: Record<string, unknown> = indexedTrack();
+    delete withoutTrackId.musicbrainz_trackid;
+    apiMock.mockResolvedValue(
+      syncPlan({
+        changes: [
+          {
+            entity_uid: introUid,
+            action: "update_index",
+            relative_path: "Echo/Night/01 Intro.flac",
+            before: withoutTrackId,
+            after: indexedTrack({ musicbrainz_trackid: mbNew }),
+          },
+        ],
+      }),
+    );
+    renderReview();
+    const list = await screen.findByRole("list", { name: "Proposed changes" });
+    expect(
+      within(list).getByText("Identifiers change · see Technical details"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No field changes.")).not.toBeInTheDocument();
+    expect(document.body.textContent ?? "").not.toContain(mbNew);
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    expect(
+      screen.getByText("Track 1 · Proposed › Musicbrainz trackid")
+        .parentElement,
+    ).toHaveTextContent(mbNew);
+  });
+
   it("shows both values of a changed artist MBID", async () => {
     apiMock.mockResolvedValue(artistMetadataPlan());
     renderReview();

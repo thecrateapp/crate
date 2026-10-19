@@ -80,7 +80,13 @@ function RowMarker({ row }: { row: DiffRowView }) {
   );
 }
 
-function FieldDiffTable({ rows }: { rows: DiffRowView[] }) {
+function FieldDiffTable({
+  rows,
+  identifiersOnly = false,
+}: {
+  rows: DiffRowView[];
+  identifiersOnly?: boolean;
+}) {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const contentId = useId();
   const unchangedCount = rows.filter(
@@ -92,6 +98,11 @@ function FieldDiffTable({ rows }: { rows: DiffRowView[] }) {
 
   return (
     <div className="space-y-2">
+      {identifiersOnly ? (
+        <p className="text-[11px] text-amber-200/80">
+          Identifiers change · see Technical details
+        </p>
+      ) : null}
       <div id={contentId}>
         {visible.length > 0 ? (
           <Table className="table-fixed">
@@ -127,7 +138,7 @@ function FieldDiffTable({ rows }: { rows: DiffRowView[] }) {
               ))}
             </TableBody>
           </Table>
-        ) : (
+        ) : identifiersOnly ? null : (
           <p className="text-sm text-white/55">No field changes.</p>
         )}
       </div>
@@ -157,7 +168,12 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
     case "photo":
       return <BeforeAfter current={body.current} proposed={body.proposed} />;
     case "diff":
-      return <FieldDiffTable rows={body.rows} />;
+      return (
+        <FieldDiffTable
+          rows={body.rows}
+          identifiersOnly={body.identifiersOnly === true}
+        />
+      );
     case "scalar":
       return (
         <div className="space-y-2">

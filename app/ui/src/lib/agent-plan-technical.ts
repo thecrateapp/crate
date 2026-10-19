@@ -255,7 +255,16 @@ export type DiffRowView = {
 
 export type ChangeBody =
   | { kind: "photo"; current: string; proposed: string }
-  | { kind: "diff"; rows: DiffRowView[] }
+  | {
+      kind: "diff";
+      rows: DiffRowView[];
+      /**
+       * Every row on the card is unchanged, but an identifier listed only in
+       * Technical details is added: the card points there instead of saying
+       * there are no field changes.
+       */
+      identifiersOnly?: true;
+    }
   | {
       kind: "scalar";
       current: unknown;
@@ -334,8 +343,14 @@ function hiddenLeaves(value: unknown, path: string[], whole: boolean) {
  * details: the record's existing value changed and must stay visible.
  * Unchanged identifier keys are listed in Technical details alone.
  */
-function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
+function diffRows(
+  rows: FieldDiffRow[],
+  sink: TechnicalLeaf[],
+): { views: DiffRowView[]; hiddenChange: boolean } {
   const views: DiffRowView[] = [];
+  // An identifier added to a key `before` does not have is listed in
+  // Technical details only; remember it so the card can point there.
+  let hiddenChange = false;
   for (const row of rows) {
     const label = humanizeKey(row.key);
     const technicalKey = isTechnicalKey(row.key);
@@ -356,7 +371,10 @@ function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
       // brand-new record, where there is nothing to compare against. A
       // present key (even null) means an existing record just gained this
       // identifier, so the row must stay visible.
-      if (row.status !== "added" || row.before === undefined) continue;
+      if (row.status !== "added" || row.before === undefined) {
+        if (row.status === "added" && row.after != null) hiddenChange = true;
+        continue;
+      }
       views.push({
         key: row.key,
         status: row.status,
@@ -374,7 +392,7 @@ function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
       seeTechnical: row.status === "added",
     });
   }
-  return views;
+  return { views, hiddenChange };
 }
 
 type ChangeDraft = Omit<ChangeView, "owner" | "numbered" | "technical"> & {
@@ -455,9 +473,18 @@ function changeDraft(
     change.after,
   );
   if (rows) {
-    const views = diffRows(rows, leaves);
+    const { views, hiddenChange } = diffRows(rows, leaves);
     leaves.push(...siblings.hidden);
-    return { ...common, body: { kind: "diff", rows: views } };
+    const identifiersOnly =
+      hiddenChange && views.every((view) => view.status === "unchanged");
+    return {
+      ...common,
+      body: {
+        kind: "diff",
+        rows: views,
+        ...(identifiersOnly ? { identifiersOnly: true as const } : {}),
+      },
+    };
   }
 
   // A scalar change of an identifier (an MBID, a hash) is the subject of the

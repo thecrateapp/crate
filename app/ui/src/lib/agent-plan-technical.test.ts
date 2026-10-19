@@ -302,6 +302,45 @@ describe("planChangeViews", () => {
     });
   });
 
+  it("points to Technical details when an existing record only gains an identifier", () => {
+    const view = one({
+      entity_uid: "track-1",
+      action: "update_index",
+      relative_path: "Echo/Album/01 Song.flac",
+      // An existing record whose `before` omits the key `after` adds.
+      before: { title: "Song" },
+      after: { title: "Song", musicbrainz_trackid: mbidAfter },
+    });
+    expect(view.body).toEqual({
+      kind: "diff",
+      identifiersOnly: true,
+      rows: [
+        {
+          key: "title",
+          before: "Song",
+          after: "Song",
+          status: "unchanged",
+          seeTechnical: false,
+        },
+      ],
+    });
+    expect(view.technical).toContainEqual({
+      label: "Missing track · Proposed › Musicbrainz trackid",
+      value: mbidAfter,
+    });
+  });
+
+  it("does not point anywhere when an identifier key only appears as null", () => {
+    const view = one({
+      entity_uid: "track-1",
+      action: "update_index",
+      relative_path: "Echo/Album/01 Song.flac",
+      before: { title: "Song" },
+      after: { title: "Song", musicbrainz_trackid: null },
+    });
+    expect(view.body).not.toHaveProperty("identifiersOnly");
+  });
+
   it("still hides a newly set identifier on a brand-new record", () => {
     const view = one({
       entity_uid: "track-1",
