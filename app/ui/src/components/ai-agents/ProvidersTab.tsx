@@ -30,7 +30,8 @@ function ConnectionCard({
     setBusy(true);
     try {
       const result = await writeAI<Enqueued>(path, body, method);
-      if (path.endsWith("/refresh")) setJob(result);
+      if (path.endsWith("/refresh"))
+        setJob((current) => (result.task_id ? result : (current ?? result)));
       refresh();
       refetch();
       return true;
@@ -93,6 +94,7 @@ function ConnectionCard({
         <>
           {manage ? (
             <ConnectionEditor
+              key={c.revision}
               connection={c}
               busy={busy}
               save={(body) =>
@@ -323,11 +325,7 @@ export function ProvidersTab({
         compatibility tests are a separate explicit action under profiles.
       </p>
       {snapshot.connections.map((c) => (
-        <ConnectionCard
-          key={`${c.id}:${c.revision}`}
-          connection={c}
-          refresh={refresh}
-        />
+        <ConnectionCard key={c.id} connection={c} refresh={refresh} />
       ))}
       {manage ? (
         <form

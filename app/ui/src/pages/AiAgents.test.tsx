@@ -445,3 +445,120 @@ it("does not fetch usage without its separate capability", async () => {
     ),
   ).toBe(false);
 });
+
+it("keeps polling the accepted environment catalog job across materialization", async () => {
+  const user = userEvent.setup();
+  const jobPoll = vi.fn();
+  const running = {
+    id: "job1",
+    type: "ai_catalog_refresh",
+    status: "running",
+    result: null,
+  };
+  const original = useApiMock.getMockImplementation()!;
+  useApiMock.mockImplementation((url: string | null) =>
+    url?.includes("/jobs/")
+      ? { data: running, loading: false, error: null, refetch: jobPoll }
+      : original(url),
+  );
+  const { rerender, authValue } = renderWithAdminProviders(<AiAgents />);
+  await user.click(screen.getByRole("tab", { name: "Providers" }));
+  await user.click(
+    screen.getByRole("button", { name: "Refresh catalog Environment" }),
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("job1");
+  snapshot = {
+    ...snapshot,
+    connections: snapshot.connections.map((c) =>
+      c.id === "env:gemini" ? { ...c, persistent_id: id, revision: 1 } : c,
+    ),
+  };
+  const { AuthContext } = await import("@/contexts/AuthContext");
+  const { MemoryRouter } = await import("react-router");
+  rerender(
+    <MemoryRouter>
+      <AuthContext.Provider value={authValue}>
+        <AiAgents />
+      </AuthContext.Provider>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("status")).toHaveTextContent("job1");
+  await waitFor(() => expect(jobPoll).toHaveBeenCalled(), { timeout: 2500 });
+});
+it("retains the known catalog job after a null deduplicated acceptance and follows a new valid job", async () => {
+  const user = userEvent.setup();
+  apiMock
+    .mockResolvedValueOnce({ task_id: "job1", deduplicated: false })
+    .mockResolvedValueOnce({ task_id: null, deduplicated: true })
+    .mockResolvedValueOnce({ task_id: "job2", deduplicated: false });
+  renderWithAdminProviders(<AiAgents />);
+  await user.click(screen.getByRole("tab", { name: "Providers" }));
+  const refresh = screen.getByRole("button", {
+    name: "Refresh catalog Studio",
+  });
+  await user.click(refresh);
+  expect(screen.getByRole("status")).toHaveTextContent("job1");
+  await user.click(refresh);
+  expect(screen.getByRole("status")).toHaveTextContent("job1");
+  expect(screen.getByRole("status")).not.toHaveTextContent("unavailable");
+  await user.click(refresh);
+  expect(screen.getByRole("status")).toHaveTextContent("job2");
+  expect(useApiMock).toHaveBeenCalledWith("/api/admin/ai/jobs/job2");
+});
+it("names every tab panel through stable IDs", async () => {
+  const user = userEvent.setup();
+  renderWithAdminProviders(<AiAgents />);
+  for (const label of [
+    "Actions",
+    "Providers",
+    "Models and profiles",
+    "Activity and usage",
+  ]) {
+    await user.click(screen.getByRole("tab", { name: label }));
+    const panel = screen.getByRole("tabpanel", { name: label });
+    expect(panel.id).not.toMatch(/\s/);
+    expect(panel.getAttribute("aria-labelledby")).not.toMatch(/\s/);
+  }
+});
+it("renders snapshot adapter support and a read-only related engine inventory with unknown telemetry", () => {
+  snapshot.engines = [
+    { provider: "gemini", supported: true },
+    { provider: "deepseek", supported: false },
+  ];
+  renderWithAdminProviders(<AiAgents />);
+  expect(screen.getByRole("table", { name: "LLM adapters" })).toHaveTextContent(
+    "deepseek",
+  );
+  for (const engine of [
+    "Tesseract OCR",
+    "PANNs CNN14",
+    "Essentia / librosa",
+    "Bliss",
+    "Playlist refinement heuristics",
+    "Biography web search",
+    "Metadata enrichment",
+    "External MCP clients",
+  ]) {
+    expect(
+      screen.getByRole("row", { name: new RegExp(engine.replace("/", "\\/")) }),
+    ).toBeVisible();
+  }
+  expect(
+    screen.getByRole("table", { name: "Related engines" }),
+  ).toHaveTextContent(/Unknown/);
+  expect(
+    screen.getByRole("row", { name: /External MCP clients/ }),
+  ).toHaveTextContent(/Managed in client/);
+  expect(
+    screen.getByRole("row", { name: /External MCP clients/ }),
+  ).toHaveTextContent(/model and reasoning unknown/);
+  expect(
+    screen.getByRole("row", { name: /Biography web search/ }),
+  ).toHaveTextContent(/separate from LLM tokens/);
+  expect(
+    screen.getByRole("link", { name: "Agent integrations" }),
+  ).toHaveAttribute("href", "/agent-integrations");
+  expect(
+    screen.queryByRole("button", { name: /Run.*Tesseract|Run.*Bliss/ }),
+  ).not.toBeInTheDocument();
+});

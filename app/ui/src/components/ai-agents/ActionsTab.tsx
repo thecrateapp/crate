@@ -17,6 +17,76 @@ import {
   type Activity,
 } from "./types";
 import { writeAI, reportFailure } from "./api";
+const relatedEngines = [
+  {
+    name: "Tesseract OCR",
+    state: "Unknown availability, version and languages",
+    description: "Local OCR; no LLM provider or reasoning.",
+    path: "/upcoming",
+    link: "Show imports",
+    capability: "curation.shows.write",
+  },
+  {
+    name: "PANNs CNN14",
+    state: "Unknown worker readiness, version and provenance",
+    description: "Audio tagging; independent of LLM profiles.",
+    path: "/analysis",
+    link: "Audio analysis",
+    capability: "library.analysis.manage",
+  },
+  {
+    name: "Essentia / librosa",
+    state: "Unknown worker readiness, versions and provenance",
+    description: "Audio feature analysis; independent of LLM profiles.",
+    path: "/analysis",
+    link: "Audio features",
+    capability: "library.analysis.manage",
+  },
+  {
+    name: "Bliss",
+    state: "Unknown vector readiness, version and fingerprints",
+    description: "Audio similarity vectors; independent of LLM profiles.",
+    path: "/analysis",
+    link: "Similarity analysis",
+    capability: "library.analysis.manage",
+  },
+  {
+    name: "Playlist refinement heuristics",
+    state: "Unknown runtime status",
+    description:
+      "Deterministic playlist refinement; no LLM model or reasoning.",
+    path: "/playlists",
+    link: "Playlists",
+    capability: "curation.playlists.write",
+  },
+  {
+    name: "Biography web search",
+    state: "Unknown configured provider and credential availability",
+    description:
+      "Tavily, Brave and public-source fallback have separate dependencies and credentials. Search usage is separate from LLM tokens; results feed the biography action.",
+    path: "/settings",
+    link: "Search integrations",
+    capability: "settings.manage",
+  },
+  {
+    name: "Metadata enrichment",
+    state: "Unknown integration and credential availability",
+    description:
+      "Last.fm, MusicBrainz, Spotify and other integrations retain their own credentials.",
+    path: "/settings",
+    link: "Enrichment settings",
+    capability: "settings.manage",
+  },
+  {
+    name: "External MCP clients",
+    state: "Managed in client; model and reasoning unknown to Crate",
+    description:
+      "Read-only inventory. Crate manages principals, grants and activity; client models are configured externally.",
+    path: "/agent-integrations",
+    link: "Agent integrations",
+    capability: "agents.integrations.manage",
+  },
+];
 export function ActionsTab({
   snapshot: s,
   refresh,
@@ -258,14 +328,74 @@ export function ActionsTab({
           </tbody>
         </table>
       </div>
-      <div className="rounded border border-border p-3 text-sm">
-        <h3 className="font-medium">Other engines</h3>
+      <section className="space-y-3 rounded border border-border p-3 text-sm">
+        <h3 className="font-medium">Engine inventory</h3>
         <p>
-          Local OCR, deterministic Music Paths and acoustic analysis run
-          independently of LLM profiles. External MCP services are managed in
-          their own integration settings.
+          Read-only inventory. Adapter support comes from this configuration
+          snapshot; live readiness and related-engine telemetry are not
+          included.
         </p>
-      </div>
+        <div className="overflow-x-auto">
+          <table aria-label="LLM adapters" className="w-full text-left">
+            <thead>
+              <tr>
+                <th>Adapter</th>
+                <th>Configuration support</th>
+                <th>Live readiness</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.engines.map((engine) => (
+                <tr className="border-t border-border" key={engine.provider}>
+                  <td className="p-2">{engine.provider}</td>
+                  <td className="p-2">
+                    {engine.supported
+                      ? "Supported adapter"
+                      : "Unsupported adapter"}
+                  </td>
+                  <td className="p-2">
+                    Unknown; inspect connection and catalog metadata under
+                    Providers
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="overflow-x-auto">
+          <table aria-label="Related engines" className="w-full text-left">
+            <thead>
+              <tr>
+                <th>Engine</th>
+                <th>Observed state</th>
+                <th>Scope</th>
+                <th>Where managed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {relatedEngines.map((engine) => (
+                <tr
+                  className="border-t border-border align-top"
+                  key={engine.name}
+                >
+                  <td className="p-2 font-medium">{engine.name}</td>
+                  <td className="p-2">{engine.state}</td>
+                  <td className="p-2">{engine.description}</td>
+                  <td className="p-2">
+                    {hasCapability(engine.capability) ? (
+                      <Link className="text-primary underline" to={engine.path}>
+                        {engine.link}
+                      </Link>
+                    ) : (
+                      "Separate domain access required"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
       {manage ? (
         <div className="flex gap-2">
           <Button

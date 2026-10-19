@@ -20,7 +20,7 @@ export function AiAgents() {
   const { data, error, loading, refetch } = useApi<Snapshot>(
     read ? `${AI_ROOT}/snapshot` : null,
   );
-  const [tab, setTab] = useState("Actions");
+  const [tab, setTab] = useState("actions");
   if (!read) return <p>AI configuration permission required.</p>;
   return (
     <div className="space-y-6 p-6">
@@ -39,13 +39,13 @@ export function AiAgents() {
           className="flex h-auto flex-wrap"
         >
           {[
-            "Actions",
-            "Providers",
-            "Models and profiles",
-            "Activity and usage",
-          ].map((name) => (
-            <TabsTrigger key={name} value={name}>
-              {name}
+            { value: "actions", label: "Actions" },
+            { value: "providers", label: "Providers" },
+            { value: "profiles", label: "Models and profiles" },
+            { value: "activity", label: "Activity and usage" },
+          ].map(({ value, label }) => (
+            <TabsTrigger key={value} value={value}>
+              {label}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -59,11 +59,11 @@ export function AiAgents() {
                 selected.
               </p>
             ) : null}
-            {tab === "Actions" ? (
+            {tab === "actions" ? (
               <ActionsTab snapshot={data} refresh={refetch} />
-            ) : tab === "Providers" ? (
+            ) : tab === "providers" ? (
               <ProvidersTab snapshot={data} refresh={refetch} />
-            ) : tab === "Models and profiles" ? (
+            ) : tab === "profiles" ? (
               <ProfilesTab snapshot={data} refresh={refetch} />
             ) : hasCapability("ai.usage.read") ? (
               <ActivityTab snapshot={data} />
