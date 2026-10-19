@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  Eye as SolarEyeOutline,
   ArchiveDown as SolarArchiveDownOutline,
   Cassette2 as SolarCassette2Outline,
   Heart as SolarHeartOutline,
@@ -15,6 +16,7 @@ import {
 } from "@solar-icons/react-perf/Bold";
 
 import {
+  Eye,
   Bot,
   ArrowDownToLine,
   ArrowDownToLineBold,
@@ -35,6 +37,9 @@ function renderSvgInner(ui: React.ReactElement) {
 }
 
 describe("@crate/ui/icons", () => {
+  it("exports the Solar Eye outline for preview actions", () => {
+    expect(renderSvgInner(<Eye />)).toBe(renderSvgInner(<SolarEyeOutline />));
+  });
   it("renders the official Bot Outline paths with the normal icon contract", () => {
     const { container } = render(
       <Bot size={20} aria-hidden="true" className="ai-glyph" />,

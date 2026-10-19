@@ -1,0 +1,31 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ActionGroup.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ActionGroup</DocHeading>
+<EntryDetails id="action-group" review="Visual review pending · 1AS" />
+<DocHeading as="h2">Contract</DocHeading>
+
+ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps. This reproduces the approved PlaylistEditor header and repeated-row actions; no independent visual recipe. Use short localized tooltip text (Edit/Delete/Deactivate) with a contextual accessible name. Glyphs are decorative Solar icons. ActionGroup has a named group, wraps and omits an empty list; native Tab order is preserved, so it is not a toolbar. Disabled/loading controls remain the same native node inside a focusable discovery wrapper; Enter/Space never executes. Tooltip description reaches the actual enabled trigger; Escape dismisses it. ActionLink preserves anchor attributes/ref/navigation, and unavailable links cannot navigate. Existing asChild router children remain supported; new native glyph links use ActionLink. Caller description IDs are retained alongside the tooltip. Both apps adopt the same contract; capability and data callbacks remain in each app. Ambiguous domain operations and final confirmations retain text Button. No forced loading spinner for an aria-busy-only state; loading=true owns the spinner and unavailable state.
+
+The approved persistent mockup and Diego’s confirmed adjustments are the reference. Shared components own their geometry, states and typography. Stories add layout only.
+
+<DocHeading as="h2">Real components</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Group} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Loading} />
+
+<Canvas of={Stories.UnavailableLink} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption, assistive technology and native QA remain separate from catalogue coverage.
+
+The asChild compatibility path preserves its router child and replaces only the child contents for a loading glyph. ActionLink provides the native-anchor composition for new code.

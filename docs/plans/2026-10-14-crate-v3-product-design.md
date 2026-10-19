@@ -346,7 +346,7 @@ Details are in `coverage.md` section 2 and `site-language.md` section 2; the rul
 | Table                | semantic `<table>` when 3+ comparable columns or sorting; mono uppercase `thead`; no zebra or cell borders; numbers right-aligned tabular; status cell = dot plus word; `aria-sort`; columns drop at 1000 and 760 px                                                                                                                                                            | Users, Roles, history, routes, streams                                                                                               |
 | Track row            | index (play glyph on hover/focus) / title over artist / mono `124 · 8A` meta on desktop / tabular duration (never re-rendered per tick) / actions; playing row gets the active bar and `accent-action-hi` title; quality and explicit flags as mono tags; remote rows carry `via <node>`                                                                                        | every track list                                                                                                                     |
 | Media grid           | square covers, no shadow, 1 px inset hairline; title sans 14/500; mono meta; hover tints hairline and title, no lift; 40 px play disc overlay; placeholder `accent-action/16` with mono initials                                                                                                                                                                                | grids and rails                                                                                                                      |
-| Forms                | `MonoLabel` above; 40 px fields (44 on coarse pointers); focus 2 px flush `focus-ring` outline (the existing Listen search ring); errors as `StatusDot warn` plus text, `aria-invalid`, never a toast; categorical form fields use Select; chips remain for filters and binary state toggles (1AQ amendment)                                                                                                                         | forms                                                                                                                                |
+| Forms                | `MonoLabel` above; 40 px fields (44 on coarse pointers); focus 2 px flush `focus-ring` outline (the existing Listen search ring); errors as `StatusDot warn` plus text, `aria-invalid`, never a toast; categorical form fields use Select; chips remain for filters and binary state toggles (1AQ amendment)                                                                    | forms                                                                                                                                |
 | Buttons              | primary: pill with `accent-action` fill (Listen radius per PD3); secondary: `CratePill` action variant; round play disc 40 / 56–64 px; icon buttons ghost, 32 px (44 coarse); destructive per PD10                                                                                                                                                                              | everywhere                                                                                                                           |
 | Tabs                 | `role="tablist"`, mono 11.5 px .14em text, 2 px underline; selected tab in the URL: `?tab=` by default (the plan 1b.3 helper), a path segment where the route already has one (Listen `/collection/:section`), `?section=` for Settings sections, `?queue=` for Tasks                                                                                                           | Admin Artist, Federation, Download, Settings; Listen Library (already `?tab=` on `/library` and `/collection/:section`), player tabs |
 | Dialogs and popovers | object surface, hairline, `rounded-panel`; overlay canvas at .72 without blur; `MonoLabel` eyebrow plus Bricolage 700 title; confirm dialogs carry a mono consequence line (`12 files · 1.4 GB · moves to Library Trash`) and typed confirmation for wipe and rebuild; Admin moves to the shared `ConfirmDialog`                                                                | all overlays                                                                                                                         |
@@ -1634,6 +1634,7 @@ Backend, in order (genres.md section 10 with the verification corrections):
    key `genre-wheel:local`) and a window of at least 120 s; the handler clears the dirty key before
    building and schedules again if it is set during the build. Triggers come from the choke points
    that change genre membership or taxonomy, not from a list of tasks:
+
    - `set_artist_genres` and `set_album_genres` (`db/repositories/genres_assignments.py`) call it
      after commit, only when the stored set changed. That covers `index_genres`
      (`genre_indexer.py`), `enrich_artist`/`enrich_artists` writing Last.fm tags
@@ -1662,6 +1663,7 @@ Backend, in order (genres.md section 10 with the verification corrections):
    in new columns the pre-v3 seeder never writes, so an image rollback cannot overwrite them (the
    old seeder runs on every boot and rewrites `eq_gains`, `name` and `description` of core genres,
    `db/jobs/genre_taxonomy.py:219-252`).
+
    - `genre_taxonomy_nodes.local_eq_gains`, `eq_override` (`none | set | cleared`; `cleared` makes
      "clear to inherit" representable on a core node), `local_name`, `local_description`;
      `genre_taxonomy_edges.suppressed` (PD18; the seeder never clears it and the runtime graph
@@ -1763,6 +1765,7 @@ site's `src/data/scale.json`.
   `portable_audio_tag_tracks`, `portable_tag_errors`, `rich_export_albums` and
   `rich_export_tracks`. Nothing declares them, so the GET drops them. The Coverage rows read these
   existing names. Changes (plan 3.9a, 3.10a):
+
   - `AnalysisStatusResponse` and `_empty_analysis_payload` declare the existing lyrics and
     portable fields plus `recent`, `stale`, `unavailable` and `updated_at`.
   - New: `fingerprint_failed` (one more `FILTER` in the existing query); `recent` (6 items) in the
@@ -2002,6 +2005,7 @@ COALESCE(pool,'default') …)`, which sorts every pending row on each run (thous
   loop (there it would stall behind `ImportQueue.refresh_pending_state()`, a filesystem walk, and
   the scheduler). `publish_tasks_surface_signal` fires after every `update_task` progress write, so
   with any active task the dirty flag is always set; the writer therefore:
+
   - while `admin:live:viewers:queues` exists (5.3.1): honours the dirty flag, never rebuilding more
     often than every 3 s, and upserts `ui_snapshots('ops:queues','global')` when the hash changes,
     the row is missing (for example after a `*` invalidation) or 30 s have passed (keepalive; the
@@ -2290,6 +2294,7 @@ ago`; `SAMPLER STALLED` computed client-side from server time), partial.
   is written only when a node's state, health, restart count or the container set changes, or at
   most once per 60 s, never on every 10 s sample. The GET reads the Redis key, else the row; the
   stack-stream forwards published payloads.
+
   - Sampler placement is PD54. As proposed: crate-api is the only service with the Docker socket
     and also serves all Admin and the Listen fallback traffic, while `docker_ctl._request` is
     synchronous Unix-socket I/O (30 s timeout today). So the sampler is a dedicated daemon thread in
@@ -2572,6 +2577,7 @@ fallback` (the current word scrambles for 420 ms when it changes; this is Listen
   `useEqualizerRuntime` re-runs its effect, which on Android native is a Capacitor bridge call
   `androidNativeEngine.setEq(…, 80)` (`hooks/use-equalizer-runtime.ts:96-101`). Batching that to
   one write per frame is still 60 writes a second (DS 3.8 rule 4). So, during a drag or key repeat:
+
   - gains go to the engine imperatively through a ref: Web Audio `setTargetAtTime` on web and
     desktop; native `setEq` throttled to 15–20 Hz with its ramp;
   - curve and handles are drawn by ref; the live store (glyph) gets at most one publish per
@@ -3225,6 +3231,7 @@ Small bug seen on the way: `api/curation.py` deletes `listen:explore_page:v1:{us
   whose `updated_at` is older than 300 s. Creating the row up front and sending the Dramatiq message
   with `delay=window` would collapse every window over 300 s (mood map 900 s, insights 30 min, bliss
   map 6 h) to about 5 minutes, and the delayed message would then fire a second build. Recipe:
+
   - the first trigger sets `<key>:dirty` and `ZADD NX crate:coalesce:due <now + window> <key>`;
     later triggers only set the dirty key (`NX` keeps the first due time);
   - a due check in the crate-worker service loop (the projector loop for projector actions) reads
@@ -4123,7 +4130,6 @@ record final scoped evidence, review and executor rulings. **Stop1AP uncommitted
 A20/phase6.8/global1b.8 incomplete. Keep canonical1M33PNG/manifest/pin258bbaee; no fullsuite,
 CI/baseline refresh/native/live certification, PR/merge/rebase/deploy/release or nextgroup.
 
-
 ### 1AP final local stop and broad plan audit — 2026-10-19
 
 One fresh read-only review verified all 65 pre-repair pending paths, 58 source/asset hashes and
@@ -4152,7 +4158,6 @@ The audit does not silently repair earlier published checkpoints or start the ne
 **1AO remains published as ba63836d2a23bb774832c1703eab4e4116e1468f. Stop at local 1AP, without
 commit/push, for Diego's review.** Canonical 1M images/manifest and pin 258bbaee remain intact.
 A20, phase 6.8, global 1b.8, full-phase CI and native/live QA remain pending.
-
 
 ### 1AP authorized audit reconciliation — local validation, 2026-10-19
 
@@ -4184,13 +4189,11 @@ regex escapes in the touched drift tool were removed after lint RED;17Node cases
 One fresh independent review of this new authorized amendment follows; the earlier reviewed
 1AP freeze remains historical. **Stop1AP without commit/push; preview stays active at :5186.**
 
-
 Final audit-reconciliation review: Critical0/Important0/Minor2; both new A6 prevention gaps
 (variant-prefixed utilities and lexical constant shadowing) closed in one tested pass,19guard
 cases/17Node cases/CLI/types/lint green. UI remains the validated17preview+6builtAdmin build,
 526377/532480B gzip,6103Bmargin. Full final review rulings and costs are in both handovers.
 See the single current-state table; **stop1AP uncommitted, previewactive5186**.
-
 
 ### 1AP approved — publication preparation, 2026-10-19
 
@@ -4200,7 +4203,6 @@ before publication metadata changes. The persistent1AP label/footer now say publ
 its embedding expectation changes. Earlier1AP local stops are historical. The next checkpoint
 is1AQ, to stop uncommitted for Diego; no PR/merge/rebase/deploy/release or fullCI/baselines.
 The resulting verified publication SHA is recorded in the subsequent1AQ continuation record.
-
 
 ### 1AP published; 1AQ PlaylistEditor local — 2026-10-19
 
@@ -4218,7 +4220,6 @@ stream controls. No global EventSource override or live requests. A5editor hero 
 owned6.8/A20 debt record, without increasing earlier budgets.
 Final scoped evidence and reviewer rulings are recorded in the main handover/current-state table.
 **Stop1AQ without commit/push. Previewactive5186; no next group, fullsuite/CI or canonical refresh.**
-
 
 ### 1AQ later steering — basic actions and form Selects, 2026-10-19
 
@@ -4303,7 +4304,6 @@ actuales; las propuestas restantes no se han aplicado. Datos manuales del previe
 certificación backend vivo/AT/nativo/canónica. **Mismo1AQ local sin commit/push ni siguiente
 grupo; preview5186activo**. Evidencia final y límites: [estado vigente](2026-10-19-crate-v3-current-state.md).
 
-
 ### Enmienda local1AQ: colección compartida y propuesta de filas — 2026-10-19
 
 La normalización de badges fue autorizada después de la auditoría inicial: InfoBadge24/12,
@@ -4320,13 +4320,11 @@ iluminado de notas históricas; se conserva la prohibición aprobada de iluminar
 El [estado vigente](2026-10-19-crate-v3-current-state.md) prevalece sobre stops y propuestas
 históricos. Preview5186activo, pin258bbaee y33PNG/manifest1M conservados.
 
-
 Última instrucción de Diego: pausar migraciones visuales para reconciliar el sistema completo.
 [Auditoría y catálogo propuesto](2026-10-19-crate-v3-component-reconciliation-audit.md): revisar
 contratos/adopción/overrides y aprobar el set común antes de seguir por pantallas. La propuesta
 de filas se integra en ese trabajo. No se considera aprobada la implementación del catálogo.
 Se preservan1AQlocal,preview5186y todos los checkpoints, sin commit/push.
-
 
 ### 1AQ — Storybook y primera reconciliación (estado local vigente)
 
@@ -4340,12 +4338,14 @@ Admin aún no adopta esa fila; el resto de R1–R4 sigue pendiente. Previews 600
 [contrato Hairline](2026-10-19-crate-v3-hairline-reconciliation.md).
 **Misma parada local 1AQ, sin commit/push; no se cierra la fase ni su QA.**
 
-
 1AQ aprobado por Diego el 2026-10-19; commit/push autorizados. El siguiente bloque es FormField
 y roles tipográficos, con parada de revisión en 1AR. Prevalece el [estado vigente](2026-10-19-crate-v3-current-state.md).
-
 
 1AQ publicado como `da8a4358`. 1AR agrupa toda la familia de formularios y sus roles tipográficos,
 con ejemplos nuevos solo en Storybook. Las escenas existentes conservan sus callbacks y usan
 los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-current-state.md);
 [plan de 1AR](2026-10-19-crate-v3-forms-reconciliation.md). Parada local antes de commit/push.
+
+## 1AS — shared action contracts (local review)
+
+1AR published at `a3ba497d`; 1AS is local for review. Button retains text/form/link semantics; ActionGroup, ActionButton and ActionLink compose the approved header/row Button ghost/icon-lg + Tooltip pattern,44px with4px corners, contextual accessible names and short action tooltips. IconButton retains compact round/glow utility controls;44px coarse targets reserve real layout space. Admin aliases preserve asChild router links; Listen adopts conventional server Remove. Loading/disabled discovery and activation guards belong to shared controls. Existing card surfaces and specialized playback/AI/navigation stay in their documented families. Storybook records the live contracts; [1AS plan/evidence](2026-10-19-crate-v3-actions-reconciliation.md) is the current checkpoint record. No new main-mockup section. Stop before1AS commit.

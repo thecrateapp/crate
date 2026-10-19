@@ -1,6 +1,6 @@
 import type * as React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Button } from "./button";
 
@@ -63,6 +63,33 @@ describe("Button", () => {
 });
 
 describe("Button extensions", () => {
+  it.each(["disabled", "loading"] as const)(
+    "blocks %s child links and their handlers",
+    (state) => {
+      const outer = vi.fn();
+      const inner = vi.fn();
+      render(
+        <Button asChild {...{ [state]: true }} onClick={outer}>
+          <a
+            href="#destination"
+            onClick={inner}
+            onClickCapture={inner}
+            onKeyDown={inner}
+          >
+            Unavailable
+          </a>
+        </Button>,
+      );
+      const link = screen.getByRole("link", { name: "Unavailable" });
+      expect(link).toHaveAttribute("aria-disabled", "true");
+      expect(link).toHaveAttribute("tabindex", "-1");
+      expect(fireEvent.click(link)).toBe(false);
+      expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(false);
+      expect(outer).not.toHaveBeenCalled();
+      expect(inner).not.toHaveBeenCalled();
+    },
+  );
+
   it("defaults to type=button", () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole("button")).toHaveAttribute("type", "button");

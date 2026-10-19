@@ -52,7 +52,7 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
   docs/plans/2026-10-19-crate-v3-admin-header-actions.md and register concrete glyph sites;
   Diego explicitly authorized all18inventoried headers and playlist row actions in local1AQ.
   Other proposals are not a mass-migration instruction or a new backend contract. Use the Admin
-  PageHeader composition. Repeated-row tooltips name only the action (Edit/Delete/Activate/
+  PageHeader composition (now a compatibility adapter to shared ActionGroup/ActionButton). Repeated-row tooltips name only the action (Edit/Delete/Activate/
   Deactivate); accessible labels retain the object. Avoid duplicate Card + row padding.
   Disabled icon actions must still expose their tooltip by pointer/keyboard while their native
   Button remains disabled. Keep that Button node stable across busy/availability changes.
@@ -127,7 +127,6 @@ numeric counters use its `counter` variant (6px inline inset). FilterChip and Se
 use12px with32/44px minimums; GenrePill remains the musical-domain component. Shadcn Badge
 retains its API with the common informative recipe. No local type/geometry overrides; see
 `docs/plans/2026-10-19-crate-v3-ui-labels.md`. This local1AQ rule supersedes earlier16px tags.
-
 
 ## Official icon language — Diego, 2026-10-19
 

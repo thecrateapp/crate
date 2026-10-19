@@ -1,0 +1,29 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Button.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Button</DocHeading>
+<EntryDetails id="shadcn-button" review="Visual review pending · 1AS" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Text actions, explicit confirmation and semantic native links. Existing seven visual variants retain the mockup recipe: Poppins 500, default 14px, rectangular 4px corners or an explicit pill. Fine heights xs24/sm32/default40/lg44; coarse targets reserve at least44px in layout. Icon sizes remain compatibility options; named ActionButton is preferred for conventional item/header actions. Native form type, ref and enabled router child handlers are preserved. Disabled/loading links stay named links, leave Tab order and block pointer/keyboard navigation and both child/caller handlers. Loading buttons show one decorative spinner, stay named and block repeat execution.
+
+The approved persistent mockup and Diego’s confirmed adjustments are the reference. Shared components own their geometry, states and typography. Stories add layout only.
+
+<DocHeading as="h2">Real components</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Loading} />
+
+<Canvas of={Stories.Link} />
+
+<Canvas of={Stories.DisabledLink} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption, assistive technology and native QA remain separate from catalogue coverage.

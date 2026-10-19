@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Link, MemoryRouter, useLocation } from "react-router";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -8,6 +9,28 @@ import {
 } from "./PageHeader";
 afterEach(cleanup);
 describe("Admin page header composition", () => {
+  it("preserves the existing asChild router-link contract", async () => {
+    function Route() {
+      return <output>{useLocation().pathname}</output>;
+    }
+    render(
+      <MemoryRouter>
+        <PageHeaderActions>
+          <PageHeaderAction asChild label="Open album">
+            <Link to="/albums/42">
+              <svg aria-hidden="true" />
+            </Link>
+          </PageHeaderAction>
+        </PageHeaderActions>
+        <Route />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole("link", { name: "Open album" });
+    expect(link).toHaveAttribute("href", "/albums/42");
+    await userEvent.tab();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("status")).toHaveTextContent("/albums/42");
+  });
   it("names compact actions, keeps native button semantics, keyboard tooltip and callback", async () => {
     const click = vi.fn();
     render(

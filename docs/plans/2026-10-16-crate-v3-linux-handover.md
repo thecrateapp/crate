@@ -851,3 +851,9 @@ los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-cu
 ### 2026-10-19 — revisiones aisladas por paso
 
 Diego pide una página pequeña por paso, solo con el alcance en prueba, y dejar de ampliar el mockup grande. Se conserva como referencia. La escena se comparte con Storybook, cuyo inventario/documentación sigue siendo obligatorio. Primera vista: `http://127.0.0.1:5186/review-1ar-labels.html`, también `Reviews/1AR/Field labels`. Detalle/evidencia en el estado vigente y plan1AR; sin commit/push.
+
+## 1AR publication and 1AS action reconciliation
+
+Diego approved 1AR; published commit `a3ba497ddfdf05835441686fbd8c874c07e4cea6` on `feat/crate_v3`. Previous local review stops are historical. Next local checkpoint 1AS covers Button, IconButton, ActionGroup/ActionButton/ActionLink and the ActionIcon compatibility entry. The approved header pattern moves into shared composition; Admin aliases preserve asChild router usage and Listen adopts the conventional server Remove action. Typography/form approval remains intact.
+
+Review: `http://127.0.0.1:5186/review-1as-actions.html` and Storybook `Reviews/1AS/Actions`. One scene, no new main mockup section. See [plan/evidence](2026-10-19-crate-v3-actions-reconciliation.md) and [current state](2026-10-19-crate-v3-current-state.md). Keep both previews active; stop before 1AS commit. No full suites, CI, canonical baseline updates or native/backend QA claimed.

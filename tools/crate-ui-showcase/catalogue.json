@@ -44,7 +44,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/jetbrains-mono.css": "03d8e43bde9a8a9fc21310d2f6a1676a236c0cd6b2402b856d9527a42fa0c0af",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
-        "app/shared/ui/icons/actions.tsx": "f94bf38dade8a03bf9514314a1ccc43b38b70a3689fa9d57697c6af2f07b8882",
+        "app/shared/ui/icons/actions.tsx": "0486b01b222c7fee9c0b3f7e0987b6d079a972b98f689e95c2cc071da643554a",
         "app/shared/ui/icons/base.tsx": "38861e8bf92b09be4347d0fd73083becaf76e9b67cd0336a95c629020264e280",
         "app/shared/ui/icons/bot.tsx": "74b735005caf1e102474f505b63099dbbd0598e62390f6308daab623b2e705e4",
         "app/shared/ui/icons/index.tsx": "385bd55a47f85b1619a97400e5cd2f5c874a77bd4d667df5f1b70a9b90253242",
@@ -68,7 +68,7 @@
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "a4c9a4536b84098ebad2ba7a52115c3d4c33e30b0a5401ae609a08a424dfba4b"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "c1510488cda0e4cbb1b3e985333603febbdc771d73431757cb77bef0dffce20a"
       },
       "category": "Foundations"
     },
@@ -88,7 +88,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/MonoLabel.tsx": "1ff67ba85f1955f2312d797a6680339e8b56b3e8d9fc947cd4a86865dbfa2f62",
         "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "68fb231024277e8a40f261760aec0c26eac82c159780b4efc3860e61c0b76012",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "8c390dd33357d8001eef09441627f2c58c00e7220197d97bb3d544fd70fecf89"
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "9ddaed29b17113a618bf33ec7c2375b219432f6bb0c2f2d2b5e1620215a23c27"
       },
       "category": "Data Display"
     },
@@ -128,7 +128,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/StatNumber.tsx": "56baeeb2bee3fe7741eba57ea533a04892fc1fddf5ab24fb432ea80f549a1e53",
         "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "ac8008b434f2712c7eebafb760702b9dbaeff23c10589bcc478c38d8cbf61e36",
-        "tools/crate-ui-showcase/docs/StatNumber.mdx": "8b9ad2d0561a34e2bf952378eb1b36d1ce931634a277d3f499be06142ff3cf89"
+        "tools/crate-ui-showcase/docs/StatNumber.mdx": "5ae03d8b518b9fae8d1b6c4e24e4684bdf13265add35f8879880a22490b300e4"
       },
       "category": "Data Display"
     },
@@ -190,7 +190,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/FilterChip.tsx": "eff73b75e83767f3db4738fba6898ba6cc0bf5ed5e507bed380a57d249cf8ffb",
         "tools/crate-ui-showcase/stories/FilterChip.stories.tsx": "c27b8cf5ccdeeafbc218e88247963798407ad4a26320e8e33ef894e2d00a62b7",
-        "tools/crate-ui-showcase/docs/FilterChip.mdx": "5a69d1d4c71199869443a98ee3fa985c088cec4bda54f5418957ac9f95b25690"
+        "tools/crate-ui-showcase/docs/FilterChip.mdx": "4b85d2bc04c6890e92be2e20dafcda2c33229fb2e09bf98b35dc1847645ee51f"
       },
       "category": "Forms"
     },
@@ -210,7 +210,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/SegmentedControl.tsx": "dff469b97db4ffbefed556bad121078adff5e7e33ed0e8923d521640916bd9af",
         "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx": "ac29972fa006ca9df6e85c3b0ba389a5061a89e0311eb0b93f4dde5cd7b6c9a8",
-        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "201e735f4f6b217bc88edd1511394a8f192325bcad10956f845f12fcc02239b7"
+        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "f61fbb7494689b15826cbab324fd183662b54f554be5743a84079c823d5fcc9e"
       },
       "category": "Forms"
     },
@@ -272,7 +272,7 @@
       "fingerprints": {
         "app/shared/ui/composites/AdminSelect.tsx": "fe340f1220c67b7be6d23027dfc96b0d838667c33d6272daafa6fd93e78e01b5",
         "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx": "b91b2ad48ee94ca2e88cc328cb09a82ac2342b237641d85edc8331cfa99f8194",
-        "tools/crate-ui-showcase/docs/AdminSelect.mdx": "33934c8b87b0bc577a2ef31377b075de176d37844c6be870f72fc8e8ba1751fe"
+        "tools/crate-ui-showcase/docs/AdminSelect.mdx": "514079fdb7b57c9b61cbc0cafd8cd5f2bfa3778cc9309a89b405aa1ea27f1e9c"
       },
       "category": "Forms"
     },
@@ -945,20 +945,24 @@
     {
       "id": "primitives-actioniconbutton",
       "name": "ActionIconButton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Compatibility controls used by existing entity rows and artwork cards.",
+      "coverage": "documented",
+      "adoption": "Legacy row/card callers remain in both apps; conversion is consumer-by-consumer with no new copies.",
+      "storyId": "components-actioniconbutton",
+      "story": "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ActionIconButton.mdx",
       "sources": [
         "app/shared/ui/primitives/ActionIconButton.tsx"
       ],
-      "knownIssues": [],
+      "knownIssues": [
+        "Existing card surface retained; solid-surface reconciliation belongs to the next R1 group."
+      ],
       "fingerprints": {
-        "app/shared/ui/primitives/ActionIconButton.tsx": "980761979268f348daf204d00390918a4ad27807cd90b9e8eec37cbbdce3d5c8"
+        "app/shared/ui/primitives/ActionIconButton.tsx": "cc3c971bd061c2b190dc00a852378cbe66bdf6bd5fd9dd9ea556d3e05ddf4414",
+        "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx": "7cbf47778c776971593a740546a9f59127b95b6fe6de34b9b020ba515e88c7c9",
+        "tools/crate-ui-showcase/docs/ActionIconButton.mdx": "f7b1502d0081eabf0a2a0fa9396deb8b67e6dbb107110fa84ad32c9f0006d42a"
       },
-      "category": "Actions"
+      "category": "Compatibility"
     },
     {
       "id": "primitives-apperrorboundary",
@@ -1048,7 +1052,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416",
         "tools/crate-ui-showcase/stories/Checkbox.stories.tsx": "fd50b9cd8856f3f9a687eb0eca05264d9ee42bc3c1a9652f5fc28668e29b4496",
-        "tools/crate-ui-showcase/docs/Checkbox.mdx": "a98b8043488402a1afd80d5c5a2eda582cef08d0c80fb1b41f10bbb91238e911"
+        "tools/crate-ui-showcase/docs/Checkbox.mdx": "0ab70ef9270c04f69cffb0df0fc803b75ba3ccf542ab0c45e1e87207ea8ae2bf"
       },
       "category": "Forms"
     },
@@ -1104,25 +1108,29 @@
       "fingerprints": {
         "app/shared/ui/primitives/FormField.tsx": "51219738a5841395e79e9152fe3be4d419aa6c5b05f79baa78bccc463b1deced",
         "tools/crate-ui-showcase/stories/FormField.stories.tsx": "d8d83921dff37e4e94fd92b81a89593ef12bb3866252f2aa9a8618769befeacc",
-        "tools/crate-ui-showcase/docs/FormField.mdx": "4bdeee7e3bb699361dcea268307d477cc560e71e656409f1bb99f61790a5516f"
+        "tools/crate-ui-showcase/docs/FormField.mdx": "c57c007f82c5fc69cec7e8eebd2b3e4446f62c0798a7b7ddba7d6e7e88c43a59"
       },
       "category": "Forms"
     },
     {
       "id": "primitives-iconbutton",
       "name": "IconButton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Compact round controls with semantic default/primary/danger tones, icon-only accessible label and native title.",
+      "coverage": "documented",
+      "adoption": "Existing compact controls in both apps; real coarse target validated in the isolated scene. No broad consumer restyle.",
+      "storyId": "components-iconbutton",
+      "story": "tools/crate-ui-showcase/stories/IconButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/IconButton.mdx",
       "sources": [
         "app/shared/ui/primitives/IconButton.tsx"
       ],
-      "knownIssues": [],
+      "knownIssues": [
+        "Existing card surface retained; solid-surface reconciliation belongs to the next R1 group."
+      ],
       "fingerprints": {
-        "app/shared/ui/primitives/IconButton.tsx": "24a800d8b1455fc8439b5e0a1782e83f5a5615fc248ce936590e6bfa1d2af7ce"
+        "app/shared/ui/primitives/IconButton.tsx": "e57038290c13e0992872d91b044e33976c01fa33a7fbd0791c78c7660a95163c",
+        "tools/crate-ui-showcase/stories/IconButton.stories.tsx": "fa5b753316190d36e8fc82f2c64c7d39d9517a57490e1116cc66beebd0e18d31",
+        "tools/crate-ui-showcase/docs/IconButton.mdx": "a7642ee81792e91092cc1746cec70b9e73cc96e35e5efff4b0fa7f30b42acb8d"
       },
       "category": "Actions"
     },
@@ -1250,7 +1258,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/RadioGroup.tsx": "25ea47560430742f51ab7aed77d51d4b135001f8dddd40aa26e26997916c4c4f",
         "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx": "b6bda01d491dbd1b29a4b90cf0e654d02b8d24e91a2fa2864ec2725d697432d9",
-        "tools/crate-ui-showcase/docs/RadioGroup.mdx": "b5b20e5b17999ce78316dd72c3d33075e4f70ea0ab693e1daa89678bbf00da8f"
+        "tools/crate-ui-showcase/docs/RadioGroup.mdx": "40baefb61d35586f73db0686e6c878f6223a52dd8150a3ac7d97c505f6358422"
       },
       "category": "Forms"
     },
@@ -1270,7 +1278,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/Readout.tsx": "877a73be30722a3096f74460d86485949807626dddf57ce07b0b14c20ff60a9f",
         "tools/crate-ui-showcase/stories/Readout.stories.tsx": "4f9a168ec50ded5ca454e6669b3bed177d788ecf6ea78c04d71185d22ec0670b",
-        "tools/crate-ui-showcase/docs/Readout.mdx": "c3cc4154c365f5c825b9bc2a239099372e191b0201ac7ec036ddd2f6d2d135b2"
+        "tools/crate-ui-showcase/docs/Readout.mdx": "65e695b1809c729070e2306be2934e744d2006ebca1815adaedd273ec950035c"
       },
       "category": "Data Display"
     },
@@ -1290,7 +1298,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/SearchInput.tsx": "4cc93dd710412e3594718bd66aa07510d8f910cc1d3ce8918bad294734351fa6",
         "tools/crate-ui-showcase/stories/SearchInput.stories.tsx": "eaf42c873df434baa911eabd627c379523fa513821e819839fb055c00fe53005",
-        "tools/crate-ui-showcase/docs/SearchInput.mdx": "20e4dfb6ce440ea3f403c9d5fd03d0a0d8b621a8774bd9ea31a77a63b7a39401"
+        "tools/crate-ui-showcase/docs/SearchInput.mdx": "16807f1f35da6d9852b70a4086f486d33b49447ff5d623afdd7d232748881052"
       },
       "category": "Forms"
     },
@@ -1364,7 +1372,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b",
         "tools/crate-ui-showcase/stories/Switch.stories.tsx": "d62bcec0b12e968f9f349e78c8e66fec662246320d7ff0a4a164dcac2cc254aa",
-        "tools/crate-ui-showcase/docs/Switch.mdx": "52536c25348fb7550fab502a687cbf0be85ac9d8de57f36f706b50977a24d772"
+        "tools/crate-ui-showcase/docs/Switch.mdx": "b302c51f4fd0d894e92f586b5ae25b685a8b456a2762ee147664e534878171e3"
       },
       "category": "Forms"
     },
@@ -1406,19 +1414,21 @@
     },
     {
       "id": "shadcn-button",
-      "name": "button",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Button",
+      "purpose": "Text actions, explicit confirmation and semantic native links.",
+      "coverage": "documented",
+      "adoption": "Existing foundation in both apps; disabled/link and coarse-target contracts validated in affected consumers. Broader page QA remains pending.",
+      "storyId": "components-button",
+      "story": "tools/crate-ui-showcase/stories/Button.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Button.mdx",
       "sources": [
         "app/shared/ui/shadcn/button.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/button.tsx": "1452aadf522bdd1a383872a91a7ec7b2b8a5106f8edbb1302f7b3b22cee5e63c"
+        "app/shared/ui/shadcn/button.tsx": "8a722ba61aa337cc5844b827ee8a1ae8c4d791c7d3407ecf5f8bfe3263ddae1a",
+        "tools/crate-ui-showcase/stories/Button.stories.tsx": "8f50483aa06972f5d8d8993b11211be2f33d995d6fe119a3f5b3c021eae94c29",
+        "tools/crate-ui-showcase/docs/Button.mdx": "d4bf7a5719a34f949f0a2d3eeb59c994742072931a1d3601318774249531eae2"
       },
       "category": "Actions"
     },
@@ -1510,7 +1520,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda",
         "tools/crate-ui-showcase/stories/Input.stories.tsx": "cd1f45b1440a588c2fe953ee4ea018c48fc3cd4f97c53e8097756d9c0a759c81",
-        "tools/crate-ui-showcase/docs/Input.mdx": "6215d5f0d38a3291e2ebde37d53795411a7ef8ccb51333a383f046d1cdab9a22"
+        "tools/crate-ui-showcase/docs/Input.mdx": "8cf09d48661bb066453f5b05165aab1713312da00f64f4a956362c7a9b70fcec"
       },
       "category": "Forms"
     },
@@ -1602,7 +1612,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/select.tsx": "2668625e5e9cec7b58fedd851dab5f4cf5965982e6fd600f5e699f24aa273b14",
         "tools/crate-ui-showcase/stories/Select.stories.tsx": "015b9c0ab4d16d8a473a4522e230a9eee561165850a81498480ef9eea47e2316",
-        "tools/crate-ui-showcase/docs/Select.mdx": "47691c2c907f3e9a4ceac1a8ca8128f1ecf5308ffd6c2f8a599b708d13b044e0"
+        "tools/crate-ui-showcase/docs/Select.mdx": "203983f194f1f7bfc53492eccfefb9bfb2a860e2938a9b9f4c437f71150ac01f"
       },
       "category": "Forms"
     },
@@ -1712,7 +1722,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909",
         "tools/crate-ui-showcase/stories/Textarea.stories.tsx": "cace2303feab2e7c21deb1ad7ac063c3f1e602bd8d1a09ccdd10d854465f19da",
-        "tools/crate-ui-showcase/docs/Textarea.mdx": "0055322129f8ceb7273f10db551931a4c3faa7a6cb3bfae0bfe88b4595f2beaa"
+        "tools/crate-ui-showcase/docs/Textarea.mdx": "b636df94ebae9c366eb821b23a915529f15b8a5b3a0f826f20853aa510a50930"
       },
       "category": "Forms"
     },
@@ -1751,8 +1761,28 @@
       "fingerprints": {
         "app/shared/ui/primitives/Slider.tsx": "4a9191416f323f49132012745499cca868e8ca6ee80fe93a908956b4dfecc88c",
         "tools/crate-ui-showcase/stories/Slider.stories.tsx": "6abf79cdd2552c32659d128f210499957f18692002100981c07202dac97f96bc",
-        "tools/crate-ui-showcase/docs/Slider.mdx": "4956274ab58ccdf59cf634b25885a2e4cc3cd9f3c3c2a977e469c7108d73efce"
+        "tools/crate-ui-showcase/docs/Slider.mdx": "056d8845c80ebb1c81499c07cd9c940bbf70e74eb5c57b0b748c5a78b937437d"
       }
+    },
+    {
+      "id": "action-group",
+      "sources": [
+        "app/shared/ui/primitives/ActionGroup.tsx"
+      ],
+      "fingerprints": {
+        "app/shared/ui/primitives/ActionGroup.tsx": "62395485d44f98b5cf8d018beedf7052d5264e3a280eb68cea2de4e6857a5a6a",
+        "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "1c8615a53f43982003eb847fb384a3e4c072bfd6b22dc13af9d4f843097832e3",
+        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "aaa774120f2408877e07d48e6e098329aa74032618e511d72f5d306664c40d51"
+      },
+      "name": "ActionGroup",
+      "purpose": "ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps.",
+      "coverage": "documented",
+      "adoption": "Shared actions adopted by Admin PageHeader and Listen Servers; broader page adoption remains scoped.",
+      "storyId": "components-actiongroup",
+      "story": "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ActionGroup.mdx",
+      "knownIssues": [],
+      "category": "Actions"
     }
   ]
 }

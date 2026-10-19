@@ -66,6 +66,24 @@ describe("ServersSection", () => {
     setCurrentServerIdMock.mockReset();
   });
 
+  it("uses a short shared Remove tooltip with the server name in its accessible name", async () => {
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <ServersSection />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+    const action = screen.getByRole("button", { name: "Remove Server A" });
+    expect(action).toHaveAttribute("title", "Remove");
+    expect(action).toHaveAttribute("data-size", "icon-lg");
+    expect(action).toHaveAttribute("data-variant", "ghost");
+    action.focus();
+    expect(
+      await screen.findByRole("tooltip", { name: "Remove" }),
+    ).toBeVisible();
+  });
+
   it("revokes the removed server snapshot without logging out the fallback", async () => {
     render(
       <MemoryRouter>

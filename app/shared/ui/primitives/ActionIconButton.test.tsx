@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ActionIconButton, ActionIconLink } from "./ActionIconButton";
 
@@ -84,6 +84,23 @@ describe("ActionIconButton", () => {
 });
 
 describe("ActionIconLink", () => {
+  it("blocks disabled links without executing the callback", () => {
+    const click = vi.fn();
+    render(
+      <ActionIconLink
+        href="#destination"
+        disabled
+        onClick={click}
+        onClickCapture={click}
+      >
+        Open
+      </ActionIconLink>,
+    );
+    const link = screen.getByRole("link", { name: "Open" });
+    expect(link).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(link)).toBe(false);
+    expect(click).not.toHaveBeenCalled();
+  });
   it("renders as anchor", () => {
     render(<ActionIconLink href="/path">Link</ActionIconLink>);
     expect(screen.getByRole("link")).toHaveAttribute("href", "/path");

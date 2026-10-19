@@ -18,10 +18,10 @@ const actionToneClassName = iconButtonToneClassName;
 
 function actionVariantClassName(variant: ActionVariant) {
   if (variant === "card") {
-    return "h-9 min-h-11 w-9 min-w-11 border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md md:min-h-0 md:min-w-0";
+    return "h-9 min-h-11 w-9 min-w-11 border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md pointer-fine:min-h-0 pointer-fine:min-w-0";
   }
 
-  return "h-10 min-h-11 w-10 min-w-11 md:min-h-0 md:min-w-0";
+  return "h-10 min-h-11 w-10 min-w-11 pointer-fine:min-h-0 pointer-fine:min-w-0";
 }
 
 interface ActionIconButtonProps
@@ -83,12 +83,18 @@ export function ActionIconLink({
   href,
   tone = "default",
   variant = "row",
+  onClick,
+  onClickCapture,
+  onKeyDown,
+  onKeyDownCapture,
+  tabIndex,
   ...props
 }: ActionIconLinkProps) {
+  const unavailable = disabled || !href;
   return (
     <a
       href={href || "#"}
-      aria-disabled={disabled || !href}
+      aria-disabled={unavailable}
       className={cn(
         "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
@@ -97,6 +103,31 @@ export function ActionIconLink({
         className,
       )}
       {...props}
+      tabIndex={unavailable ? -1 : tabIndex}
+      onClickCapture={(event) => {
+        if (unavailable) {
+          event.preventDefault();
+          event.stopPropagation();
+        } else onClickCapture?.(event);
+      }}
+      onKeyDownCapture={(event) => {
+        if (unavailable && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.stopPropagation();
+        } else onKeyDownCapture?.(event);
+      }}
+      onClick={(event) => {
+        if (unavailable) {
+          event.preventDefault();
+          event.stopPropagation();
+        } else onClick?.(event);
+      }}
+      onKeyDown={(event) => {
+        if (unavailable && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.stopPropagation();
+        } else onKeyDown?.(event);
+      }}
     >
       {children}
     </a>

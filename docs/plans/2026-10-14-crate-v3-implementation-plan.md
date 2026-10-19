@@ -130,6 +130,7 @@ simulated thread pools. Do not read or use any other design branch.
   operational approval; there is no unconditional `alembic stamp` step.
 
   Migration numbers are written `NNN` below. Every migration:
+
   - puts its DDL in an immutable `app/crate/db/schema_sections/<area>_vNNN.py` called from
     `upgrade()` and from the bootstrap;
   - uses `ADD COLUMN IF NOT EXISTS`, nullable columns, and `autocommit_block` for concurrent
@@ -140,6 +141,7 @@ simulated thread pools. Do not read or use any other design branch.
 
 - New task types are registered in five places, checked by `app/tests/test_task_runtime_contract.py`
   and `test_task_queue_routing.py`:
+
   1. `app/crate/actors.py` `TASK_POOL_CONFIG`;
   2. a `TaskTypeInfo` in `app/crate/task_registry.py`;
   3. a handler in a `*_TASK_HANDLERS` dict;
@@ -2452,6 +2454,7 @@ Commits:
 **Files:**
 
 - Create: `app/crate/api/admin_live.py`. Route `GET /api/admin/live-stream?surfaces=...`:
+
   - surface registry `{name: (capability, channel, kind, reader)}`;
   - at connect, filter to allowed surfaces; 403 only when none is allowed; 400 on an unknown name;
   - snapshot surfaces re-read the row by primary key with `asyncio.to_thread(get_ui_snapshot)` on
@@ -2533,6 +2536,7 @@ priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`),
   never the serial service loop, where it would stall behind `ImportQueue.refresh_pending_state()`
   and the scheduler). `publish_tasks_surface_signal` fires on every `update_task` progress write,
   so with any active task the dirty flag is always set; the cadence therefore is:
+
   - while `admin:live:viewers:queues` exists: rebuild when `GETDEL crate:ops:queues:dirty` is set,
     at most once per 3 s;
   - otherwise: rebuild every 15 s, only for `worker_live`.
@@ -2592,6 +2596,7 @@ priority, created_at LIMIT :n`, plus a `pool IS NULL` branch read as `default`),
 - Modify: `app/crate/api/admin_live.py` (`queues` surface)
 - Modify: `app/crate/db/queries/tasks.py` and `app/crate/api/tasks.py` (`list_tasks` gains a `pool` filter for `?queue=`)
 - Test: `app/tests/test_tasks_api.py`
+
   - the endpoint never builds;
   - permission is enforced;
   - catalog flags equal `TASK_POOL_CONFIG` and the frozensets;
@@ -5197,6 +5202,7 @@ Merge rules for the Smart Mix merge, whichever side lands second:
    clock from `resolveNativeCrossfadeTransition`. `includeProfiles` is behind a server capability,
    because the request model is `extra='forbid'`. Tests include an old-server compatibility case.
 2. **Access tokens.** Covers:
+
    - `app/listen/src/components/settings/access-tokens/*`;
    - `GET /api/auth/access-tokens/policy`, with route metadata defined after
      `_is_vdj_access_token_request`;
@@ -5209,8 +5215,10 @@ Merge rules for the Smart Mix merge, whichever side lands second:
    (`sm:app/crate/api/smart_mix_admin.py`: `GET /api/admin/smart-mix/status`, `POST /backfill`,
    `/backfill/pause`, `/backfill/resume`, `/backfill/cancel`; `SmartMixCoverage.tsx` with
    `idle | running | paused`).
+
    - Files: `app/ui/src/components/SmartMixCoverage.tsx` (from `sm:`) restyled as a row of the
      3.9b Coverage panel on `app/ui/src/pages/Analysis.tsx`:
+
      - the stacked hairline bar reads counters added to the 120 s `analysis_status` block (never
        counted in a request);
      - campaign state as `StatusDot` plus the word `idle`, `running` or `paused`;
@@ -6170,7 +6178,6 @@ record final scoped evidence, review and executor rulings. **Stop1AP uncommitted
 A20/phase6.8/global1b.8 incomplete. Keep canonical1M33PNG/manifest/pin258bbaee; no fullsuite,
 CI/baseline refresh/native/live certification, PR/merge/rebase/deploy/release or nextgroup.
 
-
 ### 1AP final local stop and broad plan audit — 2026-10-19
 
 One fresh read-only review verified all 65 pre-repair pending paths, 58 source/asset hashes and
@@ -6199,7 +6206,6 @@ The audit does not silently repair earlier published checkpoints or start the ne
 **1AO remains published as ba63836d2a23bb774832c1703eab4e4116e1468f. Stop at local 1AP, without
 commit/push, for Diego's review.** Canonical 1M images/manifest and pin 258bbaee remain intact.
 A20, phase 6.8, global 1b.8, full-phase CI and native/live QA remain pending.
-
 
 ### 1AP authorized audit reconciliation — local validation, 2026-10-19
 
@@ -6231,13 +6237,11 @@ regex escapes in the touched drift tool were removed after lint RED;17Node cases
 One fresh independent review of this new authorized amendment follows; the earlier reviewed
 1AP freeze remains historical. **Stop1AP without commit/push; preview stays active at :5186.**
 
-
 Final audit-reconciliation review: Critical0/Important0/Minor2; both new A6 prevention gaps
 (variant-prefixed utilities and lexical constant shadowing) closed in one tested pass,19guard
 cases/17Node cases/CLI/types/lint green. UI remains the validated17preview+6builtAdmin build,
 526377/532480B gzip,6103Bmargin. Full final review rulings and costs are in both handovers.
 See the single current-state table; **stop1AP uncommitted, previewactive5186**.
-
 
 ### 1AP approved — publication preparation, 2026-10-19
 
@@ -6247,7 +6251,6 @@ before publication metadata changes. The persistent1AP label/footer now say publ
 its embedding expectation changes. Earlier1AP local stops are historical. The next checkpoint
 is1AQ, to stop uncommitted for Diego; no PR/merge/rebase/deploy/release or fullCI/baselines.
 The resulting verified publication SHA is recorded in the subsequent1AQ continuation record.
-
 
 ### 1AP published; 1AQ PlaylistEditor local — 2026-10-19
 
@@ -6265,7 +6268,6 @@ stream controls. No global EventSource override or live requests. A5editor hero 
 owned6.8/A20 debt record, without increasing earlier budgets.
 Final scoped evidence and reviewer rulings are recorded in the main handover/current-state table.
 **Stop1AQ without commit/push. Previewactive5186; no next group, fullsuite/CI or canonical refresh.**
-
 
 ### 1AQ later steering — basic actions and form Selects, 2026-10-19
 
@@ -6350,7 +6352,6 @@ actuales; las propuestas restantes no se han aplicado. Datos manuales del previe
 certificación backend vivo/AT/nativo/canónica. **Mismo1AQ local sin commit/push ni siguiente
 grupo; preview5186activo**. Evidencia final y límites: [estado vigente](2026-10-19-crate-v3-current-state.md).
 
-
 ### Enmienda local1AQ: colección compartida y propuesta de filas — 2026-10-19
 
 La normalización de badges fue autorizada después de la auditoría inicial: InfoBadge24/12,
@@ -6367,13 +6368,11 @@ iluminado de notas históricas; se conserva la prohibición aprobada de iluminar
 El [estado vigente](2026-10-19-crate-v3-current-state.md) prevalece sobre stops y propuestas
 históricos. Preview5186activo, pin258bbaee y33PNG/manifest1M conservados.
 
-
 Última instrucción de Diego: pausar migraciones visuales para reconciliar el sistema completo.
 [Auditoría y catálogo propuesto](2026-10-19-crate-v3-component-reconciliation-audit.md): revisar
 contratos/adopción/overrides y aprobar el set común antes de seguir por pantallas. La propuesta
 de filas se integra en ese trabajo. No se considera aprobada la implementación del catálogo.
 Se preservan1AQlocal,preview5186y todos los checkpoints, sin commit/push.
-
 
 ### 1AQ — Storybook y primera reconciliación (estado local vigente)
 
@@ -6387,12 +6386,16 @@ Admin aún no adopta esa fila; el resto de R1–R4 sigue pendiente. Previews 600
 [contrato Hairline](2026-10-19-crate-v3-hairline-reconciliation.md).
 **Misma parada local 1AQ, sin commit/push; no se cierra la fase ni su QA.**
 
-
 1AQ aprobado por Diego el 2026-10-19; commit/push autorizados. El siguiente bloque es FormField
 y roles tipográficos, con parada de revisión en 1AR. Prevalece el [estado vigente](2026-10-19-crate-v3-current-state.md).
-
 
 1AQ publicado como `da8a4358`. 1AR agrupa toda la familia de formularios y sus roles tipográficos,
 con ejemplos nuevos solo en Storybook. Las escenas existentes conservan sus callbacks y usan
 los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-current-state.md);
 [plan de 1AR](2026-10-19-crate-v3-forms-reconciliation.md). Parada local antes de commit/push.
+
+## 1AR publication and 1AS action reconciliation
+
+Diego approved 1AR; published commit `a3ba497ddfdf05835441686fbd8c874c07e4cea6` on `feat/crate_v3`. Previous local review stops are historical. Next local checkpoint 1AS covers Button, IconButton, ActionGroup/ActionButton/ActionLink and the ActionIcon compatibility entry. The approved header pattern moves into shared composition; Admin aliases preserve asChild router usage and Listen adopts the conventional server Remove action. Typography/form approval remains intact.
+
+Review: `http://127.0.0.1:5186/review-1as-actions.html` and Storybook `Reviews/1AS/Actions`. One scene, no new main mockup section. See [plan/evidence](2026-10-19-crate-v3-actions-reconciliation.md) and [current state](2026-10-19-crate-v3-current-state.md). Keep both previews active; stop before 1AS commit. No full suites, CI, canonical baseline updates or native/backend QA claimed.

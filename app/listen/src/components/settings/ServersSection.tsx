@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { IconButton } from "@crate/ui/primitives/IconButton";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { usesConfigurableServer } from "@/lib/platform";
@@ -116,16 +116,15 @@ export function ServersSection() {
                 </div>
                 <div className="text-xs text-text-muted">{server.url}</div>
               </button>
-              <IconButton
-                tone="danger"
+              <ActionButton
+                tooltip={t("common.remove")}
                 onClick={() => handleRemove(server)}
                 label={t("settings.servers.remove", {
                   name: server.label,
                 })}
-                className="size-9 rounded-lg border border-border-quiet text-text-muted hover:border-state-danger/40 hover:bg-state-danger/10 hover:text-state-danger-text"
               >
-                <Trash2 size={CRATE_ICON_SIZE.xs} className="size-3.5" />
-              </IconButton>
+                <Trash2 aria-hidden="true" />
+              </ActionButton>
             </div>
           );
         })}

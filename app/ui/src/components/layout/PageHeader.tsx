@@ -1,19 +1,6 @@
-import {
-  Children,
-  cloneElement,
-  type ComponentProps,
-  type HTMLAttributes,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "@crate/ui/lib/cn";
-import { Button, type ButtonProps } from "@crate/ui/shadcn/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@crate/ui/shadcn/tooltip";
+import { ActionGroup } from "@crate/ui/primitives/ActionGroup";
 
 export function PageHeaderLayout({
   as: Tag = "div",
@@ -49,6 +36,8 @@ export function PageHeaderLayout({
   );
 }
 
+// Compatibility names: geometry, tooltip and disabled discovery now belong to @crate/ui.
+export { ActionButton as PageHeaderAction } from "@crate/ui/primitives/ActionGroup";
 export function PageHeaderActions({
   children,
   label = "Page actions",
@@ -56,87 +45,5 @@ export function PageHeaderActions({
   children: ReactNode;
   label?: string;
 }) {
-  if (Children.toArray(children).length === 0) return null;
-  return (
-    <TooltipProvider>
-      <div
-        role="group"
-        aria-label={label}
-        className="flex max-w-full flex-wrap items-center justify-end gap-2"
-      >
-        {children}
-      </div>
-    </TooltipProvider>
-  );
-}
-
-// Keep the same native button through availability changes. Radix supplies its tooltip
-// description to the wrapper; forward it to the button as well for the enabled trigger.
-function HeaderActionTrigger({
-  children,
-  disabled,
-  label,
-  ...triggerProps
-}: Omit<ComponentProps<"span">, "children"> & {
-  children: ReactElement<ButtonProps>;
-  disabled?: boolean;
-  label: string;
-}) {
-  return (
-    <span
-      {...triggerProps}
-      role={disabled ? "group" : undefined}
-      aria-label={disabled ? label : undefined}
-      aria-disabled={disabled || undefined}
-      tabIndex={disabled ? 0 : undefined}
-      className="inline-flex rounded-md"
-    >
-      {cloneElement(children, {
-        "aria-describedby": triggerProps["aria-describedby"],
-      })}
-    </span>
-  );
-}
-
-type PageHeaderActionProps = Omit<
-  ButtonProps,
-  | "size"
-  | "variant"
-  | "shape"
-  | "className"
-  | "loading"
-  | "aria-label"
-  | "title"
-> & { label: string; tooltip?: string };
-export function PageHeaderAction({
-  label,
-  tooltip = label,
-  children,
-  disabled,
-  ...props
-}: PageHeaderActionProps) {
-  const control = (
-    <Button
-      {...props}
-      disabled={disabled}
-      loading={false}
-      size="icon-lg"
-      variant="ghost"
-      className="aria-pressed:text-accent-action-hi"
-      aria-label={label}
-      title={tooltip}
-    >
-      {children}
-    </Button>
-  );
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <HeaderActionTrigger disabled={disabled} label={label} title={tooltip}>
-          {control}
-        </HeaderActionTrigger>
-      </TooltipTrigger>
-      <TooltipContent side="top">{tooltip}</TooltipContent>
-    </Tooltip>
-  );
+  return <ActionGroup label={label}>{children}</ActionGroup>;
 }

@@ -105,7 +105,6 @@ compatibility adapters/recipes, not separate foundations. No local typography/ge
 See docs/plans/2026-10-19-crate-v3-ui-labels.md. Generic text-badge/text-label and the player queue
 counter keep their separate roles; do not change their global values to resize the collection.
 
-
 ## Mandatory showcase maintenance — 1AQ
 
 Visual source of truth: Diego's approved persistent mockup (5186), with his later confirmed
@@ -127,7 +126,6 @@ Run `npm run design-system:showcase:refresh -- ID`, `design-system:showcase:chec
 story/consumer tests. The staged hook and shared policy test enforce correspondence; semantic
 review remains required. Do not refresh pending hashes to bypass coverage. See the showcase
 README and AGENTS. Keep stories/docs outside shared tsup entry folders and app runtime imports.
-
 
 ## Complete form family — local 1AR
 
@@ -156,3 +154,14 @@ settings. Preserve specialized player/EQ progress, beam and volume behavior.
 All twelve forms have live Storybook entries and Patterns/Forms composes them. New samples
 belong only in Storybook. Existing persistent mockup controls, including fixture helpers,
 must import these components; preview-component-policy.test.ts rejects raw form copies.
+
+## Shared action family — 1AS
+
+Button is the text-action foundation. ActionGroup/ActionButton/ActionLink compose the approved
+Button ghost/icon-lg plus Tooltip recipe for conventional header/row actions;44px, short tooltip,
+contextual accessible name, native group/Tab semantics. Disabled/loading discovery uses a stable
+wrapper and preserves the native control. Admin PageHeader names are compatibility adapters.
+IconButton retains compact round/glow controls; ActionIconButton/ActionIconLink remain legacy
+row/card compatibility. Coarse targets reserve44px in layout, not overlapping pseudo-elements.
+Do not use an icon-only control for ambiguous domain operations or final confirmations. AI
+availability, BackLink/navigation and specialized PlayButton/progress remain separate contracts.

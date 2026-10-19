@@ -82,7 +82,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         data-active={isActive || undefined}
         className={cn(
           "relative inline-flex shrink-0 items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px disabled:pointer-events-none disabled:opacity-50",
-          "after:absolute after:top-1/2 after:left-1/2 after:size-11 after:-translate-x-1/2 after:-translate-y-1/2 pointer-fine:after:hidden",
+          "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
           SIZE_CLASS_NAME[size],
           VARIANT_CLASS_NAME[variant],
           iconButtonToneClassName(isActive ? "primary" : tone),

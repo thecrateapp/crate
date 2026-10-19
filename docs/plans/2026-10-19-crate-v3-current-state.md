@@ -7,17 +7,17 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AQ publicado: `da8a43586e800164e3111ba74fa4d22c087c3eb1`; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AR aprobado por Diego**: familia completa de formularios y sus roles tipográficos; publicación autorizada                                                                        |
-| Revisión actual         | `http://127.0.0.1:5186/review-1ar-forms.html`; familia completa de formularios, misma escena en Storybook `Reviews/1AR/Forms`; URL anterior de etiquetas conservada         |
+| Publicado               | 1AR publicado: `a3ba497ddfdf05835441686fbd8c874c07e4cea6`; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AS aprobado por Diego**: acciones compartidas y catálogo; publicación autorizada                                                                                                 |
+| Revisión actual         | `http://127.0.0.1:5186/review-1as-actions.html`; misma escena en Storybook `Reviews/1AS/Actions`; vistas anteriores conservadas                                             |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 21 entradas documentadas / 71 pendientes                                       |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 25 entradas documentadas / 68 pendientes                                       |
 | Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | Publicación de 1AR autorizada; siguiente grupo de componentes se revisa antes de commit. Sin PR, merge, rebase, deploy ni release                                                                      |
+| Restricción             | Publicación de 1AS autorizada; 1AT se revisa antes de commit. Sin PR, merge, rebase, deploy ni release                                                                                      |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -362,3 +362,13 @@ Regresión de cobertura: fallaba por ausencia del slider antes de ampliar. Pasan
 ### Aprobación de 1AR
 
 Diego aprueba la familia completa de formularios y autoriza commit/push de 1AR. La evidencia y los límites anteriores se conservan; no se repiten suites completas. El siguiente checkpoint será 1AS, acciones compartidas según el orden R1 de la reconciliación, con referencia en el mockup, actualización de Storybook y vista aislada. Ambos previews permanecen activos.
+
+### 1AS — acciones compartidas, listo para revisión local
+
+1AR publicado en `a3ba497ddfdf05835441686fbd8c874c07e4cea6`. 1AS completa Button/IconButton, la composición ActionGroup/ActionButton/ActionLink y la ficha de compatibilidad ActionIcon. El patrón aprobado de cabecera pasa a shared; Admin conserva sus alias y enlaces asChild, y Listen adopta Remove en servidores. Las áreas táctiles44px ocupan espacio real. Estados unavailable/loading bloquean navegación/callbacks y los tooltips conservan las descripciones accesibles.
+
+Revisión pequeña: `http://127.0.0.1:5186/review-1as-actions.html`; misma escena en Storybook `Reviews/1AS/Actions`. Catálogo25/93/120. Pasan125pruebas unitarias focalizadas y15casos browser, tipos/lint/builds de herramientas y apps. Admin527150/532480Bgzip; Listen200102/307200B. Revisión independiente sin bloqueos; discrepancia documental de radio corregida a4px. Evidencia/límites en el [plan1AS](2026-10-19-crate-v3-actions-reconciliation.md). Ambos previews activos. **1AS sin commit/push, detenido para Diego.**
+
+### Aprobación de 1AS
+
+Diego aprueba 1AS y autoriza commit/push. Siguiente grupo1AT: superficies y contenedores según R1, con el mockup como referencia, catálogo actualizado y vista aislada; detener antes de commit. Solicita además un análisis paralelo documentado de agrupaciones para checkpoints posteriores.

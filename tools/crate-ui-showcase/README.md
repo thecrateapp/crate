@@ -16,8 +16,8 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1ar-forms.html and Storybook `Reviews/1AR/Forms`.
-The previous labels URL remains an alias. Both import `reviews/FormsReview.tsx`; no copied
+Current: http://127.0.0.1:5186/review-1as-actions.html and Storybook `Reviews/1AS/Actions`.
+Both import `reviews/ActionsReview.tsx`; earlier forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
 
@@ -85,7 +85,7 @@ Navigation, Actions, Overlays, Media and Layout hold canonical components; Compa
 legacy adapters. Foundations remains in System. Category definitions live in Maintenance.
 Pending entries are categorized too; a category does not imply validated documentation.
 
-92 entries link 119 sources: 21 documented entries and 71 pending by family. Adoption and visual
+93 entries link 120 sources: 25 documented entries and 68 pending by family. Adoption and visual
 review remain explicitly separate; these are not counts of certified consumers. SegmentedControl
 demonstrates real-prop controls, radio mode and tabs with persistent linked panels. HairlineRow
 owns its inset/alignment and supports wrapping
@@ -95,3 +95,7 @@ are still pending.
 ## Form family — local 1AR
 
 All form primitives have live entries: FormField, Input, Textarea, SearchInput, Select, AdminSelect, Checkbox, Switch, RadioGroup, SegmentedControl, FilterChip and the general native Slider. `Patterns/Forms` composes the real components. New specimens belong only in Storybook; the persistent mockup stays a reference. Use FormField stacked for ordinary controls, inline for a checkbox/switch caption. Input retains native number/date/time/file variants. Page-wide adoption and player/EQ controls remain separate.
+
+## Action family — local 1AS
+
+Button is the text-action foundation; ActionGroup/ActionButton/ActionLink compose the approved header/row recipe. IconButton retains compact round/glow controls; ActionIconButton/ActionIconLink have explicit Compatibility entries. See each live contract and Reviews/1AS/Actions. Specialized play/AI/navigation semantics remain separate.

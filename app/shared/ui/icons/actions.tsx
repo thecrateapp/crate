@@ -7,6 +7,7 @@ import {
   Copy as SolarCopy,
   Diskette as SolarDiskette,
   Download as SolarDownload,
+  Eye as SolarEye,
   GalleryAdd as SolarGalleryAdd,
   MagicStick as SolarMagicStick,
   MenuDots as SolarMenuDots,
@@ -36,6 +37,7 @@ export const ArrowDownToLineBold = createIcon(
 export const Camera = createIcon(SolarCamera, "Camera");
 export const Copy = createIcon(SolarCopy, "Copy");
 export const Download = createIcon(SolarDownload, "Download");
+export const Eye = createIcon(SolarEye, "Eye");
 export const GripVertical = createIcon(SolarReorder2, "GripVertical");
 export const ImagePlus = createIcon(SolarGalleryAdd, "ImagePlus");
 export const MoreHorizontal = createIcon(SolarMenuDots, "MoreHorizontal");

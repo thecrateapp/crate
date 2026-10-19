@@ -42,8 +42,8 @@ describe("IconButton", () => {
     const small = screen.getByRole("button", { name: "Small" });
     expect(small).toHaveClass(
       "size-8",
-      "after:size-11",
-      "pointer-fine:after:hidden",
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:min-w-11",
     );
     expect(screen.getByRole("button", { name: "Large" })).toHaveClass(
       "size-11",

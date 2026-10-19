@@ -6,7 +6,7 @@ import { Loader2 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 aria-invalid:border-state-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium pointer-coarse:min-h-11 pointer-coarse:min-w-11 transition-[color,background-color,border-color,box-shadow,opacity,transform] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 aria-invalid:border-state-danger [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
   {
     variants: {
       variant: {
@@ -73,13 +73,38 @@ function Button({
   };
 
   if (asChild) {
+    const unavailable = Boolean(props.disabled || loading);
+    const block = (event: React.SyntheticEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const blockKey = (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") block(event);
+    };
+    // Slot merges child handlers before its own. Override both sides when unavailable,
+    // including capture, so a router link cannot execute its handler or navigate.
+    const blockedProps = unavailable
+      ? {
+          tabIndex: -1,
+          onClick: block,
+          onClickCapture: block,
+          onKeyDown: blockKey,
+          onKeyDownCapture: blockKey,
+        }
+      : {};
+    const child =
+      unavailable &&
+      React.isValidElement<React.HTMLAttributes<HTMLElement>>(children)
+        ? React.cloneElement(children, blockedProps)
+        : children;
     return (
       <Slot.Root
         {...sharedProps}
-        aria-disabled={props.disabled || loading || undefined}
         {...props}
+        {...blockedProps}
+        aria-disabled={unavailable || props["aria-disabled"] || undefined}
       >
-        {children}
+        {child}
       </Slot.Root>
     );
   }
