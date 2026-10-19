@@ -5,13 +5,10 @@ import { DocHeading } from "../components/DocHeading";
 
 <Meta of={Stories} />
 <DocHeading as="h1">ActionIconButton</DocHeading>
-<EntryDetails
-  id="primitives-actioniconbutton"
-  review="Visual review pending · 1AS"
-/>
+<EntryDetails id="primitives-actioniconbutton" review="1AS and 1AT approved" />
 <DocHeading as="h2">Contract</DocHeading>
 
-Compatibility controls used by existing entity rows and artwork cards. Fine row40px/card36px, both reserve44px coarse targets. Keep default/primary/danger tone and active pulse, global focus and reduced-motion. Callers must supply an accessible name and decorative glyph. ActionIconLink preserves enabled native links; missing href or disabled removes Tab eligibility and blocks execution/navigation. New conventional header/row actions use ActionButton/ActionLink in ActionGroup; compact round controls use IconButton. Replace compatibility imports only with consumer evidence, never a mass rename. Existing card surface reconciliation remains pending with the surface family.
+Compatibility controls used by existing entity rows and artwork cards. Fine row40px/card36px, both reserve44px coarse targets. Keep default/primary/danger tone and active pulse, global focus and reduced-motion. Callers must supply an accessible name and decorative glyph. ActionIconLink preserves enabled native links; missing href or disabled removes Tab eligibility and blocks execution/navigation. New conventional header/row actions use ActionButton/ActionLink in ActionGroup; compact round controls use IconButton. Replace compatibility imports only with consumer evidence, never a mass rename. The card surface is now opaque surface-object with a quiet border and no shadow/backdrop (1AT).
 
 The approved persistent mockup and Diego’s confirmed adjustments are the reference. Shared components own their geometry, states and typography. Stories add layout only.
 

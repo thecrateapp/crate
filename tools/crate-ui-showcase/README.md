@@ -16,8 +16,8 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1as-actions.html and Storybook `Reviews/1AS/Actions`.
-Both import `reviews/ActionsReview.tsx`; earlier forms/labels review URLs stay available. No copied
+Current: http://127.0.0.1:5186/review-1at-surfaces.html and Storybook `Reviews/1AT/Surfaces`.
+Both import `reviews/SurfacesReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
 
@@ -85,7 +85,7 @@ Navigation, Actions, Overlays, Media and Layout hold canonical components; Compa
 legacy adapters. Foundations remains in System. Category definitions live in Maintenance.
 Pending entries are categorized too; a category does not imply validated documentation.
 
-93 entries link 120 sources: 25 documented entries and 68 pending by family. Adoption and visual
+93 entries link 120 sources: 28 documented entries and 65 pending by family. Adoption and visual
 review remain explicitly separate; these are not counts of certified consumers. SegmentedControl
 demonstrates real-prop controls, radio mode and tabs with persistent linked panels. HairlineRow
 owns its inset/alignment and supports wrapping
@@ -99,3 +99,15 @@ All form primitives have live entries: FormField, Input, Textarea, SearchInput, 
 ## Action family — local 1AS
 
 Button is the text-action foundation; ActionGroup/ActionButton/ActionLink compose the approved header/row recipe. IconButton retains compact round/glow controls; ActionIconButton/ActionIconLink have explicit Compatibility entries. See each live contract and Reviews/1AS/Actions. Specialized play/AI/navigation semantics remain separate.
+
+## Surface family — local 1AT
+
+Card represents a solid standalone object; InstrumentPanel is an unfilled ruled section.
+Separator supplies the horizontal/vertical rule. Card icon variants share the object surface.
+Admin OpsPanel and Listen Settings Section delegate to InstrumentPanel; hero/stat/media families
+remain separate. See the live contracts and Reviews/1AT/Surfaces.
+
+Review captions use FormField kind="group", its named sample and real 8 px grid gap. Equivalent
+controls use the same canonical component/size/variant. Explicit compatibility or size galleries
+retain their separate contracts. Browser checks measure these relationships in both hosts;
+passing intrinsic component checks alone does not validate composition.

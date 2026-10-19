@@ -7,17 +7,17 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AR publicado: `a3ba497ddfdf05835441686fbd8c874c07e4cea6`; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AS aprobado por Diego**: acciones compartidas y catálogo; publicación autorizada                                                                                                 |
-| Revisión actual         | `http://127.0.0.1:5186/review-1as-actions.html`; misma escena en Storybook `Reviews/1AS/Actions`; vistas anteriores conservadas                                             |
+| Publicado               | 1AS publicado: `9b5356862db1cef1d014c0b56c7a7e61bd7cad18`; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AT aprobado por Diego**: publicación autorizada; siguiente grupo 1AU, cabeceras                                                                                          |
+| Revisión actual         | `http://127.0.0.1:5186/review-1at-surfaces.html`; misma escena en Storybook `Reviews/1AT/Surfaces`; vistas anteriores conservadas                                           |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 25 entradas documentadas / 68 pendientes                                       |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 28 entradas documentadas / 65 pendientes                                       |
 | Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | Publicación de 1AS autorizada; 1AT se revisa antes de commit. Sin PR, merge, rebase, deploy ni release                                                                                      |
+| Restricción             | 1AT aprobado: commit/push autorizados; 1AU se revisa antes de publicar. Sin PR, merge, rebase, deploy ni release                                                                                 |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -28,14 +28,14 @@ bajo el límite de532480Bgzip. Sin suites/CI completas ni actualización de capt
 No se considera que la migración de iconos haya completado el restyle de cada página. La
 reconciliación autorizada asigna esta deuda a sus fases, sin rediseñar ahora todos los paneles.
 
-| Residuo                                                                           | Dueño                                                | Fase                                    | Criterio de cierre                                                                                                                  |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `OpsPageHero`, `OpsStatTile`, `OpsPanel`: transparencias de panel, sombras y blur | Mantenedor de Admin UI y design system               | 3.1; adopción por 3.3, 3.5b, 3.6 y 3.9b | Receta compartida de superficie sólida; retirar los tokens heredados registrados y verificar cada consumidor                        |
-| Paneles de Bandcamp, Upcoming y ShowCard                                          | Mantenedor de páginas de catálogo de Admin           | 6.5                                     | Mismos tokens sólidos, sin skins locales; conservar acciones, contenido y glifos UX                                                 |
-| Paneles de Users y Roles                                                          | Mantenedor de acceso de Admin                        | 6.6                                     | Adoptar la superficie compartida preservando lista, modal ancho, avatares y capacidades reales                                      |
-| Playlists, editor y Translations                                                  | Mantenedor de curación/i18n de Admin                 | 6.8 / A20–A21                           | Eliminar paneles heredados y completar estados/tabs por página; conservar reglas, payloads y edición                                |
-| Otras utilidades de color y estructuras anteriores en el inventario de Admin      | Dueño de cada página, con revisión del design system | 3.x o 6.x de la página correspondiente  | Clasificar por rol antes de migrar. No confundir tokens semánticos válidos con desviaciones; cerrar mediante pruebas del consumidor |
-| Adaptadores que reexportan Select/Popover/skeleton                                | Mantenedor de fundamentos compartidos y Admin        | 3.1 y migraciones de consumidores       | Retirar nombres de compatibilidad cuando no tengan consumidores, sin crear una implementación duplicada                             |
+| Residuo                                                                      | Dueño                                                | Fase                                    | Criterio de cierre                                                                                                                  |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `OpsPageHero`, `OpsStatTile`: transparencias de panel, sombras y blur        | Mantenedor de Admin UI y design system               | 3.1; adopción por 3.3, 3.5b, 3.6 y 3.9b | Receta compartida de superficie sólida; retirar los tokens heredados registrados y verificar cada consumidor                        |
+| Paneles de Bandcamp, Upcoming y ShowCard                                     | Mantenedor de páginas de catálogo de Admin           | 6.5                                     | Mismos tokens sólidos, sin skins locales; conservar acciones, contenido y glifos UX                                                 |
+| Paneles de Users y Roles                                                     | Mantenedor de acceso de Admin                        | 6.6                                     | Adoptar la superficie compartida preservando lista, modal ancho, avatares y capacidades reales                                      |
+| Playlists, editor y Translations                                             | Mantenedor de curación/i18n de Admin                 | 6.8 / A20–A21                           | Eliminar paneles heredados y completar estados/tabs por página; conservar reglas, payloads y edición                                |
+| Otras utilidades de color y estructuras anteriores en el inventario de Admin | Dueño de cada página, con revisión del design system | 3.x o 6.x de la página correspondiente  | Clasificar por rol antes de migrar. No confundir tokens semánticos válidos con desviaciones; cerrar mediante pruebas del consumidor |
+| Adaptadores que reexportan Select/Popover/skeleton                           | Mantenedor de fundamentos compartidos y Admin        | 3.1 y migraciones de consumidores       | Retirar nombres de compatibilidad cuando no tengan consumidores, sin crear una implementación duplicada                             |
 
 El [registro ejecutable de adopción](../../scripts/design-system/admin-adoption-debt.json)
 enumera los archivos y las ocurrencias exactas de las superficies confirmadas, con dueño,
@@ -372,3 +372,42 @@ Revisión pequeña: `http://127.0.0.1:5186/review-1as-actions.html`; misma escen
 ### Aprobación de 1AS
 
 Diego aprueba 1AS y autoriza commit/push. Siguiente grupo1AT: superficies y contenedores según R1, con el mockup como referencia, catálogo actualizado y vista aislada; detener antes de commit. Solicita además un análisis paralelo documentado de agrupaciones para checkpoints posteriores.
+
+## 1AS publicado; 1AT — superficies y contenedores
+
+1AS publicado en `9b5356862db1cef1d014c0b56c7a7e61bd7cad18`. 1AT distingue Card como
+objeto sólido (surface-object, radio14, slots24, título Poppins16/24) e InstrumentPanel como
+sección sin relleno (regla1, inset22 y separación de cabecera20). Se completan semántica nativa,
+descripción, acciones y nombres accesibles. Separator conserva orientación y ARIA. Las variantes
+card de controles usan la superficie sólida; sus contratos de tamaño siguen diferenciados.
+Admin OpsPanel delega al panel compartido y Listen Settings Section delega su descripción.
+OpsPageHero/StatTile y las demás adopciones A5 permanecen pendientes; no se declara A5 cerrada.
+
+Diego detectó una composición incorrecta en la propia review: captions sueltos con gap0 y mezcla
+de IconButton40 con ActionIconButton36. Las escenas 1AS/1AT usan ahora FormField kind=group para
+captions de muestras, con8px reales y grupos nombrados. El ejemplo sobre artwork usa dos
+IconButton card equivalentes (40px fine /44px coarse, glyph18), sin overrides. La galería
+explícita de compatibilidad conserva sus tamaños. Una regresión reprodujo los dos fallos antes
+de corregirlos; las medidas de composición se verifican en ambos hosts y quedan en sus AGENTS.
+
+Revisión: `http://127.0.0.1:5186/review-1at-surfaces.html` y Storybook `Reviews/1AT/Surfaces`.
+Sin nueva sección en el mockup grande. [Plan y evidencia](2026-10-19-crate-v3-surfaces-reconciliation.md).
+El [documento solicitado de grupos](2026-10-19-crate-v3-component-checkpoint-groups.md) propone
+cabeceras, imágenes/identidad, eventos/fechas, entidades, colecciones, métricas, estados, capas,
+menús y navegación. Es una propuesta, no autorización de todas las migraciones. Incluye la deuda
+de la guarda de exports: su uso combinado no demuestra adopción en ambas apps.
+
+Validación focalizada:81pruebas unitarias (41shared,36Admin,4Listen),21casos browser de superficies
+/acciones y2del editor real;25guardas focalizadas, tipos shared/Storybook, lint, catálogo28/93/120 y builds de ambas apps
+y herramientas verdes. Admin527161/532480Bgzip (5319Bde margen); Listen200102/307200B. Una revisión
+independiente detectó el gap ausente de acciones en fragmentos de OpsPanel: corregido en el slot
+compartido y probado con los4botones reales a390/1200. Backend vivo, AT, otros motores/native,
+validación completa de fase y comparación canónica siguen pendientes. No se genera captura
+manual tras el rechazo de protocolo del navegador. Ambos servicios activos; **parada1AT antes
+de commit/push**.
+
+### Aprobación de 1AT
+
+Diego aprueba1AT y autoriza commit/push. Continúa1AU con PageHeader, SectionHeader, PageHero,
+HeroActionBar y BackLink, usando el mockup como referencia y actualizando Storybook y la vista
+pequeña del checkpoint. Ambos previews permanecen activos;1AU se detiene antes de commit/push.

@@ -15,10 +15,12 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <InstrumentPanel as="section" headingLevel={2} label={{ children: title }}>
-      {description ? (
-        <p className="mb-5 text-sm text-text-muted">{description}</p>
-      ) : null}
+    <InstrumentPanel
+      as="section"
+      headingLevel={2}
+      label={{ children: title }}
+      description={description}
+    >
       <div className="space-y-5">{children}</div>
     </InstrumentPanel>
   );

@@ -31,7 +31,7 @@ describe("OpsStatTile status colours", () => {
   );
 });
 
-it("keeps the V3 display/label/readout hierarchy on operational surfaces", () => {
+it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => {
   render(
     <>
       <OpsPageHero title="Analysis" description="Body copy" />
@@ -44,8 +44,9 @@ it("keeps the V3 display/label/readout hierarchy on operational surfaces", () =>
     "font-extrabold",
   );
   expect(screen.getByRole("heading", { name: "Coverage" })).toHaveClass(
-    "font-display",
-    "font-bold",
+    "font-mono",
+    "font-normal",
+    "uppercase",
   );
   expect(screen.getByText("Tracks")).toHaveClass("font-mono", "font-normal");
   expect(screen.getByText("1,200")).toHaveClass("font-display", "tabular-nums");
@@ -56,6 +57,25 @@ it("keeps the V3 display/label/readout hierarchy on operational surfaces", () =>
 });
 
 describe("Admin operational surfaces without decorative glyphs", () => {
+  it("uses the shared named ruled panel with associated description", () => {
+    render(
+      <OpsPanel
+        title="Queue"
+        description="Current work"
+        action={<button type="button">Refresh</button>}
+      >
+        <span>2 jobs</span>
+      </OpsPanel>,
+    );
+    const panel = screen.getByRole("region", { name: "Queue" });
+    expect(panel).toHaveAccessibleDescription("Current work");
+    expect(panel).toContainElement(
+      screen.getByRole("heading", { name: "Queue", level: 2 }),
+    );
+    expect(panel).toContainElement(
+      screen.getByRole("button", { name: "Refresh" }),
+    );
+  });
   it("keeps the page heading, description, children and action while removing the hero glyph", async () => {
     const action = vi.fn();
     const { container } = render(

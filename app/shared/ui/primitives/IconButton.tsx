@@ -34,7 +34,7 @@ const SIZE_CLASS_NAME: Record<IconButtonSize, string> = {
 
 const VARIANT_CLASS_NAME: Record<IconButtonVariant, string> = {
   ghost: "",
-  card: "border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md",
+  card: "border border-border-quiet bg-surface-object",
 };
 
 export interface IconButtonProps

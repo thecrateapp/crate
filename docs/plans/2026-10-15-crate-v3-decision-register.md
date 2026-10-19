@@ -1504,3 +1504,14 @@ los componentes compartidos. [Estado y límites vigentes](2026-10-19-crate-v3-cu
 ## 1AS — shared action contracts (local review)
 
 1AR published at `a3ba497d`; 1AS is local for review. Button retains text/form/link semantics; ActionGroup, ActionButton and ActionLink compose the approved header/row Button ghost/icon-lg + Tooltip pattern,44px with4px corners, contextual accessible names and short action tooltips. IconButton retains compact round/glow utility controls;44px coarse targets reserve real layout space. Admin aliases preserve asChild router links; Listen adopts conventional server Remove. Loading/disabled discovery and activation guards belong to shared controls. Existing card surfaces and specialized playback/AI/navigation stay in their documented families. Storybook records the live contracts; [1AS plan/evidence](2026-10-19-crate-v3-actions-reconciliation.md) is the current checkpoint record. No new main-mockup section. Stop before1AS commit.
+
+## 1AS publication and 1AT surface reconciliation — 2026-10-19
+
+1AS published as `9b5356862db1cef1d014c0b56c7a7e61bd7cad18`; previous local stops are historical.
+1AT is local for review: Card object, InstrumentPanel section, Separator, solid card controls and
+two thin app adapters. Sample captions compose FormField with real8px gaps; equivalent artwork
+controls use the same canonical component/size. No repair CSS or new main-mockup section.
+[Current state and evidence](2026-10-19-crate-v3-current-state.md),
+[1AT scope and limits](2026-10-19-crate-v3-surfaces-reconciliation.md), and
+[requested future groups proposal](2026-10-19-crate-v3-component-checkpoint-groups.md).
+Both previews active; stop before1AT commit/push. Broader adoption and phase/native/canonical QA remain open.

@@ -68,7 +68,7 @@
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "c1510488cda0e4cbb1b3e985333603febbdc771d73431757cb77bef0dffce20a"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "ecdda6b694000a8efe97d90888fa890483d5a2eaa92c3208e402dacc5a5fa5a8"
       },
       "category": "Foundations"
     },
@@ -954,13 +954,11 @@
       "sources": [
         "app/shared/ui/primitives/ActionIconButton.tsx"
       ],
-      "knownIssues": [
-        "Existing card surface retained; solid-surface reconciliation belongs to the next R1 group."
-      ],
+      "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/ActionIconButton.tsx": "cc3c971bd061c2b190dc00a852378cbe66bdf6bd5fd9dd9ea556d3e05ddf4414",
+        "app/shared/ui/primitives/ActionIconButton.tsx": "eb7f5f15859a70e2804ab53b696bbe9a0e846932f327cfd62911eef1af1cb775",
         "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx": "7cbf47778c776971593a740546a9f59127b95b6fe6de34b9b020ba515e88c7c9",
-        "tools/crate-ui-showcase/docs/ActionIconButton.mdx": "f7b1502d0081eabf0a2a0fa9396deb8b67e6dbb107110fa84ad32c9f0006d42a"
+        "tools/crate-ui-showcase/docs/ActionIconButton.mdx": "37b7484dda43e425e3907f2cded4c8319add231189c8a9a229bc08c9ec84dba6"
       },
       "category": "Compatibility"
     },
@@ -1124,13 +1122,11 @@
       "sources": [
         "app/shared/ui/primitives/IconButton.tsx"
       ],
-      "knownIssues": [
-        "Existing card surface retained; solid-surface reconciliation belongs to the next R1 group."
-      ],
+      "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/IconButton.tsx": "e57038290c13e0992872d91b044e33976c01fa33a7fbd0791c78c7660a95163c",
+        "app/shared/ui/primitives/IconButton.tsx": "2c134c00ebf58d39132b0d204ade3de0a2c1e73a671b5884855e3903ef228f34",
         "tools/crate-ui-showcase/stories/IconButton.stories.tsx": "fa5b753316190d36e8fc82f2c64c7d39d9517a57490e1116cc66beebd0e18d31",
-        "tools/crate-ui-showcase/docs/IconButton.mdx": "a7642ee81792e91092cc1746cec70b9e73cc96e35e5efff4b0fa7f30b42acb8d"
+        "tools/crate-ui-showcase/docs/IconButton.mdx": "1d06240bf8842d376a00c06803ca904ed4f5b46e3da7240e64833e81f5af4220"
       },
       "category": "Actions"
     },
@@ -1155,18 +1151,20 @@
     {
       "id": "primitives-instrumentpanel",
       "name": "InstrumentPanel",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Ruled unfilled figure or section, shared label, metadata, status, description and actions.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-instrumentpanel",
+      "story": "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/InstrumentPanel.mdx",
       "sources": [
         "app/shared/ui/primitives/InstrumentPanel.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/InstrumentPanel.tsx": "3e524b50fe97eba813d3865501fc6b91270836a6cc1437af052e11883211dd7b"
+        "app/shared/ui/primitives/InstrumentPanel.tsx": "459f188ffdf025119300c84d876bae3ceecae484b6d3a43e9cd6ab46a651cee4",
+        "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx": "f6ee516ae87fb2521ac4f47c2b16f6b048d6e4e951da77798267e1ea492b3c34",
+        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "b1dce8fdf95c09916a33945e3bad1b3b637874349ea06721ccdb2d14850c0654"
       },
       "category": "Layout"
     },
@@ -1428,25 +1426,27 @@
       "fingerprints": {
         "app/shared/ui/shadcn/button.tsx": "8a722ba61aa337cc5844b827ee8a1ae8c4d791c7d3407ecf5f8bfe3263ddae1a",
         "tools/crate-ui-showcase/stories/Button.stories.tsx": "8f50483aa06972f5d8d8993b11211be2f33d995d6fe119a3f5b3c021eae94c29",
-        "tools/crate-ui-showcase/docs/Button.mdx": "d4bf7a5719a34f949f0a2d3eeb59c994742072931a1d3601318774249531eae2"
+        "tools/crate-ui-showcase/docs/Button.mdx": "52118123d05f433824dbf4bce854c0a83022983908ce530a91c6286a646c2ae4"
       },
       "category": "Actions"
     },
     {
       "id": "shadcn-card",
-      "name": "card",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Card",
+      "purpose": "Standalone object, solid surface and complete native card slots.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-card",
+      "story": "tools/crate-ui-showcase/stories/Card.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Card.mdx",
       "sources": [
         "app/shared/ui/shadcn/card.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/card.tsx": "059a06914443d40ac696b1159dc59cf464d1239a24ca0dc103987c75b1716aeb"
+        "app/shared/ui/shadcn/card.tsx": "9d3427f06657fc9edcbb058cea1073eb60fb5b15637ba9ee1a37633131a87896",
+        "tools/crate-ui-showcase/stories/Card.stories.tsx": "56fcde94f7b0f072fef249f7177a51be0351a42107eba67f08fd7642ff7c4400",
+        "tools/crate-ui-showcase/docs/Card.mdx": "4df8cdab2d5507a76707a2050c06a6d8383ef4299f25b1fd7fe17fbfbe8e0203"
       },
       "category": "Layout"
     },
@@ -1618,19 +1618,21 @@
     },
     {
       "id": "shadcn-separator",
-      "name": "separator",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "name": "Separator",
+      "purpose": "One-pixel horizontal or vertical rule, decorative by default with explicit semantic mode.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-separator",
+      "story": "tools/crate-ui-showcase/stories/Separator.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Separator.mdx",
       "sources": [
         "app/shared/ui/shadcn/separator.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/separator.tsx": "1a3f00e6a66e2ff70aec58fcb8c8a5e274bb8d733b57c712d82a29fd15b68c72"
+        "app/shared/ui/shadcn/separator.tsx": "1a3f00e6a66e2ff70aec58fcb8c8a5e274bb8d733b57c712d82a29fd15b68c72",
+        "tools/crate-ui-showcase/stories/Separator.stories.tsx": "58f2f69b34fd22a3e8db21081371352410a99ed695f960fdf6f30864af390196",
+        "tools/crate-ui-showcase/docs/Separator.mdx": "5535fe6b616de2f09cb518c0781057a249e337449259ce1e296b8961d2a926da"
       },
       "category": "Layout"
     },
@@ -1772,7 +1774,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/ActionGroup.tsx": "62395485d44f98b5cf8d018beedf7052d5264e3a280eb68cea2de4e6857a5a6a",
         "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "1c8615a53f43982003eb847fb384a3e4c072bfd6b22dc13af9d4f843097832e3",
-        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "aaa774120f2408877e07d48e6e098329aa74032618e511d72f5d306664c40d51"
+        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "4f4f6cd34ed0d38fe30818d711528f1d26dde5733e03bae333063bb9e8caf7ce"
       },
       "name": "ActionGroup",
       "purpose": "ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps.",

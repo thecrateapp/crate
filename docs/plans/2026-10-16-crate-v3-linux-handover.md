@@ -857,3 +857,14 @@ Diego pide una página pequeña por paso, solo con el alcance en prueba, y dejar
 Diego approved 1AR; published commit `a3ba497ddfdf05835441686fbd8c874c07e4cea6` on `feat/crate_v3`. Previous local review stops are historical. Next local checkpoint 1AS covers Button, IconButton, ActionGroup/ActionButton/ActionLink and the ActionIcon compatibility entry. The approved header pattern moves into shared composition; Admin aliases preserve asChild router usage and Listen adopts the conventional server Remove action. Typography/form approval remains intact.
 
 Review: `http://127.0.0.1:5186/review-1as-actions.html` and Storybook `Reviews/1AS/Actions`. One scene, no new main mockup section. See [plan/evidence](2026-10-19-crate-v3-actions-reconciliation.md) and [current state](2026-10-19-crate-v3-current-state.md). Keep both previews active; stop before 1AS commit. No full suites, CI, canonical baseline updates or native/backend QA claimed.
+
+## 1AS publication and 1AT surface reconciliation — 2026-10-19
+
+1AS published as `9b5356862db1cef1d014c0b56c7a7e61bd7cad18`; previous local stops are historical.
+1AT is local for review: Card object, InstrumentPanel section, Separator, solid card controls and
+two thin app adapters. Sample captions compose FormField with real8px gaps; equivalent artwork
+controls use the same canonical component/size. No repair CSS or new main-mockup section.
+[Current state and evidence](2026-10-19-crate-v3-current-state.md),
+[1AT scope and limits](2026-10-19-crate-v3-surfaces-reconciliation.md), and
+[requested future groups proposal](2026-10-19-crate-v3-component-checkpoint-groups.md).
+Both previews active; stop before1AT commit/push. Broader adoption and phase/native/canonical QA remain open.

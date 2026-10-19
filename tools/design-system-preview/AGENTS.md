@@ -8,12 +8,14 @@ named `review-<checkpoint>-<scope>.html`. Reuse a scene from
 or import Storybook runtime/CSF into the standalone page. Keep older checkpoints available.
 Component inventory/docs remain mandatory in Storybook. Match the view against the complete
 approved checkpoint scope before sharing, including all component families and agreed states.
-Current review: `review-1as-actions.html`. The approved forms review and its labels alias remain available.
+Current review: `review-1at-surfaces.html`. The approved forms review and its labels alias remain available.
 
 Existing scenes import actual `@crate/ui` components. Auxiliary fixture controls also use
 FormField/Input/Checkbox/Select/etc.; never add raw input/select/textarea copies. The shared
 preview-component policy and scoped browser scene tests enforce this contract. FormField inline
-owns checkbox/switch caption layout; its stacked layout owns real 8 px label gaps. Scene CSS
+owns checkbox/switch caption layout; its stacked layout owns real 8 px label gaps. Labelled samples use FormField kind="group" and its 8 px gap, with the supplied ID/ARIA
+on the actual sample group. Equivalent controls use the same component/size/variant; separate
+explicit compatibility or size galleries. Measure these relationships in both hosts. Scene CSS
 places components; it does not repair their internal typography, focus or geometry.
 Do not mark caption text as `form-field-value`: that slot is reserved for real values which
 retain their case. Test the style of the visible text, including any inner spans.

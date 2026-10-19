@@ -5,6 +5,57 @@ import { InstrumentPanel } from "./InstrumentPanel";
 import { StatusDot } from "./StatusDot";
 
 describe("InstrumentPanel", () => {
+  it("names a section from its visible label even without a heading and associates its description", () => {
+    render(
+      <InstrumentPanel
+        as="section"
+        label={{ children: "Source" }}
+        description="Library source"
+      >
+        <span>Details</span>
+      </InstrumentPanel>,
+    );
+    const panel = screen.getByRole("region", { name: "Source" });
+    expect(panel).toHaveAccessibleDescription("Library source");
+    expect(within(panel).queryByRole("heading")).toBeNull();
+  });
+  it("keeps actions, descriptions and measurements outside its status announcement", async () => {
+    const { rerender } = render(
+      <InstrumentPanel
+        as="section"
+        headingLevel={2}
+        label={{ children: "Resources" }}
+        description="Current storage"
+        meta="Updated today"
+        status="Ready"
+        actions={<button type="button">Refresh</button>}
+      >
+        <span>280 GB</span>
+      </InstrumentPanel>,
+    );
+    const panel = screen.getByRole("region", { name: "Resources" });
+    const id = panel.getAttribute("aria-labelledby");
+    expect(panel).toHaveAccessibleDescription("Current storage");
+    expect(
+      within(panel).getByRole("button", { name: "Refresh" }),
+    ).toBeVisible();
+    expect(panel.querySelector('[aria-live="polite"]')).toHaveTextContent(
+      /^Ready$/,
+    );
+    rerender(
+      <InstrumentPanel
+        as="section"
+        headingLevel={2}
+        label={{ children: "Resources" }}
+        description={0}
+      >
+        <span>281 GB</span>
+      </InstrumentPanel>,
+    );
+    expect(panel).toHaveAttribute("aria-labelledby", id);
+    expect(panel).toHaveAccessibleDescription("0");
+    expect(panel.querySelector('[aria-live="polite"]')).toBeNull();
+  });
   it("names the default figure with its summary and retains its content", () => {
     render(
       <InstrumentPanel

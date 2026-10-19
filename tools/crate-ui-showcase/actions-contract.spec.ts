@@ -23,6 +23,31 @@ for (const host of ["preview", "storybook"]) {
             ? "http://127.0.0.1:5186/review-1as-actions.html"
             : "/iframe.html?id=reviews-1as-actions--complete&viewMode=story",
         );
+        for (const [region, caption] of [
+          ["Text actions", "Button · text actions"],
+          ["Compact icon controls", "IconButton · round controls"],
+          ["Compatibility actions", "ActionIcon · compatibility"],
+        ] as const) {
+          await expect(
+            page
+              .getByRole("region", { name: region })
+              .getByRole("group", { name: caption, exact: true }),
+          ).toBeVisible();
+          const gap = await page
+            .getByRole("region", { name: region })
+            .getByText(caption, { exact: true })
+            .evaluate((element) => {
+              const label =
+                element.closest('[data-slot="form-field-label"]') ?? element;
+              return (
+                label.nextElementSibling!.getBoundingClientRect().top -
+                label.getBoundingClientRect().bottom
+              );
+            });
+          expect
+            .soft(gap, `${caption}: actual caption-to-sample gap`)
+            .toBeCloseTo(8, 1);
+        }
         const duplicate = page.getByRole("button", {
           name: "Duplicate Costa de noche",
         });

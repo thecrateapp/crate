@@ -3,6 +3,7 @@ import { PageHeaderLayout } from "@/components/layout/PageHeader";
 
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -121,26 +122,15 @@ export function OpsPanel({
   className?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "rounded-md border border-white/10 bg-panel-surface/90 shadow-[0_24px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl",
-        className,
-      )}
+    <InstrumentPanel
+      as="section"
+      headingLevel={2}
+      label={{ children: title }}
+      description={description}
+      actions={action}
+      className={className}
     >
-      <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
-        <div className="space-y-1">
-          <h2 className="font-display text-[clamp(1.25rem,1.7vw,1.6rem)] font-bold leading-[1.1] tracking-tight text-text-primary">
-            {title}
-          </h2>
-          {description ? (
-            <p className="max-w-3xl text-sm text-white/45">{description}</p>
-          ) : null}
-        </div>
-        {action ? (
-          <div className="flex flex-wrap items-center gap-2">{action}</div>
-        ) : null}
-      </div>
-      <div className="px-4 py-4 md:px-5 md:py-5">{children}</div>
-    </section>
+      {children}
+    </InstrumentPanel>
   );
 }

@@ -28,14 +28,12 @@
       "path": "app/ui/src/components/admin/ops-surfaces.tsx",
       "owner": "Admin UI / design-system maintainer",
       "phase": "3.1 with 3.3\u20133.9b page adoption",
-      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "reason": "OpsPanel adopted shared unfilled InstrumentPanel at1AT. Remaining opacity/shadow/blur belongs to OpsPageHero and OpsStatTile in their owning phases; no additions permitted.",
       "tokens": {
         "bg-panel-surface/95": 1,
         "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
-        "backdrop-blur-xl": 2,
-        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1,
-        "bg-panel-surface/90": 1,
-        "shadow-[0_24px_60px_rgba(0,0,0,0.2)]": 1
+        "backdrop-blur-xl": 1,
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1
       }
     },
     {

@@ -9,6 +9,7 @@ import {
   ActionIconButton,
   ActionIconLink,
 } from "@crate/ui/primitives/ActionIconButton";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button, type ButtonProps } from "@crate/ui/shadcn/button";
@@ -29,7 +30,7 @@ export function ActionsReview() {
   const [unavailable, setUnavailable] = useState(true);
   return (
     <main className="mx-auto max-w-6xl space-y-10 p-6 sm:p-10">
-      <header className="space-y-3">
+      <header className="grid gap-3">
         <MonoLabel accent="1AS">Checkpoint 1AS · Actions</MonoLabel>
         <h1 className="font-display text-3xl font-bold">
           Actions with one contract.
@@ -110,101 +111,116 @@ export function ActionsReview() {
           </Button>
         </div>
       </section>
-      <section aria-label="Text actions" className="space-y-4">
-        <MonoLabel>Button · text actions</MonoLabel>
-        <div className="flex flex-wrap gap-3">
-          {variants.map((variant) => (
-            <Button
-              key={variant}
-              variant={variant}
-              onClick={() => setResult(`${variant} action.`)}
-            >
-              {variant}
-            </Button>
-          ))}
-        </div>
-        <form
-          className="flex flex-wrap items-center gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setResult("Form submitted.");
-          }}
+      <section aria-label="Text actions">
+        <FormField kind="group" label="Button · text actions">
+          {(group) => (
+            <div {...group} role="group" className="grid gap-4">
+              <div className="flex flex-wrap gap-3">
+                {variants.map((variant) => (
+                  <Button
+                    key={variant}
+                    variant={variant}
+                    onClick={() => setResult(`${variant} action.`)}
+                  >
+                    {variant}
+                  </Button>
+                ))}
+              </div>
+              <form
+                className="flex flex-wrap items-center gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setResult("Form submitted.");
+                }}
+              >
+                <Button type="submit">Submit form</Button>
+                <Button size="xs">Compact</Button>
+                <Button size="sm">Small</Button>
+                <Button size="lg">Large</Button>
+                <Button disabled>Disabled</Button>
+                <Button loading>Loading</Button>
+                <Button asChild>
+                  <a href="#preview-target">Enabled text link</a>
+                </Button>
+                <Button asChild disabled>
+                  <a href="#blocked-target">Disabled text link</a>
+                </Button>
+              </form>
+            </div>
+          )}
+        </FormField>
+      </section>
+      <section aria-label="Compact icon controls">
+        <FormField kind="group" label="IconButton · round controls">
+          {(group) => (
+            <div {...group} role="group" className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <IconButton
+                  label="Small control"
+                  size="sm"
+                  onClick={() => setResult("Small control used.")}
+                >
+                  <Eye aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  label="Follow artist"
+                  aria-pressed={following}
+                  onClick={() => setFollowing(!following)}
+                >
+                  <Heart aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Large control" size="lg">
+                  <Copy aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Primary control" tone="primary">
+                  <Save aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Danger control" tone="danger">
+                  <Trash2 aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Disabled control" disabled>
+                  <Save aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Busy control" loading>
+                  <Save aria-hidden="true" />
+                </IconButton>
+                <IconButton label="Artwork control" variant="card">
+                  <Heart aria-hidden="true" />
+                </IconButton>
+              </div>
+            </div>
+          )}
+        </FormField>
+      </section>
+      <section aria-label="Compatibility actions">
+        <FormField
+          kind="group"
+          label="ActionIcon · compatibility"
+          hint="Compatibility row/card controls retain their documented sizes. New compositions use IconButton or ActionGroup."
         >
-          <Button type="submit">Submit form</Button>
-          <Button size="xs">Compact</Button>
-          <Button size="sm">Small</Button>
-          <Button size="lg">Large</Button>
-          <Button disabled>Disabled</Button>
-          <Button loading>Loading</Button>
-          <Button asChild>
-            <a href="#preview-target">Enabled text link</a>
-          </Button>
-          <Button asChild disabled>
-            <a href="#blocked-target">Disabled text link</a>
-          </Button>
-        </form>
-      </section>
-      <section aria-label="Compact icon controls" className="space-y-4">
-        <MonoLabel>IconButton · round controls</MonoLabel>
-        <div className="flex flex-wrap items-center gap-3">
-          <IconButton
-            label="Small control"
-            size="sm"
-            onClick={() => setResult("Small control used.")}
-          >
-            <Eye aria-hidden="true" />
-          </IconButton>
-          <IconButton
-            label="Follow artist"
-            aria-pressed={following}
-            onClick={() => setFollowing(!following)}
-          >
-            <Heart aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Large control" size="lg">
-            <Copy aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Primary control" tone="primary">
-            <Save aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Danger control" tone="danger">
-            <Trash2 aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Disabled control" disabled>
-            <Save aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Busy control" loading>
-            <Save aria-hidden="true" />
-          </IconButton>
-          <IconButton label="Artwork control" variant="card">
-            <Heart aria-hidden="true" />
-          </IconButton>
-        </div>
-      </section>
-      <section aria-label="Compatibility actions" className="space-y-4">
-        <MonoLabel>ActionIcon · compatibility</MonoLabel>
-        <p className="text-sm text-text-muted">
-          Existing row/card controls. Card surface reconciliation is pending; no
-          new consumer copies.
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <ActionIconButton aria-label="Legacy row">
-            <Eye aria-hidden="true" />
-          </ActionIconButton>
-          <ActionIconButton aria-label="Legacy card" variant="card">
-            <Heart aria-hidden="true" />
-          </ActionIconButton>
-          <ActionIconLink href="#preview-target" aria-label="Legacy link">
-            <Eye aria-hidden="true" />
-          </ActionIconLink>
-          <ActionIconLink
-            href="#blocked-target"
-            disabled
-            aria-label="Disabled legacy link"
-          >
-            <Download aria-hidden="true" />
-          </ActionIconLink>
-        </div>
+          {(group) => (
+            <div {...group} role="group" className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <ActionIconButton aria-label="Legacy row">
+                  <Eye aria-hidden="true" />
+                </ActionIconButton>
+                <ActionIconButton aria-label="Legacy card" variant="card">
+                  <Heart aria-hidden="true" />
+                </ActionIconButton>
+                <ActionIconLink href="#preview-target" aria-label="Legacy link">
+                  <Eye aria-hidden="true" />
+                </ActionIconLink>
+                <ActionIconLink
+                  href="#blocked-target"
+                  disabled
+                  aria-label="Disabled legacy link"
+                >
+                  <Download aria-hidden="true" />
+                </ActionIconLink>
+              </div>
+            </div>
+          )}
+        </FormField>
       </section>
       <output className="block text-sm text-text-secondary" aria-live="polite">
         {result}

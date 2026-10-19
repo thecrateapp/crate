@@ -16,6 +16,9 @@ describe("settings primitives", () => {
     );
 
     const section = screen.getByRole("region", { name: "Playback" });
+    expect(section).toHaveAccessibleDescription(
+      "Tune your listening experience.",
+    );
     expect(section.tagName).toBe("SECTION");
     expect(section).toHaveClass(
       "border-t",

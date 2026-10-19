@@ -73,7 +73,7 @@ describe("IconButton", () => {
     );
     expect(screen.getByRole("button")).toHaveClass(
       "text-state-danger",
-      "bg-surface-icon-control",
+      "bg-surface-object",
     );
   });
 

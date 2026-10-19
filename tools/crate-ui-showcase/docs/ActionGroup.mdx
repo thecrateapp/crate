@@ -5,7 +5,7 @@ import { DocHeading } from "../components/DocHeading";
 
 <Meta of={Stories} />
 <DocHeading as="h1">ActionGroup</DocHeading>
-<EntryDetails id="action-group" review="Visual review pending · 1AS" />
+<EntryDetails id="action-group" review="1AS approved" />
 <DocHeading as="h2">Contract</DocHeading>
 
 ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps. This reproduces the approved PlaylistEditor header and repeated-row actions; no independent visual recipe. Use short localized tooltip text (Edit/Delete/Deactivate) with a contextual accessible name. Glyphs are decorative Solar icons. ActionGroup has a named group, wraps and omits an empty list; native Tab order is preserved, so it is not a toolbar. Disabled/loading controls remain the same native node inside a focusable discovery wrapper; Enter/Space never executes. Tooltip description reaches the actual enabled trigger; Escape dismisses it. ActionLink preserves anchor attributes/ref/navigation, and unavailable links cannot navigate. Existing asChild router children remain supported; new native glyph links use ActionLink. Caller description IDs are retained alongside the tooltip. Both apps adopt the same contract; capability and data callbacks remain in each app. Ambiguous domain operations and final confirmations retain text Button. No forced loading spinner for an aria-busy-only state; loading=true owns the spinner and unavailable state.

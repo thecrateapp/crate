@@ -18,7 +18,7 @@ const actionToneClassName = iconButtonToneClassName;
 
 function actionVariantClassName(variant: ActionVariant) {
   if (variant === "card") {
-    return "h-9 min-h-11 w-9 min-w-11 border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md pointer-fine:min-h-0 pointer-fine:min-w-0";
+    return "h-9 min-h-11 w-9 min-w-11 border border-border-quiet bg-surface-object pointer-fine:min-h-0 pointer-fine:min-w-0";
   }
 
   return "h-10 min-h-11 w-10 min-w-11 pointer-fine:min-h-0 pointer-fine:min-w-0";

@@ -1,0 +1,25 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Card.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Card</DocHeading>
+<EntryDetails id="shadcn-card" review="1AT approved" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Standalone object, solid surface and complete native card slots.
+
+Use for a standalone contained object, not a general section or metric tile. Solid surface-object, quiet1px border,14px panel radius, no shadow/backdrop.24px base vertical padding, gaps and horizontal slot insets. Title is the small mockup Poppins60016/24 role; names/page headings keep their separate display components. Header actions align at the upper right; long title/content wraps without enlarging the container. Root supports div(default), section and article; title supports div(default) or h2/h3/h4. Name a semantic object with native aria-labelledby and an explicit title id. Native props/ref/callbacks and caller layout classes are preserved. No automatic button roles, clicks or hidden overflow.
+
+The approved persistent mockup and confirmed amendments are the reference. Scene layout never repairs component internals.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.LongContent} />
+
+<Canvas of={Stories.Semantic} />
+
+<Canvas of={Stories.AllSlots} />
+
+<Controls of={Stories.Base} />

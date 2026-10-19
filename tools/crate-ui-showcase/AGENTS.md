@@ -13,6 +13,10 @@ doubts, deviations and mobile sizing conflicts to Diego before choosing a differ
   in `reviews/` and reuse it in a CSF review story; standalone pages import the scene directly,
   never CSF or Storybook runtime. Do not append more cases to the large historical mockup.
   Match each view against the full approved checkpoint scope, including its families and states.
+- Labelled samples use FormField kind="group" with a named group and its actual 8 px stacked
+  gap; never loose MonoLabel plus space-y or caller margins. Use the same canonical component,
+  size and variant for equivalent controls. Explicit size/compatibility galleries are separate.
+  Test the rendered caption-to-sample gap and equivalent-control dimensions in both hosts.
 - Every added/modified shared visual module updates its catalogue entry, docs/story and relevant
   checks in the same change. Run showcase:refresh for the specific documented id, then check.
   Never regenerate the pending baseline to hide source changes. Do not edit hashes alone.
