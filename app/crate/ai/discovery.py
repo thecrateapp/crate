@@ -205,8 +205,9 @@ def _request_json(
     params: dict | None = None,
     body: dict | None = None,
 ) -> dict:
-    timeout = min(REQUEST_SECONDS, deadline - time.monotonic())
-    if timeout <= 0:
+    started = time.monotonic()
+    request_deadline = min(deadline, started + REQUEST_SECONDS)
+    if request_deadline <= started:
         raise _error("AI_DISCOVERY_TIMEOUT", "Provider discovery timed out")
     packet = json.dumps(
         {
@@ -241,9 +242,9 @@ def _request_json(
                 )
             except ProcessLookupError:
                 pass
-            remaining = min(timeout, deadline - time.monotonic())
+            remaining = request_deadline - time.monotonic()
             if remaining <= 0:
-                raise subprocess.TimeoutExpired("discovery", timeout)
+                raise subprocess.TimeoutExpired("discovery", REQUEST_SECONDS)
             process.communicate(input=packet, timeout=remaining)
             if process.returncode:
                 raise _error(
@@ -287,7 +288,7 @@ def _request_json(
 
 
 def _entries(payload: dict, field: str) -> list[dict]:
-    entries = payload.get(field, [])
+    entries = payload.get(field)
     if not isinstance(entries, list):
         raise _error("AI_CATALOG_INVALID", "Provider catalog is malformed")
     bounded = entries[:MAX_MODELS]

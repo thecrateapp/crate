@@ -533,3 +533,80 @@ def test_deepseek_discovery_normalizes_catalog_and_passes_exact_key(monkeypatch)
     assert result[0]["reasoning_levels"] == ["low", "high", "max"]
     assert request.call_args.args[:3] == ("deepseek", None, "/models")
     assert request.call_args.kwargs["api_key"] == "exact-key"
+
+
+@pytest.mark.parametrize(
+    "provider,field,endpoint",
+    [
+        ("gemini", "models", None),
+        ("deepseek", "data", None),
+        ("ollama", "models", "http://127.0.0.1:11434"),
+    ],
+)
+@pytest.mark.parametrize("payload", [{}, {"error": "unexpected provider error"}])
+def test_discovery_requires_catalog_array(
+    monkeypatch, provider, field, endpoint, payload
+):
+    monkeypatch.setattr(discovery, "_request_json", Mock(return_value=payload))
+    with pytest.raises(AIConfigurationError) as exc:
+        discover_models(provider, api_key="key", endpoint=endpoint)
+    assert exc.value.code == "AI_CATALOG_INVALID"
+
+
+@pytest.mark.parametrize(
+    "provider,field,endpoint",
+    [
+        ("gemini", "models", None),
+        ("deepseek", "data", None),
+        ("ollama", "models", "http://127.0.0.1:11434"),
+    ],
+)
+def test_discovery_accepts_explicit_empty_catalog(
+    monkeypatch, provider, field, endpoint
+):
+    monkeypatch.setattr(discovery, "_request_json", Mock(return_value={field: []}))
+    assert discover_models(provider, api_key="key", endpoint=endpoint) == []
+
+
+@pytest.mark.parametrize("setup_seconds,expected_wait", [(3.0, 2.0), (6.0, None)])
+def test_request_deadline_deducts_all_setup(monkeypatch, setup_seconds, expected_wait):
+    now = [100.0]
+    original_dumps = discovery.json.dumps
+    original_tempfile = discovery.tempfile.TemporaryFile
+    process = Mock(pid=12345)
+    process.poll.return_value = None
+    process.communicate.side_effect = discovery.subprocess.TimeoutExpired(
+        "discovery", 5
+    )
+
+    def serialize(*args, **kwargs):
+        now[0] += 0.5
+        return original_dumps(*args, **kwargs)
+
+    def tempfile(*args, **kwargs):
+        now[0] += 0.5
+        return original_tempfile(*args, **kwargs)
+
+    def spawn(*args, **kwargs):
+        now[0] += 1
+        return process
+
+    def limit(*args, **kwargs):
+        now[0] += setup_seconds - 2
+
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(discovery.json, "dumps", serialize)
+    monkeypatch.setattr(discovery.tempfile, "TemporaryFile", tempfile)
+    monkeypatch.setattr(discovery.subprocess, "Popen", spawn)
+    monkeypatch.setattr(discovery.resource, "prlimit", limit)
+    with pytest.raises(AIConfigurationError) as exc:
+        discovery._request_json(
+            "gemini", None, "/v1beta/models", api_key="key", deadline=130
+        )
+    assert exc.value.code == "AI_DISCOVERY_TIMEOUT"
+    if expected_wait is None:
+        process.communicate.assert_not_called()
+    else:
+        assert process.communicate.call_args.kwargs["timeout"] == expected_wait
+    process.kill.assert_called_once_with()
+    process.wait.assert_called_once_with()
