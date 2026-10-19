@@ -269,6 +269,10 @@ def test_api_guards_openapi_and_closed_payload(test_app, monkeypatch):
                 "$ref"
                 in spec["responses"]["200"]["content"]["application/json"]["schema"]
             )
+    for path in ("/api/admin/ai/default-model", "/api/admin/ai/actions/{id}/model"):
+        assert paths[path]["post"]["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ]["$ref"].endswith("ModelAssignmentResult")
 
 
 def test_actual_guard_rejects_bearer_mutation(test_app):
@@ -672,3 +676,155 @@ def test_action_availability_uses_domain_permission_and_closed_private_response(
     assert schema["responses"]["200"]["content"]["application/json"]["schema"][
         "$ref"
     ].endswith("/ActionAvailability")
+
+
+def manage_session(monkeypatch):
+    from crate.api import ai_agents as api
+
+    monkeypatch.setattr(
+        api,
+        "require_agent_admin_session",
+        lambda request, capability: {
+            "id": None,
+            "capabilities": ["ai.config.manage", "ai.config.read"],
+        },
+    )
+
+
+def assignment_body(model_id="gemini-3.8-flash", connection_id="env:gemini"):
+    from crate.ai import configuration as service
+
+    current = service.snapshot()
+    return {
+        "connection_id": connection_id,
+        "model_id": model_id,
+        "reasoning": {"mode": "level", "level": "high"},
+        "expected_revision": current["revision"],
+        "expected_review_fingerprint": current["review_fingerprint"],
+    }
+
+
+def test_default_model_http_dry_run_apply_and_stale_replay(
+    test_app, pg_db, monkeypatch
+):
+    from tests.test_ai_model_assignment import gemini_environment
+
+    manage_session(monkeypatch)
+    gemini_environment(monkeypatch)
+    body = assignment_body()
+
+    preview = test_app.post(
+        "/api/admin/ai/default-model", json={**body, "dry_run": True}
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["dry_run"] is True
+    assert preview.json()["activation"] is True
+    assert len(preview.json()["outcomes"]) == 11
+    assert preview.headers["cache-control"] == "no-store"
+    assert store.list_bindings() == []
+
+    applied = test_app.post("/api/admin/ai/default-model", json=body)
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["activation"] is True
+    assert len(store.list_bindings()) == 11
+
+    replay = test_app.post("/api/admin/ai/default-model", json=body)
+    assert replay.status_code == 409
+    assert replay.headers["x-crate-error"] == "AI_CONFIGURATION_CONFLICT"
+
+
+def test_default_model_http_reports_closed_error_codes(test_app, pg_db, monkeypatch):
+    from tests.test_ai_model_assignment import gemini_environment
+
+    manage_session(monkeypatch)
+    gemini_environment(monkeypatch)
+    body = assignment_body()
+
+    minimal = test_app.post(
+        "/api/admin/ai/default-model",
+        json={**body, "reasoning": {"mode": "level", "level": "minimal"}},
+    )
+    assert minimal.status_code == 422
+    assert minimal.headers["x-crate-error"] == "AI_PROFILE_INCOMPATIBLE"
+
+    unknown = test_app.post(
+        "/api/admin/ai/default-model",
+        json={**body, "connection_id": "00000000-0000-0000-0000-00000000abcd"},
+    )
+    assert unknown.status_code == 404
+    assert unknown.headers["x-crate-error"] == "AI_CONNECTION_UNKNOWN"
+
+    extra = test_app.post(
+        "/api/admin/ai/default-model", json={**body, "config": {"timeout_seconds": 8}}
+    )
+    assert extra.status_code == 422
+    assert store.list_profiles() == []
+    assert store.list_bindings() == []
+
+
+def test_feature_model_http_route(test_app, pg_db, monkeypatch):
+    from crate.ai import configuration as service
+    from tests.test_ai_model_assignment import gemini_environment
+
+    manage_session(monkeypatch)
+    gemini_environment(monkeypatch)
+    before = service.snapshot()
+    service.activate(before["revision"], None, before["review_fingerprint"])
+    eq = store.get_binding("genres.eq.propose")
+
+    response = test_app.post(
+        "/api/admin/ai/actions/genres.eq.propose/model", json=assignment_body()
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["activation"] is False
+    assert [(o["action_id"], o["outcome"]) for o in data["outcomes"]] == [
+        ("genres.eq.propose", "applied")
+    ]
+    assert store.get_binding("genres.eq.propose")["revision"] == eq["revision"] + 1
+    assert store.configuration_state()["default_model"] is None
+
+    unknown = test_app.post("/api/admin/ai/actions/nope/model", json=assignment_body())
+    assert unknown.status_code == 404
+    assert unknown.headers["x-crate-error"] == "AI_ACTION_UNKNOWN"
+    assert (
+        test_app.post(
+            "/api/admin/ai/actions/genres.eq.propose/model",
+            json={**assignment_body(), "dry_run": True},
+        ).status_code
+        == 422
+    )
+
+
+def test_model_assignment_requires_a_manage_session(test_app, monkeypatch):
+    from crate.api import ai_agents as api
+    from fastapi import HTTPException
+
+    real_guard = api.require_agent_admin_session
+    calls = []
+
+    def guard(request, capability):
+        calls.append(capability)
+        raise HTTPException(403, "Denied")
+
+    monkeypatch.setattr(api, "require_agent_admin_session", guard)
+    body = {
+        "connection_id": "env:gemini",
+        "model_id": "gemini-3.8-flash",
+        "expected_revision": 0,
+        "expected_review_fingerprint": "a" * 64,
+    }
+    paths = (
+        "/api/admin/ai/default-model",
+        "/api/admin/ai/actions/genres.eq.propose/model",
+    )
+    for path in paths:
+        assert test_app.post(path, json=body).status_code == 403
+    assert calls == ["ai.config.manage", "ai.config.manage"]
+
+    monkeypatch.setattr(api, "require_agent_admin_session", real_guard)
+    for path in paths:
+        response = test_app.post(
+            path, headers={"Authorization": "Bearer machine"}, json=body
+        )
+        assert response.status_code == 401

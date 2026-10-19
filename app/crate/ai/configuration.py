@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from uuid import NAMESPACE_URL, uuid5
+from collections import Counter
+from uuid import NAMESPACE_URL, UUID, uuid5
 from typing import NoReturn
 
 from crate.ai.actions import ACTIONS, get_action, list_actions
@@ -21,7 +22,7 @@ from crate.ai.contracts import (
     ProfileConfig,
     ReasoningConfig,
 )
-from crate.ai.default_model import derive_all
+from crate.ai.default_model import derive_all, require_supported_reasoning
 from crate.ai.discovery import validate_endpoint
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories import ai_configuration as store
@@ -512,6 +513,235 @@ def activate(expected_revision, actor_id, expected_review_fingerprint):
         review_fingerprint,
     )
     return {k: result[k] for k in ("active", "revision", "activated_at")}
+
+
+def _assignment_connection(public_id, connections):
+    """Resolve a public connection id inside one read snapshot; never persists."""
+    if public_id.startswith("env:"):
+        provider = public_id[4:]
+        if provider not in _PROVIDERS:
+            _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
+        row = connections.get(_env_id(provider))
+        if row is None:
+            _fail("AI_MODEL_UNVALIDATED", "Refresh this provider's models first")
+        return row
+    try:
+        row = connections.get(str(UUID(public_id)))
+    except ValueError:
+        row = None
+    if row is None:
+        _fail("AI_CONNECTION_UNKNOWN", "Connection does not exist")
+    return row
+
+
+def _assignment_model(connection, model_id, reasoning):
+    if not connection["enabled"]:
+        _fail("AI_CONNECTION_UNAVAILABLE", "Connection is disabled")
+    if not _has_credential(connection):
+        _fail("AI_CREDENTIAL_REQUIRED", "Provider credential is required")
+    model = next(
+        (m for m in connection["model_catalog"] if m["model_id"] == model_id), None
+    )
+    if (
+        model is None
+        or not model.get("validated")
+        or model.get("provider") != connection["provider"]
+    ):
+        _fail("AI_MODEL_UNVALIDATED", "Model is absent from the validated catalog")
+    capabilities = ModelCapabilities.model_validate(model)
+    require_supported_reasoning(capabilities, reasoning)
+    return capabilities
+
+
+def _outcome(action_id, outcome, reason=None, adjustments=()):
+    return {
+        "action_id": action_id,
+        "outcome": outcome,
+        "reason": reason,
+        "adjustments": list(adjustments),
+    }
+
+
+def _owned_profile(action_id, binding, profiles, references):
+    """A profile is the action's own only if bound to nothing else and labelled for it."""
+    profile = profiles.get(binding["profile_id"]) if binding else None
+    if (
+        profile is None
+        or references[profile["id"]] != 1
+        or profile["label"] != ACTIONS[action_id].label
+    ):
+        return None
+    return profile
+
+
+def _plan_assignment(derived, data, contexts, connection, model_id):
+    """Return (outcomes, steps) for the targeted actions, in ACTIONS order; no writes."""
+    active = data["state"]["active"]
+    bindings = {b["action_id"]: b for b in data["bindings"]}
+    versions = {(v["profile_id"], v["version"]): v for v in data["versions"]}
+    profiles = {p["id"]: p for p in data["profiles"]}
+    connections = {c["id"]: c for c in data["connections"]}
+    references = Counter(b["profile_id"] for b in data["bindings"])
+    outcomes, steps = [], []
+    for entry in derived:
+        action_id = entry.action_id
+        binding = bindings.get(action_id)
+        bound = (
+            versions.get((binding["profile_id"], binding["profile_version"]))
+            if binding
+            else None
+        )
+        step = {
+            "action_id": action_id,
+            "enabled": binding["enabled"] if binding else True,
+            "expected_binding_revision": binding["revision"] if binding else 0,
+        }
+        if entry.config is not None:
+            config = entry.config.model_dump(mode="json")
+            fingerprint = store.version_fingerprint(connection["id"], model_id, config)
+            target = {
+                "connection_id": connection["id"],
+                "model_id": model_id,
+                "config": config,
+            }
+            owned = _owned_profile(action_id, binding, profiles, references)
+            current = (
+                versions.get((owned["id"], owned["current_version"])) if owned else None
+            )
+            if bound is not None and bound["fingerprint"] == fingerprint:
+                outcome = "unchanged"
+                step |= {
+                    "op": "keep",
+                    "profile_id": bound["profile_id"],
+                    "version": bound["version"],
+                }
+            elif owned is None:
+                outcome = "applied"
+                step |= target | {"op": "create", "label": ACTIONS[action_id].label}
+            elif current is not None and current["fingerprint"] == fingerprint:
+                outcome = "applied"
+                step |= {
+                    "op": "reuse",
+                    "profile_id": owned["id"],
+                    "version": owned["current_version"],
+                }
+            else:
+                outcome = "applied"
+                step |= target | {
+                    "op": "append",
+                    "profile_id": owned["id"],
+                    "expected_version": owned["current_version"],
+                }
+            steps.append(step)
+            outcomes.append(_outcome(action_id, outcome, None, entry.adjustments))
+            continue
+        if active:
+            outcomes.append(_outcome(action_id, "kept_current", entry.reason))
+            continue
+        try:
+            if binding is not None:
+                if bound is None:
+                    _fail("AI_PROFILE_UNKNOWN", "Profile version does not exist")
+                _validate_legacy_or_normal(
+                    connections[bound["connection_id"]], bound, action_id
+                )
+                outcome = "kept_current"
+                step |= {
+                    "op": "keep",
+                    "profile_id": bound["profile_id"],
+                    "version": bound["version"],
+                }
+            else:
+                context = contexts[action_id]
+                if context["provider"] not in _PROVIDERS:
+                    _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
+                row = connections.get(_env_id(context["provider"]))
+                if row is None:
+                    _fail(
+                        "AI_MODEL_UNVALIDATED",
+                        "Refresh the inherited provider's models first",
+                    )
+                _validate_legacy_or_normal(row, context, action_id)
+                outcome = "kept_legacy"
+                step |= {"op": "legacy", "legacy_context": context}
+        except AIConfigurationError as error:
+            outcomes.append(_outcome(action_id, "blocked", error.code))
+            continue
+        steps.append(step)
+        outcomes.append(_outcome(action_id, outcome, entry.reason))
+    return outcomes, steps
+
+
+def assign_model(data, actor_id, *, action_ids=None, make_default=True):
+    """Use one validated model for every compatible target action in one reviewed write.
+
+    Reads only the cached catalog: no provider or discovery request. Before activation
+    the same transaction activates, and incompatible actions keep their legacy snapshot.
+    """
+    from crate.api.schemas.ai_agents import ModelAssignment
+
+    request = ModelAssignment.model_validate(data)
+    for action_id in action_ids or ():
+        get_action(action_id)
+    current = store.configuration_snapshot()
+    contexts = _legacy_contexts()
+    fingerprint = _review_fingerprint(contexts, current)
+    if (
+        current["state"]["revision"] != request.expected_revision
+        or fingerprint != request.expected_review_fingerprint
+    ):
+        _fail("AI_CONFIGURATION_CONFLICT", "Configuration changed; reload and review")
+    active = current["state"]["active"]
+    if action_ids is not None and not active:
+        _fail("AI_CONFIGURATION_INVALID", "Choose a default model first")
+    connection = _assignment_connection(
+        request.connection_id, {c["id"]: c for c in current["connections"]}
+    )
+    capabilities = _assignment_model(connection, request.model_id, request.reasoning)
+    derived = derive_all(capabilities, request.reasoning, action_ids)
+    if all(entry.config is None for entry in derived):
+        _fail("AI_MODEL_INCOMPATIBLE", "This model cannot run any of these features")
+    outcomes, steps = _plan_assignment(
+        derived, current, contexts, connection, request.model_id
+    )
+    if request.dry_run:
+        return {
+            "dry_run": True,
+            "activation": not active,
+            "revision": current["state"]["revision"],
+            "review_fingerprint": fingerprint,
+            "outcomes": outcomes,
+        }
+    if any(outcome["outcome"] == "blocked" for outcome in outcomes):
+        _fail(
+            "AI_SETUP_BLOCKED",
+            "A feature can keep neither this model nor its inherited setup",
+        )
+    result = store.apply_model_assignment(
+        steps,
+        default_model={
+            "connection_id": connection["id"],
+            "model_id": request.model_id,
+            "reasoning": request.reasoning.model_dump(mode="json"),
+        }
+        if make_default
+        else None,
+        expected_revision=request.expected_revision,
+        expected_review_fingerprint=request.expected_review_fingerprint,
+        review_fingerprint=lambda locked: _review_fingerprint(
+            _legacy_contexts(), locked
+        ),
+        validate_legacy=_validate_legacy_or_normal,
+        validate_bindings=_validate_bindings,
+        actor_id=actor_id,
+    )
+    return {
+        "dry_run": False,
+        "activation": result["activated"],
+        "revision": result["revision"],
+        "review_fingerprint": review_fingerprint(),
+        "outcomes": outcomes,
+    }
 
 
 def _validate_legacy_or_normal(connection, version, action_id):

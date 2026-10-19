@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import nullcontext
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any, NoReturn, overload
 from uuid import UUID
 
@@ -644,6 +644,38 @@ __all__ += [
 ]
 
 
+def _capture_legacy_binding(s, action_id, context, validate, actor_id) -> dict:
+    """Snapshot one inherited action as a version-1 profile; return its new binding."""
+    provider = context["provider"]
+    conn = ensure_environment_connection(provider, context["endpoint"], session=s)
+    assert conn is not None
+    # Catalog metadata must already have been explicitly refreshed.
+    validate(conn, context, action_id)
+    profile = create_profile(
+        {
+            "label": ACTIONS[action_id].label,
+            "connection_id": conn["id"],
+            "model_id": context["model_id"],
+            "config": {
+                "kind": "legacy_snapshot",
+                "action_id": action_id,
+                "legacy_model": context["legacy_model"],
+                "legacy_options": context["legacy_options"],
+                "legacy_deadline_seconds": context["legacy_deadline_seconds"],
+            },
+        },
+        actor_id,
+        session=s,
+    )
+    return {
+        "action_id": action_id,
+        "profile_id": profile["id"],
+        "profile_version": 1,
+        "enabled": True,
+        "revision": 0,
+    }
+
+
 def activate_legacy_configuration(
     expected_revision,
     actor_id,
@@ -673,38 +705,9 @@ def activate_legacy_configuration(
             for action_id, context in legacy_contexts.items():
                 binding = existing.get(action_id)
                 if binding is None:
-                    provider = context["provider"]
-                    conn = ensure_environment_connection(
-                        provider, context["endpoint"], session=s
+                    binding = _capture_legacy_binding(
+                        s, action_id, context, validate, actor_id
                     )
-                    assert conn is not None
-                    # Catalog metadata must already have been explicitly refreshed.
-                    validate(conn, context, action_id)
-                    profile = create_profile(
-                        {
-                            "label": ACTIONS[action_id].label,
-                            "connection_id": conn["id"],
-                            "model_id": context["model_id"],
-                            "config": {
-                                "kind": "legacy_snapshot",
-                                "action_id": action_id,
-                                "legacy_model": context["legacy_model"],
-                                "legacy_options": context["legacy_options"],
-                                "legacy_deadline_seconds": context[
-                                    "legacy_deadline_seconds"
-                                ],
-                            },
-                        },
-                        actor_id,
-                        session=s,
-                    )
-                    binding = {
-                        "action_id": action_id,
-                        "profile_id": profile["id"],
-                        "profile_version": 1,
-                        "enabled": True,
-                        "revision": 0,
-                    }
                 changes.append(
                     {k: v for k, v in binding.items() if k != "revision"}
                     | {"expected_revision": binding["revision"]}
@@ -733,3 +736,110 @@ def activate_legacy_configuration(
 
 
 __all__ += ["activate_legacy_configuration"]
+
+
+_ASSIGNMENT_OPS = frozenset({"create", "append", "reuse", "legacy", "keep"})
+
+
+def apply_model_assignment(
+    steps: list[dict],
+    *,
+    default_model: dict | None,
+    expected_revision: int,
+    expected_review_fingerprint: str,
+    review_fingerprint: Callable[[dict], str],
+    validate_legacy: Callable[[dict, dict, str], object],
+    validate_bindings: Callable[[dict, list[dict]], None],
+    actor_id: int | None,
+    session=None,
+) -> dict:
+    """Apply one reviewed model assignment atomically; activate when not yet active.
+
+    Every write happens after the review is rechecked under the configuration lock.
+    """
+    if any(step["op"] not in _ASSIGNMENT_OPS for step in steps):
+        raise AIConfigurationError("AI_CONFIGURATION_INVALID", "Invalid assignment")
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            s.execute(
+                text(
+                    "SELECT singleton FROM ai_configuration_state WHERE singleton FOR UPDATE"
+                )
+            )
+            # Lock connections against concurrent catalog/credential edits through commit.
+            s.execute(
+                text("SELECT id FROM ai_provider_connections ORDER BY id FOR SHARE")
+            )
+            data = configuration_snapshot(session=s)
+            if (
+                data["state"]["revision"] != expected_revision
+                or review_fingerprint(data) != expected_review_fingerprint
+            ):
+                _conflict()
+            active = data["state"]["active"]
+            changes = []
+            for step in steps:
+                op, action_id = step["op"], step["action_id"]
+                if op == "keep" and active:
+                    continue
+                if op == "create":
+                    profile_id = create_profile(
+                        {
+                            "label": step["label"],
+                            "connection_id": step["connection_id"],
+                            "model_id": step["model_id"],
+                            "config": step["config"],
+                        },
+                        actor_id,
+                        session=s,
+                    )["id"]
+                    version = 1
+                elif op == "append":
+                    profile_id = step["profile_id"]
+                    version = create_profile_version(
+                        profile_id,
+                        {
+                            "connection_id": step["connection_id"],
+                            "model_id": step["model_id"],
+                            "config": step["config"],
+                        },
+                        step["expected_version"],
+                        actor_id,
+                        session=s,
+                    )["version"]
+                elif op == "legacy":
+                    captured = _capture_legacy_binding(
+                        s, action_id, step["legacy_context"], validate_legacy, actor_id
+                    )
+                    profile_id = captured["profile_id"]
+                    version = captured["profile_version"]
+                else:  # reuse, keep
+                    profile_id, version = step["profile_id"], step["version"]
+                changes.append(
+                    {
+                        "action_id": action_id,
+                        "profile_id": profile_id,
+                        "profile_version": version,
+                        "enabled": step["enabled"],
+                        "expected_revision": step["expected_binding_revision"],
+                    }
+                )
+            revision = data["state"]["revision"]
+            if not active:
+                revision = apply_validated_bindings(
+                    changes,
+                    actor_id,
+                    validate_bindings,
+                    activate_revision=expected_revision,
+                    session=s,
+                )["revision"]
+            elif changes:
+                apply_validated_bindings(
+                    changes, actor_id, validate_bindings, session=s
+                )
+            if default_model is not None:
+                set_default_model(default_model, actor_id, session=s)
+            return {"activated": not active, "revision": revision}
+
+
+__all__ += ["apply_model_assignment"]

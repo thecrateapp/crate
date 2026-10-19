@@ -223,6 +223,35 @@ class Snapshot(ClosedModel):
     default_model: DefaultModelState | None = None
 
 
+class FeatureModelAssignment(ClosedModel):
+    connection_id: ID  # public id: "env:<provider>" or UUID
+    model_id: ModelID
+    reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
+    expected_revision: Revision
+    expected_review_fingerprint: Fingerprint
+
+
+class ModelAssignment(FeatureModelAssignment):
+    dry_run: bool = False
+
+
+class AssignmentOutcome(ClosedModel):
+    action_id: ID
+    outcome: Literal["applied", "unchanged", "kept_legacy", "kept_current", "blocked"]
+    reason: Code | None
+    adjustments: list[Literal["reasoning", "image_detail"]] = Field(
+        default_factory=list, max_length=2
+    )
+
+
+class ModelAssignmentResult(ClosedModel):
+    dry_run: bool
+    activation: bool  # dry run: applying would activate; apply: it activated
+    revision: Revision
+    review_fingerprint: Fingerprint
+    outcomes: list[AssignmentOutcome] = Field(max_length=11)
+
+
 class ActivationResponse(ClosedModel):
     active: bool
     revision: Revision

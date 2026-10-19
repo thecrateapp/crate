@@ -210,6 +210,32 @@ def activate(request: Request, body: dto.Activation):
 
 
 @router.post(
+    "/default-model",
+    response_model=dto.ModelAssignmentResult,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Use one validated model for every compatible AI feature",
+)
+def default_model(request: Request, body: dto.ModelAssignment):
+    return _invoke(service.assign_model, body.model_dump(), _write(request))
+
+
+@router.post(
+    "/actions/{id}/model",
+    response_model=dto.ModelAssignmentResult,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Use a different validated model for one AI feature",
+)
+def feature_model(request: Request, id: dto.ID, body: dto.FeatureModelAssignment):
+    return _invoke(
+        service.assign_model,
+        body.model_dump(),
+        _write(request),
+        action_ids=[id],
+        make_default=False,
+    )
+
+
+@router.post(
     "/profiles/{id}/versions/{version}/test",
     response_model=dto.Enqueued,
     responses=AUTH_ERROR_RESPONSES,
