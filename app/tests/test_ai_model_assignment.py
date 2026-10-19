@@ -1,5 +1,6 @@
 """Default-model persistence, per-feature status and the reviewed assignment operation."""
 
+import json
 import threading
 
 import pytest
@@ -664,3 +665,350 @@ def test_assignment_never_contacts_a_provider(pg_db, monkeypatch):
     assert preview["activation"] is True
     assert result["activation"] is True
     assert store.configuration_state()["active"] is True
+
+
+def write_counts():
+    return (
+        scalar("SELECT COUNT(*) FROM ai_profiles"),
+        scalar("SELECT COUNT(*) FROM ai_profile_versions"),
+        tuple(
+            (b["action_id"], b["revision"], b["profile_id"], b["profile_version"])
+            for b in store.list_bindings()
+        ),
+        store.configuration_state(),
+        audit_count("ai.%"),
+    )
+
+
+def bind(action_id, profile_id, version=1):
+    binding = store.get_binding(action_id)
+    service.apply_bindings(
+        [
+            {
+                "action_id": action_id,
+                "profile_id": profile_id,
+                "profile_version": version,
+                "enabled": True,
+                "expected_revision": binding["revision"] if binding else 0,
+            }
+        ],
+        None,
+    )
+
+
+def test_model_that_runs_no_target_feature_is_rejected_without_writes(
+    pg_db, monkeypatch
+):
+    gemini_environment(monkeypatch)
+    activate_legacy()
+    text_only = ollama_text()
+    tiny = ollama_text(context=6000)
+    before = write_counts()
+
+    with pytest.raises(AIConfigurationError) as image_only:
+        assign(
+            text_only["id"],
+            "qwen3:8b",
+            action_ids=["shows.extract.vision"],
+            make_default=False,
+        )
+    assert image_only.value.code == "AI_MODEL_INCOMPATIBLE"
+    with pytest.raises(AIConfigurationError) as too_small:
+        assign(tiny["id"], "qwen3:8b")
+    assert too_small.value.code == "AI_MODEL_INCOMPATIBLE"
+    assert write_counts() == before
+
+
+def test_owned_profile_with_the_target_as_current_version_is_reused(pg_db, monkeypatch):
+    gemini_environment(monkeypatch, legacy_model="gemini/gemini-3.8-flash")
+    assign("env:gemini", "gemini-3.8-flash", LEVEL_HIGH)
+    feature = "playlists.description.generate"
+    ollama = ollama_text()
+    assign(ollama["id"], "qwen3:8b", action_ids=[feature], make_default=False)
+    profile_id = store.get_binding(feature)["profile_id"]
+    # Point the feature back at its first version; version 2 stays current.
+    bind(feature, profile_id, 1)
+    versions = scalar("SELECT COUNT(*) FROM ai_profile_versions")
+
+    result = assign(ollama["id"], "qwen3:8b", action_ids=[feature], make_default=False)
+
+    assert [(o["action_id"], o["outcome"]) for o in result["outcomes"]] == [
+        (feature, "applied")
+    ]
+    binding = store.get_binding(feature)
+    assert (binding["profile_id"], binding["profile_version"]) == (profile_id, 2)
+    assert scalar("SELECT COUNT(*) FROM ai_profile_versions") == versions
+    current = {p["id"]: p for p in store.list_profiles()}[profile_id]
+    assert current["current_version"] == 2
+
+
+def test_pre_activation_bound_incompatible_feature_keeps_a_valid_binding(
+    pg_db, monkeypatch
+):
+    env = gemini_environment(monkeypatch)
+    vision = service.create_profile(
+        {
+            "label": "Poster reader",
+            "connection_id": env["id"],
+            "model_id": "gemini-3.8-flash",
+            "config": {},
+        },
+        None,
+    )
+    bind("shows.extract.vision", vision["id"])
+    ollama = ollama_text()
+
+    result = assign(ollama["id"], "qwen3:8b")
+
+    assert result["activation"] is True
+    outcomes = outcomes_by_action(result)
+    assert outcomes["shows.extract.vision"]["outcome"] == "kept_current"
+    assert outcomes["shows.extract.vision"]["reason"] == "AI_ACTION_NEEDS_IMAGE"
+    assert outcomes["artwork.hero.analyze"]["outcome"] == "kept_legacy"
+    binding = store.get_binding("shows.extract.vision")
+    assert (binding["profile_id"], binding["profile_version"]) == (vision["id"], 1)
+    assert store.configuration_state()["active"] is True
+
+
+def test_pre_activation_bound_incompatible_feature_blocks_an_invalid_binding(
+    pg_db, monkeypatch
+):
+    gemini_environment(monkeypatch)
+    operator = service.create_connection(
+        {"label": "Gemini", "provider": "gemini"}, None
+    )
+    operator = store.save_model_catalog(
+        operator["id"],
+        [model_capabilities("gemini", "gemini-3.8-flash").model_dump(mode="json")],
+        "ready",
+        operator["revision"],
+    )
+    vision = service.create_profile(
+        {
+            "label": "Poster reader",
+            "connection_id": operator["id"],
+            "model_id": "gemini-3.8-flash",
+            "config": {},
+        },
+        None,
+    )
+    bind("shows.extract.vision", vision["id"])
+    store.update_connection(
+        operator["id"], {"enabled": False}, operator["revision"], None
+    )
+    ollama = ollama_text()
+    before = write_counts()
+
+    preview = assign(ollama["id"], "qwen3:8b", dry_run=True)
+
+    outcomes = outcomes_by_action(preview)
+    assert outcomes["shows.extract.vision"]["outcome"] == "blocked"
+    assert outcomes["shows.extract.vision"]["reason"] == "AI_CONNECTION_UNAVAILABLE"
+    assert outcomes["artwork.hero.analyze"]["outcome"] == "kept_legacy"
+    with pytest.raises(AIConfigurationError) as blocked:
+        assign(ollama["id"], "qwen3:8b")
+    assert blocked.value.code == "AI_SETUP_BLOCKED"
+    assert write_counts() == before
+
+
+def test_unsupported_legacy_provider_blocks_unbound_image_features(pg_db, monkeypatch):
+    from crate.llm import provider
+
+    monkeypatch.setattr(
+        provider,
+        "get_config",
+        lambda: {
+            "model": "openai/gpt-4o",
+            "provider": "openai",
+            "ollama_url": "http://ollama:11434",
+        },
+    )
+    ollama = ollama_text()
+
+    preview = assign(ollama["id"], "qwen3:8b", dry_run=True)
+
+    outcomes = outcomes_by_action(preview)
+    for action_id in IMAGE_ACTIONS:
+        assert outcomes[action_id]["outcome"] == "blocked"
+        assert outcomes[action_id]["reason"] == "AI_PROVIDER_UNSUPPORTED"
+    assert {outcomes[a]["outcome"] for a in TEXT_ACTIONS} == {"applied"}
+    with pytest.raises(AIConfigurationError) as blocked:
+        assign(ollama["id"], "qwen3:8b")
+    assert blocked.value.code == "AI_SETUP_BLOCKED"
+    assert_nothing_written()
+
+
+def test_apply_model_assignment_rejects_an_unknown_op_without_writes(pg_db):
+    ollama = ollama_text()
+    state = store.configuration_state()
+    valid = {
+        "action_id": "genres.eq.propose",
+        "op": "create",
+        "enabled": True,
+        "expected_binding_revision": 0,
+        "label": ACTIONS["genres.eq.propose"].label,
+        "connection_id": ollama["id"],
+        "model_id": "qwen3:8b",
+        "config": {},
+    }
+    unknown = {
+        "action_id": "genres.taxonomy.propose",
+        "op": "drop",
+        "enabled": True,
+        "expected_binding_revision": 0,
+    }
+
+    def never(*args):
+        pytest.fail("callback reached before the steps were checked")
+
+    with pytest.raises(AIConfigurationError) as error:
+        store.apply_model_assignment(
+            [valid, unknown],
+            default_model={
+                "connection_id": ollama["id"],
+                "model_id": "qwen3:8b",
+                "reasoning": ReasoningConfig().model_dump(mode="json"),
+            },
+            expected_revision=state["revision"],
+            expected_review_fingerprint="a" * 64,
+            review_fingerprint=never,
+            validate_legacy=never,
+            validate_bindings=never,
+            actor_id=None,
+        )
+    assert error.value.code == "AI_CONFIGURATION_INVALID"
+    assert_nothing_written()
+
+
+def stored_default(connection_id, model_id, reasoning=None):
+    store.set_default_model(
+        {
+            "connection_id": connection_id,
+            "model_id": model_id,
+            "reasoning": reasoning or ReasoningConfig().model_dump(mode="json"),
+        },
+        None,
+    )
+
+
+def test_snapshot_rejects_a_catalog_entry_from_another_provider(pg_db):
+    conn = service.create_connection(
+        {"label": "Local", "provider": "ollama", "endpoint": "http://ollama:11434"},
+        None,
+    )
+    foreign = model_capabilities("gemini", "gemini-3.8-flash").model_dump(mode="json")
+    store.save_model_catalog(conn["id"], [foreign], "ready", conn["revision"])
+    stored_default(conn["id"], "gemini-3.8-flash")
+
+    default_model = service.snapshot()["default_model"]
+
+    assert default_model["available"] is False
+    assert default_model["error_code"] == "AI_MODEL_UNVALIDATED"
+    assert default_model["features"] == []
+    current = service.snapshot()
+    with pytest.raises(AIConfigurationError) as error:
+        assign(conn["id"], "gemini-3.8-flash", snapshot=current)
+    assert error.value.code == "AI_MODEL_UNVALIDATED"
+
+
+def test_snapshot_reports_reasoning_that_is_no_longer_native(pg_db):
+    ollama = ollama_text()
+    stored_default(
+        ollama["id"],
+        "qwen3:8b",
+        {"mode": "level", "level": "high", "budget_tokens": None},
+    )
+
+    result = service.snapshot()
+
+    default_model = result["default_model"]
+    assert default_model["available"] is False
+    assert default_model["error_code"] == "AI_PROFILE_INCOMPATIBLE"
+    assert default_model["features"] == []
+    Snapshot.model_validate(result)
+
+
+def test_malformed_stored_default_reads_as_unavailable(test_app, pg_db):
+    from crate.db.tx import transaction_scope
+
+    ollama = ollama_text()
+    malformed = (
+        {"connection_id": "not-a-uuid", "model_id": "qwen3:8b", "reasoning": {}},
+        {},
+        {"connection_id": 7, "model_id": ["qwen3:8b"], "reasoning": "high"},
+        {
+            "connection_id": ollama["id"],
+            "model_id": "qwen3:8b",
+            "reasoning": {"mode": "level"},
+        },
+    )
+    for value in malformed:
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE ai_configuration_state SET default_model=CAST(:value AS jsonb) WHERE singleton"
+                ),
+                {"value": json.dumps(value)},
+            )
+        assert store.configuration_snapshot()["state"]["default_model"] == value
+        store.configuration_snapshot(bounded=True)
+
+        result = service.snapshot()
+
+        default_model = result["default_model"]
+        assert default_model["available"] is False, value
+        assert default_model["error_code"] == "AI_CONFIGURATION_INVALID", value
+        assert default_model["features"] == []
+        Snapshot.model_validate(result)
+        response = test_app.get("/api/admin/ai/snapshot")
+        assert response.status_code == 200, response.text
+        assert response.json()["default_model"]["available"] is False
+
+
+def test_version_fingerprint_is_stable_and_matches_stored_versions(pg_db):
+    pinned = "00000000-0000-0000-0000-000000000001"
+    legacy = {
+        "kind": "legacy_snapshot",
+        "action_id": "genres.eq.propose",
+        "legacy_model": "gemini/gemini-2.5-flash",
+        "legacy_options": {
+            "timeout_seconds": None,
+            "max_tokens": None,
+            "image_detail": "default",
+        },
+        "legacy_deadline_seconds": 60.0,
+    }
+    tuned = {
+        "reasoning": {"mode": "level", "level": "high"},
+        "timeout_seconds": 8,
+        "max_output_tokens": 4096,
+    }
+    # Digests recorded before _version stopped normalising twice; they must not move.
+    assert (
+        store.version_fingerprint(pinned, "qwen3:8b", {})
+        == "c60b66ec2663115cfb1cb1216dd66ca58d6e151bd2c3ca682b90e8bac9d11886"
+    )
+    assert (
+        store.version_fingerprint(pinned, "gemini-3.8-flash", tuned)
+        == "44f1e000d739e8e23799172137e37dd0a1633696d764ae5126a911781f776d78"
+    )
+    assert (
+        store.version_fingerprint(pinned, "gemini-2.5-flash", legacy)
+        == "b1af350cd6dfba1bd6ceefb0f0ed83730cf3796437c967fd4c32a9590071c5f0"
+    )
+
+    ollama = ollama_text()
+    for config in ({}, tuned, legacy):
+        profile = store.create_profile(
+            {
+                "label": "Pinned",
+                "connection_id": ollama["id"],
+                "model_id": "qwen3:8b",
+                "config": config,
+            },
+            None,
+        )
+        stored = store.get_profile_version(profile["id"], 1)
+        assert stored["fingerprint"] == store.version_fingerprint(
+            ollama["id"], "qwen3:8b", config
+        )

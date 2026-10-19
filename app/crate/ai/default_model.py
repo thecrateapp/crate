@@ -41,6 +41,11 @@ def require_supported_reasoning(
         model.max_output_tokens or 16000,
         (model.context_window or 16001) - 1,
     )
+    if max_output_tokens < 1:
+        # No probe fits (context_window=1); no action could run on this model either.
+        raise AIConfigurationError(
+            "AI_MODEL_INCOMPATIBLE", "Model context window is too small"
+        )
     config = ProfileConfig(
         reasoning=reasoning,
         timeout_seconds=1,
@@ -52,7 +57,7 @@ def require_supported_reasoning(
 
 def _image_detail(
     model: ModelCapabilities, action_id: str, is_image_action: bool
-) -> tuple[ImageDetail, bool]:
+) -> tuple[ImageDetail | None, bool]:
     if is_image_action:
         candidates: list[ImageDetail] = [
             PREFERRED_IMAGE_DETAIL.get(action_id, "default"),
@@ -64,8 +69,10 @@ def _image_detail(
             "default" if "default" in model.image_details else model.image_details[0]
         )
         candidates = [preferred]
-    chosen = next(detail for detail in candidates if detail in model.image_details)
-    return chosen, chosen != candidates[0]
+    chosen = next(
+        (detail for detail in candidates if detail in model.image_details), None
+    )
+    return chosen, chosen is not None and chosen != candidates[0]
 
 
 def _resolve_reasoning(
@@ -109,6 +116,8 @@ def derive_action_config(
     image_detail, image_detail_adjusted = _image_detail(
         model, action_id, is_image_action
     )
+    if image_detail is None:
+        return DerivedConfig(action_id, None, "AI_PROFILE_INCOMPATIBLE")
     resolved_reasoning, reasoning_adjusted = _resolve_reasoning(
         reasoning, model, output
     )

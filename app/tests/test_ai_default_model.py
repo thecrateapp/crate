@@ -4,7 +4,7 @@ import pytest
 
 from crate.ai.actions import ACTIONS
 from crate.ai.capabilities import model_capabilities, validate_profile
-from crate.ai.contracts import AIConfigurationError, ReasoningConfig
+from crate.ai.contracts import AIConfigurationError, ModelCapabilities, ReasoningConfig
 from crate.ai.default_model import (
     derive_action_config,
     derive_all,
@@ -235,3 +235,31 @@ def test_derive_all_keeps_action_order_and_rejects_unknown_actions():
     with pytest.raises(AIConfigurationError) as excinfo:
         derive_all(GEMINI_38, HIGH, ["nope"])
     assert excinfo.value.code == "AI_ACTION_UNKNOWN"
+
+
+def test_unsupported_image_detail_is_a_closed_reason():
+    only_ultra = ModelCapabilities.model_validate(
+        GEMINI_38.model_dump() | {"image_details": ["ultra_high"]}
+    )
+
+    results = {d.action_id: d for d in derive_all(only_ultra, HIGH)}
+
+    hero = results["artwork.hero.analyze"]
+    assert hero.config is None
+    assert hero.reason == "AI_PROFILE_INCOMPATIBLE"
+    assert results["shows.extract.vision"].config.image_detail == "ultra_high"
+
+
+def test_degenerate_context_window_is_a_closed_reasoning_error():
+    degenerate = ModelCapabilities.model_validate(
+        OLLAMA_TEXT.model_dump() | {"context_window": 1}
+    )
+
+    with pytest.raises(AIConfigurationError) as excinfo:
+        require_supported_reasoning(degenerate, PROVIDER_DEFAULT)
+
+    assert excinfo.value.code == "AI_MODEL_INCOMPATIBLE"
+    assert all(
+        d.reason == "AI_CONTEXT_TOO_SMALL"
+        for d in derive_all(degenerate, PROVIDER_DEFAULT, ["genres.eq.propose"])
+    )

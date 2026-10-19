@@ -9,6 +9,8 @@ from collections import Counter
 from uuid import NAMESPACE_URL, UUID, uuid5
 from typing import NoReturn
 
+from pydantic import TypeAdapter
+
 from crate.ai.actions import ACTIONS, get_action, list_actions
 from crate.ai.capabilities import (
     image_token_bound,
@@ -19,6 +21,7 @@ from crate.ai.contracts import (
     AIConfigurationError,
     LegacyProfileConfig,
     ModelCapabilities,
+    ModelID,
     ProfileConfig,
     ReasoningConfig,
 )
@@ -171,75 +174,84 @@ def _has_credential(connection):
     return False
 
 
-def _default_model_state(data):
-    """Build the snapshot's default_model section from one already-read scope."""
-    default_model = data["state"].get("default_model")
-    if default_model is None:
+_MODEL_ID = TypeAdapter(ModelID)
+
+
+def _valid_or_none(parse, value):
+    try:
+        return parse(value)
+    except (KeyError, TypeError, ValueError, AttributeError):
         return None
+
+
+def _default_model_state(data):
+    """Build the snapshot's default_model section from one already-read scope.
+
+    Availability uses the same checks as assign_model; a malformed stored value is
+    reported as unavailable (AI_CONFIGURATION_INVALID) rather than failing the read.
+    """
+    stored = data["state"].get("default_model")
+    if stored is None:
+        return None
+    fields = stored if isinstance(stored, dict) else {}
+    connection_id = _valid_or_none(lambda v: str(UUID(v)), fields.get("connection_id"))
+    model_id = _valid_or_none(
+        lambda v: _MODEL_ID.validate_python(v, strict=True), fields.get("model_id")
+    )
+    reasoning = _valid_or_none(ReasoningConfig.model_validate, fields.get("reasoning"))
     connection = data.get("default_connection")
-    model_id = default_model["model_id"]
-    available = connection is not None and connection["enabled"]
-    error_code = None
-    model = None
-    if not available:
-        error_code = "AI_CONNECTION_UNAVAILABLE"
-    elif not _has_credential(connection):
-        available = False
-        error_code = "AI_CREDENTIAL_REQUIRED"
-    else:
-        model = next(
-            (m for m in connection["model_catalog"] if m["model_id"] == model_id),
-            None,
-        )
-        if model is None or not model.get("validated"):
-            available = False
-            error_code = "AI_MODEL_UNVALIDATED"
-    features = []
-    if available:
-        capabilities = ModelCapabilities.model_validate(model)
-        reasoning = ReasoningConfig.model_validate(default_model["reasoning"])
-        bindings = {b["action_id"]: b for b in data["bindings"]}
-        versions = {(v["profile_id"], v["version"]): v for v in data["versions"]}
-        for derived in derive_all(capabilities, reasoning):
-            if derived.config is None:
-                features.append(
-                    {
-                        "action_id": derived.action_id,
-                        "status": "incompatible",
-                        "reason": derived.reason,
-                    }
-                )
-                continue
-            expected_fingerprint = store.version_fingerprint(
-                connection["id"], model_id, derived.config.model_dump(mode="json")
-            )
-            binding = bindings.get(derived.action_id)
-            bound_version = (
-                versions.get((binding["profile_id"], binding["profile_version"]))
-                if binding
-                else None
-            )
-            status = (
-                "default"
-                if bound_version is not None
-                and bound_version["fingerprint"] == expected_fingerprint
-                else "override"
-            )
-            features.append(
-                {"action_id": derived.action_id, "status": status, "reason": None}
-            )
-    return {
+    state = {
         "connection_id": (
             _public_connection_id(connection)
             if connection is not None
-            else default_model["connection_id"]
+            else connection_id or "unknown"
         ),
-        "model_id": model_id,
-        "reasoning": default_model["reasoning"],
-        "available": available,
-        "error_code": error_code,
-        "features": features,
+        "model_id": model_id or "unknown",
+        "reasoning": (reasoning or ReasoningConfig()).model_dump(mode="json"),
+        "available": False,
+        "error_code": None,
+        "features": [],
     }
+    try:
+        if connection_id is None or model_id is None or reasoning is None:
+            _fail("AI_CONFIGURATION_INVALID", "Stored default model is malformed")
+        if connection is None:
+            _fail("AI_CONNECTION_UNAVAILABLE", "Connection does not exist")
+        capabilities = _assignment_model(connection, model_id, reasoning)
+    except AIConfigurationError as error:
+        return state | {"error_code": error.code}
+    bindings = {b["action_id"]: b for b in data["bindings"]}
+    versions = {(v["profile_id"], v["version"]): v for v in data["versions"]}
+    features = []
+    for derived in derive_all(capabilities, reasoning):
+        if derived.config is None:
+            features.append(
+                {
+                    "action_id": derived.action_id,
+                    "status": "incompatible",
+                    "reason": derived.reason,
+                }
+            )
+            continue
+        expected_fingerprint = store.version_fingerprint(
+            connection["id"], model_id, derived.config.model_dump(mode="json")
+        )
+        binding = bindings.get(derived.action_id)
+        bound_version = (
+            versions.get((binding["profile_id"], binding["profile_version"]))
+            if binding
+            else None
+        )
+        status = (
+            "default"
+            if bound_version is not None
+            and bound_version["fingerprint"] == expected_fingerprint
+            else "override"
+        )
+        features.append(
+            {"action_id": derived.action_id, "status": status, "reason": None}
+        )
+    return state | {"available": True, "features": features}
 
 
 def snapshot():

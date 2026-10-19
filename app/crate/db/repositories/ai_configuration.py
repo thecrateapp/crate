@@ -197,16 +197,16 @@ def save_model_catalog(
         return _connection(row)
 
 
-def version_fingerprint(
-    connection_id: str, model_id: str, config: Mapping[str, Any]
-) -> str:
-    """Stable identity of a (connection, model, config) tuple; no SQL."""
+def _normalized_config(config: Mapping[str, Any]) -> dict[str, Any]:
     config_type = (
         LegacyProfileConfig
         if config.get("kind") == "legacy_snapshot"
         else ProfileConfig
     )
-    normalized = config_type.model_validate(config).model_dump(mode="json")
+    return config_type.model_validate(config).model_dump(mode="json")
+
+
+def _fingerprint(connection_id, model_id, normalized: Mapping[str, Any]) -> str:
     content = {
         "connection_id": str(connection_id),
         "model_id": model_id,
@@ -217,17 +217,16 @@ def version_fingerprint(
     ).hexdigest()
 
 
+def version_fingerprint(
+    connection_id: str, model_id: str, config: Mapping[str, Any]
+) -> str:
+    """Stable identity of a (connection, model, config) tuple; no SQL."""
+    return _fingerprint(connection_id, model_id, _normalized_config(config))
+
+
 def _version(s, id, version, data):
-    config_data = data.get("config", {})
-    config_type = (
-        LegacyProfileConfig
-        if config_data.get("kind") == "legacy_snapshot"
-        else ProfileConfig
-    )
-    config = config_type.model_validate(config_data).model_dump(mode="json")
-    fingerprint = version_fingerprint(
-        data["connection_id"], data["model_id"], config_data
-    )
+    config = _normalized_config(data.get("config", {}))
+    fingerprint = _fingerprint(data["connection_id"], data["model_id"], config)
     return _json(
         s.execute(
             text("""INSERT INTO ai_profile_versions(profile_id,version,connection_id,model_id,config,fingerprint)
@@ -467,6 +466,14 @@ __all__ = [
 ]
 
 
+def _default_connection_id(default_model) -> str | None:
+    """The stored default's connection UUID; a malformed value reads as none."""
+    try:
+        return str(UUID(default_model["connection_id"]))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
+
+
 def configuration_snapshot(*, bounded=False, session=None) -> dict:
     """Read all configuration in one scope with fixed batch queries.
 
@@ -475,10 +482,10 @@ def configuration_snapshot(*, bounded=False, session=None) -> dict:
     """
     with _read(session) as s:
         state = configuration_state(session=s)
-        default_model = state.get("default_model")
+        default_connection_id = _default_connection_id(state.get("default_model"))
         default_connection = (
-            get_connection(default_model["connection_id"], session=s)
-            if default_model
+            get_connection(default_connection_id, session=s)
+            if default_connection_id
             else None
         )
         if not bounded:
