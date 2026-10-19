@@ -2,6 +2,7 @@
 
 from crate.agent_access import ALLOWED_GRANTS
 from crate.agent_scope_catalog import (
+    _LABELS,
     SCOPE_DETAILS,
     SCOPE_GROUPS,
     SCOPE_PRESETS,
@@ -10,6 +11,9 @@ from crate.agent_scope_catalog import (
 
 
 def test_every_allowed_grant_has_details():
+    # SCOPE_DETAILS is built from ALLOWED_GRANTS, so compare the label source:
+    # a grant without a written label, or a label for a removed grant, fails.
+    assert set(_LABELS) == set(ALLOWED_GRANTS)
     assert set(SCOPE_DETAILS) == set(ALLOWED_GRANTS)
 
 

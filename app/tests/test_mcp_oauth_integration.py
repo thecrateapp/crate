@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import html
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -1150,3 +1151,50 @@ def test_delegated_request_authorization_fails_closed_for_invalid_context(
     with pytest.raises(DiagnosticError) as denied, transaction_scope() as session:
         _authorize(session, invalid, {"library.health.read"}, worker=True)
     assert denied.value.code == "FORBIDDEN"
+
+
+def test_consent_page_names_every_permission_with_its_catalog_label(oauth_env):
+    from crate.agent_access import ALLOWED_GRANTS
+    from crate.agent_scope_catalog import SCOPE_DETAILS
+
+    store.register_oauth_client(
+        "every-scope-client",
+        "Every scope client",
+        ["https://client.example/callback"],
+        set(ALLOWED_GRANTS),
+    )
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app, base_url=ISSUER)
+    cookie = auth.create_jwt(
+        oauth_env["id"], oauth_env["email"], "admin", session_id=oauth_env["session_id"]
+    )
+    client.cookies.set("crate_session", cookie)
+
+    page = client.get(
+        "/oauth/authorize",
+        params=_parameters(
+            client_id="every-scope-client", scope=" ".join(sorted(ALLOWED_GRANTS))
+        ),
+    )
+
+    assert page.status_code == 200, page.text
+    lines = {
+        scope: html.unescape(shown)
+        for scope, shown in re.findall(
+            r"<li data-scope='([^']+)'>([^<]*)</li>", page.text
+        )
+    }
+    assert set(lines) == set(ALLOWED_GRANTS)
+    for scope, shown in lines.items():
+        assert shown == SCOPE_DETAILS[scope].label
+        assert shown != scope
+
+
+def test_permission_list_falls_back_to_the_id_for_an_unknown_scope():
+    from crate.api.mcp_oauth import _permission_list
+
+    rendered = _permission_list(["ops.status.read", "ops.future.read"])
+
+    assert "<li data-scope='ops.status.read'>Read instance status</li>" in rendered
+    assert "<li data-scope='ops.future.read'>ops.future.read</li>" in rendered

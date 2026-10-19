@@ -12,6 +12,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 
 from crate.agent_access import ALLOWED_GRANTS
 from crate.agent_diagnostics import DiagnosticError
+from crate.agent_scope_catalog import SCOPE_DETAILS
 from crate.api.agent_guards import require_agent_admin_session
 from crate.api.schemas.mcp_oauth import (
     MCPAuthorizationServerMetadata,
@@ -31,16 +32,12 @@ _HTML_HEADERS = {
     "X-Frame-Options": "DENY",
 }
 
-_SCOPE_LABELS = {
-    "library.health.read": "Inspect library health",
-    "library.health.run": "Run an artist health check",
-    "library.repair.photo_flag": "Apply artist photo repairs",
-    "ops.status.read": "Read operational status",
-    "ops.jobs.read": "Read jobs and progress",
-    "ops.logs.read": "Read operational diagnostics",
-    "ops.jobs.retry": "Retry this application's eligible jobs",
-    "ops.jobs.cancel_pending": "Cancel this application's pending jobs",
-}
+
+def _scope_label(scope: str) -> str:
+    """The Admin catalog label, so consent reads the same as Admin; an unknown
+    scope falls back to its id."""
+    detail = SCOPE_DETAILS.get(scope)
+    return detail.label if detail else scope
 
 
 def _permission_list(scopes: Iterable[str]):
@@ -48,7 +45,7 @@ def _permission_list(scopes: Iterable[str]):
         "<li data-scope='"
         + html.escape(scope, quote=True)
         + "'>"
-        + html.escape(_SCOPE_LABELS.get(scope, scope))
+        + html.escape(_scope_label(scope))
         + "</li>"
         for scope in scopes
     )
