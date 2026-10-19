@@ -1,6 +1,7 @@
 """Contract tests for the Genre API endpoints."""
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
+from tests.ai_consumer_fakes import pin_actions
 
 
 async def _unauthenticated(self, request):
@@ -356,7 +357,10 @@ class TestGenreTaxonomyAPI:
         assert create_task.call_args.args[1]["type"] == "genre_cover"
         assert create_task.call_args.args[1]["slug"] == "post-hardcore"
 
-    def test_infer_taxonomy_node_proposal_returns_reviewable_diff(self, test_app):
+    def test_infer_taxonomy_node_proposal_returns_reviewable_diff(
+        self, test_app, monkeypatch
+    ):
+        pin_actions(monkeypatch)
         proposal = {
             "ok": True,
             "slug": "post-hardcore",
@@ -388,9 +392,12 @@ class TestGenreTaxonomyAPI:
         assert data["slug"] == "post-hardcore"
         assert data["description"].startswith("Angular")
         assert data["relations"][0]["relation_type"] == "parent"
-        build_proposal.assert_called_once_with("post-hardcore")
+        build_proposal.assert_called_once_with("post-hardcore", ai_call=ANY)
 
-    def test_infer_taxonomy_node_proposal_allows_raw_unmapped_genres(self, test_app):
+    def test_infer_taxonomy_node_proposal_allows_raw_unmapped_genres(
+        self, test_app, monkeypatch
+    ):
+        pin_actions(monkeypatch)
         proposal = {
             "ok": True,
             "slug": "instrumental",
@@ -417,7 +424,7 @@ class TestGenreTaxonomyAPI:
         assert data["recommended_action"] == "alias_existing"
         assert data["recommended_target_slug"] == "instrumental-rock"
         assert data["evidence"]["seed_artists"] == ["Mogwai"]
-        build_proposal.assert_called_once_with("instrumental")
+        build_proposal.assert_called_once_with("instrumental", ai_call=ANY)
 
     def test_apply_taxonomy_proposal_maps_raw_genre_as_alias(self, test_app):
         with (
@@ -640,7 +647,8 @@ class TestGenreTaxonomyAPI:
         assign_alias.assert_called_once_with("post hardcore", "post-hardcore")
         invalidate.assert_called_once_with(broadcast=True)
 
-    def test_rebuild_taxonomy_proposal_queues_review_task(self, test_app):
+    def test_rebuild_taxonomy_proposal_queues_review_task(self, test_app, monkeypatch):
+        pin_actions(monkeypatch)
         with (
             patch("crate.api.genres.list_tasks", return_value=[]),
             patch(
@@ -663,6 +671,11 @@ class TestGenreTaxonomyAPI:
         create_task.assert_called_once_with(
             "rebuild_genre_taxonomy_proposals",
             {
+                "actor_user_id": ANY,
+                "ai_acceptance": {
+                    "action_id": "genres.taxonomy.propose",
+                    "fingerprint": "accepted:genres.taxonomy.propose",
+                },
                 "alias_limit": 42,
                 "node_limit": 7,
                 "include_external": False,

@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace as S
 from crate import show_extraction as extract
 from crate.api.schemas.show_imports import ShowCandidate
+from tests.ai_consumer_fakes import pin_actions
 
 
 def test_url_fetch_reads_real_body_checks_each_redirect_and_has_honest_fallback(
@@ -39,21 +40,7 @@ def test_url_fetch_reads_real_body_checks_each_redirect_and_has_honest_fallback(
 
 
 def test_explicit_vision_and_text_use_one_call_and_discard_llm_coordinates(monkeypatch):
-    monkeypatch.setattr(
-        extract.provider,
-        "get_config",
-        lambda: {"model": "test/vision", "provider": "test"},
-    )
-    monkeypatch.setattr(
-        extract,
-        "_configuration",
-        lambda _: {
-            "configured": True,
-            "dependency_available": True,
-            "model": "test/vision",
-            "provider": "test",
-        },
-    )
+    pin_actions(monkeypatch, model="test/vision")
     calls = []
 
     def model(*args, **kwargs):
@@ -79,7 +66,10 @@ def test_explicit_vision_and_text_use_one_call_and_discard_llm_coordinates(monke
     content = (Path(__file__).parent / "fixtures/shows/flyer.png").read_bytes()
     images = [{"id": "image", "content": content, "sha256": "hash"}]
     vision = extract.extract_show_candidates({"mode": "vision", "raw_text": ""}, images)
-    assert len(calls) == 1 and calls[0]["timeout_seconds"] == 90
+    assert (
+        len(calls) == 1
+        and calls[0]["context"]["legacy_options"]["timeout_seconds"] == 90
+    )
     assert "latitude" not in vision["candidates"][0]
     assert vision["coverage"] == "incomplete"
     assert "image" in calls[0]
@@ -87,7 +77,7 @@ def test_explicit_vision_and_text_use_one_call_and_discard_llm_coordinates(monke
         {"mode": "text_llm", "raw_text": "2027-03-02"}, []
     )
     assert len(calls) == 2 and "image" not in calls[1]
-    assert calls[1]["timeout_seconds"] == 45
+    assert calls[1]["context"]["legacy_options"]["timeout_seconds"] == 45
     assert result["model"] == "test/vision"
 
     def broken(*args, **kwargs):
@@ -128,21 +118,7 @@ def test_ocr_then_text_model_is_optional_and_ocr_alone_never_reads_llm_config(
         ][0]["date"]
         == "2027-03-02"
     )
-    monkeypatch.setattr(
-        extract.provider,
-        "get_config",
-        lambda: {"model": "test/text", "provider": "test"},
-    )
-    monkeypatch.setattr(
-        extract,
-        "_configuration",
-        lambda _: {
-            "configured": True,
-            "dependency_available": True,
-            "model": "test/text",
-            "provider": "test",
-        },
-    )
+    pin_actions(monkeypatch, model="test/text")
     calls = []
     monkeypatch.setattr(
         extract.provider,
@@ -157,15 +133,7 @@ def test_ocr_then_text_model_is_optional_and_ocr_alone_never_reads_llm_config(
 
 
 def test_worker_probe_keeps_configuration_connectivity_and_vision_separate(monkeypatch):
-    monkeypatch.setattr(
-        extract.provider,
-        "get_config",
-        lambda: {
-            "model": "ollama/text",
-            "provider": "ollama",
-            "ollama_url": "http://configured-ollama",
-        },
-    )
+    pin_actions(monkeypatch, model="ollama/text", provider="ollama")
     monkeypatch.setattr(
         extract,
         "ocr_readiness",
@@ -173,13 +141,11 @@ def test_worker_probe_keeps_configuration_connectivity_and_vision_separate(monke
     )
     monkeypatch.setattr(
         "requests.post",
-        lambda *args, **kwargs: S(
-            raise_for_status=lambda: None, json=lambda: {"capabilities": ["completion"]}
-        ),
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("provider request")),
     )
     state = extract.probe_show_extractors()
-    assert state["configured"] and state["connectivity"] == "available"
-    assert state["vision"] == "unsupported"
+    assert state["configured"] and state["connectivity"] == "not_checked"
+    assert state["vision"] == "unknown"
     assert "ollama_url" not in state
 
 

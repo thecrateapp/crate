@@ -137,10 +137,21 @@ def accept_show_extraction(
         replay = requests._replay(current, principal, "extract_shows", key, fingerprint)
         if replay:
             return replay
+        accepted_ai = None
         if source["mode"] in {"vision", "text_llm", "ocr_text_llm"}:
-            from crate.show_extraction import show_llm_configuration
+            from crate.ai import configuration
+            from crate.ai.consumers import acceptance_reference
+            from crate.ai.contracts import AIConfigurationError
+            from crate.show_extraction import SHOW_ACTIONS, show_llm_configuration
 
-            selected = show_llm_configuration()
+            try:
+                context = configuration.resolve_action(SHOW_ACTIONS[source["mode"]])
+            except AIConfigurationError:
+                raise DiagnosticError(
+                    "LLM_UNAVAILABLE", "Selected model configuration is unavailable"
+                ) from None
+            selected = show_llm_configuration(source["mode"], context=context)
+            accepted_ai = acceptance_reference(context)
             if (
                 source["expected_model"] != selected["model"]
                 or source["expected_configuration"]
@@ -167,7 +178,11 @@ def accept_show_extraction(
             current,
             principal,
             "extract_shows",
-            {"domain_operation": "shows_extract", "draft_id": draft_id},
+            {
+                "domain_operation": "shows_extract",
+                "draft_id": draft_id,
+                **({"ai_acceptance": accepted_ai} if accepted_ai else {}),
+            },
             key,
             request_hash=fingerprint,
         )

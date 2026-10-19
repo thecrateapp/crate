@@ -9,7 +9,9 @@ from crate.db.repositories.show_extraction_jobs import (
     finish_show_extraction,
     save_show_extractor_readiness,
 )
-from crate.show_extraction import extract_show_candidates
+from crate.show_extraction import SHOW_ACTIONS, extract_show_candidates
+from crate.ai import consumers
+from crate.ai.contracts import AIConfigurationError
 
 
 def handle_show_extraction(task_id: str, params: dict, config: dict) -> dict:
@@ -20,9 +22,36 @@ def handle_show_extraction(task_id: str, params: dict, config: dict) -> dict:
         private = load_show_extraction(task_id)
         if private["job"]["result"] is not None:
             return public_operation_result(private["job"]["result"])
-        draft = extract_show_candidates(
-            private["input"], private["images"], cancelled=cancelled
-        )
+        ai_call = None
+        action_id = SHOW_ACTIONS.get(private["input"]["mode"])
+        try:
+            if action_id:
+                ai_call = consumers.resume_action(
+                    action_id,
+                    private["job"]["payload"].get("ai_acceptance"),
+                    actor_id=private["job"].get("human_actor_id"),
+                    job_id=task_id,
+                )
+            draft = extract_show_candidates(
+                private["input"],
+                private["images"],
+                cancelled=cancelled,
+                ai_call=ai_call,
+            )
+            consumers.revalidate_call(ai_call)
+        except AIConfigurationError as error:
+            from crate.show_ocr import parse_show_text
+
+            # Keep the owned text reviewable even when the queued provider was revoked.
+            draft = parse_show_text(private["input"].get("raw_text") or "")
+            draft["error_code"] = (
+                "CONFIGURATION_CHANGED"
+                if error.code == "AI_CONTEXT_STALE"
+                else "LLM_UNAVAILABLE"
+            )
+            draft["warnings"].append(
+                "The accepted model configuration changed or was revoked; accept a new extraction."
+            )
         from crate.show_telemetry import record_show_metrics
 
         record_show_metrics(candidates=len(draft.get("candidates", [])))

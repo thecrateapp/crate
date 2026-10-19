@@ -55,6 +55,7 @@ def generate_eq_preset(
     genre_name: str,
     description: str | None = None,
     parent_genres: list[str] | None = None,
+    ai_call: dict | None = None,
 ) -> EqPresetResponse:
     """Generate an EQ preset for a genre using the configured LLM."""
     from crate.llm import ask_structured
@@ -64,4 +65,7 @@ def generate_eq_preset(
         EqPresetResponse,
         prompt,
         system=EQ_SYSTEM_PROMPT,
+        action_id="genres.eq.propose",
+        private_response=True,
+        **(ai_call or {}),
     )

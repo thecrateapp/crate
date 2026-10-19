@@ -421,42 +421,18 @@ def llm_status(request: Request):
         configured_web_search_providers,
         web_search_provider_label,
     )
-    from crate.llm import get_config, get_provider_api_key, get_provider_key_names
+    from crate.ai.actions import ACTIONS
+    from crate.ai.runtime import action_availability
 
-    config = get_config()
-
-    # Test connectivity
-    available = False
-    error = None
-    try:
-        if config["provider"] == "ollama":
-            import requests as req
-
-            resp = req.get(f"{config['ollama_url']}/api/tags", timeout=5)
-            available = resp.status_code == 200
-            models = (
-                [m["name"] for m in resp.json().get("models", [])] if available else []
-            )
-        else:
-            key_names = get_provider_key_names(config["provider"])
-            if key_names:
-                available = bool(get_provider_api_key(config["provider"]))
-                if not available:
-                    error = f"{' or '.join(key_names)} not set"
-            else:
-                available = False
-                error = f"Unsupported LLM provider: {config['provider']}"
-            models = []
-    except Exception as e:
-        error = str(e)
-        models = []
-
+    actions = {}
+    for action_id, action in ACTIONS.items():
+        try:
+            require_permission(request, action.permission)
+        except HTTPException:
+            continue
+        actions[action_id] = action_availability(action_id)
     return {
-        "available": available,
-        "model": config["model"],
-        "provider": config["provider"],
-        "models": models,
-        "error": error,
+        "actions": actions,
         "web_research": {
             "available": True,
             "provider": web_search_provider_label(),

@@ -536,6 +536,14 @@ def _handle_normalize_artist_bios(task_id: str, params: dict, config: dict) -> d
 def _handle_research_artist_bio(task_id: str, params: dict, config: dict) -> dict:
     del config
     from crate.artist_bio_research import research_artist_bio
+    from crate.ai.consumers import resume_action, revalidate_call
+
+    ai_call = resume_action(
+        "artists.bio.research",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
     from crate.db.repositories.library import (
         get_library_artist,
         get_library_artist_by_entity_uid,
@@ -562,7 +570,9 @@ def _handle_research_artist_bio(task_id: str, params: dict, config: dict) -> dic
         artist,
         language=str(params.get("language") or "English"),
         progress=report,
+        ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     progress.done = 1
     progress.item = "Research complete"
     emit_progress(task_id, progress, force=True)

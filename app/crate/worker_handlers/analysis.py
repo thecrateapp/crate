@@ -753,6 +753,14 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
+    from crate.ai.consumers import resume_action
+
+    ai_call = resume_action(
+        "genres.description.generate",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     limit = max(
         1,
@@ -791,6 +799,7 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
         include_external=include_external,
         progress_callback=_tax_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
     emit_task_event(
         task_id,
@@ -809,6 +818,14 @@ def _handle_rebuild_genre_taxonomy_proposals(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
+    from crate.ai.consumers import resume_action
+
+    ai_call = resume_action(
+        "genres.taxonomy.propose",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     alias_limit = max(
         1,
@@ -860,6 +877,7 @@ def _handle_rebuild_genre_taxonomy_proposals(
         aggressive=aggressive,
         progress_callback=_proposal_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
     summary = result.get("summary") or {}
     emit_task_event(

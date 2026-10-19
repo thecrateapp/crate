@@ -768,7 +768,7 @@ def admin_generate_playlist_description(
     playlist_id: int,
     body: GeneratePlaylistDescriptionRequest | None = None,
 ):
-    _require_playlist_curator(request)
+    actor = _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     rules = (
         body.smart_rules
@@ -780,11 +780,17 @@ def admin_generate_playlist_description(
             generate_playlist_description,
         )
 
+        from crate.ai.consumers import resolve_call, revalidate_call
+
+        ai_call = resolve_call(
+            "playlists.description.generate", actor_id=actor.get("id")
+        )
         response = generate_playlist_description(
             name=playlist.get("name") or "Untitled playlist",
             category=playlist.get("category"),
             smart_rules=rules,
             tracks=get_playlist_tracks(playlist_id)[:60],
+            ai_call=ai_call,
         )
     except Exception as exc:
         raise HTTPException(
@@ -794,6 +800,7 @@ def admin_generate_playlist_description(
 
     applied = bool(body and body.apply)
     if applied:
+        revalidate_call(ai_call)
         update_playlist(playlist_id, description=response.description)
     return {"description": response.description, "applied": applied}
 

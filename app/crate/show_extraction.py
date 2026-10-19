@@ -3,7 +3,6 @@
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from io import BytesIO
-import importlib.util
 import hashlib
 import json
 import time
@@ -111,77 +110,67 @@ def fetch_show_source(url: str, *, cancelled=lambda: False) -> dict:
     }
 
 
-def _configuration(config: dict) -> dict:
-    name = config["provider"]
-    native = name in {"ollama", "ollama_chat", "gemini"}
-    installed = native or importlib.util.find_spec("litellm") is not None
-    configured = name in {"ollama", "ollama_chat"} or bool(
-        provider.get_provider_api_key(name)
+SHOW_ACTIONS = {
+    "vision": "shows.extract.vision",
+    "text_llm": "shows.extract.text",
+    "ocr_text_llm": "shows.extract.ocr_text",
+}
+
+
+def show_llm_configuration(
+    mode: str = "vision", *, context: dict | None = None
+) -> dict:
+    from crate.ai import runtime
+    from crate.llm.prompts.show_extraction import build_show_extraction_prompt
+
+    action_id = SHOW_ACTIONS[mode]
+    state = (
+        runtime.action_availability(action_id)
+        if context is None
+        else {
+            "available": True,
+            "model_id": (
+                f"{context['provider']}/{context['model_id']}"
+                if context.get("legacy_model")
+                else context["model_id"]
+            ),
+            "provider": context["provider"],
+            "fingerprint": context["config_fingerprint"],
+        }
     )
+    fingerprint = runtime.context_fingerprint(
+        {
+            "configuration": state["fingerprint"],
+            "action_id": action_id,
+            "prompt": build_show_extraction_prompt("", 0),
+            "schema": ExtractedShows.model_json_schema(),
+            "extractor": EXTRACTOR_VERSION,
+        }
+    )
+    # Preserve the legacy display label used by exact source consent.
+    model = state["model_id"]
+    if context is None and state.get("status") == "legacy" and model:
+        model = f"{state['provider']}/{model}"
     return {
-        "model": config["model"],
-        "provider": name,
-        "configured": configured,
+        "model": model,
+        "provider": state["provider"],
+        "configured": state["available"],
         "connectivity": "not_checked",
         "vision": "unknown",
-        "dependency_available": installed,
-        "configuration_fingerprint": hashlib.sha256(
-            json.dumps(
-                {
-                    "model": config["model"],
-                    "provider": name,
-                    "endpoint": config.get("ollama_url")
-                    if name in {"ollama", "ollama_chat"}
-                    else None,
-                },
-                sort_keys=True,
-            ).encode()
-        ).hexdigest(),
+        "dependency_available": state["available"],
+        "configuration_fingerprint": fingerprint,
+        "action_id": action_id,
     }
-
-
-def show_llm_configuration() -> dict:
-    return _configuration(provider.get_config())
 
 
 def probe_show_extractors() -> dict:
-    import requests
-
-    config = provider.get_config()
-    state = {
+    # Readiness is configuration/capability evidence; it never contacts a provider.
+    return {
         "ocr": ocr_readiness(),
-        **_configuration(config),
+        **show_llm_configuration(),
+        "actions": {mode: show_llm_configuration(mode) for mode in SHOW_ACTIONS},
         "checked_at": datetime.now(UTC).isoformat(),
     }
-    if config["provider"] in {"ollama", "ollama_chat"}:
-        try:
-            response = requests.post(
-                config["ollama_url"].rstrip("/") + "/api/show",
-                json={"model": config["model"].split("/", 1)[-1]},
-                timeout=5,
-            )
-            response.raise_for_status()
-            data = response.json()
-            state["connectivity"] = "available"
-            if isinstance(data.get("capabilities"), list):
-                state["vision"] = (
-                    "supported" if "vision" in data["capabilities"] else "unsupported"
-                )
-        except Exception:
-            state["connectivity"] = "unavailable"
-    elif state["configured"]:
-        # Registry capability and actual connectivity are separate. No billable probe.
-        try:
-            import litellm
-
-            state["vision"] = (
-                "supported"
-                if litellm.supports_vision(model=config["model"])
-                else "unsupported"
-            )
-        except (ImportError, KeyError, ValueError):
-            pass
-    return state
 
 
 def _composite(images):
@@ -273,7 +262,11 @@ def _parse_sources(sources):
 
 
 def extract_show_candidates(
-    source: dict, images: list[dict], *, cancelled=lambda: False
+    source: dict,
+    images: list[dict],
+    *,
+    cancelled=lambda: False,
+    ai_call: dict | None = None,
 ) -> dict:
     mode = source["mode"]
     if cancelled():
@@ -340,26 +333,26 @@ def extract_show_candidates(
         mode=mode,
     )
     if mode in {"vision", "text_llm", "ocr_text_llm"}:
-        runtime_config = provider.get_config()
-        config = _configuration(runtime_config)
-        if not config["configured"] or not config["dependency_available"]:
+        from crate.ai import consumers
+        from crate.ai.contracts import AIConfigurationError
+
+        try:
+            ai_call = ai_call or consumers.resolve_call(SHOW_ACTIONS[mode])
+            consumers.revalidate_call(ai_call)
+            config = show_llm_configuration(mode, context=ai_call["context"])
+            if source.get("expected_configuration") and (
+                source["expected_configuration"] != config["configuration_fingerprint"]
+                or source.get("expected_model") != config["model"]
+            ):
+                raise AIConfigurationError("AI_CONTEXT_STALE", "Configuration changed")
+        except AIConfigurationError as error:
             draft.update(
-                error_code="LLM_UNAVAILABLE",
+                error_code="CONFIGURATION_CHANGED"
+                if error.code == "AI_CONTEXT_STALE"
+                else "LLM_UNAVAILABLE",
                 warnings=[
                     *draft["warnings"],
-                    "The configured model is unavailable. Recognized text is preserved; use local OCR or manual correction.",
-                ],
-            )
-            return draft
-        if source.get("expected_configuration") and (
-            source["expected_configuration"] != config["configuration_fingerprint"]
-            or source.get("expected_model") != config["model"]
-        ):
-            draft.update(
-                error_code="CONFIGURATION_CHANGED",
-                warnings=[
-                    *draft["warnings"],
-                    "The configured model changed. Check readiness and explicitly choose the model again; no source was sent.",
+                    "The selected model configuration is unavailable or changed; no source was sent.",
                 ],
             )
             return draft
@@ -375,17 +368,9 @@ def extract_show_candidates(
 
         prompt = build_show_extraction_prompt(raw[:MAX_TEXT], len(images))
         options = {
-            "model": config["model"],
-            # Vision reads the complete poster before generating every tour row.
-            # 45 s for a preceding URL + 90 s here leaves room in the 180 s task.
-            "timeout_seconds": 90 if mode == "vision" else 45,
-            "max_tokens": 16000,
+            "action_id": SHOW_ACTIONS[mode],
             "private_response": True,
-            **(
-                {"ollama_url": runtime_config["ollama_url"]}
-                if config["provider"] in {"ollama", "ollama_chat"}
-                else {}
-            ),
+            **ai_call,
         }
         try:
             if mode == "vision":
@@ -394,11 +379,6 @@ def extract_show_candidates(
                     prompt,
                     image=_composite(images),
                     media_type="image/jpeg",
-                    image_detail=(
-                        "ultra_high"
-                        if config["model"].startswith("gemini/gemini-3")
-                        else "default"
-                    ),
                     **options,
                 )
             else:
@@ -409,6 +389,7 @@ def extract_show_candidates(
                 "The configured model did not return valid candidates. Recognized text is preserved for manual correction; no second model call was made."
             )
             return draft
+        consumers.revalidate_call(ai_call)
         if mode == "vision":
             for item in evidence:
                 if item["modality"] == "image":

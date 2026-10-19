@@ -63,7 +63,41 @@ def test_show_extractor_allows_slow_vision_but_bounds_each_single_request(
             },
         )
 
-    monkeypatch.setattr(provider.requests, "post", post)
+    from crate.ai import configuration, runtime, transport
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-private-key")
+
+    def resolve(action):
+        context = configuration._legacy(action)
+        context["config_fingerprint"] = configuration._hash(context)
+        return context
+
+    monkeypatch.setattr(configuration, "resolve_action", resolve)
+    monkeypatch.setattr(configuration, "revalidate_context", lambda c: None)
+    monkeypatch.setattr(
+        runtime.usage,
+        "reserve_invocation",
+        lambda *a, **k: {"id": "invocation", "claimed": True},
+    )
+    monkeypatch.setattr(runtime.usage, "finish_invocation", lambda *a, **k: None)
+    monkeypatch.setattr(
+        transport,
+        "_request_json",
+        lambda **k: transport._legacy_response(
+            {
+                "body": k["body"],
+                "api_key": k["api_key"],
+                "timeout_seconds": k["body"]["context"]["legacy_deadline_seconds"],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        transport,
+        "_http_json",
+        lambda provider, endpoint, path, **k: post(
+            path, json=k["body"], timeout=k["timeout_seconds"]
+        ).json(),
+    )
     images = (
         [
             {

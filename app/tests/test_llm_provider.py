@@ -70,12 +70,25 @@ def test_llm_status_requires_cloud_provider_key(monkeypatch):
     monkeypatch.setattr(
         admin_metrics, "_require_llm_status_viewer", lambda request: {"id": 1}
     )
-    with patch("crate.db.cache_settings.get_setting", side_effect=_settings_default):
-        result = admin_metrics.llm_status(cast(Any, object()))
+    monkeypatch.setattr(admin_metrics, "require_permission", lambda *a: {})
+    from crate.ai import configuration
 
-    assert result["available"] is False
-    assert result["provider"] == "gemini"
-    assert result["error"] == "GEMINI_API_KEY or AUDIOMUSE_GEMINI_API_KEY not set"
+    monkeypatch.setattr(
+        configuration,
+        "get_action_configuration",
+        lambda action: {
+            "mode": "legacy",
+            "provider": "gemini",
+            "model_id": "gemini-2.5-flash",
+            "config_fingerprint": "accepted",
+        },
+    )
+    result = admin_metrics.llm_status(cast(Any, object()))
+    assert all(not action["available"] for action in result["actions"].values())
+    assert (
+        result["actions"]["artists.bio.research"]["error_code"]
+        == "AI_CREDENTIAL_REQUIRED"
+    )
 
 
 def test_structured_public_action_routing_and_legacy_recursion_guard(monkeypatch):

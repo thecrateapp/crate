@@ -32,22 +32,9 @@ def _ocr_sources(monkeypatch, texts):
 
 
 def _configured_model(monkeypatch, mode, candidates):
-    monkeypatch.setattr(
-        extract.provider,
-        "get_config",
-        lambda: {"model": "test/model", "provider": "test"},
-    )
-    monkeypatch.setattr(
-        extract,
-        "_configuration",
-        lambda _: {
-            "configured": True,
-            "dependency_available": True,
-            "model": "test/model",
-            "provider": "test",
-            "configuration_fingerprint": "f" * 64,
-        },
-    )
+    from tests.ai_consumer_fakes import pin_actions
+
+    pin_actions(monkeypatch)
     calls = []
 
     def ask(*args, **kwargs):
@@ -370,7 +357,9 @@ def test_combined_model_manifest_is_durable_after_private_source_expiration(
             "raw_text": "External Band tour",
             "upload_ids": [upload["upload_id"]],
             "expected_model": "test/model",
-            "expected_configuration": "f" * 64,
+            "expected_configuration": extract.show_llm_configuration("vision")[
+                "configuration_fingerprint"
+            ],
         },
         "composite-image",
     )
@@ -458,7 +447,9 @@ def test_empty_vision_result_keeps_image_provenance_after_manual_publication(
             "mode": "vision",
             "upload_ids": [row["upload_id"] for row in uploads],
             "expected_model": "test/model",
-            "expected_configuration": "f" * 64,
+            "expected_configuration": extract.show_llm_configuration("vision")[
+                "configuration_fingerprint"
+            ],
         },
         "empty-vision-result",
     )

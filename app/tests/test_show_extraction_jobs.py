@@ -233,3 +233,62 @@ def test_configured_model_change_never_sends_the_source_to_another_provider(
     assert result["execution"]["error_code"] == "CONFIGURATION_CHANGED"
     assert result["draft"]["candidates"]
     call.assert_not_called()
+
+
+@pytest.mark.parametrize("change", ["key", "native_options"])
+def test_accepted_show_identity_rejects_credential_and_option_changes(
+    show_world, monkeypatch, change
+):
+    from crate.show_extraction import show_llm_configuration
+    from crate.ai import configuration
+    from unittest.mock import Mock
+
+    config = {
+        "model": "gemini/gemini-3.8-flash",
+        "provider": "gemini",
+        "ollama_url": "http://unused",
+    }
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-accepted-key")
+    monkeypatch.setattr("crate.llm.provider.get_config", lambda: dict(config))
+    state = show_llm_configuration("text_llm")
+    source = {
+        "mode": "text_llm",
+        "raw_text": "PRIVATE-POSTER 2027-03-02 Madrid",
+        "expected_model": state["model"],
+        "expected_configuration": state["configuration_fingerprint"],
+    }
+    accepted = accept_show_extraction(
+        show_world["principal"], source, "pinned-identity"
+    )
+    with read_scope() as db:
+        params = db.execute(
+            text("SELECT params_json FROM tasks WHERE id=:id"),
+            {"id": accepted["job_id"]},
+        ).scalar_one()
+        assert "PRIVATE-POSTER" not in str(params)
+        assert "test-only-accepted-key" not in str(params)
+        payload = db.execute(
+            text("SELECT payload FROM agent_jobs WHERE task_id=:id"),
+            {"id": accepted["job_id"]},
+        ).scalar_one()
+        assert set(payload["ai_acceptance"]) == {"action_id", "fingerprint"}
+    provider = Mock(side_effect=AssertionError("revoked source must not be sent"))
+    monkeypatch.setattr("crate.llm.provider.ask_structured", provider)
+    if change == "key":
+        monkeypatch.setenv("GEMINI_API_KEY", "test-only-rotated-key")
+    else:
+        original = configuration._legacy
+
+        def changed(*a, **k):
+            ctx = original(*a, **k)
+            ctx["legacy_options"]["max_tokens"] = 8000
+            return ctx
+
+        monkeypatch.setattr(configuration, "_legacy", changed)
+    start_task(accepted["job_id"])
+    public = handle_show_extraction(accepted["job_id"], {}, {})
+    assert "PRIVATE-POSTER" not in str(public)
+    full = read_show_job(show_world["principal"], accepted["job_id"])["result"]
+    assert full["execution"]["error_code"] == "CONFIGURATION_CHANGED"
+    assert full["draft"]["candidates"]
+    provider.assert_not_called()

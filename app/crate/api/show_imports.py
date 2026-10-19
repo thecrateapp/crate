@@ -224,7 +224,7 @@ def extract_shows(request: Request, body: ShowExtractionRequest):
 )
 def show_import_availability(request: Request):
     from crate.db.repositories.show_extraction_jobs import show_extractor_readiness
-    from crate.show_extraction import show_llm_configuration
+    from crate.show_extraction import SHOW_ACTIONS, show_llm_configuration
 
     _principal(request)
     config = show_llm_configuration()
@@ -244,6 +244,7 @@ def show_import_availability(request: Request):
     return {
         **config,
         **state,
+        "actions": {mode: show_llm_configuration(mode) for mode in SHOW_ACTIONS},
         "limits": {
             "images": 3,
             "image_bytes": 8388608,

@@ -2811,17 +2811,24 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
         )
         base_messages = dict((latest or {}).get("messages_json") or {})
 
+    from crate.ai.consumers import resume_action, revalidate_call
+
     try:
+        ai_call = resume_action(
+            "i18n.listen.draft", params.get("ai_acceptance"), job_id=task_id
+        )
         draft = generate_i18n_translation_draft(
             target_locale=locale,
             source_messages=source_messages,
+            ai_call=ai_call,
         )
         translations = validate_i18n_translation_draft(
             draft,
             expected_keys=set(source_messages),
             target_locale=locale,
         )
-    except Exception as exc:
+        revalidate_call(ai_call)
+    except Exception:
         update_translation_request_status(
             app=app,
             locale=locale,
@@ -2835,14 +2842,14 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
             {
                 "message": "Listen translation draft requires manual translation",
                 "locale": locale,
-                "error": str(exc)[:500],
+                "error": "AI_TRANSLATION_UNAVAILABLE",
             },
         )
         return {
             "status": "manual_required",
             "locale": locale,
             "source_version": source_version,
-            "reason": str(exc)[:500],
+            "reason": "AI_TRANSLATION_UNAVAILABLE",
         }
 
     bundle = insert_translation_bundle_draft(

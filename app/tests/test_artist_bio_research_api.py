@@ -1,4 +1,14 @@
+import pytest
+
+from tests.ai_consumer_fakes import pin_actions
+
+
 from unittest.mock import MagicMock
+
+
+@pytest.fixture(autouse=True)
+def pinned_ai(monkeypatch):
+    pin_actions(monkeypatch)
 
 
 def test_artist_bio_research_endpoint_queues_deduplicated_worker_task(monkeypatch):

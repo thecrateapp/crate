@@ -55,6 +55,7 @@ def generate_genre_node_description(
     related_genres: list[str] | None = None,
     aliases: list[str] | None = None,
     seed_artists: list[str] | None = None,
+    ai_call: dict | None = None,
 ) -> GenreNodeDescriptionResponse:
     """Generate a genre node description using the configured LLM."""
     from crate.llm import ask_structured
@@ -71,4 +72,7 @@ def generate_genre_node_description(
         GenreNodeDescriptionResponse,
         prompt,
         system=GENRE_NODE_DESCRIPTION_SYSTEM_PROMPT,
+        action_id="genres.description.generate",
+        private_response=True,
+        **(ai_call or {}),
     )
