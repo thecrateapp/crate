@@ -15,6 +15,7 @@ from crate.api.auth import (
     _require_vdj_scope,
 )
 from crate.api.radio import continuation_radio_tracks
+from crate.config import android_bass_handoff_enabled
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
 from crate.api.schemas.smart_mix import (
     CompatibilityScoreResponse,
@@ -365,7 +366,21 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
         user_cue_profile=payload.user_cue_profile,
         allow_beatmatch=payload.allow_beatmatch,
         allow_tempo_adjustment=payload.allow_tempo_adjustment,
+        allow_bass_handoff=_bass_handoff_allowed(payload),
     )
+
+
+def _bass_handoff_allowed(payload: TransitionContextRequest) -> bool:
+    return payload.allow_bass_handoff and android_bass_handoff_enabled()
+
+
+def _cache_context(payload: TransitionContextRequest) -> dict:
+    context = payload.model_dump(mode="json", by_alias=True)
+    if _bass_handoff_allowed(payload):
+        context["allowBassHandoff"] = True
+    else:
+        context.pop("allowBassHandoff", None)
+    return context
 
 
 def _plan_cache_key(
@@ -384,7 +399,7 @@ def _plan_cache_key(
         "incomingProfileRevision": (
             incoming.profile_revision if incoming is not None else "missing"
         ),
-        "context": edge.context.model_dump(mode="json", by_alias=True),
+        "context": _cache_context(edge.context),
     }
     canonical = json.dumps(
         cache_identity,

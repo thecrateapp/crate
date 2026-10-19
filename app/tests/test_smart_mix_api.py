@@ -168,6 +168,84 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     assert len(planned) == 1
 
 
+def test_bass_handoff_follows_the_request_and_splits_the_plan_cache(
+    test_app,
+    monkeypatch,
+) -> None:
+    from crate.api import smart_mix
+
+    outgoing_uid = str(uuid.uuid4())
+    incoming_uid = str(uuid.uuid4())
+    cached: dict[str, dict] = {}
+    monkeypatch.setattr(
+        smart_mix,
+        "get_track_mix_profiles_by_entity_uids",
+        lambda entity_uids, **_kwargs: [_profile(uid) for uid in entity_uids],
+    )
+    monkeypatch.setattr(
+        smart_mix,
+        "get_smart_mix_plan_caches",
+        lambda keys: {key: cached[key] for key in keys if key in cached},
+    )
+    monkeypatch.setattr(
+        smart_mix, "set_smart_mix_plan_caches", lambda plans: cached.update(plans)
+    )
+    monkeypatch.setenv("CRATE_ANDROID_BASS_HANDOFF_ENABLED", "true")
+    edge = _edge(outgoing_uid, incoming_uid)
+    bass_edge = {**edge, "context": {**edge["context"], "allowBassHandoff": True}}
+
+    with_bass = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v2", "edges": [bass_edge]},
+    )
+    without_bass = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v2", "edges": [edge]},
+    )
+
+    assert with_bass.json()["plans"][0]["bassHandoff"] == "balanced"
+    assert without_bass.json()["plans"][0]["bassHandoff"] == "none"
+    assert len(cached) == 2
+
+
+def test_the_server_flag_switches_bass_handoff_off(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    monkeypatch.delenv("CRATE_ANDROID_BASS_HANDOFF_ENABLED", raising=False)
+    monkeypatch.setattr(
+        smart_mix,
+        "get_track_mix_profiles_by_entity_uids",
+        lambda entity_uids, **_kwargs: [_profile(uid) for uid in entity_uids],
+    )
+    monkeypatch.setattr(smart_mix, "get_smart_mix_plan_caches", lambda _keys: {})
+    monkeypatch.setattr(smart_mix, "set_smart_mix_plan_caches", lambda _plans: None)
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    edge["context"]["allowBassHandoff"] = True
+
+    response = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v2", "edges": [edge]},
+    )
+
+    assert response.json()["plans"][0]["bassHandoff"] == "none"
+
+
+def test_requests_without_bass_handoff_keep_their_plan_cache_key() -> None:
+    from crate.api import smart_mix
+    from crate.api.schemas.smart_mix import TransitionEdgeRequest
+
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    legacy = TransitionEdgeRequest.model_validate(edge)
+    explicit = TransitionEdgeRequest.model_validate(
+        {**edge, "context": {**edge["context"], "allowBassHandoff": False}}
+    )
+
+    assert smart_mix._cache_context(legacy.context) == edge["context"]
+    assert smart_mix._plan_cache_key(legacy, None, None) == smart_mix._plan_cache_key(
+        explicit, None, None
+    )
+
+
 def test_missing_profile_returns_per_edge_fallback(test_app, monkeypatch) -> None:
     from crate.api import smart_mix
 

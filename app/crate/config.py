@@ -54,6 +54,10 @@ def android_beatmatch_enabled() -> bool:
     return _env_enabled("CRATE_ANDROID_BEATMATCH_ENABLED")
 
 
+def android_bass_handoff_enabled() -> bool:
+    return _env_enabled("CRATE_ANDROID_BASS_HANDOFF_ENABLED")
+
+
 def vdj_enabled() -> bool:
     return _env_enabled("CRATE_VDJ_ENABLED")
 

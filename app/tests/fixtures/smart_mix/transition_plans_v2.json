@@ -5,7 +5,8 @@
       "name": "late_outro_cue_moves_to_an_earlier_beat",
       "context": {
         "source": "radio",
-        "preferred_duration_ms": 12000
+        "preferred_duration_ms": 12000,
+        "allow_bass_handoff": true
       },
       "outgoing": {
         "outro_cue_ms": 176000
@@ -34,7 +35,8 @@
       "name": "short_incoming_shortens_the_fade",
       "context": {
         "source": "radio",
-        "preferred_duration_ms": 12000
+        "preferred_duration_ms": 12000,
+        "allow_bass_handoff": true
       },
       "outgoing": {},
       "incoming": {
@@ -97,7 +99,8 @@
       "name": "tempo_adjusted_beatmatch",
       "context": {
         "source": "playlist",
-        "preferred_duration_ms": 8000
+        "preferred_duration_ms": 8000,
+        "allow_bass_handoff": true
       },
       "outgoing": {},
       "incoming": {

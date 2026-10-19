@@ -133,6 +133,7 @@ class TransitionContextRequest(SmartMixRequestModel):
     )
     allow_beatmatch: bool = Field(alias="allowBeatmatch")
     allow_tempo_adjustment: bool = Field(alias="allowTempoAdjustment")
+    allow_bass_handoff: bool = Field(default=False, alias="allowBassHandoff")
 
 
 class TransitionEdgeRequest(SmartMixRequestModel):

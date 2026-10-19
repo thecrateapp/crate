@@ -24,6 +24,7 @@ def _context(
     source: str,
     automatic: bool = True,
     preferred_duration_ms: int = 6_000,
+    allow_bass_handoff: bool = False,
 ) -> TransitionContext:
     return TransitionContext(
         source=source,
@@ -33,6 +34,7 @@ def _context(
         user_cue_profile="default",
         allow_beatmatch=True,
         allow_tempo_adjustment=True,
+        allow_bass_handoff=allow_bass_handoff,
     )
 
 
@@ -184,6 +186,24 @@ def test_normalizes_half_and_double_tempo(
 
     assert plan.mode is TransitionMode.BEATMATCH
     assert plan.incoming_tempo_ratio == pytest.approx(expected_ratio, abs=1e-4)
+
+
+@pytest.mark.parametrize(
+    ("allow_bass_handoff", "expected"),
+    [(False, "none"), (True, "balanced")],
+)
+def test_beatmatch_hands_off_bass_only_when_allowed(
+    allow_bass_handoff: bool,
+    expected: str,
+) -> None:
+    plan = plan_transition(
+        _profile("outgoing"),
+        _profile("incoming"),
+        _context(source="radio", allow_bass_handoff=allow_bass_handoff),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.bass_handoff == expected
 
 
 @pytest.mark.parametrize(

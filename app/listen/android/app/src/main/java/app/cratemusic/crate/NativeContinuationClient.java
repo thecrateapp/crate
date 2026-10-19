@@ -32,6 +32,7 @@ final class NativeContinuationClient {
         final String source;
         final long preferredDurationMs;
         final boolean allowBeatmatch;
+        final boolean allowBassHandoff;
         final String delivery;
         final boolean refill;
 
@@ -43,7 +44,7 @@ final class NativeContinuationClient {
             long preferredDurationMs,
             boolean allowBeatmatch
         ) {
-            this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch, "", false);
+            this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch, false, "", false);
         }
 
         Config(
@@ -53,6 +54,7 @@ final class NativeContinuationClient {
             String source,
             long preferredDurationMs,
             boolean allowBeatmatch,
+            boolean allowBassHandoff,
             String delivery,
             boolean refill
         ) {
@@ -62,6 +64,7 @@ final class NativeContinuationClient {
             this.source = source == null || source.isEmpty() ? "manual" : source;
             this.preferredDurationMs = Math.max(0L, preferredDurationMs);
             this.allowBeatmatch = allowBeatmatch;
+            this.allowBassHandoff = allowBeatmatch && allowBassHandoff;
             this.delivery = delivery == null || delivery.isEmpty() ? "original" : delivery;
             this.refill = refill;
         }
@@ -77,6 +80,7 @@ final class NativeContinuationClient {
                 payload.optString("source", "manual"),
                 payload.optLong("preferredDurationMs", 0L),
                 payload.optBoolean("allowBeatmatch", false),
+                payload.optBoolean("allowBassHandoff", false),
                 payload.optString("delivery", ""),
                 payload.optBoolean("refill", false)
             );
@@ -281,7 +285,7 @@ final class NativeContinuationClient {
     }
 
     private static JSONObject edgeContext(Config config) throws JSONException {
-        return new JSONObject()
+        JSONObject context = new JSONObject()
             .put("source", config.source)
             .put("automatic", true)
             .put("offline", false)
@@ -289,6 +293,8 @@ final class NativeContinuationClient {
             .put("userCueProfile", "default")
             .put("allowBeatmatch", config.allowBeatmatch)
             .put("allowTempoAdjustment", config.allowBeatmatch);
+        if (config.allowBassHandoff) context.put("allowBassHandoff", true);
+        return context;
     }
 
     static JSONObject requestBody(

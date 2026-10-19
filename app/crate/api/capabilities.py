@@ -7,6 +7,7 @@ from crate.api.schemas.capabilities import (
     VDJCapabilities,
 )
 from crate.config import (
+    android_bass_handoff_enabled,
     android_beatmatch_enabled,
     android_native_crossfade_enabled,
     smart_mix_enabled,
@@ -33,6 +34,7 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
     available = smart_mix_enabled()
     native_crossfade = available and android_native_crossfade_enabled()
     beatmatch = native_crossfade and android_beatmatch_enabled()
+    bass_handoff = beatmatch and android_bass_handoff_enabled()
     vdj_available = vdj_enabled()
     vdj_smart_mix_assistant = vdj_available and available
     vdj_automation = vdj_smart_mix_assistant and vdj_automation_enabled()
@@ -42,6 +44,7 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             planner_version=PLANNER_IDENTIFIER if available else None,
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
+            android_bass_handoff=bass_handoff,
         ),
         vdj=VDJCapabilities(
             available=vdj_available,

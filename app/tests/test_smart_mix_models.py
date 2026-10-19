@@ -98,6 +98,7 @@ def test_context_and_plan_serialize_for_typescript_and_java() -> None:
         "userCueProfile": "default",
         "allowBeatmatch": True,
         "allowTempoAdjustment": True,
+        "allowBassHandoff": False,
     }
     assert plan.to_dict()["plannerVersion"] == 1
     assert plan.to_dict()["incomingTempoRatio"] == 1.0

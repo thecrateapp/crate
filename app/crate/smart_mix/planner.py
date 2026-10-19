@@ -186,7 +186,7 @@ def plan_transition(
                 confidence=min(compatibility.overall, compatibility.signal_confidence),
                 outgoing_gain_db=outgoing_gain_db,
                 incoming_gain_db=incoming_gain_db,
-                bass_handoff="balanced",
+                bass_handoff="balanced" if context.allow_bass_handoff else "none",
                 policy=policy,
             )
 

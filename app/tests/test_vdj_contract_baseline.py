@@ -13,4 +13,5 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
         "planner_version": "smart-mix-v2",
         "android_native_crossfade": False,
         "android_beatmatch": False,
+        "android_bass_handoff": False,
     }

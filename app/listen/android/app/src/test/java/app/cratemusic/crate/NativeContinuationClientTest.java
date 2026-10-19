@@ -64,6 +64,7 @@ public class NativeContinuationClientTest {
         assertEquals("playlist", context.getString("source"));
         assertEquals(12_000L, context.getLong("preferredDurationMs"));
         assertFalse(context.getBoolean("allowBeatmatch"));
+        assertFalse(context.has("allowBassHandoff"));
     }
 
     @Test
@@ -152,6 +153,23 @@ public class NativeContinuationClientTest {
     }
 
     @Test
+    public void bassHandoffIsOnlyRequestedWithBeatmatch() throws Exception {
+        NativeContinuationClient.Config withBeatmatch = NativeContinuationClient.Config.fromJson(
+            new JSONObject(
+                "{\"token\":\"crv_x\",\"allowBeatmatch\":true,\"allowBassHandoff\":true}"
+            )
+        );
+        NativeContinuationClient.Config withoutBeatmatch = NativeContinuationClient.Config.fromJson(
+            new JSONObject(
+                "{\"token\":\"crv_x\",\"allowBeatmatch\":false,\"allowBassHandoff\":true}"
+            )
+        );
+
+        assertTrue(withBeatmatch.allowBassHandoff);
+        assertFalse(withoutBeatmatch.allowBassHandoff);
+    }
+
+    @Test
     public void anEmptyTokenClearsTheConfiguration() throws Exception {
         assertNull(NativeContinuationClient.Config.fromJson(new JSONObject("{\"token\":\"\"}")));
     }
@@ -163,6 +181,7 @@ public class NativeContinuationClientTest {
             2_000_000L,
             "radio",
             12_000L,
+            false,
             false,
             "balanced",
             true

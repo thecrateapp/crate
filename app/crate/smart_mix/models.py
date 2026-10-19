@@ -264,6 +264,7 @@ class TransitionContext:
     user_cue_profile: str
     allow_beatmatch: bool
     allow_tempo_adjustment: bool
+    allow_bass_handoff: bool = False
 
     def __post_init__(self) -> None:
         if self.source not in {
@@ -286,6 +287,7 @@ class TransitionContext:
             "userCueProfile": self.user_cue_profile,
             "allowBeatmatch": self.allow_beatmatch,
             "allowTempoAdjustment": self.allow_tempo_adjustment,
+            "allowBassHandoff": self.allow_bass_handoff,
         }
 
 

@@ -6,6 +6,7 @@ class SmartMixCapabilities(BaseModel):
     planner_version: str | None
     android_native_crossfade: bool
     android_beatmatch: bool
+    android_bass_handoff: bool
 
 
 class VDJCapabilities(BaseModel):
