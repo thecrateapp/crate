@@ -87,6 +87,16 @@ final class PcmBusChannel {
     }
 
     synchronized int mixInto(float[] mix, float[] scratch, int frames, long blockStartFrame) {
+        return mixInto(mix, null, scratch, frames, blockStartFrame);
+    }
+
+    synchronized int mixInto(
+        float[] mix,
+        float[] tap,
+        float[] scratch,
+        int frames,
+        long blockStartFrame
+    ) {
         if (!playing) return 0;
         int offset = 0;
         long start = startFrame.get();
@@ -104,7 +114,9 @@ final class PcmBusChannel {
         float gain = volume;
         int base = offset * PcmBusMixer.CHANNELS;
         for (int index = 0; index < read * PcmBusMixer.CHANNELS; index++) {
-            mix[base + index] += scratch[index] * gain;
+            float sample = scratch[index] * gain;
+            mix[base + index] += sample;
+            if (tap != null) tap[base + index] = sample;
         }
         consumedFrames.addAndGet(read);
         return read == 0 ? 0 : offset + read;

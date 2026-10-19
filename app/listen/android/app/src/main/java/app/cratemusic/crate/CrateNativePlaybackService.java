@@ -51,6 +51,10 @@ import androidx.media3.session.SessionResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -165,6 +169,16 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private long lastTransitionProgressEventElapsedMs;
     private final AudioManager.OnAudioFocusChangeListener
         audioFocusChangeListener = this::handleAudioFocusChange;
+    static final String CAPTURE_START_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_START";
+    static final String CAPTURE_STOP_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_STOP";
+    private boolean captureReceiverRegistered;
+    private final BroadcastReceiver captureReceiver =
+        new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent != null) handleCaptureIntent(intent);
+            }
+        };
     private final BroadcastReceiver noisyAudioReceiver =
         new BroadcastReceiver() {
             @Override
@@ -305,6 +319,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                                 + " phaseErrorMs=" + mixController.medianPhaseErrorMs()
                         );
                     }
+                    pcmBusMixer.markCapture("completed");
                     startTempoRestore();
                     JSObject payload = transitionPayload(activeTransitionPlan, 1.0f);
                     payload.put("finalIndex", finalIndex);
@@ -318,6 +333,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     String reason,
                     boolean afterHandoff
                 ) {
+                    pcmBusMixer.markCapture("cancelled " + reason);
                     startTempoRestore();
                     clearNativeTransitionState();
                     JSObject payload = basePayload();
@@ -378,6 +394,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         );
         audioManager = getSystemService(AudioManager.class);
         registerNoisyAudioReceiver();
+        registerCaptureReceiver();
         player.addListener(new Player.Listener() {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
@@ -887,6 +904,53 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     }
 
+    private void registerCaptureReceiver() {
+        if (!BuildConfig.DEBUG || !USE_PCM_BUS || captureReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(CAPTURE_START_ACTION);
+        filter.addAction(CAPTURE_STOP_ACTION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(captureReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(captureReceiver, filter);
+        }
+        captureReceiverRegistered = true;
+    }
+
+    private void unregisterCaptureReceiver() {
+        if (!captureReceiverRegistered) return;
+        unregisterReceiver(captureReceiver);
+        captureReceiverRegistered = false;
+    }
+
+    private void handleCaptureIntent(Intent intent) {
+        String name = intent.getStringExtra("name");
+        String safeName = name == null || name.isEmpty()
+            ? "capture-" + System.currentTimeMillis()
+            : name.replaceAll("[^A-Za-z0-9._-]", "_");
+        File directory = new File(getExternalFilesDir(null), "captures");
+        try {
+            if (CAPTURE_START_ACTION.equals(intent.getAction())) {
+                if (!directory.isDirectory() && !directory.mkdirs()) {
+                    throw new IOException("Cannot create " + directory);
+                }
+                File file = new File(directory, safeName + ".wav");
+                pcmBusMixer.startCapture(file);
+                Log.i(NativeMixAudioProcessor.QOE_TAG, "bus capture started " + file);
+                return;
+            }
+            JSONObject summary = pcmBusMixer.stopCapture();
+            if (summary == null) return;
+            String file = summary.getString("file");
+            File summaryFile = new File(directory, file.replaceAll("\\.wav$", "") + ".json");
+            try (FileOutputStream output = new FileOutputStream(summaryFile)) {
+                output.write(summary.toString(2).getBytes(StandardCharsets.UTF_8));
+            }
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "bus capture stopped " + summary);
+        } catch (IOException | JSONException error) {
+            Log.w(NativeMixAudioProcessor.QOE_TAG, "bus capture failed", error);
+        }
+    }
+
     private void registerNoisyAudioReceiver() {
         if (noisyReceiverRegistered) return;
         IntentFilter filter = new IntentFilter(
@@ -1101,6 +1165,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         stopPositionTicker();
         stopNativeMixTicker();
         unregisterNoisyAudioReceiver();
+        unregisterCaptureReceiver();
         abandonPlaybackFocus();
         cancelNativeTransition("service_destroyed");
         if (mediaSession != null) {
@@ -2026,6 +2091,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     + " bassHandoff=" + boundedPlan.bassHandoff
             );
         }
+        pcmBusMixer.markCapture(
+            "start " + edgeKey(boundedPlan)
+                + " mode=" + boundedPlan.mode
+                + " engaged=" + mixController.isBeatmatching()
+                + " bass=" + boundedPlan.bassHandoff
+        );
         emit("transitionStarted", transitionPayload(boundedPlan, 0.0f));
     }
 
