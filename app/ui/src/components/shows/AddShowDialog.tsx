@@ -619,11 +619,11 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
                   This exact plan requires human approval.{" "}
                   <a
                     className="underline"
-                    href={`/agent-plans/${plan.plan_id}`}
+                    href={`/agents/approvals/${plan.plan_id}`}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Open Agent Plans
+                    Open Agent approvals
                   </a>{" "}
                   before applying.
                 </p>

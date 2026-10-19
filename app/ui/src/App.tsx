@@ -70,6 +70,17 @@ const AgentPlanReview = lazy(() =>
     default: m.AgentPlanReview,
   })),
 );
+const Agents = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({ default: m.Agents })),
+);
+const AgentsIndex = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({ default: m.AgentsIndex })),
+);
+const LegacyPlanRedirect = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({
+    default: m.LegacyPlanRedirect,
+  })),
+);
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
 );
@@ -158,9 +169,9 @@ function AdminIndex() {
   if (hasCapability("ops.health.view"))
     return <Navigate to="/system" replace />;
   if (hasCapability("agents.integrations.manage"))
-    return <Navigate to="/agent-integrations" replace />;
+    return <Navigate to="/agents/connections" replace />;
   if (hasCapability("agents.plans.review"))
-    return <Navigate to="/agent-plans" replace />;
+    return <Navigate to="/agents/approvals" replace />;
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
@@ -197,6 +208,10 @@ const USERS_VIEW = ["users.view"] as const;
 const ROLES_VIEW = ["roles.view"] as const;
 const AGENT_INTEGRATIONS = ["agents.integrations.manage"] as const;
 const AGENT_PLANS = ["agents.plans.review"] as const;
+const AGENTS_SECTION = [
+  "agents.plans.review",
+  "agents.integrations.manage",
+] as const;
 const ADMIN_ACCESS = ["admin.access"] as const;
 const RELEASE_CURATION = [
   "curation.releases.write",
@@ -238,20 +253,46 @@ export default function App() {
               >
                 <Route index element={<AdminIndex />} />
                 <Route
-                  path="agent-integrations"
+                  path="agents"
                   element={
-                    <RequireCapabilities anyOf={AGENT_INTEGRATIONS}>
-                      <AgentIntegrations />
+                    <RequireCapabilities anyOf={AGENTS_SECTION}>
+                      <Agents />
                     </RequireCapabilities>
                   }
-                />
+                >
+                  <Route index element={<AgentsIndex />} />
+                  <Route
+                    path="approvals"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_PLANS}>
+                        <AgentPlanReview />
+                      </RequireCapabilities>
+                    }
+                  />
+                  <Route
+                    path="approvals/:planId"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_PLANS}>
+                        <AgentPlanReview />
+                      </RequireCapabilities>
+                    }
+                  />
+                  <Route
+                    path="connections"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_INTEGRATIONS}>
+                        <AgentIntegrations />
+                      </RequireCapabilities>
+                    }
+                  />
+                </Route>
                 <Route
                   path="agent-plans/:planId?"
-                  element={
-                    <RequireCapabilities anyOf={AGENT_PLANS}>
-                      <AgentPlanReview />
-                    </RequireCapabilities>
-                  }
+                  element={<LegacyPlanRedirect />}
+                />
+                <Route
+                  path="agent-integrations"
+                  element={<Navigate to="/agents/connections" replace />}
                 />
                 <Route
                   path="browse"

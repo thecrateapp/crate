@@ -656,3 +656,27 @@ it("does not offer the AI Agents page without read capability", async () => {
   await screen.findByRole("dialog", { name: "Command palette" });
   expect(screen.queryByText("AI Agents")).not.toBeInTheDocument();
 });
+
+it("offers Agent approvals to plan reviewers", async () => {
+  mockAuth(["agents.plans.review"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("Agent approvals")).toBeInTheDocument();
+  expect(screen.getByText("Agents")).toBeInTheDocument();
+});
+
+it("offers Agents without Agent approvals to connection managers only", async () => {
+  mockAuth(["agents.integrations.manage"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("Agents")).toBeInTheDocument();
+  expect(screen.queryByText("Agent approvals")).not.toBeInTheDocument();
+});

@@ -22,6 +22,7 @@ import {
   AudioWaveform,
   ScrollText,
   ShieldCheck,
+  Bot,
   PanelLeftClose,
   PanelLeftOpen,
   Trash2,
@@ -36,6 +37,7 @@ import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
+import { usePendingApprovals } from "@/hooks/use-pending-approvals";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { cn } from "@/lib/utils";
 import { useAuth, userCanAccessAdminConsole } from "@/contexts/AuthContext";
@@ -189,16 +191,11 @@ const navItems = [
     capabilities: ["users.view"],
   },
   {
-    to: "/agent-integrations",
-    icon: ShieldCheck,
-    label: "Agent integrations",
-    capabilities: ["agents.integrations.manage"],
-  },
-  {
-    to: "/agent-plans",
-    icon: ShieldCheck,
-    label: "Agent plans",
-    capabilities: ["agents.plans.review"],
+    to: "/agents",
+    icon: Bot,
+    label: "Agents",
+    badgeKey: "pending_approvals" as const,
+    capabilities: ["agents.plans.review", "agents.integrations.manage"],
   },
   {
     to: "/roles",
@@ -309,6 +306,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const setPreviewRole = auth.setPreviewRole ?? (() => {});
   const clearPreview = clearRolePreview ?? (() => {});
   const { data: opsSnapshot } = useOpsSnapshot();
+  const pendingApprovals = usePendingApprovals();
   const profileHref =
     user && hasAnyCapability(["users.view"])
       ? `/users?inspect=${user.id}`
@@ -319,6 +317,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
     issue_count: opsSnapshot?.status.issue_count || 0,
     pending_imports: opsSnapshot?.status.pending_imports || 0,
     running_tasks: opsSnapshot?.status.running_tasks || 0,
+    pending_approvals: pendingApprovals,
   };
 
   function toggleExpanded() {

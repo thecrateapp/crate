@@ -8,6 +8,10 @@ vi.mock("@/contexts/OpsSnapshotContext", () => ({
   useOpsSnapshot: () => ({ data: null }),
 }));
 
+vi.mock("@/hooks/use-pending-approvals", () => ({
+  usePendingApprovals: () => 4,
+}));
+
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
     actualUser: null,
@@ -51,6 +55,26 @@ describe("Sidebar", () => {
       "/i18n",
     );
   });
+});
+
+it("links agents reviewers to the unified Agents section with the pending badge", () => {
+  granted.clear();
+  granted.add("agents.plans.review");
+  render(
+    <MemoryRouter>
+      <Sidebar />
+    </MemoryRouter>,
+  );
+
+  const link = screen.getByRole("link", { name: /Agents/i });
+  expect(link).toHaveAttribute("href", "/agents");
+  expect(link).toHaveTextContent("4");
+  expect(
+    screen.queryByRole("link", { name: /Agent plans/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: /Agent integrations/i }),
+  ).not.toBeInTheDocument();
 });
 
 it("gates AI navigation by configuration read capability", () => {
