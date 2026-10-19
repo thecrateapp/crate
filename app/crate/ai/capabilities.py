@@ -117,7 +117,11 @@ def model_capabilities(
                     raise ValueError("Unsupported native effort")
                 if "default_level" in effort and effort["default_level"] not in levels:
                     raise ValueError("Invalid effort default")
-                data.update(reasoning_levels=levels, reasoning_disabled=True)
+                data.update(
+                    reasoning_levels=levels,
+                    reasoning_disabled=True,
+                    reasoning_enabled=True,
+                )
             compatible = (
                 "text" in modalities
                 and outputs == ["text"]
@@ -165,6 +169,7 @@ def model_capabilities(
                         value for value in values if isinstance(value, str)
                     ],
                     reasoning_disabled=any(value is False for value in values),
+                    reasoning_enabled=any(value is True for value in values),
                 )
             info = meta.get("model_info", {})
             if not isinstance(info, dict):
@@ -198,6 +203,8 @@ def validate_profile(
     if config.image_detail not in model.image_details:
         reject("Image detail is not supported by this model")
     reasoning = config.reasoning
+    if reasoning.mode == "enabled" and not model.reasoning_enabled:
+        reject("Thinking cannot be explicitly enabled for this model")
     if reasoning.mode == "disabled" and not model.reasoning_disabled:
         reject("Thinking cannot be disabled for this model")
     if reasoning.mode == "level" and reasoning.level not in model.reasoning_levels:
@@ -243,3 +250,16 @@ def validate_profile(
         ):
             reject("Profile exceeds action bounds")
     return config
+
+
+# Manifest revision 2026-10-19. Official per-image maxima plus margin:
+# Gemini 3 default/high ~1120, ultra_high ~2240; DeepSeek vision upper bound 1024.
+# These conservative admission estimates are not exact provider invoice counts.
+def image_token_bound(model: ModelCapabilities) -> int | None:
+    if not model.validated or "image" not in model.input_modalities:
+        return None
+    if model.provider == "gemini" and model.model_id == "gemini-3.8-flash":
+        return 4096
+    if model.provider == "deepseek":
+        return 2048
+    return None

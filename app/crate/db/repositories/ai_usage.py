@@ -25,6 +25,8 @@ from crate.db.tx import optional_scope
 def _row(row, claimed=False) -> dict:
     data = _json(row)
     assert data is not None
+    if "provider" in data and "connection_id" not in data:
+        data.update(metering_mode="legacy_unsupported", usage_known=False)
     data["claimed"] = claimed
     data["claim_token"] = str(row["claim_token"]) if claimed else None
     return data
@@ -82,6 +84,51 @@ def reserve_invocation(
         )
         if prior is not None:
             return _row(prior)
+        receipt = (
+            s.execute(
+                text(
+                    "SELECT * FROM ai_legacy_invocation_receipts WHERE idempotency_key=:key"
+                ),
+                {"key": idempotency_key},
+            )
+            .mappings()
+            .first()
+        )
+        if receipt is not None:
+            return _row(receipt)
+        tracking = (
+            context.get("mode") == "legacy"
+            and kind == "action"
+            and context.get("profile_id") is None
+        )
+        if tracking:
+            active = s.execute(
+                text(
+                    "SELECT active FROM ai_configuration_state WHERE singleton FOR UPDATE"
+                )
+            ).scalar_one()
+            if active:
+                _error("AI_CONTEXT_STALE", "Legacy acceptance ended at activation")
+            if context.get("provider") not in {"gemini", "deepseek", "ollama"}:
+                row = (
+                    s.execute(
+                        text("""INSERT INTO ai_legacy_invocation_receipts
+                    (idempotency_key,action_id,provider,model_id,config_fingerprint,actor_id,job_id)
+                    VALUES(:key,:action,:provider,:model,:fingerprint,:actor,:job) RETURNING *"""),
+                        {
+                            "key": idempotency_key,
+                            "action": context["action_id"],
+                            "provider": context["provider"],
+                            "model": context["model_id"],
+                            "fingerprint": context.get("config_fingerprint"),
+                            "actor": actor_id,
+                            "job": job_id,
+                        },
+                    )
+                    .mappings()
+                    .one()
+                )
+                return _row(row, claimed=True)
         conn = (
             s.execute(
                 text("SELECT * FROM ai_provider_connections WHERE id=:id FOR UPDATE"),
@@ -106,11 +153,16 @@ def reserve_invocation(
             .mappings()
             .one()
         )
-        if conn["active_invocations"] >= conn["max_concurrent"]:
+        if tracking and (
+            conn["secret_source"] != "environment"
+            or conn["provider"] != context["provider"]
+        ):
+            _error("AI_CONTEXT_STALE", "Legacy connection does not match")
+        if not tracking and conn["active_invocations"] >= conn["max_concurrent"]:
             _error("AI_CONCURRENCY_LIMIT", "Connection concurrency limit reached")
-        if totals["calls"] >= conn["daily_calls"]:
+        if not tracking and totals["calls"] >= conn["daily_calls"]:
             _error("AI_DAILY_CALL_LIMIT", "Daily call limit reached")
-        if totals["tokens"] + reserved > conn["daily_tokens"]:
+        if not tracking and totals["tokens"] + reserved > conn["daily_tokens"]:
             _error("AI_DAILY_TOKEN_LIMIT", "Daily token limit reached")
         params = {
             "connection_id": conn["id"],
@@ -126,12 +178,13 @@ def reserve_invocation(
             "key": idempotency_key,
             "tokens": reserved,
             "day": day,
+            "metering": "legacy_tracking" if tracking else "enforced",
         }
         row = (
             s.execute(
                 text("""INSERT INTO ai_invocations(connection_id,invocation_kind,action_id,model_id,profile_id,profile_version,
-            config_fingerprint,actor_id,job_id,idempotency_key,reserved_tokens,charged_tokens,usage_day)
-            VALUES(:connection_id,:kind,:action_id,:model_id,:profile_id,:profile_version,:fingerprint,:actor_id,:job_id,:key,:tokens,:tokens,:day) RETURNING *"""),
+            config_fingerprint,actor_id,job_id,idempotency_key,reserved_tokens,charged_tokens,usage_day,metering_mode)
+            VALUES(:connection_id,:kind,:action_id,:model_id,:profile_id,:profile_version,:fingerprint,:actor_id,:job_id,:key,:tokens,:tokens,:day,:metering) RETURNING *"""),
                 params,
             )
             .mappings()
@@ -144,9 +197,9 @@ def reserve_invocation(
             params,
         )
         s.execute(
-            text("""INSERT INTO ai_usage_daily(day,connection_id,invocation_kind,action_id,calls,tokens)
-            VALUES(:day,:connection_id,:kind,:bucket_action,1,:tokens) ON CONFLICT(day,connection_id,invocation_kind,action_id)
-            DO UPDATE SET calls=ai_usage_daily.calls+1,tokens=ai_usage_daily.tokens+EXCLUDED.tokens"""),
+            text("""INSERT INTO ai_usage_daily(day,connection_id,invocation_kind,action_id,calls,tokens,unknown_calls)
+            VALUES(:day,:connection_id,:kind,:bucket_action,1,:tokens,1) ON CONFLICT(day,connection_id,invocation_kind,action_id)
+            DO UPDATE SET calls=ai_usage_daily.calls+1,tokens=ai_usage_daily.tokens+EXCLUDED.tokens,unknown_calls=ai_usage_daily.unknown_calls+1"""),
             params,
         )
         return _row(row, claimed=True)
@@ -199,7 +252,34 @@ def finish_invocation(
             text("SELECT connection_id FROM ai_invocations WHERE id=:id"), {"id": id}
         ).scalar_one_or_none()
         if connection_id is None:
-            _error("AI_INVOCATION_UNKNOWN", "Invocation not found")
+            receipt = (
+                s.execute(
+                    text(
+                        "SELECT * FROM ai_legacy_invocation_receipts WHERE id=:id FOR UPDATE"
+                    ),
+                    {"id": id},
+                )
+                .mappings()
+                .first()
+            )
+            if receipt is None:
+                _error("AI_INVOCATION_UNKNOWN", "Invocation not found")
+            if receipt["status"] == "reserved":
+                receipt = (
+                    s.execute(
+                        text("""UPDATE ai_legacy_invocation_receipts SET status=:status,error_code=:error,
+                    duration_ms=:duration,finished_at=NOW() WHERE id=:id RETURNING *"""),
+                        {
+                            "id": id,
+                            "status": status,
+                            "error": error_code,
+                            "duration": duration_ms,
+                        },
+                    )
+                    .mappings()
+                    .one()
+                )
+            return _row(receipt)
         s.execute(
             text("SELECT id FROM ai_provider_connections WHERE id=:id FOR UPDATE"),
             {"id": connection_id},
@@ -231,6 +311,7 @@ def finish_invocation(
             "duration": duration_ms,
             "model": reported_model,
             "known": known,
+            "known_delta": int(known),
             "input": usage["input_tokens"] if known else None,
             "output": usage["output_tokens"] if known else None,
             "thought": usage.get("thought_tokens") if known else None,
@@ -250,7 +331,7 @@ def finish_invocation(
             params,
         )
         s.execute(
-            text("""UPDATE ai_usage_daily SET tokens=tokens+:delta,completed=completed+1,failed=failed+:failed
+            text("""UPDATE ai_usage_daily SET tokens=tokens+:delta,completed=completed+1,failed=failed+:failed,unknown_calls=unknown_calls-:known_delta
             WHERE day=:day AND connection_id=:connection AND invocation_kind=:kind AND action_id=:action"""),
             params,
         )
@@ -331,7 +412,12 @@ def usage_summary(*, daily_limit=None, session=None) -> dict:
     Only precomputed UTC buckets are aggregated, never invocation history.
     """
     with _read(session) as s:
-        fields = ("calls", "tokens", "completed", "failed")
+        legacy_unknown = s.execute(
+            text(
+                "SELECT EXISTS(SELECT 1 FROM ai_legacy_invocation_receipts WHERE created_at>=NOW()-INTERVAL '90 days')"
+            )
+        ).scalar_one()
+        fields = ("calls", "tokens", "completed", "failed", "unknown_calls")
         if daily_limit is not None:
             limit = min(max(daily_limit, 1), 5000)
             window = ",".join(
@@ -358,7 +444,12 @@ def usage_summary(*, daily_limit=None, session=None) -> dict:
             for bucket in daily:
                 if bucket["invocation_kind"] == "probe":
                     bucket["action_id"] = None
-            return {"totals": totals, "daily": daily, "truncated": truncated}
+            return {
+                "totals": totals,
+                "daily": daily,
+                "truncated": truncated,
+                "legacy_usage_unknown": legacy_unknown,
+            }
         daily = [
             _json(r)
             for r in s.execute(
@@ -370,12 +461,13 @@ def usage_summary(*, daily_limit=None, session=None) -> dict:
         for bucket in daily:
             if bucket["invocation_kind"] == "probe":
                 bucket["action_id"] = None
-        totals: dict = {
-            key: sum(row[key] for row in daily)
-            for key in ("calls", "tokens", "completed", "failed")
-        }
+        totals: dict = {key: sum(row[key] for row in daily) for key in fields}
         totals["estimated_cost"] = None
-        return {"totals": totals, "daily": daily}
+        return {
+            "totals": totals,
+            "daily": daily,
+            "legacy_usage_unknown": legacy_unknown,
+        }
 
 
 def prune_ai_activity(limit=500, *, session=None) -> dict:
@@ -391,7 +483,14 @@ def prune_ai_activity(limit=500, *, session=None) -> dict:
             DELETE FROM ai_invocations WHERE id IN (SELECT id FROM expired) RETURNING id"""),
             {"limit": min(max(limit, 1), 5000)},
         ).all()
-        return {"deleted": len(deleted)}
+        legacy_deleted = s.execute(
+            text("""WITH expired AS (SELECT id FROM ai_legacy_invocation_receipts
+            WHERE created_at<NOW()-INTERVAL '90 days' AND status<>'reserved'
+            ORDER BY created_at,id LIMIT :limit FOR UPDATE SKIP LOCKED)
+            DELETE FROM ai_legacy_invocation_receipts WHERE id IN (SELECT id FROM expired) RETURNING id"""),
+            {"limit": min(max(limit, 1), 5000)},
+        ).all()
+        return {"deleted": len(deleted), "legacy_deleted": len(legacy_deleted)}
 
 
 __all__ = [

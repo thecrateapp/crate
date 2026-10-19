@@ -610,3 +610,42 @@ def test_request_deadline_deducts_all_setup(monkeypatch, setup_seconds, expected
         assert process.communicate.call_args.kwargs["timeout"] == expected_wait
     process.kill.assert_called_once_with()
     process.wait.assert_called_once_with()
+
+
+def test_native_ollama_boolean_enable_is_not_inferred_from_generic_flag():
+    boolean = model_capabilities(
+        "ollama",
+        "boolean-model",
+        {
+            "capabilities": ["completion", "thinking"],
+            "thinking": {"values": [True, False], "default": False},
+        },
+    )
+    assert boolean.reasoning_enabled and boolean.reasoning_disabled
+    for mode in ("enabled", "disabled"):
+        validate_profile(ProfileConfig(reasoning={"mode": mode}), boolean)
+    generic = model_capabilities(
+        "ollama", "generic", {"capabilities": ["completion", "thinking"]}
+    )
+    assert not generic.reasoning_enabled
+    with pytest.raises(AIConfigurationError):
+        validate_profile(ProfileConfig(reasoning={"mode": "enabled"}), generic)
+
+
+def test_image_token_bound_uses_trusted_manifest_and_provider_vision():
+    from crate.ai.capabilities import image_token_bound
+
+    assert image_token_bound(model_capabilities("gemini", "gemini-3.8-flash")) == 4096
+    assert image_token_bound(model_capabilities("gemini", "gemini-2.5-flash")) is None
+    assert image_token_bound(model_capabilities("ollama", "unknown")) is None
+    deepseek = model_capabilities(
+        "deepseek",
+        "vision",
+        {
+            "input_modalities": ["text", "image"],
+            "output_modalities": ["text"],
+            "context_window": 131072,
+            "max_output_tokens": 8192,
+        },
+    )
+    assert image_token_bound(deepseek) == 2048

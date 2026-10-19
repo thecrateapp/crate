@@ -203,6 +203,7 @@ def test_parallel_reservations_have_one_owner_and_respect_shared_limits(pg_db):
     assert usage.usage_summary()["totals"] == {
         "calls": 2,
         "tokens": 60,
+        "unknown_calls": 2,
         "completed": 0,
         "failed": 0,
         "estimated_cost": None,
@@ -454,3 +455,83 @@ def test_invalid_invocation_kinds_reject_before_database(kind, action):
             input_tokens=1,
             output_tokens=1,
         )
+
+
+def test_legacy_tracking_ignores_new_quotas_but_never_replays(pg_db):
+    conn = config.ensure_environment_connection("ollama", "http://localhost:11434")
+    context = {
+        "mode": "legacy",
+        "invocation_kind": "action",
+        "connection_id": conn["id"],
+        "action_id": "genres.eq.propose",
+        "provider": "ollama",
+        "model_id": "old-model",
+    }
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE ai_provider_connections SET max_concurrent=1,daily_calls=1,daily_tokens=1"
+            )
+        )
+    first = usage.reserve_invocation(
+        context, idempotency_key="legacy-one", input_tokens=0, output_tokens=0
+    )
+    second = usage.reserve_invocation(
+        context, idempotency_key="legacy-two", input_tokens=0, output_tokens=0
+    )
+    assert first["claimed"] and second["claimed"]
+    assert first["metering_mode"] == "legacy_tracking"
+    assert not usage.reserve_invocation(
+        context, idempotency_key="legacy-one", input_tokens=0, output_tokens=0
+    )["claimed"]
+    usage.finish_invocation(first["id"], None, "failed")
+    usage.finish_invocation(
+        second["id"], {"input_tokens": 3, "output_tokens": 4}, "succeeded"
+    )
+    summary = usage.usage_summary()
+    assert summary["totals"]["unknown_calls"] == 1
+    assert summary["totals"]["tokens"] == 7
+    with transaction_scope() as session:
+        session.execute(text("UPDATE ai_configuration_state SET active=TRUE"))
+    with pytest.raises(AIConfigurationError) as error:
+        usage.reserve_invocation(
+            context, idempotency_key="late-legacy", input_tokens=0, output_tokens=0
+        )
+    assert error.value.code == "AI_CONTEXT_STALE"
+
+
+def test_unsupported_legacy_receipt_shares_idempotency_and_stays_unknown(pg_db):
+    context = {
+        "mode": "legacy",
+        "invocation_kind": "action",
+        "action_id": "genres.eq.propose",
+        "provider": "anthropic",
+        "model_id": "old-model",
+        "config_fingerprint": "a" * 64,
+    }
+    first = usage.reserve_invocation(
+        context, idempotency_key="same-receipt", input_tokens=0, output_tokens=0
+    )
+    assert first["claimed"] and first["metering_mode"] == "legacy_unsupported"
+    conn = connection()
+    supported = {
+        "connection_id": conn["id"],
+        "action_id": "genres.eq.propose",
+        "model_id": "model",
+    }
+    duplicate = usage.reserve_invocation(
+        supported, idempotency_key="same-receipt", input_tokens=1, output_tokens=1
+    )
+    assert not duplicate["claimed"] and duplicate["id"] == first["id"]
+    result = usage.finish_invocation(
+        first["id"], None, "failed", error_code="AI_PROVIDER_FAILED"
+    )
+    assert result["status"] == "failed" and result["usage_known"] is False
+    assert usage.usage_summary()["legacy_usage_unknown"] is True
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE ai_legacy_invocation_receipts SET created_at=NOW()-INTERVAL '100 days'"
+            )
+        )
+    assert usage.prune_ai_activity()["legacy_deleted"] == 1

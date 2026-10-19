@@ -562,6 +562,34 @@ def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeyp
     assert changed["catalog_status"] == "pending"
     store.save_model_catalog(conn["id"], models, "ready", changed["revision"])
     before = service.snapshot()
+    with pytest.raises(AIConfigurationError) as unknown:
+        service.activate(before["revision"], None, before["review_fingerprint"])
+    assert unknown.value.code == "AI_LEGACY_LIMITS_UNKNOWN"
+    from crate.ai.actions import ACTIONS
+
+    bounded = service.create_profile(
+        {
+            "label": "Bounded",
+            "connection_id": conn["id"],
+            "model_id": "model",
+            "config": {"timeout_seconds": 8},
+        },
+        None,
+    )
+    service.apply_bindings(
+        [
+            {
+                "action_id": action_id,
+                "profile_id": bounded["id"],
+                "profile_version": 1,
+                "expected_revision": 0,
+                "enabled": True,
+            }
+            for action_id in ACTIONS
+        ],
+        None,
+    )
+    before = service.snapshot()
     service.activate(before["revision"], None, before["review_fingerprint"])
     context = service.resolve_action("shows.extract.text")
     assert context["endpoint"] == "http://server-c:11434"
@@ -598,3 +626,49 @@ def test_generic_ai_retry_requires_dedicated_human_request(test_app, monkeypatch
         )
         response = test_app.post("/api/tasks/retry", json={"task_id": "original"})
         assert response.status_code == 409
+
+
+def test_action_availability_uses_domain_permission_and_closed_private_response(
+    test_app, monkeypatch
+):
+    from crate.api import ai_agents as api
+    from crate.ai import runtime
+    from fastapi import HTTPException
+
+    calls = []
+
+    def guard(request, permission):
+        calls.append(permission)
+        if permission != "curation.shows.write":
+            raise HTTPException(403, "Denied")
+        return {"id": 2}
+
+    monkeypatch.setattr(api, "require_permission", guard)
+    monkeypatch.setattr(
+        runtime,
+        "action_availability",
+        lambda action_id: {
+            "action_id": action_id,
+            "available": True,
+            "status": "configured",
+            "provider": "gemini",
+            "model_id": "model",
+            "fingerprint": "a" * 64,
+            "error_code": None,
+        },
+    )
+    response = test_app.get("/api/admin/ai/actions/shows.extract.text/availability")
+    assert response.status_code == 200
+    assert calls == ["curation.shows.write"]
+    assert "no-store" in response.headers["Cache-Control"]
+    assert (
+        test_app.get("/api/admin/ai/actions/i18n.listen.draft/availability").status_code
+        == 403
+    )
+    schema = test_app.get("/openapi.json").json()["paths"][
+        "/api/admin/ai/actions/{id}/availability"
+    ]["get"]
+    assert schema["security"]
+    assert schema["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ActionAvailability")

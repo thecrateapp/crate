@@ -261,6 +261,7 @@ class Invocation(ClosedModel):
     total_tokens: int | None
     charged_tokens: int
     reserved_tokens: int
+    metering_mode: Literal["enforced", "legacy_tracking"] = "enforced"
     usage_known: bool
     error_code: Code | None
     duration_ms: int
@@ -275,6 +276,7 @@ class Activity(ClosedModel):
 
 
 class UsageTotals(ClosedModel):
+    unknown_calls: int = 0
     calls: int
     tokens: int
     completed: int
@@ -290,6 +292,17 @@ class DailyUsage(UsageTotals):
 
 
 class Usage(ClosedModel):
+    legacy_usage_unknown: bool = False
     truncated: bool = False
     totals: UsageTotals
     daily: list[DailyUsage] = Field(max_length=5000)
+
+
+class ActionAvailability(ClosedModel):
+    action_id: ID
+    available: bool
+    status: Literal["legacy", "configured", "unavailable"]
+    provider: ID | None
+    model_id: ModelID | None
+    fingerprint: Fingerprint | None
+    error_code: Code | None

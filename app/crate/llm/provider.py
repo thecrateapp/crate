@@ -27,6 +27,7 @@ _PROVIDER_API_KEYS = {
     "anthropic": ("ANTHROPIC_API_KEY",),
     "gemini": ("GEMINI_API_KEY", "AUDIOMUSE_GEMINI_API_KEY"),
     "groq": ("GROQ_API_KEY",),
+    "deepseek": ("DEEPSEEK_API_KEY",),
     "openai": ("OPENAI_API_KEY",),
 }
 
@@ -45,6 +46,32 @@ def get_provider_api_key(provider: str) -> str | None:
         if value:
             return value
     return None
+
+
+def legacy_native_timeout(
+    model: str, *, image: bool = False
+) -> tuple[float | None, str | None]:
+    """Read the installed legacy SDK default, without changing omitted call options."""
+    import importlib
+    import math
+
+    if model.startswith("gemini/"):
+        return (90.0 if image else 60.0), None
+    if model.startswith(("ollama/", "ollama_chat/")):
+        return 300.0, None
+    try:
+        sdk = importlib.import_module("litellm")
+    except Exception:
+        return None, "AI_LEGACY_SDK_UNAVAILABLE"
+    timeout = getattr(sdk, "request_timeout", None)
+    if (
+        not isinstance(timeout, (int, float))
+        or isinstance(timeout, bool)
+        or not math.isfinite(timeout)
+        or not 0 < timeout <= 86400
+    ):
+        return None, "AI_LEGACY_LIMITS_UNKNOWN"
+    return float(timeout), None
 
 
 def _env_default_model() -> str:
@@ -103,9 +130,10 @@ def _ollama_chat(
     timeout_seconds: float | None = None,
     max_tokens: int | None = None,
     ollama_url: str | None = None,
+    _injected: dict | None = None,
 ) -> str:
     """Call Ollama HTTP API directly. No extra dependencies."""
-    url = f"{(ollama_url or _get_ollama_url()).rstrip('/')}/api/chat"
+    url = f"{((_injected['endpoint'] if _injected is not None else ollama_url) or _get_ollama_url()).rstrip('/')}/api/chat"
     body: dict = {
         "model": model.removeprefix("ollama/").removeprefix("ollama_chat/"),
         "messages": messages,
@@ -117,7 +145,8 @@ def _ollama_chat(
     if max_tokens is not None:
         body["options"] = {"num_predict": max_tokens}
     try:
-        resp = requests.post(url, json=body, timeout=timeout_seconds or 300)
+        post = _injected["post"] if _injected is not None else requests.post
+        resp = post(url, json=body, timeout=timeout_seconds or 300)
         resp.raise_for_status()
         data = resp.json()
         return data.get("message", {}).get("content", "")
@@ -138,14 +167,34 @@ def _litellm_chat(
     *,
     timeout_seconds: float | None = None,
     max_tokens: int | None = None,
+    _injected: dict | None = None,
 ) -> str:
     """Call any provider via litellm (if installed)."""
+    if _injected is not None and model.startswith("deepseek/"):
+        body = {
+            "model": model.removeprefix("deepseek/"),
+            "messages": messages,
+            "stream": False,
+        }
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
+        if max_tokens is not None:
+            body["max_tokens"] = max_tokens
+        response = _injected["post"](
+            "https://api.deepseek.com/chat/completions",
+            json=body,
+            timeout=timeout_seconds,
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"] or ""
     try:
         import litellm
 
         litellm.set_verbose = False
 
         kwargs: dict = {"model": model, "messages": messages}
+        if _injected is not None:
+            kwargs.update(api_key=_injected["api_key"], num_retries=0)
         if timeout_seconds is not None:
             kwargs.update(timeout=timeout_seconds, num_retries=0)
         if max_tokens is not None:
@@ -154,7 +203,9 @@ def _litellm_chat(
             kwargs["response_format"] = {"type": "json_object"}
         # Set Ollama base URL if using ollama provider
         if model.startswith("ollama"):
-            kwargs["api_base"] = _get_ollama_url()
+            kwargs["api_base"] = (
+                _injected["endpoint"] if _injected is not None else _get_ollama_url()
+            )
 
         response = litellm.completion(**kwargs)
         return response.choices[0].message.content or ""
@@ -171,9 +222,14 @@ def _gemini_chat(
     *,
     timeout_seconds: float | None = None,
     max_tokens: int | None = None,
+    _injected: dict | None = None,
 ) -> str:
     """Call Google Gemini API directly."""
-    api_key = get_provider_api_key("gemini")
+    api_key = (
+        _injected["api_key"]
+        if _injected is not None
+        else get_provider_api_key("gemini")
+    )
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set")
 
@@ -195,7 +251,8 @@ def _gemini_chat(
     if max_tokens is not None:
         body.setdefault("generationConfig", {})["maxOutputTokens"] = max_tokens
     try:
-        resp = requests.post(
+        post = _injected["post"] if _injected is not None else requests.post
+        resp = post(
             url, json=body, params={"key": api_key}, timeout=timeout_seconds or 60
         )
         resp.raise_for_status()
@@ -204,7 +261,9 @@ def _gemini_chat(
         if candidates:
             parts = candidates[0].get("content", {}).get("parts", [])
             if parts:
-                return parts[0].get("text", "")
+                return "".join(
+                    part.get("text", "") for part in parts if not part.get("thought")
+                )
         return ""
     except Exception as e:
         raise RuntimeError(f"Gemini error: {e}")
@@ -218,6 +277,7 @@ def _chat(
     timeout_seconds: float | None = None,
     max_tokens: int | None = None,
     ollama_url: str | None = None,
+    _injected: dict | None = None,
 ) -> str:
     """Route to the appropriate backend."""
     options = {
@@ -228,6 +288,8 @@ def _chat(
         }.items()
         if value is not None
     }
+    if _injected is not None:
+        options["_injected"] = _injected
     if model.startswith("ollama/") or model.startswith("ollama_chat/"):
         return _ollama_chat(
             model,
@@ -265,12 +327,36 @@ def ask_structured(
     max_tokens: int | None = None,
     private_response: bool = False,
     ollama_url: str | None = None,
+    action_id: str | None = None,
+    context: dict | None = None,
+    expected_fingerprint: str | None = None,
+    actor_id: int | None = None,
+    job_id: str | None = None,
+    idempotency_key: str | None = None,
+    _injected: dict | None = None,
 ) -> T:
     """Ask an LLM and parse the response into a Pydantic model.
 
     Uses JSON mode + schema instructions in the prompt.
     Works with any provider — no instructor dependency needed.
     """
+    if action_id is not None:
+        if _injected is not None:
+            raise ValueError("Legacy injection cannot recurse into action routing")
+        from crate.ai.runtime import execute_structured
+
+        return execute_structured(
+            action_id,
+            response_model,
+            prompt,
+            system=system,
+            context=context,
+            expected_fingerprint=expected_fingerprint,
+            actor_id=actor_id,
+            job_id=job_id,
+            idempotency_key=idempotency_key,
+        )
+
     m = model or _get_model()
 
     schema = response_model.model_json_schema()
@@ -296,6 +382,8 @@ def ask_structured(
         }.items()
         if value is not None
     }
+    if _injected is not None:
+        options["_injected"] = _injected
     raw = _chat(
         m,
         messages,
@@ -358,8 +446,34 @@ def ask_image_structured(
     private_response: bool = False,
     ollama_url: str | None = None,
     image_detail: Literal["default", "ultra_high"] = "default",
+    action_id: str | None = None,
+    context: dict | None = None,
+    expected_fingerprint: str | None = None,
+    actor_id: int | None = None,
+    job_id: str | None = None,
+    idempotency_key: str | None = None,
+    _injected: dict | None = None,
 ) -> T:
     """Ask for image analysis; optional Gemini 3 detail doubles the image token budget."""
+    if action_id is not None:
+        if _injected is not None:
+            raise ValueError("Legacy injection cannot recurse into action routing")
+        from crate.ai.runtime import execute_structured
+
+        return execute_structured(
+            action_id,
+            response_model,
+            prompt,
+            system=system,
+            context=context,
+            expected_fingerprint=expected_fingerprint,
+            actor_id=actor_id,
+            job_id=job_id,
+            idempotency_key=idempotency_key,
+            image=image,
+            media_type=media_type,
+        )
+
     if not image or not media_type.startswith("image/"):
         raise ValueError("A valid image payload is required")
     selected_model = model or _get_model()
@@ -377,6 +491,8 @@ def ask_image_structured(
         }.items()
         if value is not None
     }
+    if _injected is not None:
+        options["_injected"] = _injected
     if selected_model.startswith(("ollama/", "ollama_chat/")) and ollama_url:
         options["ollama_url"] = ollama_url
     schema = json.dumps(response_model.model_json_schema(), indent=2)
@@ -386,7 +502,11 @@ def ask_image_structured(
     encoded = base64.b64encode(image).decode()
 
     if selected_model.startswith("gemini/"):
-        api_key = get_provider_api_key("gemini")
+        api_key = (
+            _injected["api_key"]
+            if _injected is not None
+            else get_provider_api_key("gemini")
+        )
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY not set")
         model_name = selected_model.removeprefix("gemini/")
@@ -413,12 +533,17 @@ def ask_image_structured(
         if max_tokens is not None:
             body["generationConfig"]["maxOutputTokens"] = max_tokens
         try:
-            response = requests.post(
+            post = _injected["post"] if _injected is not None else requests.post
+            response = post(
                 url, json=body, params={"key": api_key}, timeout=timeout_seconds or 90
             )
             response.raise_for_status()
             parts = response.json()["candidates"][0]["content"]["parts"]
-            raw = next(str(part["text"]) for part in parts if "text" in part)
+            raw = "".join(
+                str(part["text"])
+                for part in parts
+                if "text" in part and not part.get("thought")
+            )
         except Exception as exc:
             raise RuntimeError(f"Gemini vision error: {exc}") from exc
     elif selected_model.startswith(("ollama/", "ollama_chat/")):

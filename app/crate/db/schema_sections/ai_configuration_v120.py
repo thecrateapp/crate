@@ -58,6 +58,7 @@ def create_ai_configuration_v120_schema(cur):
         config_fingerprint TEXT CHECK(length(config_fingerprint)<=64),
         actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL, job_id TEXT CHECK(length(job_id)<=200),
         status TEXT NOT NULL DEFAULT 'reserved' CHECK(status IN ('reserved','succeeded','failed','timeout','cancelled')),
+        metering_mode TEXT NOT NULL DEFAULT 'enforced' CHECK(metering_mode IN ('enforced','legacy_tracking')),
         reserved_tokens BIGINT NOT NULL CHECK(reserved_tokens>=0), charged_tokens BIGINT NOT NULL CHECK(charged_tokens>=0),
         input_tokens BIGINT CHECK(input_tokens BETWEEN 0 AND 1000000000), output_tokens BIGINT CHECK(output_tokens BETWEEN 0 AND 1000000000),
         thought_tokens BIGINT CHECK(thought_tokens BETWEEN 0 AND 1000000000),
@@ -73,9 +74,23 @@ def create_ai_configuration_v120_schema(cur):
         action_id TEXT NOT NULL,
         CHECK((invocation_kind='action' AND action_id IN ({ACTIONS_SQL})) OR (invocation_kind='probe' AND action_id='')),
         calls BIGINT NOT NULL DEFAULT 0 CHECK(calls>=0),
+        unknown_calls BIGINT NOT NULL DEFAULT 0 CHECK(unknown_calls>=0),
         tokens BIGINT NOT NULL DEFAULT 0 CHECK(tokens>=0), completed BIGINT NOT NULL DEFAULT 0 CHECK(completed>=0),
         failed BIGINT NOT NULL DEFAULT 0 CHECK(failed>=0), estimated_cost NUMERIC,
         PRIMARY KEY(day,connection_id,invocation_kind,action_id))""")
+    cur.execute(f"""CREATE TABLE IF NOT EXISTS ai_legacy_invocation_receipts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(), idempotency_key TEXT NOT NULL UNIQUE CHECK(length(idempotency_key) BETWEEN 1 AND 200),
+        claim_token UUID NOT NULL DEFAULT gen_random_uuid(),
+        action_id TEXT NOT NULL CHECK(action_id IN ({ACTIONS_SQL})),
+        provider TEXT NOT NULL CHECK(length(provider) BETWEEN 1 AND 200 AND provider NOT IN ('gemini','deepseek','ollama')),
+        model_id TEXT NOT NULL CHECK(length(model_id) BETWEEN 1 AND 200), config_fingerprint TEXT CHECK(length(config_fingerprint)<=64),
+        actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL, job_id TEXT CHECK(length(job_id)<=200),
+        status TEXT NOT NULL DEFAULT 'reserved' CHECK(status IN ('reserved','succeeded','failed','timeout','cancelled')),
+        error_code TEXT CHECK(length(error_code)<=80), duration_ms BIGINT NOT NULL DEFAULT 0 CHECK(duration_ms>=0),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), finished_at TIMESTAMPTZ)""")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ai_legacy_receipts_retention ON ai_legacy_invocation_receipts(created_at,id)"
+    )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_ai_invocations_activity ON ai_invocations(created_at DESC,id DESC)"
     )

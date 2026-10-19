@@ -644,6 +644,9 @@ def activate_legacy_configuration(
                                 "action_id": action_id,
                                 "legacy_model": context["legacy_model"],
                                 "legacy_options": context["legacy_options"],
+                                "legacy_deadline_seconds": context[
+                                    "legacy_deadline_seconds"
+                                ],
                             },
                         },
                         actor_id,

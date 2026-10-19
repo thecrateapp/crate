@@ -1,6 +1,7 @@
 """Explicit queued catalog discovery and one-shot synthetic profile tests."""
 
 import importlib
+import time
 
 from crate.ai import configuration as service
 from crate.ai.contracts import AIConfigurationError
@@ -79,6 +80,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
     )
     if not invocation["claimed"]:
         return {"status": "duplicate"}
+    started = time.monotonic()
     try:
         key = service.load_context_key(context)
         result = execute_probe(
@@ -98,6 +100,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
             result.get("usage"),
             "succeeded" if compatible else "failed",
             reported_model=result.get("reported_model"),
+            duration_ms=int((time.monotonic() - started) * 1000),
         )
         return {
             "status": "succeeded" if compatible else "failed",
@@ -105,7 +108,11 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
         }
     except Exception:
         usage.finish_invocation(
-            invocation["id"], None, "failed", error_code="AI_PROBE_FAILED"
+            invocation["id"],
+            None,
+            "failed",
+            error_code="AI_PROBE_FAILED",
+            duration_ms=int((time.monotonic() - started) * 1000),
         )
         return {"status": "failed", "error_code": "AI_PROBE_FAILED"}
 

@@ -17,6 +17,7 @@ def upgrade():
 
 def downgrade():
     for table in (
+        "ai_legacy_invocation_receipts",
         "ai_usage_daily",
         "ai_invocations",
         "ai_action_bindings",

@@ -9,7 +9,11 @@ from uuid import NAMESPACE_URL, uuid5
 from typing import NoReturn
 
 from crate.ai.actions import ACTIONS, get_action, list_actions
-from crate.ai.capabilities import model_capabilities, validate_profile
+from crate.ai.capabilities import (
+    image_token_bound,
+    model_capabilities,
+    validate_profile,
+)
 from crate.ai.contracts import (
     AIConfigurationError,
     LegacyProfileConfig,
@@ -472,16 +476,29 @@ def _validate_legacy_or_normal(connection, version, action_id):
             "AI_PROFILE_INCOMPATIBLE",
             "Inherited model is incompatible with this action",
         )
+    if (config or version).get("legacy_deadline_seconds") is None:
+        _fail("AI_LEGACY_LIMITS_UNKNOWN", "Inherited native timeout is unknown")
     options = (
         config["legacy_options"] if config is not None else version["legacy_options"]
     )
+    if caps.context_window is None or (
+        options["max_tokens"] is None and caps.max_output_tokens is None
+    ):
+        _fail(
+            "AI_LEGACY_LIMITS_UNKNOWN",
+            "Create a bounded profile before activating an inherited model with unknown limits",
+        )
     if options["image_detail"] not in caps.image_details:
         _fail("AI_PROFILE_INCOMPATIBLE", "Inherited image detail is incompatible")
     return LegacyProfileConfig.model_validate(config) if config is not None else None
 
 
 def _legacy(action_id, config=None):
-    from crate.llm.provider import get_config, get_provider_api_key
+    from crate.llm.provider import (
+        get_config,
+        get_provider_api_key,
+        legacy_native_timeout,
+    )
 
     config = config if config is not None else get_config()
     model = config["model"]
@@ -497,6 +514,13 @@ def _legacy(action_id, config=None):
         if action_id == "shows.extract.vision" and model.startswith("gemini/gemini-3")
         else "default",
     }
+    native_timeout, compatibility_error = legacy_native_timeout(
+        model, image=action.input == "image"
+    )
+    effective_timeout = options["timeout_seconds"] or native_timeout
+    deadline_seconds = (
+        float(effective_timeout) if effective_timeout is not None else None
+    )
     key = (
         _environment_key(provider)
         if provider in _PROVIDERS
@@ -512,6 +536,8 @@ def _legacy(action_id, config=None):
         "legacy_model": model,
         "endpoint": config["ollama_url"] if provider == "ollama" else None,
         "legacy_options": options,
+        "legacy_deadline_seconds": deadline_seconds,
+        "legacy_compatibility_error": compatibility_error,
         "credential_source": "environment",
         "credential_ref": None,
         "credential_version": _hash(key),
@@ -538,8 +564,22 @@ def _context(version, connection, *, action_id=None, binding=None):
         key = None
     if connection["provider"] != "ollama" and not key:
         _fail("AI_CREDENTIAL_REQUIRED", "Provider credential is required")
+    model = next(
+        m for m in connection["model_catalog"] if m["model_id"] == version["model_id"]
+    )
+    capabilities = ModelCapabilities.model_validate(model)
+    reservation_bounds = None
+    if isinstance(config, LegacyProfileConfig):
+        reservation_bounds = {
+            "input_tokens": model["context_window"],
+            "output_tokens": config.legacy_options.max_tokens
+            or model["max_output_tokens"],
+        }
     return {
         "mode": "configured",
+        "reservation_bounds": reservation_bounds,
+        "image_token_bound": image_token_bound(capabilities),
+        "native_context_window": capabilities.context_window,
         "invocation_kind": "action" if action_id else "probe",
         "action_id": action_id,
         "connection_id": connection["id"],
@@ -577,6 +617,11 @@ def resolve_action(action_id, expected_fingerprint=None):
     state = store.configuration_state()
     if not state["active"]:
         context = _legacy(action_id)
+        if context["legacy_compatibility_error"]:
+            _fail(
+                context["legacy_compatibility_error"],
+                "Inherited provider requires a compatible installed SDK or a bounded profile",
+            )
     else:
         binding = store.get_binding(action_id)
         if not binding or not binding["enabled"]:
@@ -619,12 +664,19 @@ def revalidate_context(context):
 def load_context_key(context):
     revalidate_context(context)
     if context["credential_source"] == "stored":
-        return load_secret(context["credential_ref"], scope="ai")["api_key"]
-    if context["mode"] == "legacy" and context["provider"] not in _PROVIDERS:
+        try:
+            key = load_secret(context["credential_ref"], scope="ai")["api_key"]
+        except (CredentialSecretError, KeyError):
+            _fail("AI_CREDENTIAL_UNAVAILABLE", "Credential is unavailable")
+    elif context["mode"] == "legacy" and context["provider"] not in _PROVIDERS:
         from crate.llm.provider import get_provider_api_key
 
-        return get_provider_api_key(context["provider"])
-    return _environment_key(context["provider"])
+        key = get_provider_api_key(context["provider"])
+    else:
+        key = _environment_key(context["provider"])
+    if _hash(key) != context["credential_version"]:
+        _fail("AI_CONTEXT_STALE", "Credential changed before execution")
+    return key
 
 
 def get_action_configuration(action_id):

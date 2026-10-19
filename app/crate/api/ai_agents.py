@@ -279,3 +279,18 @@ def activity(
 def usage(request: Request):
     require_permission(request, "ai.usage.read")
     return _invoke(usage_summary, daily_limit=5000)
+
+
+@router.get(
+    "/actions/{id}/availability",
+    response_model=dto.ActionAvailability,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Read action availability using its domain permission",
+)
+def action_availability(request: Request, id: str):
+    from crate.ai.actions import get_action
+    from crate.ai.runtime import action_availability as availability
+
+    action = _invoke(get_action, id)
+    require_permission(request, action.permission)
+    return _invoke(availability, id)

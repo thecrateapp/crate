@@ -27,7 +27,7 @@ class ClosedModel(BaseModel):
 
 
 class ReasoningConfig(ClosedModel):
-    mode: Literal["provider_default", "disabled", "level", "budget"] = (
+    mode: Literal["provider_default", "enabled", "disabled", "level", "budget"] = (
         "provider_default"
     )
     level: Level | None = None
@@ -60,6 +60,7 @@ class ModelCapabilities(ClosedModel):
     structured_output: bool = False
     reasoning_levels: list[Level] = Field(default_factory=list, max_length=16)
     reasoning_disabled: bool = False
+    reasoning_enabled: bool = False
     thinking_budget_min: int | None = Field(default=None, ge=0, le=131072)
     thinking_budget_max: int | None = Field(default=None, ge=0, le=131072)
     max_output_tokens: int | None = Field(default=None, ge=1, le=2097152)
@@ -116,3 +117,4 @@ class LegacyProfileConfig(ClosedModel):
     action_id: ShortText
     legacy_model: ShortText
     legacy_options: LegacyOptions
+    legacy_deadline_seconds: Annotated[float, Field(gt=0, le=86400)] | None = None
