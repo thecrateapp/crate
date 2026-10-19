@@ -1776,8 +1776,9 @@ eight plus integrity/build. Full Pyright, Ruff check/format and Admin typecheck/
 The original 115 grant DDL remains frozen; its test now checks the literal phase-five grant set.
 CI explicitly installs Tesseract eng/spa. See the plan for commands, review fixes and exclusions.
 
-No real-browser/mobile visual audit, live paid model call, production-copy migration timing,
-production capacity run, public proxy or new commercial-client certification was performed.
+At the initial 2026-10-16 phase-eight gate, no real-browser/mobile visual audit, live paid model
+call, production-copy migration timing, production capacity run, public proxy or new
+commercial-client certification was performed.
 Local fixtures, deterministic providers and prior phase-seven client evidence do not establish
 those properties. The default OCR/manual paths remain independent of a model or network.
 
@@ -1796,8 +1797,9 @@ invalidation events for the batch. This is isolated test evidence, not a product
 
 Default tests use simulated providers. A real configured model smoke is opt-in only, against the
 synthetic tour fixture and a disposable test DB: `cd app` followed by `CRATE_TEST_SHOW_LLM_SMOKE=1 ../.venv/bin/python -m pytest tests/test_show_extraction.py::test_configured_show_vision_smoke_opt_in -q`. Supply a test provider
-configuration/credentials explicitly. This smoke has not been run for this cut. No production
-migration, merge, deployment, real paid model request or flag activation was performed.
+configuration/credentials explicitly. This smoke was not run at that initial phase-eight gate,
+which also performed no production migration, merge, deployment, real paid model request or
+flag activation. The later real-model lab acceptance is recorded separately below.
 
 ### Real poster and DICE acceptance — 2026-10-19
 
