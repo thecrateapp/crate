@@ -662,13 +662,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     boolean enableAudioTrackPlaybackParams
                 ) {
                     if (USE_PCM_BUS) {
-                        AudioProcessor resampler =
-                            new BusResamplerAudioProcessor(PcmBusMixer.SAMPLE_RATE);
                         return new DefaultAudioSink.Builder(context)
                             .setEnableFloatOutput(false)
                             .setEnableAudioTrackPlaybackParams(false)
                             .setAudioProcessors(
-                                new AudioProcessor[] { resampler, audioProcessor }
+                                PcmBusAudioOutputProvider.busAudioProcessors(audioProcessor)
                             )
                             .setAudioOutputProvider(
                                 new PcmBusAudioOutputProvider(

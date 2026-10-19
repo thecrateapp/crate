@@ -4,6 +4,7 @@ import android.media.AudioFormat;
 
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.audio.AudioOutput;
@@ -19,6 +20,14 @@ final class PcmBusAudioOutputProvider implements AudioOutputProvider {
         this.channel = channel;
     }
 
+    static AudioProcessor[] busAudioProcessors(AudioProcessor mixProcessor) {
+        return new AudioProcessor[] {
+            new BusDownmixAudioProcessor(),
+            new BusResamplerAudioProcessor(PcmBusMixer.SAMPLE_RATE),
+            mixProcessor,
+        };
+    }
+
     @Override
     public FormatSupport getFormatSupport(FormatConfig formatConfig) {
         Format format = formatConfig.format;
@@ -26,7 +35,7 @@ final class PcmBusAudioOutputProvider implements AudioOutputProvider {
             MimeTypes.AUDIO_RAW.equals(format.sampleMimeType) &&
             Util.isEncodingLinearPcm(format.pcmEncoding) &&
             format.channelCount >= 1 &&
-            format.channelCount <= 2;
+            format.channelCount <= BusDownmixAudioProcessor.MAX_INPUT_CHANNELS;
         return supported
             ? new FormatSupport.Builder()
                 .setFormatSupportLevel(FORMAT_SUPPORTED_DIRECTLY)
