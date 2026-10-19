@@ -1357,6 +1357,29 @@ describe("AgentPlanDetail presentation", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 
+  it("lists the OAuth client and authorization in Technical details", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(
+      plan({
+        authorization_context: {
+          actor_user_id: 4,
+          client_id: "remote-client",
+          authorization_id: "authorization-7",
+        },
+      }),
+    );
+    renderReview();
+    await user.click(
+      await screen.findByRole("button", { name: "Technical details" }),
+    );
+    expect(screen.getByText("Client ID").parentElement).toHaveTextContent(
+      "remote-client",
+    );
+    expect(
+      screen.getByText("Authorization ID").parentElement,
+    ).toHaveTextContent("authorization-7");
+  });
+
   it("names the person behind a delegated plan", async () => {
     apiMock.mockResolvedValue(
       showImportPlan({
@@ -1411,4 +1434,271 @@ describe("AgentPlanDetail presentation", () => {
     ).toHaveAttribute("href", "/agents/approvals");
     expect(screen.getByText("Applied")).toBeInTheDocument();
   });
+});
+
+const albumUid = "30000000-0000-4000-8000-000000000001";
+const introUid = "30000000-0000-4000-8000-000000000002";
+const outroUid = "30000000-0000-4000-8000-000000000003";
+const mbAlbum = "a1a1a1a1-0000-4000-8000-000000000001";
+const mbOld = "b2b2b2b2-0000-4000-8000-000000000002";
+const mbNew = "c3c3c3c3-0000-4000-8000-000000000003";
+
+function indexedTrack(overrides: Record<string, unknown> = {}) {
+  // native_scan's track payload minus path and audio fingerprints.
+  return {
+    filename: "01 Intro.flac",
+    title: "Intro",
+    track_number: 1,
+    disc_number: 1,
+    format: "flac",
+    bitrate: 912,
+    sample_rate: 44100,
+    bit_depth: 16,
+    duration: 120.5,
+    size: 13_400_000,
+    year: "2020",
+    genre: null,
+    albumartist: "Echo",
+    musicbrainz_albumid: mbAlbum,
+    musicbrainz_trackid: mbOld,
+    _crate_identity_tagged: true,
+    ...overrides,
+  };
+}
+
+// Mirrors agent_sync.compile_operation for one indexed album.
+function syncPlan(): AgentPlan {
+  const targets = [
+    { entity_type: "track", entity_uid: introUid },
+    { entity_type: "track", entity_uid: outroUid },
+  ];
+  return plan({
+    operation: "library_sync",
+    risk: "destructive",
+    target_count: 2,
+    returned_count: 2,
+    targets,
+    changes: [
+      {
+        entity_uid: introUid,
+        action: "update_index",
+        relative_path: "Echo/Night/01 Intro.flac",
+        before: indexedTrack(),
+        after: indexedTrack({ musicbrainz_trackid: mbNew }),
+      },
+      {
+        entity_uid: outroUid,
+        action: "remove_index",
+        before: { title: "Outro" },
+        after: null,
+      },
+    ],
+    source_versions: {
+      albums: [
+        {
+          entity_uid: albumUid,
+          database: "d".repeat(64),
+          filesystem: "e".repeat(64),
+        },
+      ],
+    },
+    impact: {
+      database: true,
+      filesystem: false,
+      scope: "album",
+      indexed_albums_only: true,
+      new_album_discovery: false,
+      albums: 1,
+      tracks: 2,
+      removed_indexes: 1,
+      refreshes_artist_summary: true,
+      artwork_materialization: "album-cover when present",
+      enrichment: false,
+      preserves_field_locks: true,
+      filesystem_precondition: "device/inode/size/mtime/ctime manifest",
+    },
+    reversibility:
+      "removed indexes can affect references; rescan does not restore deleted references",
+  });
+}
+
+// Mirrors agent_metadata.compile_operation for an artist patch.
+function artistMetadataPlan(): AgentPlan {
+  return plan({
+    operation: "metadata_update",
+    risk: "safe",
+    targets: [{ entity_type: "artist", entity_uid: uid }],
+    changes: [
+      { entity_uid: uid, field: "mbid", before: mbOld, after: mbNew },
+      {
+        entity_uid: uid,
+        field: "bio",
+        before: "Old biography",
+        after: "New biography",
+      },
+    ],
+    source_versions: { database: "d".repeat(64), files: [] },
+    impact: {
+      database: true,
+      filesystem: false,
+      files: 0,
+      bytes_read_for_preconditions: 0,
+      locks_modified_fields: true,
+      provenance: "manual_edit",
+      refreshes_size_totals: [],
+    },
+    reversibility: "new_plan_required",
+  });
+}
+
+// Mirrors agent_enrichment.compile_operation for one artist.
+function enrichmentPlan(): AgentPlan {
+  const providers = ["musicbrainz", "lastfm"];
+  return plan({
+    operation: "enrichment",
+    risk: "safe",
+    targets: [{ entity_type: "artist", entity_uid: uid }],
+    changes: [
+      {
+        artist_uid: uid,
+        providers,
+        facets: ["bio", "tags"],
+        locked_fields_preserved: ["bio"],
+        value_policy: "only_missing_unlocked_values",
+        after: "provider_result_unknown_until_execution",
+      },
+    ],
+    source_versions: { database: "d".repeat(64) },
+    impact: {
+      database: true,
+      filesystem: false,
+      external_providers: providers,
+      provider_facets: { musicbrainz: ["tags"], lastfm: ["bio", "tags"] },
+      unsupported_provider_facets: { musicbrainz: ["bio"], lastfm: [] },
+      provider_fetches: 2,
+      provider_min_intervals_seconds: { musicbrainz: 1, lastfm: 0.25 },
+      transport_requests:
+        "Provider clients may issue multiple requests and reuse their configured caches; refresh does not purge caches",
+      metadata_only: true,
+      setlists_storage: "bounded_metadata_cache_and_job_result",
+      implicit_photos: false,
+      mode: "missing",
+    },
+    reversibility: "new_plan_required; provider history is recorded in audit",
+  });
+}
+
+// Mirrors agent_runtime.compile_operation for a runtime policy patch.
+function runtimePlan(): AgentPlan {
+  const target = { entity_type: "runtime", name: "policy" };
+  return plan({
+    operation: "runtime_update",
+    risk: "high",
+    targets: [target],
+    changes: [
+      {
+        ...target,
+        before: { max_workers: 2, analysis: { enabled: true, threads: 4 } },
+        after: { max_workers: 3, analysis: { enabled: true, threads: 4 } },
+      },
+    ],
+    source_versions: undefined,
+    impact: {
+      scope: "instance",
+      configured_policy_only: true,
+      running_tasks_interrupted: false,
+      process_resize: false,
+    },
+  });
+}
+
+function textLeaves(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value === "number") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap(textLeaves);
+  if (value && typeof value === "object")
+    return Object.values(value).flatMap(textLeaves);
+  return [];
+}
+
+describe("AgentPlanDetail completeness", () => {
+  it("shows a changed MusicBrainz id as a changed row with both values", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(syncPlan());
+    renderReview();
+    const row = await screen.findByRole("row", { name: /Musicbrainz trackid/ });
+    expect(row).toHaveAttribute("data-status", "changed");
+    expect(row).toHaveTextContent("Changed · see Technical details");
+    expect(row).toHaveTextContent(mbOld);
+    expect(row).toHaveTextContent(mbNew);
+    // Equal values, including null on both sides, are folded as unchanged.
+    expect(
+      screen.queryByRole("row", { name: /Genre/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("No field changes.")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: /^\d+ unchanged fields$/ }),
+    );
+    expect(screen.getByRole("row", { name: /Genre/ })).toHaveAttribute(
+      "data-status",
+      "unchanged",
+    );
+    // Unlabelled tracks are numbered and the path tells the cards apart.
+    expect(screen.getByText("Track 1")).toBeInTheDocument();
+    expect(screen.getByText("Track 2")).toBeInTheDocument();
+    expect(screen.getByText("Echo/Night/01 Intro.flac")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    expect(
+      screen.getByText("Track 1 · Proposed › Musicbrainz trackid")
+        .parentElement,
+    ).toHaveTextContent(mbNew);
+  });
+
+  it("shows both values of a changed artist MBID", async () => {
+    apiMock.mockResolvedValue(artistMetadataPlan());
+    renderReview();
+    const list = await screen.findByRole("list", { name: "Proposed changes" });
+    const card = within(list).getByText("Mbid").closest("li");
+    expect(card).not.toBeNull();
+    expect(card).toHaveTextContent("Changed · see Technical details");
+    expect(card).toHaveTextContent(mbOld);
+    expect(card).toHaveTextContent(mbNew);
+    expect(card).not.toHaveTextContent("Listed in technical details");
+  });
+
+  it.each([
+    ["library sync", syncPlan],
+    ["artist metadata", artistMetadataPlan],
+    ["enrichment", enrichmentPlan],
+    ["runtime policy", runtimePlan],
+  ] as const)(
+    "shows every leaf of the %s plan's changes and impact",
+    async (_label, makePlan) => {
+      const user = userEvent.setup();
+      const item = makePlan();
+      apiMock.mockResolvedValue(item);
+      renderReview();
+      await screen.findByRole("list", { name: "Proposed changes" });
+      for (const toggle of screen.queryAllByRole("button", {
+        name: /unchanged field/,
+      }))
+        await user.click(toggle);
+      await user.click(
+        screen.getByRole("button", { name: "Technical details" }),
+      );
+      const text = (document.body.textContent ?? "").toLowerCase();
+      const missing = [
+        ...textLeaves(item.changes),
+        ...textLeaves(item.impact),
+      ].filter((leaf) => {
+        const value = leaf.toLowerCase();
+        // The subject (field, action or pipeline) is a heading, humanized
+        // like a key: «update_index» reads «Update index».
+        return (
+          !text.includes(value) && !text.includes(value.replace(/_/g, " "))
+        );
+      });
+      expect(missing).toEqual([]);
+    },
+  );
 });

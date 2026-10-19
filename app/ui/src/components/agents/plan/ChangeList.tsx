@@ -14,7 +14,11 @@ import {
 import { StructuredValue } from "@/components/admin/StructuredValue";
 import type { AgentPlan } from "@/lib/agent-integrations";
 import type { FieldDiffRow } from "@/lib/agent-plan-presentation";
-import { changeView, type ChangeBody } from "@/lib/agent-plan-technical";
+import {
+  planChangeViews,
+  type ChangeBody,
+  type DiffRowView,
+} from "@/lib/agent-plan-technical";
 import { humanizeKey } from "@/lib/humanize";
 
 function BeforeAfter({
@@ -50,12 +54,33 @@ const rowTone: Record<FieldDiffRow["status"], string> = {
   unchanged: "",
 };
 
-const rowMarker: Partial<Record<FieldDiffRow["status"], ReactNode>> = {
-  changed: <span className="block text-[11px] text-amber-200/80">Changed</span>,
-  added: <span className="block text-[11px] text-emerald-200/80">Added</span>,
+const statusWord: Record<FieldDiffRow["status"], string> = {
+  changed: "Changed",
+  added: "Added",
+  cleared: "Cleared",
+  unchanged: "Unchanged",
 };
 
-function FieldDiffTable({ rows }: { rows: FieldDiffRow[] }) {
+const markerTone: Record<FieldDiffRow["status"], string> = {
+  changed: "text-amber-200/80",
+  added: "text-emerald-200/80",
+  cleared: "text-red-200/80",
+  unchanged: "text-white/45",
+};
+
+/** «Changed», or «Changed · see Technical details» when ids are listed there. */
+function RowMarker({ row }: { row: DiffRowView }) {
+  const plain = row.status === "changed" || row.status === "added";
+  if (!plain && !row.seeTechnical) return null;
+  return (
+    <span className={`block text-[11px] ${markerTone[row.status]}`}>
+      {statusWord[row.status]}
+      {row.seeTechnical ? " · see Technical details" : null}
+    </span>
+  );
+}
+
+function FieldDiffTable({ rows }: { rows: DiffRowView[] }) {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const contentId = useId();
   const unchangedCount = rows.filter(
@@ -86,7 +111,7 @@ function FieldDiffTable({ rows }: { rows: FieldDiffRow[] }) {
                 >
                   <TableCell className="align-top font-medium break-words whitespace-normal text-white/80">
                     {humanizeKey(row.key)}
-                    {rowMarker[row.status] ?? null}
+                    <RowMarker row={row} />
                   </TableCell>
                   <TableCell className="align-top break-words whitespace-normal text-white/60">
                     <StructuredValue value={row.before} />
@@ -135,16 +160,23 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
       return <FieldDiffTable rows={body.rows} />;
     case "scalar":
       return (
-        <BeforeAfter
-          current={<StructuredValue value={body.current} />}
-          proposed={
-            body.cleared ? (
-              <span className="text-red-200">Cleared</span>
-            ) : (
-              <StructuredValue value={body.proposed} />
-            )
-          }
-        />
+        <div className="space-y-2">
+          {body.seeTechnical ? (
+            <p className="text-[11px] text-amber-200/80">
+              Changed · see Technical details
+            </p>
+          ) : null}
+          <BeforeAfter
+            current={<StructuredValue value={body.current} />}
+            proposed={
+              body.cleared ? (
+                <span className="text-red-200">Cleared</span>
+              ) : (
+                <StructuredValue value={body.proposed} />
+              )
+            }
+          />
+        </div>
       );
     case "details":
       return body.details ? (
@@ -159,14 +191,11 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
   // Preserve every proposed change, including identical entries, with keys
   // that do not depend on unrelated rows' positions.
   const occurrences = new Map<string, number>();
-  const changes = plan.changes.map((change, index) => {
-    const content = JSON.stringify(change);
+  const changes = planChangeViews(plan).map((view, index) => {
+    const content = JSON.stringify(plan.changes[index] ?? null);
     const occurrence = occurrences.get(content) ?? 0;
     occurrences.set(content, occurrence + 1);
-    return {
-      view: changeView(change, index, plan),
-      key: `${content}/${occurrence}`,
-    };
+    return { view, key: `${content}/${occurrence}` };
   });
 
   return (
@@ -177,18 +206,35 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
             key={key}
             className="min-w-0 space-y-3 rounded-md border border-white/10 bg-white/[0.02] p-4"
           >
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <p className="font-medium break-words text-white">
-                {view.targets.map((label, index) => (
-                  <span key={`${index}:${label}`}>
-                    {index > 0 ? ", " : null}
-                    <span>{label}</span>
-                  </span>
-                ))}
-              </p>
-              <p className="text-sm text-white/55">{view.subject}</p>
+            <div className="space-y-1">
+              {view.numbered ? (
+                <p className="text-[11px] uppercase tracking-[0.12em] text-white/40">
+                  Change {view.number}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className="font-medium break-words text-white">
+                  {view.targets.map((label, index) => (
+                    <span key={`${index}:${label}`}>
+                      {index > 0 ? ", " : null}
+                      <span>{label}</span>
+                    </span>
+                  ))}
+                </p>
+                <p className="text-sm text-white/55">{view.subject}</p>
+              </div>
+              {view.discriminator ? (
+                <p className="text-xs break-words text-white/45">
+                  {view.discriminator}
+                </p>
+              ) : null}
             </div>
             <ChangeBodyView body={view.body} />
+            {view.details ? (
+              <div className="border-t border-white/8 pt-3 text-sm text-white/80">
+                <StructuredValue value={view.details} />
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>

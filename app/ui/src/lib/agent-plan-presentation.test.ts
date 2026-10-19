@@ -6,6 +6,7 @@ import {
   fieldDiff,
   formatTrackDuration,
   impactChips,
+  impactDetails,
   operationLabel,
   planStateView,
   planTitle,
@@ -259,6 +260,19 @@ describe("fieldDiff", () => {
     ]);
   });
 
+  it("classifies equal values, including null on both sides, as unchanged", () => {
+    const rows = fieldDiff(
+      { genre: null, year: 2020, tags: ["a"] },
+      { genre: null, year: 2020, tags: ["a"], title: null },
+    );
+    expect(rows?.map(({ key, status }) => ({ key, status }))).toEqual([
+      { key: "genre", status: "unchanged" },
+      { key: "year", status: "unchanged" },
+      { key: "tags", status: "unchanged" },
+      { key: "title", status: "added" },
+    ]);
+  });
+
   it("classifies an explicit clear as cleared", () => {
     const rows = fieldDiff({ bio: "Old" }, { bio: null });
     expect(rows?.map(({ key, status }) => ({ key, status }))).toEqual([
@@ -299,5 +313,26 @@ describe("apiErrorText", () => {
     ["a non-error value", { status: 409 }, fallback],
   ])("reads %s", (_label, error, expected) => {
     expect(apiErrorText(error, fallback)).toBe(expected);
+  });
+});
+
+describe("impactDetails", () => {
+  it("keeps exactly the entries that no chip expresses", () => {
+    const impact = {
+      database: true,
+      external_providers: ["musicbrainz", "lastfm"],
+      provider_min_intervals_seconds: { musicbrainz: 1 },
+      provider_fetches: 2,
+      missing: null,
+    };
+    expect(impactChips(impact)).toEqual([
+      "Changes the database",
+      "Provider fetches: 2",
+    ]);
+    expect(impactDetails(impact)).toEqual({
+      external_providers: ["musicbrainz", "lastfm"],
+      provider_min_intervals_seconds: { musicbrainz: 1 },
+      missing: null,
+    });
   });
 });

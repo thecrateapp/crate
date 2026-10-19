@@ -46,10 +46,11 @@ import {
   targetIdentity,
 } from "@/lib/agent-plan-review";
 import {
-  changeView,
   editorialView,
+  impactView,
+  planChangeViews,
+  planTargetNamer,
   redactTechnical,
-  targetDisplayName,
   technicalItems,
   type TechnicalItem,
 } from "@/lib/agent-plan-technical";
@@ -101,6 +102,8 @@ function sourceItems(sources: Record<string, unknown> | undefined) {
 
 /** Every identifier of the plan; the only place hashes and ids are shown. */
 function planTechnicalItems(item: AgentPlan): TechnicalItem[] {
+  const nameOf = planTargetNamer(item.targets);
+  const context = item.authorization_context ?? {};
   const items: TechnicalItem[] = [
     { label: "Plan ID", value: item.plan_id },
     { label: "Plan version", value: item.plan_version },
@@ -108,14 +111,19 @@ function planTechnicalItems(item: AgentPlan): TechnicalItem[] {
     { label: "Authorization hash", value: item.authorization_context_hash },
     { label: "Policy revision", value: item.policy_revision },
     { label: "Job ID", value: item.job_id ?? null },
+    ...(context.client_id
+      ? [{ label: "Client ID", value: context.client_id }]
+      : []),
+    ...(context.authorization_id
+      ? [{ label: "Authorization ID", value: context.authorization_id }]
+      : []),
     ...sourceItems(item.source_versions),
     ...item.targets.map((target) => ({
-      label: `Target: ${targetDisplayName(target)}`,
+      label: `Target: ${nameOf(target)}`,
       value: targetIdentity(target),
     })),
-    ...item.changes.flatMap(
-      (change, index) => changeView(change, index, item).technical,
-    ),
+    ...impactView(item.impact).technical,
+    ...planChangeViews(item).flatMap((view) => view.technical),
     ...(item.operation === "editorial_change"
       ? editorialView(item).technical
       : []),

@@ -1,6 +1,11 @@
 import { humanizeKey } from "./humanize";
 import type { AgentPlan } from "./agent-integrations";
-import { fieldDiff, type FieldDiffRow } from "./agent-plan-presentation";
+import {
+  fieldDiff,
+  impactChips,
+  impactDetails,
+  type FieldDiffRow,
+} from "./agent-plan-presentation";
 import { isRecord, targetIdentity } from "./agent-plan-review";
 
 /** Shown where a value was moved into Technical details. */
@@ -12,7 +17,8 @@ export type TechnicalLeaf = { path: string[]; value: string | number | null };
 type Change = AgentPlan["changes"][number];
 type Target = AgentPlan["targets"][number];
 
-const TECHNICAL_KEY = /(^|_)(uid|id|hash|sha256|fingerprint|version)$/;
+const TECHNICAL_KEY =
+  /(^|_)(uid|id|hash|sha256|fingerprint|version|mbid)$|^musicbrainz_/;
 // A 64-hex digest or a UUID, optionally behind a reference scheme such as
 // `upload:` or `show:`.
 const TECHNICAL_STRING =
@@ -36,7 +42,10 @@ const TARGET_REFERENCE_KEYS = new Set([
   "scope",
 ]);
 
-/** `item_id`, `source_hash`, `planVersion`, `sha256`, … (snake or camel case). */
+/**
+ * `item_id`, `source_hash`, `planVersion`, `sha256`, `mbid`,
+ * `musicbrainz_trackid`, … (snake or camel case).
+ */
 export function isTechnicalKey(key: string): boolean {
   const snake = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
   return TECHNICAL_KEY.test(snake);
@@ -151,16 +160,48 @@ export function targetDisplayName(target: Record<string, unknown>): string {
   return kind ? humanizeKey(kind) : "Unknown target";
 }
 
-function resolvedTarget(
-  reference: Record<string, unknown>,
+/**
+ * Names the plan's targets so that two different targets never share a name:
+ * unlabelled targets of one kind become «Track 1», «Track 2», … Any other
+ * reference falls back to its own display name.
+ */
+export function planTargetNamer(
   targets: Target[],
-): Record<string, unknown> {
-  const identity = targetIdentity(reference);
-  return (
-    (identity &&
-      targets.find((target) => targetIdentity(target) === identity)) ||
-    reference
+): (reference: Record<string, unknown>) => string {
+  const identitiesByName = new Map<string, string[]>();
+  for (const target of targets) {
+    const identity = targetIdentity(target);
+    if (!identity) continue;
+    const name = targetDisplayName(target);
+    const identities = identitiesByName.get(name) ?? [];
+    if (!identities.includes(identity)) identities.push(identity);
+    identitiesByName.set(name, identities);
+  }
+  const names = new Map<string, string>();
+  identitiesByName.forEach((identities, name) =>
+    identities.forEach((identity, index) =>
+      names.set(
+        identity,
+        identities.length > 1 ? `${name} ${index + 1}` : name,
+      ),
+    ),
   );
+  return (reference) => {
+    const identity = targetIdentity(reference);
+    return (identity && names.get(identity)) || targetDisplayName(reference);
+  };
+}
+
+function targetLabelsWith(
+  change: Change,
+  nameOf: (reference: Record<string, unknown>) => string,
+): string[] {
+  if (targetIdentity(change)) return [nameOf(change)];
+  const nested = Array.isArray(change.targets)
+    ? change.targets.filter(isRecord)
+    : [];
+  if (nested.length > 0) return nested.map(nameOf);
+  return [change.scope === "global" ? "Whole library" : "Unknown target"];
 }
 
 /** Every target a change applies to, by name, resolved through the plan. */
@@ -168,38 +209,32 @@ export function changeTargetLabels(
   change: Change,
   targets: Target[],
 ): string[] {
-  if (targetIdentity(change))
-    return [targetDisplayName(resolvedTarget(change, targets))];
-  const nested = Array.isArray(change.targets)
-    ? change.targets.filter(isRecord)
-    : [];
-  if (nested.length > 0)
-    return nested.map((target) =>
-      targetDisplayName(resolvedTarget(target, targets)),
-    );
-  return [change.scope === "global" ? "Whole library" : "Unknown target"];
+  return targetLabelsWith(change, planTargetNamer(targets));
 }
 
 // Replaces nested target references (for example `deleted_targets`) by the
 // target's name when the plan declares that target.
-function nameTargetReferences(value: unknown, targets: Target[]): unknown {
+function nameTargetReferences(
+  value: unknown,
+  targets: Target[],
+  nameOf: (reference: Record<string, unknown>) => string,
+): unknown {
   if (Array.isArray(value))
-    return value.map((entry) => nameTargetReferences(entry, targets));
+    return value.map((entry) => nameTargetReferences(entry, targets, nameOf));
   if (!isRecord(value)) return value;
   const keys = Object.keys(value);
   const identity = targetIdentity(value);
   if (
     identity &&
     keys.length > 0 &&
-    keys.every((key) => TARGET_REFERENCE_KEYS.has(key))
-  ) {
-    const target = targets.find((entry) => targetIdentity(entry) === identity);
-    if (target) return targetDisplayName(target);
-  }
+    keys.every((key) => TARGET_REFERENCE_KEYS.has(key)) &&
+    targets.some((entry) => targetIdentity(entry) === identity)
+  )
+    return nameOf(value);
   return Object.fromEntries(
     Object.entries(value).map(([key, entry]) => [
       key,
-      nameTargetReferences(entry, targets),
+      nameTargetReferences(entry, targets, nameOf),
     ]),
   );
 }
@@ -207,90 +242,292 @@ function nameTargetReferences(value: unknown, targets: Target[]): unknown {
 const hasOwn = (value: object, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key);
 
+export type DiffRowView = {
+  key: string;
+  status: FieldDiffRow["status"];
+  /** Value shown in the Current column. */
+  before: unknown;
+  /** Value shown in the Proposed column. */
+  after: unknown;
+  /** Some of this row's values are listed in Technical details. */
+  seeTechnical: boolean;
+};
+
 export type ChangeBody =
   | { kind: "photo"; current: string; proposed: string }
-  | { kind: "diff"; rows: FieldDiffRow[] }
-  | { kind: "scalar"; current: unknown; proposed: unknown; cleared: boolean }
+  | { kind: "diff"; rows: DiffRowView[] }
+  | {
+      kind: "scalar";
+      current: unknown;
+      proposed: unknown;
+      cleared: boolean;
+      seeTechnical: boolean;
+    }
   | { kind: "details"; details: Record<string, unknown> | null };
 
 export type ChangeView = {
+  /** 1-based position of the change in the plan. */
+  number: number;
+  /** Prefix of this change's Technical details labels. */
+  owner: string;
+  /** The card shows «Change n», which its Technical details labels use. */
+  numbered: boolean;
   targets: string[];
   subject: string;
+  /** A readable hint that tells similar cards apart (path or title). */
+  discriminator: string | null;
   body: ChangeBody;
+  /** The change's other keys (providers, policies, paths, …). */
+  details: Record<string, unknown> | null;
   technical: TechnicalItem[];
 };
 
-function changeSubject(change: Change): string {
-  const subject = change.field ?? change.action ?? change.pipeline;
-  return humanizeKey(typeof subject === "string" ? subject : "operation");
+function subjectKey(change: Change): string | null {
+  for (const key of ["field", "action", "pipeline"])
+    if (typeof change[key] === "string") return key;
+  return null;
 }
 
-/** What a change card shows, and the identifiers it moves out of view. */
-export function changeView(
+function changeSubject(change: Change): string {
+  const key = subjectKey(change);
+  return humanizeKey(key ? String(change[key]) : "operation");
+}
+
+function readableText(value: unknown): string | null {
+  const text = nonemptyText(value);
+  return text && !isTechnicalString(text) ? text : null;
+}
+
+function changeDiscriminator(change: Change): {
+  text: string | null;
+  key: string | null;
+} {
+  const relativePath = readableText(change.relative_path);
+  if (relativePath) return { text: relativePath, key: "relative_path" };
+  const before = isRecord(change.before) ? change.before : {};
+  const after = isRecord(change.after) ? change.after : {};
+  return {
+    text:
+      readableText(before.title) ??
+      readableText(before.name) ??
+      readableText(after.title),
+    key: null,
+  };
+}
+
+function hiddenLeaves(value: unknown, path: string[], whole: boolean) {
+  if (!whole) return redactTechnical(value, path);
+  const hidden: TechnicalLeaf[] = [];
+  // An absent side (a new record) has nothing to list; an explicit null does.
+  if (value !== undefined) collectLeaves(value, path, hidden, true);
+  return { visible: TECHNICAL_PLACEHOLDER as unknown, hidden };
+}
+
+/**
+ * Field rows are classified on the raw values, so a changed identifier is
+ * never shown as unchanged. A row that changes or clears an identifier shows
+ * both raw values (the reviewer must see what changes) and also lists them in
+ * Technical details. Added identifiers and unchanged rows are redacted;
+ * internal identifier keys (`*_id`, `*_hash`, …) that are only added or kept
+ * are listed in Technical details alone.
+ */
+function diffRows(rows: FieldDiffRow[], sink: TechnicalLeaf[]): DiffRowView[] {
+  const views: DiffRowView[] = [];
+  for (const row of rows) {
+    const label = humanizeKey(row.key);
+    const technicalKey = isTechnicalKey(row.key);
+    const before = hiddenLeaves(row.before, ["Current", label], technicalKey);
+    const after = hiddenLeaves(row.after, ["Proposed", label], technicalKey);
+    const hidden = [...before.hidden, ...after.hidden];
+    if (hidden.length === 0 && !technicalKey) {
+      views.push({ ...row, seeTechnical: false });
+      continue;
+    }
+    sink.push(...hidden);
+    if (row.status === "changed" || row.status === "cleared") {
+      views.push({ ...row, seeTechnical: true });
+      continue;
+    }
+    if (technicalKey) continue;
+    views.push({
+      key: row.key,
+      status: row.status,
+      before: before.visible,
+      after: after.visible,
+      seeTechnical: row.status === "added",
+    });
+  }
+  return views;
+}
+
+type ChangeDraft = Omit<ChangeView, "owner" | "numbered" | "technical"> & {
+  leaves: TechnicalLeaf[];
+};
+
+function changeDraft(
   change: Change,
   index: number,
   plan: Pick<AgentPlan, "operation" | "targets">,
-): ChangeView {
-  const targets = changeTargetLabels(change, plan.targets);
-  const [onlyTarget] = targets;
-  const owner =
-    targets.length === 1 && onlyTarget && onlyTarget !== "Unknown target"
-      ? onlyTarget
-      : `Change ${index + 1}`;
+  nameOf: (reference: Record<string, unknown>) => string,
+): ChangeDraft {
+  const targets = targetLabelsWith(change, nameOf);
   const subject = changeSubject(change);
+  const leaves: TechnicalLeaf[] = [];
+  const base = { number: index + 1, targets, subject, leaves };
+  const hasBeforeAfter = hasOwn(change, "before") || hasOwn(change, "after");
 
-  if (plan.operation === "repair_photo_flag")
+  if (!hasBeforeAfter && plan.operation !== "repair_photo_flag") {
+    const rest = Object.fromEntries(
+      Object.entries(change).filter(([key]) => !TARGET_KEYS.has(key)),
+    );
+    const { visible, hidden } = redactTechnical(
+      nameTargetReferences(rest, plan.targets, nameOf),
+    );
+    leaves.push(...hidden);
     return {
-      targets,
-      subject,
-      technical: [],
+      ...base,
+      discriminator: null,
+      details: null,
+      body: {
+        kind: "details",
+        details:
+          isRecord(visible) && Object.keys(visible).length > 0 ? visible : null,
+      },
+    };
+  }
+
+  const discriminator = changeDiscriminator(change);
+  // Keys the card already shows elsewhere: targets, the subject, the
+  // before/after body and the discriminating path.
+  const shown = new Set([...TARGET_KEYS, "before", "after"]);
+  if (targetIdentity(change))
+    TARGET_REFERENCE_KEYS.forEach((key) => shown.add(key));
+  const subjectField = subjectKey(change);
+  if (subjectField) shown.add(subjectField);
+  if (discriminator.key) shown.add(discriminator.key);
+  const siblings = redactTechnical(
+    nameTargetReferences(
+      Object.fromEntries(
+        Object.entries(change).filter(([key]) => !shown.has(key)),
+      ),
+      plan.targets,
+      nameOf,
+    ),
+  );
+  const details =
+    isRecord(siblings.visible) && Object.keys(siblings.visible).length > 0
+      ? siblings.visible
+      : null;
+  const common = { ...base, discriminator: discriminator.text, details };
+
+  if (plan.operation === "repair_photo_flag") {
+    leaves.push(...siblings.hidden);
+    return {
+      ...common,
       body: {
         kind: "photo",
         current: change.before ? "Photo present" : "No photo",
         proposed: change.after ? "Photo present" : "No photo",
       },
     };
-
-  if (hasOwn(change, "before") || hasOwn(change, "after")) {
-    const before = redactTechnical(change.before, ["Current"]);
-    const after = redactTechnical(change.after, ["Proposed"]);
-    const technical = technicalItems(owner, [
-      ...before.hidden,
-      ...after.hidden,
-    ]);
-    const rows = fieldDiff(before.visible, after.visible);
-    if (rows)
-      return { targets, subject, technical, body: { kind: "diff", rows } };
-    return {
-      targets,
-      subject,
-      technical,
-      body: {
-        kind: "scalar",
-        current: before.visible,
-        proposed: after.visible,
-        cleared:
-          hasOwn(change, "after") &&
-          change.after === null &&
-          change.before !== null &&
-          change.before !== undefined,
-      },
-    };
   }
 
-  const rest = Object.fromEntries(
-    Object.entries(change).filter(([key]) => !TARGET_KEYS.has(key)),
+  // A missing `before` means the record is new: every field is added.
+  const rows = fieldDiff(
+    change.before === undefined ? null : change.before,
+    change.after,
   );
-  const { visible, hidden } = redactTechnical(
-    nameTargetReferences(rest, plan.targets),
-  );
-  const details =
-    isRecord(visible) && Object.keys(visible).length > 0 ? visible : null;
+  if (rows) {
+    const views = diffRows(rows, leaves);
+    leaves.push(...siblings.hidden);
+    return { ...common, body: { kind: "diff", rows: views } };
+  }
+
+  // A scalar change of an identifier (an MBID, a hash) is the subject of the
+  // change: both values stay on the card and are also listed for copying.
+  const subjectIsIdentifier =
+    !!subjectField && isTechnicalKey(String(change[subjectField]));
+  const before = hiddenLeaves(change.before, ["Current"], subjectIsIdentifier);
+  const after = hiddenLeaves(change.after, ["Proposed"], subjectIsIdentifier);
+  const identifiers = [...before.hidden, ...after.hidden];
+  leaves.push(...identifiers, ...siblings.hidden);
   return {
-    targets,
-    subject,
-    technical: technicalItems(owner, hidden),
-    body: { kind: "details", details },
+    ...common,
+    body: {
+      kind: "scalar",
+      current: change.before,
+      proposed: change.after,
+      cleared:
+        hasOwn(change, "after") &&
+        change.after === null &&
+        change.before !== null &&
+        change.before !== undefined,
+      seeTechnical: identifiers.length > 0,
+    },
+  };
+}
+
+/**
+ * What every change card shows, and the identifiers each one moves into
+ * Technical details. Owners («Echo», «Track 2 · Genre», «Change 3») are unique
+ * within the plan so a Technical details row can be tied to its card.
+ */
+export function planChangeViews(
+  plan: Pick<AgentPlan, "operation" | "targets" | "changes">,
+): ChangeView[] {
+  const nameOf = planTargetNamer(plan.targets);
+  const drafts = plan.changes.map((change, index) =>
+    changeDraft(change, index, plan, nameOf),
+  );
+  const single = drafts.map(({ targets }) => {
+    const [only] = targets;
+    return targets.length === 1 && only && only !== "Unknown target"
+      ? only
+      : null;
+  });
+  const countOf = (values: (string | null)[], value: string | null) =>
+    values.filter((entry) => entry === value).length;
+  const firstPass = drafts.map((draft, index) => {
+    const name = single[index] ?? null;
+    if (name === null) return `Change ${draft.number}`;
+    return countOf(single, name) > 1 ? `${name} · ${draft.subject}` : name;
+  });
+  return drafts.map(({ leaves, ...draft }, index) => {
+    const candidate = firstPass[index] ?? `Change ${draft.number}`;
+    const owner =
+      countOf(firstPass, candidate) > 1
+        ? `Change ${draft.number} · ${candidate}`
+        : candidate;
+    return {
+      ...draft,
+      owner,
+      numbered: owner.startsWith(`Change ${draft.number}`),
+      technical: technicalItems(owner, leaves),
+    };
+  });
+}
+
+/** Impact as chips, plus the lists and maps no chip can express. */
+export function impactView(impact: Record<string, unknown> | undefined): {
+  chips: string[];
+  details: Record<string, unknown> | null;
+  technical: TechnicalItem[];
+} {
+  const entries = Object.entries(impact ?? {});
+  const identifier = ([key, value]: [string, unknown]) =>
+    isTechnicalKey(key) || isTechnicalString(value);
+  const readable = Object.fromEntries(
+    entries.filter((entry) => !identifier(entry)),
+  );
+  const { visible, hidden } = redactTechnical({
+    ...impactDetails(readable),
+    ...Object.fromEntries(entries.filter(identifier)),
+  });
+  return {
+    chips: impactChips(readable),
+    details:
+      isRecord(visible) && Object.keys(visible).length > 0 ? visible : null,
+    technical: technicalItems("Impact", hidden),
   };
 }
 

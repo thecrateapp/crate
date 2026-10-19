@@ -50,6 +50,7 @@ export function StructuredValue({ value }: { value: unknown }) {
   }
 
   if (typeof value === "object") {
+    if (Object.keys(value).length === 0) return <>Empty</>;
     return (
       <dl className="space-y-1">
         {Object.entries(value).map(([key, entryValue]) => (

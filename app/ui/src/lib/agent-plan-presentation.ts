@@ -114,60 +114,52 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function impactChips(impact: Record<string, unknown>): string[] {
-  const chips: string[] = [];
-
-  for (const [key, value] of Object.entries(impact)) {
-    if (
-      (key === "filesystem" || key === "filesystem_writes") &&
-      typeof value === "boolean"
-    ) {
-      chips.push(value ? "Writes files" : "No file changes");
-      continue;
-    }
-    if (key === "notifications" && typeof value === "boolean") {
-      chips.push(value ? "Sends notifications" : "No notifications");
-      continue;
-    }
-    if (key === "public" && typeof value === "boolean") {
-      chips.push(value ? "Visible to listeners" : "Not public");
-      continue;
-    }
-    if (key === "database" && typeof value === "boolean") {
-      chips.push(value ? "Changes the database" : "No database changes");
-      continue;
-    }
-    if (key === "database_fields" && typeof value === "number") {
-      chips.push(`${value} database field${value === 1 ? "" : "s"}`);
-      continue;
-    }
-    if (key === "scope" && value === "global") {
-      chips.push("Whole library");
-      continue;
-    }
-    if (key === "scope" && value === "selected") {
-      chips.push("Selected items only");
-      continue;
-    }
-    if (key.endsWith("_count") && typeof value === "number") {
-      const noun = key
-        .slice(0, -"_count".length)
-        .replace(/_/g, " ")
-        .toLowerCase();
-      chips.push(`${value} ${noun}${value === 1 ? "" : "s"}`);
-      continue;
-    }
-    if (isPlainObject(value) || Array.isArray(value)) continue;
-    if (typeof value === "boolean") {
-      chips.push(`${humanizeKey(key)}: ${value ? "Yes" : "No"}`);
-      continue;
-    }
-    if (typeof value === "number" || typeof value === "string") {
-      chips.push(`${humanizeKey(key)}: ${value}`);
-    }
+function impactChip(key: string, value: unknown): string | null {
+  if (
+    (key === "filesystem" || key === "filesystem_writes") &&
+    typeof value === "boolean"
+  )
+    return value ? "Writes files" : "No file changes";
+  if (key === "notifications" && typeof value === "boolean")
+    return value ? "Sends notifications" : "No notifications";
+  if (key === "public" && typeof value === "boolean")
+    return value ? "Visible to listeners" : "Not public";
+  if (key === "database" && typeof value === "boolean")
+    return value ? "Changes the database" : "No database changes";
+  if (key === "database_fields" && typeof value === "number")
+    return `${value} database field${value === 1 ? "" : "s"}`;
+  if (key === "scope" && value === "global") return "Whole library";
+  if (key === "scope" && value === "selected") return "Selected items only";
+  if (key.endsWith("_count") && typeof value === "number") {
+    const noun = key
+      .slice(0, -"_count".length)
+      .replace(/_/g, " ")
+      .toLowerCase();
+    return `${value} ${noun}${value === 1 ? "" : "s"}`;
   }
+  if (typeof value === "boolean")
+    return `${humanizeKey(key)}: ${value ? "Yes" : "No"}`;
+  if (typeof value === "number" || typeof value === "string")
+    return `${humanizeKey(key)}: ${value}`;
+  return null;
+}
 
-  return chips;
+export function impactChips(impact: Record<string, unknown>): string[] {
+  return Object.entries(impact).flatMap(([key, value]) => {
+    const chip = impactChip(key, value);
+    return chip === null ? [] : [chip];
+  });
+}
+
+/** Impact entries no chip can express (lists, maps, empty values). */
+export function impactDetails(
+  impact: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(impact).filter(
+      ([key, value]) => impactChip(key, value) === null,
+    ),
+  );
 }
 
 function isRealId(value: unknown): value is number | string {
@@ -234,14 +226,12 @@ export function fieldDiff(
     const afterValue = inAfter ? after[key] : beforeValue;
 
     let status: FieldDiffRow["status"];
-    if (!inAfter) {
+    if (!inAfter || (inBefore && deepEqual(beforeValue, afterValue))) {
       status = "unchanged";
     } else if (afterValue === null && inBefore && beforeValue !== null) {
       status = "cleared";
     } else if (!inBefore || beforeValue === null) {
       status = "added";
-    } else if (deepEqual(beforeValue, afterValue)) {
-      status = "unchanged";
     } else {
       status = "changed";
     }

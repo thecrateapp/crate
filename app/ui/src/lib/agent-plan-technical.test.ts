@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { AgentPlan } from "./agent-integrations";
 import {
   changeTargetLabels,
-  changeView,
   editorialTrackIdentities,
   editorialView,
+  impactView,
   isTechnicalKey,
   isTechnicalString,
+  planChangeViews,
   redactTechnical,
   TECHNICAL_PLACEHOLDER,
   targetDisplayName,
@@ -145,72 +146,265 @@ describe("changeTargetLabels", () => {
   });
 });
 
-describe("changeView", () => {
-  it("diffs fields without identifiers and lists them as technical items", () => {
-    const view = changeView(
+const mbidBefore = "11111111-2222-4333-8444-555555555555";
+const mbidAfter = "99999999-8888-4777-8666-555555555555";
+
+function one(
+  change: Record<string, unknown>,
+  operation = "library_sync",
+  planTargets: AgentPlan["targets"] = targets,
+) {
+  const [view] = planChangeViews({
+    operation,
+    targets: planTargets,
+    changes: [change],
+  });
+  if (!view) throw new Error("no view");
+  return view;
+}
+
+describe("planChangeViews", () => {
+  it("lists added internal identifiers in Technical details only", () => {
+    const show = { entity_type: "show", name: hex, label: "Coilguns" };
+    const view = one(
       {
-        targets: [{ entity_type: "show", name: hex, label: "Coilguns" }],
+        targets: [show],
         before: {},
-        after: { city: "Madrid", item_id: uuid },
+        after: { city: "Madrid", item_id: uuid, source_ref: `upload:${uuid}` },
       },
-      0,
-      {
-        operation: "shows_import",
-        targets: [{ entity_type: "show", name: hex, label: "Coilguns" }],
-      },
+      "shows_import",
+      [show],
     );
     expect(view.targets).toEqual(["Coilguns"]);
     expect(view.body).toEqual({
       kind: "diff",
       rows: [
-        { key: "city", before: undefined, after: "Madrid", status: "added" },
+        {
+          key: "city",
+          before: undefined,
+          after: "Madrid",
+          status: "added",
+          seeTechnical: false,
+        },
+        {
+          key: "source_ref",
+          before: undefined,
+          after: TECHNICAL_PLACEHOLDER,
+          status: "added",
+          seeTechnical: true,
+        },
       ],
     });
     expect(view.technical).toEqual([
       { label: "Coilguns · Proposed › Item id", value: uuid },
+      { label: "Coilguns · Proposed › Source ref", value: `upload:${uuid}` },
     ]);
   });
 
-  it("names target references in a change body and numbers its owner", () => {
-    const view = changeView(
-      {
-        issue_id: 42,
-        action: "delete_track",
-        targets: [
-          { entity_type: "artist", entity_uid: "artist-1" },
-          { entity_type: "track", entity_uid: "track-1" },
-        ],
-        deleted_targets: [{ entity_type: "track", entity_uid: "track-1" }],
+  // Mirrors agent_sync's update_index change and native_scan's track payload.
+  it("shows a changed MusicBrainz id as changed, with both values", () => {
+    const view = one({
+      entity_uid: "track-1",
+      action: "update_index",
+      relative_path: "Echo/Album/01 Song.flac",
+      before: {
+        title: "Song",
+        genre: null,
+        musicbrainz_trackid: mbidBefore,
       },
-      2,
-      { operation: "repairs", targets },
-    );
-    expect(view.subject).toBe("Delete track");
+      after: {
+        title: "Song",
+        genre: null,
+        musicbrainz_trackid: mbidAfter,
+      },
+    });
+    expect(view.discriminator).toBe("Echo/Album/01 Song.flac");
+    expect(view.details).toBeNull();
     expect(view.body).toEqual({
+      kind: "diff",
+      rows: [
+        {
+          key: "title",
+          before: "Song",
+          after: "Song",
+          status: "unchanged",
+          seeTechnical: false,
+        },
+        {
+          key: "genre",
+          before: null,
+          after: null,
+          status: "unchanged",
+          seeTechnical: false,
+        },
+        {
+          key: "musicbrainz_trackid",
+          before: mbidBefore,
+          after: mbidAfter,
+          status: "changed",
+          seeTechnical: true,
+        },
+      ],
+    });
+    expect(view.technical).toEqual([
+      {
+        label: "Missing track · Current › Musicbrainz trackid",
+        value: mbidBefore,
+      },
+      {
+        label: "Missing track · Proposed › Musicbrainz trackid",
+        value: mbidAfter,
+      },
+    ]);
+  });
+
+  it("keeps both values of a changed identifier field on the card", () => {
+    const view = one(
+      {
+        entity_uid: "artist-1",
+        field: "mbid",
+        before: mbidBefore,
+        after: mbidAfter,
+      },
+      "metadata_update",
+    );
+    expect(view.subject).toBe("Mbid");
+    expect(view.body).toEqual({
+      kind: "scalar",
+      current: mbidBefore,
+      proposed: mbidAfter,
+      cleared: false,
+      seeTechnical: true,
+    });
+    expect(view.technical.map(({ value }) => value)).toEqual([
+      mbidBefore,
+      mbidAfter,
+    ]);
+  });
+
+  it("keeps the change's other keys as details", () => {
+    const view = one(
+      {
+        artist_uid: "artist-1",
+        providers: ["musicbrainz", "lastfm"],
+        facets: ["bio"],
+        locked_fields_preserved: ["bio"],
+        value_policy: "only_missing_unlocked_values",
+        after: "provider_result_unknown_until_execution",
+      },
+      "enrichment",
+    );
+    expect(view.details).toEqual({
+      providers: ["musicbrainz", "lastfm"],
+      facets: ["bio"],
+      locked_fields_preserved: ["bio"],
+      value_policy: "only_missing_unlocked_values",
+    });
+    expect(view.body).toMatchObject({
+      kind: "scalar",
+      proposed: "provider_result_unknown_until_execution",
+    });
+  });
+
+  it("names target references in a change body and numbers its owner", () => {
+    const [, , view] = planChangeViews({
+      operation: "repairs",
+      targets,
+      changes: [
+        { entity_uid: "artist-1", field: "bio", before: "a", after: "b" },
+        { entity_uid: "track-1", field: "title", before: "a", after: "b" },
+        {
+          issue_id: 42,
+          action: "delete_track",
+          targets: [
+            { entity_type: "artist", entity_uid: "artist-1" },
+            { entity_type: "track", entity_uid: "track-1" },
+          ],
+          deleted_targets: [{ entity_type: "track", entity_uid: "track-1" }],
+        },
+      ],
+    });
+    expect(view?.subject).toBe("Delete track");
+    expect(view?.numbered).toBe(true);
+    expect(view?.body).toEqual({
       kind: "details",
       details: { action: "delete_track", deleted_targets: ["Missing track"] },
     });
-    expect(view.technical).toEqual([
+    expect(view?.technical).toEqual([
       { label: "Change 3 · Issue id", value: 42 },
+    ]);
+  });
+
+  it("numbers unlabelled targets and keeps owners unique", () => {
+    const tracks: AgentPlan["targets"] = [
+      { entity_type: "track", entity_uid: "t-1" },
+      { entity_type: "track", entity_uid: "t-2" },
+    ];
+    const views = planChangeViews({
+      operation: "metadata_update",
+      targets: tracks,
+      changes: [
+        { entity_uid: "t-1", field: "genre", before: ["a"], after: ["b"] },
+        { entity_uid: "t-2", field: "genre", before: ["a"], after: ["b"] },
+        { entity_uid: "t-2", field: "year", before: ["1"], after: ["2"] },
+        { entity_uid: "t-2", field: "year", before: ["1"], after: ["3"] },
+      ],
+    });
+    expect(views.map(({ targets: names }) => names)).toEqual([
+      ["Track 1"],
+      ["Track 2"],
+      ["Track 2"],
+      ["Track 2"],
+    ]);
+    expect(views.map(({ owner }) => owner)).toEqual([
+      "Track 1",
+      "Track 2 · Genre",
+      "Change 3 · Track 2 · Year",
+      "Change 4 · Track 2 · Year",
+    ]);
+    expect(views.map(({ numbered }) => numbered)).toEqual([
+      false,
+      false,
+      true,
+      true,
     ]);
   });
 
   it("shows the photo flag in words", () => {
     expect(
-      changeView(
+      one(
         {
           artist_uid: "artist-1",
           field: "has_photo",
           before: false,
           after: true,
         },
-        0,
-        { operation: "repair_photo_flag", targets },
+        "repair_photo_flag",
       ).body,
     ).toEqual({
       kind: "photo",
       current: "No photo",
       proposed: "Photo present",
+    });
+  });
+});
+
+describe("impactView", () => {
+  it("keeps lists and maps under the chips and lists identifiers", () => {
+    expect(
+      impactView({
+        filesystem: false,
+        external_providers: ["musicbrainz"],
+        provider_min_intervals_seconds: { musicbrainz: 1 },
+        snapshot_hash: hex,
+      }),
+    ).toEqual({
+      chips: ["No file changes"],
+      details: {
+        external_providers: ["musicbrainz"],
+        provider_min_intervals_seconds: { musicbrainz: 1 },
+      },
+      technical: [{ label: "Impact · Snapshot hash", value: hex }],
     });
   });
 });

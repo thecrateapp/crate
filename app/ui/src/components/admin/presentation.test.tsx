@@ -137,6 +137,12 @@ describe("TechnicalDetails", () => {
 });
 
 describe("StructuredValue", () => {
+  it("renders an empty object as Empty", () => {
+    const { container } = render(<StructuredValue value={{}} />);
+    expect(container).toHaveTextContent(/^Empty$/);
+    expect(container.querySelector("dl")).toBeNull();
+  });
+
   it("renders nested structured content without raw JSON", () => {
     const { container } = render(
       <StructuredValue
