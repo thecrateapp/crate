@@ -31,6 +31,8 @@ def _empty_status() -> dict:
         "total_tracks": 0,
         "current_profiles": 0,
         "stale_profiles": 0,
+        "outdated_profiles": 0,
+        "source_changed_profiles": 0,
         "missing_profiles": 0,
         "coverage_percent": 0.0,
         "quality": {"full": 0, "partial": 0, "legacy": 0, "unavailable": 0},
@@ -41,6 +43,7 @@ def _empty_status() -> dict:
             "exhausted": 0,
             "completed": 0,
         },
+        "versions": [],
         "refreshed_at": None,
     }
 

@@ -292,6 +292,18 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                     OR profile.source_stale_at IS NOT NULL
                                 )
                                 AS is_stale,
+                            profile.track_id IS NOT NULL
+                                AND profile.quality <> 'unavailable'
+                                AND profile.source_stale_at IS NULL
+                                AND (
+                                    profile.profile_version <> :profile_version
+                                    OR profile.analyzer_version <> :analyzer_version
+                                )
+                                AS is_outdated,
+                            profile.track_id IS NOT NULL
+                                AND profile.quality <> 'unavailable'
+                                AND profile.source_stale_at IS NOT NULL
+                                AS is_source_changed,
                             processing.state,
                             processing.attempts,
                             processing.target_generation = :analyzer_version
@@ -307,6 +319,10 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                         COUNT(*)::int AS total_tracks,
                         COUNT(*) FILTER (WHERE is_current)::int AS current_profiles,
                         COUNT(*) FILTER (WHERE is_stale)::int AS stale_profiles,
+                        COUNT(*) FILTER (WHERE is_outdated)::int AS outdated_profiles,
+                        COUNT(*) FILTER (
+                            WHERE is_source_changed
+                        )::int AS source_changed_profiles,
                         COUNT(*) FILTER (WHERE quality = 'full')::int AS full_profiles,
                         COUNT(*) FILTER (
                             WHERE quality = 'partial'
@@ -344,6 +360,23 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
             .mappings()
             .one()
         )
+        version_rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT profile.analyzer_version, COUNT(*)::int AS profiles
+                    FROM track_mix_profiles profile
+                    JOIN library_tracks track ON track.id = profile.track_id
+                    LEFT JOIN library_albums album ON album.id = track.album_id
+                    WHERE album.quarantined_at IS NULL
+                    GROUP BY profile.analyzer_version
+                    ORDER BY profiles DESC, profile.analyzer_version
+                    """
+                )
+            )
+            .mappings()
+            .all()
+        )
     total_tracks = int(row["total_tracks"])
     current_profiles = int(row["current_profiles"])
     snapshot = {
@@ -352,6 +385,8 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
         "total_tracks": total_tracks,
         "current_profiles": current_profiles,
         "stale_profiles": int(row["stale_profiles"]),
+        "outdated_profiles": int(row["outdated_profiles"]),
+        "source_changed_profiles": int(row["source_changed_profiles"]),
         "missing_profiles": max(total_tracks - current_profiles, 0),
         "coverage_percent": (
             round(current_profiles / total_tracks * 100, 1) if total_tracks else 0.0
@@ -369,6 +404,14 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
             "exhausted": int(row["exhausted"]),
             "completed": int(row["completed"]),
         },
+        "versions": [
+            {
+                "analyzer_version": version["analyzer_version"],
+                "profiles": int(version["profiles"]),
+                "current": version["analyzer_version"] == SMART_MIX_ANALYZER_VERSION,
+            }
+            for version in version_rows
+        ],
     }
     set_ops_runtime_state(COVERAGE_STATE_KEY, snapshot)
     return snapshot

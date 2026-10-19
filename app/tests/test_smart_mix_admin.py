@@ -70,6 +70,8 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
         "total_tracks": 4,
         "current_profiles": 1,
         "stale_profiles": 1,
+        "outdated_profiles": 1,
+        "source_changed_profiles": 0,
         "missing_profiles": 3,
         "coverage_percent": 25.0,
         "quality": {
@@ -85,6 +87,10 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
             "exhausted": 0,
             "completed": 0,
         },
+        "versions": [
+            {"analyzer_version": "future-v2", "profiles": 1, "current": False},
+            {"analyzer_version": ANALYZER_VERSION, "profiles": 1, "current": True},
+        ],
     }
 
 
@@ -98,9 +104,146 @@ def test_admin_routes_require_analysis_management_permission(test_app) -> None:
             "/api/admin/smart-mix/backfill",
             json={"batchSize": 25, "maxAttempts": 3},
         )
+        tracks = test_app.get("/api/admin/smart-mix/tracks")
+        reanalyze = test_app.post("/api/admin/smart-mix/tracks/1/reanalyze")
 
     assert status.status_code == 403
     assert backfill.status_code == 403
+    assert tracks.status_code == 403
+    assert reanalyze.status_code == 403
+
+
+def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:
+    del pg_db
+    current, outdated, changed, missing, failed = _create_tracks(5)
+    _insert_profile(current, ANALYZER_VERSION)
+    _insert_profile(outdated, "smart-mix-audio-v3")
+    _insert_profile(changed, ANALYZER_VERSION, source_stale=True)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO track_processing_state (
+                    track_id, pipeline, state, attempts, priority, last_error
+                )
+                VALUES (:track_id, 'smart_mix', 'failed', 3, 5, 'decoder exploded')
+                """
+            ),
+            {"track_id": failed},
+        )
+
+    from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
+
+    every = {row["track_id"]: row for row in list_smart_mix_tracks(limit=100)}
+
+    assert every[current]["status"] == "current"
+    assert every[outdated]["status"] == "outdated"
+    assert every[outdated]["analyzer_version"] == "smart-mix-audio-v3"
+    assert every[changed]["status"] == "source_changed"
+    assert every[missing]["status"] == "missing"
+    assert every[failed]["processing_error"] == "decoder exploded"
+    for status, expected in (
+        ("current", [current]),
+        ("outdated", [outdated]),
+        ("source_changed", [changed]),
+        ("missing", [failed, missing]),
+        ("failed", [failed]),
+    ):
+        rows = list_smart_mix_tracks(status=status, limit=100)
+        assert [row["track_id"] for row in rows if row["track_id"] in every] == (
+            expected
+        ), status
+    by_version = list_smart_mix_tracks(analyzer_version="smart-mix-audio-v3")
+    assert [row["track_id"] for row in by_version] == [outdated]
+
+
+def test_track_list_searches_and_pages_by_track_id(pg_db) -> None:
+    del pg_db
+    track_ids = _create_tracks(3)
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE library_tracks SET title = '100% Pure_Love' WHERE id = :id"),
+            {"id": track_ids[1]},
+        )
+
+    from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
+
+    found = list_smart_mix_tracks(search="pure_love")
+    literal = list_smart_mix_tracks(search="100%")
+    wildcard = list_smart_mix_tracks(search="Pure%Love")
+    first = list_smart_mix_tracks(limit=2)
+    second = list_smart_mix_tracks(limit=2, before_track_id=first[-1]["track_id"])
+
+    assert [row["track_id"] for row in found] == [track_ids[1]]
+    assert [row["track_id"] for row in literal] == [track_ids[1]]
+    assert wildcard == []
+    assert [row["track_id"] for row in first] == [track_ids[2], track_ids[1]]
+    assert second[0]["track_id"] == track_ids[0]
+
+
+def test_track_route_pages_and_rejects_short_searches(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    calls: list[dict] = []
+
+    def fake_list(**kwargs):
+        calls.append(kwargs)
+        return [
+            {"track_id": track_id, "status": "missing", "title": f"Track {track_id}"}
+            for track_id in (30, 20, 10)
+        ][: kwargs["limit"]]
+
+    monkeypatch.setattr(smart_mix_admin, "list_smart_mix_tracks", fake_list)
+
+    page = test_app.get("/api/admin/smart-mix/tracks?status=missing&q=Fazer&limit=2")
+    short = test_app.get("/api/admin/smart-mix/tracks?q=ab")
+    unknown = test_app.get("/api/admin/smart-mix/tracks?status=bogus")
+
+    assert page.status_code == 200
+    assert [track["trackId"] for track in page.json()["tracks"]] == [30, 20]
+    assert page.json()["nextBefore"] == 20
+    assert calls[0] == {
+        "status": "missing",
+        "analyzer_version": None,
+        "search": "Fazer",
+        "before_track_id": None,
+        "limit": 3,
+    }
+    assert short.status_code == 422
+    assert unknown.status_code == 422
+
+
+def test_reanalyze_queues_one_profile_task_per_track(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    queued: list[tuple[str, dict, str]] = []
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "resolve_smart_mix_track",
+        lambda *, track_id: (
+            {"id": track_id, "entity_uid": "uid-7"} if track_id == 7 else None
+        ),
+    )
+
+    def fake_dedup(task_type, params, *, dedup_key):
+        queued.append((task_type, params, dedup_key))
+        return "task-1" if len(queued) == 1 else None
+
+    monkeypatch.setattr(smart_mix_admin, "create_task_dedup", fake_dedup)
+
+    first = test_app.post("/api/admin/smart-mix/tracks/7/reanalyze")
+    again = test_app.post("/api/admin/smart-mix/tracks/7/reanalyze")
+    missing = test_app.post("/api/admin/smart-mix/tracks/8/reanalyze")
+
+    assert first.status_code == 202
+    assert first.json() == {"taskId": "task-1", "status": "queued"}
+    assert again.json() == {"taskId": None, "status": "already_queued"}
+    assert missing.status_code == 404
+    assert queued[0] == (
+        "compute_smart_mix_profile",
+        {"track_id": 7, "track_entity_uid": "uid-7"},
+        "smart-mix-profile:7",
+    )
 
 
 def _coverage(refreshed_at: str | None = "2099-01-01T00:00:00+00:00") -> dict:
@@ -366,3 +509,30 @@ def _create_tracks(count: int) -> list[int]:
             )
             for index in range(count)
         ]
+
+
+def _insert_profile(
+    track_id: int, analyzer_version: str, *, source_stale: bool = False
+) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO track_mix_profiles (
+                    track_id, profile_version, profile_revision, analyzer,
+                    analyzer_version, source_revision, quality, analyzed_at,
+                    source_stale_at
+                )
+                VALUES (
+                    :track_id, 1, :revision, 'crate-rust', :analyzer_version,
+                    'source', 'full', NOW(), CASE WHEN :stale THEN NOW() END
+                )
+                """
+            ),
+            {
+                "track_id": track_id,
+                "revision": f"profile-{track_id}",
+                "analyzer_version": analyzer_version,
+                "stale": source_stale,
+            },
+        )

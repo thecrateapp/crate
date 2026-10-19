@@ -23,6 +23,10 @@ vi.mock("sonner", () => ({
   },
 }));
 
+vi.mock("@/components/SmartMixTracks", () => ({
+  SmartMixTracks: () => null,
+}));
+
 import { SmartMixCoverage } from "./SmartMixCoverage";
 
 const status = {

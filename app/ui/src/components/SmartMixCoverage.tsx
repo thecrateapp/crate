@@ -13,6 +13,10 @@ import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import {
+  SmartMixTracks,
+  type SmartMixVersionCount,
+} from "@/components/SmartMixTracks";
 
 type SmartMixControlState = "idle" | "running" | "paused";
 
@@ -22,6 +26,8 @@ interface SmartMixAdminStatus {
   totalTracks: number;
   currentProfiles: number;
   staleProfiles: number;
+  outdatedProfiles?: number;
+  sourceChangedProfiles?: number;
   missingProfiles: number;
   coveragePercent: number;
   quality: {
@@ -37,6 +43,7 @@ interface SmartMixAdminStatus {
     exhausted: number;
     completed: number;
   };
+  versions?: SmartMixVersionCount[];
   refreshedAt: string | null;
   controlState: SmartMixControlState;
   activeTask: {
@@ -225,6 +232,8 @@ export function SmartMixCoverage() {
         <Metric label="Failed" value={data.processing.failed} />
         <Metric label="Exhausted" value={data.processing.exhausted} />
       </div>
+
+      <SmartMixTracks counts={data} />
     </div>
   );
 }

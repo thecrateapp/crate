@@ -3,14 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.permissions import require_permission
 from crate.api.schemas.smart_mix_admin import (
     SmartMixAdminStatusResponse,
     SmartMixBackfillRequest,
     SmartMixBackfillResponse,
+    SmartMixReanalyzeResponse,
+    SmartMixTrackListResponse,
 )
+from crate.db.jobs.analysis_storage import resolve_smart_mix_track
 from crate.db.jobs.smart_mix_backfill import (
     queue_next_smart_mix_batch,
     set_smart_mix_campaign_status,
@@ -20,6 +23,7 @@ from crate.db.queries.smart_mix_admin import (
     get_smart_mix_admin_status,
     get_smart_mix_campaign_status,
 )
+from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.tasks import create_task_dedup
 
@@ -29,6 +33,11 @@ BACKFILL_TASK_TYPE = "backfill_smart_mix_profiles"
 COVERAGE_TASK_TYPE = "refresh_smart_mix_coverage"
 COVERAGE_DEDUP_KEY = "smart-mix:coverage"
 COVERAGE_MAX_AGE_SECONDS = 600
+PROFILE_TASK_TYPE = "compute_smart_mix_profile"
+TRACK_PAGE_SIZE = 50
+TrackStatusFilter = Literal[
+    "all", "current", "outdated", "source_changed", "unavailable", "missing", "failed"
+]
 _ACTIVE_TASK_STATUSES = {"pending", "running", "delegated", "completing"}
 
 
@@ -85,6 +94,54 @@ def smart_mix_status(request: Request) -> SmartMixAdminStatusResponse:
             "campaign": campaign,
             "activeTask": _active_backfill_task(),
         }
+    )
+
+
+@router.get("/tracks", response_model=SmartMixTrackListResponse)
+def smart_mix_tracks(
+    request: Request,
+    status: TrackStatusFilter = "all",
+    version: str | None = Query(default=None, max_length=64),
+    q: str | None = Query(default=None, min_length=3, max_length=100),
+    before: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=TRACK_PAGE_SIZE, ge=1, le=100),
+) -> SmartMixTrackListResponse:
+    _require_manage(request)
+    rows = list_smart_mix_tracks(
+        status=status,
+        analyzer_version=version,
+        search=q.strip() if q else None,
+        before_track_id=before,
+        limit=limit + 1,
+    )
+    page = rows[:limit]
+    return SmartMixTrackListResponse.model_validate(
+        {
+            "tracks": page,
+            "nextBefore": page[-1]["track_id"] if len(rows) > limit else None,
+        }
+    )
+
+
+@router.post(
+    "/tracks/{track_id}/reanalyze",
+    response_model=SmartMixReanalyzeResponse,
+    status_code=202,
+)
+def reanalyze_smart_mix_track(
+    track_id: int, request: Request
+) -> SmartMixReanalyzeResponse:
+    _require_manage(request)
+    track = resolve_smart_mix_track(track_id=track_id)
+    if track is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    task_id = create_task_dedup(
+        PROFILE_TASK_TYPE,
+        {"track_id": int(track["id"]), "track_entity_uid": track["entity_uid"]},
+        dedup_key=f"smart-mix-profile:{int(track['id'])}",
+    )
+    return SmartMixReanalyzeResponse(
+        task_id=task_id, status="queued" if task_id else "already_queued"
     )
 
 
