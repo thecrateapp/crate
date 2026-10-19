@@ -31,6 +31,7 @@ def _write_capture(
     dropped: int = 0,
     markers: bool = True,
     silent: bool = False,
+    wall_s: float | None = None,
 ) -> Path:
     total_s = PRE_S + MIX_S + 4
     frames = total_s * RATE
@@ -58,6 +59,8 @@ def _write_capture(
         "frames": frames,
         "droppedFrames": dropped,
         "underruns": 0,
+        "startedAtMs": 1_000_000,
+        "stoppedAtMs": 1_000_000 + round((wall_s or total_s) * 1000),
         "markers": (
             [
                 f"{start}:start a>b mode=BEATMATCH engaged=true bass=balanced",
@@ -91,6 +94,7 @@ def test_an_aligned_mix_passes_every_gate(tmp_path: Path) -> None:
         "clipping": True,
         "truePeak": True,
         "captureIntact": True,
+        "captureContinuous": True,
         "signal": True,
         "phaseP95": True,
     }
@@ -131,6 +135,29 @@ def test_dropped_capture_frames_fail_the_capture(tmp_path: Path) -> None:
     result = _analyze(_write_capture(tmp_path, dropped=480))
 
     assert result["gates"]["captureIntact"] is False
+
+
+def test_a_bus_that_stops_writing_fails_continuity(tmp_path: Path) -> None:
+    result = _analyze(_write_capture(tmp_path, wall_s=PRE_S + MIX_S + 4 + 8))
+
+    assert result["captureGapS"] == pytest.approx(8.0)
+    assert result["gates"]["captureContinuous"] is False
+    assert result["passed"] is False
+
+
+def test_a_capture_without_its_wall_clock_span_is_not_trusted(
+    tmp_path: Path,
+) -> None:
+    path = _write_capture(tmp_path)
+    summary_path = path.with_suffix(".json")
+    summary = json.loads(summary_path.read_text())
+    del summary["stoppedAtMs"]
+    summary_path.write_text(json.dumps(summary))
+
+    result = _analyze(path)
+
+    assert result["captureGapS"] is None
+    assert result["gates"]["captureContinuous"] is False
 
 
 def test_measures_the_incoming_bass_coming_back(tmp_path: Path) -> None:

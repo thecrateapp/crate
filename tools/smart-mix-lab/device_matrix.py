@@ -98,6 +98,7 @@ def summarize(name: str, result: dict[str, Any]) -> dict[str, Any]:
         "phaseP95Ms": max(phases) if phases else None,
         "underruns": result.get("underruns"),
         "droppedFrames": result.get("droppedFrames"),
+        "captureGapS": result.get("captureGapS"),
         "gates": result.get("gates", {}),
     }
 
@@ -162,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{row['name']:<12} passed={row['passed']} completed={row['completed']}"
             f" engaged={row['engaged']} phaseP95={row['phaseP95Ms']}"
             f" underruns={row['underruns']} dropped={row['droppedFrames']}"
+            f" gapS={row['captureGapS']}"
         )
     return 0 if all(row["passed"] for row in rows) else 1
 

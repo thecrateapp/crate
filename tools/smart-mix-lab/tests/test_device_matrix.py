@@ -53,6 +53,7 @@ def test_the_summary_reports_the_worst_phase_and_counters() -> None:
             "passed": True,
             "underruns": 0,
             "droppedFrames": 0,
+            "captureGapS": 0.12,
             "transitions": [
                 {"status": "measured", "engaged": True, "phase": {"p95Ms": 3.0}},
                 {"status": "measured", "engaged": True, "phase": {"p95Ms": 6.0}},
@@ -63,6 +64,7 @@ def test_the_summary_reports_the_worst_phase_and_counters() -> None:
     assert row["passed"] is True
     assert row["phaseP95Ms"] == 6.0
     assert row["engaged"] == 2
+    assert row["captureGapS"] == 0.12
 
 
 def test_offline_removes_and_restores_the_server_tunnel() -> None:

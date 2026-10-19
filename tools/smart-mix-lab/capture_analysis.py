@@ -32,6 +32,7 @@ MAX_BEAT_MS = 750.0
 SEARCH_MIN_BEAT_MS = 300.0
 SEARCH_MAX_BEAT_MS = 1100.0
 TEMPO_REFERENCE_S = 8.0
+MAX_CAPTURE_GAP_S = 1.0
 
 
 @dataclass(frozen=True)
@@ -259,6 +260,15 @@ def analyze_transition(capture: Capture, transition: Transition) -> dict[str, An
     return result
 
 
+def capture_gap_s(capture: Capture) -> float | None:
+    started = capture.summary.get("startedAtMs")
+    stopped = capture.summary.get("stoppedAtMs")
+    if started is None or stopped is None:
+        return None
+    wall_s = (int(stopped) - int(started)) / 1000
+    return round(wall_s - capture.mix.shape[0] / capture.sample_rate, 2)
+
+
 def analyze(capture: Capture) -> dict[str, Any]:
     total = capture.mix.shape[0]
     if total == 0 or rms_dbfs(capture.mix) < MIN_DECK_RMS_DBFS:
@@ -270,10 +280,12 @@ def analyze(capture: Capture) -> dict[str, Any]:
     dropped = int(capture.summary.get("droppedFrames", 0))
     phase_p95 = [item["phase"]["p95Ms"] for item in measured if "phase" in item]
     mixed = [item for item in measured if "clippedSamples" in item]
+    gap_s = capture_gap_s(capture)
     gates = {
         "clipping": all(item["clippedSamples"] == 0 for item in mixed),
         "truePeak": all(item["truePeakDbtp"] <= TRUE_PEAK_LIMIT_DBTP for item in mixed),
         "captureIntact": dropped == 0,
+        "captureContinuous": gap_s is not None and gap_s <= MAX_CAPTURE_GAP_S,
         "signal": all(item["status"] == "measured" for item in measured),
     }
     if phase_p95:
@@ -288,6 +300,7 @@ def analyze(capture: Capture) -> dict[str, Any]:
         "underruns": int(capture.summary.get("underruns", 0)),
         "droppedFrames": dropped,
         "busStallPolls": int(capture.summary.get("busStallPolls", 0)),
+        "captureGapS": gap_s,
         "transitions": measured,
         "gates": gates,
         "passed": bool(measured) and all(gates.values()),
