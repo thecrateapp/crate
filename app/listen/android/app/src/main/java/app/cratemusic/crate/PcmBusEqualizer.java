@@ -2,16 +2,32 @@ package app.cratemusic.crate;
 
 import androidx.annotation.Nullable;
 
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
+
 final class PcmBusEqualizer {
     static final int[] BANDS_HZ = { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
     static final double Q = 1.41;
     static final float MAX_GAIN_DB = 12.0f;
 
+    private static final class Request {
+        final float[] gainsDb;
+        final int rampFrames;
+
+        Request(float[] gainsDb, int rampFrames) {
+            this.gainsDb = gainsDb;
+            this.rampFrames = rampFrames;
+        }
+    }
+
     private final int sampleRate;
     private final int channels;
+    private final AtomicReference<Request> pending = new AtomicReference<>();
+    private final float[] currentDb = new float[BANDS_HZ.length];
+    private final float[] targetDb = new float[BANDS_HZ.length];
+    private final double[][] coefficients = new double[BANDS_HZ.length][];
     private final double[][] state;
-    @Nullable
-    private volatile double[][] coefficients;
+    private int remainingRampFrames;
 
     PcmBusEqualizer(int sampleRate, int channels) {
         this.sampleRate = sampleRate;
@@ -20,27 +36,30 @@ final class PcmBusEqualizer {
     }
 
     void setGains(@Nullable float[] gainsDb) {
-        double[][] next = new double[BANDS_HZ.length][];
-        boolean active = false;
+        setGains(gainsDb, 0);
+    }
+
+    void setGains(@Nullable float[] gainsDb, int rampFrames) {
+        float[] targets = new float[BANDS_HZ.length];
         for (int band = 0; band < BANDS_HZ.length; band++) {
             float gainDb = gainsDb != null && band < gainsDb.length ? gainsDb[band] : 0.0f;
-            gainDb = Math.max(-MAX_GAIN_DB, Math.min(MAX_GAIN_DB, gainDb));
-            if (gainDb == 0.0f) continue;
-            next[band] = peaking(BANDS_HZ[band], gainDb);
-            active = true;
+            targets[band] = Math.max(-MAX_GAIN_DB, Math.min(MAX_GAIN_DB, gainDb));
         }
-        coefficients = active ? next : null;
+        pending.set(new Request(targets, Math.max(0, rampFrames)));
     }
 
     boolean isActive() {
-        return coefficients != null;
+        for (double[] band : coefficients) {
+            if (band != null) return true;
+        }
+        return false;
     }
 
     void process(float[] samples, int frames) {
-        double[][] bands = coefficients;
-        if (bands == null) return;
-        for (int band = 0; band < bands.length; band++) {
-            double[] c = bands[band];
+        applyPendingRequest();
+        advanceRamp(frames);
+        for (int band = 0; band < coefficients.length; band++) {
+            double[] c = coefficients[band];
             if (c == null) continue;
             double[] z = state[band];
             for (int frame = 0; frame < frames; frame++) {
@@ -55,6 +74,39 @@ final class PcmBusEqualizer {
                 }
             }
         }
+    }
+
+    private void applyPendingRequest() {
+        Request request = pending.getAndSet(null);
+        if (request == null) return;
+        System.arraycopy(request.gainsDb, 0, targetDb, 0, targetDb.length);
+        remainingRampFrames = request.rampFrames;
+        if (remainingRampFrames == 0) {
+            System.arraycopy(targetDb, 0, currentDb, 0, currentDb.length);
+            for (int band = 0; band < BANDS_HZ.length; band++) updateBand(band);
+        }
+    }
+
+    private void advanceRamp(int frames) {
+        if (remainingRampFrames <= 0) return;
+        float fraction = Math.min(1.0f, frames / (float) remainingRampFrames);
+        remainingRampFrames = Math.max(0, remainingRampFrames - frames);
+        for (int band = 0; band < BANDS_HZ.length; band++) {
+            if (currentDb[band] == targetDb[band]) continue;
+            currentDb[band] = remainingRampFrames == 0
+                ? targetDb[band]
+                : currentDb[band] + (targetDb[band] - currentDb[band]) * fraction;
+            updateBand(band);
+        }
+    }
+
+    private void updateBand(int band) {
+        if (currentDb[band] == 0.0f) {
+            coefficients[band] = null;
+            Arrays.fill(state[band], 0.0);
+            return;
+        }
+        coefficients[band] = peaking(BANDS_HZ[band], currentDb[band]);
     }
 
     private double[] peaking(int frequencyHz, float gainDb) {

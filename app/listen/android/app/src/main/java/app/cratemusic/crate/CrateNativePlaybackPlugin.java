@@ -291,7 +291,11 @@ public class CrateNativePlaybackPlugin extends Plugin {
         try {
             float[] gains = parseGains(call.getArray("gains"));
             runOnMain(call, () -> {
-                service.setEq(call.getBoolean("enabled", false), gains);
+                service.setEq(
+                    call.getBoolean("enabled", false),
+                    gains,
+                    call.getInt("rampMs", (int) CrateNativePlaybackService.DEFAULT_EQ_RAMP_MS)
+                );
                 call.resolve(service.getSnapshot());
             });
         } catch (JSONException e) {

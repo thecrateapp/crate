@@ -96,6 +96,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     };
     static final boolean USE_PCM_BUS = true;
+    static final long DEFAULT_EQ_RAMP_MS = 80L;
     private final PcmBusMixer pcmBusMixer = new PcmBusMixer();
     private final NativeQueueState queueState = new NativeQueueState();
     private final NativeContinuationPolicy continuationPolicy =
@@ -147,6 +148,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     );
     private float[] currentEqGains = new float[10];
     private boolean eqEnabled = false;
+    private long eqRampMs = DEFAULT_EQ_RAMP_MS;
     private boolean sessionRegistered = false;
     private boolean resumeAuthorizationPending = false;
     private boolean restoredPlayWhenReady = false;
@@ -1861,8 +1863,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (deckBPlayer != null) deckBPlayer.setPlaybackSpeed(safeRate);
     }
 
-    public void setEq(boolean enabled, float[] gains) {
+    public void setEq(boolean enabled, float[] gains, int rampMs) {
         eqEnabled = enabled;
+        eqRampMs = Math.max(0, rampMs);
         currentEqGains = gains == null ? new float[10] : gains;
         applyEqForCurrentTrack();
     }
@@ -2347,9 +2350,13 @@ public class CrateNativePlaybackService extends MediaSessionService {
         emit("eqChanged", payload);
     }
 
+    private int eqRampFrames() {
+        return (int) (eqRampMs * PcmBusMixer.SAMPLE_RATE / 1_000L);
+    }
+
     private boolean applySystemEqualizer(float[] gains) {
         if (USE_PCM_BUS) {
-            pcmBusMixer.equalizer().setGains(gains);
+            pcmBusMixer.equalizer().setGains(gains, eqRampFrames());
             return true;
         }
         if (
@@ -2370,7 +2377,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void releaseSystemEqualizer() {
-        pcmBusMixer.equalizer().setGains(null);
+        pcmBusMixer.equalizer().setGains(null, eqRampFrames());
         if (eqController != null) {
             eqController.releaseAll();
         }
