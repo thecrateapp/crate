@@ -106,6 +106,8 @@ services:
       target: api
     container_name: crate-dev-api
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -216,6 +218,8 @@ services:
       target: worker-core
     container_name: crate-dev-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -397,6 +401,8 @@ services:
       target: worker-core
     container_name: crate-dev-maintenance-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -508,6 +514,8 @@ services:
       target: worker-analysis
     container_name: crate-dev-analysis-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data

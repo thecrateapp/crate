@@ -12,6 +12,28 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes AI configuration with native controls and operational limits", async () => {
+    window.history.pushState(null, "", "/operations/ai-agents");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "AI agents configuration",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Credential storage and rotation" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Limits and metering" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "MCP integrations" })
+        .getAttribute("href"),
+    ).toBe("/architecture/agents-and-mcp");
+  });
+
   it("publishes the MCP architecture guide with operational reading paths", async () => {
     window.history.pushState(null, "", "/architecture/agents-and-mcp");
     render(<App />);

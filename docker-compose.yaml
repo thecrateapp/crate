@@ -260,6 +260,8 @@ services:
     group_add:
       - "${DOCKER_GID:-988}"
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=api
       - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
@@ -501,6 +503,8 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
       - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
@@ -709,6 +713,8 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
       - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
@@ -840,6 +846,8 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
       - SENTRY_SERVICE=worker-analysis

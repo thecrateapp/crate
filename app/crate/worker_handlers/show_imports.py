@@ -29,7 +29,7 @@ def handle_show_extraction(task_id: str, params: dict, config: dict) -> dict:
                 ai_call = consumers.resume_action(
                     action_id,
                     private["job"]["payload"].get("ai_acceptance"),
-                    actor_id=private["job"].get("human_actor_id"),
+                    actor_id=private["human_actor_id"],
                     job_id=task_id,
                 )
             draft = extract_show_candidates(

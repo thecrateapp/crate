@@ -40,6 +40,10 @@ interface ManifestDoc {
 type MarkdownLoader = () => Promise<string>;
 
 const loaders: Record<string, MarkdownLoader> = {
+  "docs/technical/ai-agents.md": () =>
+    import("../../../docs/technical/ai-agents.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/README.md": () =>
     import("../../../docs/README.md?raw").then((module) => module.default),
   "docs/api.md": () =>

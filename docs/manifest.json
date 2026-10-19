@@ -394,5 +394,14 @@
     "summary": "Reference notes for Crate enrichment sources and flow.",
     "keywords": ["enrichment", "metadata", "providers"],
     "order": 50
+  },
+  {
+    "sourcePath": "docs/technical/ai-agents.md",
+    "route": "/operations/ai-agents",
+    "section": "operations",
+    "title": "AI agents configuration",
+    "summary": "Action routing, validated native model profiles, private credentials and bounded usage in Crate.",
+    "keywords": ["ai", "models", "reasoning", "credentials", "usage"],
+    "order": 95
   }
 ]

@@ -226,6 +226,8 @@ def load_show_extraction(task_id: str, *, session=None) -> dict:
         )
         return {
             "job": job,
+            # Derived only after current principal and private-source ownership checks.
+            "human_actor_id": principal.human_actor_id,
             "draft_id": row["id"],
             "input": row["input"],
             "images": [

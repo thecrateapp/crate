@@ -1844,3 +1844,54 @@ cd app
 The lab uses explicit local-only opt-ins; production configuration, provider selection and flags
 were not changed. This cut performs no merge or deployment. CI and persistent review remain
 separate gates on the exact published PR head.
+
+### AI configuration integration follow-up — 2026-10-19
+
+[AI agents configuration](ai-agents.md) now documents Crate's independent action
+bindings, immutable profiles, native controls, encrypted credentials and usage.
+External MCP clients retain their own model configuration; the new human AI
+capabilities do not expand integration grants or bypass show approval.
+
+The latest isolated lab run at `ff000a2333ac635d13494a47d5f838f26bca4574` returned
+2021 instead of 2027 for poster vision (77.1 s, eleven candidates; festival date
+null). This fails the year acceptance criterion. The earlier ten-date success
+above remains the result of that earlier run. OCR→text preserved uncertainty when
+the year was absent (eleven null dates, 33.17 s). The separate DICE source returned
+Coilguns on 2027-03-14 at Wurlitzer Ballroom, Madrid, doors 21:00 (12.36 s).
+
+A deterministic comparison found identical old/integrated legacy request bodies
+for the same image, prompt, `ultra_high`, 90 second vision deadline and 16000 token
+output bound. No causal implementation regression was identified. The provider's
+incorrect year remains a quality limitation requiring manual review. No heuristic
+year correction, paid retry, automatic fallback or real show application followed.
+
+One separate explicit new native profile probe succeeded with Gemini 3.8 Flash,
+`low` reasoning, a 45 second timeout and 4096/2048 input/output limits: 3.523 s,
+53 input/5 output/58 total tokens, reservation 6144 settled to 58. Thought, cache
+and cost remained unknown. The lab still had migration disabled and zero bindings.
+This establishes that profile's synthetic API/worker/runtime path, not broad
+provider accuracy. Its encryption key was generated for the isolated lab;
+production credentials were not copied into the vault.
+
+Functional browser checks at `3eded83eafbdc6d088b70bbabd7fd2d2e6171dda` exercised
+four accessible named panels, four validated Gemini models, native 3.8 levels,
+read-only inherited connections, eight related-engine rows with honest unknown
+readiness, and activity with unknown cost. The user subsequently rejected the
+usability and visual consistency of AI Agents, Agent Integrations and Agent Plans.
+Their redesign, final browser acceptance, whole-branch review and exact-HEAD CI
+remain pending; functional checks do not close those gates.
+
+Focused deterministic HTTP/PostgreSQL integration tests additionally cover all
+three assisted show modes with human attribution, native Gemini/DeepSeek/Ollama
+routing, replay, stale-batch rollback, actor/key revocation and quota rejection.
+Sources and reasoning remain outside public invocation metadata. Full private lab
+evidence stays outside repository artifacts; this dated record preserves the
+actual outcomes and limitations without publishing private sources.
+
+The historical real show invocations above have null human attribution. A narrow
+follow-up now forwards the actor from the validated private principal to the
+runtime. Real-PostgreSQL deterministic tests verify all three HTTP-accepted show
+modes and the persisted invocation actor; the historical audit rows were not
+rewritten and no further paid call was needed. The Task 6 focused gate passed
+21 backend/Compose cases without skips, plus eight documentation smoke cases;
+document integrity checked 45 canonical documents and the docs build passed.

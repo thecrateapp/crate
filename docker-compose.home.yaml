@@ -54,6 +54,10 @@ x-crate-env: &crate-env
   CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES: ${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
   CRATE_FEDERATION_IMPORT_LEASE_SECONDS: ${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
 
+x-ai-credential-env: &ai-credential-env
+  CRATE_CREDENTIAL_KEY: ${CRATE_CREDENTIAL_KEY:-}
+  CRATE_CREDENTIAL_PREVIOUS_KEYS: ${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
+
 x-crate-enrichment-env: &crate-enrichment-env
   LASTFM_APIKEY: ${LASTFM_APIKEY:-}
   LASTFM_API_SECRET: ${LASTFM_API_SECRET:-}
@@ -237,7 +241,7 @@ services:
     group_add:
       - "${DOCKER_GID:-988}"
     environment:
-      <<: [*crate-env, *crate-enrichment-env]
+      <<: [*crate-env, *crate-enrichment-env, *ai-credential-env]
       CRATE_RUNTIME: api
       CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
       CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
@@ -392,6 +396,7 @@ services:
       <<:
         [
           *crate-env,
+          *ai-credential-env,
           *crate-enrichment-env,
           *worker-resource-env,
           *worker-native-env,
@@ -510,6 +515,7 @@ services:
       <<:
         [
           *crate-env,
+          *ai-credential-env,
           *crate-enrichment-env,
           *worker-resource-env,
           *worker-native-env,
@@ -560,7 +566,13 @@ services:
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      <<: [*crate-env, *worker-resource-env, *worker-native-env]
+      <<:
+        [
+          *crate-env,
+          *worker-resource-env,
+          *worker-native-env,
+          *ai-credential-env,
+        ]
       CRATE_RUNTIME: worker
       CRATE_LEGACY_POOL_MAXCONN: ${ANALYSIS_LEGACY_POOL_MAXCONN:-2}
       CRATE_SQLALCHEMY_POOL_SIZE: ${ANALYSIS_SQLALCHEMY_POOL_SIZE:-1}

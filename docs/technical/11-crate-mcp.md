@@ -5,7 +5,7 @@ section: architecture
 audience: [developer, operator]
 status: canonical
 order: 100
-verified: 2026-10-18
+verified: 2026-10-19
 sources:
   - app/crate/mcp/server.py
   - app/crate/mcp/tools.py
@@ -35,6 +35,11 @@ This chapter explains the architecture and normal workflows. Use
 the detailed domain contracts. Use [contract and acceptance](crate-mcp-distribution.md)
 for the exported tool schemas, client example, evaluation and rollout gates.
 Those pages also retain the implementation's dated validation records.
+
+Crate's own language model actions use [AI agents configuration](ai-agents.md),
+with independent connections, immutable native model profiles and action bindings.
+An external MCP client's model and reasoning are configured in that client; Crate
+controls the integration's grants and domain effects.
 
 ## Where MCP runs
 
