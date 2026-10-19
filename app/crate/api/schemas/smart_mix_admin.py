@@ -24,6 +24,12 @@ class SmartMixProfileQualityCounts(SmartMixAdminModel):
     unavailable: int = Field(ge=0)
 
 
+class SmartMixCurrentQualityCounts(SmartMixAdminModel):
+    full: int = Field(default=0, ge=0)
+    partial: int = Field(default=0, ge=0)
+    legacy: int = Field(default=0, ge=0)
+
+
 class SmartMixProcessingCounts(SmartMixAdminModel):
     pending: int = Field(ge=0)
     active: int = Field(ge=0)
@@ -85,6 +91,35 @@ class SmartMixTrackListResponse(SmartMixAdminModel):
     next_before: int | None = Field(default=None, alias="nextBefore")
 
 
+class SmartMixActivityTrack(SmartMixAdminModel):
+    task_id: str = Field(alias="taskId")
+    track_id: int | None = Field(default=None, alias="trackId")
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+
+
+class SmartMixRunningTrack(SmartMixActivityTrack):
+    started_at: datetime | None = Field(default=None, alias="startedAt")
+    elapsed_ms: int | None = Field(default=None, alias="elapsedMs", ge=0)
+
+
+class SmartMixFinishedTrack(SmartMixActivityTrack):
+    outcome: str
+    quality: str | None = None
+    error: str | None = None
+    finished_at: datetime | None = Field(default=None, alias="finishedAt")
+    duration_ms: int | None = Field(default=None, alias="durationMs", ge=0)
+
+
+class SmartMixActivityResponse(SmartMixAdminModel):
+    queued: int = Field(ge=0)
+    running: list[SmartMixRunningTrack]
+    recent: list[SmartMixFinishedTrack]
+    tracks_per_minute: float = Field(alias="tracksPerMinute", ge=0.0)
+    rate_window_minutes: int = Field(alias="rateWindowMinutes", ge=1)
+
+
 class SmartMixReanalyzeResponse(SmartMixAdminModel):
     task_id: str | None = Field(default=None, alias="taskId")
     status: Literal["queued", "already_queued"]
@@ -101,6 +136,9 @@ class SmartMixAdminStatusResponse(SmartMixAdminModel):
     missing_profiles: int = Field(alias="missingProfiles", ge=0)
     coverage_percent: float = Field(alias="coveragePercent", ge=0.0, le=100.0)
     quality: SmartMixProfileQualityCounts
+    current_quality: SmartMixCurrentQualityCounts = Field(
+        default_factory=SmartMixCurrentQualityCounts, alias="currentQuality"
+    )
     processing: SmartMixProcessingCounts
     versions: list[SmartMixVersionCount] = Field(default_factory=list)
     refreshed_at: datetime | str | None = Field(default=None, alias="refreshedAt")

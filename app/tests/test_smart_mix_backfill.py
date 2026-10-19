@@ -288,6 +288,10 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         lambda capture, _draft: analysis.SmartMixPublication.PUBLISHED,
     )
     monkeypatch.setattr(analysis, "emit_task_event", lambda *_args, **_kwargs: None)
+    refreshes: list[bool] = []
+    monkeypatch.setattr(
+        analysis, "refresh_live_smart_mix_coverage", lambda: refreshes.append(True)
+    )
 
     result = analysis._handle_compute_smart_mix_profile(
         "task-1",
@@ -302,6 +306,35 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         "quality": "partial",
     }
     assert captured == [(7, "/music/artist/album/track.flac", "worker:claim")]
+    assert refreshes == [True]
+
+
+def test_failed_profiles_also_refresh_the_live_coverage(monkeypatch) -> None:
+    from crate.worker_handlers import analysis
+
+    monkeypatch.setattr(
+        analysis,
+        "resolve_smart_mix_track",
+        lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
+    )
+    monkeypatch.setattr(
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+    )
+
+    def broken(_path):
+        raise RuntimeError("decoder exploded")
+
+    monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", broken)
+    monkeypatch.setattr(analysis, "record_smart_mix_failure", lambda *_a, **_k: None)
+    refreshes: list[bool] = []
+    monkeypatch.setattr(
+        analysis, "refresh_live_smart_mix_coverage", lambda: refreshes.append(True)
+    )
+
+    result = analysis._handle_compute_smart_mix_profile("task-1", {"track_id": 7}, {})
+
+    assert "decoder exploded" in result["error"]
+    assert refreshes == [True]
 
 
 def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> None:
@@ -339,6 +372,10 @@ def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> N
             (track_id, reason, claim_token)
         ),
     )
+    refreshes: list[bool] = []
+    monkeypatch.setattr(
+        analysis, "refresh_live_smart_mix_coverage", lambda: refreshes.append(True)
+    )
 
     result = analysis._handle_compute_smart_mix_profile(
         "task-1", {"track_id": 7, "claim_token": "worker:claim"}, {}
@@ -346,6 +383,51 @@ def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> N
 
     assert "publication failed" in result["error"]
     assert failures == [(7, "beat positions must be positive", "worker:claim")]
+    assert refreshes == [True]
+
+
+def test_live_coverage_refresh_is_throttled_while_work_is_in_flight(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        COVERAGE_STATE_KEY,
+        refresh_live_smart_mix_coverage,
+    )
+
+    [claimed] = _create_tracks(tmp_path, count=1)
+    _insert_processing(
+        claimed, state="analyzing", attempts=1, target_generation=ANALYZER_VERSION
+    )
+
+    assert refresh_live_smart_mix_coverage() is True
+    assert refresh_live_smart_mix_coverage() is False
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE ops_runtime_state
+                SET updated_at = NOW() - INTERVAL '11 seconds'
+                WHERE key = :key
+                """
+            ),
+            {"key": COVERAGE_STATE_KEY},
+        )
+    assert refresh_live_smart_mix_coverage() is True
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE track_processing_state
+                SET state = 'done'
+                WHERE track_id = :track_id
+                """
+            ),
+            {"track_id": claimed},
+        )
+    assert refresh_live_smart_mix_coverage() is True
 
 
 def _create_tracks(tmp_path: Path, *, count: int) -> list[int]:

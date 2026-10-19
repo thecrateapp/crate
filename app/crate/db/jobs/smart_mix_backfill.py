@@ -25,6 +25,7 @@ DEFAULT_MAX_ATTEMPTS = 3
 BACKFILL_TASK_TYPE = "backfill_smart_mix_profiles"
 CAMPAIGN_STATE_KEY = "smart_mix:backfill_campaign"
 COVERAGE_STATE_KEY = "smart_mix:coverage"
+LIVE_COVERAGE_MAX_AGE_SECONDS = 10
 
 
 def claim_smart_mix_backfill_batch(
@@ -325,6 +326,15 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                         )::int AS source_changed_profiles,
                         COUNT(*) FILTER (WHERE quality = 'full')::int AS full_profiles,
                         COUNT(*) FILTER (
+                            WHERE is_current AND quality = 'full'
+                        )::int AS current_full_profiles,
+                        COUNT(*) FILTER (
+                            WHERE is_current AND quality = 'partial'
+                        )::int AS current_partial_profiles,
+                        COUNT(*) FILTER (
+                            WHERE is_current AND quality = 'legacy'
+                        )::int AS current_legacy_profiles,
+                        COUNT(*) FILTER (
                             WHERE quality = 'partial'
                         )::int AS partial_profiles,
                         COUNT(*) FILTER (
@@ -397,6 +407,11 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
             "legacy": int(row["legacy_profiles"]),
             "unavailable": int(row["unavailable_profiles"]),
         },
+        "current_quality": {
+            "full": int(row["current_full_profiles"]),
+            "partial": int(row["current_partial_profiles"]),
+            "legacy": int(row["current_legacy_profiles"]),
+        },
         "processing": {
             "pending": int(row["pending"]),
             "active": int(row["active"]),
@@ -415,6 +430,19 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
     }
     set_ops_runtime_state(COVERAGE_STATE_KEY, snapshot)
     return snapshot
+
+
+def refresh_live_smart_mix_coverage() -> bool:
+    fresh = get_ops_runtime_state(
+        COVERAGE_STATE_KEY, max_age_seconds=LIVE_COVERAGE_MAX_AGE_SECONDS
+    )
+    if fresh is not None and count_smart_mix_in_flight() > 0:
+        return False
+    campaign = get_smart_mix_campaign() or {}
+    refresh_smart_mix_coverage(
+        max_attempts=int(campaign.get("max_attempts") or DEFAULT_MAX_ATTEMPTS)
+    )
+    return True
 
 
 def get_smart_mix_campaign() -> dict[str, Any] | None:

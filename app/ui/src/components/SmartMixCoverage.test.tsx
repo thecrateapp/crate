@@ -27,6 +27,10 @@ vi.mock("@/components/SmartMixTracks", () => ({
   SmartMixTracks: () => null,
 }));
 
+vi.mock("@/components/SmartMixActivity", () => ({
+  SmartMixActivity: () => null,
+}));
+
 import { SmartMixCoverage } from "./SmartMixCoverage";
 
 const status = {
@@ -99,6 +103,24 @@ describe("SmartMixCoverage", () => {
       );
     });
     expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it("counts full and partial over current profiles only", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...status,
+        currentQuality: { full: 191, partial: 538, legacy: 0 },
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(<SmartMixCoverage />);
+
+    expect(screen.getByText("191")).toBeInTheDocument();
+    expect(screen.getByText("538")).toBeInTheDocument();
+    expect(screen.queryByText("35")).toBeNull();
   });
 
   it("starts a bounded backfill when coverage is idle", async () => {

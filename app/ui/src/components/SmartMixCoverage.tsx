@@ -13,6 +13,7 @@ import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { SmartMixActivity } from "@/components/SmartMixActivity";
 import {
   SmartMixTracks,
   type SmartMixVersionCount,
@@ -35,6 +36,11 @@ interface SmartMixAdminStatus {
     partial: number;
     legacy: number;
     unavailable: number;
+  };
+  currentQuality?: {
+    full: number;
+    partial: number;
+    legacy: number;
   };
   processing: {
     pending: number;
@@ -223,8 +229,14 @@ export function SmartMixCoverage() {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-8">
-        <Metric label="Full" value={data.quality.full} />
-        <Metric label="Partial" value={data.quality.partial} />
+        <Metric
+          label="Full"
+          value={data.currentQuality?.full ?? data.quality.full}
+        />
+        <Metric
+          label="Partial"
+          value={data.currentQuality?.partial ?? data.quality.partial}
+        />
         <Metric label="Stale" value={data.staleProfiles} />
         <Metric label="Missing" value={data.missingProfiles} />
         <Metric label="Pending" value={data.processing.pending} />
@@ -232,6 +244,12 @@ export function SmartMixCoverage() {
         <Metric label="Failed" value={data.processing.failed} />
         <Metric label="Exhausted" value={data.processing.exhausted} />
       </div>
+
+      <SmartMixActivity
+        live={data.controlState === "running"}
+        remaining={data.missingProfiles}
+        onRefreshCounts={refetch}
+      />
 
       <SmartMixTracks counts={data} />
     </div>

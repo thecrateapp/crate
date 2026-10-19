@@ -27,6 +27,7 @@ from crate.db.jobs.smart_mix_backfill import (
     count_smart_mix_in_flight,
     get_smart_mix_campaign,
     queue_next_smart_mix_batch,
+    refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
     save_smart_mix_campaign,
@@ -1157,6 +1158,7 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     except Exception as exc:
         record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
+        _refresh_live_coverage()
         return {
             "error": f"Smart Mix analysis failed: {exc}",
             "track_id": track_id,
@@ -1167,11 +1169,13 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     except Exception as exc:
         record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix profile publication failed for %s", path, exc_info=True)
+        _refresh_live_coverage()
         return {
             "error": f"Smart Mix profile publication failed: {exc}",
             "track_id": track_id,
         }
     stored = outcome is SmartMixPublication.PUBLISHED
+    _refresh_live_coverage()
     if stored:
         emit_task_event(
             task_id,
@@ -1188,6 +1192,13 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
         "outcome": str(outcome),
         "quality": str(draft.quality),
     }
+
+
+def _refresh_live_coverage() -> None:
+    try:
+        refresh_live_smart_mix_coverage()
+    except Exception:
+        log.warning("Smart Mix coverage refresh failed", exc_info=True)
 
 
 def _handle_backfill_smart_mix_profiles(

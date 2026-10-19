@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.permissions import require_permission
 from crate.api.schemas.smart_mix_admin import (
+    SmartMixActivityResponse,
     SmartMixAdminStatusResponse,
     SmartMixBackfillRequest,
     SmartMixBackfillResponse,
@@ -23,6 +24,7 @@ from crate.db.queries.smart_mix_admin import (
     get_smart_mix_admin_status,
     get_smart_mix_campaign_status,
 )
+from crate.db.queries.smart_mix_admin_activity import get_smart_mix_activity
 from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.tasks import create_task_dedup
@@ -95,6 +97,12 @@ def smart_mix_status(request: Request) -> SmartMixAdminStatusResponse:
             "activeTask": _active_backfill_task(),
         }
     )
+
+
+@router.get("/activity", response_model=SmartMixActivityResponse)
+def smart_mix_activity(request: Request) -> SmartMixActivityResponse:
+    _require_manage(request)
+    return SmartMixActivityResponse.model_validate(get_smart_mix_activity())
 
 
 @router.get("/tracks", response_model=SmartMixTrackListResponse)

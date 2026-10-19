@@ -80,6 +80,7 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
             "legacy": 0,
             "unavailable": 0,
         },
+        "current_quality": {"full": 1, "partial": 0, "legacy": 0},
         "processing": {
             "pending": 1,
             "active": 0,
@@ -106,11 +107,108 @@ def test_admin_routes_require_analysis_management_permission(test_app) -> None:
         )
         tracks = test_app.get("/api/admin/smart-mix/tracks")
         reanalyze = test_app.post("/api/admin/smart-mix/tracks/1/reanalyze")
+        activity = test_app.get("/api/admin/smart-mix/activity")
 
     assert status.status_code == 403
     assert backfill.status_code == 403
     assert tracks.status_code == 403
     assert reanalyze.status_code == 403
+    assert activity.status_code == 403
+
+
+def test_activity_reports_running_recent_queue_and_rate(pg_db) -> None:
+    del pg_db
+    running_id, published_id, failed_id = _create_tracks(3)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO tasks (
+                    id, type, status, params_json, result_json, error,
+                    created_at, updated_at, started_at
+                )
+                VALUES
+                    ('run-1', 'compute_smart_mix_profile', 'running',
+                     jsonb_build_object('track_id', :running_id), NULL, NULL,
+                     NOW() - INTERVAL '1 minute', NOW() - INTERVAL '4 seconds',
+                     NOW() - INTERVAL '4 seconds'),
+                    ('done-1', 'compute_smart_mix_profile', 'completed',
+                     jsonb_build_object('track_id', :published_id),
+                     '{"outcome": "published", "quality": "full"}', NULL,
+                     NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '30 seconds',
+                     NOW() - INTERVAL '33 seconds'),
+                    ('bad-1', 'compute_smart_mix_profile', 'completed',
+                     jsonb_build_object('track_id', :failed_id),
+                     '{"error": "decoder exploded"}', NULL,
+                     NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '20 seconds',
+                     NOW() - INTERVAL '21 seconds'),
+                    ('old-1', 'compute_smart_mix_profile', 'completed',
+                     jsonb_build_object('track_id', :published_id),
+                     '{"outcome": "published"}', NULL,
+                     NOW() - INTERVAL '3 hours', NOW() - INTERVAL '3 hours',
+                     NOW() - INTERVAL '3 hours'),
+                    ('queued-1', 'compute_smart_mix_profile', 'pending',
+                     jsonb_build_object('track_id', 1), NULL, NULL, NOW(), NOW(), NULL),
+                    ('queued-2', 'compute_smart_mix_profile', 'pending',
+                     jsonb_build_object('track_id', 2), NULL, NULL, NOW(), NOW(), NULL),
+                    ('other-1', 'analyze_track', 'pending',
+                     '{}'::jsonb, NULL, NULL, NOW(), NOW(), NULL)
+                """
+            ),
+            {
+                "running_id": running_id,
+                "published_id": published_id,
+                "failed_id": failed_id,
+            },
+        )
+
+    from crate.db.queries.smart_mix_admin_activity import get_smart_mix_activity
+
+    activity = get_smart_mix_activity()
+
+    assert activity["queued"] == 2
+    [running] = activity["running"]
+    assert running["track_id"] == running_id
+    assert running["title"] == "Track 0"
+    assert 3_000 <= running["elapsed_ms"] <= 60_000
+    assert [item["task_id"] for item in activity["recent"]] == ["bad-1", "done-1"]
+    assert activity["recent"][0]["outcome"] == "failed"
+    assert activity["recent"][0]["error"] == "decoder exploded"
+    assert activity["recent"][1]["outcome"] == "published"
+    assert activity["recent"][1]["duration_ms"] == 3_000
+    assert activity["tracks_per_minute"] == 0.2
+
+
+def test_activity_route_serializes_the_live_snapshot(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "get_smart_mix_activity",
+        lambda: {
+            "queued": 3,
+            "running": [
+                {
+                    "task_id": "run-1",
+                    "track_id": 7,
+                    "title": "Fazer",
+                    "artist": "Artist",
+                    "album": None,
+                    "started_at": "2026-10-19T17:00:00+00:00",
+                    "elapsed_ms": 4_100,
+                }
+            ],
+            "recent": [],
+            "tracks_per_minute": 16.5,
+            "rate_window_minutes": 10,
+        },
+    )
+
+    response = test_app.get("/api/admin/smart-mix/activity")
+
+    assert response.status_code == 200
+    assert response.json()["running"][0]["elapsedMs"] == 4_100
+    assert response.json()["tracksPerMinute"] == 16.5
 
 
 def test_track_list_classifies_profiles_and_filters_by_status(pg_db) -> None:

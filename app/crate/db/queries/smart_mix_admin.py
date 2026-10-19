@@ -36,6 +36,7 @@ def _empty_status() -> dict:
         "missing_profiles": 0,
         "coverage_percent": 0.0,
         "quality": {"full": 0, "partial": 0, "legacy": 0, "unavailable": 0},
+        "current_quality": {"full": 0, "partial": 0, "legacy": 0},
         "processing": {
             "pending": 0,
             "active": 0,
