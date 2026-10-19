@@ -79,7 +79,7 @@ def test_explicit_vision_and_text_use_one_call_and_discard_llm_coordinates(monke
     content = (Path(__file__).parent / "fixtures/shows/flyer.png").read_bytes()
     images = [{"id": "image", "content": content, "sha256": "hash"}]
     vision = extract.extract_show_candidates({"mode": "vision", "raw_text": ""}, images)
-    assert len(calls) == 1 and calls[0]["timeout_seconds"] == 45
+    assert len(calls) == 1 and calls[0]["timeout_seconds"] == 90
     assert "latitude" not in vision["candidates"][0]
     assert vision["coverage"] == "incomplete"
     assert "image" in calls[0]
@@ -87,6 +87,7 @@ def test_explicit_vision_and_text_use_one_call_and_discard_llm_coordinates(monke
         {"mode": "text_llm", "raw_text": "2027-03-02"}, []
     )
     assert len(calls) == 2 and "image" not in calls[1]
+    assert calls[1]["timeout_seconds"] == 45
     assert result["model"] == "test/vision"
 
     def broken(*args, **kwargs):

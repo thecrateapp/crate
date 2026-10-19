@@ -1690,7 +1690,7 @@ at expiry and pruned by bounded staging/service cleanup; accepted-request identi
 | Vision canvas     | One bounded composite, at most 20 MP                                                                                                    |
 | OCR               | Tesseract 5, `eng+spa`, PSM 6, one CPU thread; 30 s / 25 CPU s / 512 MiB per child                                                      |
 | Extraction task   | Maintenance pool, 180 s, no automatic retry; ten accepted jobs/editor/15 minutes                                                        |
-| Model call        | Explicit vision, text, or OCR→text; one call, 45 s request timeout, 16K output tokens, no provider fallback                             |
+| Model call        | Explicit vision, text, or OCR→text; one call, 90 s vision / 45 s text request timeout, 16K output tokens, no provider fallback          |
 | Public URL fetch  | Shared pinned resolver in an isolated worker child, 45 s wall deadline / 256 MiB; DNS/response stalls are killed before acknowledgement |
 | Draft             | 200 candidate proposals, 60K text; truncation/coverage reported                                                                         |
 | Exact publication | 50 selected shows, complete plan limited to 40K bytes                                                                                   |
@@ -1701,6 +1701,18 @@ Coverage stays incomplete until a human compares the source; neither an OCR scor
 claim certifies concert correctness or that every tour date was interpreted. Split selections persist
 outcomes by item in the private draft without losing unselected dates. Model failure preserves
 recognized text for manual correction and does not make another paid call.
+
+The `shows-extraction-v2` model prompt reads a four-digit tour year from the same poster's
+heading and applies it to that tour's `DD.MM` rows, retaining the heading and row as evidence.
+Missing, illegible or conflicting years stay unknown; an unrelated source, URL slug or current
+date supplies no year. A festival range without an explicit performance day remains one
+undated candidate with its printed range and a warning. These are extraction instructions;
+the existing exact-date schema and human review still govern publication.
+Gemini 3 poster extraction explicitly requests per-image `MEDIA_RESOLUTION_ULTRA_HIGH` in
+the same model call: its image token budget is roughly twice the default. This closed internal
+option preserves the 20 MP canvas, 16K output and single-call limits. Other image consumers,
+Gemini 2.5 and non-Gemini providers retain their default detail. See the provider's
+[media resolution contract](https://ai.google.dev/gemini-api/docs/generate-content/media-resolution?authuser=01&hl=en).
 
 Configuration, connectivity and model vision support are exposed separately to curators by the
 narrow show API. Worker readiness is checked explicitly without a billable model request. A key
@@ -1786,3 +1798,47 @@ Default tests use simulated providers. A real configured model smoke is opt-in o
 synthetic tour fixture and a disposable test DB: `cd app` followed by `CRATE_TEST_SHOW_LLM_SMOKE=1 ../.venv/bin/python -m pytest tests/test_show_extraction.py::test_configured_show_vision_smoke_opt_in -q`. Supply a test provider
 configuration/credentials explicitly. This smoke has not been run for this cut. No production
 migration, merge, deployment, real paid model request or flag activation was performed.
+
+### Real poster and DICE acceptance — 2026-10-19
+
+An isolated loopback-only Linux lab subsequently exercised the actual HTTP acceptance ledger,
+Dramatiq maintenance worker, PostgreSQL, Redis and **Gemini 3.8 Flash**, using the supplied
+Viva Belgrado poster and a separate public DICE link. No source answers or manual year/date
+corrections were supplied to the model. This focused follow-up does not rerun the full suites
+or certify arbitrary posters, production capacity, public TLS or other models.
+
+The original vision request hit its 45 s read timeout. A 90 s diagnostic completed in 63.1 s
+but left all dates unknown. The revised shared-year prompt with default image detail completed
+in 57.87 s but misread the stylized year as 2021. Changing only per-image detail to ultra high
+returned all ten exact 2027 dates in 66.02 s. That diagnostic motivated the explicit Gemini 3
+detail option; it was then verified through new persisted jobs with the integrated worker:
+
+| Input and mode                                                                                     | Observed result                                                                                                                                                                            | End-to-end time |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
+| Viva Belgrado poster, vision                                                                       | Ten exact dates/cities/venues, 2027-01-22 through 2027-05-15; no show/doors times invented. Eleventh candidate retains `03-05.06`, Barcelona, Primavera Sound, with null date and warning. | 71.37 s         |
+| Same poster, local OCR → model                                                                     | Eleven proposals; OCR loses the heading year, so dates remain null with an explicit warning. No image is secretly sent in text mode.                                                       | 22.98 s         |
+| [DICE short link](https://link.dice.fm/ZcaQVxQ0f7b?sharer_id=6037d4b3814cdd00019b99ca), text model | Separate Coilguns event, 2027-03-14, Wurlitzer Ballroom, Madrid; doors 21:00 from the fetched page. Never attached to Viva Belgrado.                                                       | 8.43 s          |
+
+The ten exact tour rows were compared to a manual transcription of the original attachment,
+including Moon, El Tren and Apolo 1. Only rows with known dates were selected for local plan
+review; the festival remains pending. Preparation exercises the shared plan engine and MCP
+approval requirement without applying or publishing the real shows. Full private drafts and
+the user image remain in the ignored lab directory, outside the repository artifacts.
+
+Focused validation passed **94 distinct cases** with Python 3.13 and real PostgreSQL through
+Testcontainers, sequentially. One separate opt-in paid-model smoke was skipped; no PostgreSQL
+case was skipped. The real jobs above supply the live-provider evidence. HTTP doubles cover
+65 s vision success, a 95 s timeout, the unchanged text deadline, one request/no fallback,
+private failure handling, exact detail payload, unsupported detail/model rejection and
+unchanged provider defaults. They validate the transport contract, not model accuracy or
+elapsed wall time. Independent review found no P1/P2/P3; targeted Ruff/Pyright passed.
+
+```sh
+cd app
+../.venv/bin/python -m pytest tests/test_show_llm_budget.py tests/test_show_extraction.py tests/test_show_extraction_jobs.py tests/test_show_extraction_sources.py tests/test_llm_provider.py tests/test_artist_hero_candidates.py -q
+../.venv/bin/python -m pytest tests/test_show_import_plans.py tests/test_mcp_shows.py -q
+```
+
+The lab uses explicit local-only opt-ins; production configuration, provider selection and flags
+were not changed. This cut performs no merge or deployment. CI and persistent review remain
+separate gates on the exact published PR head.

@@ -8,7 +8,7 @@ import json
 import base64
 import logging
 import os
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import requests
 from pydantic import BaseModel
@@ -357,11 +357,18 @@ def ask_image_structured(
     max_tokens: int | None = None,
     private_response: bool = False,
     ollama_url: str | None = None,
+    image_detail: Literal["default", "ultra_high"] = "default",
 ) -> T:
-    """Ask a vision-capable provider for structured image analysis."""
+    """Ask for image analysis; optional Gemini 3 detail doubles the image token budget."""
     if not image or not media_type.startswith("image/"):
         raise ValueError("A valid image payload is required")
     selected_model = model or _get_model()
+    if image_detail not in {"default", "ultra_high"}:
+        raise ValueError("Unsupported image detail")
+    if image_detail == "ultra_high" and not selected_model.startswith(
+        "gemini/gemini-3"
+    ):
+        raise ValueError("Ultra-high image detail requires Gemini 3")
     options = {
         key: value
         for key, value in {
@@ -399,6 +406,10 @@ def ask_image_structured(
             ],
             "generationConfig": {"responseMimeType": "application/json"},
         }
+        if image_detail == "ultra_high":
+            body["contents"][0]["parts"][1]["mediaResolution"] = {
+                "level": "MEDIA_RESOLUTION_ULTRA_HIGH"
+            }
         if max_tokens is not None:
             body["generationConfig"]["maxOutputTokens"] = max_tokens
         try:

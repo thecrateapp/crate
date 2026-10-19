@@ -23,7 +23,7 @@ from crate.show_ocr import (
     recognize_image,
 )
 
-EXTRACTOR_VERSION = "shows-extraction-v1"
+EXTRACTOR_VERSION = "shows-extraction-v2"
 
 
 class ExtractedShows(BaseModel):
@@ -376,7 +376,9 @@ def extract_show_candidates(
         prompt = build_show_extraction_prompt(raw[:MAX_TEXT], len(images))
         options = {
             "model": config["model"],
-            "timeout_seconds": 45,
+            # Vision reads the complete poster before generating every tour row.
+            # 45 s for a preceding URL + 90 s here leaves room in the 180 s task.
+            "timeout_seconds": 90 if mode == "vision" else 45,
             "max_tokens": 16000,
             "private_response": True,
             **(
@@ -392,6 +394,11 @@ def extract_show_candidates(
                     prompt,
                     image=_composite(images),
                     media_type="image/jpeg",
+                    image_detail=(
+                        "ultra_high"
+                        if config["model"].startswith("gemini/gemini-3")
+                        else "default"
+                    ),
                     **options,
                 )
             else:
