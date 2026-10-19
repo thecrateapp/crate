@@ -38,6 +38,8 @@ TASK_CATEGORIES: dict[str, str] = {
 }
 
 TASK_TYPES: dict[str, TaskTypeInfo] = {
+    "ai_catalog_refresh": TaskTypeInfo("AI Model Catalog Refresh", "enrichment"),
+    "ai_profile_test": TaskTypeInfo("AI Synthetic Profile Test", "enrichment"),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),

@@ -68,6 +68,8 @@ class TaskPoolConfig(NamedTuple):
 
 
 TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
+    "ai_catalog_refresh": TaskPoolConfig("maintenance", 0, 180, 0),
+    "ai_profile_test": TaskPoolConfig("maintenance", 0, 180, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

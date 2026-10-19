@@ -474,6 +474,7 @@ async def cache_invalidate_endpoint(request: Request, body: CacheInvalidationReq
 
 # Map mutation routes to cache scopes they invalidate.
 _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
+    (re.compile(r"^/api/admin/ai(?:/|$)"), ["ai_configuration"]),
     (re.compile(r"^/api/auth/(?:logout|sessions|profile)"), ["auth"]),
     (re.compile(r"^/api/admin/(?:auth/)?users/\d+(?:/|$)"), ["auth"]),
     (re.compile(r"^/api/me/likes"), ["likes"]),

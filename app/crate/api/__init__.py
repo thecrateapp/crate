@@ -593,6 +593,9 @@ def create_app() -> FastAPI:
     from crate.api.agent_plans import router as agent_plans_router
     from crate.api.show_imports import router as show_imports_router
 
+    from crate.api.ai_agents import router as ai_agents_router
+
+    app.include_router(ai_agents_router)
     app.include_router(agent_integrations_router)
     app.include_router(agent_plans_router)
     app.include_router(show_imports_router)

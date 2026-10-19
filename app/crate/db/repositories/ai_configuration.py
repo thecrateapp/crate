@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from crate.ai.actions import ACTIONS, get_action
-from crate.ai.contracts import AIConfigurationError, ProfileConfig
+from crate.ai.contracts import AIConfigurationError, LegacyProfileConfig, ProfileConfig
 from crate.db.serialize import serialize_row
 from crate.db.tx import optional_scope, read_scope
 
@@ -147,6 +147,8 @@ def create_connection(data, actor_id, *, session=None) -> dict:
 def update_connection(id, data, expected_revision, actor_id, *, session=None) -> dict:
     values = _connection_data(data)
     assignments = ",".join(f"{key}=:{key}" for key in sorted(values))
+    if "endpoint" in values:
+        assignments += ",model_catalog='[]'::jsonb,catalog_status='pending',catalog_error_code=NULL,catalog_updated_at=NULL"
     with optional_scope(session) as s:
         row = (
             s.execute(
@@ -196,9 +198,13 @@ def save_model_catalog(
 
 
 def _version(s, id, version, data):
-    config = ProfileConfig.model_validate(data.get("config", {})).model_dump(
-        mode="json"
+    config_data = data.get("config", {})
+    config_type = (
+        LegacyProfileConfig
+        if config_data.get("kind") == "legacy_snapshot"
+        else ProfileConfig
     )
+    config = config_type.model_validate(config_data).model_dump(mode="json")
     content = {
         "connection_id": str(data["connection_id"]),
         "model_id": data["model_id"],
@@ -422,3 +428,235 @@ __all__ = [
     "configuration_state",
     "activate_configuration",
 ]
+
+
+def configuration_snapshot(*, bounded=False, session=None) -> dict:
+    """Read all configuration in one scope with fixed batch queries.
+
+    Public snapshots read at most 1001 rows per collection to expose truncation.
+    Internal validation reads complete history so binding validation remains exact.
+    """
+    with _read(session) as s:
+        if not bounded:
+            return {
+                "state": configuration_state(session=s),
+                "connections": list_connections(session=s),
+                "profiles": list_profiles(session=s),
+                "bindings": list_bindings(session=s),
+                "versions": [
+                    _json(r)
+                    for r in s.execute(
+                        text(
+                            "SELECT * FROM ai_profile_versions ORDER BY profile_id,version"
+                        )
+                    ).mappings()
+                ],
+            }
+        return {
+            "state": configuration_state(session=s),
+            "connections": [
+                _json(r)
+                for r in s.execute(
+                    text(
+                        "SELECT id,label,provider,revision,secret_source,endpoint,enabled,catalog_status,catalog_error_code,catalog_updated_at,max_concurrent,daily_calls,daily_tokens,(secret_ref IS NOT NULL) AS has_secret,jsonb_array_length(model_catalog) AS model_count FROM ai_provider_connections ORDER BY created_at,id LIMIT 1001"
+                    )
+                ).mappings()
+            ],
+            "profiles": [
+                _json(r)
+                for r in s.execute(
+                    text("SELECT * FROM ai_profiles ORDER BY created_at,id LIMIT 1001")
+                ).mappings()
+            ],
+            "bindings": list_bindings(session=s),
+            "versions": [
+                _json(r)
+                for r in s.execute(
+                    text(
+                        "SELECT * FROM ai_profile_versions ORDER BY created_at DESC,profile_id,version DESC LIMIT 1001"
+                    )
+                ).mappings()
+            ],
+        }
+
+
+def swap_connection_credential(
+    id, api_key, expected_revision, actor_id, *, session=None
+):
+    """Encrypt, CAS swap and revoke old credential in the same transaction."""
+    from crate.credentials import store_secret, revoke_secret
+
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            row = (
+                s.execute(
+                    text(
+                        "SELECT * FROM ai_provider_connections WHERE id=:id FOR UPDATE"
+                    ),
+                    {"id": id},
+                )
+                .mappings()
+                .first()
+            )
+            if row is None or row["revision"] != expected_revision:
+                _conflict()
+            if row["secret_source"] == "environment":
+                raise AIConfigurationError(
+                    "AI_ENVIRONMENT_READ_ONLY", "Environment connections are read only"
+                )
+            ref = (
+                store_secret(
+                    "ai", {"api_key": api_key}, require_strong_key=True, session=s
+                )
+                if api_key is not None
+                else None
+            )
+            result = update_connection(
+                id,
+                {"secret_ref": ref, "secret_source": "stored" if ref else "none"},
+                expected_revision,
+                actor_id,
+                session=s,
+            )
+            if row["secret_ref"]:
+                revoke_secret(row["secret_ref"], session=s)
+            return result
+
+
+def ensure_environment_connection(provider, endpoint, *, session=None):
+    """Persist metadata only on explicit refresh, activation or execution acceptance."""
+    from uuid import NAMESPACE_URL, uuid5
+
+    id = str(uuid5(NAMESPACE_URL, f"crate:ai:env:{provider}"))
+    with optional_scope(session) as s:
+        s.execute(
+            text("""INSERT INTO ai_provider_connections(id,label,provider,secret_source,endpoint)
+        VALUES(:id,:label,:provider,'environment',:endpoint) ON CONFLICT(id) DO NOTHING"""),
+            {
+                "id": id,
+                "label": f"Environment {provider}",
+                "provider": provider,
+                "endpoint": endpoint,
+            },
+        )
+        return get_connection(id, private=True, session=s)
+
+
+def apply_validated_bindings(
+    changes, actor_id, validate, *, activate_revision=None, session=None
+):
+    """Validate current catalog under locks and apply the complete CAS batch."""
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            s.execute(
+                text(
+                    "SELECT singleton FROM ai_configuration_state WHERE singleton FOR UPDATE"
+                )
+            )
+            # Lock connections against concurrent catalog/credential edits through commit.
+            s.execute(
+                text("SELECT id FROM ai_provider_connections ORDER BY id FOR SHARE")
+            )
+            snapshot = configuration_snapshot(session=s)
+            validate(snapshot, changes)
+            if activate_revision is not None:
+                return activate_configuration(
+                    changes, activate_revision, actor_id, session=s
+                )
+            return apply_bindings(changes, actor_id, session=s)
+
+
+__all__ += [
+    "configuration_snapshot",
+    "swap_connection_credential",
+    "ensure_environment_connection",
+    "apply_validated_bindings",
+]
+
+
+def activate_legacy_configuration(
+    expected_revision,
+    actor_id,
+    legacy_contexts,
+    validate,
+    expected_review_fingerprint,
+    review_fingerprint,
+    *,
+    session=None,
+):
+    """Internal-only exact legacy snapshots; editable API never accepts this config."""
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            s.execute(
+                text(
+                    "SELECT singleton FROM ai_configuration_state WHERE singleton FOR UPDATE"
+                )
+            )
+            s.execute(
+                text("SELECT id FROM ai_provider_connections ORDER BY id FOR SHARE")
+            )
+            if review_fingerprint() != expected_review_fingerprint:
+                _conflict()
+            data = configuration_snapshot(session=s)
+            existing = {b["action_id"]: b for b in data["bindings"]}
+            changes = []
+            for action_id, context in legacy_contexts.items():
+                binding = existing.get(action_id)
+                if binding is None:
+                    provider = context["provider"]
+                    conn = ensure_environment_connection(
+                        provider, context["endpoint"], session=s
+                    )
+                    assert conn is not None
+                    # Catalog metadata must already have been explicitly refreshed.
+                    validate(conn, context, action_id)
+                    profile = create_profile(
+                        {
+                            "label": ACTIONS[action_id].label,
+                            "connection_id": conn["id"],
+                            "model_id": context["model_id"],
+                            "config": {
+                                "kind": "legacy_snapshot",
+                                "action_id": action_id,
+                                "legacy_model": context["legacy_model"],
+                                "legacy_options": context["legacy_options"],
+                            },
+                        },
+                        actor_id,
+                        session=s,
+                    )
+                    binding = {
+                        "action_id": action_id,
+                        "profile_id": profile["id"],
+                        "profile_version": 1,
+                        "enabled": True,
+                        "revision": 0,
+                    }
+                changes.append(
+                    {k: v for k, v in binding.items() if k != "revision"}
+                    | {"expected_revision": binding["revision"]}
+                )
+            # Revalidate all reviewed and captured versions under connection locks.
+            s.execute(
+                text("SELECT id FROM ai_provider_connections ORDER BY id FOR SHARE")
+            )
+            data = configuration_snapshot(session=s)
+            for change in changes:
+                version = next(
+                    v
+                    for v in data["versions"]
+                    if v["profile_id"] == change["profile_id"]
+                    and v["version"] == change["profile_version"]
+                )
+                conn = next(
+                    c
+                    for c in data["connections"]
+                    if c["id"] == version["connection_id"]
+                )
+                validate(conn, version, change["action_id"])
+            return activate_configuration(
+                changes, expected_revision, actor_id, session=s
+            )
+
+
+__all__ += ["activate_legacy_configuration"]

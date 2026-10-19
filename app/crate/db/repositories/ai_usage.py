@@ -10,8 +10,9 @@ buckets. Connection locks serialize all actions sharing a provider connection.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from uuid import UUID
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from sqlalchemy import text
 
@@ -273,14 +274,31 @@ def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
     are omitted. Activity older than 90 days is excluded even before bounded prune.
     """
     clauses = ["created_at>=NOW()-INTERVAL '90 days'"]
-    params = {"limit": min(max(limit, 1), 200) + 1}
-    for key in ("connection_id", "action_id", "invocation_kind", "status", "actor_id"):
+    params: dict[str, Any] = {"limit": min(max(limit, 1), 200) + 1}
+    for key in (
+        "connection_id",
+        "action_id",
+        "invocation_kind",
+        "status",
+        "actor_id",
+        "model_id",
+    ):
         if filters.get(key) is not None:
             clauses.append(f"{key}=:{key}")
             params[key] = filters[key]
+    if filters.get("provider") is not None:
+        if filters["provider"] not in {"gemini", "deepseek", "ollama"}:
+            _error("AI_USAGE_INVALID", "Unknown provider")
+        clauses.append(
+            "connection_id IN (SELECT id FROM ai_provider_connections WHERE provider=:provider)"
+        )
+        params["provider"] = filters["provider"]
     if cursor:
         try:
             created, identifier = json.loads(cursor)
+            if not isinstance(created, str) or len(created) > 100:
+                raise ValueError("Invalid activity cursor")
+            datetime.fromisoformat(created)
             UUID(identifier)
         except (ValueError, TypeError):
             _error("AI_USAGE_INVALID", "Invalid activity cursor")
@@ -307,12 +325,40 @@ def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
         return {"items": items, "next_cursor": next_cursor}
 
 
-def usage_summary(*, session=None) -> dict:
+def usage_summary(*, daily_limit=None, session=None) -> dict:
     """{totals:{calls,tokens,completed,failed,estimated_cost},daily:[bucket rows]}.
 
     Only precomputed UTC buckets are aggregated, never invocation history.
     """
     with _read(session) as s:
+        fields = ("calls", "tokens", "completed", "failed")
+        if daily_limit is not None:
+            limit = min(max(daily_limit, 1), 5000)
+            window = ",".join(
+                f"SUM({field}) OVER () AS total_{field}" for field in fields
+            )
+            rows = [
+                _json(r)
+                for r in s.execute(
+                    text(
+                        f"SELECT *,{window} FROM ai_usage_daily WHERE day>=(NOW() AT TIME ZONE 'UTC')::date-89 ORDER BY day DESC,connection_id,action_id LIMIT :limit"
+                    ),
+                    {"limit": limit + 1},
+                ).mappings()
+            ]
+            totals = {
+                field: int(rows[0][f"total_{field}"]) if rows else 0 for field in fields
+            }
+            totals["estimated_cost"] = None
+            truncated = len(rows) > limit
+            daily = [
+                {k: v for k, v in row.items() if not k.startswith("total_")}
+                for row in rows[:limit]
+            ]
+            for bucket in daily:
+                if bucket["invocation_kind"] == "probe":
+                    bucket["action_id"] = None
+            return {"totals": totals, "daily": daily, "truncated": truncated}
         daily = [
             _json(r)
             for r in s.execute(

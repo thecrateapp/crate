@@ -103,3 +103,16 @@ class AIAction(ClosedModel):
     location: ShortText
     maxima: ActionMaxima
     description: Annotated[str, Field(min_length=1, max_length=500)]
+
+
+class LegacyOptions(ClosedModel):
+    timeout_seconds: Annotated[int, Field(ge=1, le=300)] | None = None
+    max_tokens: Annotated[int, Field(ge=1, le=16000)] | None = None
+    image_detail: Literal["default", "ultra_high"] = "default"
+
+
+class LegacyProfileConfig(ClosedModel):
+    kind: Literal["legacy_snapshot"] = "legacy_snapshot"
+    action_id: ShortText
+    legacy_model: ShortText
+    legacy_options: LegacyOptions

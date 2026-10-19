@@ -531,6 +531,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
 
 _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
+        "crate.worker_handlers.ai_configuration",
+        "AI_CONFIGURATION_TASK_HANDLERS",
+        ("ai_catalog_refresh", "ai_profile_test"),
+    ),
+    (
         "crate.worker_handlers.acquisition",
         "ACQUISITION_TASK_HANDLERS",
         (
