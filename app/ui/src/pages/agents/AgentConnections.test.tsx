@@ -102,7 +102,17 @@ function readDefault(path: string, items: AgentIntegration[]) {
   if (path.startsWith(`${base}/oauth-clients`))
     return Promise.resolve(emptyPage);
   if (path.includes("/activity")) return Promise.resolve(emptyPage);
+  // The sheet reads a connection again after every change.
+  const single = items.find((item) => path === `${base}/${item.principal_id}`);
+  if (single) return Promise.resolve(single);
   return Promise.resolve({ items, next_cursor: null });
+}
+
+/** Expiry of each token row the Token section offers actions for. */
+function activeTokenExpiries(section: HTMLElement) {
+  return within(section)
+    .queryAllByRole("listitem")
+    .map((row) => row.querySelector("time")?.getAttribute("datetime"));
 }
 
 function mockReads(items = [integration]) {
@@ -382,21 +392,28 @@ describe("AgentConnections", () => {
 
   it("treats delegated connections as account revocation rather than service token rotation", async () => {
     const user = userEvent.setup();
-    mockReads([
-      {
-        ...integration,
-        kind: "delegated",
-        credentials: null,
-        authorizations: [
-          {
-            authorization_id: "authorization-one",
-            user_id: 14,
-            client_id: "agent-client",
-            revoked_at: null,
-          },
-        ],
-      },
-    ]);
+    const signIn = {
+      authorization_id: "authorization-one",
+      user_id: 14,
+      client_id: "agent-client",
+      revoked_at: null as string | null,
+    };
+    let delegated: AgentIntegration = {
+      ...integration,
+      kind: "delegated",
+      credentials: null,
+      authorizations: [signIn],
+    };
+    apiMock.mockImplementation((path: string, method = "GET") => {
+      if (method === "POST") {
+        delegated = {
+          ...delegated,
+          authorizations: [{ ...signIn, revoked_at: "2026-10-19T12:00:00Z" }],
+        };
+        return Promise.resolve({ revoked: true });
+      }
+      return readDefault(path, [delegated]);
+    });
     renderWithAdminProviders(<AgentConnections />);
 
     expect(
@@ -420,6 +437,10 @@ describe("AgentConnections", () => {
         "POST",
       ),
     );
+    expect(await within(sheet).findByText("Revoked")).toBeInTheDocument();
+    expect(
+      within(sheet).queryByRole("button", { name: "Disconnect" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: "New token" }),
     ).not.toBeInTheDocument();
@@ -728,14 +749,17 @@ describe("AgentConnections", () => {
     const dialog = screen.getByRole("dialog", { name: "Register OAuth app" });
     await user.type(
       within(dialog).getByLabelText("Client ID"),
-      "https://agent.example/client.json",
+      "  https://agent.example/client.json ",
     );
     await user.click(
       within(dialog).getByLabelText(
         "Verify the client ID as a public metadata document",
       ),
     );
-    await user.type(within(dialog).getByLabelText("App name"), "Remote agent");
+    await user.type(
+      within(dialog).getByLabelText("App name"),
+      " Remote agent  ",
+    );
     await user.type(
       within(dialog).getByLabelText("Redirect URIs (one per line)"),
       " https://agent.example/callback {Enter}{Enter}http://127.0.0.1/cb",
@@ -793,6 +817,191 @@ describe("AgentConnections", () => {
         "POST",
         { client_id: "remote-client", enabled: false },
       ),
+    );
+  });
+
+  it("keeps a later-page connection current after rotating and revoking its token", async () => {
+    const user = userEvent.setup();
+    const oldToken = {
+      credential_id: "credential-old",
+      expires_at: "2030-01-01T00:00:00Z",
+      revoked_at: null as string | null,
+    };
+    const newToken = {
+      credential_id: "credential-new",
+      expires_at: "2031-06-01T00:00:00Z",
+      revoked_at: null as string | null,
+    };
+    let later: AgentIntegration = {
+      ...integration,
+      principal_id: "service-two",
+      name: "Night operator",
+      credentials: [oldToken],
+    };
+    apiMock.mockImplementation((path: string) => {
+      if (path === `${base}/credentials/credential-old/rotate`) {
+        later = {
+          ...later,
+          credentials: [
+            newToken,
+            { ...oldToken, revoked_at: "2026-10-19T12:00:00Z" },
+          ],
+        };
+        return Promise.resolve({
+          ...secret,
+          credential_id: newToken.credential_id,
+          expires_at: newToken.expires_at,
+        });
+      }
+      if (path === `${base}/credentials/credential-new/revoke`) {
+        later = {
+          ...later,
+          credentials: (later.credentials ?? []).map((credential) => ({
+            ...credential,
+            revoked_at: credential.revoked_at ?? "2026-10-19T12:05:00Z",
+          })),
+        };
+        return Promise.resolve({ revoked: true });
+      }
+      if (path === `${base}?limit=20`)
+        return Promise.resolve({ items: [integration], next_cursor: "one" });
+      if (path === `${base}?limit=20&cursor=one`)
+        return Promise.resolve({ items: [later], next_cursor: null });
+      if (path === `${base}/service-two`) return Promise.resolve(later);
+      return readDefault(path, [integration]);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    await screen.findByRole("button", { name: "Library reader" });
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+    const sheet = await openConnection(user, "Night operator");
+    const tokens = within(sheet).getByRole("region", { name: "Token" });
+    expect(activeTokenExpiries(tokens)).toEqual([oldToken.expires_at]);
+
+    await user.click(
+      within(tokens).getByRole("button", { name: "Rotate token" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Rotate token",
+      }),
+    );
+    expect(
+      await within(sheet).findByRole("textbox", { name: "New token" }),
+    ).toHaveValue(secret.token);
+    await waitFor(() =>
+      expect(activeTokenExpiries(tokens)).toEqual([newToken.expires_at]),
+    );
+    expect(
+      within(tokens).getAllByRole("button", { name: "Rotate token" }),
+    ).toHaveLength(1);
+    expect(apiMock).toHaveBeenCalledWith(`${base}/service-two`);
+
+    await user.click(
+      within(tokens).getByRole("button", { name: "Revoke token" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Revoke token",
+      }),
+    );
+    expect(
+      await within(tokens).findByText("This connection has no active token."),
+    ).toBeInTheDocument();
+    expect(
+      within(tokens).queryByRole("button", { name: "Revoke token" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(tokens).queryByRole("button", { name: "Rotate token" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(sheet).getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Night operator" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Library reader" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Night operator" }),
+    ).toHaveTextContent("Token revoked");
+    expect(
+      apiMock.mock.calls.filter(([path]) => path === `${base}?limit=20`),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the loaded connections when the next page fails and retries it", async () => {
+    const user = userEvent.setup();
+    const second = {
+      ...integration,
+      principal_id: "service-two",
+      name: "Night operator",
+    };
+    let failNextPage = true;
+    apiMock.mockImplementation((path: string) => {
+      if (path === `${base}?limit=20`)
+        return Promise.resolve({ items: [integration], next_cursor: "one" });
+      if (path === `${base}?limit=20&cursor=one`) {
+        if (failNextPage) {
+          failNextPage = false;
+          return Promise.reject(new Error("Gateway timeout"));
+        }
+        return Promise.resolve({ items: [second], next_cursor: null });
+      }
+      return readDefault(path, []);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    await screen.findByRole("button", { name: "Library reader" });
+
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "More connections could not be loaded.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Library reader" }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByRole("button", { name: "Night operator" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Library reader" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      apiMock.mock.calls.filter(([path]) => path === `${base}?limit=20`),
+    ).toHaveLength(1);
+  });
+
+  it("submits the OAuth app form with Enter in the client ID field", async () => {
+    const user = userEvent.setup();
+    renderWithAdminProviders(<AgentConnections />);
+    await screen.findByText(
+      "Register an app before anyone can connect with OAuth.",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Register app" }));
+    const dialog = screen.getByRole("dialog", { name: "Register OAuth app" });
+    await user.type(within(dialog).getByLabelText("App name"), "Remote agent");
+    await user.type(
+      within(dialog).getByLabelText("Redirect URIs (one per line)"),
+      "https://agent.example/callback",
+    );
+    await user.type(
+      within(dialog).getByLabelText("Client ID"),
+      "remote-client{Enter}",
+    );
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(`${base}/oauth-clients`, "POST", {
+        client_id: "remote-client",
+        name: "Remote agent",
+        redirect_uris: ["https://agent.example/callback"],
+        scopes: ["library.health.read"],
+        metadata_url: null,
+      }),
     );
   });
 });

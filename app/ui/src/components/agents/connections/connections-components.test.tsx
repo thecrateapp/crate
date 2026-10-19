@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -154,6 +155,13 @@ const readOnlyPreset = catalog.presets.find(
   (preset) => preset.id === "read_only",
 )!;
 
+function ControlledPicker({ initial }: { initial: string[] }) {
+  const [value, setValue] = useState(initial);
+  return (
+    <PermissionPicker catalog={catalog} value={value} onChange={setValue} />
+  );
+}
+
 describe("PermissionPicker", () => {
   it("has a labelled radiogroup of preset and custom cards", () => {
     render(
@@ -230,6 +238,54 @@ describe("PermissionPicker", () => {
         "Needs a permission you don't have: Change editorial playlist visibility",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("moves focus and selection with the arrow keys, skipping disabled presets", async () => {
+    const user = userEvent.setup();
+    render(<ControlledPicker initial={readOnlyPreset.scopes} />);
+    const readOnly = screen.getByRole("radio", { name: "Read only" });
+    readOnly.focus();
+
+    await user.keyboard("{ArrowRight}");
+    const showsCurator = screen.getByRole("radio", { name: "Shows curator" });
+    expect(showsCurator).toBeChecked();
+    expect(showsCurator).toHaveFocus();
+
+    // «Editorial curator» needs a permission the caller lacks.
+    await user.keyboard("{ArrowDown}");
+    const maintainer = screen.getByRole("radio", {
+      name: "Library maintainer",
+    });
+    expect(maintainer).toBeChecked();
+    expect(maintainer).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: "Custom" })).toHaveFocus();
+    expect(screen.getByRole("radio", { name: "Custom" })).toBeChecked();
+
+    await user.keyboard("{ArrowRight}");
+    expect(readOnly).toHaveFocus();
+    expect(readOnly).toBeChecked();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("radio", { name: "Custom" })).toHaveFocus();
+  });
+
+  it("keeps the preset cards a single tab stop on the checked card", async () => {
+    const user = userEvent.setup();
+    render(<ControlledPicker initial={readOnlyPreset.scopes} />);
+
+    const inTabOrder = screen
+      .getAllByRole("radio")
+      .filter((radio) => radio.tabIndex === 0);
+    expect(inTabOrder).toEqual([
+      screen.getByRole("radio", { name: "Read only" }),
+    ]);
+
+    await user.tab();
+    expect(screen.getByRole("radio", { name: "Read only" })).toHaveFocus();
+    await user.tab();
+    expect(document.body).toHaveFocus();
   });
 
   it("disables an ungrantable scope checkbox in the custom editor", async () => {
@@ -347,6 +403,25 @@ describe("ConnectAgentDialog", () => {
     );
     expect(screen.getByText(/claude mcp add/)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(secret.token))).toBeInTheDocument();
+  });
+
+  it("goes to the permissions step when Enter is pressed in the name field", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Night operator{Enter}");
+
+    expect(screen.getByText("Step 2 of 3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Create connection" }),
+    ).toBeInTheDocument();
   });
 
   it("resets to step 1 with no token once closed and reopened", async () => {

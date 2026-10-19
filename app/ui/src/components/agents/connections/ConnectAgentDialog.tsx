@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -78,7 +78,13 @@ export function ConnectAgentDialog({
     onOpenChange(next);
   }
 
-  async function createConnection() {
+  function goToPermissions(event: FormEvent) {
+    event.preventDefault();
+    if (name.trim()) setStep(2);
+  }
+
+  async function createConnection(event: FormEvent) {
+    event.preventDefault();
     if (busy || grants.length === 0) return;
     setBusy(true);
     setError(null);
@@ -112,7 +118,7 @@ export function ConnectAgentDialog({
         </DialogHeader>
 
         {step === 1 ? (
-          <div className="space-y-4">
+          <form onSubmit={goToPermissions} className="space-y-4">
             <label className="grid gap-1 text-sm">
               Name
               <Input
@@ -133,19 +139,15 @@ export function ConnectAgentDialog({
               />
             </div>
             <div className="flex justify-end">
-              <Button
-                type="button"
-                disabled={!name.trim()}
-                onClick={() => setStep(2)}
-              >
+              <Button type="submit" disabled={!name.trim()}>
                 Next
               </Button>
             </div>
-          </div>
+          </form>
         ) : null}
 
         {step === 2 ? (
-          <div className="space-y-4">
+          <form onSubmit={createConnection} className="space-y-4">
             <PermissionPicker
               catalog={catalog}
               value={grants}
@@ -179,15 +181,11 @@ export function ConnectAgentDialog({
               >
                 Back
               </Button>
-              <Button
-                type="button"
-                disabled={busy || grants.length === 0}
-                onClick={() => void createConnection()}
-              >
+              <Button type="submit" disabled={busy || grants.length === 0}>
                 {busy ? "Creating…" : "Create connection"}
               </Button>
             </div>
-          </div>
+          </form>
         ) : null}
 
         {step === 3 && secret ? (

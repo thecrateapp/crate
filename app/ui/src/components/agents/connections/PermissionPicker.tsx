@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
 
@@ -85,26 +85,35 @@ function PresetCard({
   reason,
   selected,
   disabled,
+  focusable,
+  buttonRef,
   onSelect,
+  onKeyDown,
 }: {
   label: string;
   description: string;
   reason?: string | null;
   selected: boolean;
   disabled?: boolean;
+  focusable: boolean;
+  buttonRef: (node: HTMLButtonElement | null) => void;
   onSelect: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   const descriptionId = useId();
   const reasonId = useId();
   return (
     <button
+      ref={buttonRef}
       type="button"
       role="radio"
       aria-checked={selected}
       aria-label={label}
       aria-describedby={reason ? `${descriptionId} ${reasonId}` : descriptionId}
       disabled={disabled}
+      tabIndex={focusable ? 0 : -1}
       onClick={onSelect}
+      onKeyDown={onKeyDown}
       className={cn(
         "flex flex-col gap-1 rounded-md border border-border p-3 text-left transition-colors",
         selected ? "border-primary bg-primary/5" : "hover:bg-muted/50",
@@ -140,9 +149,38 @@ export function PermissionPicker({
   disabled?: boolean;
 }) {
   const [customChosen, setCustomChosen] = useState(false);
+  const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const matchedPreset = presetForGrants(value, catalog.presets);
   const selected = customChosen ? "custom" : matchedPreset;
   const grantSet = new Set(value);
+  const cards = [
+    ...catalog.presets.map((preset) => {
+      const reason = presetUnavailableReason(preset, catalog.scopes);
+      return {
+        id: preset.id,
+        label: preset.label,
+        description: preset.description,
+        reason,
+        disabled: Boolean(disabled) || reason !== null,
+        select: () => choosePreset(preset),
+      };
+    }),
+    {
+      id: "custom",
+      label: "Custom",
+      description: "Choose individual permissions.",
+      reason: null,
+      disabled: Boolean(disabled),
+      select: () => setCustomChosen(true),
+    },
+  ];
+  // Roving tabindex, as in SegmentedControl: the group is one Tab stop, on
+  // the checked card when it is enabled, otherwise on the first enabled one.
+  const selectedIndex = cards.findIndex((card) => card.id === selected);
+  const focusableIndex =
+    selectedIndex >= 0 && !cards[selectedIndex]?.disabled
+      ? selectedIndex
+      : cards.findIndex((card) => !card.disabled);
 
   function choosePreset(preset: AgentScopePreset) {
     setCustomChosen(false);
@@ -155,6 +193,49 @@ export function PermissionPicker({
     );
   }
 
+  function findEnabled(start: number, step: 1 | -1): number {
+    const count = cards.length;
+    for (let offset = 1; offset <= count; offset += 1) {
+      const index = (((start + step * offset) % count) + count) % count;
+      if (!cards[index]?.disabled) return index;
+    }
+    return -1;
+  }
+
+  function moveTo(index: number) {
+    const card = cards[index];
+    if (!card) return;
+    cardRefs.current[index]?.focus();
+    if (card.id !== selected) card.select();
+  }
+
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) {
+    let next = -1;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        next = findEnabled(index, 1);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        next = findEnabled(index, -1);
+        break;
+      case "Home":
+        next = cards.findIndex((card) => !card.disabled);
+        break;
+      case "End":
+        next = findEnabled(0, -1);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    if (next >= 0) moveTo(next);
+  }
+
   return (
     <div className="space-y-4">
       <div
@@ -162,27 +243,22 @@ export function PermissionPicker({
         aria-label="Access"
         className="grid gap-2 sm:grid-cols-2"
       >
-        {catalog.presets.map((preset) => {
-          const reason = presetUnavailableReason(preset, catalog.scopes);
-          return (
-            <PresetCard
-              key={preset.id}
-              label={preset.label}
-              description={preset.description}
-              reason={reason}
-              selected={selected === preset.id}
-              disabled={disabled || reason !== null}
-              onSelect={() => choosePreset(preset)}
-            />
-          );
-        })}
-        <PresetCard
-          label="Custom"
-          description="Choose individual permissions."
-          selected={selected === "custom"}
-          disabled={disabled}
-          onSelect={() => setCustomChosen(true)}
-        />
+        {cards.map((card, index) => (
+          <PresetCard
+            key={card.id}
+            label={card.label}
+            description={card.description}
+            reason={card.reason}
+            selected={selected === card.id}
+            disabled={card.disabled}
+            focusable={index === focusableIndex}
+            buttonRef={(node) => {
+              cardRefs.current[index] = node;
+            }}
+            onSelect={card.select}
+            onKeyDown={(event) => handleKeyDown(event, index)}
+          />
+        ))}
       </div>
       {selected === "custom" ? (
         <div className="space-y-4">

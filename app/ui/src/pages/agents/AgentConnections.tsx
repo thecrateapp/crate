@@ -147,15 +147,18 @@ export function AgentConnections() {
     );
   }
 
-  // The sheet follows the list's copy of the connection once it is
-  // refetched; a connection beyond the reloaded first page keeps its last
-  // known copy.
+  // The sheet shows the freshest copy: the one it re-read after a change
+  // (patched into the list as well) or the list's own after a reload.
   const current = selected
     ? connections.items.find(
         (item) => item.principal_id === selected.principal_id,
       ) ?? selected
     : null;
-  const error = connections.error || catalog.error;
+  const error = catalog.error
+    ? catalog.error
+    : connections.error && connections.items.length > 0
+      ? "More connections could not be loaded."
+      : connections.error;
   // Rows summarise grants with the catalog's access levels, so they wait for
   // it rather than briefly counting every grant as a change.
   const listLoading =
@@ -164,9 +167,15 @@ export function AgentConnections() {
   const scopes = catalog.data?.scopes ?? null;
 
   function refreshAll() {
-    connections.refresh();
+    connections.reload();
     catalog.refetch();
     setOauthGeneration((value) => value + 1);
+  }
+
+  function connectionChanged(fresh: AgentIntegration) {
+    // Patch the changed row in place so the pages already loaded stay put.
+    connections.replace(fresh);
+    setSelected(fresh);
   }
 
   return (
@@ -243,7 +252,20 @@ export function AgentConnections() {
               ))}
             </ul>
           ) : null}
-          {connections.nextCursor && !connections.error ? (
+          {connections.error || catalog.error ? (
+            <Button
+              variant="outline"
+              disabled={connections.loadingMore}
+              onClick={() => {
+                // A failed next page is asked for again; the rows already
+                // shown stay.
+                if (connections.error) connections.retry();
+                if (catalog.error) catalog.refetch();
+              }}
+            >
+              Try again
+            </Button>
+          ) : connections.nextCursor ? (
             <Button
               variant="outline"
               disabled={connections.loadingMore}
@@ -256,12 +278,7 @@ export function AgentConnections() {
       </OpsPanel>
 
       {catalog.data ? (
-        <OAuthApps
-          key={oauthGeneration}
-          catalog={catalog.data}
-          busy={catalog.loading}
-          onChanged={connections.refresh}
-        />
+        <OAuthApps key={oauthGeneration} catalog={catalog.data} />
       ) : null}
 
       {catalog.data ? (
@@ -269,7 +286,7 @@ export function AgentConnections() {
           open={connectOpen}
           onOpenChange={setConnectOpen}
           catalog={catalog.data}
-          onCreated={connections.refresh}
+          onCreated={connections.reload}
         />
       ) : null}
 
@@ -279,7 +296,7 @@ export function AgentConnections() {
           integration={current}
           catalog={catalog.data}
           canReadActivity={canReadActivity}
-          onChanged={connections.refresh}
+          onChanged={connectionChanged}
           onClose={() => setSelected(null)}
         />
       ) : null}

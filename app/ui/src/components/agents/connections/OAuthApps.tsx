@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { AppWindow } from "lucide-react";
 import { toast } from "sonner";
 
@@ -47,13 +47,11 @@ function readOnlyScopes(catalog: AgentCatalog): string[] {
 function OAuthAppDialog({
   catalog,
   client,
-  busy,
   onClose,
   onSaved,
 }: {
   catalog: AgentCatalog;
   client: AgentOAuthClient | null;
-  busy: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -70,7 +68,6 @@ function OAuthAppDialog({
   const nameField = useId();
   const redirectsField = useId();
   const metadataHint = useId();
-  const disabled = busy || saving;
   const redirectUris = redirects
     .split("\n")
     .map((value) => value.trim())
@@ -81,8 +78,9 @@ function OAuthAppDialog({
       redirectUris.length > 0 &&
       scopes.length > 0;
 
-  async function submit() {
-    if (disabled || !complete) return;
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (saving || !complete) return;
     setSaving(true);
     try {
       await api(
@@ -91,11 +89,11 @@ function OAuthAppDialog({
         editing
           ? { client_id: clientId, scopes }
           : {
-              client_id: clientId,
-              name,
+              client_id: clientId.trim(),
+              name: name.trim(),
               redirect_uris: redirectUris,
               scopes,
-              metadata_url: useMetadata ? clientId : null,
+              metadata_url: useMetadata ? clientId.trim() : null,
             },
       );
       toast.success(
@@ -134,7 +132,7 @@ function OAuthAppDialog({
               : "Use the client ID and exact redirect URIs supplied by the agent application."}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <form onSubmit={submit} className="space-y-4">
           {editing ? (
             <div className="space-y-0.5 text-sm">
               <p className="font-medium [overflow-wrap:anywhere]">{name}</p>
@@ -154,7 +152,7 @@ function OAuthAppDialog({
                 <label className="flex items-center gap-2">
                   <Switch
                     checked={useMetadata}
-                    disabled={disabled}
+                    disabled={saving}
                     onCheckedChange={setUseMetadata}
                   />
                   Verify the client ID as a public metadata document
@@ -192,7 +190,7 @@ function OAuthAppDialog({
             catalog={catalog}
             value={scopes}
             onChange={setScopes}
-            disabled={disabled}
+            disabled={saving}
           />
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -203,15 +201,11 @@ function OAuthAppDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              disabled={disabled || !complete}
-              onClick={() => void submit()}
-            >
+            <Button type="submit" disabled={saving || !complete}>
               {editing ? "Save permissions" : "Register app"}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -276,15 +270,7 @@ function OAuthAppRow({
 }
 
 /** Secondary panel for the OAuth apps that agents sign in through. */
-export function OAuthApps({
-  catalog,
-  busy = false,
-  onChanged,
-}: {
-  catalog: AgentCatalog;
-  busy?: boolean;
-  onChanged?: () => void;
-}) {
+export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
   const clients = useCursorList<AgentOAuthClient>(
     `${base}/oauth-clients`,
     (client) => client.client_id,
@@ -294,12 +280,6 @@ export function OAuthApps({
   const [confirmation, setConfirmation] = useState<AgentOAuthClient | null>(
     null,
   );
-  const disabled = busy || toggling;
-
-  function changed() {
-    clients.refresh();
-    onChanged?.();
-  }
 
   async function toggle(client: AgentOAuthClient) {
     setToggling(true);
@@ -311,7 +291,7 @@ export function OAuthApps({
       toast.success(
         client.enabled ? "OAuth app disabled" : "OAuth app enabled",
       );
-      changed();
+      clients.reload();
     } catch (error) {
       toast.error(apiErrorText(error, "Could not update the app."));
     } finally {
@@ -328,7 +308,6 @@ export function OAuthApps({
         <Button
           type="button"
           variant="outline"
-          disabled={busy}
           onClick={() => setForm("register")}
         >
           Register app
@@ -353,7 +332,7 @@ export function OAuthApps({
               type="button"
               size="sm"
               variant="outline"
-              onClick={clients.refresh}
+              onClick={clients.retry}
             >
               Try again
             </Button>
@@ -371,7 +350,7 @@ export function OAuthApps({
                 key={client.client_id}
                 client={client}
                 catalog={catalog}
-                disabled={disabled}
+                disabled={toggling}
                 onEdit={() => setForm(client)}
                 onToggle={() => setConfirmation(client)}
               />
@@ -394,11 +373,10 @@ export function OAuthApps({
           key={form === "register" ? "register" : form.client_id}
           catalog={catalog}
           client={form === "register" ? null : form}
-          busy={busy}
           onClose={() => setForm(null)}
           onSaved={() => {
             setForm(null);
-            changed();
+            clients.reload();
           }}
         />
       ) : null}

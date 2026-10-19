@@ -74,11 +74,6 @@ export interface AgentActivityEntry {
   };
 }
 
-type PolicyFields = Pick<
-  AgentIntegration,
-  "policy_revision" | "enabled" | "grants" | "require_approval"
->;
-
 type PolicyChange = Partial<
   Pick<AgentIntegration, "enabled" | "grants" | "require_approval">
 >;
@@ -89,27 +84,6 @@ interface Confirmation {
   confirmLabel: string;
   destructive: boolean;
   run: () => Promise<unknown>;
-}
-
-/** The policy part of an integration or of a PATCH response, if complete. */
-function policyFields(value: unknown): PolicyFields | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  if (
-    typeof record.policy_revision !== "number" ||
-    typeof record.enabled !== "boolean" ||
-    typeof record.require_approval !== "boolean" ||
-    !Array.isArray(record.grants)
-  )
-    return null;
-  return {
-    policy_revision: record.policy_revision,
-    enabled: record.enabled,
-    require_approval: record.require_approval,
-    grants: record.grants.filter(
-      (grant): grant is string => typeof grant === "string",
-    ),
-  };
 }
 
 function isConflict(error: unknown): boolean {
@@ -370,17 +344,14 @@ export function ConnectionSheet({
   integration: AgentIntegration;
   catalog: AgentCatalog;
   canReadActivity: boolean;
-  onChanged: () => void;
+  onChanged: (fresh: AgentIntegration) => void;
   onClose: () => void;
 }) {
   const now = useNow(60_000);
-  // A policy read or saved here can be newer than the list's copy until the
-  // list is refetched; the higher revision wins.
-  const [latest, setLatest] = useState<PolicyFields | null>(null);
-  const policy: AgentIntegration =
-    latest && latest.policy_revision > integration.policy_revision
-      ? { ...integration, ...latest }
-      : integration;
+  // After every change the connection is read again and handed to the page,
+  // so this prop is always the server's current copy: policy, tokens and
+  // sign-ins alike.
+  const policy = integration;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -411,9 +382,22 @@ export function ConnectionSheet({
   );
   const policyLocked = busy || conflict;
 
-  function changed() {
-    onChanged();
-    activity.refresh();
+  /** Reads the connection again and passes the fresh copy up. */
+  async function reread(): Promise<boolean> {
+    try {
+      const fresh = await api<AgentIntegration>(principalPath);
+      if (fresh?.principal_id !== integration.principal_id) return false;
+      onChanged(fresh);
+      return true;
+    } catch (error) {
+      toast.error(apiErrorText(error, "Could not reload this connection."));
+      return false;
+    }
+  }
+
+  async function changed() {
+    activity.reload();
+    await reread();
   }
 
   async function patchPolicy(
@@ -426,13 +410,13 @@ export function ConnectionSheet({
     setFormError(null);
     setNotice(null);
     try {
-      const result = await api<unknown>(principalPath, "PATCH", {
+      await api(principalPath, "PATCH", {
         ...change,
         expected_policy_revision: policy.policy_revision,
       });
-      const fields = policyFields(result);
-      if (fields) setLatest(fields);
-      changed();
+      // Busy until the fresh copy is in, so a second change never sends the
+      // revision this one just replaced.
+      await changed();
       toast.success(success);
       return true;
     } catch (error) {
@@ -454,14 +438,10 @@ export function ConnectionSheet({
     setBusy(true);
     setFormError(null);
     try {
-      const current = await api<AgentIntegration>(principalPath);
-      const fields = policyFields(current);
-      if (fields) setLatest(fields);
-      setConflict(false);
-      setNotice(editing ? RELOADED_WHILE_EDITING : "Policy reloaded.");
-      onChanged();
-    } catch (error) {
-      toast.error(apiErrorText(error, "Could not reload the policy."));
+      if (await reread()) {
+        setConflict(false);
+        setNotice(editing ? RELOADED_WHILE_EDITING : "Policy reloaded.");
+      }
     } finally {
       setBusy(false);
     }
@@ -471,7 +451,7 @@ export function ConnectionSheet({
     setBusy(true);
     try {
       await action();
-      changed();
+      await changed();
       toast.success(success);
     } catch (error) {
       toast.error(apiErrorText(error, "Could not update the connection."));
@@ -838,7 +818,7 @@ export function ConnectionSheet({
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={activity.refresh}
+                      onClick={activity.retry}
                     >
                       Try again
                     </Button>
