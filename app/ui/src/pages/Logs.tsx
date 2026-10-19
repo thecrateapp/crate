@@ -130,7 +130,7 @@ function LogRow({ entry }: { entry: LogEntry }) {
   return (
     <div
       className={cn(
-        "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors hover:bg-white/[0.03] md:grid-cols-[78px_68px_minmax(0,1fr)]",
+        "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors  md:grid-cols-[78px_68px_minmax(0,1fr)]",
       )}
     >
       <div className="text-white/25 tabular-nums">

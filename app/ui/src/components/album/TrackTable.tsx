@@ -538,7 +538,7 @@ function MoveTrackDialog({
                       type="button"
                       disabled={busy || isCurrentAlbum || album.id == null}
                       onClick={() => onMove(album)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/45">
                         <Disc3 size={16} />

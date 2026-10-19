@@ -59,7 +59,7 @@ export function ArtistShowsSection({
             href={show.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-4 p-3 rounded-md border border-accent-action/10 hover:border-accent-action/20 transition-[border-color,background-color] hover:bg-card/80 group"
+            className="flex items-center gap-4 p-3 rounded-md border border-accent-action/10 hover:border-accent-action/20 transition-[border-color,background-color]  group"
           >
             <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
               <img

@@ -223,7 +223,7 @@ export function EndpointPanel({
                       setQuery("");
                       setResults([]);
                     }}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition hover:bg-text-primary/5 hover:text-text-primary"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition  hover:text-text-primary"
                   >
                     {result.imageUrl ? (
                       <CrateImage

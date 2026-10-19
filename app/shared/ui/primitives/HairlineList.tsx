@@ -111,7 +111,7 @@ export function HairlineRow({
       data-muted={muted || undefined}
       data-active={active || undefined}
       className={cn(
-        "relative border-b border-border-quiet-subtle hover:bg-accent-action/4",
+        "relative border-b border-border-quiet-subtle ",
         active && "bg-linear-to-r from-accent-action/8 to-transparent",
         !asChild && layout,
         className,

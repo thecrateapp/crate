@@ -65,7 +65,7 @@ export function Roles() {
 
       <Card className="border-white/10 bg-panel-surface">
         <CardHeader>
-          <CardTitle className="font-display">Role presets</CardTitle>
+          <CardTitle className="font-sans">Role presets</CardTitle>
           <CardDescription>
             These presets are code-defined for now. Custom role editing can come
             later without changing the authorization model.
@@ -89,7 +89,7 @@ export function Roles() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="crate-form-field min-w-0">
-                      <div className="font-display text-lg font-semibold text-white">
+                      <div className="font-sans text-lg font-semibold text-white">
                         {role.name}
                       </div>
                       <MonoLabel as="div" className="break-all text-white/35">
@@ -105,7 +105,7 @@ export function Roles() {
                       <Badge
                         key={capability}
                         variant="secondary"
-                        className="max-w-full whitespace-normal break-all font-mono text-[11px]"
+                        className="max-w-full whitespace-normal break-all font-mono font-normal text-[11px]"
                       >
                         {capability}
                       </Badge>
@@ -120,7 +120,7 @@ export function Roles() {
 
       <Card className="border-white/10 bg-panel-surface">
         <CardHeader>
-          <CardTitle className="font-display">Capability catalog</CardTitle>
+          <CardTitle className="font-sans">Capability catalog</CardTitle>
           <CardDescription>
             The backend primitive is the capability. Roles are just readable
             presets over this list.
@@ -140,7 +140,7 @@ export function Roles() {
                   <Badge
                     key={capability}
                     variant="outline"
-                    className="max-w-full whitespace-normal break-all font-mono text-[11px] text-white/68"
+                    className="max-w-full whitespace-normal break-all font-mono font-normal text-[11px] text-white/68"
                   >
                     {capability}
                   </Badge>

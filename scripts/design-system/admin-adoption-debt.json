@@ -1,0 +1,153 @@
+{
+  "recordedAt": "2026-10-19",
+  "basis": "Confirmed A5 source at the approved audit stop; existing occurrences only, no drift-budget increase.",
+  "scope": [
+    "app/ui/src/components/layout/Sidebar.tsx",
+    "app/ui/src/components/shows/ShowCard.tsx",
+    "app/ui/src/pages/Playlists.tsx",
+    "app/ui/src/pages/Roles.tsx",
+    "app/ui/src/pages/Users.tsx",
+    "app/ui/src/pages/I18nReview.tsx",
+    "app/ui/src/pages/Upcoming.tsx",
+    "app/ui/src/pages/Bandcamp.tsx",
+    "app/ui/src/pages/Analysis.tsx",
+    "app/ui/src/pages/Health.tsx"
+  ],
+  "pending": [
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "3.2",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "backdrop-blur-xl": 2
+      }
+    },
+    {
+      "path": "app/ui/src/components/admin/ops-surfaces.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "3.1 with 3.3\u20133.9b page adoption",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 2,
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1,
+        "bg-panel-surface/90": 1,
+        "shadow-[0_24px_60px_rgba(0,0,0,0.2)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "3.5b",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "3.5b",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_18px_40px_rgba(0,0,0,0.35)]": 1,
+        "backdrop-blur-xl": 1,
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 7,
+        "shadow-[0_12px_28px_rgba(0,0,0,0.12)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.5",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "3.11b",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "shadow-[0_16px_36px_rgba(0,0,0,0.16)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.6",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.6",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 1,
+        "shadow-[0_24px_70px_rgba(0,0,0,0.2)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.8",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.5",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 2,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.24)]": 2,
+        "shadow-[0_18px_48px_rgba(0,0,0,0.22)]": 1,
+        "shadow-[0_16px_36px_rgba(0,0,0,0.22)]": 1,
+        "shadow-[0_14px_34px_rgba(0,0,0,0.18)]": 1,
+        "shadow-[0_12px_32px_rgba(0,0,0,0.16)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.8",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 1,
+        "shadow-[0_20px_60px_rgba(0,0,0,0.2)]": 2
+      }
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "owner": "Admin UI / design-system maintainer",
+      "phase": "6.5",
+      "reason": "Inherited panel opacity, backdrop or arbitrary shadow retained by icon-only migration; replace with the shared solid surface recipe during the owning page phase. No additions permitted.",
+      "tokens": {
+        "backdrop-blur-sm": 1,
+        "shadow-[0_20px_48px_rgba(0,0,0,0.28)]": 1
+      }
+    }
+  ]
+}

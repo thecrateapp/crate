@@ -1317,7 +1317,7 @@ function HistoryTaskRow({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors "
       >
         <Icon size={14} className={status.iconClass} />
         <div className="min-w-0 flex-1">

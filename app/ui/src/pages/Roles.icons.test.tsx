@@ -25,9 +25,9 @@ describe("Roles text catalog with the real component and mount request", () => {
     expect(
       screen.getByRole("heading", { name: "Roles & Permissions" }),
     ).toHaveClass("font-display");
-    expect(screen.getByText("Role presets")).toHaveClass("font-display");
-    expect(screen.getByText("Capability catalog")).toHaveClass("font-display");
-    expect(screen.getByText("Librarian")).toHaveClass("font-display");
+    expect(screen.getByText("Role presets")).toHaveClass("font-sans");
+    expect(screen.getByText("Capability catalog")).toHaveClass("font-sans");
+    expect(screen.getByText("Librarian")).toHaveClass("font-sans");
     expect(screen.getByText("librarian")).toHaveClass("font-mono");
     expect(screen.getByText("librarian").parentElement).toHaveClass(
       "crate-form-field",

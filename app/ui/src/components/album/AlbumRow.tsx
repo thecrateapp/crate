@@ -55,7 +55,7 @@ export function AlbumRow({
     });
 
   return (
-    <div className="group flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-white/5">
+    <div className="group flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors ">
       <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-white/5">
         {!placeholder && !imgError ? (
           <img

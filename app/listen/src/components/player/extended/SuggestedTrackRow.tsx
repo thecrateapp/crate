@@ -21,7 +21,7 @@ export function SuggestedTrackRow({
       type="button"
       key={trackKey}
       onClick={() => onPlay(track)}
-      className="group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-text-primary/5"
+      className="group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors "
     >
       <span className="w-4 shrink-0 text-right text-xs tabular-nums text-text-primary/20">
         {index + 1}

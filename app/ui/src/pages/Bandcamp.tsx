@@ -424,7 +424,7 @@ function MatchRow({
             {match.source || "sync"}
           </span>
         </div>
-        <h3 className="font-display mt-2 truncate text-base font-bold text-white">
+        <h3 className="font-sans mt-2 truncate text-base font-bold text-white">
           {entity}
         </h3>
         <p className="truncate text-sm text-slate-400">{title}</p>
@@ -501,7 +501,7 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
             className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-primary"
           />
         </div>
-        <h3 className="font-display mt-2 truncate text-sm font-bold text-white">
+        <h3 className="font-sans mt-2 truncate text-sm font-bold text-white">
           {match.entity_name || itemTitle(match)}
         </h3>
         <p className="truncate text-xs text-slate-500">{itemTitle(match)}</p>
@@ -532,7 +532,7 @@ function CompactItemList({
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display truncate text-sm font-bold text-white">
+            <h3 className="font-sans truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">
@@ -561,7 +561,7 @@ function CompactImportList({ imports }: { imports: BandcampImport[] }) {
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display truncate text-sm font-bold text-white">
+            <h3 className="font-sans truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">
@@ -595,7 +595,7 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display truncate text-sm font-bold text-white">
+            <h3 className="font-sans truncate text-sm font-bold text-white">
               {itemTitle(item)}
             </h3>
             <p className="truncate text-xs text-slate-500">

@@ -1042,7 +1042,7 @@ export function GenreTaxonomyTree({
           className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${
             isSelected
               ? "border-accent-action/40 bg-accent-action/10"
-              : "border-white/6 bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]"
+              : "border-white/6 bg-white/[0.02] hover:border-white/15 "
           }`}
           style={{ paddingLeft: depth * 16 + 10 }}
         >

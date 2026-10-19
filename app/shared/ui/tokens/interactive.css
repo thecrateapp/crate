@@ -116,7 +116,6 @@
 @media (hover: hover) and (pointer: fine) {
   .interactive-row:hover {
     border-color: var(--hover-border);
-    background: var(--hover-bg);
   }
 }
 .interactive-row[data-active="true"],

@@ -130,13 +130,13 @@ function tileSurfaceClass(state: OfflineItemState): string | undefined {
 
 function rowSurfaceClass(state: OfflineItemState): string | undefined {
   if (state === "ready") {
-    return "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-within:bg-accent-action/[0.08]";
+    return "bg-accent-action/[0.04] focus-within:bg-accent-action/[0.08]";
   }
   if (isOfflineBusy(state)) {
-    return "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-within:bg-accent-action/[0.09]";
+    return "bg-accent-action/[0.05] focus-within:bg-accent-action/[0.09]";
   }
   if (state === "error") {
-    return "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-within:bg-state-warning/[0.09]";
+    return "bg-state-warning/[0.05] focus-within:bg-state-warning/[0.09]";
   }
   return "focus-within:bg-text-primary/5";
 }

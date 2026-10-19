@@ -1,5 +1,8 @@
 # Crate v3 handover
 
+> Estado vigente: [tabla única de continuación](2026-10-19-crate-v3-current-state.md).
+> Los registros cronológicos conservan sus estados históricos; las aprobaciones posteriores los sustituyen.
+
 Entry point for agents picking up Crate v3. Revised 2026-10-18. Read this file and the implementation
 plan; the status table separates implementation from pending QA.
 
@@ -18,7 +21,7 @@ icon-restyle proposal is withdrawn, not approved/published. Page/lazy/menu remov
 /timeline redirects to Browse with its library.view gate. The old specimen URL redirects to
 <http://127.0.0.1:5186/#cronologia-admin>, now a retirement record without a Timeline iframe.
 Review navigation at <http://127.0.0.1:5186/admin-navigation-demo.html>. The obsolete StatStrip
-reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** **1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.** **1AL Roles is approved and published as `d72232e9ef581248ae59a1289bd357dec0629db1`.** **1AM Users is approved and published as `b0f20194fb364e24cd3edb18e9b1c6084cb34f96`.** **1AN Translations is approved and published as `2df63f31177da67b48eec11c5da575b76d17d394`**, including the French fixture-counter correction. Local1AO covers Upcoming/show cards; stop uncommitted for Diego.
+reference is corrected; **1AH Bandcamp is approved and published as `58b2695b39bbd91c477a968192ff74332a220e71`.** **1AI Discovery is approved and published as `a304ecf9c41bc254dab98b9f52668e18f4d87852`.** **1AJ New Releases is approved and published as `235b892f5dadab07faf3ae7a1a1727864b7a06c9`.** **1AK Global Catalog is approved and published as `44d5f16a1eb20d6b7c89e6b22aee768d86c5bac2`.** **1AL Roles is approved and published as `d72232e9ef581248ae59a1289bd357dec0629db1`.** **1AM Users is approved and published as `b0f20194fb364e24cd3edb18e9b1c6084cb34f96`.** **1AN Translations is approved and published as `2df63f31177da67b48eec11c5da575b76d17d394`**, including the French fixture-counter correction. **1AO Upcoming is approved and published as `ba63836d2a23bb774832c1703eab4e4116e1468f`**, including metadata400 and title-right List/Calendar icon-only controls. Local1AP covers System Playlists/artwork and Diego's row/operator amendments; stop uncommitted for review.
 
 Published **1AD Health** context: Diego approved the issue-queue sketch and explicitly authorised
 its implementation on 2026-10-18.
@@ -82,7 +85,7 @@ Canonical 1N–1P Linux recording/comparison and native QA remain pending.
    resync. Read files from that git tree; the moving branch HEAD does not silently change the pin.
    The discarded `vnext` is never a reference. All canonical docs and evidence are tracked.
 
-## Current authorisation and checkpoints
+## Historical authorisation and checkpoints — see current-state table above
 
 Diego approved **Checkpoint 1A (1.2–1.4)** after reviewing the local mockup on 2026-10-15 and
 authorised commit/push of that reviewed batch, including the persistent preview. Its local checks
@@ -2951,7 +2954,7 @@ uses real existing endpoints; the no-backend specimen deliberately uses labelled
 HEAD/origin remain **439b3e78** / feat/crate_v3; no 1AD commit/push or next group.
 **Stop at 1AD for Diego's review before commit.**
 
-## Final current 1AD — visual drift corrected, review before commit (2026-10-18)
+## Historical 1AD — visual drift corrected before its later publication (2026-10-18)
 
 Diego authorised correcting the visual drift after comparing the approved sketch with the
 initial composition. This supersedes its earlier visual-readiness claim and style/budget
@@ -4383,3 +4386,181 @@ Publication labels updated; retain previewactive5186 and stop next1AP uncommitte
 No PR/merge/rebase/deploy/release, broadCI or canonical refresh.
 
 Publication validation:28affected unit cases/3files,9preview+6builtAdmin Chromium, scoped types/lint and unchanged AST contracts pass. Actual bundle in1ao-publication-bundle.log; generatedcache restored, source15publicationfreeze retained.
+
+### 1AO published; 1AP System Playlists and row amendments local — 2026-10-19
+
+Diego approved1AO; published `ba63836d2a23bb774832c1703eab4e4116e1468f` includes metadata
+JetBrains Mono400 and title-right List/Calendar icon-only44px UX controls. The metadata Minor
+is resolved. Earlier Users stickyheader/sharedSelect-label issues remain deferred.
+
+Local1AP retires redundant System Playlists title/empty/labelled-action glyphs, preserving6UX
+sites (search,3loaders,2closeX), actual data/requests/rules/actions/navigation and route capability
+`curation.playlists.write`.26whole-file icon policy/102UX sites,4bounded AdminSelect calls.
+Shared PlaylistArtwork adds optional showFallbackIcon defaulttrue; Admin pinsfalse after spread
+and omits it from its public type. Gradients/covers/collages/Crate mark/URL helpers/renderImage
+stay. Existing Listen/default consumers retain the glyph. PlaylistEditor receives only this
+artwork behavior, the explicit operator amendment and quiet-row styles; its icon group is next.
+
+Diego additionally requests uniform playlist row chips, no row hover background illumination,
+and Operator chips replaced with standard selects. Remove local11px chip overrides. Quiet
+content-list/table row surfaces apply to both apps/shared foundations, with45inventoried roots
+across33TSX files, the offline-row helper and4CSS recipes. Active/selected/offline surfaces,
+focus, playback halo/ring/trail and internal button/menu/grid-card interactions remain. Operator
+selects in create and editor retain the exact ops arrays and reset callbacks, with no clear
+option. This explicit2field amendment overrides the short-selector-chip policy there. Every
+label/component remains8px via crate-form-field; three-font identity retained.
+
+Review actual page at <http://127.0.0.1:5186/admin-playlists-demo.html> or persistent /#playlists-admin.
+Response-shaped fictional data, manual read/mutation/failure states, local route placeholders,
+shared row specimens and copied existing brand bytes. No backend/external media/library writes
+or persistence. Latest handover and `.superpowers/sdd/2026-10-18-crate-v3-playlists-icons/progress.md`
+record final scoped evidence, review and executor rulings. **Stop1AP uncommitted for Diego.**
+A20/phase6.8/global1b.8 incomplete. Keep canonical1M33PNG/manifest/pin258bbaee; no fullsuite,
+CI/baseline refresh/native/live certification, PR/merge/rebase/deploy/release or nextgroup.
+
+### 1AP pre-review validation — 2026-10-19
+
+Scoped Admin87cases/13files, shared45/6, Listen65/5 and Desktop-alias40/3 pass, all maxWorkers1.
+The final small-heading correction has10affected Admin cases/3files plus9preview/6builtAdmin
+Chromium checks at1440/768/390, workers1. Bricolage stays on20px+ titles; compact headings
+and row names use Poppins, metadata JetBrains Mono400. A primary-family browser RED catches
+the compact-display mismatch before correction; checking a fallback family substring was too
+loose. Shared/base row hover stays visually quiet; selected/active/playback state remains.
+
+Strict scoped Admin/shared/Listen/preview/Desktop types and50changed TS/TSX ESLint pass.
+Playlists73declarations/63bindings and Editor115/66 remain, with onValueChange→onChange widget
+callback equivalence explicitly audited. Thirty additional TSX files differ only in reviewed
+row hover/background classes; exact shared artwork opt-out and underlying image helpers remain.
+Admin/21entrypreview builds pass. Initial JS526371/532480Bgzip,9assets,6109Bmargin. Generated
+buildcache restored. Logs `.artifacts/review/1ap-*`, full ledger under the1APplan workspace.
+One fresh read-only pending-package review follows; source remains uncommitted on published1AO.
+Diego additionally requests an audit of any plan deviation, not just visual examples. Its
+read-only findings will separate approved amendments, inherited/unmigrated scope, involuntary
+drift and outstanding QA. No further implementation or publication is authorized by that audit.
+
+
+### 1AP final local stop and broad plan audit — 2026-10-19
+
+One fresh read-only review verified all 65 pre-repair pending paths, 58 source/asset hashes and
+full diff against published 1AO. Critical 0 / Important 0 / Minor 4. One focused repair pass
+closed all four directly requested gaps: preserve two menu-action hover surfaces, quiet three
+omitted content rows, support actions on newly created preview playlists, and complete the
+filter-options fixture with all seven actual response fields. No second review was opened.
+Final row scope is **45 roots / 33 TSX files**, plus the offline helper and four CSS recipes;
+32 additional TSX files are audited as style-only. Active/selected/focus/playback state remains.
+
+Post-repair checks pass: 13 affected Admin cases / four files, four shared row-policy cases,
+actual Pydantic response validation, five strict scoped type configurations, changed-source
+lint and AST contracts, nine preview + six built-Admin Chromium checks at 1440/768/390, workers 1.
+Admin and 21-entry preview builds pass. **526379 / 532480 B gzip**, nine assets, **6101 B margin**.
+Generated build cache restored; initial reviewed and final post-repair freezes remain separate.
+Actual IAB proof: `.artifacts/review/checkpoint-1ap-operator.jpg`. Preview stays active at :5186.
+
+Diego requested an audit of **any** plan deviation after this group. The
+[read-only audit](2026-10-19-crate-v3-plan-audit.md) records confirmed contrast, typography,
+chip geometry, copy, documentation and enforcement gaps; approved product amendments,
+unmigrated scope and QA debt are classified separately. Forty browser observations at 1440/390
+show 303 visible field pairs at 8 px, all three fonts available and no horizontal overflow.
+This is sampled evidence, not a whole-product accessibility or native certification.
+The audit does not silently repair earlier published checkpoints or start the next group.
+
+**1AO remains published as ba63836d2a23bb774832c1703eab4e4116e1468f. Stop at local 1AP, without
+commit/push, for Diego's review.** Canonical 1M images/manifest and pin 258bbaee remain intact.
+A20, phase 6.8, global 1b.8, full-phase CI and native/live QA remain pending.
+
+
+### Executor rulings for behaviors the independent review did not certify
+
+| Behavior | Ruling | Concrete cost / limit |
+| --- | --- | --- |
+| Remaining PlaylistEditor icons and typography | Next bounded group; 1AP reviews only its changed operator/artwork/row contracts. | Editor remains partially migrated; no claim of page completion. |
+| Existing Playlists read-error presentation and concurrent mutations | Preserve existing handlers/state/requests; affected tests and AST show no introduced contract change. Future page-state adoption remains separate. | A read error can resemble empty data after its toast; no new concurrency guarantees. |
+| Earlier Users sticky header and shared Select visible-label association | Carry both known Minors without unrelated source changes. | Sticky overlap and complete combobox label/AT qualification remain unresolved. Native-input names sampled by the audit do not close the Select issue. |
+| Live image auth, retries and native transport | Existing helpers and delegation unchanged; shared/Admin/Listen consumer tests plus Desktop aliases pass. | Real authenticated media, runtime retries and native-device behavior remain uncertified locally. |
+| Full suites, CI, canonical/native/AT certification | Defer under Diego's scoped serial testing policy and documented phase-close procedure. | Forty diagnostic views and focused tests cannot qualify all data/states/devices. Canonical evidence remains 1M. |
+| Broad plan deviations and incomplete Smart Mix/A20/6.8/global 1b.8 | Execute a separate read-only audit and persist findings; do not turn it into another implementation group. | Confirmed historical typography/contrast/geometry and adoption debts remain listed until a correction iteration; no global completion claim. |
+| Inherited solid-surface/token drift beyond changed rendering | Additional row files are style-only; classify existing panels/utilities in the broad audit and assign later adoption. | Translucent/shadowed local ops surfaces and other legacy styles still diverge from the final target. |
+
+Executor also accepts the four Minor findings as real requirement gaps, fixes them in one scoped
+pass and stops without another review loop. The original reviewed snapshot is preserved; final
+post-repair hashes identify exactly what changed. This is local readiness for Diego's review,
+not approval to publish or a claim that the broad audit findings are already corrected.
+
+
+### 1AP authorized audit reconciliation — local validation, 2026-10-19
+
+Diego authorizes the confirmed audit fixes in report order, with preview active and review
+before commit. A1 count foreground, A2 Mono400, A3 compact Poppins, A4 shared-tag geometry and
+consumer overrides, A7 published-bundle copy, A6 Admin guard and A8 state reconciliation are
+implemented locally. Bricolage numerals16px+ and titles20px+, native exceptions, content/actions
+and actual8px fields remain. A5 has explicit owner/phase/acceptance criteria in the single
+[current-state table](2026-10-19-crate-v3-current-state.md) and an exact executable surface
+register; its page migrations remain pending as the approved audit proposed.
+
+Validation: eight new computed browser checks plus nine existing1AP preview checks pass, and
+six builtAdmin cases pass (Chromium1440/768/390, workers1). Shared26cases, existing Listen38,
+actual adaptive-chip Listen1 and Desktop-alias1 pass. Admin affected18files initially167pass/1
+old assertion failure: Roles expected compact Bricolage, contradicting the corrected DS role.
+Update that specific assertion; all six Roles cases plus15guard cases pass. The remaining17
+files passed without changes. Three new actual-page cases cover zero/one/two published bundles.
+No whole-suite repeat was run. Five strict scoped type configurations and final lint pass.
+Node drift-inventory17cases and CLI pass; the CLI includes Admin16files/12pending-adoption
+records without raising any existing budget. Unchanged non-render declarations and behavior/
+route bindings in all ten corrected consumers are independently AST-compared to the pre-fix
+snapshot (except the dead private UserPresence size variable, explicitly removed).
+
+Admin and21-entrypreview builds pass. Initial JS **526377 / 532480 B gzip**, nine assets,
+**6103 B margin**. Generatedcache restored; no dependency/lockfile, backend, pin or baseline
+change. Formatter used the existing Prettier3.6.2 cache; shared lint used the explicit existing
+Listen config because the shared package has no local ESLint config. Two pre-existing redundant
+regex escapes in the touched drift tool were removed after lint RED;17Node cases remain green.
+One fresh independent review of this new authorized amendment follows; the earlier reviewed
+1AP freeze remains historical. **Stop1AP without commit/push; preview stays active at :5186.**
+
+
+### 1AP audit reconciliation — final local stop, 2026-10-19
+
+Fresh independent review verified86/86pendingpaths,77/77source/asset hashes and the22source-path
+amendment against the preserved earlier1AP freeze. Critical0/Important0/Minor2. No product
+regression identified. The two Minors were new A6 prevention correctness gaps: Tailwind variant
+prefixes and lexical constant resolution. Executor retains their severity and closes both in
+one focused tested pass under Diego's explicit prevention requirement. Variant utility parsing
+now preserves bracketed selectors/values; exceptions still require the exact original token.
+Constant resolution uses the nearest lexical binding and respects runtime parameter shadowing.
+RED4fail/15pass → GREEN19/19; Node17, CLI, scopedAdmin types and lint pass. No second reviewer
+or change to UI rendering after the17preview+6builtAdmin checks and526377/532480B bundle result.
+
+All A1–A4/A6–A8 corrections are local and reviewable. A5 follows its approved owner/phase path:
+12exact pending surface records and the current-state acceptance table remain visible. Existing
+phase/native/live/canonical debt is not marked complete. Actual IAB screenshots are
+`.artifacts/review/checkpoint-1ap-reconciliation.jpg` and `checkpoint-1ap-analysis-reconciled.jpg`.
+The persistent1AP section now links the eight affected real-page specimens. Previewactive5186.
+**Stop1AP, without commit/push. PublishedHEAD/origin stays ba63836d (1AO).**
+
+#### Executor rulings on all behaviors set aside by the fresh review
+
+| Behavior | Ruling | Concrete cost / limit |
+| --- | --- | --- |
+| Full legacy panel/surface migration | A5 is ownership/phase assignment in this approved order; exact records and acceptance criteria exist. | Translucent/shadowed inherited panels remain until the owning page migration. |
+| Remaining PlaylistEditor icons, compact typography and tag overrides | Keep the next bounded group separate; changed operator/artwork/row contracts are covered here. | Editor remains partially migrated; this is no A20/6.8 completion claim. |
+| Existing Playlists read-error and concurrent mutations | Preserve actual handlers and API/state semantics, verified by affected tests/AST. | Read error may still look empty after the toast; no stronger concurrency guarantee. |
+| Users sticky header and shared Select visible-label association | Carry the two earlier known Minors to their consumer work. | Sticky overlap and complete combobox label/AT qualification remain unresolved. |
+| Every untouched element/unvisited contrast or typography state | Accept recorded representative computed tests only. | No whole-product conformance certificate; further states can still expose drift. |
+| Arbitrary runtime-generated classes and files outside registered guard scope | Static guard covers registered roles/literal branches and exact pending surfaces; dynamic classes remain outside its guarantee. | Runtime/unsampled file drift still requires consumer review. Ordinary variant and lexical-constant gaps inside the guarantee were fixed. |
+| Live backend, authenticated artwork and retries | Helpers/contracts unchanged; use fixtures/delegation tests locally. | Production service freshness, credentials and runtime retry behavior remain uncertified. |
+| Native/AT/zoom/other engines/canonical/fullsuite/CI | Follow Diego's phase-close procedure and scoped serial iteration policy. | Native accessibility, engines and full-phase qualification remain pending; canonical evidence stays1M. |
+
+Ruling: complete the two directly requested new-guard correctness gaps in the single repair
+pass rather than leave A6 partly effective under the generic Minor-defer guideline. Cost: the
+guard gains bounded parsing/binding logic and four focused tests; no second review or broad
+source repair. Both original reviewed packages and final repair freezes are retained.
+
+
+### 1AP approved — publication preparation, 2026-10-19
+
+Diego approved the final1AP and explicitly authorized commit/push followed by PlaylistEditor,
+with functional UX preserved and the preview active. All77approved source/asset hashes match
+before publication metadata changes. The persistent1AP label/footer now say published; only
+its embedding expectation changes. Earlier1AP local stops are historical. The next checkpoint
+is1AQ, to stop uncommitted for Diego; no PR/merge/rebase/deploy/release or fullCI/baselines.
+The resulting verified publication SHA is recorded in the subsequent1AQ continuation record.

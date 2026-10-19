@@ -490,7 +490,7 @@ export function Upcoming() {
 
       {!loading && items.length === 0 && (
         <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-          <div className="font-display text-lg font-semibold">
+          <div className="font-sans text-lg font-semibold">
             Nothing upcoming
           </div>
           <div className="text-sm text-muted-foreground mt-1">
@@ -504,7 +504,7 @@ export function Upcoming() {
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-4 font-display flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
+              <h2 className="mb-4 font-sans flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
                 Coming Up
               </h2>
               {groupByMonth(upcoming).map(([month, monthItems]) => (
@@ -522,7 +522,7 @@ export function Upcoming() {
           )}
           {past.length > 0 && (
             <section>
-              <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
+              <h2 className="mb-4 font-sans text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
                 Recently Released
               </h2>
               {groupByMonth(past).map(([month, monthItems]) => (
@@ -648,7 +648,7 @@ function EventCard({
       tabIndex={0}
       className={cn(
         "group relative overflow-hidden rounded-md border p-3.5 transition-[background-color,border-color,box-shadow] duration-200",
-        "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl hover:bg-white/[0.07]",
+        "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl",
         item.tidal_url
           ? "border-primary/25 shadow-none"
           : "border-white/10 hover:border-white/20",
@@ -696,12 +696,12 @@ function EventCard({
             {albumHref ? (
               <Link
                 to={albumHref}
-                className="font-display truncate text-sm font-medium text-white transition-colors hover:text-primary"
+                className="font-sans truncate text-sm font-medium text-white transition-colors hover:text-primary"
               >
                 {item.title}
               </Link>
             ) : (
-              <span className="font-display truncate text-sm font-medium text-white">
+              <span className="font-sans truncate text-sm font-medium text-white">
                 {item.title}
               </span>
             )}
@@ -850,7 +850,7 @@ function CalendarView({
             size={16}
           />
         </Button>
-        <span className="font-display text-sm font-semibold text-white/85">
+        <span className="font-sans text-sm font-semibold text-white/85">
           {month.toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
@@ -1043,12 +1043,12 @@ function ReleasePopoverContent({
           {albumHref ? (
             <Link
               to={albumHref}
-              className="font-display font-bold text-sm truncate block hover:text-foreground transition-colors"
+              className="font-sans font-bold text-sm truncate block hover:text-foreground transition-colors"
             >
               {item.title}
             </Link>
           ) : (
-            <div className="font-display font-bold text-sm truncate">
+            <div className="font-sans font-bold text-sm truncate">
               {item.title}
             </div>
           )}

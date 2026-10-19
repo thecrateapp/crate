@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
+import { buildAdminConsistencyInventory } from "./admin-consistency-policy.mjs";
 
 const SOURCE_DIRECTORIES = ["app/listen/src", "app/shared/ui"];
 const SOURCE_EXTENSIONS = new Set([".css", ".js", ".jsx", ".ts", ".tsx"]);
@@ -166,8 +167,8 @@ const INTENTIONAL_DUPLICATE_TOKEN_GROUPS = [
   },
 ];
 const SURFACE_ROLE_PATTERNS = [
-  /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
-  /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
+  /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,)])/gim,
+  /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,)])/gim,
 ];
 
 function countMatches(content, pattern) {
@@ -565,8 +566,9 @@ if (
   resolve(process.argv[1]) === resolve(import.meta.filename)
 ) {
   const inventory = buildDriftInventory();
+  const admin = buildAdminConsistencyInventory();
   if (!process.argv.includes("--check")) {
-    console.log(JSON.stringify(inventory, null, 2));
+    console.log(JSON.stringify({ ...inventory, admin }, null, 2));
   }
 
   const results = evaluateDriftBudget(inventory, loadDriftBudget());
@@ -585,6 +587,13 @@ if (
       `drift budget exceeded: ${metric} is ${actual}, budget ${limit}`,
     );
   });
-  if (exceeded.length > 0) process.exit(1);
+  for (const issue of admin.violations)
+    console.error(
+      `Admin consistency: ${issue.path}:${issue.line} ${issue.rule}: ${issue.detail}`,
+    );
+  if (exceeded.length > 0 || admin.violations.length > 0) process.exit(1);
+  console.error(
+    `Admin consistency: ${admin.filesScanned} files, ${admin.pending.length} explicit pending-adoption records`,
+  );
   console.error(`drift budget: ${results.length} metrics within budget`);
 }

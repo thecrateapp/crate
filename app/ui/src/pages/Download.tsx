@@ -1002,7 +1002,7 @@ export function DownloadPage() {
                     {results.tracks!.map((track) => (
                       <div
                         key={track.id}
-                        className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-secondary/30 transition-colors group"
+                        className="flex items-center gap-3 px-3 py-2 rounded-md  transition-colors group"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-sm truncate">{track.title}</div>
@@ -1135,7 +1135,7 @@ export function DownloadPage() {
                     {uploadFiles.map((file) => (
                       <div
                         key={`${file.name}-${file.size}-${file.lastModified}`}
-                        className="flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md hover:bg-secondary/30"
+                        className="flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md "
                       >
                         {file.name.toLowerCase().endsWith(".zip") ? (
                           <Disc3 size={14} className="text-primary" />
@@ -1804,7 +1804,7 @@ function TidalAlbumCard({
                 {tracks.map((t) => (
                   <div
                     key={t.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50 group/track"
+                    className="flex items-center gap-2 py-1.5 px-2 rounded  group/track"
                   >
                     <span className="text-[11px] text-muted-foreground w-5 text-right font-mono">
                       {t.track_number}
@@ -1995,7 +1995,7 @@ function SlskResultCard({
               return (
                 <div
                   key={`${f.filename}-${f.size}-${f.length}`}
-                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50"
+                  className="flex items-center gap-2 py-1.5 px-2 rounded "
                 >
                   <span className="text-[11px] text-muted-foreground w-5 text-right font-mono">
                     {i + 1}

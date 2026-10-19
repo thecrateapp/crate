@@ -232,7 +232,8 @@ export function latestRepairSummary(task: TaskInsightLike | null) {
   }
   if (task.type === "repair" || task.type === "fix_artist") {
     const revalidation = result.revalidation as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
     const remaining = count(revalidation?.issue_count);
     if (remaining != null) parts.push(`${remaining} open after revalidation`);
   }
@@ -457,7 +458,8 @@ export function Health() {
     if (!activeTaskId || !activeTaskDone) return;
     if (activeTaskDone.status === "completed") {
       const revalidation = activeTaskDone.result?.revalidation as
-        Record<string, unknown> | undefined;
+        | Record<string, unknown>
+        | undefined;
       const remaining = Number(revalidation?.issue_count ?? NaN);
       if (!scanning && Number.isFinite(remaining)) {
         toast.success(
@@ -774,7 +776,7 @@ export function Health() {
             const canRunGlobalFix = fixAll !== "none";
             const hasArtistReview = Boolean(
               catalogEntry?.supports_artist_scope &&
-              items.some((issue) => issue.artist_id),
+                items.some((issue) => issue.artist_id),
             );
             const recordedCount = counts[check] ?? items.length;
             return (
@@ -1030,7 +1032,7 @@ export function Health() {
             {catalogItems.map((entry) => (
               <li key={entry.check_type} className="space-y-3 py-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <h3 className="font-display text-lg font-bold">
+                  <h3 className="font-sans text-lg font-bold">
                     {CHECK_LABELS[entry.check_type] ||
                       entry.check_type.replace(/_/g, " ")}
                   </h3>

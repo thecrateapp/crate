@@ -211,6 +211,34 @@ describe("I18nReview", () => {
     ).toHaveTextContent("No bundle yet");
   });
 
+  it.each([
+    [0, "0 published bundles"],
+    [1, "1 published bundle"],
+    [2, "2 published bundles"],
+  ])(
+    "names %i published bundles without pluralizing an adjective",
+    async (count, label) => {
+      const original = mockApi.getMockImplementation()!;
+      mockApi.mockImplementation((url, ...args) =>
+        url === "/api/admin/i18n/listen/bundles"
+          ? Promise.resolve({
+              bundles: Array.from({ length: count }, (_, index) => ({
+                ...publishedBundleSummary,
+                id: `published-${index}`,
+              })),
+            })
+          : original(url, ...args),
+      );
+      render(<I18nReview />);
+      const health = await screen.findByRole("article", {
+        name: "fr locale health",
+      });
+      expect(
+        within(health).getByText(label, { exact: true }),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("queues an AI draft for missing or stale locale keys", async () => {
     const user = userEvent.setup();
 

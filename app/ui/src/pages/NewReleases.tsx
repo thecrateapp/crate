@@ -202,7 +202,7 @@ function ReleaseTimelineRow({
   const albumHref = releaseAlbumHref(release);
 
   return (
-    <div className="group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors hover:border-white/14 hover:bg-white/[0.04] xl:flex-row xl:items-center">
+    <div className="group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors hover:border-white/14  xl:flex-row xl:items-center">
       <div className="flex items-center gap-4 xl:w-[320px] xl:flex-shrink-0">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-white/8 bg-white/[0.03]">
           <ReleaseDateBadge release={release} />

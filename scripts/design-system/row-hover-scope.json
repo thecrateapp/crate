@@ -1,0 +1,227 @@
+[
+  {
+    "path": "app/shared/ui/shadcn/table.tsx",
+    "prefix": "border-b border-text-primary/6 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/shared/ui/primitives/HairlineList.tsx",
+    "prefix": "relative border-b border-border-quiet-subtle",
+    "kind": "row"
+  },
+  {
+    "path": "app/shared/ui/domain/entity/EntityRow.tsx",
+    "prefix": "item-action-target group/row relative flex min-w-0 items-center rounded-lg text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Playlists.tsx",
+    "prefix": "flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/I18nReview.tsx",
+    "prefix": "block w-full px-5 py-4 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Stack.tsx",
+    "prefix": "flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Shows.tsx",
+    "prefix": "flex items-center gap-4 p-3 bg-card border border-border rounded-md",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Album.tsx",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Album.tsx",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-3 px-3 py-2 rounded-md",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-2 py-1.5 px-2 rounded",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-2 py-1.5 px-2 rounded",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/PlaylistEditor.tsx",
+    "prefix": "flex items-center gap-3 rounded-md px-2 py-2",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/PlaylistEditor.tsx",
+    "prefix": "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/NewReleases.tsx",
+    "prefix": "group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Logs.tsx",
+    "prefix": "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Artist.tsx",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Genres.tsx",
+    "prefix": "flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
+    "prefix": "w-full flex items-center gap-3 px-4 py-2.5",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+    "prefix": "w-full flex items-center gap-4 px-4 py-2 text-left transition-colors group",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+    "prefix": "w-full flex items-center gap-4 px-4 py-2 text-left opacity-60 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+    "prefix": "flex items-center gap-4 p-3 rounded-md border border-accent-action/10",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+    "prefix": "w-full flex items-center gap-4 px-4 py-2.5 rounded-md",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistRow.tsx",
+    "prefix": "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/album/AlbumRow.tsx",
+    "prefix": "group flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+    "prefix": "group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+    "prefix": "border-white/6 bg-white/[0.02]",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+    "prefix": "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/pages/PathsParts.tsx",
+    "prefix": "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/player/extended/SuggestedTrackRow.tsx",
+    "prefix": "group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/artist/ArtistSetlistSection.tsx",
+    "prefix": "flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+    "prefix": "group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+    "prefix": "absolute inset-0 opacity-20 grayscale transition-opacity ",
+    "kind": "artwork-opacity"
+  },
+  {
+    "path": "app/listen/src/components/settings/LinksSection.tsx",
+    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/settings/LinksSection.tsx",
+    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/settings/LinksSection.tsx",
+    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/settings/LinksSection.tsx",
+    "prefix": "hidden items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/settings/LinksSection.tsx",
+    "prefix": "flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-state-danger transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Upcoming.tsx",
+    "prefix": "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Tasks.tsx",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/album/TrackTable.tsx",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/components/playlists/PlaylistTrackSearch.tsx",
+    "prefix": "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors",
+    "kind": "row"
+  }
+]

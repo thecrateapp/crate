@@ -114,7 +114,7 @@ export const EntityRow = memo(function EntityRow({
   return (
     <article
       className={cn(
-        "item-action-target group/row relative flex min-w-0 items-center rounded-lg text-left transition-colors hover:bg-text-primary/5",
+        "item-action-target group/row relative flex min-w-0 items-center rounded-lg text-left transition-colors ",
         compact
           ? "gap-2 px-2 py-1.5"
           : "gap-[var(--content-row-gap)] px-3 py-[var(--content-row-padding-y)]",

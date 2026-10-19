@@ -25,6 +25,7 @@ interface PlaylistArtworkProps {
   tracks?: PlaylistArtworkTrack[];
   className?: string;
   showCrateMark?: boolean;
+  showFallbackIcon?: boolean;
   crateMarkClassName?: string;
   logoSrc?: string;
   buildCoverUrl: (track: PlaylistArtworkTrack) => string | null;
@@ -68,6 +69,7 @@ export function PlaylistArtwork({
   tracks = [],
   className = "",
   showCrateMark = false,
+  showFallbackIcon = true,
   crateMarkClassName,
   logoSrc = "/icons/logo.svg",
   buildCoverUrl,
@@ -162,7 +164,9 @@ export function PlaylistArtwork({
         } as CSSProperties
       }
     >
-      <ListMusic size={CRATE_ICON_SIZE.xl} className="text-text-primary/60" />
+      {showFallbackIcon ? (
+        <ListMusic size={CRATE_ICON_SIZE.xl} className="text-text-primary/60" />
+      ) : null}
       {crateMark}
     </div>
   );

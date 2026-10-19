@@ -64,7 +64,7 @@ export function ArtistRow({
           handleClick();
         }
       }}
-      className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-white/5 ${
+      className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors  ${
         isSelected ? "bg-white/[0.06]" : ""
       }`}
     >

@@ -1284,14 +1284,15 @@ export function PlaylistEditor() {
                           </Field>
 
                           <Field label="Operator">
-                            <SegmentedControl
-                              as="radio"
-                              label="Operator"
+                            <AdminSelect
                               value={rule.op}
-                              onValueChange={(value) =>
+                              onChange={(value) =>
                                 updateRule(index, { op: value, value: "" })
                               }
-                              items={ops}
+                              options={ops}
+                              allowClear={false}
+                              placeholder="Operator"
+                              triggerClassName="w-full max-w-none"
                             />
                           </Field>
 
@@ -1473,7 +1474,7 @@ export function PlaylistEditor() {
                               key={`${track.artist ?? "artist"}-${
                                 track.album ?? "album"
                               }-${track.title ?? "track"}`}
-                              className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-white/[0.03]"
+                              className="flex items-center gap-3 rounded-md px-2 py-2 "
                             >
                               <span className="w-6 text-right text-xs text-muted-foreground">
                                 {index + 1}
@@ -1724,7 +1725,7 @@ export function PlaylistEditor() {
                         onDrop={() => void handleTrackDrop(rowId)}
                         onDragEnd={() => setDraggedTrackId(null)}
                         className={
-                          "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10 hover:bg-white/[0.03] " +
+                          "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10  " +
                           (draggedTrackId === rowId
                             ? "bg-primary/10"
                             : "bg-transparent")

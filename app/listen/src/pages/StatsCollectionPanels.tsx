@@ -373,7 +373,7 @@ export function TopListenersPanel({
               {listener.username ? (
                 <Link
                   to={`/users/${encodeURIComponent(listener.username)}`}
-                  className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-text-primary/5"
+                  className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors "
                 >
                   {body}
                 </Link>

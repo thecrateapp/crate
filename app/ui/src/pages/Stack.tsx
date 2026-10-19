@@ -169,7 +169,7 @@ function StackLogLine({ line }: { line: string }) {
   const timestamp = formatLogTimestamp(line);
 
   return (
-    <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60 hover:bg-white/[0.03]">
+    <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60 ">
       {timestamp ? (
         <span className="w-[78px] shrink-0 text-white/20 tabular-nums">
           {timestamp}

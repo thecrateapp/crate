@@ -1637,7 +1637,7 @@ function GenreList() {
                     {unmappedGenres!.slice(0, 12).map((genre) => (
                       <div
                         key={`unmapped-${genre.slug}`}
-                        className="flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors hover:bg-black/20"
+                        className="flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors "
                       >
                         <button
                           type="button"

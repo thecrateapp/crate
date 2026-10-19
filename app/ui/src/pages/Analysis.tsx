@@ -124,7 +124,7 @@ function PipelineCoverage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CrateChip className="text-[10px]">{percent}% coverage</CrateChip>
+          <CrateChip>{percent}% coverage</CrateChip>
           {active > 0 ? <CrateChip active>{active} active</CrateChip> : null}
           {failed > 0 ? (
             <CrateChip tone="warning">{failed} failed</CrateChip>
@@ -568,9 +568,7 @@ export function Analysis() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <CrateChip className="text-[10px]">
-                  {metrics.fingerprintPercent}% coverage
-                </CrateChip>
+                <CrateChip>{metrics.fingerprintPercent}% coverage</CrateChip>
                 <CrateChip
                   className={
                     status.chromaprint_available
@@ -728,7 +726,7 @@ export function Analysis() {
       >
         <div className="grid gap-4 xl:grid-cols-3">
           <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
@@ -740,9 +738,7 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
-                {metrics.lyricsPercent}% cache
-              </CrateChip>
+              <CrateChip>{metrics.lyricsPercent}% cache</CrateChip>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <MiniMetric
@@ -762,7 +758,7 @@ export function Analysis() {
           </div>
 
           <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
@@ -774,9 +770,7 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
-                {metrics.portableSidecarPercent}% albums
-              </CrateChip>
+              <CrateChip>{metrics.portableSidecarPercent}% albums</CrateChip>
             </div>
             <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
               <MiniMetric
@@ -800,7 +794,7 @@ export function Analysis() {
           </div>
 
           <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
@@ -812,7 +806,7 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
+              <CrateChip>
                 {status.rich_export_tracks.toLocaleString()} tracks
               </CrateChip>
             </div>

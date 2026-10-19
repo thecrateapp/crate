@@ -39,11 +39,25 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/Users.tsx",
     "app/ui/src/pages/I18nReview.tsx",
     "app/ui/src/pages/Upcoming.tsx",
+    "app/ui/src/pages/Playlists.tsx",
+    "app/ui/src/components/playlists/PlaylistArtwork.tsx",
     "app/ui/src/components/shows/ShowCard.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Playlists.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 4 },
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@crate/ui/composites/ConfirmDialog",
+    { component: "ConfirmDialog", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@/components/playlists/PlaylistArtwork",
+    { component: "PlaylistArtwork", limit: 1 },
+  ],
   [
     "app/ui/src/pages/Upcoming.tsx:@/components/ui/AdminSelect",
     { component: "AdminSelect", limit: 2 },
@@ -123,6 +137,12 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Playlists:playlists-search", ["lucide-react", "Search"]],
+  ["Playlists:playlists-loading", ["lucide-react", "Loader2"]],
+  ["Playlists:playlists-static-close", ["lucide-react", "X"]],
+  ["Playlists:playlists-static-saving", ["lucide-react", "Loader2"]],
+  ["Playlists:playlists-smart-close", ["lucide-react", "X"]],
+  ["Playlists:playlists-smart-saving", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-view-list", ["lucide-react", "List"]],
   ["Upcoming:upcoming-view-calendar", ["lucide-react", "CalendarDays"]],
   ["Upcoming:upcoming-sync", ["lucide-react", "Loader2"]],
@@ -231,6 +251,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
   const found: string[] = [];
   const controlUses = new Map<string, number>();
   const usedUx = new Set<string>();
+  const trees = new Map<string, ts.SourceFile>();
   for (const entry of entries.filter((entry) => sources.has(entry.path))) {
     if (entry.kind === "external-visual") continue;
     if (
@@ -256,13 +277,16 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       continue; // Checked directly in this scope.
     const key = `${entry.path}:${entry.source}`;
     const source = sources.get(entry.path)!;
-    const tree = ts.createSourceFile(
-      entry.path,
-      source,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TSX,
-    );
+    const tree =
+      trees.get(entry.path) ??
+      ts.createSourceFile(
+        entry.path,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+    trees.set(entry.path, tree);
     let attributes: ts.JsxAttributes | undefined;
     let reviewedInstrument = false;
     function visit(node: ts.Node) {
@@ -340,6 +364,54 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       continue;
     }
 
+    // Only the Admin artwork wrapper may pin the decorative fallback off.
+    // Require the original imported component and false after every spread.
+    const artworkParent = attributes.parent;
+    const artworkTag =
+      ts.isJsxOpeningElement(artworkParent) ||
+      ts.isJsxSelfClosingElement(artworkParent)
+        ? artworkParent.tagName.getText(tree)
+        : "";
+    const artworkImport = tree.statements.some(
+      (statement) =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text ===
+          "@crate/ui/domain/playlists/PlaylistArtwork" &&
+        statement.importClause?.namedBindings &&
+        ts.isNamedImports(statement.importClause.namedBindings) &&
+        statement.importClause.namedBindings.elements.some(
+          (binding) =>
+            binding.name.text === artworkTag &&
+            binding.propertyName?.text === "PlaylistArtwork",
+        ),
+    );
+    const fallback = prop("showFallbackIcon");
+    const artworkKey = `PlaylistArtwork:disabled-fallback:${entry.kind}`;
+    if (
+      entry.path === "app/ui/src/components/playlists/PlaylistArtwork.tsx" &&
+      artworkImport &&
+      artworkTag === "PlaylistArtworkBase" &&
+      ((entry.kind === "owned-icon-consumer" &&
+        entry.source === "@crate/ui/domain/playlists/PlaylistArtwork") ||
+        (entry.kind === "icon-prop" && entry.name === "showFallbackIcon")) &&
+      fallback?.initializer?.getText(tree) === "{false}" &&
+      attrs.filter(
+        (attr) =>
+          ts.isJsxAttribute(attr) &&
+          attr.name.getText(tree) === "showFallbackIcon",
+      ).length === 1 &&
+      attrs.indexOf(fallback) >
+        attrs.reduce(
+          (last, attr, index) => (ts.isJsxSpreadAttribute(attr) ? index : last),
+          -1,
+        ) &&
+      !usedUx.has(artworkKey)
+    ) {
+      usedUx.add(artworkKey);
+      continue;
+    }
+
     const reviewedControl = approvedControls.get(key);
     if (
       !unknownSpread &&
@@ -410,6 +482,30 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
+  });
+  it("bounds the artwork opt-out to one exact imported wrapper with false after every spread", () => {
+    const path = "app/ui/src/components/playlists/PlaylistArtwork.tsx";
+    const prefix =
+      'import {PlaylistArtwork as PlaylistArtworkBase} from "@crate/ui/domain/playlists/PlaylistArtwork";';
+    for (const source of [
+      prefix +
+        "const view = <PlaylistArtworkBase {...props} showFallbackIcon={true}/>;",
+      prefix +
+        "const view = <PlaylistArtworkBase {...props} showFallbackIcon={enabled}/>;",
+      prefix +
+        "const view = <PlaylistArtworkBase showFallbackIcon={false} {...props}/>;",
+      prefix +
+        "const view = <OtherArtwork {...props} showFallbackIcon={false}/>;",
+      prefix +
+        "const view = <><PlaylistArtworkBase {...props} showFallbackIcon={false}/><PlaylistArtworkBase {...props} showFallbackIcon={false}/></>;",
+      "const view = <PlaylistArtworkBase {...props} showFallbackIcon={false}/>;",
+    ])
+      expect(
+        violations(
+          new Map([[path, source]]),
+          analyzeSource(path, source).entries,
+        ).length,
+      ).toBeGreaterThan(0);
   });
   it("bounds Leaflet marker asset properties to their original instrument call and literals", () => {
     const path = "app/ui/src/pages/Upcoming.tsx";

@@ -613,7 +613,7 @@ function ShowListItem({
 
   return (
     <button
-      className="flex items-center gap-4 p-3 bg-card border border-border rounded-md hover:bg-white/5 transition-colors w-full text-left"
+      className="flex items-center gap-4 p-3 bg-card border border-border rounded-md  transition-colors w-full text-left"
       onClick={onClick}
     >
       {d && (

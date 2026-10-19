@@ -553,7 +553,6 @@ function listenRegisterUrl(inviteToken: string) {
 
 function UserPresence({
   user,
-  compact = false,
 }: {
   user: Pick<
     UserRecord,
@@ -564,10 +563,7 @@ function UserPresence({
     | "last_seen_at"
     | "current_track"
   >;
-  compact?: boolean;
 }) {
-  const baseClass = compact ? "text-[11px]" : "text-xs";
-
   return (
     <div className="flex flex-wrap gap-2">
       <CrateChip
@@ -592,11 +588,11 @@ function UserPresence({
       >
         {user.listening_now ? "Listening now" : "Not playing"}
       </CrateChip>
-      <CrateChip className={baseClass}>
+      <CrateChip>
         {user.active_devices ?? 0} device
         {(user.active_devices ?? 0) === 1 ? "" : "s"}
       </CrateChip>
-      <CrateChip className={baseClass}>
+      <CrateChip>
         {user.active_sessions ?? 0} active session
         {(user.active_sessions ?? 0) === 1 ? "" : "s"}
       </CrateChip>
@@ -1019,7 +1015,7 @@ export function Users() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="crate-form-field">
-                          <h2 className="break-words font-display text-base font-semibold text-text-main">
+                          <h2 className="break-words font-sans text-base font-semibold text-text-main">
                             {user.name || user.email}
                           </h2>
                           <span className="break-all text-xs text-text-muted">
@@ -1031,7 +1027,7 @@ export function Users() {
                             <Badge
                               key={role}
                               variant="outline"
-                              className="font-mono text-[10px]"
+                              className="font-mono font-normal text-[10px]"
                             >
                               {roleLabel(role)}
                             </Badge>
@@ -1567,13 +1563,13 @@ function UserDetailDialog({
                           .map((capability) => (
                             <CrateChip
                               key={capability}
-                              className="text-[10px] text-white/55"
+                              className="text-white/55"
                             >
                               {capability}
                             </CrateChip>
                           ))}
                         {(detail.capabilities?.length ?? 0) > 8 ? (
-                          <CrateChip className="text-[10px] text-white/40">
+                          <CrateChip className="text-white/40">
                             +{(detail.capabilities?.length ?? 0) - 8} more
                           </CrateChip>
                         ) : null}
@@ -1669,7 +1665,7 @@ function UserDetailDialog({
 
                 <Card className="border-white/10 bg-panel-surface">
                   <CardHeader>
-                    <CardTitle className="font-display text-base text-white">
+                    <CardTitle className="font-sans text-base text-white">
                       Presence
                     </CardTitle>
                     <CardDescription>
@@ -1711,7 +1707,7 @@ function UserDetailDialog({
 
                 <Card className="border-white/10 bg-panel-surface">
                   <CardHeader>
-                    <CardTitle className="font-display text-base text-white">
+                    <CardTitle className="font-sans text-base text-white">
                       Access & session footprint
                     </CardTitle>
                     <CardDescription>
@@ -1723,10 +1719,7 @@ function UserDetailDialog({
                     <div className="flex flex-wrap gap-2">
                       {(detail.connected_accounts || []).length > 0 ? (
                         (detail.connected_accounts || []).map((account) => (
-                          <CrateChip
-                            key={`${detail.id}-${account.provider}`}
-                            className="text-[11px]"
-                          >
+                          <CrateChip key={`${detail.id}-${account.provider}`}>
                             {account.provider}
                             {account.external_username
                               ? ` · ${account.external_username}`
@@ -1734,7 +1727,7 @@ function UserDetailDialog({
                           </CrateChip>
                         ))
                       ) : (
-                        <CrateChip className="text-[11px] text-white/45">
+                        <CrateChip className="text-white/45">
                           No linked providers
                         </CrateChip>
                       )}
@@ -1813,22 +1806,22 @@ function UserDetailDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {source.online + source.connected > 0 ? (
-                                    <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi text-[11px]">
+                                    <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                                       {source.online + source.connected} active
                                     </CrateChip>
                                   ) : null}
                                   {source.recent > 0 ? (
-                                    <CrateChip className="text-[11px]">
+                                    <CrateChip>
                                       {source.recent} recent
                                     </CrateChip>
                                   ) : null}
                                   {source.history > 0 ? (
-                                    <CrateChip className="text-[11px] text-white/55">
+                                    <CrateChip className="text-white/55">
                                       {source.history} history
                                     </CrateChip>
                                   ) : null}
                                   {source.revoked > 0 ? (
-                                    <CrateChip className="text-[11px] text-white/45">
+                                    <CrateChip className="text-white/45">
                                       {source.revoked} revoked
                                     </CrateChip>
                                   ) : null}
@@ -1876,7 +1869,7 @@ function UserDetailDialog({
                 <CardHeader>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <CardTitle className="font-display text-base text-white">
+                      <CardTitle className="font-sans text-base text-white">
                         Sessions
                       </CardTitle>
                       <CardDescription>
@@ -1936,9 +1929,7 @@ function UserDetailDialog({
                               <Badge className={status.className}>
                                 {status.label}
                               </Badge>
-                              <CrateChip className="text-[11px]">
-                                {session.app_id || "web"}
-                              </CrateChip>
+                              <CrateChip>{session.app_id || "web"}</CrateChip>
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm text-white/45">
                               <span>

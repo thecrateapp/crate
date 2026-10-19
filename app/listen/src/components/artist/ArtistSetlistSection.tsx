@@ -86,7 +86,7 @@ export function ArtistSetlistModal({
                 track.frequency,
                 track.play_count,
               ].join(":")}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-text-primary/[0.03]"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors "
             >
               <span className="w-5 shrink-0 text-right text-xs tabular-nums text-text-primary/20">
                 {i + 1}

@@ -157,7 +157,7 @@ export const CrateChip = memo(function CrateChip({
     <span
       data-tone={tone}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border bg-transparent px-2 py-0.5 font-mono text-badge",
+        "inline-flex items-center gap-1 rounded-full border bg-transparent px-2 py-0.5 font-mono font-normal text-badge leading-none",
         active
           ? "border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] text-[var(--active-text)]"
           : tone === "accent"

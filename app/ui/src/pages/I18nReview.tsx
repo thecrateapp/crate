@@ -624,7 +624,7 @@ function OverviewSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-display text-sm font-semibold text-white">
+            <h2 className="font-sans text-sm font-semibold text-white">
               Locale health
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -670,7 +670,10 @@ function OverviewSection({
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
                 <HealthMetric label="draft" value={health.draftCount} />
-                <HealthMetric label="published" value={health.publishedCount} />
+                <HealthMetric
+                  label="published bundle"
+                  value={health.publishedCount}
+                />
                 <HealthMetric label="request" value={health.requestCount} />
               </div>
               <Button
@@ -742,7 +745,7 @@ function BundlesSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="font-display text-sm font-semibold text-white">
+            <h2 className="font-sans text-sm font-semibold text-white">
               Bundles
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -814,14 +817,14 @@ function BundlesSection({
                 aria-label={`Review ${bundle.locale}`}
                 onClick={() => void onSelectBundle(bundle)}
                 className={cn(
-                  "block w-full px-5 py-4 text-left transition-colors hover:bg-white/[0.04]",
+                  "block w-full px-5 py-4 text-left transition-colors ",
                   selected && "bg-accent-action/[0.06]",
                 )}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-display text-lg font-bold text-white">
+                      <span className="font-sans text-lg font-bold text-white">
                         {bundle.locale}
                       </span>
                       <Badge
@@ -840,7 +843,7 @@ function BundlesSection({
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="font-display text-sm font-semibold text-white">
+                    <div className="font-sans text-sm font-semibold text-white">
                       {bundle.messageCount} strings
                     </div>
                     <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/35">
@@ -895,7 +898,7 @@ function EditorSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-display text-sm font-semibold text-white">
+            <h2 className="font-sans text-sm font-semibold text-white">
               Editor
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -978,7 +981,7 @@ function EditorSection({
           <QualityIssues report={qualityReport} />
 
           <div className="overflow-hidden rounded-md border border-white/8">
-            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 font-mono md:grid border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
+            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 font-mono md:grid border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-normal uppercase tracking-[0.12em] text-white/35">
               <span>Key</span>
               <span>English source</span>
               <span>Translation</span>
@@ -1065,7 +1068,7 @@ function EditorSection({
           {exportedJson ? (
             <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
               <div className="border-b border-white/8 px-4 py-3">
-                <h3 className="font-display text-sm font-semibold text-white">
+                <h3 className="font-sans text-sm font-semibold text-white">
                   Exported JSON
                 </h3>
               </div>
@@ -1102,7 +1105,7 @@ function QualityIssues({
     <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.03]">
       <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
         <div>
-          <h3 className="font-display text-sm font-semibold text-white">
+          <h3 className="font-sans text-sm font-semibold text-white">
             Quality issues
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -1200,7 +1203,7 @@ function ImportExportSection() {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="border-b border-white/8 px-5 py-4">
-        <h2 className="font-display text-sm font-semibold text-white">
+        <h2 className="font-sans text-sm font-semibold text-white">
           Import / Export
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1265,7 +1268,7 @@ function FilterSelect({
 function HealthMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-white/6 bg-black/10 px-2 py-2">
-      <div className="font-mono font-semibold text-white">
+      <div className="font-mono font-normal text-white">
         {value} {label}
         {value === 1 ? "" : "s"}
       </div>
@@ -1296,7 +1299,7 @@ function Meta({ label, value }: { label: string; value: string }) {
       <div className="font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
         {label}
       </div>
-      <div className="break-all font-mono text-sm font-semibold text-white">
+      <div className="break-all font-mono text-sm font-normal text-white">
         {value}
       </div>
     </div>

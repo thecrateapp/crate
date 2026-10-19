@@ -166,7 +166,7 @@ export function ArtistSetlistSection({
               return (
                 <button
                   key={song.title}
-                  className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-md hover:bg-white/5 transition-colors text-left group ${
+                  className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-md  transition-colors text-left group ${
                     !isPlayable ? "opacity-50" : ""
                   }`}
                   onClick={() => {

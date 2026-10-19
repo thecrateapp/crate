@@ -9,22 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Layers3,
-  ListMusic,
-  Loader2,
-  Plus,
-  Search,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
@@ -187,22 +174,18 @@ function getOpsForField(field: string) {
 
 function getGenerationChip(status?: string) {
   if (status === "running") {
-    return (
-      <CrateChip active className="text-[11px]">
-        Generating
-      </CrateChip>
-    );
+    return <CrateChip active>Generating</CrateChip>;
   }
   if (status === "queued") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Queued
       </CrateChip>
     );
   }
   if (status === "failed") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
+      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Failed
       </CrateChip>
     );
@@ -366,21 +349,18 @@ export function Playlists() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-                <Layers3 size={22} />
-              </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">
+                <h1 className="font-display text-2xl font-semibold tracking-tight">
                   System Playlists
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Editorial playlists for `listen`, with smart generation and
-                  admin-only controls.
+                  Editorial playlists for Listen, with smart generation and
+                  Admin controls.
                 </p>
               </div>
             </div>
@@ -389,6 +369,7 @@ export function Playlists() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               size="sm"
+              className="min-h-11"
               variant={composerMode === "static" ? "default" : "outline"}
               onClick={() =>
                 setComposerMode((current) =>
@@ -396,10 +377,11 @@ export function Playlists() {
                 )
               }
             >
-              <Plus size={14} className="mr-1" /> New static
+              New static
             </Button>
             <Button
               size="sm"
+              className="min-h-11"
               variant={composerMode === "smart" ? "default" : "outline"}
               onClick={() =>
                 setComposerMode((current) =>
@@ -407,34 +389,48 @@ export function Playlists() {
                 )
               }
             >
-              <Sparkles size={14} className="mr-1" /> New smart
+              New smart
             </Button>
           </div>
         </div>
 
         <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search playlists by name, description or category"
-                className="pl-9"
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+            <div className="crate-form-field min-w-0 flex-1">
+              <label
+                htmlFor="playlists-search"
+                className="font-mono font-normal text-meta text-text-muted"
+              >
+                Search playlists
+              </label>
+              <div className="relative">
+                <Search
+                  data-admin-ux="playlists-search"
+                  aria-hidden="true"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="playlists-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search playlists by name, description or category"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="crate-form-field">
+              <MonoLabel as="span">Category</MonoLabel>
+              <AdminSelect
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+                options={categoryOptions}
+                placeholder="All categories"
+                searchable
+                searchPlaceholder="Search categories..."
+                triggerClassName="w-full lg:w-[220px]"
               />
             </div>
-            <AdminSelect
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              options={categoryOptions}
-              placeholder="All categories"
-              searchable
-              searchPlaceholder="Search categories..."
-              triggerClassName="w-full lg:w-[220px]"
-            />
           </div>
 
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -446,7 +442,7 @@ export function Playlists() {
                   onClick={() => setFilter(item.key)}
                 >
                   {item.label}
-                  <span className="text-white/40">
+                  <span>
                     {item.key === "all"
                       ? counts.all
                       : item.key === "curated"
@@ -481,15 +477,22 @@ export function Playlists() {
       ) : null}
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-          <Loader2 size={16} className="animate-spin" /> Loading playlists…
+        <div
+          role="status"
+          aria-label="Loading playlists"
+          className="flex items-center justify-center gap-2 py-16 text-muted-foreground"
+        >
+          <Loader2
+            data-admin-ux="playlists-loading"
+            aria-hidden="true"
+            size={16}
+            className="animate-spin"
+          />{" "}
+          Loading playlists…
         </div>
       ) : filteredPlaylists.length === 0 ? (
         <Card className="border-white/10 bg-card p-10 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/35">
-            <ListMusic size={20} />
-          </div>
-          <h2 className="mt-4 text-lg font-medium">
+          <h2 className="text-lg font-medium">
             No playlists for this view yet
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -507,7 +510,7 @@ export function Playlists() {
               <div
                 role="link"
                 tabIndex={0}
-                className="flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors hover:bg-white/[0.03] lg:flex-row lg:items-stretch"
+                className="flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors  lg:flex-row lg:items-stretch"
                 onClick={() => navigate(`/playlists/${playlist.id}`)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -558,23 +561,19 @@ export function Playlists() {
                   )}
 
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <CrateChip className="text-[11px]">
-                      {playlist.track_count} tracks
-                    </CrateChip>
-                    <CrateChip className="text-[11px]">
+                    <CrateChip>{playlist.track_count} tracks</CrateChip>
+                    <CrateChip>
                       {fmtDuration(playlist.total_duration)}
                     </CrateChip>
-                    <CrateChip className="text-[11px]">
+                    <CrateChip>
                       {playlist.follower_count} follower
                       {playlist.follower_count === 1 ? "" : "s"}
                     </CrateChip>
                     {playlist.featured_rank != null ? (
-                      <CrateChip className="text-[11px]">
-                        Rank {playlist.featured_rank}
-                      </CrateChip>
+                      <CrateChip>Rank {playlist.featured_rank}</CrateChip>
                     ) : null}
                     {playlist.last_generated_at ? (
-                      <CrateChip className="text-[11px]">
+                      <CrateChip>
                         Generated {timeAgo(playlist.last_generated_at)}
                       </CrateChip>
                     ) : null}
@@ -582,37 +581,37 @@ export function Playlists() {
                 </div>
 
                 <div
-                  className="flex shrink-0 items-center gap-2"
+                  className="flex min-w-0 shrink-0 flex-wrap items-center gap-2"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <Button
                     size="sm"
+                    className="min-h-11"
                     variant="outline"
                     onClick={() => navigate(`/playlists/${playlist.id}`)}
                   >
-                    Open editor <ArrowRight size={14} className="ml-1" />
+                    Open editor
                   </Button>
-                  <ActionIconButton
-                    variant="row"
-                    className="h-8 w-8"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-11"
+                    aria-label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
                     onClick={() => {
                       void toggleActive(playlist);
                     }}
                   >
-                    {playlist.is_active ? (
-                      <EyeOff size={14} />
-                    ) : (
-                      <Eye size={14} />
-                    )}
-                  </ActionIconButton>
-                  <ActionIconButton
-                    variant="row"
-                    tone="default"
-                    className="h-8 w-8"
+                    {playlist.is_active ? "Deactivate" : "Activate"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-11"
+                    aria-label={`Delete ${playlist.name}`}
                     onClick={() => setDeleteTarget(playlist)}
                   >
-                    <Trash2 size={14} />
-                  </ActionIconButton>
+                    Delete
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -686,9 +685,6 @@ function CreateStaticPlaylistPanel({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-primary">
-                <Plus size={18} />
-              </div>
               <div>
                 <h2 className="text-lg font-semibold">New static playlist</h2>
                 <p className="text-sm text-muted-foreground">
@@ -711,14 +707,26 @@ function CreateStaticPlaylistPanel({
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            <X size={14} className="mr-1" /> Close
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-11"
+            onClick={onCancel}
+          >
+            <X
+              data-admin-ux="playlists-static-close"
+              aria-hidden="true"
+              size={14}
+              className="mr-1"
+            />{" "}
+            Close
           </Button>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
           <Field label="Name">
             <Input
+              aria-label="Name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Playlist name"
@@ -736,6 +744,7 @@ function CreateStaticPlaylistPanel({
           <Field label="Featured rank">
             <Input
               type="number"
+              aria-label="Featured rank"
               value={featuredRank}
               onChange={(event) => setFeaturedRank(event.target.value)}
               placeholder="Optional"
@@ -743,6 +752,7 @@ function CreateStaticPlaylistPanel({
           </Field>
           <Field label="Description" className="lg:col-span-3">
             <Textarea
+              aria-label="Description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Short editorial description for listen"
@@ -757,15 +767,22 @@ function CreateStaticPlaylistPanel({
             and editorial metadata stay in the same workflow.
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={onCancel}>
+            <Button className="min-h-11" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving || !name.trim()}>
+            <Button
+              className="min-h-11"
+              onClick={submit}
+              disabled={saving || !name.trim()}
+            >
               {saving ? (
-                <Loader2 size={14} className="mr-1 animate-spin" />
-              ) : (
-                <Plus size={14} className="mr-1" />
-              )}
+                <Loader2
+                  data-admin-ux="playlists-static-saving"
+                  aria-hidden="true"
+                  size={14}
+                  className="mr-1 animate-spin"
+                />
+              ) : null}
               Create & open
             </Button>
           </div>
@@ -914,9 +931,6 @@ function CreateSmartPlaylistPanel({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary">
-                <Sparkles size={18} />
-              </div>
               <div>
                 <h2 className="text-lg font-semibold">New smart playlist</h2>
                 <p className="text-sm text-muted-foreground">
@@ -944,14 +958,26 @@ function CreateSmartPlaylistPanel({
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            <X size={14} className="mr-1" /> Close
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-11"
+            onClick={onCancel}
+          >
+            <X
+              data-admin-ux="playlists-smart-close"
+              aria-hidden="true"
+              size={14}
+              className="mr-1"
+            />{" "}
+            Close
           </Button>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
           <Field label="Name">
             <Input
+              aria-label="Name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Playlist name"
@@ -969,6 +995,7 @@ function CreateSmartPlaylistPanel({
           <Field label="Featured rank">
             <Input
               type="number"
+              aria-label="Featured rank"
               value={featuredRank}
               onChange={(event) => setFeaturedRank(event.target.value)}
               placeholder="Optional"
@@ -976,6 +1003,7 @@ function CreateSmartPlaylistPanel({
           </Field>
           <Field label="Description" className="lg:col-span-3">
             <Textarea
+              aria-label="Description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Editorial summary shown in listen"
@@ -1011,6 +1039,7 @@ function CreateSmartPlaylistPanel({
                   type="number"
                   min={1}
                   max={500}
+                  aria-label="Limit"
                   value={limit}
                   onChange={(event) => setLimit(event.target.value)}
                 />
@@ -1045,18 +1074,17 @@ function CreateSmartPlaylistPanel({
                   className="rounded-md border border-white/10 bg-card/60 p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <CrateChip className="text-[11px]">
-                      Rule {index + 1}
-                    </CrateChip>
-                    <ActionIconButton
-                      variant="row"
-                      tone="default"
-                      className="h-8 w-8"
+                    <CrateChip>Rule {index + 1}</CrateChip>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-11"
+                      aria-label={`Remove rule ${index + 1}`}
                       onClick={() => removeRule(index)}
                       disabled={rules.length === 1}
                     >
-                      <Trash2 size={14} />
-                    </ActionIconButton>
+                      Remove rule
+                    </Button>
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-[180px_160px_minmax(0,1fr)]">
@@ -1075,11 +1103,9 @@ function CreateSmartPlaylistPanel({
                     </Field>
 
                     <Field label="Operator">
-                      <SegmentedControl
-                        as="radio"
-                        label="Operator"
+                      <AdminSelect
                         value={rule.op}
-                        onValueChange={(value) =>
+                        onChange={(value) =>
                           updateRule(index, {
                             op: value,
                             value: "",
@@ -1087,7 +1113,10 @@ function CreateSmartPlaylistPanel({
                             rangeMax: "",
                           })
                         }
-                        items={ops}
+                        options={ops}
+                        allowClear={false}
+                        placeholder="Operator"
+                        triggerClassName="w-full max-w-none"
                       />
                     </Field>
 
@@ -1096,6 +1125,7 @@ function CreateSmartPlaylistPanel({
                         <div className="grid gap-3 sm:grid-cols-2">
                           <Input
                             type="number"
+                            aria-label="Minimum"
                             value={rule.rangeMin}
                             onChange={(event) =>
                               updateRule(index, {
@@ -1106,6 +1136,7 @@ function CreateSmartPlaylistPanel({
                           />
                           <Input
                             type="number"
+                            aria-label="Maximum"
                             value={rule.rangeMax}
                             onChange={(event) =>
                               updateRule(index, {
@@ -1128,6 +1159,7 @@ function CreateSmartPlaylistPanel({
                         />
                       ) : (
                         <Input
+                          aria-label="Value"
                           value={rule.value}
                           onChange={(event) =>
                             updateRule(index, { value: event.target.value })
@@ -1147,8 +1179,13 @@ function CreateSmartPlaylistPanel({
               Prefer one condition per rule. If you need multiple buckets,
               create more rules and switch match mode to `Any`.
             </p>
-            <Button variant="outline" size="sm" onClick={addRule}>
-              <Plus size={14} className="mr-1" /> Add rule
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
+              onClick={addRule}
+            >
+              Add rule
             </Button>
           </div>
         </div>
@@ -1159,15 +1196,22 @@ function CreateSmartPlaylistPanel({
             continue in the editor for cover, status and later refinements.
           </p>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={onCancel}>
+            <Button className="min-h-11" variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving || !name.trim()}>
+            <Button
+              className="min-h-11"
+              onClick={submit}
+              disabled={saving || !name.trim()}
+            >
               {saving ? (
-                <Loader2 size={14} className="mr-1 animate-spin" />
-              ) : (
-                <Sparkles size={14} className="mr-1" />
-              )}
+                <Loader2
+                  data-admin-ux="playlists-smart-saving"
+                  aria-hidden="true"
+                  size={14}
+                  className="mr-1 animate-spin"
+                />
+              ) : null}
               Create & open
             </Button>
           </div>

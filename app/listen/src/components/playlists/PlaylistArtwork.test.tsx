@@ -96,4 +96,13 @@ describe("PlaylistArtwork", () => {
     ).toMatch(/^\d+$/);
     expect(container.innerHTML).not.toContain("hsl(");
   });
+  it("retains Listen's default decorative fallback without opting out", () => {
+    const { container } = render(
+      <PlaylistArtwork name="Listen fallback" tracks={[]} />,
+    );
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.firstElementChild).toHaveClass(
+      "playlist-artwork-placeholder",
+    );
+  });
 });

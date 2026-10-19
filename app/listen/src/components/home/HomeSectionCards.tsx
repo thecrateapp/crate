@@ -29,7 +29,7 @@ export function UpcomingPreviewRow({
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-border-quiet hover:bg-text-primary/5"
+      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-border-quiet "
     >
       {artworkUrl ? (
         <ArtworkSurface
@@ -38,7 +38,7 @@ export function UpcomingPreviewRow({
           fallback={null}
           imageProps={LAZY_IMAGE_PROPS}
           imageClassName="object-cover"
-          className="absolute inset-0 opacity-20 grayscale transition-opacity group-hover:opacity-30"
+          className="absolute inset-0 opacity-20 grayscale transition-opacity "
         />
       ) : null}
       <div className="home-upcoming-row-scrim absolute inset-0" />

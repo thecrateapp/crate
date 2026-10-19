@@ -1,6 +1,15 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { installRadixElementPolyfills } from "@/test/radix-element-polyfills";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
 
@@ -31,7 +40,7 @@ describe("Playlists smart rule composer", () => {
     });
   });
 
-  it("keeps operator focus across consecutive arrows and submits the current rule", async () => {
+  it("keeps operator select focus across keyboard choices and submits the current rule", async () => {
     renderWithAdminProviders(<Playlists />, { route: "/playlists" });
     await screen.findByText("No playlists for this view yet");
     await userEvent.click(screen.getByRole("button", { name: "New smart" }));
@@ -45,28 +54,18 @@ describe("Playlists smart rule composer", () => {
     expect(
       screen.getByRole("combobox", { name: "Select genre" }),
     ).toHaveTextContent("screamo");
-    const operator = () => screen.getByRole("radiogroup", { name: "Operator" });
-    await userEvent.click(
-      within(operator()).getByRole("radio", { name: "Contains" }),
-    );
-
-    await userEvent.keyboard("{ArrowRight}");
-    const notContains = within(operator()).getByRole("radio", {
-      name: "Not contains",
-    });
-    expect(notContains).toHaveAttribute("aria-checked", "true");
-    expect(notContains).toHaveFocus();
+    const operator = screen.getByRole("combobox", { name: "Operator" });
+    await userEvent.click(operator);
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(operator).toHaveTextContent("Not contains");
+    expect(operator).toHaveFocus();
     expect(
       screen.getByRole("combobox", { name: "Select genre" }),
     ).toHaveTextContent("Select genre");
-
-    await userEvent.keyboard("{ArrowRight}");
-    const equals = within(operator()).getByRole("radio", { name: "Equals" });
-    expect(equals).toHaveAttribute("aria-checked", "true");
-    expect(equals).toHaveFocus();
-    expect(
-      screen.getByRole("combobox", { name: "Select genre" }),
-    ).toHaveTextContent("Select genre");
+    await userEvent.click(operator);
+    await userEvent.keyboard("{Home}{Enter}");
+    expect(operator).toHaveTextContent("Equals");
+    expect(operator).toHaveFocus();
 
     fireEvent.click(screen.getByRole("combobox", { name: "Select genre" }));
     fireEvent.click(await screen.findByRole("option", { name: "ambient" }));
@@ -89,3 +88,9 @@ describe("Playlists smart rule composer", () => {
     });
   });
 });
+
+let disposeRadix: () => void;
+beforeAll(() => {
+  disposeRadix = installRadixElementPolyfills();
+});
+afterAll(() => disposeRadix());

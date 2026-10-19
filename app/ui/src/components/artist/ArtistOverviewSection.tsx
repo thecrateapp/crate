@@ -115,7 +115,7 @@ function TopTracks({ tracks }: { tracks: TopTrack[] }) {
               trackTitle={track.title}
               albumCover={coverUrl}
             >
-              <div className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/5">
+              <div className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ">
                 <span className="w-5 text-right text-xs text-white/30">
                   {index + 1}
                 </span>

@@ -349,7 +349,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                 {badgeValue != null && badgeValue > 0 ? (
                   <Badge
                     variant="secondary"
-                    className="shrink-0 px-1.5 py-1 font-mono text-xs leading-3.5 tabular-nums"
+                    className="shrink-0 px-1.5 py-1 font-mono font-normal text-xs leading-3.5 tabular-nums"
                   >
                     {badgeValue}
                   </Badge>

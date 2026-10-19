@@ -1410,10 +1410,6 @@
   transition: background-color var(--motion-duration-fast) ease;
 }
 
-.user-profile-item:hover {
-  background: var(--surface-placeholder);
-}
-
 .user-profile-stat {
   border: 1px solid var(--border-quiet);
   background: var(--surface-canvas-panel);
@@ -3807,9 +3803,7 @@ button.genre-pill:hover,
   border-bottom: 1px solid var(--border-quiet);
   cursor: pointer;
 }
-.track-row:not([data-disabled="true"]):hover {
-  background: color-mix(in srgb, var(--accent-action) 4%, transparent);
-}
+
 .track-row[data-density="compact"] {
   min-height: 52px;
 }
@@ -3984,9 +3978,7 @@ button.genre-pill:hover,
 .crate-track-table tbody tr {
   border-bottom: 1px solid var(--border-quiet);
 }
-.crate-track-table tbody tr:hover {
-  background: color-mix(in srgb, var(--accent-action) 4%, transparent);
-}
+
 .crate-track-table .crate-track-action {
   border-radius: 0;
 }

@@ -249,7 +249,7 @@ function normalizeShow(show: ShowCardInput): NormalizedShow {
 function CompactCard({ show }: { show: ShowEvent }) {
   const normalized = normalizeShow(show);
   return (
-    <div className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-white/5">
+    <div className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors ">
       <div className="h-[18px] w-[18px] flex-shrink-0 overflow-hidden rounded-sm bg-white/5">
         {normalized.artistPhotoUrl ? (
           <img
@@ -302,7 +302,7 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="font-display truncate text-[13px] font-semibold text-foreground">
+        <div className="font-sans truncate text-[13px] font-semibold text-foreground">
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
@@ -472,12 +472,12 @@ function ExpandedShowCardBody({
               {artistHref ? (
                 <Link
                   to={artistHref}
-                  className="block truncate font-display text-sm font-bold text-white transition-colors hover:text-primary"
+                  className="block truncate font-sans text-sm font-bold text-white transition-colors hover:text-primary"
                 >
                   {show.primaryArtist?.name ?? show.title}
                 </Link>
               ) : (
-                <div className="truncate font-display text-sm font-bold text-white">
+                <div className="truncate font-sans text-sm font-bold text-white">
                   {show.primaryArtist?.name ?? show.title}
                 </div>
               )}
@@ -587,7 +587,7 @@ export function ShowCard({
         "relative w-full overflow-hidden rounded-md border",
         expanded
           ? "border-primary/20 shadow-none transition-[height,border-color,box-shadow] duration-400 ease-out"
-          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
+          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 ",
         className,
       )}
       style={{ height: cardHeight }}

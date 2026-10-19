@@ -13,6 +13,17 @@ export default defineConfig({
       enforce: "pre",
       resolveId(source, importer) {
         if (
+          (importer?.endsWith("/app/ui/src/pages/Playlists.tsx") &&
+            source === "@/lib/api") ||
+          (importer?.endsWith(
+            "/app/ui/src/components/playlists/PlaylistArtwork.tsx",
+          ) &&
+            source === "@/lib/library-routes")
+        )
+          return fileURLToPath(
+            new URL("admin-playlists-fixtures.ts", import.meta.url),
+          );
+        if (
           (importer?.endsWith("/app/ui/src/pages/Upcoming.tsx") &&
             source === "@/lib/api") ||
           (importer?.endsWith("/app/ui/src/components/shows/ShowCard.tsx") &&
@@ -166,6 +177,9 @@ export default defineConfig({
         ),
         adminContributions: fileURLToPath(
           new URL("admin-contributions-demo.html", import.meta.url),
+        ),
+        adminPlaylists: fileURLToPath(
+          new URL("admin-playlists-demo.html", import.meta.url),
         ),
         adminUpcoming: fileURLToPath(
           new URL("admin-upcoming-demo.html", import.meta.url),

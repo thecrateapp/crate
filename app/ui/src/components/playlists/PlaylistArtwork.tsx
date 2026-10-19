@@ -23,12 +23,13 @@ function buildCoverUrl(track: PlaylistArtworkTrack): string | null {
 export function PlaylistArtwork(
   props: Omit<
     React.ComponentProps<typeof PlaylistArtworkBase>,
-    "buildCoverUrl" | "logoSrc"
+    "buildCoverUrl" | "logoSrc" | "showFallbackIcon"
   >,
 ) {
   return (
     <PlaylistArtworkBase
       {...props}
+      showFallbackIcon={false}
       buildCoverUrl={buildCoverUrl}
       logoSrc="/assets/logo.svg"
       showCrateMark={props.showCrateMark ?? true}
