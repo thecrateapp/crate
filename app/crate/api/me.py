@@ -2309,7 +2309,7 @@ def update_location(request: Request, body: UpdateLocationBody):
     responses=AUTH_ERROR_RESPONSES,
     summary="Search cities for show-location autocomplete",
 )
-def search_cities_endpoint(request: Request, q: str = Query("", min_length=2)):
+def search_cities_endpoint(request: Request, q: str = Query(..., min_length=2)):
     """Search cities for autocomplete."""
     _require_auth(request)
     from crate.geolocation import search_cities

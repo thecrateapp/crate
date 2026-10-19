@@ -880,6 +880,20 @@ class TestTimelineAPI:
         )
 
 
+def test_city_search_requires_a_query(test_app):
+    from unittest.mock import patch
+
+    with patch("crate.geolocation.search_cities", return_value=[]) as search:
+        missing = test_app.get("/api/me/cities/search")
+        short = test_app.get("/api/me/cities/search?q=a")
+        found = test_app.get("/api/me/cities/search?q=Bil")
+
+    assert missing.status_code == 422
+    assert short.status_code == 422
+    assert found.status_code == 200
+    search.assert_called_once_with("Bil", limit=5)
+
+
 class TestSearchAPI:
     def test_search_short_query(self, test_app):
         resp = test_app.get("/api/search?q=a")
