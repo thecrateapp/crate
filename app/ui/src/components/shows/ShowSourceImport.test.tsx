@@ -220,3 +220,100 @@ it("keeps local text mode available and returns all tour rows for explicit selec
       .mock.calls.find(([url]) => url.endsWith("/extractions"))?.[2],
   ).toEqual(expect.objectContaining({ mode: "parse" }));
 });
+
+it.each(["vision", "text_llm", "ocr_text_llm"])(
+  "uses %s model and its own exact source consent",
+  async (method) => {
+    const actions = Object.fromEntries(
+      ["vision", "text_llm", "ocr_text_llm"].map((mode) => [
+        mode,
+        {
+          configured: true,
+          model: `${mode}-model`,
+          configuration_fingerprint: `${mode}-fingerprint`,
+          connectivity: "not_checked",
+          vision: "unknown",
+        },
+      ]),
+    );
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (url.endsWith("/availability"))
+        return {
+          configured: true,
+          model: "wrong-global",
+          configuration_fingerprint: "wrong-global-fingerprint",
+          connectivity: "not_checked",
+          vision: "unknown",
+          actions,
+          ocr: { available: true },
+        };
+      if (url.endsWith("/drafts")) return { items: [] };
+      if (url.endsWith("/uploads")) return { upload_id: "image" };
+      if (url.endsWith("/extractions")) return { job_id: "own-model" };
+      if (url.endsWith("/jobs/own-model"))
+        return {
+          status: "completed",
+          result: { draft: { candidates: [], coverage: "incomplete" } },
+        };
+      throw new Error(url);
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<ShowSourceImport open onDraft={vi.fn()} />);
+    await screen.findByText(/OCR worker: ready/);
+    await user.selectOptions(
+      screen.getByLabelText("Extraction method"),
+      method,
+    );
+    await user.type(screen.getByLabelText("Source text"), "Tour text");
+    if (method !== "text_llm")
+      await user.upload(
+        screen.getByLabelText("Images (up to 3)"),
+        new File(["image"], "flyer.png", { type: "image/png" }),
+      );
+    expect(screen.getByText(new RegExp(`LLM: ${method}-model`))).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "Extract candidates" }),
+    );
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/show-imports/extractions",
+        "POST",
+        expect.objectContaining({
+          mode: method,
+          expected_model: `${method}-model`,
+          expected_configuration: `${method}-fingerprint`,
+        }),
+        expect.anything(),
+      ),
+    );
+  },
+);
+it("keeps available vision independent of unavailable text actions", async () => {
+  vi.mocked(api).mockImplementation(async (url) =>
+    url.endsWith("/availability")
+      ? {
+          configured: false,
+          ocr: { available: true },
+          actions: {
+            vision: {
+              configured: true,
+              model: "vision-only",
+              configuration_fingerprint: "vision-only-fingerprint",
+              vision: "unknown",
+              connectivity: "not_checked",
+            },
+            text_llm: { configured: false },
+            ocr_text_llm: { configured: false },
+          },
+        }
+      : { items: [] },
+  );
+  renderWithAdminProviders(<ShowSourceImport open onDraft={vi.fn()} />);
+  await screen.findByText(/OCR worker: ready/);
+  expect(
+    screen.getByRole("option", { name: "Configured model vision" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("option", { name: "Configured model from text / URL" }),
+  ).toBeDisabled();
+});

@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithAdminProviders as render } from "@/test/render-with-admin-providers";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +15,14 @@ vi.mock("@/contexts/OpsSnapshotContext", () => ({
 
 vi.mock("@/hooks/use-api", () => ({
   useApi: useApiMock,
+}));
+
+vi.mock("@/hooks/use-llm", () => ({
+  useActionLLMStatus: () => ({
+    available: true,
+    status: "configured",
+    model_id: "paths-model",
+  }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -110,6 +119,7 @@ describe("Settings", () => {
       });
     });
     expect(refetchMock).toHaveBeenCalled();
+    expect(screen.getByText(/Configured action: paths-model/)).toBeVisible();
   });
 
   it("exposes a targeted Music Paths AI cache clear action", async () => {

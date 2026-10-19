@@ -375,6 +375,7 @@ function NodeDetailPanel({
             </div>
             <div className="flex shrink-0 gap-2">
               <AIButton
+                actionId="genres.taxonomy.propose"
                 loading={savingKey === "proposal"}
                 disabled={savingKey !== null && savingKey !== "proposal"}
                 onClick={inferNodeProposal}
@@ -897,7 +898,9 @@ export function GenreTaxonomyTree({
     return set;
   }, [hideEmpty, data, nodeMap]);
 
-  const selectedNode = selectedSlug ? nodeMap.get(selectedSlug) ?? null : null;
+  const selectedNode = selectedSlug
+    ? (nodeMap.get(selectedSlug) ?? null)
+    : null;
 
   const runAction = useCallback(
     (key: string) => {

@@ -6,13 +6,18 @@ import { waitForShowJob } from "./show-import-jobs";
 import type { ShowDraft, ShowJob } from "./show-import-types";
 
 type Method = "parse" | "ocr" | "vision" | "text_llm" | "ocr_text_llm";
-interface Availability {
+interface ModelAvailability {
   configured: boolean;
   configuration_fingerprint?: string;
   model?: string;
   connectivity: string;
   vision: string;
+}
+interface Availability extends ModelAvailability {
   ocr: { available: boolean; reason?: string };
+  actions?: Partial<
+    Record<"vision" | "text_llm" | "ocr_text_llm", ModelAvailability>
+  >;
 }
 interface Recent {
   id: string;
@@ -36,6 +41,11 @@ export function ShowSourceImport({
   const [files, setFiles] = useState<{ id: string; file: File }[]>([]);
   const [storedImages, setStoredImages] = useState<string[]>([]);
   const [availability, setAvailability] = useState<Availability | null>(null);
+  const selectedAction =
+    method === "vision" || method === "text_llm" || method === "ocr_text_llm"
+      ? availability?.actions?.[method]
+      : null;
+  const modelMode = ["vision", "text_llm", "ocr_text_llm"].includes(method);
   const [recent, setRecent] = useState<Recent[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -164,11 +174,11 @@ export function ShowSourceImport({
             source_url: probe ? null : url || null,
             expected_model:
               !probe && ["vision", "text_llm", "ocr_text_llm"].includes(method)
-                ? availability?.model
+                ? selectedAction?.model
                 : null,
             expected_configuration:
               !probe && ["vision", "text_llm", "ocr_text_llm"].includes(method)
-                ? availability?.configuration_fingerprint
+                ? selectedAction?.configuration_fingerprint
                 : null,
             idempotency_key: key.current,
           },
@@ -297,11 +307,11 @@ export function ShowSourceImport({
             ? "ready"
             : availability.ocr.reason || "not checked"}{" "}
           · LLM:{" "}
-          {availability.configured
-            ? availability.model || "configured"
+          {selectedAction?.configured
+            ? selectedAction.model || "configured"
             : "not configured"}{" "}
-          · connectivity: {availability.connectivity} · vision:{" "}
-          {availability.vision}
+          · connectivity: {selectedAction?.connectivity ?? "not checked"} ·
+          vision: {selectedAction?.vision ?? "not checked"}
         </p>
       ) : null}
       <fieldset disabled={disabled || busy || uncertain} className="space-y-3">
@@ -320,16 +330,22 @@ export function ShowSourceImport({
             <option
               value="vision"
               disabled={
-                !availability?.configured ||
-                availability.vision === "unsupported"
+                !availability?.actions?.vision?.configured ||
+                availability.actions.vision.vision === "unsupported"
               }
             >
               Configured model vision
             </option>
-            <option value="text_llm" disabled={!availability?.configured}>
+            <option
+              value="text_llm"
+              disabled={!availability?.actions?.text_llm?.configured}
+            >
               Configured model from text / URL
             </option>
-            <option value="ocr_text_llm" disabled={!availability?.configured}>
+            <option
+              value="ocr_text_llm"
+              disabled={!availability?.actions?.ocr_text_llm?.configured}
+            >
               Local OCR then configured text model
             </option>
           </select>
@@ -440,6 +456,10 @@ export function ShowSourceImport({
             disabled ||
             busy ||
             uncertain ||
+            (modelMode &&
+              (!selectedAction?.configured ||
+                !selectedAction.configuration_fingerprint ||
+                !selectedAction.model)) ||
             (!text.trim() && !url && !files.length && !storedImages.length)
           }
           onClick={() => void run()}

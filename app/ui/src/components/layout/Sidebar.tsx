@@ -213,6 +213,12 @@ const navItems = [
     capabilities: ["admin.access"],
   },
   {
+    to: "/ai-agents",
+    icon: Sparkles,
+    label: "AI Agents",
+    capabilities: ["ai.config.read"],
+  },
+  {
     to: "/settings",
     icon: Settings,
     label: "Settings",

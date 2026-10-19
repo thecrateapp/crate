@@ -634,3 +634,25 @@ describe("command palette helpers", () => {
     expect(matchesCommandQuery("Sync Library", "health")).toBe(false);
   });
 });
+
+it("offers the AI Agents page to configuration readers", async () => {
+  mockAuth(["ai.config.read"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("AI Agents")).toBeVisible();
+});
+it("does not offer the AI Agents page without read capability", async () => {
+  mockAuth(["settings.manage"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  await screen.findByRole("dialog", { name: "Command palette" });
+  expect(screen.queryByText("AI Agents")).not.toBeInTheDocument();
+});

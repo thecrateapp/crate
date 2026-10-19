@@ -7,7 +7,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { Badge } from "@crate/ui/shadcn/badge";
-import { useLLMAvailable } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 
 const EQ_BAND_COUNT = 10;
 const FLAT_GAINS: number[] = new Array(EQ_BAND_COUNT).fill(0);
@@ -57,7 +57,8 @@ export function GenreEqEditor({
   const [clearing, setClearing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reasoning, setReasoning] = useState(eqReasoning || "");
-  const llmAvailable = useLLMAvailable();
+  const llmAvailable =
+    useActionLLMStatus("genres.eq.propose")?.available ?? false;
 
   useEffect(() => {
     setGains(seeded);
@@ -182,6 +183,7 @@ export function GenreEqEditor({
         <div className="flex flex-wrap gap-2">
           {llmAvailable && (
             <AIButton
+              actionId="genres.eq.propose"
               onClick={generateWithAI}
               loading={generating}
               disabled={saving || clearing}

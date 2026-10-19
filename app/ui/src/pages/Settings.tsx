@@ -25,6 +25,8 @@ import {
   TableBody,
   TableCell,
 } from "@crate/ui/shadcn/table";
+import { Link } from "react-router";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
@@ -1292,6 +1294,7 @@ function EnrichmentSection({
   settings: SettingsData;
   refetch: () => void;
 }) {
+  const pathAI = useActionLLMStatus("music_paths.refine");
   const enrichment = settings.enrichment;
   const proc = settings.processing ?? {
     mb_auto_apply_threshold: 85,
@@ -1419,18 +1422,30 @@ function EnrichmentSection({
       >
         <PanelCard
           icon={Bot}
-          title="LLM Refinement"
-          description="Let the configured LLM review generated paths and apply safe swaps from deterministic candidates."
+          title="Legacy LLM Refinement"
+          description="The legacy toggle controls inherited refinement. Configured action bindings are managed in AI Agents."
         >
+          <p className="text-sm">
+            {pathAI?.status === "configured"
+              ? `Configured action: ${pathAI.available ? pathAI.model_id : "unavailable"}. The legacy toggle does not control this binding.`
+              : pathAI?.status === "unavailable"
+                ? "Action unavailable. The legacy toggle does not enable a disabled binding."
+                : pathAI?.status === "legacy"
+                  ? "Legacy routing: the toggle below controls inherited refinement."
+                  : "Action routing has not been checked yet."}{" "}
+            <Link className="text-primary underline" to="/ai-agents">
+              AI Agents
+            </Link>
+          </p>
           <FieldRow
-            label="LLM refinement"
+            label="Legacy LLM refinement"
             hint={`Accepted refinements are cached for ${paths.llm_refinement_cache_ttl_hours} hours per path signature.`}
           >
             <Toggle
               checked={llmRefinementEnabled}
               onChange={savePathsSetting}
               disabled={savingPaths}
-              ariaLabel="LLM refinement"
+              ariaLabel="Legacy LLM refinement"
             />
             <Badge
               variant={llmRefinementEnabled ? "default" : "secondary"}

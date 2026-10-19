@@ -65,6 +65,18 @@ export interface ShowJob {
   result?: {
     draft?: ShowDraft & {
       readiness?: {
+        actions?: Partial<
+          Record<
+            "vision" | "text_llm" | "ocr_text_llm",
+            {
+              configured: boolean;
+              model?: string;
+              configuration_fingerprint?: string;
+              connectivity: string;
+              vision: string;
+            }
+          >
+        >;
         configured: boolean;
         model?: string;
         connectivity: string;

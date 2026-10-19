@@ -11,7 +11,7 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
-  useLLMStatus: () => ({
+  useActionLLMStatus: () => ({
     available: true,
     model: "gemini-test",
     provider: "gemini",

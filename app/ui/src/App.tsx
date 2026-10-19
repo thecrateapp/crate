@@ -73,6 +73,9 @@ const AgentPlanReview = lazy(() =>
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
 );
+const AiAgents = lazy(() =>
+  import("@/pages/AiAgents").then((m) => ({ default: m.AiAgents })),
+);
 const Settings = lazy(() =>
   import("@/pages/Settings").then((m) => ({ default: m.Settings })),
 );
@@ -439,6 +442,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={ADMIN_ACCESS}>
                       <I18nReview />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="ai-agents"
+                  element={
+                    <RequireCapabilities anyOf={["ai.config.read"]}>
+                      <AiAgents />
                     </RequireCapabilities>
                   }
                 />

@@ -46,7 +46,7 @@ import {
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
-import { useLLMStatus } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ApiError, api, apiSseUrl } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 
@@ -432,10 +432,11 @@ export function PlaylistEditor() {
   const { data: filterOptions } = useApi<FilterOptions>(
     "/api/playlists/filter-options",
   );
-  const llmStatus = useLLMStatus();
+  const llmStatus = useActionLLMStatus("playlists.description.generate");
   const llmAvailable = llmStatus?.available ?? false;
   const llmUnavailableReason =
-    llmStatus?.error || "Configure an LLM provider before generating copy.";
+    llmStatus?.error_code ||
+    "Configure an LLM provider before generating copy.";
   const [liveSurface, setLiveSurface] = useState<PlaylistEditorSurface | null>(
     null,
   );
@@ -1099,6 +1100,7 @@ export function PlaylistEditor() {
                 />
                 <div className="mt-2 flex justify-end">
                   <AIButton
+                    actionId="playlists.description.generate"
                     type="button"
                     onClick={handleGenerateDescription}
                     loading={describing}

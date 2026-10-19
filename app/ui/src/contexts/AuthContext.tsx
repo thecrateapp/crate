@@ -33,6 +33,7 @@ export interface RolePreset {
 }
 
 export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
+  "ai.config.read",
   "ops.health.view",
   "ops.logs.view",
   "ops.tasks.manage",
