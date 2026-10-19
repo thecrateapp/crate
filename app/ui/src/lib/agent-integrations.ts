@@ -87,6 +87,15 @@ export interface AgentPlanSummary {
   operation?: string;
 }
 
+export interface AgentPlanListItem extends AgentPlanSummary {
+  created_at: string;
+  integration_name: string | null;
+  integration_kind: "service" | "delegated" | "human" | null;
+  target_count: number;
+  risk: string;
+  expired: boolean;
+}
+
 export interface AgentEditorialContent {
   kind:
     | "create"
@@ -132,6 +141,10 @@ export interface AgentEditorialContent {
 export interface AgentPlan
   extends AgentPlanSummary, Partial<AgentEditorialContent> {
   job_id?: string | null;
+  created_at?: string;
+  integration_name?: string | null;
+  integration_kind?: string | null;
+  requester_name?: string | null;
   plan_version: string;
   content_hash: string;
   authorization_context_hash: string;
