@@ -621,6 +621,32 @@ fn median(values: &[f32]) -> f32 {
     percentile(values, 0.5)
 }
 
+/// Tempo from a least-squares fit of beat index against refined beat time.
+///
+/// Frame-quantised intervals bias the mean interval by up to a hop over the
+/// whole track, which the planner then extrapolates from the downbeat anchor
+/// to a cue minutes later. Fitting the refined grid keeps that drift sub-ms.
+fn grid_bpm(beat_grid_ms: &[u64]) -> Option<f32> {
+    if beat_grid_ms.len() < 4 {
+        return None;
+    }
+    let count = beat_grid_ms.len() as f64;
+    let mean_index = (count - 1.0) / 2.0;
+    let mean_time = beat_grid_ms.iter().map(|value| *value as f64).sum::<f64>() / count;
+    let (covariance, variance) = beat_grid_ms.iter().enumerate().fold(
+        (0.0_f64, 0.0_f64),
+        |(covariance, variance), (index, time)| {
+            let di = index as f64 - mean_index;
+            (
+                covariance + di * (*time as f64 - mean_time),
+                variance + di * di,
+            )
+        },
+    );
+    let period = covariance / variance;
+    (period > 0.0).then(|| (60_000.0 / period) as f32)
+}
+
 fn tempo_features(
     beat_frames: &[usize],
     onsets: &[f32],
@@ -818,11 +844,10 @@ pub fn analyze_smart_mix_segments(
     let features = beat_tracking::frame_features(samples, sample_rate);
     let onsets = &features.onsets;
     let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
-    let beat_grid_ms: Vec<u64> = beat_frames
-        .iter()
-        .map(|frame| *frame as u64 * HOP_SIZE as u64 * 1_000 / u64::from(sample_rate))
-        .collect();
-    let (bpm, bpm_confidence, tempo_stability) = tempo_features(&beat_frames, onsets, sample_rate);
+    let beat_grid_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
+    let (frame_bpm, bpm_confidence, tempo_stability) =
+        tempo_features(&beat_frames, onsets, sample_rate);
+    let bpm = grid_bpm(&beat_grid_ms).or(frame_bpm);
     let downbeat_anchor_ms = if bpm_confidence >= DOWNBEAT_MIN_CONFIDENCE {
         beat_tracking::downbeat_phase(&features, &beat_frames)
             .and_then(|phase| beat_grid_ms.get(phase).copied())

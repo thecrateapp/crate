@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 
 pub const FORMAT_NAME: &str = "delta-ms-v1";
-pub const ANALYZER_VERSION: &str = "smart-mix-audio-v3";
+pub const ANALYZER_VERSION: &str = "smart-mix-audio-v4";
 pub const FORMAT_VERSION: u8 = 1;
 pub const MAX_BEAT_COUNT: usize = 100_000;
 pub const MAX_GRID_DURATION_MS: u64 = 24 * 60 * 60 * 1_000;

@@ -5,7 +5,7 @@ from crate.smart_mix.policy import PLANNER_POLICY
 
 API_CONTRACT_VERSION = "2026-08"
 PROFILE_SCHEMA_VERSION = 1
-ANALYZER_VERSION = "smart-mix-audio-v3"
+ANALYZER_VERSION = "smart-mix-audio-v4"
 PYTHON_ANALYZER = "crate-python"
 MEASUREMENT_VERSION = "bs1770-v1"
 PLANNER_IDENTIFIER = PLANNER_POLICY.identifier

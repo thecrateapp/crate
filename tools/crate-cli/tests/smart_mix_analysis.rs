@@ -59,6 +59,29 @@ fn rust_extracts_versioned_stable_mix_profile() {
     assert_eq!(profile.time_signature, Some(4));
 }
 
+#[test]
+fn rust_tempo_is_precise_enough_to_extrapolate_to_late_cues() {
+    let samples = click_track(120.0, 120.0, 150.0, 0.0, 0.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    let bpm = f64::from(profile.bpm.unwrap());
+    let anchor = profile.downbeat_anchor_ms.unwrap() as f64;
+    let beats_to_cue = (140_000.0 - anchor) / 500.0;
+    let drift_ms = beats_to_cue * (60_000.0 / bpm - 500.0);
+    assert!(
+        drift_ms.abs() <= 3.0,
+        "bpm {bpm} drifts {drift_ms} ms by the cue"
+    );
+    for position in profile.beat_grid_ms.iter().take(20) {
+        let error = *position as f64 - (*position as f64 / 500.0).round() * 500.0;
+        assert!(
+            error.abs() <= 3.0,
+            "beat at {position} ms is {error} ms off"
+        );
+    }
+}
+
 fn syncopated_band(bpm: f32, duration_seconds: f32) -> Vec<f32> {
     let mut samples = vec![0.0_f32; (duration_seconds * SAMPLE_RATE as f32) as usize];
     let mut seed = 0x2545_f491_u32;
@@ -230,7 +253,7 @@ fn rust_profile_serializes_the_shared_camel_case_schema() {
     let payload = serde_json::to_value(profile).unwrap();
 
     assert_eq!(payload["schemaVersion"], 1);
-    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v3");
+    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v4");
     assert!(payload.get("measurementVersion").is_some());
     assert!(payload.get("integratedLufs").is_some());
     assert!(payload.get("activeStartMs").is_some());

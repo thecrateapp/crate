@@ -152,7 +152,7 @@ def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> 
 
     profile = analyze_mix_profile(track)
 
-    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v3"
+    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v4"
     assert profile.intro_lufs is None
     assert profile.outro_lufs is None
     assert profile.integrated_lufs is None

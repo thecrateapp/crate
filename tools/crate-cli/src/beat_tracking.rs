@@ -22,6 +22,11 @@ const CHROMA_MAX_HZ: f32 = 5_000.0;
 const DOWNBEAT_WINDOW_FRAMES: usize = 2;
 const DOWNBEAT_MIN_BEATS: usize = 16;
 const DOWNBEAT_MARGIN: f32 = 0.3;
+const REFINE_LOOKBACK_MS: f64 = 46.0;
+const REFINE_LOOKAHEAD_MS: f64 = 12.0;
+const REFINE_WINDOW_MS: f64 = 2.0;
+const REFINE_RISE_MS: usize = 3;
+const REFINE_MIN_RISE: f64 = 0.5;
 
 fn hz_to_mel(hz: f32) -> f32 {
     let f_sp = 200.0 / 3.0;
@@ -530,6 +535,58 @@ pub fn track_beats(onsets: &[f32], sample_rate: u32) -> Vec<usize> {
     trim_weak_beats(&local, beats)
 }
 
+/// Places each tracked beat on the attack of its onset with millisecond precision.
+///
+/// Beats come out of the hop-sized onset envelope, so they are quantised to ~23 ms
+/// and lag the attack by the envelope's alignment. Each beat is moved to the
+/// steepest rise of short-window log energy shortly before its frame; beats
+/// without a clear attack keep their frame time.
+pub fn refine_beat_times_ms(samples: &[f32], sample_rate: u32, beat_frames: &[usize]) -> Vec<u64> {
+    if sample_rate == 0 {
+        return Vec::new();
+    }
+    let rate = f64::from(sample_rate);
+    let step = (rate / 1_000.0).round().max(1.0) as usize;
+    let step_ms = step as f64 * 1_000.0 / rate;
+    let window = ((REFINE_WINDOW_MS * rate / 1_000.0) as usize).max(1);
+    let energy: Vec<f64> = (0..samples.len() / step)
+        .map(|index| {
+            let start = index * step;
+            let end = (start + window).min(samples.len());
+            let sum: f64 = samples[start..end]
+                .iter()
+                .map(|value| f64::from(*value) * f64::from(*value))
+                .sum();
+            (sum / (end - start).max(1) as f64 + 1e-12).ln()
+        })
+        .collect();
+    let mut refined = Vec::with_capacity(beat_frames.len());
+    let mut previous: Option<u64> = None;
+    for frame in beat_frames {
+        let frame_ms = *frame as f64 * HOP_SIZE as f64 * 1_000.0 / rate;
+        let from =
+            (((frame_ms - REFINE_LOOKBACK_MS).max(0.0) / step_ms) as usize).max(REFINE_RISE_MS);
+        let to = (((frame_ms + REFINE_LOOKAHEAD_MS) / step_ms) as usize)
+            .min(energy.len().saturating_sub(1));
+        let best = (from..=to)
+            .filter(|index| *index < energy.len())
+            .map(|index| (index, energy[index] - energy[index - REFINE_RISE_MS]))
+            .max_by(|left, right| left.1.total_cmp(&right.1));
+        let mut position = match best {
+            Some((index, rise)) if rise >= REFINE_MIN_RISE => {
+                (index as f64 * step_ms).round() as u64
+            }
+            _ => frame_ms.round() as u64,
+        };
+        if let Some(last) = previous {
+            position = position.max(last + 1);
+        }
+        previous = Some(position);
+        refined.push(position);
+    }
+    refined
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,6 +607,62 @@ mod tests {
             time += step;
         }
         samples
+    }
+
+    #[test]
+    fn refined_beats_land_on_the_click_attacks() {
+        let samples = clicks(120.0, 30.0);
+        let onsets = onset_strength(&samples, SAMPLE_RATE);
+        let beats = track_beats(&onsets, SAMPLE_RATE);
+
+        let refined = refine_beat_times_ms(&samples, SAMPLE_RATE, &beats);
+
+        assert_eq!(refined.len(), beats.len());
+        let errors: Vec<f64> = refined
+            .iter()
+            .map(|position| {
+                let beat = (*position as f64 / 500.0).round() * 500.0;
+                *position as f64 - beat
+            })
+            .collect();
+        let mean = errors.iter().sum::<f64>() / errors.len() as f64;
+        let worst = errors
+            .iter()
+            .fold(0.0_f64, |acc, value| acc.max(value.abs()));
+        assert!(mean.abs() <= 2.0, "mean bias {mean} ms");
+        assert!(worst <= 3.0, "worst error {worst} ms");
+    }
+
+    #[test]
+    fn frame_beats_lag_the_attacks_they_are_refined_from() {
+        let samples = clicks(120.0, 30.0);
+        let beats = track_beats(&onset_strength(&samples, SAMPLE_RATE), SAMPLE_RATE);
+        let mean_lag = beats
+            .iter()
+            .map(|frame| {
+                let ms = *frame as f64 * HOP_SIZE as f64 * 1_000.0 / f64::from(SAMPLE_RATE);
+                ms - (ms / 500.0).round() * 500.0
+            })
+            .sum::<f64>()
+            / beats.len() as f64;
+
+        assert!(mean_lag > 5.0, "frame beats lag by {mean_lag} ms");
+    }
+
+    #[test]
+    fn beats_without_an_attack_keep_their_frame_time() {
+        let silence = vec![0.0_f32; SAMPLE_RATE as usize * 4];
+
+        let refined = refine_beat_times_ms(&silence, SAMPLE_RATE, &[43, 86]);
+
+        let expected: Vec<u64> = [43_u64, 86]
+            .iter()
+            .map(|frame| {
+                ((*frame as f64) * HOP_SIZE as f64 * 1_000.0 / f64::from(SAMPLE_RATE)).round()
+                    as u64
+            })
+            .collect();
+        assert_eq!(refined, expected);
     }
 
     #[test]
