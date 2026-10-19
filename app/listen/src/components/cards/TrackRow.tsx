@@ -3,8 +3,9 @@ import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { TrackRowContent } from "./TrackRowContent";
 import {
   formatTrackAnalysis,
-  formatTrackQuality,
+  formatMusicalKey,
 } from "@crate/ui/lib/track-meta";
+import { getQualityBadge } from "../player/bar/player-bar-utils";
 import { memo, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -68,16 +69,15 @@ export const TrackRow = memo(function TrackRow({
   });
   const isActive = isActiveOverride ?? currentTrack?.id === model.playbackId;
   const compact = density === "compact";
-  const analysis = formatTrackAnalysis(
-    track.bpm,
-    track.audio_key,
-    track.audio_scale,
-  );
-  const quality = formatTrackQuality(
-    track.format,
-    track.bit_depth,
-    track.sample_rate,
-  );
+  const tempo = formatTrackAnalysis(track.bpm);
+  const musicalKey = formatMusicalKey(track.audio_key, track.audio_scale);
+  const quality = getQualityBadge({
+    format: track.format,
+    path: track.path,
+    bitrate: track.bitrate,
+    bitDepth: track.bit_depth,
+    sampleRate: track.sample_rate,
+  });
   const playback = useTrackRowPlayback({
     disabled: model.disabled,
     isActive,
@@ -188,7 +188,8 @@ export const TrackRow = memo(function TrackRow({
         }
         meta={meta}
         quality={quality}
-        analysis={analysis}
+        tempo={tempo}
+        musicalKey={musicalKey}
         explicitLabel={track.explicit ? t("trackRow.explicit") : undefined}
         provenance={
           model.isRemote && (track.node_name || track.node_uid) ? (

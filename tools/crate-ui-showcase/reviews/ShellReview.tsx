@@ -84,7 +84,7 @@ function ReviewTrack({ title, index }: { title: string; index: number }) {
           </div>
         }
         duration="3:24"
-        quality="FLAC"
+        quality={{ label: "FLAC", tier: "lossless", detail: "FLAC" }}
         leading={
           <TrackRowPlaybackControl
             index={index + 1}

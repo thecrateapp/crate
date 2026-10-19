@@ -12,6 +12,7 @@ import {
   type ShowActionInput,
 } from "@/components/actions/show-actions";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
 import {
@@ -153,6 +154,10 @@ export const ShowCard = memo(function ShowCard({
         ) : (
           <>
             <UpcomingShowExpandedView
+              artistHref={artistPagePath({
+                artistId: item.artist_id,
+                artistSlug: item.artist_slug,
+              })}
               item={item}
               attending={attending}
               savingAttendance={savingAttendance}

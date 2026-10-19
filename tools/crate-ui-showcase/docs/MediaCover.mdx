@@ -7,7 +7,7 @@ import { DocHeading } from "../components/DocHeading";
 <DocHeading as="h1">MediaCover</DocHeading>
 <EntryDetails
   id="domain-media-mediacover"
-  review="Visual review approved · 1AW"
+  review="1AW approved · compact avatar distinction under review in 1BA"
 />
 <DocHeading as="h2">Contract</DocHeading>
 
@@ -37,5 +37,7 @@ real shared components. Local1AV evidence is separate from adoption on all route
 Legacy managed/raw frames use the shared `crate-media-thumbnail` minimum recipe until their
 owning page adopts MediaCover. TrackCoverThumb deliberately retains ArtworkSurface/CrateImage;
 wrapping that renderer in an auto-height frame caused invisible artwork and was withdrawn.
+Compact artist identity beside a name uses EntityAvatar instead:24px in album bylines and28px
+in the player, preserving V2. Circular standalone artist media still keep the48px minimum.
 The focused browser fixture mounts the actual Listen renderer and checks decoded, visible48px
 artwork in both densities. It does not certify production credentials or every native runtime.

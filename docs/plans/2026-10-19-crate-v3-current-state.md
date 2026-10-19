@@ -7,18 +7,19 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                  | Estado vigente                                                                                                                                                              |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace                 | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado                 | 1AY aprobado y publicado: `81665c5c`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
-| Checkpoint local          | **1AZ local para revisión**: reproductor, cola y relojes de UI; sin commit/push                                                                                             |
+| Publicado                 | 1AZ aprobado y publicado: `18a880c2`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
+| Checkpoint local          | **1BA local para revisión**: Álbum, acceso y primer recorrido offline; sin commit/push                                                                                             |
+| Enmiendas de revisión     | Columnas fijas y QualityBadge común a hero/fila/player; porcentajes GenrePill en shows del artista. Backend local conserva calidad en Top Tracks; producción requiere desplegar esa corrección. |
 | Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.                           |
-| Revisión actual           | `http://127.0.0.1:5186/review-1az-player.html`; misma escena en Storybook `Reviews/1AZ/Player`; Listen vivo en5174                                                          |
+| Revisión actual           | `http://127.0.0.1:5186/review-1ba-artist-player.html`; misma escena en Storybook `Reviews/1BA/Artist and player refinements`; revisiones player-motion y album-access conservadas; Listen vivo en5174 |
 | Auditoría                 | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                   | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1az-player--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                        |
+| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1ba-artist-player--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                      |
 | Próximo grupo de iconos   | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia    | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica        | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente          | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción               | 1AY publicado81665c5c. Parar en1AZ para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
+| Restricción               | 1AZ publicado18a880c2. Parar en1BA para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -764,3 +765,84 @@ fuentes válido. Servicios5186/6006/5174 activos y HTTP200. Stop local1AZ sin co
 Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
 Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
 las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.
+
+
+## 1BA local — Álbum, acceso y primer recorrido offline
+
+1AZ aprobado y publicado en18a880c2, confirmado enorigin/feat/crate_v3. Plan [1BA](2026-10-19-crate-v3-album-access.md).
+AuthFrame/CredentialsForm, ServerSetupView/AuthCallbackView consumen FormField/Input/Button
+sin overrides de etiqueta, altura o glass; preservan cookie/sesión segura, espera de persistencia,
+invite-only, server probe y deep links. AlbumHeroFrame conserva la composición móvil/nativa
+medida; AlbumActionsView y AlbumSelectionToolbar son las piezas reales de la escena. Countdown
+sólido con MonoLabel/StatNumber; avisos con superficies/roles y acciones canónicas. Artist→Album/
+TopTracks usa SectionHeader, MediaGrid y TrackList; helpers local/global/legacy intactos.
+
+Dos fallos funcionales confirmados y corregidos con RED→GREEN: errores de lectura dejaban un
+“not found” falso sin retry; la conversión Album→Track descartaba length_sec que la API ya entrega.
+OfflineLibraryView conserva solo grupos de archivos verificados; seek/ring leen el reloj en hojas,
+transportes sin pista deshabilitados y EmptyState real. El recorrido instrumentado completo usa
+Login→LibraryAlbumsTab→Album→play/seek→QueuePanel→SavedAlbumsProvider→offline verificado→reconexión,
+con límites API/player/storage controlados. No equivale a una descarga nativa ni a writes de prod.
+
+Revisión pequeña5186 y Storybook Reviews/1BA/Album and access reutilizan la misma escena de
+componentes locales reales; catálogo shared53/93/120 sin nuevas fuentes compartidas. No se añade
+al mockup histórico. Presupuestos de raw buttons82→78 y dos excepciones tipográficas retiradas.
+Validación final y revisión independiente se registran debajo antes de la entrega. No commit1BA.
+
+
+### Validación final1BA
+
+182pruebas Listen en34archivos,28guardas shared en4archivos y26Desktop en2archivos:236casos
+focalizados verdes.4casos Playwright verdes (Storybook/standalone × desktop/mobile): acceso
+pendiente/error/invite, selección y feedback real de menú, pre-release sin play, import con
+confirmación, lista offline nombrada, teclado/seek, vacío,8px entre caption/control,40/44px forms,
+48px covers y acciones44px; sin overflow. Caso adicional de semántica/nombre/teclado offline
+RED→GREEN. Recorrido instrumentado completo verde; no engine/storage nativo real.
+
+Tipos Listen/shared/Desktop/Storybook y lint de todos los TS/TSX afectados (0warnings) verdes.
+Builds Listen, Storybook y preview verdes; input1BA incluido. Inicial Listen202193Bgzip/307200
+de presupuesto,24assets. Catálogo53documentadas/93entradas/120fuentes válido.
+Evidencia en.artifacts/review/1ba-*; captura review1ba-review.jpg y álbum vivo1ba-live-album.jpg.
+Listen autenticado: Nights Of Lust, portada real cargada280px/título sin recorte; artista real con
+Albums/Top Tracks y los dos grids comprobado sin play ni escrituras de producción.
+
+Revisión independiente: ninguna crítica; importante de accesibilidad offline resuelta; menor
+de cobertura promovida por completitud y resuelta con frames reales de artista/pending access.
+No menores diferidos. Comparación/ejecución independiente, AT, dispositivos y writes/reconexión
+de producción no certificados por el revisor; autor verifica contratos y navegador descritos.
+Conservada composición nativa existente, pendiente QA real; ver reglas/decisiones en plan1BA.
+Tres servicios5186/6006/5174 activos.1BA sin commit/push: detenerse para revisión de Diego.
+
+
+Enmiendas de revisión1BA: metadatos de pistas en columnas reservadas y QualityBadge real;
+perfil de géneros de shows con porcentajes y8px tras el mes; EntityAvatar24px en byline de
+álbum y28px en reproductor, manteniendo miniaturas48px. Ver evidencia y límite de API Top Tracks
+en el [plan1BA](2026-10-19-crate-v3-album-access.md). Sin commit/push; tres previews activos.
+
+Enmienda posterior1BA: vuelve hover solo a TrackRow habilitado con ratón; selección comparte
+la superficie HairlineRow y su marcador, Suggested usa TrackList/TrackRow y ambos niveles de
+Collection comparten44px. Escenas de revisión TrackInteractions/CollectionNavigation añadidas.
+Parar para Diego antes de commit; ver comprobaciones y límites en el plan1BA.
+
+Última enmienda1BA: giro del disco continuo mediante animación nativa, sin reanclaje ante
+correcciones ordinarias de reloj; conserva fase en pausa/buffering/jog y respeta movimiento
+reducido. Modos como acciones icon-only44px sin marco, accent/blanco; Collection abierto en
+sus rutas. Nueva revisión pequeña player-motion en5186/6006 con las piezas reales.98Listen
+(4skips previos),11guardas,50Desktop y15casos navegador verdes, tipos/lint/builds verdes;
+inicial202228Bgzip/307200,24assets. Detalle y límites en el plan1BA. Tres servicios activos;
+checkpoint completo sigue local para revisión, sin commit/push.
+
+Último ajuste1BA solicitado por Diego: discografía con escalaV2 (MediaGrid comfortable2/3/4/5,
+gap16px), ModalBody a todo el ancho, acceso alEQ independiente de activación, cabecera sin
+rótulo añadido y Lyrics fullscreen sin fondo degradado. Revisión actual artist-player y fichas
+relacionadas actualizadas.81Listen/66shared/11Admin/50Desktop y16casos de navegador verdes;
+tipos/lint/builds y catálogo53/93/120 verdes. Inicial202228Bgzip/307200. Evidencia con Placebo
+y player real en el plan1BA; mismas limitaciones nativas/AT/producción. Tres previews activos,
+sin commit/push y sin avanzar de checkpoint.
+
+
+## 2026-10-19 — 1BA aprobado; publicación autorizada
+
+Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
+usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
+manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.

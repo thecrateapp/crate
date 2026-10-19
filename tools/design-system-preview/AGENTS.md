@@ -8,7 +8,9 @@ named `review-<checkpoint>-<scope>.html`. Reuse a scene from
 or import Storybook runtime/CSF into the standalone page. Keep older checkpoints available.
 Component inventory/docs remain mandatory in Storybook. Match the view against the complete
 approved checkpoint scope before sharing, including all component families and agreed states.
-Current review: `review-1az-player.html`. The approved forms review and its labels alias remain available.
+Current amendment review: `review-1ba-artist-player.html`; `review-1ba-player-motion.html`
+retains the disc/navigation amendment, and the full1BA scope remains in
+`review-1ba-album-access.html`. The approved forms review and its labels alias remain available.
 
 Existing scenes import actual `@crate/ui` components. Auxiliary fixture controls also use
 FormField/Input/Checkbox/Select/etc.; never add raw input/select/textarea copies. The shared

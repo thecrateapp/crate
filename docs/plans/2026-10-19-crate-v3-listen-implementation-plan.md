@@ -291,3 +291,20 @@ las mismas piezas reales; Listen autenticado sigue activo. Detención antes de c
 Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
 Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
 las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.
+
+
+## 2026-10-19 — 1AZ publicado;1BA local para revisión
+
+1AZ aprobado/publicado18a880c2.1BA aplica el alcance H1 de Álbum, acceso y primer recorrido
+offline; conserva native/auth/engine/route contracts, usa shared forms/headers/rows/actions y
+actualiza Storybook con las piezas reales. [Plan y límites](2026-10-19-crate-v3-album-access.md),
+[estado vigente](2026-10-19-crate-v3-current-state.md). Revisión pequeña review-1ba-album-access.html,
+Storybook Reviews/1BA/Album and access; tres servicios activos. Stop1BA sin commit/push para Diego.
+No certifica dispositivos nativos, AT, escrituras reales ni cierra toda la migración de Listen.
+
+
+## 2026-10-19 — 1BA aprobado; publicación autorizada
+
+Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
+usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
+manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.

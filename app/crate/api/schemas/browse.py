@@ -184,6 +184,9 @@ class ArtistTopTrackResponse(IdentityFieldsMixin):
     duration: float | int
     track: int | str
     format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
     bpm: float | None = None
     audio_key: str | None = None
     audio_scale: str | None = None

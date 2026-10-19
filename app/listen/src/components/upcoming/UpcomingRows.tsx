@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { UpcomingMonthGroupView } from "./UpcomingMonthGroupView";
 
 import { ReleaseRow } from "@/components/upcoming/ReleaseRow";
 import { ShowCard } from "@/components/upcoming/ShowCard";
@@ -38,38 +38,33 @@ export function UpcomingMonthGroup({
   >({});
 
   return (
-    <div className="space-y-2">
-      <MonoLabel as="div" className="border-b border-border-quiet pb-2">
-        {formatMonthLabel(month)}
-      </MonoLabel>
-      <div className="space-y-2">
-        {items.map((item, index) => {
-          const key = itemKey(item, index);
-          const itemWithOverrides =
-            attendanceOverrides[key] == null
-              ? item
-              : { ...item, user_attending: attendanceOverrides[key] };
+    <UpcomingMonthGroupView label={formatMonthLabel(month)}>
+      {items.map((item, index) => {
+        const key = itemKey(item, index);
+        const itemWithOverrides =
+          attendanceOverrides[key] == null
+            ? item
+            : { ...item, user_attending: attendanceOverrides[key] };
 
-          if (item.type === "show") {
-            return (
-              <ShowCard
-                key={key}
-                item={itemWithOverrides}
-                expanded={expandedId === key}
-                onToggle={() => onToggleExpand(expandedId === key ? null : key)}
-                onAttendanceChange={(attending) => {
-                  setAttendanceOverrides((current) => ({
-                    ...current,
-                    [key]: attending,
-                  }));
-                }}
-              />
-            );
-          }
+        if (item.type === "show") {
+          return (
+            <ShowCard
+              key={key}
+              item={itemWithOverrides}
+              expanded={expandedId === key}
+              onToggle={() => onToggleExpand(expandedId === key ? null : key)}
+              onAttendanceChange={(attending) => {
+                setAttendanceOverrides((current) => ({
+                  ...current,
+                  [key]: attending,
+                }));
+              }}
+            />
+          );
+        }
 
-          return <ReleaseRow key={key} item={itemWithOverrides} />;
-        })}
-      </div>
-    </div>
+        return <ReleaseRow key={key} item={itemWithOverrides} />;
+      })}
+    </UpcomingMonthGroupView>
   );
 }

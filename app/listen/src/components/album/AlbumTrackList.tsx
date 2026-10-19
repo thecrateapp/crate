@@ -1,12 +1,10 @@
+import { AlbumSelectionToolbar } from "./AlbumSelectionToolbar";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { TrackList } from "@crate/ui/domain/tracks/TrackList";
 import type { RefObject, MouseEvent } from "react";
 import type { TFunction } from "i18next";
 
-import { AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
-import { CRATE_ICON_SIZE, Disc, ListPlus, X } from "@crate/ui/icons";
-import { IconButton } from "@crate/ui/primitives/IconButton";
-import { Button } from "@crate/ui/shadcn/button";
+import { CRATE_ICON_SIZE, Disc } from "@crate/ui/icons";
 
 import {
   ContextMenu,
@@ -131,75 +129,16 @@ export function AlbumTrackList({
   return (
     <div className="mx-auto w-full max-w-content px-4 pb-8 sm:px-6">
       {isDesktop && selectedAlbumTracks.length > 0 ? (
-        <div
-          ref={selectionBarRef}
-          className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-lg p-3 "
-        >
-          <div className="mr-auto min-w-0 px-1">
-            <p className="text-sm font-semibold text-text-primary">
-              {t("common.selectedCount", { count: selectedAlbumTracks.length })}
-            </p>
-            <p className="text-xs text-text-muted">
-              {t("album.selection.doubleClickHint")}
-            </p>
-          </div>
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              shape="pill"
-              className="h-9 text-xs"
-              onClick={onToggleSelectionPlaylistPicker}
-            >
-              <ListPlus size={CRATE_ICON_SIZE.xs} />
-              {t("playlist.actions.addToPlaylist")}
-            </Button>
-            {selectionPlaylistPickerOpen ? (
-              <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-panel">
-                <div className="p-1.5">
-                  <button
-                    type="button"
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-primary transition-colors hover:bg-text-primary/5"
-                    onClick={onCreatePlaylistFromSelection}
-                  >
-                    {t("playlist.actions.addNew")}
-                  </button>
-                  {playlists.length > 0 ? (
-                    <AppPopoverDivider className="mx-1" />
-                  ) : null}
-                  {playlists.map((playlist) => (
-                    <button
-                      key={playlist.id}
-                      type="button"
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-text-muted transition-colors hover:bg-text-primary/5 hover:text-text-primary"
-                      onClick={() => void onAddSelectedToPlaylist(playlist.id)}
-                    >
-                      {playlist.name}
-                    </button>
-                  ))}
-                </div>
-              </AppPopover>
-            ) : null}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            shape="pill"
-            className="h-9 text-xs"
-            onClick={onCreatePlaylistFromSelection}
-          >
-            {t("playlist.actions.create")}
-          </Button>
-          <IconButton
-            label={t("album.selection.clear")}
-            variant="card"
-            size="sm"
-            className="size-9"
-            onClick={onClearSelection}
-          >
-            <X size={CRATE_ICON_SIZE.xs} />
-          </IconButton>
-        </div>
+        <AlbumSelectionToolbar
+          selectedCount={selectedAlbumTracks.length}
+          playlists={playlists}
+          selectionPlaylistPickerOpen={selectionPlaylistPickerOpen}
+          selectionBarRef={selectionBarRef}
+          onToggleSelectionPlaylistPicker={onToggleSelectionPlaylistPicker}
+          onCreatePlaylistFromSelection={onCreatePlaylistFromSelection}
+          onAddSelectedToPlaylist={onAddSelectedToPlaylist}
+          onClearSelection={onClearSelection}
+        />
       ) : null}
 
       <ContextMenu

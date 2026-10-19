@@ -24,8 +24,15 @@ for (const host of hosts) {
     await nav.getByRole("button", { name: "Collection", exact: true }).click();
     const links = nav.locator("li a");
     await expect(links).toHaveCount(7);
-    for (const link of await links.all())
-      expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const parentHeight = (await nav
+      .getByRole("button", { name: "Collection", exact: true })
+      .boundingBox())!.height;
+    for (const link of await links.all()) {
+      expect((await link.boundingBox())!.height).toBe(parentHeight);
+      expect((await link.locator("..").boundingBox())!.height).toBe(
+        parentHeight,
+      );
+    }
     await expect(
       nav.getByRole("link", { name: "Albums", exact: true }),
     ).toHaveAttribute("aria-current", "page");

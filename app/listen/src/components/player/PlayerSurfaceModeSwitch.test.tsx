@@ -18,14 +18,12 @@ vi.mock("react-i18next", () => ({
 import { PlayerSurfaceModeSwitch } from "./PlayerSurfaceModeSwitch";
 
 describe("PlayerSurfaceModeSwitch", () => {
-  it("shares the chip recipe and exposes the selected player mode as a radio", () => {
-    render(
-      <PlayerSurfaceModeSwitch mode="cd" onChange={vi.fn()} variant="boxed" />,
-    );
+  it("uses unboxed canonical icon actions and exposes the selected player mode as a radio", () => {
+    render(<PlayerSurfaceModeSwitch mode="cd" onChange={vi.fn()} />);
 
     expect(
       screen.getByRole("radiogroup", { name: "Player surface" }),
-    ).toHaveAttribute("data-slot", "segmented-control");
+    ).not.toHaveAttribute("data-slot", "segmented-control");
     expect(screen.getByRole("radio", { name: "CD" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "CD" })).toHaveAttribute(
       "data-state",
@@ -33,9 +31,16 @@ describe("PlayerSurfaceModeSwitch", () => {
     );
     expect(screen.getByRole("radio", { name: "Cover" })).not.toBeChecked();
     for (const radio of screen.getAllByRole("radio")) {
-      expect(radio).toHaveClass("crate-form-chip");
-      expect(radio).toHaveAttribute("data-slot", "chip");
+      expect(radio).toHaveAttribute("data-slot", "button");
+      expect(radio).toHaveAttribute("data-variant", "ghost");
+      expect(radio).not.toHaveClass("crate-form-chip");
     }
+    expect(
+      screen.getByRole("radio", { name: "CD" }).querySelector("svg"),
+    ).toHaveClass("text-accent-action-hi");
+    expect(
+      screen.getByRole("radio", { name: "Cover" }).querySelector("svg"),
+    ).toHaveClass("text-text-primary");
   });
 
   it("notifies the selected mode and preserves the visualizer capability gate", () => {

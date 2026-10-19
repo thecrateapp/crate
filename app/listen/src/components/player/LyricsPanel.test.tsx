@@ -73,7 +73,7 @@ describe("lyrics surfaces", () => {
 
     expect(
       container.querySelector(".lyrics-surface-gradient"),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(activeLine).toHaveAttribute("aria-current", "true");
     expect(activeLine).toHaveClass("listen-lyric-line");
     expect(container.innerHTML).not.toContain("rgba(");

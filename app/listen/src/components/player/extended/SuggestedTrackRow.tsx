@@ -1,7 +1,8 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-
-import { formatDuration } from "@/lib/utils";
-
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { TrackRow } from "@/components/cards/TrackRow";
+import { toTrackRowData } from "@/lib/track-row-data";
 import type { SimilarTrack } from "./use-suggested-tracks";
 
 export function SuggestedTrackRow({
@@ -13,41 +14,31 @@ export function SuggestedTrackRow({
   index: number;
   onPlay: (track: SimilarTrack) => void;
 }) {
-  const { t } = useTranslation();
-  const trackKey = track.track_entity_uid ?? track.track_id ?? track.path;
-
+  const { t, i18n } = useTranslation();
+  const rowTrack = useMemo(() => toTrackRowData(track), [track]);
+  const percentage =
+    typeof track.score === "number" && Number.isFinite(track.score)
+      ? new Intl.NumberFormat(i18n.language, { style: "percent" }).format(
+          Math.max(0, Math.min(1, track.score)),
+        )
+      : null;
   return (
-    <button
-      type="button"
-      key={trackKey}
-      onClick={() => onPlay(track)}
-      className="group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors "
-    >
-      <span className="w-4 shrink-0 text-right text-xs tabular-nums text-text-primary/20">
-        {index + 1}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.75rem] text-text-primary/80">
-          {track.title}
-        </p>
-        <p className="truncate text-xs text-text-primary/40">
-          {track.artist} — {track.album}
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="text-xs tabular-nums text-text-primary/40">
-          {formatDuration(track.duration)}
-        </span>
-        <div className="h-1 w-12 overflow-hidden rounded-full bg-text-primary/5">
-          <div
-            className="h-full rounded-full bg-accent-action/60"
-            style={{ width: `${Math.min(track.score * 100, 100)}%` }}
-          />
-        </div>
-      </div>
-      <span className="sr-only">
-        {t("player.suggested.playSource", { title: track.title })}
-      </span>
-    </button>
+    <TrackRow
+      track={rowTrack}
+      albumCover={track.albumCover ?? track.album_cover ?? undefined}
+      rank={index + 1}
+      density="compact"
+      showCoverThumb
+      showArtist
+      showAlbum
+      onPlayOverride={() => onPlay(track)}
+      meta={
+        percentage ? (
+          <InfoBadge>
+            {t("player.queue.suggested")} · {percentage}
+          </InfoBadge>
+        ) : undefined
+      }
+    />
   );
 }

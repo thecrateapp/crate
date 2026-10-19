@@ -261,36 +261,6 @@
   background: var(--_lyrics-ambient-glow);
 }
 
-.lyrics-surface-gradient {
-  --_lyrics-surface-gradient: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-action) 12%, transparent) 0%,
-    transparent 28%,
-    transparent 72%,
-    color-mix(in srgb, var(--accent-action) 6%, transparent) 100%
-  );
-  background: var(--_lyrics-surface-gradient);
-}
-
-.lyrics-fullscreen-backdrop {
-  --_lyrics-fullscreen-backdrop: radial-gradient(
-      circle at 18% 20%,
-      color-mix(in srgb, var(--accent-action) 20%, transparent),
-      transparent 32%
-    ),
-    radial-gradient(
-      circle at 84% 56%,
-      color-mix(in srgb, var(--state-info) 24%, transparent),
-      transparent 44%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-elevated) 22%, transparent),
-      color-mix(in srgb, var(--surface-canvas) 86%, transparent)
-    );
-  background: var(--_lyrics-fullscreen-backdrop);
-}
-
 .lyrics-active-line {
   --_lyrics-active-text-shadow: 0 0 20px var(--accent-action-glow);
   text-shadow: var(--_lyrics-active-text-shadow);
@@ -3235,7 +3205,8 @@ button.genre-pill:hover,
 }
 
 .crate-overlay-body {
-  max-width: 60ch;
+  min-width: 0;
+  width: 100%;
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.6;
@@ -3846,6 +3817,13 @@ label
 }
 
 /* V3 track rows and media: shared geometry, no cover lift or shadow. */
+.crate-row-highlight {
+  background-image: linear-gradient(
+    to right in oklab,
+    color-mix(in oklab, var(--accent-action) 8%, transparent),
+    transparent
+  );
+}
 .crate-track-list {
   --content-list-gap: 0px;
   border-top: 1px solid var(--border-quiet);
@@ -3862,11 +3840,13 @@ label
 .track-row[data-density="compact"] {
   min-height: 52px;
 }
-.track-row[data-active="true"],
-.track-row[data-selected="true"] {
-  background: color-mix(in srgb, var(--accent-action) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .track-row:not([data-disabled="true"]):hover {
+    background-color: color-mix(in srgb, var(--accent-action) 4%, transparent);
+  }
 }
 .track-row[data-active="true"]::before,
+.track-row[data-selected="true"]::before,
 .crate-entity-row[data-active="true"]::before {
   content: "";
   position: absolute;
@@ -3963,6 +3943,50 @@ label
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-subtle);
+  display: none;
+}
+
+/* A row owns its metadata columns. Missing values leave an empty slot; badge
+   anatomy stays with InfoBadge. Narrow queues use the same container contract. */
+.crate-track-metadata {
+  display: grid;
+  grid-template-columns: 3.5rem 44px 44px;
+  align-items: center;
+  gap: var(--content-row-gap);
+  flex: none;
+  font: 400 var(--type-meta-size) / 16px var(--font-mono-stack);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.crate-track-quality-slot,
+.crate-track-analysis-slot {
+  display: none;
+  min-width: 0;
+}
+.crate-track-metadata .crate-track-analysis {
+  display: grid;
+  grid-template-columns: 4ch 1ch 4ch;
+  column-gap: 0.5ch;
+  align-items: center;
+}
+.crate-track-bpm,
+.crate-track-duration {
+  text-align: right;
+  white-space: nowrap;
+}
+.crate-track-key {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crate-track-duration {
+  font-size: 0.75rem;
+}
+.crate-track-control-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
 }
 .crate-track-source-ring {
   display: inline-block;
@@ -4095,30 +4119,28 @@ label
   .crate-track-table td {
     padding-inline: 6px;
   }
-  .track-row > .crate-track-quality:not(.crate-track-explicit) {
-    display: none;
-  }
 }
 
 /* Metadata follows the row's actual container, including narrow desktop queue/recommendation rows. */
-.track-row > .crate-track-quality:not(.crate-track-explicit),
-.track-row > .crate-track-analysis,
-.track-row > .crate-track-provenance {
-  display: none;
-}
 @container crate-track (min-width: 480px) {
-  .track-row > .crate-track-quality:not(.crate-track-explicit) {
-    display: inline-flex;
+  .crate-track-metadata {
+    grid-template-columns: 9.5rem 3.5rem 44px 44px;
+  }
+  .crate-track-quality-slot {
+    display: block;
   }
 }
 @container crate-track (min-width: 620px) {
-  .track-row > .crate-track-analysis {
-    display: inline;
+  .crate-track-metadata {
+    grid-template-columns: 9.5rem 10ch 3.5rem 44px 44px;
+  }
+  .crate-track-analysis-slot {
+    display: block;
   }
 }
 @container crate-track (min-width: 800px) {
-  .track-row > .crate-track-provenance {
-    display: inline;
+  .crate-track-provenance {
+    display: block;
   }
 }
 .crate-track-table td.font-mono,

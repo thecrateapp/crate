@@ -4,22 +4,8 @@ import { useMediaAccessVersion } from "@/hooks/use-media-access-version";
 import { ApiError, api, apiSseUrl } from "@/lib/api";
 import { cacheInvalidate } from "@/lib/cache";
 
-export type RemoteImportStatus =
-  | "idle"
-  | "requesting"
-  | "requested"
-  | "awaiting_approval"
-  | "approved"
-  | "reserving"
-  | "downloading"
-  | "verifying"
-  | "importing"
-  | "completed"
-  | "cancelled"
-  | "failed"
-  | "cleaned"
-  | "offline"
-  | "forbidden";
+import type { RemoteImportStatus } from "../lib/remote-import-types";
+export type { RemoteImportStatus } from "../lib/remote-import-types";
 
 export interface RemoteImportRequest {
   request_id: string;

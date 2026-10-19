@@ -37,10 +37,9 @@ describe("shared row interaction contract", () => {
         );
     }
   });
-  it("retains selection while row recipes add no hover background", () => {
+  it("keeps non-track row recipes without pointer illumination", () => {
     for (const [path, selector] of [
       ["tokens/interactive.css", ".interactive-row:hover"],
-      ["tokens/recipes.css", '.track-row:not([data-disabled="true"]):hover'],
       ["tokens/recipes.css", ".crate-track-table tbody tr:hover"],
       ["tokens/recipes.css", ".user-profile-item:hover"],
     ]) {
@@ -67,15 +66,19 @@ describe("shared row interaction contract", () => {
     expect(fn).toContain("focus-within:bg-");
     expect(fn).toContain("bg-state-warning/");
   });
+  it("records Diego's track-row exception while preserving disabled and selection states", () => {
+    const recipes = readFileSync(
+      resolve(process.cwd(), "tokens/recipes.css"),
+      "utf8",
+    );
+    expect(recipes).toContain("@media (hover: hover) and (pointer: fine)");
+    expect(recipes).toContain('.track-row:not([data-disabled="true"]):hover');
+    expect(recipes).toContain(
+      "background-color: color-mix(in srgb, var(--accent-action) 4%, transparent)",
+    );
+    expect(recipes).toContain('.track-row[data-selected="true"]::before');
+    expect(recipes).toContain(".crate-row-highlight");
+  });
 });
 
-it("retains pointer feedback on Add-to-playlist menu actions", () => {
-  const source = readFileSync(
-    resolve(root, "app/listen/src/components/album/AlbumTrackList.tsx"),
-    "utf8",
-  );
-  const menu = source
-    .split("{selectionPlaylistPickerOpen ? (")[1]!
-    .split("</AppPopover>")[0]!;
-  expect(menu.match(/hover:bg-text-primary\/5/g)).toHaveLength(2);
-});
+// Menu feedback is exercised on actual canonical buttons in album-access-review.spec.ts.

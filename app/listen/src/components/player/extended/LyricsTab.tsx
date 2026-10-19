@@ -4,6 +4,7 @@ import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 
 import { SyncedLyrics } from "../SyncedLyrics";
+import { PlayerLyricsSurface } from "../PlayerLyricsSurface";
 import { useLyrics } from "./use-lyrics";
 
 export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
@@ -31,7 +32,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   }
 
   return (
-    <div className="lyrics-mask lyrics-surface-gradient relative flex-1 overflow-y-auto pr-1">
+    <PlayerLyricsSurface masked className="pr-1">
       {lyrics.synced ? (
         <div
           className="space-y-1 px-1"
@@ -46,6 +47,6 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
           {lyrics.plain}
         </pre>
       ) : null}
-    </div>
+    </PlayerLyricsSurface>
   );
 }

@@ -1,3 +1,5 @@
+import { AuthFrame } from "@/components/auth/AuthFrame";
+import { AuthCallbackView } from "@/components/auth/AuthCallbackView";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -96,28 +98,13 @@ export function AuthCallback() {
   }, [loading, navigate, user]);
 
   if (desktopDeepLink) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-surface-canvas px-6 text-text-primary">
-        <div className="w-full max-w-md rounded-panel border border-border-quiet bg-text-primary/[0.04] p-8 text-center shadow-card">
-          <img
-            src="/icons/logo.svg"
-            alt="Crate"
-            className="mx-auto mb-4 size-14"
-          />
-          <h1 className="text-2xl font-bold">{t("authCallback.title")}</h1>
-          <p className="mt-3 text-sm leading-6 text-text-secondary">
-            {t("authCallback.desktopHint")}
-          </p>
-          <a
-            href={desktopDeepLink}
-            className="mt-6 inline-flex h-12 items-center justify-center rounded-full bg-accent-action px-6 text-sm font-semibold text-accent-action-foreground transition hover:bg-accent-action-hover"
-          >
-            {t("authCallback.openCrate")}
-          </a>
-        </div>
-      </div>
-    );
+    return <AuthCallbackView desktopDeepLink={desktopDeepLink} />;
   }
-
-  return null;
+  return (
+    <AuthFrame title={t("authCallback.title")} subtitle={t("auth.tagline")}>
+      <p role="status" className="text-center text-sm text-text-muted">
+        {t("common.loading")}
+      </p>
+    </AuthFrame>
+  );
 }

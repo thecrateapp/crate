@@ -193,14 +193,26 @@ placement/dimensions remain composition, not a reason to override internal typog
 MediaCover owns a48px minimum in both dimensions for standalone track/album/artist thumbnails,
 including compact rows. The shared `crate-media-thumbnail` recipe gives legacy managed/raw
 frames the same minimum until their owning page adopts MediaCover; user avatars, logos and
-internal collage tiles keep their separate roles. New media consumers use the component.
+internal collage tiles keep their separate roles. Compact artist identity beside a name also
+uses Avatar/EntityAvatar, not the thumbnail minimum: xs24px in album bylines and inline28px
+in the player, preserving V2 (Diego's1BA amendment). Circular standalone artist list/card media
+still keep48px. Size belongs to Avatar; do not add caller overrides. New media consumers use
+the component.
 EntityRow/Card own14px/500 body titles and technical mono metadata; HairlineRow remains12/18.
 Selection does not imply current playback. Optional full text wraps inside the frame. EntityCard
 profileSize owns the existing finite artist widths; do not restore local width maps.
 TrackList keeps injected virtualization at80 and stable entry keys; Grid/Rail retain native
 navigation and reserve geometry. Listen playback remains local: white18px glyph in a24px visual slot over48px cover,
 40px active ring with aura/core/effects, real coarse hit area and progress-only leaf subscriptions.
-No row hover background. Do not replace the specialized player/EQ controls.
+Track rows are Diego's1BA exception to the no-hover-fill policy: enabled rows use a4% accent
+wash for fine-pointer hover. Selected/current rows share HairlineRow's8%-to-transparent
+crate-row-highlight recipe and2px marker; selection alone never means current playback.
+Other row families retain no hover fill. Do not replace the specialized player/EQ controls.
+
+Diego's1BA amendment keeps V2 image scale by role; shared adoption must not shrink discography
+artwork. MediaGrid comfortable owns the existing2/3/4/5-column artist scale,16px gap and five
+column cap. Compact/default/wide retain their own roles. ModalBody fills its panel; the old60ch
+limit incorrectly constrained the entire layout/scroll region and must not return as a caller fix.
 
 ## Layers, feedback and minimum navigation — local1AX
 

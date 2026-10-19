@@ -7,11 +7,18 @@ import { DocHeading } from "../components/DocHeading";
 <DocHeading as="h1">EntityAvatar</DocHeading>
 <EntryDetails
   id="domain-entity-entityavatar"
-  review="Visual review approved · 1AV"
+  review="1AV approved · compact artist identity under review in 1BA"
 />
 <DocHeading as="h2">Contract</DocHeading>
 
 Composes Avatar without another size system. Ring none/accent/subtle and badge positioning are existing explicit roles. Accent uses the shared2px ring/2px offset; subtle uses1px. A supplied badgeLabel names the badge independently; the badge and image must not repeat an unrelated name. Native attributes/ref and the managed renderer reach Avatar. UserAvatar remains the Listen adapter for user-ID resolution, fallback URL order and transport. This does not declare all user/profile views migrated.
+
+Compact artist identity uses xs24px in album bylines and inline28px in the player, preserving
+V2 geometry. Listen supplies CrateImage, including its credential recovery and final-error
+callback. Adjacent visible artist text names the action, so the avatar is decorative. Loading,
+missing or failed images keep the same compact frame. Standalone artist/album/track media in
+lists and cards still use MediaCover or the legacy48px minimum recipe. Shape alone never
+determines whether a thumbnail may be compact.
 
 The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
 real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
@@ -25,5 +32,7 @@ real shared components. Local1AV evidence is separate from adoption on all route
 <Canvas of={Stories.Status} />
 
 <Canvas of={Stories.Rounded} />
+
+<Canvas of={Stories.CompactArtistIdentity} />
 
 <Controls of={Stories.Base} />

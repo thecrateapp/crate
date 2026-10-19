@@ -29,6 +29,14 @@ const meta = {
   id: "components-hairlinerow",
   title: "Components/Data Display/HairlineRow",
   component: Example,
+  parameters: {
+    docs: {
+      description: {
+        component:
+          "HairlineRow owns text-row geometry and uses the shared selection gradient. Track rows reuse the surface with their own media geometry; only track rows illuminate on pointer hover.",
+      },
+    },
+  },
 } satisfies Meta<typeof Example>;
 export default meta;
 type Story = StoryObj<typeof meta>;

@@ -34,4 +34,5 @@ export const Base: Story = {};
 
 export const Compact: Story = { args: { density: "compact" } };
 export const Wide: Story = { args: { density: "wide" } };
+export const Comfortable: Story = { args: { density: "comfortable" } };
 export const BoundedMinimum: Story = { args: { minItemWidth: 220 } };

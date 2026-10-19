@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { EntityAvatar } from "@crate/ui/domain/entity/EntityAvatar";
 import { PlayerIdentityText } from "./PlayerIdentityText";
 import { cn } from "@crate/ui/lib/cn";
 
@@ -102,18 +103,23 @@ export function PlayerTrackIdentity({
             badgeClassName,
           )}
         >
-          {artistAvatarUrl ? (
-            <CrateImage
-              src={artistAvatarUrl}
-              alt={currentTrack.artist}
-              className="crate-media-thumbnail size-12 shrink-0 rounded-full object-cover"
-              onError={onArtistAvatarError}
-            />
-          ) : (
-            <div className="crate-media-thumbnail flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-control-hover text-xs font-semibold text-text-secondary">
-              {currentTrack.artist.slice(0, 1).toUpperCase()}
-            </div>
-          )}
+          <EntityAvatar
+            src={artistAvatarUrl}
+            name={currentTrack.artist}
+            alt=""
+            size="inline"
+            renderImage={(image) => (
+              <CrateImage
+                src={image.src}
+                alt={image.alt}
+                className={image.className}
+                onError={() => {
+                  image.onError();
+                  onArtistAvatarError?.();
+                }}
+              />
+            )}
+          />
           <span
             className={cn(
               "truncate font-mono text-xs text-text-primary",

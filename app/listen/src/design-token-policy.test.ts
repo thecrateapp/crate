@@ -15,10 +15,6 @@ const DYNAMIC_ICON = /^(?:[A-Z]\w*)?Icon$/;
 
 const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "components/cards/TrackRowPlaybackControl.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
-  "components/album/ReleaseCountdown.tsx": {
-    "tracking-[-0.075em]": 1,
-    "tracking-[0.13em]": 1,
-  },
   "components/dev/TauriDevLogPanel.tsx": {
     "text-[0.65rem]": 1,
     "text-[0.68rem]": 1,
@@ -28,7 +24,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/bar/PlayerBarFrame.tsx": { "rounded-t-[2rem]": 1 },
   "components/player/extended/InfoTabPrimitives.tsx": { "text-[0.75rem]": 1 },
   "components/player/extended/LyricsTab.tsx": { "text-[0.875rem]": 1 },
-  "components/player/extended/SuggestedTrackRow.tsx": { "text-[0.75rem]": 1 },
   "components/playlists/EditorialPlaylistArtwork.tsx": {
     "rounded-[3px]": 1,
     "tracking-[-0.09em]": 1,
@@ -40,7 +35,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "pages/ExploreLandingSections.tsx": { "tracking-[-0.035em]": 1 },
   "pages/PathDetail.tsx": { "text-[0.75rem]": 1 },
   "pages/Paths.tsx": { "text-[0.75rem]": 1 },
-  "pages/ServerSetup.tsx": { "text-[0.75rem]": 1 },
   "pages/StatsCollectionPanels.tsx": {
     "text-[8.5rem]": 1,
     "tracking-[-0.12em]": 1,

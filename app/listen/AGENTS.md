@@ -131,3 +131,63 @@ owns sampling and drawing in one loop through useAudioVisualizer manual mode; st
 pipelines without an analyser show none. Preserve remote authority, Jam locks, authenticated
 artwork recovery and lazy player chunks. Both review hosts reuse these actual player views;
 app-local player components belong to Listen/Player, with no invented Admin consumer.
+
+
+## Album/access reconciliation — local 1BA
+
+AuthFrame/CredentialsForm, ServerSetupView and AuthCallbackView compose canonical shared forms
+without local label, size or glass overrides; pages own cookie/native secure session, invite,
+probe and deep-link behavior. AlbumHeroFrame preserves the tested mobile/native placement and
+measured offsets; its poster is content without a decorative chrome shadow. AlbumActionsView
+and AlbumSelectionToolbar share actual production/review actions. Countdown uses the solid
+surface and MonoLabel/StatNumber. Album queue conversion preserves the API length_sec as duration;
+read failures keep retry instead of claiming not-found. Artist entry sections use SectionHeader,
+MediaGrid and TrackList. OfflineLibraryView only receives verified groups; its progress/ring
+leaves own clock subscriptions. No app-local auth/storage/engine behavior moves to shared UI.
+
+TrackRowContent owns reserved quality/BPM/key/duration/action columns through the shared recipe;
+missing values keep their slots. Use the actual Listen QualityBadge in hero, row and player
+(Solar soundwave, tier colors, InfoBadge anatomy); never derive a track's quality from an album.
+The artist Top Tracks API must preserve per-track depth/rate/bitrate in the existing batch read.
+Show items retain optional genre_profile. Artist pages pass their already loaded canonical
+profile to that artist's shows; GenrePillRow preserves its percentages/source, including0%.
+Name-only show responses do not acquire synthetic percentages or per-row API fetches.
+
+Diego's expanded show card is the composition reference for the next Listen migrations: strong
+display title, uppercase contextual labels, real GenrePill profiles, clear content regions and
+deliberate spacing. Month/group captions use FormField kind="group": the bottom separator stays
+inside the caption and the first item begins8px below it. UpcomingMonthGroupView owns that frame.
+
+Compact artist identity beside a name uses EntityAvatar: xs24px in AlbumHero and inline28px
+in PlayerTrackIdentity, preserving V2. CrateImage retains credential recovery and only final
+errors reach the shared fallback. Adjacent artist text names the action; the avatar is decorative.
+Standalone track/album/artist list thumbnails retain48px, including circular artist media.
+Do not apply crate-media-thumbnail to compact identity avatars or override Avatar dimensions.
+
+Diego's1BA track-row amendment restores enabled fine-pointer hover illumination. TrackRowView
+and HairlineRow share crate-row-highlight for the8%-to-transparent selected/current surface;
+selected tracks get the2px marker without becoming the current track. SuggestedTab composes
+TrackList/SuggestedTrackRow -> actual TrackRow, with existing data/callbacks and no extra fetches.
+Collection children use the same listen-nav-item recipe as first-level navigation (44px),
+including collapsed popovers and mobile sheets; HairlineRow is a text-list role, not navigation.
+
+SpinningDisc uses one compositor transform animation at120deg/s, with a single RAF fallback;
+ordinary coarse media-clock corrections must not reset its visible phase. Pause, buffering,
+hidden/reduced motion and jog freeze/capture that phase; jog starts from the visible rotation
+and resumes without snapping to the audio-clock angle. Large seeks may reposition it. Keep
+artwork authentication in SpinningDiscArtwork and audio authority in the player controller.
+SpinningDiscFrame is the actual visual frame used in production and the isolated review.
+PlayerSurfaceModeSwitch uses unboxed44px ActionButton radios: active accent, other glyphs primary
+white, tooltip only, arrow/Home/End navigation. Preserve each renderer's visualizer capability
+gate and existing preference/haptic callbacks. Expanded Collection stays open on its routes;
+collapsed popovers and mobile sheets retain their normal dismissal/focus behavior.
+
+Image scale follows V2 by role, with Diego's confirmed48px thumbnail minimum and compact-artist
+24/28px exceptions. ArtistAlbumGroupFrame uses MediaGrid comfortable:2/3/4/5 columns,16px gap,
+no additional columns above1024px; compact density is not the discography default. Do not shrink
+image roles as a side effect of adopting a shared frame. ModalBody is a full-width layout/scroll
+region; do not reintroduce the60ch cap or repair it in ArtistBioProfile callers.
+Fullscreen EQ access follows renderer capability, independently of whether the effect is on.
+Opening the existing EQ panel does not enable processing or alter preferences. The desktop
+header has no added Now Playing caption. Both fullscreen lyrics renderers use the flat
+PlayerLyricsSurface; keep timed text, seek, masks and scroll behavior without a colored backdrop.

@@ -6,7 +6,6 @@ import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerAr
 import { useFullscreenPlayerLyrics } from "@/components/player/useFullscreenPlayerLyrics";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import { artistPagePath } from "@/lib/library-routes";
 import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
 import { usePlayerClock } from "@/contexts/PlayerClock";
@@ -58,9 +57,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   );
   const navigate = useNavigate();
   const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
-  const equalizerEnabled = useEqualizerEnabled();
   const allowMobileEqualizer =
-    equalizerEnabled && (canUseWebAudioEffects || androidNativePlayerEnabled);
+    canUseWebAudioEffects || androidNativePlayerEnabled;
   const spinningDiscJogSeekMode = androidNativePlayerEnabled
     ? "commit"
     : "live";

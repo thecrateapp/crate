@@ -12,7 +12,10 @@ describe("QualityBadge", () => {
     const badge = container.firstElementChild;
 
     expect(container.textContent).toContain("HI-RES");
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     expect(badge).toHaveClass(
       "text-info-badge",
       "font-mono",
@@ -32,7 +35,10 @@ describe("QualityBadge", () => {
     );
     const badge = container.firstElementChild;
 
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     expect(badge).toHaveClass(
       "text-info-badge",
       "font-mono",
@@ -54,7 +60,10 @@ describe("QualityBadge", () => {
     );
     const badge = container.firstElementChild;
 
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     expect(badge).toHaveClass(
       "text-info-badge",
       "font-mono",

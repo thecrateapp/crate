@@ -3,10 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
-import { FormField } from "@crate/ui/primitives/FormField";
-import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
+import { CredentialsForm } from "@/components/auth/CredentialsForm";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { isTauriRuntime } from "@/lib/platform";
@@ -16,9 +13,6 @@ import {
   type TauriAuthDiagnostic,
 } from "@/lib/tauri-auth-diagnostic";
 import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
-
-const AUTH_INPUT_CLASS_NAME =
-  "h-10 rounded-lg bg-text-primary/5 px-3 shadow-none backdrop-blur-none md:text-base";
 
 export function Login() {
   const navigate = useNavigate();
@@ -105,86 +99,33 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-canvas px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
-        <div className="flex flex-col items-center pb-4">
-          <CrateLogo title="Crate" className="mb-2 size-16" />
-          <h1 className="text-2xl font-bold text-text-primary">Crate</h1>
-          <p className="text-sm text-text-primary/40 -mt-0.5">
-            {t("auth.tagline")}
-          </p>
-        </div>
-
-        {authConfig.invite_only ? (
-          <div className="rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-text-accent">
-            {t("auth.login.inviteOnly")}
-          </div>
-        ) : null}
-
-        {error && (
-          <p role="alert" className="text-sm text-state-danger text-center">
-            {error}
-          </p>
-        )}
-
-        <FormField
-          label={t("common.email")}
-          labelClassName="font-normal text-text-primary/60"
-        >
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className={AUTH_INPUT_CLASS_NAME}
-          />
-        </FormField>
-
-        <FormField
-          label={t("common.password")}
-          labelClassName="font-normal text-text-primary/60"
-        >
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className={AUTH_INPUT_CLASS_NAME}
-          />
-        </FormField>
-
-        <Button
-          type="submit"
-          disabled={submitting}
-          className="h-10 w-full rounded-lg"
-        >
-          {submitting ? t("auth.login.submitting") : t("auth.login.submit")}
-        </Button>
-
-        <OAuthButtons returnTo={returnTo} />
-
-        {tauriAuthDiagnostic ? (
-          <div className="rounded-lg border border-border-quiet bg-text-primary/[0.03] px-3 py-2 text-xs text-text-primary/45">
-            <span className="text-text-primary/65">Desktop OAuth:</span>{" "}
-            {tauriAuthDiagnostic.status}
-            {tauriAuthDiagnostic.detail
-              ? ` · ${tauriAuthDiagnostic.detail}`
-              : ""}
-          </div>
-        ) : null}
-
-        <p className="text-center text-sm text-text-primary/40">
-          {t("auth.login.noAccount")}{" "}
-          <Link
-            to={`/register?return_to=${encodeURIComponent(returnTo)}`}
-            className="link-accent"
-          >
-            {t("auth.login.createOne")}
-          </Link>
+    <CredentialsForm
+      mode="login"
+      email={email}
+      password={password}
+      busy={submitting}
+      error={error}
+      notice={authConfig.invite_only ? t("auth.login.inviteOnly") : undefined}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onSubmit={handleSubmit}
+    >
+      <OAuthButtons returnTo={returnTo} />
+      {tauriAuthDiagnostic ? (
+        <p className="font-mono text-xs text-text-muted">
+          Desktop OAuth: {tauriAuthDiagnostic.status}
+          {tauriAuthDiagnostic.detail ? ` · ${tauriAuthDiagnostic.detail}` : ""}
         </p>
-      </form>
-    </div>
+      ) : null}
+      <p className="text-center text-sm text-text-muted">
+        {t("auth.login.noAccount")}{" "}
+        <Link
+          to={`/register?return_to=${encodeURIComponent(returnTo)}`}
+          className="link-accent"
+        >
+          {t("auth.login.createOne")}
+        </Link>
+      </p>
+    </CredentialsForm>
   );
 }

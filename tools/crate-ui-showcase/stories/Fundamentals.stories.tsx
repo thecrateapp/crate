@@ -112,7 +112,11 @@ export const Spacing: Story = {
       <p>
         Fields use an actual 8 px label gap through crate-form-field.
         Informative badges are 24 px high; filters use 32 px fine-pointer / 44
-        px coarse-pointer minimums. Scene layout does not redefine components.
+        px coarse-pointer minimums. Track rows reserve metadata columns even
+        when values are missing; responsive visibility follows the row's actual
+        container. Track selection shares the HairlineRow gradient; enabled
+        track rows restore a fine-pointer hover wash. Scene layout does not
+        redefine components.
       </p>
       <TokenTable
         tokens={[

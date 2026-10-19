@@ -225,7 +225,7 @@ describe("ExtendedPlayer", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("hides the desktop Equalizer access when it is globally disabled", () => {
+  it("keeps desktop Equalizer access while the effect is off without enabling it", async () => {
     localStorage.setItem("listen-eq-enabled", "false");
     const track = createMockTrack({
       id: "extended-eq-track",
@@ -245,7 +245,16 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Now playing", { exact: true }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Equalizer"));
+    expect(screen.getByLabelText("Equalizer")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
   });
 
   it("uses semantic tokens for the player chrome and tabs", async () => {

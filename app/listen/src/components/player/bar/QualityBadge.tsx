@@ -1,4 +1,5 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { AudioLines } from "@crate/ui/icons";
 import type { QualityBadge as QualityBadgeData } from "./player-bar-utils";
 
 type QualityBadgeOrigin = "source" | "stream";
@@ -17,6 +18,9 @@ export function QualityBadge({
 
   return (
     <InfoBadge
+      icon={AudioLines}
+      data-quality-tier={badge.tier}
+      data-quality-origin={origin}
       tone={
         badge.tier === "hi-res"
           ? "warning"

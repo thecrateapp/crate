@@ -41,7 +41,13 @@ it("keeps the real album identity, artist navigation and injected actions throug
       offlineState="idle"
       year="2026"
       playerTrackCount={0}
-      qualityBadges={[]}
+      qualityBadges={[
+        {
+          label: "FLAC 16/44.1",
+          tier: "lossless",
+          detail: "16-bit / 44.1 kHz",
+        },
+      ]}
       visibleContributor={null}
       primaryContributorName={null}
       primaryContributorPath={null}
@@ -59,6 +65,16 @@ it("keeps the real album identity, artist navigation and injected actions throug
     screen.getByRole("heading", { level: 1, name: "Luz de octubre" }),
   );
   expect(screen.getByText("2026")).toBeVisible();
+  const quality = screen
+    .getByText("FLAC 16/44.1")
+    .closest('[data-slot="info-badge"]');
+  expect(quality).toHaveAttribute("data-quality-tier", "lossless");
+  expect(quality?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  expect(
+    screen
+      .getByRole("button", { name: "Costa Norte" })
+      .querySelector('[data-slot="avatar"]'),
+  ).toHaveAttribute("data-size", "xs");
   await userEvent.click(screen.getByRole("button", { name: "Costa Norte" }));
   expect(artist).toHaveBeenCalledOnce();
   await userEvent.click(screen.getByRole("button", { name: "Play album" }));

@@ -52,4 +52,25 @@ describe("Register", () => {
       screen.getByRole("link", { name: "Iniciar sesión" }),
     ).toBeInTheDocument();
   });
+  it("uses canonical access fields with browser credential semantics", () => {
+    renderWithListenProviders(<Register />, {
+      auth: { user: null, loading: false },
+      locale: "en",
+    });
+    expect(screen.getByLabelText("Email")).toHaveAttribute(
+      "autocomplete",
+      "email",
+    );
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
+    expect(
+      screen.getByLabelText("Password").closest("[data-slot=auth-frame]"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).not.toHaveClass(
+      "h-10",
+      "md:text-base",
+    );
+  });
 });

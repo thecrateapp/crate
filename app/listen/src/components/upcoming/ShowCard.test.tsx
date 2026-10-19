@@ -53,6 +53,10 @@ describe("ShowCard ticket", () => {
       "font-display",
       "leading-display",
     );
+    expect(screen.getByRole("link", { name: "Converge" })).toHaveAttribute(
+      "href",
+      "/artists/converge",
+    );
   });
 
   it("lists the probable setlist as numbered hairline rows", () => {

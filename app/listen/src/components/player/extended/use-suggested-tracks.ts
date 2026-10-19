@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 
 import type { Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
+import type { PlayableTrackInput } from "@/lib/playable-track";
 
-export interface SimilarTrack {
+export interface SimilarTrack extends PlayableTrackInput {
   path: string;
   track_entity_uid?: string;
   track_id?: number;
@@ -11,7 +12,7 @@ export interface SimilarTrack {
   artist: string;
   album: string;
   duration: number;
-  score: number;
+  score?: number;
 }
 
 export function useSuggestedTracks(currentTrack: Track | null | undefined) {

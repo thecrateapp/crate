@@ -32,3 +32,12 @@ body {
 
 @source "../../app/listen/src/components/player";
 @source "../../app/listen/src/components/settings/SleepTimerView.tsx";
+
+@source "../../app/listen/src/components/auth";
+@source "../../app/listen/src/components/album";
+@source "../../app/listen/src/components/imports/RemoteImportView.tsx";
+@source "../../app/listen/src/pages/OfflineLibraryView.tsx";
+
+@source "../../app/listen/src/components/artist/ArtistLibraryFrames.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingMonthGroupView.tsx";

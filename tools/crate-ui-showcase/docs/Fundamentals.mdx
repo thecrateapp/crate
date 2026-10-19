@@ -35,6 +35,23 @@ All field captions use MonoLabel (Mono 400, uppercase, 11/15.4 px), including in
 
 Native brand-font exceptions remain resolved through the existing font variables. General form ranges now use Slider in both apps; playback and EQ retain specialized controls.
 
+## Track metadata columns — local 1BA amendment
+
+The actual Listen TrackRowContent owns fixed slots through the shared row recipe: source quality,
+separate tempo and musical key, duration, like and menu. Missing values leave empty slots instead
+of moving neighboring values. Quality is visible at480px of row space, analysis at620px;
+narrow queues use those same container thresholds. Technical labels keep their existing Mono role
+and InfoBadge anatomy. Explicit flags and remote provenance belong to the identity block.
+The actual-view examples live under Listen/Album and access/TrackMetadata and Reviews/1BA.
+Source depth and rate must come from the individual track; never copy an album's best quality.
+
+The quality slot reserves9.5rem for the complete icon plus source label; tempo/key reserve
+4ch each, duration3.5rem, and each action44px. Duration keeps its existing12px type and fits hour-long
+timestamps; analysis keeps its technical metadata role. Badges retain their24px anatomy. The Listen adapter
+uses Solar Soundwave with the existing tier colors in heroes, rows and the player; source and
+streaming delivery remain distinct. AIFF shares the lossless classification, and invalid numeric
+source details stay absent. See the live Listen/QualityBadge entry for all tiers and origins.
+
 Radio choices reserve their 44 px coarse hit areas without overlap. Long searchable options wrap inside the menu. FormField kind="group" provides the caption and ARIA association without a native label target on a non-labelable group. Existing preview fixture controls use these same components; no new mockup specimens are added.
 
 The actions catalogue now includes Solar Eye Outline for preview actions. ActionButton/ActionLink compose the existing Button recipe; IconButton keeps the compact round/glow role. Coarse targets reserve at least44px in layout.
@@ -63,7 +80,11 @@ and explicit tags use InfoBadge24/12; technical metadata keeps its own mono role
 Listen TrackRow preserves V2 playback identity across album/playlist, queue, Home recommendations
 and statistics: a white18px glyph in a24px visual slot over the cover, without an accent-filled disc. Track/album/artist artwork is at least48px in every density; the active ring control remains40px. Coarse hit
 areas remain at least44px independently of visible geometry. The layered aura, core,2px ring,
-progress leaf subscription and effects/reduced-motion preferences remain. No row hover fill.
+progress leaf subscription and effects/reduced-motion preferences remain. Diego's1BA amendment
+restores a4% accent hover fill on enabled track rows for fine pointers. Other row families keep
+their existing no-fill policy. Selected/current track rows use the same8%-to-transparent
+selection surface as HairlineRow and a2px high-accent marker. Selection alone never claims
+current playback or changes the title to the current-track color.
 
 Diego amendment: standalone track/album/artist covers have a48px minimum in every density;
 white18px glyph (24px visual slot) and active ring40px remain smaller than the artwork. Person avatars and
@@ -73,7 +94,6 @@ The minimum-media source guard covers undersized standalone JSX image frames and
 HTML artist-tooltip header. Managed image transport remains owned by Listen; its real-browser
 fixture verifies painted48px frames in both densities. This supplements geometry and contract
 checks; it is not complete native, assistive-technology or route certification.
-
 
 ## Shell and collection amendments — 1AY
 
@@ -90,3 +110,17 @@ These amendments are approved by Diego in1AY, not a new visual source of truth.
 The underline is decorative and2px thick. Its movement never changes focus or panel semantics.
 Browser checks cover stable Select width, field/action alignment and moving/reduced/vertical/RTL
 tab geometry; these checks supplement the component contracts rather than certifying native QA.
+
+## Artist and player review amendments — 1BA
+
+Preserve V2 image scale by role. Artist discography uses MediaGrid comfortable (2/3/4/5 columns,
+16px gap, maximum5) instead of compact; approved48px thumbnails and compact identity avatars
+retain their explicit exceptions. ModalBody fills its panel; the former60ch limit on the
+layout region was drift and must not be restored as a consumer override. See AppModal's
+full-width biography and the artist/player review in both hosts.
+
+Fullscreen lyrics retain the canvas without a colored background gradient in either renderer;
+the retired gradient/backdrop recipes have no remaining consumers. Text, timed lines, seek and
+scroll behavior remain owned by Listen. The player header has no added Now Playing caption.
+EQ access follows runtime capability, independent of whether the effect is enabled; opening
+its existing panel must not enable the effect or change saved gains/preferences.

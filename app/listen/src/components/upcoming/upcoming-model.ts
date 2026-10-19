@@ -1,38 +1,8 @@
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
-export interface UpcomingItem {
-  id?: number;
-  event_key?: string;
-  type: "release" | "show";
-  date: string;
-  time?: string;
-  artist: string;
-  artist_id?: number;
-  artist_slug?: string;
-  album_id?: number;
-  album_slug?: string;
-  title: string;
-  subtitle: string;
-  cover_url: string | null;
-  status: string;
-  is_upcoming: boolean;
-  tidal_url?: string;
-  release_id?: number;
-  url?: string;
-  venue?: string;
-  address_line1?: string;
-  city?: string;
-  region?: string;
-  postal_code?: string;
-  country?: string;
-  country_code?: string;
-  latitude?: number;
-  longitude?: number;
-  lineup?: string[];
-  genres?: string[];
-  probable_setlist?: { title: string; position?: number; frequency?: number }[];
-  user_attending?: boolean;
-}
+import type { UpcomingItem } from "./upcoming-types";
+export type { UpcomingItem } from "./upcoming-types";
 
 export interface ArtistShowEvent {
   id: string;
@@ -53,6 +23,7 @@ export interface ArtistShowEvent {
   image_url?: string;
   lineup?: string[];
   artist_genres?: string[];
+  artist_genre_profile?: GenreProfileItem[];
   latitude?: number;
   longitude?: number;
   probable_setlist?: { title: string; position?: number; frequency?: number }[];
@@ -85,6 +56,7 @@ export function artistShowToUpcomingItem(show: ArtistShowEvent): UpcomingItem {
     longitude: show.longitude,
     lineup: show.lineup,
     genres: show.artist_genres || [],
+    genre_profile: show.artist_genre_profile,
     probable_setlist: show.probable_setlist || [],
     user_attending: show.user_attending,
     is_upcoming: true,

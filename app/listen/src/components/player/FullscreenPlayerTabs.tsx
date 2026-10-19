@@ -5,6 +5,7 @@ import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArt
 import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
 import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
 import { SyncedLyrics } from "./SyncedLyrics";
+import { PlayerLyricsSurface } from "./PlayerLyricsSurface";
 import { PlayerStage } from "./PlayerStage";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import type {
@@ -155,15 +156,11 @@ export function FullscreenPlayerLyricsTab({
   scrollTabBottomClearance: string;
 }) {
   return (
-    <div
+    <PlayerLyricsSurface
       ref={refs.lyricsContainerRef}
-      className="relative flex-1 overflow-y-auto px-5 py-4"
+      className="px-5 py-4"
       style={{ paddingBottom: scrollTabBottomClearance }}
     >
-      <div
-        aria-hidden="true"
-        className="lyrics-fullscreen-backdrop pointer-events-none absolute inset-0 opacity-70"
-      />
       {!lyrics ? (
         <p className="relative z-10 mt-20 text-center text-sm text-text-muted">
           {t("player.lyrics.loading")}
@@ -181,7 +178,7 @@ export function FullscreenPlayerLyricsTab({
           {t("player.lyrics.unavailable")}
         </p>
       )}
-    </div>
+    </PlayerLyricsSurface>
   );
 }
 

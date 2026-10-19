@@ -108,11 +108,11 @@ describe("HairlineList", () => {
     expect(bar).toHaveAttribute("aria-hidden", "true");
     expect(bar).toHaveClass("w-0.5", "bg-accent-action-hi", "scale-y-0");
     expect(row).not.toHaveAttribute("data-active");
-    expect(row).not.toHaveClass("from-accent-action/8");
+    expect(row).not.toHaveClass("crate-row-highlight");
 
     rerender(<HairlineRow active>Shanty</HairlineRow>);
     expect(row).toHaveAttribute("data-active", "true");
-    expect(row).toHaveClass("from-accent-action/8");
+    expect(row).toHaveClass("crate-row-highlight");
     expect(bar).toHaveClass("scale-y-100");
     expect(bar).not.toHaveClass("scale-y-0");
   });

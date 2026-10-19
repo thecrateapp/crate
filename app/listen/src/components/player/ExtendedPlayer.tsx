@@ -16,7 +16,7 @@ import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
 } from "@/hooks/use-crossfade-progress";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
+import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
@@ -65,7 +65,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const [tab, setTab] = useState<ExtendedPlayerTabId>("queue");
   const [showVizSettings, setShowVizSettings] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
-  const equalizerEnabled = useEqualizerEnabled();
+  const equalizerAvailable = canUseWebAudioEffects;
   const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } =
     useResolvedPlayerArtist(currentTrack, queue);
   const sourceLabel = getPlaySourceLabel(playSource);
@@ -147,7 +147,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   useDismissibleLayer({
     active:
       (isVisualizerMode && showVizSettings) ||
-      (equalizerEnabled && showEqualizer),
+      (equalizerAvailable && showEqualizer),
     refs: [
       vizSettingsRef,
       vizSettingsButtonRef,
@@ -222,14 +222,14 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         isBuffering,
         isPlaying,
         jamQueueLocked,
-        showEqualizer: equalizerEnabled && showEqualizer,
+        showEqualizer: equalizerAvailable && showEqualizer,
         showVizSettings: isVisualizerMode && showVizSettings,
         tab,
         volume,
         canvasRect,
         vizCfg,
         visualizerAllowed,
-        equalizerEnabled,
+        equalizerAvailable,
       }}
       refs={{
         canvasRef,

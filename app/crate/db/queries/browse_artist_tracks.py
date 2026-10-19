@@ -19,7 +19,7 @@ def get_artist_all_tracks(artist_name: str, limit: int | None = None) -> list[di
                     f"""
                 SELECT
                     t.id, t.title, t.artist, t.album, t.path, t.duration,
-                    t.track_number, t.format,
+                    t.track_number, t.format, t.bitrate, t.sample_rate, t.bit_depth,
                     t.bpm, t.audio_key, t.audio_scale, t.energy,
                     t.danceability, t.valence, t.bliss_vector,
                     t.lastfm_top_rank, t.lastfm_listeners, t.lastfm_playcount,

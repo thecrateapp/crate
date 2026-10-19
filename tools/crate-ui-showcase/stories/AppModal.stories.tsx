@@ -2,6 +2,7 @@ import { ModalExample } from "../reviews/LayersReview";
 import { TooltipProvider } from "@crate/ui/shadcn/tooltip";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { AppModal } from "@crate/ui/primitives/AppModal";
+import { ArtistBioWidthExample } from "../reviews/ArtistPlayerReview";
 const meta = {
   id: "components-appmodal",
   title: "Components/Overlays/AppModal",
@@ -22,4 +23,7 @@ export const Base: Story = {
       <ModalExample />
     </TooltipProvider>
   ),
+};
+export const FullWidthBiography: Story = {
+  render: () => <ArtistBioWidthExample />,
 };

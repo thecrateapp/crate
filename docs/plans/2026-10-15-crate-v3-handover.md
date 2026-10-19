@@ -4979,3 +4979,38 @@ No continuar a1BA ni certificar QA móvil/nativa/AT completa con las escenas ins
 Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
 Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
 las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.
+
+
+## 2026-10-19 — 1AZ publicado;1BA local para revisión
+
+1AZ aprobado/publicado18a880c2.1BA aplica el alcance H1 de Álbum, acceso y primer recorrido
+offline; conserva native/auth/engine/route contracts, usa shared forms/headers/rows/actions y
+actualiza Storybook con las piezas reales. [Plan y límites](2026-10-19-crate-v3-album-access.md),
+[estado vigente](2026-10-19-crate-v3-current-state.md). Revisión pequeña review-1ba-album-access.html,
+Storybook Reviews/1BA/Album and access; tres servicios activos. Stop1BA sin commit/push para Diego.
+No certifica dispositivos nativos, AT, escrituras reales ni cierra toda la migración de Listen.
+
+En revisión1BA Diego confirma el show expandido como referencia de composición y distingue
+los avatares compactos de identidad (álbum24px/reproductor28px) de las miniaturas48px. Estas
+correcciones, perfiles porcentuales y columnas/calidad de pistas quedan en el mismo checkpoint
+sin publicar; detalles y comprobaciones en el plan1BA.
+
+Última tanda1BA: hover/selección de TrackRow según Hairline, Suggested con TrackRow real,
+Collection con hijos44px y abierto en sus rutas. Giro del disco continuo por animación nativa,
+pausa/buffering/jog conservan fase; modos icon-only sin marco. Revisión pequeña vigente:
+`review-1ba-player-motion.html` y Storybook `reviews-1ba-player-motion--complete`; el review
+album-access conserva el alcance completo. Comprobaciones/limitaciones en el plan1BA y estado
+vigente. Mantener5186/6006/5174; parar antes del commit/push de1BA.
+
+Revisión posterior: `review-1ba-artist-player.html` y Storybook
+`reviews-1ba-artist-player--complete`. Restauradas escalaV2 de discografía y anchura completa
+de biografía; accesoEQ disponible aunque el efecto esté apagado, Lyrics sin degradado y
+cabecera sin el rótulo nuevo. Motion/album-access siguen disponibles. Validación y límites
+actualizados en plan1BA/estado vigente. Checkpoint local, pendiente de Diego antes de publicar.
+
+
+## 2026-10-19 — 1BA aprobado; publicación autorizada
+
+Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
+usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
+manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.

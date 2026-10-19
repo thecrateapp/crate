@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { renderWithListenProviders as render } from "@/test/render-with-listen-providers";
 import { describe, expect, it, vi } from "vitest";
 
@@ -61,5 +61,39 @@ describe("PlayerTrackIdentity", () => {
     expect(
       screen.getByRole("button", { name: "Go to Artist One" }),
     ).toBeDisabled();
+  });
+
+  it("keeps the artist avatar compact through a terminal error and a new source", () => {
+    const onError = vi.fn();
+    const onClick = vi.fn();
+    const props = {
+      currentTrack: track,
+      crossfadeTransition: null,
+      crossfadeProgress: 1,
+      artistClickable: true,
+      onArtistClick: onClick,
+      onArtistAvatarError: onError,
+    };
+    const { rerender } = render(
+      <PlayerTrackIdentity {...props} artistAvatarUrl="/artist.jpg" />,
+    );
+    const action = screen.getByRole("button", { name: "Go to Artist One" });
+    const avatar = action.querySelector('[data-slot="avatar"]');
+    expect(avatar).toHaveAttribute("data-size", "inline");
+    expect(avatar).not.toHaveClass("crate-media-thumbnail");
+    fireEvent.error(screen.getByTestId("crate-image"));
+    expect(onError).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("crate-image")).not.toBeInTheDocument();
+    expect(avatar).toHaveTextContent("AO");
+    expect(avatar).toHaveAttribute("data-size", "inline");
+    fireEvent.click(action);
+    expect(onClick).toHaveBeenCalledOnce();
+    rerender(
+      <PlayerTrackIdentity {...props} artistAvatarUrl="/artist-new.jpg" />,
+    );
+    expect(screen.getByTestId("crate-image")).toHaveAttribute(
+      "src",
+      "/artist-new.jpg",
+    );
   });
 });

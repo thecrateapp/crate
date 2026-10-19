@@ -1,3 +1,5 @@
+import { ArtistTopTracksFrame } from "./ArtistLibraryFrames";
+import { TrackList } from "@crate/ui/domain/tracks/TrackList";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -36,23 +38,21 @@ export function ArtistTopTracksSection({
   if (!tracks.length) return null;
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-text-primary">
-          {t("artist.sections.topTracks")}
-        </h2>
-        {topTracksPath ? (
-          <button
-            type="button"
-            className="text-sm link-accent"
-            onClick={() => navigate(topTracksPath)}
-          >
-            {t("common.viewAll")}
-          </button>
-        ) : null}
-      </div>
-      <div className="rounded-xl">
-        {tracks.map((track, index) => (
+    <ArtistTopTracksFrame
+      title={t("artist.sections.topTracks")}
+      actionLabel={topTracksPath ? t("common.viewAll") : undefined}
+      onAction={() => navigate(topTracksPath)}
+    >
+      <TrackList
+        items={tracks}
+        itemKey={(track) =>
+          track.id ??
+          track.global_track_uid ??
+          track.track_entity_uid ??
+          track.library_track_id ??
+          [track.artist, track.album, track.title].join(":")
+        }
+        renderRow={(track, index) => (
           <TrackRow
             key={
               track.id ??
@@ -78,8 +78,8 @@ export function ArtistTopTracksSection({
             showCoverThumb
             queueTracks={trackRows}
           />
-        ))}
-      </div>
-    </section>
+        )}
+      />
+    </ArtistTopTracksFrame>
   );
 }

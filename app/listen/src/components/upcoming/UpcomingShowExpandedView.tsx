@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import "./show-ticket.css";
 import { useTranslation } from "react-i18next";
 import {
   CalendarCheck,
@@ -17,8 +18,7 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Button } from "@crate/ui/shadcn/button";
-import { artistPagePath } from "@/lib/library-routes";
-import { cn } from "@/lib/utils";
+import { cn } from "@crate/ui/lib/cn";
 
 import {
   formatShowTimeRemaining,
@@ -33,6 +33,7 @@ type Setlist = NonNullable<ExpandedViewProps["item"]["probable_setlist"]>;
 
 function TicketHeader({
   item,
+  artistHref,
   dateLabel,
   timeLabel,
   timeRemaining,
@@ -41,6 +42,7 @@ function TicketHeader({
   showClose,
 }: {
   item: ExpandedViewProps["item"];
+  artistHref: string;
   dateLabel: string;
   timeLabel: string;
   timeRemaining: string | null;
@@ -56,7 +58,9 @@ function TicketHeader({
   const locationLabel = [item.city, item.region, item.country]
     .filter(Boolean)
     .join(", ");
-  const genreItems = (item.genres || []).slice(0, 3).map((name) => ({ name }));
+  const genreItems = item.genre_profile?.length
+    ? item.genre_profile
+    : (item.genres || []).map((name) => ({ name }));
 
   return (
     <header className="relative px-5 pt-5 pb-6 sm:px-7 sm:pt-7">
@@ -77,10 +81,7 @@ function TicketHeader({
       </div>
 
       <Link
-        to={artistPagePath({
-          artistId: item.artist_id,
-          artistSlug: item.artist_slug,
-        })}
+        to={artistHref}
         className="link-meta mt-4 block w-fit max-w-full font-display text-4xl font-extrabold leading-display tracking-display text-balance break-words text-text-primary sm:text-6xl"
       >
         {item.artist}
@@ -253,6 +254,7 @@ function TicketActions({
 
 export function UpcomingShowExpandedView({
   item,
+  artistHref,
   attending,
   savingAttendance,
   playingSetlist,
@@ -280,6 +282,7 @@ export function UpcomingShowExpandedView({
       <div className="setlist-ticket-top">
         <TicketHeader
           item={item}
+          artistHref={artistHref}
           dateLabel={dateLabel}
           timeLabel={timeLabel}
           timeRemaining={timeRemaining}

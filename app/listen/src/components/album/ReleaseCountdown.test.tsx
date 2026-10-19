@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -15,52 +15,35 @@ describe("ReleaseCountdown", () => {
     vi.useRealTimers();
   });
 
-  it("centers each visual separator between the value and label blocks", () => {
+  it("updates its clock and disappears at the real release time", () => {
+    vi.setSystemTime(new Date("2026-08-01T23:59:58"));
     renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
-
-    const separators = screen.getAllByTestId("release-countdown-separator");
-
-    expect(separators).toHaveLength(3);
-    for (const separator of separators) {
-      expect(separator).toHaveAttribute("aria-hidden", "true");
-      expect(separator).toHaveClass("self-center");
-    }
+    expect(
+      screen.getByTestId("release-countdown").querySelectorAll("dd"),
+    ).toHaveLength(4);
+    expect(screen.getByText("02")).toBeVisible();
+    act(() => vi.advanceTimersByTime(2000));
+    expect(screen.queryByTestId("release-countdown")).not.toBeInTheDocument();
   });
-
-  it("uses an opaque non-glass surface from the desktop breakpoint", () => {
+  it("uses the same solid surface on mobile and desktop", () => {
     renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
-
-    expect(screen.getByTestId("release-countdown")).toHaveClass(
-      "release-countdown-surface",
-      "shadow-card",
-      "sm:backdrop-blur-none",
-      "sm:backdrop-saturate-100",
-    );
-  });
-
-  it("adds a bright mobile glass layer against the dark hero overlay", () => {
-    renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
-
-    expect(screen.getByTestId("release-countdown")).toHaveClass(
-      "release-countdown-surface",
+    const countdown = screen.getByTestId("release-countdown");
+    expect(countdown).toHaveClass("bg-surface-container");
+    expect(countdown).not.toHaveClass(
       "backdrop-blur-2xl",
       "backdrop-saturate-150",
-      "border-text-primary/20",
     );
-    expect(screen.getByTestId("release-countdown-glass-sheen")).toHaveClass(
-      "release-countdown-sheen",
-      "sm:hidden",
-    );
+    expect(
+      screen.queryByTestId("release-countdown-glass-sheen"),
+    ).not.toBeInTheDocument();
+    expect(countdown.querySelectorAll("dd .font-display")).toHaveLength(4);
   });
-
-  it("does not render the cyan top rule", () => {
-    renderWithListenProviders(<ReleaseCountdown releaseDate="2026-08-02" />);
-
-    const countdown = screen.getByTestId("release-countdown");
-    const hasCyanTopRule = Array.from(countdown.querySelectorAll("*")).some(
-      (element) => element.classList.contains("bg-accent-action/90"),
+  it("hides invalid and already released dates", () => {
+    const { rerender } = renderWithListenProviders(
+      <ReleaseCountdown releaseDate="2026-02-31" />,
     );
-
-    expect(hasCyanTopRule).toBe(false);
+    expect(screen.queryByTestId("release-countdown")).not.toBeInTheDocument();
+    rerender(<ReleaseCountdown releaseDate="2026-07-29" />);
+    expect(screen.queryByTestId("release-countdown")).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 // Shared geometry for loaded media and reserved placeholders, independent of domain components.
-export type MediaGridDensity = "compact" | "default" | "wide";
+export type MediaGridDensity = "compact" | "default" | "comfortable" | "wide";
 
 export const MEDIA_GRID_BASE_CLASS_NAME = "grid gap-[var(--content-grid-gap)]";
 export const MEDIA_GRID_DENSITY_CLASS_NAME: Record<MediaGridDensity, string> = {
@@ -7,6 +7,7 @@ export const MEDIA_GRID_DENSITY_CLASS_NAME: Record<MediaGridDensity, string> = {
     "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8",
   default:
     "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7",
+  comfortable: "grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
   wide: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4",
 };
 export const MEDIA_RAIL_COLUMNS_CLASS_NAME =

@@ -361,7 +361,7 @@ export function TracksExample() {
                     </span>
                   }
                   duration="3:00"
-                  quality="FLAC"
+                  quality={{ label: "FLAC", tier: "lossless", detail: "FLAC" }}
                   actions={
                     <ActionGroup label={`${row.title} actions`}>
                       <ActionButton

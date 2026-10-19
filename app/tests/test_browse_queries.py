@@ -765,6 +765,9 @@ class TestArtistTracks:
                     "duration": 240.0,
                     "size": 2400,
                     "format": "flac",
+                    "bit_depth": 16 if i == 1 else 24,
+                    "sample_rate": 44100 if i == 1 else 96000,
+                    "bitrate": 744000 if i == 1 else 2400000,
                 }
             )
 
@@ -776,6 +779,11 @@ class TestArtistTracks:
             assert t["artist"] == artist
             assert "album_slug" in t
             assert "artist_slug" in t
+            assert (t["bit_depth"], t["sample_rate"], t["bitrate"]) == (
+                (16, 44100, 744000)
+                if t["title"] == "Up and Atom"
+                else (24, 96000, 2400000)
+            )
 
     def test_get_artist_all_tracks_respects_limit(self, pg_db):
         from crate.db.queries.browse_artist_tracks import get_artist_all_tracks

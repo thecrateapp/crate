@@ -161,3 +161,49 @@ review-1az-player.html compose the same sources. Fixture callbacks never contact
 change saved player preferences; no synthetic analyser/loudness samples. Production controllers,
 engines, authority, authenticated images and native effects stay in Listen. Shared catalogue
 coverage is unchanged; this is not a fictitious second consumer or completion of pending PlayButton.
+
+## Listen album/access — local 1BA
+
+Listen/Album and access documents the actual app-local AlbumHeroFrame/AlbumActionsView,
+AlbumSelectionToolbar, ReleaseCountdown, RemoteImportView, AuthFrame/CredentialsForm,
+ServerSetupView/AuthCallbackView and OfflineLibraryView. Reviews/1BA/Album and access and
+5186review-1ba-album-access.html share one scene. Shared catalogue entries remain authoritative
+for forms, headers, actions, media, states and rows; no invented Admin consumers. Controllers
+retain native artwork measurements, route helpers, auth, imports and verified offline storage.
+
+1BA review amendments: Listen/QualityBadge documents the actual soundwave/tier adapter used by
+hero, rows and player; TrackMetadata demonstrates reserved responsive columns and missing values.
+ShowGenres uses the real expanded show view and UpcomingMonthGroupView with its canonical8px
+caption-to-first-item gap. Supplied genre profiles retain percentages, including0%; names alone
+never acquire synthetic percentages. The expanded show composition is Diego's reference for the
+next Listen migrations. Production Top Tracks depth/rate requires the prepared backend change
+to be deployed; the live preview still reads the existing production API.
+
+ArtistAvatars compares real EntityAvatar xs24px/inline28px with a48px MediaCover. Album bylines
+and player identity retain V2 geometry; standalone artist/album/track thumbnails retain48px.
+The Avatar, EntityAvatar and MediaCover contracts document the exception. The expanded show
+view imports its ticket CSS directly, so the isolated story uses production styling.
+
+1BA TrackInteractions compares HairlineRow with actual TrackRowView/TrackRowContent selected,
+current, idle and disabled states. Only enabled fine-pointer track hover illuminates the row.
+CollectionNavigation mounts the real SidebarNavigationView: parent and child items both44px,
+with the existing indent and current-route semantics. SuggestedTab in Listen now adopts the
+actual TrackList/TrackRow controller, covered by its focused consumer tests; preview scenes do
+not authenticate, fetch recommendations or start production playback.
+
+Reviews/1BA/Player motion and navigation and5186review-1ba-player-motion.html reuse the actual
+SpinningDiscFrame, play control, motion hook, mode actions and route-aware Collection navigation.
+Listen/Player adds DiscMotion and DisplayModes entries. A local4Hz clock, coarse correction,
+seek, buffering and deliberate120ms interface load exercise continuous compositor rotation;
+pause/hidden/reduced motion retain the pose. The RAF fallback and jog continuity have focused
+consumer tests. Mode actions use44px ActionButton radios without a frame: selected accent,
+other glyphs white, keyboard/tooltip semantics and the existing mobile capability gate.
+Expanded Collection is pinned open on Collection routes; collapsed/mobile dismissal remains.
+These app-local entries do not create shared exports or change pending catalogue coverage.
+
+Latest1BA amendment: Reviews/1BA/Artist and player refinements and5186review-1ba-artist-player.html
+reuse ArtistAlbumGroupFrame with the V2 comfortable grid, AppModal/ArtistBioProfile at full body
+width, the real ExtendedPlayerHeaderBar without an added caption and PlayerLyricsSurface without
+a colored background. Listen/Album and access, Listen/Player, MediaGrid and AppModal expose the
+same examples. EQ access is separate from the persisted enable preference; actual effects/panels
+stay in Listen. Browser cases cover375/1200/1920px in both hosts, plus affected modal consumers.

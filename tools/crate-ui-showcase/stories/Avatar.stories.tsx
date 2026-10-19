@@ -13,7 +13,7 @@ export const Base: Story = {};
 export const Sizes: Story = {
   render: () => (
     <div className="showcase-line">
-      {(["xs", "sm", "md", "lg", "xl"] as const).map((size) => (
+      {(["xs", "inline", "sm", "md", "lg", "xl"] as const).map((size) => (
         <Avatar key={size} name={size} size={size} />
       ))}
     </div>

@@ -49,6 +49,23 @@ describe("lists", () => {
       expect(getByTestId("media-grid")).toHaveClass(className);
     });
 
+    it("keeps comfortable media at the V2 two-to-five column scale", () => {
+      render(
+        <MediaGrid density="comfortable">
+          <div>Album</div>
+        </MediaGrid>,
+      );
+      const grid = screen.getByTestId("media-grid");
+      expect(grid).toHaveClass(
+        "grid-cols-2",
+        "sm:grid-cols-3",
+        "md:grid-cols-4",
+        "lg:grid-cols-5",
+        "gap-4",
+      );
+      expect(grid.className).not.toMatch(/(?:xl|2xl):grid-cols-[678]/);
+    });
+
     it("applies a custom min item width", () => {
       const { container } = render(
         <MediaGrid minItemWidth={200}>

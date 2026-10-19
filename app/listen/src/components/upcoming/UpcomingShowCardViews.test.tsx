@@ -63,6 +63,7 @@ describe("UpcomingShowExpandedView", () => {
         <MemoryRouter>
           <I18nProvider initialLocale="en">
             <UpcomingShowExpandedView
+              artistHref="/artists/converge"
               item={showItem}
               attending
               savingAttendance={false}
@@ -100,6 +101,7 @@ describe("UpcomingShowExpandedView", () => {
       <MemoryRouter>
         <I18nProvider initialLocale="en">
           <UpcomingShowExpandedView
+            artistHref="/artists/converge"
             item={item}
             attending={false}
             savingAttendance={false}
@@ -113,6 +115,24 @@ describe("UpcomingShowExpandedView", () => {
       </MemoryRouter>,
     );
   }
+
+  it("preserves canonical genre percentages, including zero, in the show header", () => {
+    renderTicket({
+      ...showItem,
+      genre_profile: [
+        { name: "Hardcore", slug: "hardcore", percent: 83, source: "tags" },
+        { name: "Mathcore", share: 0 },
+      ],
+    } as UpcomingItem);
+    expect(screen.getByTitle("Hardcore · 83% · tags")).toHaveClass(
+      "genre-pill",
+    );
+    expect(screen.getByTitle("Mathcore · 0%")).toBeInTheDocument();
+    expect(screen.getByText("83%")).toHaveAttribute(
+      "data-slot",
+      "genre-percent",
+    );
+  });
 
   it("cuts the notches out of two stacked stubs instead of painting circles", () => {
     const { container } = renderTicket(showItem);
@@ -161,6 +181,7 @@ describe("UpcomingShowExpandedView", () => {
                 { title: "Concubine" },
               ],
             }}
+            artistHref="/artists/converge"
             attending={false}
             savingAttendance={false}
             playingSetlist={false}
@@ -180,7 +201,7 @@ describe("UpcomingShowExpandedView", () => {
 
   it("staggers the setlist entrance in CSS and turns it off for reduced motion", () => {
     const css = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), "../../index.css"),
+      resolve(dirname(fileURLToPath(import.meta.url)), "show-ticket.css"),
       "utf8",
     );
     const rowRule = css.match(/\.setlist-ticket-row \{([^}]*)\}/)?.[1] ?? "";

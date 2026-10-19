@@ -1,4 +1,4 @@
-import { clamp } from "@/lib/utils";
+import { clamp } from "../../../../shared/web/utils";
 
 export const DISC_DEGREES_PER_SECOND = 120;
 export const JOG_SECONDS_PER_ROTATION = 2.5;

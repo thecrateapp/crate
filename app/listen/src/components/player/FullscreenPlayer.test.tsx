@@ -114,7 +114,8 @@ vi.mock("@/components/player/bar/PlayerSeekBar", () => ({
   ),
 }));
 
-vi.mock("@/components/player/bar/player-bar-utils", () => ({
+vi.mock("@/components/player/bar/player-bar-utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./bar/player-bar-utils")>()),
   formatPlayerTime: (t: number) =>
     `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`,
 }));
@@ -781,7 +782,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("hides the mobile Equalizer access when it is globally disabled", async () => {
+    it("keeps mobile Equalizer access while the effect is off without enabling it", async () => {
       localStorage.setItem("listen-eq-enabled", "false");
       const track = makeTrack();
 
@@ -794,7 +795,8 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+        expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
       });
     });
 
@@ -1362,6 +1364,12 @@ describe("FullscreenPlayer", () => {
       expect(activeLine).toHaveAttribute("aria-current", "true");
       expect(activeLine).toHaveClass("listen-lyric-line");
       expect(nextLine).toHaveAttribute("data-state", "future");
+      expect(
+        activeLine.closest('[data-slot="player-lyrics-surface"]'),
+      ).toBeInTheDocument();
+      expect(
+        document.querySelector(".lyrics-fullscreen-backdrop"),
+      ).not.toBeInTheDocument();
     });
   });
 

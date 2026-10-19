@@ -125,9 +125,9 @@ for (const host of hosts) {
       (e) => getComputedStyle(e).backgroundColor,
     );
     await row.hover();
-    expect(await row.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(
-      before,
-    );
+    expect(
+      await row.evaluate((e) => getComputedStyle(e).backgroundColor),
+    ).not.toBe(before);
     await page
       .getByRole("button", { name: "Empty queue", exact: true })
       .click();

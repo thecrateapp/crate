@@ -26,7 +26,7 @@ export type ExtendedPlayerViewState = {
   canvasRect: VisualizerCanvasRect | null;
   vizCfg: VisualizerConfigState;
   visualizerAllowed: boolean;
-  equalizerEnabled: boolean;
+  equalizerAvailable: boolean;
 };
 
 export type ExtendedPlayerViewRefs = {

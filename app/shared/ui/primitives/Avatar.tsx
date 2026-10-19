@@ -2,11 +2,12 @@ import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
-export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
+export type AvatarSize = "xs" | "inline" | "sm" | "md" | "lg" | "xl";
 export type AvatarShape = "circle" | "rounded";
 
 const SIZE_CLASS_NAME: Record<AvatarSize, string> = {
   xs: "size-6 text-xs",
+  inline: "size-7 text-xs",
   sm: "size-8 text-xs",
   md: "size-10 text-sm",
   lg: "size-14 text-lg",
@@ -30,10 +31,8 @@ export interface AvatarImageRenderProps {
   onError: () => void;
 }
 
-export interface AvatarProps extends Omit<
-  ComponentPropsWithRef<"span">,
-  "children"
-> {
+export interface AvatarProps
+  extends Omit<ComponentPropsWithRef<"span">, "children"> {
   src?: string | null;
   name?: string | null;
   alt?: string;

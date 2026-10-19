@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 
-import type { UpcomingItem } from "./upcoming-model";
+import type { UpcomingItem } from "./upcoming-types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;

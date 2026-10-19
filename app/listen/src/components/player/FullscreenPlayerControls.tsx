@@ -1,7 +1,6 @@
 import type { TFunction } from "i18next";
 
 import {
-  Disc3,
   Loader2,
   Pause,
   Play,
@@ -11,12 +10,12 @@ import {
   SlidersHorizontal,
   SkipBack,
   SkipForward,
-  Square,
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 
+import { PlayerSurfaceModeSwitch } from "./PlayerSurfaceModeSwitch";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import type {
   ViewActions,
@@ -140,20 +139,14 @@ function FullscreenPlayerUtilityControls({
           <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
         </ActionButton>
       ) : null}
-      <ActionButton
-        onClick={actions.toggleSurfaceModeWithFeedback}
-        label={
-          state.surfaceMode === "cd"
-            ? t("player.surface.cover")
-            : t("player.surface.cd")
-        }
-      >
-        {state.surfaceMode === "cd" ? (
-          <Square size={CRATE_ICON_SIZE.lg} />
-        ) : (
-          <Disc3 size={CRATE_ICON_SIZE.lg} />
-        )}
-      </ActionButton>
+      <PlayerSurfaceModeSwitch
+        mode={state.surfaceMode}
+        allowVisualizer={false}
+        onChange={(mode) => {
+          if (mode !== state.surfaceMode)
+            actions.toggleSurfaceModeWithFeedback();
+        }}
+      />
       <PlayerTrackMenu
         currentTrack={player.currentTrack}
         className=" size-12 rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"

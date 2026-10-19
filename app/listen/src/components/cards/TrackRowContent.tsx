@@ -1,4 +1,6 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { QualityBadge } from "../player/bar/QualityBadge";
+import type { QualityBadge as QualityBadgeData } from "../player/bar/player-bar-utils";
 import type { ReactNode } from "react";
 
 // The real row's visual composition, separate from playback, selection and menu controllers.
@@ -11,7 +13,8 @@ export function TrackRowContent({
   meta,
   explicitLabel,
   quality,
-  analysis,
+  tempo,
+  musicalKey,
   provenance,
   duration,
   like,
@@ -24,8 +27,9 @@ export function TrackRowContent({
   details?: ReactNode;
   meta?: ReactNode;
   explicitLabel?: string;
-  quality?: string | null;
-  analysis?: string | null;
+  quality?: QualityBadgeData | null;
+  tempo?: string | null;
+  musicalKey?: string | null;
   provenance?: ReactNode;
   duration?: string;
   like?: ReactNode;
@@ -45,6 +49,11 @@ export function TrackRowContent({
             {title}
           </div>
           {titleAccessory}
+          {explicitLabel ? (
+            <InfoBadge className="crate-track-explicit" title={explicitLabel}>
+              E
+            </InfoBadge>
+          ) : null}
         </div>
         {details}
         {meta != null ? (
@@ -52,33 +61,40 @@ export function TrackRowContent({
             {meta}
           </div>
         ) : null}
+        {provenance ? (
+          <span className="crate-track-provenance crate-media-meta">
+            {provenance}
+          </span>
+        ) : null}
       </div>
-      {explicitLabel ? (
-        <InfoBadge
-          className="crate-track-quality crate-track-explicit"
-          title={explicitLabel}
+      <div className="crate-track-metadata">
+        <div data-track-slot="quality" className="crate-track-quality-slot">
+          {quality ? <QualityBadge badge={quality} /> : null}
+        </div>
+        <div data-track-slot="analysis" className="crate-track-analysis-slot">
+          {tempo || musicalKey ? (
+            <span className="crate-track-analysis">
+              <span className="crate-track-bpm">{tempo}</span>
+              <span aria-hidden="true">{tempo && musicalKey ? "·" : null}</span>
+              <span className="crate-track-key" title={musicalKey ?? undefined}>
+                {musicalKey}
+              </span>
+            </span>
+          ) : null}
+        </div>
+        <span
+          data-track-slot="duration"
+          className="crate-track-duration font-mono tabular-nums"
         >
-          E
-        </InfoBadge>
-      ) : null}
-      {quality ? (
-        <InfoBadge className="crate-track-quality">{quality}</InfoBadge>
-      ) : null}
-      {analysis ? (
-        <span className="crate-track-analysis">{analysis}</span>
-      ) : null}
-      {provenance ? (
-        <span className="crate-track-provenance crate-media-meta">
-          {provenance}
-        </span>
-      ) : null}
-      {duration ? (
-        <span className="text-text-muted shrink-0 font-mono text-xs tabular-nums">
           {duration}
         </span>
-      ) : null}
-      {like}
-      {actions}
+        <div data-track-slot="like" className="crate-track-control-slot">
+          {like}
+        </div>
+        <div data-track-slot="actions" className="crate-track-control-slot">
+          {actions}
+        </div>
+      </div>
     </>
   );
 }

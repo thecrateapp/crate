@@ -96,7 +96,19 @@ export function buildArtistPageViewModel(
   );
   const currentGlobalArtistUid =
     routeGlobalArtistUid ?? data.global_artist_uid ?? data.global_uid ?? null;
-  const artistShowItems = buildArtistShowItems(showsData?.events ?? []);
+  const artistShowItems = buildArtistShowItems(showsData?.events ?? []).map(
+    (show) => {
+      const sameArtist =
+        show.artist_id != null && data.id != null
+          ? show.artist_id === data.id
+          : show.artist.trim().toLowerCase() === data.name.trim().toLowerCase();
+      return !show.genre_profile?.length &&
+        sameArtist &&
+        data.genre_profile?.length
+        ? { ...show, genre_profile: data.genre_profile }
+        : show;
+    },
+  );
   const visibleShowItems = [...artistShowItems]
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
     .slice(0, 5);
@@ -145,7 +157,7 @@ export function buildArtistPageViewModel(
       },
       { size: 1280, version: imageVersion },
     ),
-    tags: data.genres.length > 0 ? data.genres : info?.tags ?? [],
+    tags: data.genres.length > 0 ? data.genres : (info?.tags ?? []),
     canonicalPath: buildArtistCanonicalPath(data, routeGlobalArtistUid),
   };
 }

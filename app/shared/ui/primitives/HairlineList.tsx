@@ -112,7 +112,7 @@ export function HairlineRow({
       data-active={active || undefined}
       className={cn(
         "relative border-b border-border-quiet-subtle ",
-        active && "bg-linear-to-r from-accent-action/8 to-transparent",
+        active && "crate-row-highlight",
         !asChild && layout,
         className,
       )}

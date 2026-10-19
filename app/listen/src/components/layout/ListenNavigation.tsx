@@ -9,7 +9,6 @@ import {
 import { createPortal } from "react-dom";
 import { Link } from "react-router";
 import { VtNavLink } from "@crate/ui/primitives/VtNavLink";
-import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
@@ -38,22 +37,21 @@ function CollectionLinks({
   onSelect: () => void;
 }) {
   return (
-    <HairlineList label={label}>
+    <ul aria-label={label} className="m-0 list-none p-0">
       {items.map((item) => (
-        <HairlineRow key={item.to} active={item.active} asChild>
+        <li key={item.to}>
           <Link
             to={item.to}
+            className="listen-nav-item"
             aria-current={item.active ? "page" : undefined}
             onClick={onSelect}
           >
-            <span className="flex items-center gap-3">
-              {item.icon}
-              <span>{item.label}</span>
-            </span>
+            {item.icon}
+            <span>{item.label}</span>
           </Link>
-        </HairlineRow>
+        </li>
       ))}
-    </HairlineList>
+    </ul>
   );
 }
 
@@ -74,7 +72,9 @@ export function SidebarNavigationView({
   collectionActive: boolean;
   onToggleExpanded: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [requestedOpen, setOpen] = useState(false);
+  const pinnedOpen = expanded && collectionActive;
+  const open = pinnedOpen || requestedOpen;
   const [position, setPosition] = useState({ left: 56, top: 0 });
   const trigger = useRef<HTMLButtonElement>(null);
   const popover = useRef<HTMLDivElement>(null);
@@ -148,7 +148,9 @@ export function SidebarNavigationView({
           aria-label={collectionLabel}
           aria-expanded={open}
           aria-controls={open ? id : undefined}
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            if (!pinnedOpen) setOpen(!requestedOpen);
+          }}
         >
           <Collection size={CRATE_ICON_SIZE.navMobile} />
           {expanded && (

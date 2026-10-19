@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { Link, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -47,6 +47,30 @@ function scrollWindowTo(y: number) {
 }
 
 describe("Shell", () => {
+  it("uses the same navigation item recipe for Collection children and first-level destinations", async () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library?tab=artists" });
+    const nav = screen.getByRole("navigation", { name: "Collection" });
+    expect(within(nav).getByRole("link", { name: "Artists" })).toBeVisible();
+    await userEvent.click(
+      within(nav).getByRole("button", { name: "Collection" }),
+    );
+    expect(within(nav).getByRole("link", { name: "Artists" })).toHaveClass(
+      "listen-nav-item",
+    );
+    expect(within(nav).getByRole("link", { name: "Music" })).toHaveClass(
+      "listen-nav-item",
+    );
+    expect(
+      within(nav).getByRole("button", { name: "Collection" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(within(nav).getByRole("link", { name: "Albums" }));
+    expect(within(nav).getByRole("link", { name: "Artists" })).toBeVisible();
+    await userEvent.click(within(nav).getByRole("link", { name: "Music" }));
+    expect(
+      within(nav).queryByRole("link", { name: "Artists" }),
+    ).not.toBeInTheDocument();
+  });
   it("adds the ordinary header hairline after scrolling", async () => {
     viewportState.isDesktop = true;
     renderWithListenProviders(<Shell />, { route: "/library" });

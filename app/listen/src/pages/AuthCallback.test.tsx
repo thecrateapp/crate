@@ -64,6 +64,12 @@ describe("AuthCallback", () => {
     window.history.replaceState({}, "", "/");
   });
 
+  it("shows access progress while the callback restores the session", () => {
+    mockRefetch.mockReturnValue(new Promise(() => {}));
+    renderWithI18n();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  });
+
   it("hydrates auth before navigating to the next route", async () => {
     mockRefetch.mockResolvedValueOnce({ id: 1 });
 
@@ -179,8 +185,8 @@ describe("AuthCallback", () => {
     expect(
       screen
         .getByRole("heading", { name: "Volver a Crate" })
-        .closest(".shadow-card"),
-    ).toHaveClass("shadow-card");
+        .closest("[data-slot=auth-frame]"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir Crate" })).toBeVisible();
   });
 

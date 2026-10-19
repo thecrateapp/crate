@@ -707,9 +707,12 @@ describe("V3 row metadata", () => {
         }}
       />,
     );
-    expect(screen.getByText("124 · 8A")).toHaveClass("crate-track-analysis");
+    expect(screen.getByText("124")).toHaveClass("crate-track-bpm");
+    expect(screen.getByText("8A")).toHaveClass("crate-track-key");
     expect(screen.getByText("4:03")).toHaveClass("font-mono", "tabular-nums");
-    expect(screen.getByText("FLAC 24/96")).toHaveClass("crate-track-quality");
+    expect(
+      screen.getByText("Hi-Res 24/96").closest('[data-slot="info-badge"]'),
+    ).toHaveAttribute("data-quality-tier", "hi-res");
   });
   it("keeps unavailable analysis absent rather than inventing zero values", () => {
     const { container } = renderWithListenProviders(

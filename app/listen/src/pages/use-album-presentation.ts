@@ -21,11 +21,7 @@ import {
   buildAlbumTrackRowData,
 } from "@/pages/album-presentation-model";
 
-const ALBUM_MOBILE_HERO_SPACING = {
-  "--album-mobile-action-overlap": "2rem",
-  "--album-mobile-info-action-gap": "20px",
-  "--album-mobile-info-y": "0px",
-} as CSSProperties;
+import { ALBUM_MOBILE_HERO_SPACING } from "@/components/album/AlbumHeroFrame";
 
 function trackPreviewId(track: AlbumTrack) {
   return track.entity_uid ? `track-${track.entity_uid}` : undefined;
