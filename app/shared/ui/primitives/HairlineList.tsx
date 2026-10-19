@@ -87,7 +87,7 @@ export function HairlineRow({
       <Content
         className={cn(
           "min-w-0 flex-1",
-          truncate && "truncate",
+          truncate ? "truncate" : "wrap-anywhere",
           muted ? "text-text-subtle" : "text-text-primary",
         )}
       >
@@ -102,7 +102,7 @@ export function HairlineRow({
     </>
   );
   const layout =
-    "flex min-h-8 items-baseline gap-3.5 py-2.5 [@media(pointer:coarse)]:min-h-11";
+    "flex min-h-8 items-baseline gap-3.5 px-3 py-2.5 text-left font-[family-name:var(--font-brand)] text-xs font-normal leading-normal [@media(pointer:coarse)]:min-h-11";
 
   return (
     <li

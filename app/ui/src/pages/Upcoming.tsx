@@ -1,7 +1,32 @@
+import { EventDate } from "@/components/ui/EventDate";
+import { EventRow } from "@/components/ui/EventRow";
+import {
+  ExternalLink as RowOpen,
+  Download as RowDownload,
+  X as RowDismiss,
+  CRATE_ICON_SIZE,
+} from "@crate/ui/icons";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  CalendarSync as HeaderCalendarSync,
+  Eraser as HeaderEraser,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  List,
+  CalendarDays,
+} from "lucide-react";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { Link } from "react-router";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import {
@@ -20,15 +45,6 @@ import {
   filterUpcomingItems,
 } from "./upcoming-filters";
 import { toast } from "sonner";
-import {
-  Loader2,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  List,
-  CalendarDays,
-} from "lucide-react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -284,7 +300,42 @@ export function Upcoming() {
   return (
     <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              {canCurateShows ? (
+                <PageHeaderAction
+                  label="Sync shows"
+                  onClick={syncShows}
+                  disabled={syncing}
+                >
+                  {syncing ? (
+                    <Loader2
+                      data-admin-ux="upcoming-sync"
+                      aria-hidden="true"
+                      size={14}
+                      className="animate-spin"
+                    />
+                  ) : null}
+                  {!syncing ? (
+                    <HeaderCalendarSync
+                      data-admin-ux="header-sync-shows"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </PageHeaderAction>
+              ) : null}
+              {isAdmin ? (
+                <PageHeaderAction label="Clear caches" onClick={clearCaches}>
+                  <HeaderEraser
+                    data-admin-ux="header-clear-caches"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+              ) : null}
+            </PageHeaderActions>
+          }
+        >
           <div className="min-w-0 flex-1 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-3">
@@ -344,47 +395,15 @@ export function Upcoming() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <CrateChip active>{releaseCount} releases</CrateChip>
-              <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+              <InfoBadge active>{releaseCount} releases</InfoBadge>
+              <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                 {showCount} shows
-              </CrateChip>
-              <CrateChip>{upcoming.length} upcoming</CrateChip>
-              {past.length > 0 && <CrateChip>{past.length} archived</CrateChip>}
+              </InfoBadge>
+              <InfoBadge>{upcoming.length} upcoming</InfoBadge>
+              {past.length > 0 && <InfoBadge>{past.length} archived</InfoBadge>}
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {canCurateShows ? (
-              <Button
-                className="min-h-11"
-                size="sm"
-                onClick={syncShows}
-                disabled={syncing}
-              >
-                {syncing ? (
-                  <Loader2
-                    data-admin-ux="upcoming-sync"
-                    aria-hidden="true"
-                    size={14}
-                    className="animate-spin"
-                  />
-                ) : null}
-                Sync shows
-              </Button>
-            ) : null}
-            {isAdmin ? (
-              <Button
-                className="min-h-11"
-                size="sm"
-                variant="outline"
-                onClick={clearCaches}
-                title="Clear caches"
-              >
-                Clear caches
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        </PageHeaderLayout>
 
         <div className="mt-5 rounded-md border border-white/8 bg-white/[0.03] p-3">
           <div className="flex flex-wrap items-start gap-4">
@@ -415,7 +434,10 @@ export function Upcoming() {
 
             {availableGenres.length > 0 && (
               <div className="crate-form-field">
-                <span className="font-mono text-meta text-text-muted">
+                <span
+                  data-slot="form-field-label"
+                  className="font-mono text-meta text-text-muted"
+                >
                   Genre
                 </span>
                 <AdminSelect
@@ -435,7 +457,10 @@ export function Upcoming() {
 
             {availableCities.length > 0 && (
               <div className="crate-form-field">
-                <span className="font-mono text-meta text-text-muted">
+                <span
+                  data-slot="form-field-label"
+                  className="font-mono text-meta text-text-muted"
+                >
                   City
                 </span>
                 <AdminSelect
@@ -456,7 +481,7 @@ export function Upcoming() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {(["all", "releases", "shows"] as const).map((f) => (
-              <CratePill
+              <FilterChip
                 key={f}
                 active={filter === f}
                 onClick={() => {
@@ -468,7 +493,7 @@ export function Upcoming() {
                 }}
               >
                 {f === "all" ? "All items" : f}
-              </CratePill>
+              </FilterChip>
             ))}
           </div>
         </div>
@@ -592,7 +617,7 @@ function MonthGroup({
         <div className="font-mono text-xs font-normal uppercase tracking-[0.22em] text-white/35">
           {label}
         </div>
-        <CrateChip>{items.length} items</CrateChip>
+        <InfoBadge>{items.length} items</InfoBadge>
       </div>
       <div className="space-y-2">
         {items.map((item) => {
@@ -635,156 +660,126 @@ function EventCard({
   onClick?: () => void;
 }) {
   const primaryArtist = getPrimaryArtist(item);
-  const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
-  const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    : "";
   const timeStr = item.time ? item.time.slice(0, 5) : "";
   const albumHref = getReleaseAlbumHref(item);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      className={cn(
-        "group relative overflow-hidden rounded-md border p-3.5 transition-[background-color,border-color,box-shadow] duration-200",
-        "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl",
-        item.tidal_url
-          ? "border-primary/25 shadow-none"
-          : "border-white/10 hover:border-white/20",
-      )}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 opacity-70 transition-opacity group-hover:opacity-100",
-          "bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.14),transparent_48%)]",
-        )}
-      />
-      <div className="relative flex flex-wrap items-center gap-4">
-        {/* Thumbnail */}
-        <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-md bg-secondary/60 shadow-[0_16px_36px_rgba(0,0,0,0.22)]">
+    <EventRow
+      artwork={
+        <>
           {item.cover_url ? (
             <img
               src={item.cover_url}
               alt=""
-              className="w-full h-full object-cover"
+              className="size-full object-cover"
             />
           ) : null}
-          {item.status === "downloading" && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+          {item.status === "downloading" ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-surface-canvas/60">
               <Loader2
                 data-admin-ux="upcoming-download-loading"
                 aria-hidden="true"
                 size={16}
-                className="text-primary animate-spin"
+                className="animate-spin text-accent-action-hi"
               />
             </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1 basis-40">
-          <div className="flex flex-wrap items-center gap-2">
-            {albumHref ? (
-              <Link
-                to={albumHref}
-                className="font-sans truncate text-sm font-medium text-white transition-colors hover:text-primary"
-              >
-                {item.title}
-              </Link>
-            ) : (
-              <span className="font-sans truncate text-sm font-medium text-white">
-                {item.title}
-              </span>
-            )}
-            {item.tidal_url && <CrateChip active>Lossless</CrateChip>}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-white/55">
-            <ArtistTextLink
-              artist={primaryArtist}
-              className="hover:text-foreground transition-colors"
-            >
-              {item.artist}
-            </ArtistTextLink>
-            <span className="text-muted-foreground/40">&middot;</span>
-            <span>{item.subtitle}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <CrateChip>{item.status}</CrateChip>
-            {item.is_upcoming && <CrateChip active>Upcoming</CrateChip>}
-            {timeStr && <CrateChip>{timeStr}</CrateChip>}
-          </div>
-        </div>
-
-        {/* Date */}
-        <div
-          className={cn(
-            "flex-shrink-0 rounded-md border px-3 py-2 text-right shadow-[0_14px_34px_rgba(0,0,0,0.18)]",
-            "border-primary/20 bg-primary/10 text-primary",
-          )}
-        >
-          <div className="font-mono text-xs font-normal">{dateStr}</div>
-          {timeStr && (
-            <div className="font-mono text-[10px] text-white/45">{timeStr}</div>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
+          ) : null}
+        </>
+      }
+      date={<EventDate date={item.date} />}
+      actions={
+        <PageHeaderActions label={`Actions for ${item.title}`}>
           {albumHref ? (
-            <Link
-              to={albumHref}
-              className="inline-flex min-h-11 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
-              onClick={(event) => event.stopPropagation()}
-            >
-              Open album
-            </Link>
+            <PageHeaderAction asChild label="Open album" tooltip="Open album">
+              <Link to={albumHref} onClick={(event) => event.stopPropagation()}>
+                <RowOpen
+                  data-admin-ux="upcoming-open-album"
+                  aria-hidden="true"
+                  size={CRATE_ICON_SIZE.lg}
+                />
+              </Link>
+            </PageHeaderAction>
           ) : null}
           {item.status === "detected" &&
-            item.tidal_url &&
-            onDownload &&
-            item.release_id && (
-              <Button
-                size="sm"
-                className="min-h-11"
-                aria-label="Download release"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDownload(item.release_id!);
-                }}
-                title="Download release"
-              >
-                Download
-              </Button>
-            )}
-          {onDismiss && item.release_id && item.status === "detected" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="min-h-11 min-w-11"
-              onClick={(e) => {
-                e.stopPropagation();
+          item.tidal_url &&
+          onDownload &&
+          item.release_id ? (
+            <PageHeaderAction
+              label="Download release"
+              tooltip="Download"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDownload(item.release_id!);
+              }}
+            >
+              <RowDownload
+                data-admin-ux="upcoming-download"
+                aria-hidden="true"
+                size={CRATE_ICON_SIZE.lg}
+              />
+            </PageHeaderAction>
+          ) : null}
+          {onDismiss && item.release_id && item.status === "detected" ? (
+            <PageHeaderAction
+              label="Dismiss release"
+              tooltip="Dismiss"
+              onClick={(event) => {
+                event.stopPropagation();
                 onDismiss(item.release_id!);
               }}
-              title="Dismiss release"
             >
-              <X
+              <RowDismiss
                 data-admin-ux="upcoming-dismiss"
                 aria-hidden="true"
-                size={14}
+                size={CRATE_ICON_SIZE.lg}
               />
-            </Button>
-          )}
-        </div>
+            </PageHeaderAction>
+          ) : null}
+        </PageHeaderActions>
+      }
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {albumHref ? (
+          <Link
+            to={albumHref}
+            className="truncate text-sm font-medium text-text-primary"
+          >
+            {item.title}
+          </Link>
+        ) : (
+          <span className="truncate text-sm font-medium text-text-primary">
+            {item.title}
+          </span>
+        )}
       </div>
-    </div>
+      <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-text-secondary">
+        <ArtistTextLink artist={primaryArtist}>{item.artist}</ArtistTextLink>
+        <span aria-hidden="true">·</span>
+        <span className="truncate">{item.subtitle}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {item.tidal_url ? <InfoBadge tone="accent">Lossless</InfoBadge> : null}
+        <InfoBadge>{item.status}</InfoBadge>
+        {item.is_upcoming ? (
+          <InfoBadge tone="accent">Upcoming</InfoBadge>
+        ) : null}
+        {timeStr ? <InfoBadge>{timeStr}</InfoBadge> : null}
+      </div>
+    </EventRow>
   );
 }
 
@@ -1059,8 +1054,8 @@ function ReleasePopoverContent({
             {item.artist}
           </ArtistTextLink>
           <div className="flex items-center gap-1.5 mt-1">
-            {item.subtitle && <CrateChip>{item.subtitle}</CrateChip>}
-            {item.tidal_url && <CrateChip active>LOSSLESS</CrateChip>}
+            {item.subtitle && <InfoBadge>{item.subtitle}</InfoBadge>}
+            {item.tidal_url && <InfoBadge active>LOSSLESS</InfoBadge>}
           </div>
         </div>
       </div>
@@ -1093,9 +1088,9 @@ function ReleasePopoverContent({
             </div>
           )}
         {item.status === "downloaded" && (
-          <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+          <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
             Downloaded
-          </CrateChip>
+          </InfoBadge>
         )}
         {item.status === "downloading" && (
           <div className="font-mono font-normal flex items-center gap-1.5 text-xs text-primary">

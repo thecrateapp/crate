@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   useCallback,
   useEffect,
@@ -38,7 +39,6 @@ import {
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
 import { albumApiPath, albumPagePath } from "@/lib/library-routes";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface AlbumCardProps {
   artist: string;
@@ -231,13 +231,13 @@ export function AlbumCardArtworkBadges({
         className="absolute left-2 top-2 z-10"
       />
       {isPreRelease ? (
-        <CrateBadge
+        <InfoBadge
           surface="overlay"
           icon={Clock}
           className="absolute bottom-2 left-2 z-10"
         >
           {t("radar.release.preRelease")}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
     </>
   );

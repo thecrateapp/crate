@@ -1,10 +1,10 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 import { Sparkles } from "@crate/ui/icons";
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 import { notify } from "@crate/ui/lib/notify";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
@@ -245,9 +245,9 @@ export function HomePlaylist() {
         description={data.description}
         metaItems={playlistMetaItems}
         badges={
-          <CrateBadge size="md" icon={Sparkles} className="w-fit">
+          <InfoBadge icon={Sparkles} className="w-fit">
             {data.badge}
-          </CrateBadge>
+          </InfoBadge>
         }
         artwork={renderArtwork}
         onPlay={handlePlay}

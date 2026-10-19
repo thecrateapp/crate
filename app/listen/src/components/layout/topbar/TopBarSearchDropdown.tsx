@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@crate/ui/icons";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { cn } from "@/lib/utils";
 
@@ -123,9 +124,9 @@ export function TopBarSearchDropdown({
               </div>
               <div className="flex shrink-0 items-center gap-1.5 text-xs">
                 {item.origin === "remote" ? (
-                  <CrateBadge icon={Server}>
+                  <InfoBadge icon={Server}>
                     {item.nodeName || t("search.remoteSource")}
-                  </CrateBadge>
+                  </InfoBadge>
                 ) : null}
                 <span className="capitalize text-text-primary/20">
                   {t("search.resultType." + item.type)}

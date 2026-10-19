@@ -27,14 +27,26 @@ describe("Translations reviewed visual contract", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
       "font-display",
     );
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
     await user.click(screen.getByRole("tab", { name: "Editor" }));
     expect(screen.getByText("Select a bundle to review")).toBeVisible();
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
     await user.click(screen.getByRole("tab", { name: "Bundles" }));
     await user.click(screen.getByRole("radio", { name: "Rejected" }));
     expect(screen.getByText("No bundles match filters")).toBeVisible();
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
   });
   it("keeps refresh and loading glyphs with accessible loading status", async () => {
     let resolve!: (value: unknown) => void;
@@ -57,7 +69,11 @@ describe("Translations reviewed visual contract", () => {
       resolve(responses["/api/admin/i18n/listen/requests"]),
     );
     expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
   });
   it("keeps real editor metadata, labelled translation fields and named pending publish", async () => {
     const user = userEvent.setup();
@@ -72,7 +88,11 @@ describe("Translations reviewed visual contract", () => {
     expect(
       screen.getByLabelText("Translation for player.play").parentElement,
     ).toHaveClass("crate-form-field");
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
     let finish!: (value: unknown) => void;
     mockedApi.mockImplementationOnce(
       () =>
@@ -97,6 +117,10 @@ describe("Translations reviewed visual contract", () => {
       }),
     );
     expect(button).toBeDisabled();
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
   });
 });

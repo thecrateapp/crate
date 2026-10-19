@@ -13,7 +13,7 @@ for (const width of [1440, 768, 390]) {
         main
           .getByRole("button", { name: "Refresh", exact: true })
           .locator("svg"),
-      ).toHaveCount(0);
+      ).toHaveAttribute("data-admin-ux", "header-refresh");
       await main.getByRole("button", { name: "Pause live" }).click();
       await expect(
         main.getByRole("button", { name: "Resume live" }).locator("svg"),

@@ -98,7 +98,9 @@ describe("Discovery text presentation with real hooks", () => {
       "Open full radar",
     ])
       for (const button of screen.getAllByRole("button", { name }))
-        expect(button).toHaveClass("min-h-11");
+        if (button.closest('[data-slot="admin-page-header"]'))
+          expect(button).toHaveAttribute("data-size", "icon-lg");
+        else expect(button).toHaveClass("min-h-11");
     expect(mockApi.mock.calls.map(([path]) => path).sort()).toEqual([
       "/api/acquisition/new-releases?status=detected",
       "/api/discover/completeness",

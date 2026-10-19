@@ -114,7 +114,7 @@ export function ArtistShowsSection({
               {show.status === "onsale" && (
                 <Badge
                   variant="outline"
-                  className="text-[9px] px-1 py-0 border-accent-action/30 text-accent-action-hi"
+                  className="border-accent-action/30 text-accent-action-hi"
                 >
                   On Sale
                 </Badge>

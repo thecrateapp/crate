@@ -81,7 +81,10 @@ export function TranslationOverlay() {
             <Field label="Quality status" value="Not checked locally" />
 
             <label className="crate-form-field">
-              <span className="block text-xs font-bold uppercase tracking-label text-text-primary/35">
+              <span
+                data-slot="form-field-label"
+                className="block text-xs font-bold uppercase tracking-label text-text-primary/35"
+              >
                 Current value
               </span>
               <textarea

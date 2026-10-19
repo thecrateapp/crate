@@ -1,3 +1,4 @@
+import { PageHeaderLayout } from "@/components/layout/PageHeader";
 import { useEffect, useMemo, useState } from "react";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
@@ -51,7 +52,7 @@ export function Roles() {
   return (
     <div className="space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-wrap items-center gap-3">
+        <PageHeaderLayout>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
               Roles & Permissions
@@ -60,7 +61,7 @@ export function Roles() {
               System role presets mapped to explicit backend capabilities.
             </p>
           </div>
-        </div>
+        </PageHeaderLayout>
       </section>
 
       <Card className="border-white/10 bg-panel-surface">
@@ -105,7 +106,7 @@ export function Roles() {
                       <Badge
                         key={capability}
                         variant="secondary"
-                        className="max-w-full whitespace-normal break-all font-mono font-normal text-[11px]"
+                        className="max-w-full"
                       >
                         {capability}
                       </Badge>
@@ -140,7 +141,7 @@ export function Roles() {
                   <Badge
                     key={capability}
                     variant="outline"
-                    className="max-w-full whitespace-normal break-all font-mono font-normal text-[11px] text-white/68"
+                    className="max-w-full text-white/68"
                   >
                     {capability}
                   </Badge>

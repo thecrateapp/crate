@@ -11,7 +11,48 @@ export default defineConfig({
     {
       name: "admin-navigation-preview-only",
       enforce: "pre",
+      transform(code, id) {
+        if (
+          id ===
+          fileURLToPath(
+            new URL(
+              "../../app/ui/src/pages/PlaylistEditor.tsx",
+              import.meta.url,
+            ),
+          )
+        )
+          return {
+            code: `import { EditorEventSource as EventSource } from ${JSON.stringify(fileURLToPath(new URL("admin-playlist-editor-fixtures.ts", import.meta.url)))};\n${code}`,
+            map: null,
+          };
+      },
       resolveId(source, importer) {
+        if (importer?.endsWith("/app/ui/src/pages/PlaylistEditor.tsx")) {
+          if (
+            ["@/lib/api", "@/hooks/use-api", "@/hooks/use-llm"].includes(source)
+          )
+            return fileURLToPath(
+              new URL("admin-playlist-editor-fixtures.ts", import.meta.url),
+            );
+          if (source === "@/components/ui/AIButton")
+            return (
+              fileURLToPath(
+                new URL(
+                  "../../app/ui/src/components/ui/AIButton.tsx",
+                  import.meta.url,
+                ),
+              ) + "?editor-preview"
+            );
+        }
+        if (
+          importer?.endsWith(
+            "/app/ui/src/components/ui/AIButton.tsx?editor-preview",
+          ) &&
+          source === "@/hooks/use-llm"
+        )
+          return fileURLToPath(
+            new URL("admin-playlist-editor-fixtures.ts", import.meta.url),
+          );
         if (
           (importer?.endsWith("/app/ui/src/pages/Playlists.tsx") &&
             source === "@/lib/api") ||
@@ -180,6 +221,12 @@ export default defineConfig({
         ),
         adminPlaylists: fileURLToPath(
           new URL("admin-playlists-demo.html", import.meta.url),
+        ),
+        badgeNormalization: fileURLToPath(
+          new URL("badge-normalization-demo.html", import.meta.url),
+        ),
+        adminPlaylistEditor: fileURLToPath(
+          new URL("admin-playlist-editor-demo.html", import.meta.url),
         ),
         adminUpcoming: fileURLToPath(
           new URL("admin-upcoming-demo.html", import.meta.url),

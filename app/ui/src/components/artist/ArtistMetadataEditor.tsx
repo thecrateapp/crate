@@ -217,7 +217,12 @@ export function ArtistMetadataEditor({
               <h3 className="text-sm font-medium text-white/75">Identity</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">MusicBrainz ID</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    MusicBrainz ID
+                  </span>
                   <Input
                     value={values.mbid}
                     onChange={(event) =>
@@ -226,7 +231,12 @@ export function ArtistMetadataEditor({
                   />
                 </label>
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">Bandcamp URL</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    Bandcamp URL
+                  </span>
                   <Input
                     value={values.bandcamp_url}
                     onChange={(event) =>
@@ -235,7 +245,12 @@ export function ArtistMetadataEditor({
                   />
                 </label>
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">Country</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    Country
+                  </span>
                   <Input
                     value={values.country}
                     onChange={(event) =>
@@ -244,7 +259,12 @@ export function ArtistMetadataEditor({
                   />
                 </label>
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">Area</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    Area
+                  </span>
                   <Input
                     value={values.area}
                     onChange={(event) =>
@@ -253,7 +273,12 @@ export function ArtistMetadataEditor({
                   />
                 </label>
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">Formed</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    Formed
+                  </span>
                   <Input
                     value={values.formed}
                     onChange={(event) =>
@@ -263,7 +288,12 @@ export function ArtistMetadataEditor({
                   />
                 </label>
                 <label className="crate-form-field text-sm">
-                  <span className="text-muted-foreground">Ended</span>
+                  <span
+                    data-slot="form-field-label"
+                    className="text-muted-foreground"
+                  >
+                    Ended
+                  </span>
                   <Input
                     value={values.ended}
                     onChange={(event) =>

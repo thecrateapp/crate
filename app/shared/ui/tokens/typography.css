@@ -1,12 +1,20 @@
 /* crate-ui — Typography */
 
 :root {
+  --info-badge-height: 24px;
+  --info-badge-padding-x: 8px;
+  --info-badge-padding-y: 3px;
+  --info-counter-padding-x: 6px;
   --type-meta-size: 0.65625rem;
 }
 
 @theme inline {
   --font-display: var(--font-display-stack);
   --font-mono: var(--font-mono-stack);
+  --text-info-badge: 0.75rem;
+  --text-info-badge--line-height: 1rem;
+  --text-filter-chip: 0.75rem;
+  --text-filter-chip--line-height: 1rem;
   --text-meta: var(--type-meta-size);
   --text-meta--line-height: 1rem;
   --text-label: 0.6875rem;

@@ -1,6 +1,23 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  FilePlus2 as HeaderFilePlus2,
+  ListPlus as HeaderListPlus,
+  Loader2,
+  Pencil,
+  Power,
+  PowerOff,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useCallback,
   useEffect,
@@ -9,7 +26,6 @@ import {
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -17,7 +33,7 @@ import {
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -174,20 +190,20 @@ function getOpsForField(field: string) {
 
 function getGenerationChip(status?: string) {
   if (status === "running") {
-    return <CrateChip active>Generating</CrateChip>;
+    return <InfoBadge active>Generating</InfoBadge>;
   }
   if (status === "queued") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
+      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Queued
-      </CrateChip>
+      </InfoBadge>
     );
   }
   if (status === "failed") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
+      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Failed
-      </CrateChip>
+      </InfoBadge>
     );
   }
   return null;
@@ -220,9 +236,9 @@ function TogglePill({
   onClick: () => void;
 }) {
   return (
-    <CratePill active={active} onClick={onClick}>
+    <FilterChip active={active} onClick={onClick}>
       {label}
-    </CratePill>
+    </FilterChip>
   );
 }
 
@@ -351,7 +367,40 @@ export function Playlists() {
   return (
     <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              <PageHeaderAction
+                label="New static"
+                onClick={() =>
+                  setComposerMode((current) =>
+                    current === "static" ? null : "static",
+                  )
+                }
+                aria-pressed={composerMode === "static"}
+              >
+                <HeaderFilePlus2
+                  data-admin-ux="header-new-static"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="New smart"
+                onClick={() =>
+                  setComposerMode((current) =>
+                    current === "smart" ? null : "smart",
+                  )
+                }
+                aria-pressed={composerMode === "smart"}
+              >
+                <HeaderListPlus
+                  data-admin-ux="header-new-smart"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+            </PageHeaderActions>
+          }
+        >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <div>
@@ -365,34 +414,7 @@ export function Playlists() {
               </div>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              className="min-h-11"
-              variant={composerMode === "static" ? "default" : "outline"}
-              onClick={() =>
-                setComposerMode((current) =>
-                  current === "static" ? null : "static",
-                )
-              }
-            >
-              New static
-            </Button>
-            <Button
-              size="sm"
-              className="min-h-11"
-              variant={composerMode === "smart" ? "default" : "outline"}
-              onClick={() =>
-                setComposerMode((current) =>
-                  current === "smart" ? null : "smart",
-                )
-              }
-            >
-              New smart
-            </Button>
-          </div>
-        </div>
+        </PageHeaderLayout>
 
         <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
@@ -436,7 +458,7 @@ export function Playlists() {
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {FILTER_OPTIONS.map((item) => (
-                <CratePill
+                <FilterChip
                   key={item.key}
                   active={filter === item.key}
                   onClick={() => setFilter(item.key)}
@@ -451,7 +473,7 @@ export function Playlists() {
                           ? counts.smart
                           : counts.inactive}
                   </span>
-                </CratePill>
+                </FilterChip>
               ))}
             </div>
 
@@ -505,12 +527,12 @@ export function Playlists() {
           {filteredPlaylists.map((playlist) => (
             <Card
               key={playlist.id}
-              className="overflow-hidden border-white/10 bg-card"
+              className="@container overflow-hidden border-white/10 bg-card py-0"
             >
               <div
                 role="link"
                 tabIndex={0}
-                className="flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors  lg:flex-row lg:items-stretch"
+                className="flex cursor-pointer flex-col gap-4 p-4 @2xl:flex-row @2xl:items-start"
                 onClick={() => navigate(`/playlists/${playlist.id}`)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -524,26 +546,26 @@ export function Playlists() {
                   name={playlist.name}
                   coverDataUrl={playlist.cover_data_url}
                   tracks={playlist.artwork_tracks}
-                  className="h-24 w-24 shrink-0 rounded-md border border-white/10 bg-white/[0.03] lg:h-auto lg:min-h-[104px] lg:w-[104px]"
+                  className="h-24 w-24 shrink-0 rounded-md border border-white/10 bg-white/[0.03] @2xl:h-26 @2xl:w-26"
                 />
 
-                <div className="min-w-0 flex-1 space-y-2 lg:flex lg:flex-col lg:justify-center">
+                <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="truncate text-sm font-semibold md:text-base">
                       {playlist.name}
                     </h2>
-                    <CrateChip>system</CrateChip>
-                    <CrateChip active={playlist.generation_mode === "smart"}>
+                    <InfoBadge>system</InfoBadge>
+                    <InfoBadge active={playlist.generation_mode === "smart"}>
                       {playlist.generation_mode}
-                    </CrateChip>
+                    </InfoBadge>
                     {playlist.is_curated ? (
-                      <CrateChip>curated</CrateChip>
+                      <InfoBadge>curated</InfoBadge>
                     ) : null}
                     {!playlist.is_active ? (
-                      <CrateChip>inactive</CrateChip>
+                      <InfoBadge>inactive</InfoBadge>
                     ) : null}
                     {playlist.category ? (
-                      <CrateChip>{playlist.category}</CrateChip>
+                      <InfoBadge>{playlist.category}</InfoBadge>
                     ) : null}
                     {getGenerationChip(playlist.generation_status)}
                   </div>
@@ -561,57 +583,70 @@ export function Playlists() {
                   )}
 
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <CrateChip>{playlist.track_count} tracks</CrateChip>
-                    <CrateChip>
+                    <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+                    <InfoBadge>
                       {fmtDuration(playlist.total_duration)}
-                    </CrateChip>
-                    <CrateChip>
+                    </InfoBadge>
+                    <InfoBadge>
                       {playlist.follower_count} follower
                       {playlist.follower_count === 1 ? "" : "s"}
-                    </CrateChip>
+                    </InfoBadge>
                     {playlist.featured_rank != null ? (
-                      <CrateChip>Rank {playlist.featured_rank}</CrateChip>
+                      <InfoBadge>Rank {playlist.featured_rank}</InfoBadge>
                     ) : null}
                     {playlist.last_generated_at ? (
-                      <CrateChip>
+                      <InfoBadge>
                         Generated {timeAgo(playlist.last_generated_at)}
-                      </CrateChip>
+                      </InfoBadge>
                     ) : null}
                   </div>
                 </div>
 
                 <div
-                  className="flex min-w-0 shrink-0 flex-wrap items-center gap-2"
+                  className="order-first min-w-0 max-w-full shrink-0 self-end @2xl:order-none @2xl:self-start"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <Button
-                    size="sm"
-                    className="min-h-11"
-                    variant="outline"
-                    onClick={() => navigate(`/playlists/${playlist.id}`)}
-                  >
-                    Open editor
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-11"
-                    aria-label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
-                    onClick={() => {
-                      void toggleActive(playlist);
-                    }}
-                  >
-                    {playlist.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-11"
-                    aria-label={`Delete ${playlist.name}`}
-                    onClick={() => setDeleteTarget(playlist)}
-                  >
-                    Delete
-                  </Button>
+                  <PageHeaderActions label={`Actions for ${playlist.name}`}>
+                    <PageHeaderAction
+                      label={`Edit ${playlist.name}`}
+                      tooltip="Edit"
+                      onClick={() => navigate(`/playlists/${playlist.id}`)}
+                    >
+                      <Pencil
+                        data-admin-ux="playlists-open-editor"
+                        aria-hidden="true"
+                      />
+                    </PageHeaderAction>
+                    <PageHeaderAction
+                      label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
+                      tooltip={playlist.is_active ? "Deactivate" : "Activate"}
+                      onClick={() => {
+                        void toggleActive(playlist);
+                      }}
+                    >
+                      {playlist.is_active ? (
+                        <PowerOff
+                          data-admin-ux="playlists-deactivate"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Power
+                          data-admin-ux="playlists-activate"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </PageHeaderAction>
+                    <PageHeaderAction
+                      label={`Delete ${playlist.name}`}
+                      tooltip="Delete"
+                      onClick={() => setDeleteTarget(playlist)}
+                    >
+                      <Trash2
+                        data-admin-ux="playlists-delete"
+                        aria-hidden="true"
+                      />
+                    </PageHeaderAction>
+                  </PageHeaderActions>
                 </div>
               </div>
             </Card>
@@ -733,12 +768,13 @@ function CreateStaticPlaylistPanel({
             />
           </Field>
           <Field label="Category">
-            <SegmentedControl
-              as="radio"
-              label="Category"
+            <AdminSelect
+              placeholder="Category"
               value={category}
-              onValueChange={setCategory}
-              items={CATEGORY_OPTIONS}
+              onChange={setCategory}
+              options={CATEGORY_OPTIONS}
+              allowClear={false}
+              triggerClassName="w-full max-w-none"
             />
           </Field>
           <Field label="Featured rank">
@@ -984,12 +1020,13 @@ function CreateSmartPlaylistPanel({
             />
           </Field>
           <Field label="Category">
-            <SegmentedControl
-              as="radio"
-              label="Category"
+            <AdminSelect
+              placeholder="Category"
               value={category}
-              onValueChange={setCategory}
-              items={CATEGORY_OPTIONS}
+              onChange={setCategory}
+              options={CATEGORY_OPTIONS}
+              allowClear={false}
+              triggerClassName="w-full max-w-none"
             />
           </Field>
           <Field label="Featured rank">
@@ -1023,15 +1060,16 @@ function CreateSmartPlaylistPanel({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Field label="Match" className="min-w-[180px]">
-                <SegmentedControl
-                  as="radio"
-                  label="Match"
+                <AdminSelect
+                  placeholder="Match"
                   value={match}
-                  onValueChange={(value) => setMatch(value as "all" | "any")}
-                  items={[
+                  onChange={(value) => setMatch(value as "all" | "any")}
+                  options={[
                     { value: "all", label: "All rules" },
                     { value: "any", label: "Any rule" },
                   ]}
+                  allowClear={false}
+                  triggerClassName="w-full max-w-none"
                 />
               </Field>
               <Field label="Limit" className="w-[120px]">
@@ -1045,12 +1083,13 @@ function CreateSmartPlaylistPanel({
                 />
               </Field>
               <Field label="Sort" className="min-w-[180px]">
-                <SegmentedControl
-                  as="radio"
-                  label="Sort"
+                <AdminSelect
+                  placeholder="Sort"
                   value={sort}
-                  onValueChange={setSort}
-                  items={SORT_OPTIONS}
+                  onChange={setSort}
+                  options={SORT_OPTIONS}
+                  allowClear={false}
+                  triggerClassName="w-full max-w-none"
                 />
               </Field>
             </div>
@@ -1071,23 +1110,26 @@ function CreateSmartPlaylistPanel({
               return (
                 <div
                   key={index}
-                  className="rounded-md border border-white/10 bg-card/60 p-3"
+                  className="@container rounded-md border border-white/10 bg-card/60 p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <CrateChip>Rule {index + 1}</CrateChip>
+                    <InfoBadge>Rule {index + 1}</InfoBadge>
                     <Button
-                      size="sm"
+                      size="icon-lg"
                       variant="ghost"
-                      className="min-h-11"
                       aria-label={`Remove rule ${index + 1}`}
                       onClick={() => removeRule(index)}
                       disabled={rules.length === 1}
+                      title={`Remove rule ${index + 1}`}
                     >
-                      Remove rule
+                      <Trash2
+                        data-admin-ux="playlists-remove-rule"
+                        aria-hidden="true"
+                      />
                     </Button>
                   </div>
 
-                  <div className="grid gap-3 lg:grid-cols-[180px_160px_minmax(0,1fr)]">
+                  <div className="grid gap-3 @xl:grid-cols-[180px_160px_minmax(0,1fr)]">
                     <Field label="Field">
                       <AdminSelect
                         value={rule.field}

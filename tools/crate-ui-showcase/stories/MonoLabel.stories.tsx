@@ -1,0 +1,39 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+const meta = {
+  id: "components-monolabel",
+  title: "Components/Data Display/MonoLabel",
+  component: MonoLabel,
+  args: { children: "Your library", as: "p", size: "label" },
+  argTypes: {
+    as: {
+      control: "select",
+      options: ["p", "span", "div", "h2", "h3", "dt", "figcaption", "legend"],
+    },
+    size: { control: "radio", options: ["label", "eyebrow"] },
+    className: { table: { disable: true } },
+  },
+} satisfies Meta<typeof MonoLabel>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Base: Story = {};
+export const Hierarchy: Story = {
+  render: () => (
+    <div className="showcase-stack">
+      <MonoLabel size="eyebrow" accent="01">
+        Your collection
+      </MonoLabel>
+      <MonoLabel>Metadata</MonoLabel>
+      <MonoLabel meta={["Radiohead", "1997", "12 tracks"]} />
+    </div>
+  ),
+};
+export const LongLabel: Story = {
+  render: () => (
+    <div className="showcase-narrow">
+      <MonoLabel>
+        A long label that may wrap across several lines in a narrow container
+      </MonoLabel>
+    </div>
+  ),
+};

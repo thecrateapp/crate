@@ -1,3 +1,4 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { useEffect, useRef, useState } from "react";
 import {
   Brain,
@@ -20,7 +21,7 @@ import {
 import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Readout } from "@crate/ui/primitives/Readout";
@@ -67,7 +68,7 @@ function EqualizerHeader({
         </Readout>
       </MonoLabel>
       <div className="flex items-center gap-2">
-        <CratePill
+        <FilterChip
           active={eq.smart}
           disabled={!eq.enabled}
           onClick={() => eq.toggleSmart(!eq.smart)}
@@ -77,7 +78,7 @@ function EqualizerHeader({
           {eq.smart && eq.smartStatus === "loading" ? (
             <span className="ml-1 text-xs opacity-60">…</span>
           ) : null}
-        </CratePill>
+        </FilterChip>
         <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
           <Checkbox
             checked={eq.enabled}
@@ -112,7 +113,7 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
       <MonoLabel as="span" className="mr-1">
         {t("player.equalizer.manualHelpers")}
       </MonoLabel>
-      <CratePill
+      <FilterChip
         active={eq.genreAdaptive}
         disabled={!eq.enabled}
         onClick={() => eq.toggleGenreAdaptive(!eq.genreAdaptive)}
@@ -122,8 +123,8 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
         {eq.genreAdaptive && eq.genreAdaptiveStatus === "loading" ? (
           <span className="ml-1 text-xs opacity-60">…</span>
         ) : null}
-      </CratePill>
-      <CratePill
+      </FilterChip>
+      <FilterChip
         active={eq.adaptive}
         disabled={!eq.enabled}
         onClick={() => eq.toggleAdaptive(!eq.adaptive)}
@@ -133,7 +134,7 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
         {eq.adaptive && eq.adaptiveStatus === "loading" ? (
           <span className="ml-1 text-xs opacity-60">…</span>
         ) : null}
-      </CratePill>
+      </FilterChip>
     </div>
   );
 }
@@ -150,7 +151,7 @@ function EqualizerPresetPicker({
   return (
     <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none">
       {EQ_PRESET_LABEL_ENTRIES.map(([name, labelKey]) => (
-        <CratePill
+        <FilterChip
           key={name}
           className={PRESET_CHIP_CLASS_NAME}
           active={
@@ -160,7 +161,7 @@ function EqualizerPresetPicker({
           onClick={() => eq.applyPreset(name)}
         >
           {t(labelKey)}
-        </CratePill>
+        </FilterChip>
       ))}
     </div>
   );

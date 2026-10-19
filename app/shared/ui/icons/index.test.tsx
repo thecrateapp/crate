@@ -15,6 +15,7 @@ import {
 } from "@solar-icons/react-perf/Bold";
 
 import {
+  Bot,
   ArrowDownToLine,
   ArrowDownToLineBold,
   BarChart3,
@@ -34,6 +35,17 @@ function renderSvgInner(ui: React.ReactElement) {
 }
 
 describe("@crate/ui/icons", () => {
+  it("renders the official Bot Outline paths with the normal icon contract", () => {
+    const { container } = render(
+      <Bot size={20} aria-hidden="true" className="ai-glyph" />,
+    );
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveAttribute("width", "20");
+    expect(svg).toHaveAttribute("height", "20");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).toHaveClass("ai-glyph");
+    expect(svg?.querySelectorAll("path")).toHaveLength(4);
+  });
   it("maps size to svg dimensions", () => {
     const { container } = render(<Play size={32} />);
 

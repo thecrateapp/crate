@@ -1857,20 +1857,29 @@
 }
 
 .genre-pill {
+  text-transform: none;
   border-color: var(--border-quiet);
   background: transparent;
   color: var(--text-primary);
 }
 
-.crate-badge {
-  border-color: var(--border-quiet);
-  background: var(--surface-canvas-raised);
-  color: var(--text-primary);
+/* Metadata/state/counters: geometry is independent of generic caption tokens. */
+.crate-info-badge {
+  text-transform: none;
+  height: var(--info-badge-height);
+  min-height: var(--info-badge-height);
+  padding: var(--info-badge-padding-y) var(--info-badge-padding-x);
 }
 
-.crate-badge[data-surface="overlay"] {
+.crate-info-badge[data-variant="counter"] {
+  padding-inline: var(--info-counter-padding-x);
+  font-variant-numeric: tabular-nums;
+}
+
+.crate-info-badge[data-surface="overlay"] {
   border-color: color-mix(in srgb, var(--text-primary) 14%, transparent);
   background: color-mix(in srgb, var(--surface-canvas) 62%, transparent);
+  color: var(--text-primary);
   backdrop-filter: blur(10px);
 }
 
@@ -3414,6 +3423,25 @@ button.genre-pill:hover,
   animation-iteration-count: 1 !important;
 }
 
+/* Field captions share the same uppercase language, including legacy native labels. */
+label,
+[data-slot="form-field-label"] {
+  text-transform: uppercase;
+}
+label
+  :is(
+    input,
+    textarea,
+    select,
+    button,
+    .crate-form-helper,
+    p,
+    [data-slot="form-field-value"]
+  ),
+[data-slot="form-field-label"] :is(input, textarea, select, button) {
+  text-transform: none;
+}
+
 /* Shared form geometry; validation remains with the caller. */
 .crate-form-field {
   display: grid;
@@ -3558,14 +3586,18 @@ button.genre-pill:hover,
 }
 
 .crate-form-chip {
+  text-transform: none;
   min-height: 32px;
-  border-color: var(--border-subtle);
-  background: transparent;
-  color: var(--text-muted);
   transition:
     background-color 150ms ease,
     border-color 150ms ease,
     color 150ms ease;
+}
+
+.crate-form-chip:not([data-tone]) {
+  border-color: var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .crate-form-chip[data-state="inactive"]:not(:disabled):hover {

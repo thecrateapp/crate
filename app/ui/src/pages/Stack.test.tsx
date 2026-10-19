@@ -46,7 +46,7 @@ describe("Stack typographic controls", () => {
     await screen.findByRole("heading", { name: "Stack" });
     expect(
       screen.getByRole("button", { name: "Refresh" }).querySelector("svg"),
-    ).toBeNull();
+    ).toHaveAttribute("data-admin-ux", "header-refresh");
     expect(screen.getByText("2/3 running").querySelector("svg")).toBeNull();
     expect(screen.getByText("1 public routes").querySelector("svg")).toBeNull();
     const restart = screen.getByRole("button", {

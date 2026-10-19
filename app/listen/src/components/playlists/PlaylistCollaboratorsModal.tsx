@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import type { TFunction } from "i18next";
 import {
@@ -10,7 +11,7 @@ import {
 
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { CollaboratorPicker } from "@/components/social/CollaboratorPicker";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
@@ -96,14 +97,14 @@ export function PlaylistCollaboratorsModal({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CrateBadge
+                  <InfoBadge
                     icon={member.role === "owner" ? Star : Users}
                     tone={member.role === "owner" ? "accent" : "neutral"}
                   >
                     {member.role === "owner"
                       ? t("playlist.collaborators.owner")
                       : t("playlist.collaborators.collab")}
-                  </CrateBadge>
+                  </InfoBadge>
                   {isOwner && member.role !== "owner" && !isCurrentUser ? (
                     <Button
                       variant="danger-soft"

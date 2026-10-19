@@ -1,7 +1,7 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import {
   Popover,
   PopoverContent,
@@ -94,9 +94,9 @@ export function ArtistGenreSelector({
           <span className="flex min-w-0 flex-1 flex-wrap gap-1">
             {value.length ? (
               value.map((slug) => (
-                <CrateChip key={slug} active className="max-w-[180px] truncate">
+                <InfoBadge key={slug} active className="max-w-[180px] truncate">
                   {labels.get(slug) ?? slug}
-                </CrateChip>
+                </InfoBadge>
               ))
             ) : (
               <span className="text-white/40">Select canonical genres</span>

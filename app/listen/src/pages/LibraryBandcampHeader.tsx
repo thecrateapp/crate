@@ -1,7 +1,7 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 
 import { StatBox } from "./LibraryPrimitives";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function LibraryBandcampHeader({
   purchases,
@@ -26,9 +26,7 @@ export function LibraryBandcampHeader({
     <div className="rounded-panel border border-accent-action/20 bg-accent-action/10 p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CrateBadge size="md" icon={BandcampLogo}>
-            Bandcamp
-          </CrateBadge>
+          <InfoBadge icon={BandcampLogo}>Bandcamp</InfoBadge>
           <h2 className="mt-3 text-xl font-black text-text-primary">{title}</h2>
           <p className="mt-1 text-sm text-text-muted">{description}</p>
         </div>

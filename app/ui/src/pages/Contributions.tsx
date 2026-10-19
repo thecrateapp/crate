@@ -1,9 +1,13 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 import { Badge } from "@crate/ui/shadcn/badge";
 
@@ -80,7 +84,34 @@ export function Contributions() {
   return (
     <div className="space-y-6">
       <section className="border-b border-border-quiet pb-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              <PageHeaderAction
+                label="Refresh"
+                type="button"
+                disabled={loading}
+                aria-busy={loading}
+                onClick={() => void load()}
+              >
+                {loading ? (
+                  <Loader2
+                    data-admin-ux="contributions-refresh-loading"
+                    aria-hidden="true"
+                    size={16}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!loading ? (
+                  <HeaderRefreshCw
+                    data-admin-ux="header-refresh"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </PageHeaderActions>
+          }
+        >
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">
               Contributions
@@ -90,25 +121,7 @@ export function Contributions() {
               each import.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11"
-            disabled={loading}
-            aria-busy={loading}
-            onClick={() => void load()}
-          >
-            {loading ? (
-              <Loader2
-                data-admin-ux="contributions-refresh-loading"
-                aria-hidden="true"
-                size={16}
-                className="mr-2 animate-spin"
-              />
-            ) : null}
-            Refresh
-          </Button>
-        </div>
+        </PageHeaderLayout>
       </section>
 
       <Card className="border-border-quiet bg-card">

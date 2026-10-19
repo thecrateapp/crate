@@ -34,6 +34,10 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Rule value choices depend on the selected field and catalog facets.",
   'app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:String(rule.value ?? "")':
     "Rule value choices depend on the selected field and catalog facets.",
+  "app/ui/src/pages/Playlists.tsx:AdminSelect:rule.op":
+    "Approved1AP operator Select; comparator options vary with the rule field type.",
+  "app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:rule.op":
+    "Approved1AP operator Select; comparator options vary with the rule field type.",
   "app/ui/src/pages/Settings.tsx:AdminSelect:actionFilter":
     "Audit action kinds are supplied by the operational API.",
   'app/ui/src/pages/Tasks.tsx:AdminSelect:filterType === "all" ? "" : filterType':
@@ -46,6 +50,48 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Locales are obtained from translation bundle metadata; the wrapper is checked per caller.",
   "app/ui/src/pages/I18nReview.tsx:FilterSelect:sourceFilter":
     "Source versions are obtained from translation bundles; the wrapper is checked per caller.",
+};
+
+type FormSelect = { choices: number; sites: number; reason: string };
+// Diego's1AQ amendment: categorical form fields use Select, while existing filter chips stay.
+// Exact cardinality and site count prevent blanket exemptions or accidental extra controls.
+const FORM_SELECTS: Record<string, FormSelect> = {
+  "app/ui/src/pages/Playlists.tsx:AdminSelect:category": {
+    choices: 6,
+    sites: 2,
+    reason: "Category in static/smart creation;1AQ user decision.",
+  },
+  "app/ui/src/pages/Playlists.tsx:AdminSelect:match": {
+    choices: 2,
+    sites: 1,
+    reason: "Match in smart creation; explicit1AQ user reply.",
+  },
+  "app/ui/src/pages/Playlists.tsx:AdminSelect:sort": {
+    choices: 5,
+    sites: 1,
+    reason: "Sort in smart creation; explicit1AQ user reply.",
+  },
+  "app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:category": {
+    choices: 7,
+    sites: 1,
+    reason: "Category plus explicit None in editor;1AQ user decision.",
+  },
+  "app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:match": {
+    choices: 2,
+    sites: 1,
+    reason: "Match in editor; explicit1AQ user reply.",
+  },
+  "app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:sort": {
+    choices: 5,
+    sites: 1,
+    reason: "Sort in editor; explicit1AQ user reply.",
+  },
+  "app/ui/src/pages/PlaylistEditor.tsx:AdminSelect:trackSearchScope": {
+    choices: 2,
+    sites: 1,
+    reason:
+      "Search scope form field;1AQ search-layout feedback, same rules/library values.",
+  },
 };
 
 function unwrap(node: ts.Expression): ts.Expression {
@@ -353,11 +399,21 @@ function inspectControls(source: string, file = "fixture.tsx"): Control[] {
 function violations(
   controls: Control[],
   exceptions: Record<string, string>,
+  formSelects: Record<string, FormSelect> = {},
 ): string[] {
   const failures: string[] = [];
   const used = new Set<string>();
+  const usedForms = new Map<string, number>();
   for (const control of controls) {
     const key = `${control.file}:${control.component}:${control.value}`;
+    const form = formSelects[key];
+    if (form?.reason.trim() && control.count === form.choices) {
+      const count = (usedForms.get(key) ?? 0) + 1;
+      usedForms.set(key, count);
+      if (count > form.sites)
+        failures.push(`${key}: too many form Select sites`);
+      continue;
+    }
     if (control.count !== undefined) {
       if (control.count <= 7)
         failures.push(
@@ -372,6 +428,9 @@ function violations(
   for (const key of Object.keys(exceptions)) {
     if (!used.has(key)) failures.push(`${key}: stale dynamic exception`);
   }
+  for (const [key, form] of Object.entries(formSelects))
+    if ((usedForms.get(key) ?? 0) < form.sites)
+      failures.push(`${key}: stale form Select exception`);
   return failures.sort();
 }
 
@@ -477,6 +536,47 @@ describe("shared short select policy", () => {
     ]);
   });
 
+  it("bounds approved form Selects by value, cardinality, reason and site count", () => {
+    const controls = inspectControls(
+      "<AdminSelect value={category} options={[1,2]} allowClear={false} />",
+    );
+    const form = {
+      "fixture.tsx:AdminSelect:category": {
+        choices: 2,
+        sites: 1,
+        reason: "Reviewed form field.",
+      },
+    };
+    expect(violations(controls, {}, form)).toEqual([]);
+    expect(violations([...controls, ...controls], {}, form)).toEqual([
+      "fixture.tsx:AdminSelect:category: too many form Select sites",
+    ]);
+    expect(violations([], {}, form)).toEqual([
+      "fixture.tsx:AdminSelect:category: stale form Select exception",
+    ]);
+    for (const changed of [
+      { ...controls[0]!, count: 3 },
+      { ...controls[0]!, value: "filter" },
+    ])
+      expect(
+        violations([changed], {}, form).some((v) =>
+          v.includes("must use shared filter chips"),
+        ),
+      ).toBe(true);
+    expect(
+      violations(
+        controls,
+        {},
+        {
+          "fixture.tsx:AdminSelect:category": {
+            ...form["fixture.tsx:AdminSelect:category"],
+            reason: " ",
+          },
+        },
+      ),
+    ).not.toEqual([]);
+  });
+
   it("keeps lexical constants separate and treats unsupported computation as dynamic", () => {
     const controls = inspectControls(`
       function First() { const options = [1,2]; return <AdminSelect value={first} options={options} allowClear={false} />; }
@@ -491,7 +591,7 @@ describe("shared short select policy", () => {
     ]);
   });
 
-  it("uses shared chips for fixed short choices in both apps and documents every dynamic menu", () => {
+  it("keeps reviewed short filters, form Selects and dynamic menus bounded in both apps", () => {
     const repo = resolve(process.cwd(), "../..");
     const controls = ["app/listen/src", "app/ui/src"].flatMap((directory) =>
       sourceFiles(resolve(repo, directory)).flatMap((path) =>
@@ -501,6 +601,6 @@ describe("shared short select policy", () => {
         ),
       ),
     );
-    expect(violations(controls, DYNAMIC_SELECTS)).toEqual([]);
+    expect(violations(controls, DYNAMIC_SELECTS, FORM_SELECTS)).toEqual([]);
   }, 15_000);
 });

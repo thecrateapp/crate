@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
@@ -22,7 +23,6 @@ import {
   buildOfflineLibraryGroups,
   type OfflineLibraryGroup,
 } from "@/pages/offline-library-model";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 function sourceForGroup(group: OfflineLibraryGroup) {
   const { item } = group;
@@ -51,9 +51,7 @@ export function OfflineLibrary() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-5 py-8 text-text-primary sm:px-8">
       <header className="space-y-3">
-        <CrateBadge size="md" icon={HardDrive}>
-          {t("offline.access.status")}
-        </CrateBadge>
+        <InfoBadge icon={HardDrive}>{t("offline.access.status")}</InfoBadge>
         <div>
           <h1 className="text-3xl font-bold">{t("offline.access.title")}</h1>
           <p className="mt-2 text-sm text-text-muted">

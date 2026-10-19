@@ -91,7 +91,15 @@ describe("Dashboard three-block operational summary", () => {
     expect(
       screen.getByText(/Worker availability is not reported/),
     ).toBeVisible();
-    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    expect(container.querySelectorAll("svg")).toHaveLength(3);
+    for (const [name, marker] of [
+      ["Refresh", "header-refresh"],
+      ["Maintenance", "header-maintenance"],
+    ]) {
+      expect(
+        screen.getByRole("button", { name }).querySelector("svg"),
+      ).toHaveAttribute("data-admin-ux", marker);
+    }
   });
   it("shows reported progress, daemon activity and dated historical failures without false urgency", () => {
     mount();

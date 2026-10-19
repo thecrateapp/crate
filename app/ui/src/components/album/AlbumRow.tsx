@@ -1,8 +1,8 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Link } from "react-router";
 import { Music } from "lucide-react";
 import { useState } from "react";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import {
   albumCoverApiUrl,
   albumPagePath,
@@ -115,7 +115,7 @@ export function AlbumRow({
         </span>
       ) : null}
       {format ? (
-        <CrateChip>{format.replace(".", "").toUpperCase()}</CrateChip>
+        <InfoBadge>{format.replace(".", "").toUpperCase()}</InfoBadge>
       ) : null}
       {size_mb !== undefined ? (
         <span className="hidden w-16 text-right text-xs text-white/30 lg:block">

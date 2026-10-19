@@ -134,7 +134,17 @@ for (const width of [1440, 768, 390]) {
       const ai = page.getByRole("button", { name: "Investigar con IA" });
       await expect(ai).toBeVisible();
       await target44(ai);
-      await expect(ai.locator("svg")).toHaveCount(0);
+      await expect(ai.locator('svg[data-admin-ux="ai-bot"]')).toHaveCount(1);
+      const glyphBox = await ai
+        .locator('svg[data-admin-ux="ai-bot"]')
+        .boundingBox();
+      expect(glyphBox!.width).toBe(20);
+      expect(glyphBox!.height).toBe(20);
+      await expect(ai).toHaveCSS("height", "44px");
+      await expect(ai.locator('svg[data-admin-ux="ai-bot"]')).toHaveCSS(
+        "width",
+        "16px",
+      );
       await ai.click();
       await expect(ai).toBeDisabled();
       await expect(ai).toHaveAttribute("aria-busy", "true");
@@ -143,7 +153,7 @@ for (const width of [1440, 768, 390]) {
         .getByRole("button", { name: "Terminar muestra de IA" })
         .click();
       await expect(ai).toBeEnabled();
-      await expect(ai.locator("svg")).toHaveCount(0);
+      await expect(ai.locator('svg[data-admin-ux="ai-bot"]')).toHaveCount(1);
       await page
         .getByRole("checkbox", { name: "Servicio de IA disponible" })
         .uncheck();

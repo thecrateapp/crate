@@ -1,13 +1,11 @@
 import { type ComponentProps } from "react";
-import { Loader2 } from "lucide-react";
+import { Bot, Loader2, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 import { cn } from "@/lib/utils";
 import { useLLMStatus } from "@/hooks/use-llm";
 
-interface AIButtonProps extends Omit<
-  ComponentProps<typeof Button>,
-  "variant" | "size"
-> {
+interface AIButtonProps
+  extends Omit<ComponentProps<typeof Button>, "variant" | "size"> {
   loading?: boolean;
 }
 
@@ -50,10 +48,17 @@ export function AIButton({
           <Loader2
             data-admin-ux="ai-loading"
             aria-hidden="true"
-            size={13}
+            size={CRATE_ICON_SIZE.xs}
             className="mr-1.5 animate-spin"
           />
-        ) : null}
+        ) : (
+          <Bot
+            data-admin-ux="ai-bot"
+            aria-hidden="true"
+            size={CRATE_ICON_SIZE.sm}
+            className="size-4 shrink-0 scale-125"
+          />
+        )}
         {children}
       </Button>
     </div>

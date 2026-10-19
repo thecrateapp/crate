@@ -1,8 +1,8 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Check, Users, Wrench } from "lucide-react";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { formatCompact, formatSize } from "@/lib/utils";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
@@ -110,17 +110,17 @@ export function ArtistRow({
           <div className="truncate text-sm font-medium text-foreground">
             {name}
           </div>
-          {isFeatured ? <CrateChip active>Featured</CrateChip> : null}
+          {isFeatured ? <InfoBadge active>Featured</InfoBadge> : null}
           {isFeatured
             ? featuredDevices.map((device) => (
-                <CrateChip key={device}>{device}</CrateChip>
+                <InfoBadge key={device}>{device}</InfoBadge>
               ))
             : null}
         </div>
         {genres && genres.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1.5">
             {genres.slice(0, 3).map((genre) => (
-              <CrateChip key={genre}>{genre.toLowerCase()}</CrateChip>
+              <InfoBadge key={genre}>{genre.toLowerCase()}</InfoBadge>
             ))}
           </div>
         ) : null}

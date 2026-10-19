@@ -1,5 +1,14 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Trash2 as HeaderTrash2,
+  Loader2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -223,7 +232,61 @@ export function Trash() {
   return (
     <div className="space-y-6">
       <section className="border-b border-border-quiet pb-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              <PageHeaderAction
+                label="Refresh"
+                type="button"
+                disabled={loading || bulkDeleting}
+                aria-busy={loading}
+                onClick={() => void load()}
+              >
+                {loading ? (
+                  <Loader2
+                    data-admin-ux="trash-refresh-loading"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!loading ? (
+                  <HeaderRefreshCw
+                    data-admin-ux="header-refresh"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Empty trash"
+                type="button"
+                aria-busy={bulkDeleting}
+                disabled={
+                  loading ||
+                  items.length === 0 ||
+                  busyPath !== null ||
+                  bulkDeleting
+                }
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                {bulkDeleting ? (
+                  <Loader2
+                    data-admin-ux="trash-empty-loading"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!bulkDeleting ? (
+                  <HeaderTrash2
+                    data-admin-ux="header-empty-trash"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </PageHeaderActions>
+          }
+        >
           <div className="flex items-start gap-4">
             <div>
               <h1 className="font-display text-3xl font-bold text-text-primary">
@@ -235,50 +298,7 @@ export function Trash() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11"
-              disabled={loading || bulkDeleting}
-              aria-busy={loading}
-              onClick={() => void load()}
-            >
-              {loading ? (
-                <Loader2
-                  data-admin-ux="trash-refresh-loading"
-                  aria-hidden="true"
-                  size={15}
-                  className="mr-2 animate-spin"
-                />
-              ) : null}
-              Refresh
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11"
-              aria-busy={bulkDeleting}
-              disabled={
-                loading ||
-                items.length === 0 ||
-                busyPath !== null ||
-                bulkDeleting
-              }
-              onClick={() => setBulkDeleteOpen(true)}
-            >
-              {bulkDeleting ? (
-                <Loader2
-                  data-admin-ux="trash-empty-loading"
-                  aria-hidden="true"
-                  size={15}
-                  className="mr-2 animate-spin"
-                />
-              ) : null}
-              Empty trash
-            </Button>
-          </div>
-        </div>
+        </PageHeaderLayout>
       </section>
 
       <Card className="border-border-quiet bg-card">

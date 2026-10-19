@@ -47,7 +47,10 @@ for (const width of [1440, 768, 390])
     await page.setViewportSize({ width, height: 1100 });
     const { root, unexpected, errors } = await open(page);
     await page.waitForFunction(() => document.fonts.status === "loaded");
-    await expect(root.locator("svg")).toHaveCount(0);
+    await expect(root.locator("svg")).toHaveCount(1);
+    await expect(
+      root.locator('svg[data-admin-ux="header-refresh"]'),
+    ).toHaveCount(1);
     expect(
       await root
         .getByRole("heading", { level: 1 })
@@ -107,7 +110,10 @@ for (const width of [1440, 768, 390])
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await expect(root.locator("svg")).toHaveCount(0);
+    await expect(root.locator("svg")).toHaveCount(1);
+    await expect(
+      root.locator('svg[data-admin-ux="header-refresh"]'),
+    ).toHaveCount(1);
     await root
       .getByRole("textbox", { name: "Translation for player.play" })
       .fill("Dale");
@@ -219,7 +225,10 @@ test("Translations local draft, reject, workspace simulation, loading/empty/no-A
   await expect(
     root.getByText("Select a bundle to review", { exact: true }),
   ).toBeVisible();
-  await expect(root.locator("svg")).toHaveCount(0);
+  await expect(root.locator("svg")).toHaveCount(1);
+  await expect(root.locator('svg[data-admin-ux="header-refresh"]')).toHaveCount(
+    1,
+  );
   expect(unexpected).toEqual([]);
   expect(errors).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,7 +17,6 @@ import type {
 } from "@/lib/playback-targets";
 
 import { PlaybackTargetIcon } from "./PlaybackTargetIcon";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function PlaybackTargetPopover({
   popoverRef,
@@ -227,12 +227,12 @@ function PlaybackTargetRow({
           </span>
         ) : null}
       </span>
-      <CrateBadge
+      <InfoBadge
         icon={target.active ? Check : undefined}
         className={cn("mt-0.5", !target.available && "text-text-subtle")}
       >
         {badgeText}
-      </CrateBadge>
+      </InfoBadge>
     </button>
   );
 }

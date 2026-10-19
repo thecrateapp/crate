@@ -17,7 +17,10 @@ for (const width of [1440, 768, 390])
       });
       await openAdminPage("/system");
       const main = page.getByRole("main");
-      await expect(main.locator("svg.lucide")).toHaveCount(0);
+      await expect(main.locator("svg.lucide")).toHaveCount(1);
+      await expect(
+        main.locator('svg[data-admin-ux="header-refresh-metrics"]'),
+      ).toHaveCount(1);
       await expect(main.locator("svg").first()).toBeVisible();
       await expect(
         main.getByRole("heading", { name: "System Health", exact: true }),

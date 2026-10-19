@@ -11,7 +11,9 @@ it.each(["Album", "EP", "Single", "Compilation"])(
         <MissingAlbumCard title="Sample" year="2026" type={type} />
       </MemoryRouter>,
     );
-    expect(screen.getByText(type)).toHaveClass("text-text-secondary");
+    expect(screen.getByText(type).closest(".crate-info-badge")).toHaveClass(
+      "text-text-secondary",
+    );
     expect(screen.getByRole("link", { name: "Search" })).toHaveAttribute(
       "href",
       "/download?q=Sample",

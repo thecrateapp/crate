@@ -1,7 +1,13 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useCallback,
   useDeferredValue,
@@ -16,30 +22,23 @@ import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
   Copy,
+  Eye,
   GripVertical,
-  ImagePlus,
-  ListMusic,
+  ListRestart,
   Loader2,
-  Play,
-  Plus,
-  RefreshCw,
   Save,
   Search,
-  Sparkles,
   Trash2,
-  Upload,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { AIButton } from "@/components/ui/AIButton";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Card,
@@ -346,44 +345,38 @@ function TogglePill({
   onClick: () => void;
 }) {
   return (
-    <CratePill active={active} onClick={onClick}>
+    <FilterChip active={active} onClick={onClick}>
       {label}
-    </CratePill>
+    </FilterChip>
   );
 }
 
 function StatusChip({ status }: { status: string }) {
   if (status === "running") {
-    return (
-      <CrateChip active className="text-[11px]">
-        Generating
-      </CrateChip>
-    );
+    return <InfoBadge active>Generating</InfoBadge>;
   }
   if (status === "queued") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
+      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Queued
-      </CrateChip>
+      </InfoBadge>
     );
   }
   if (status === "failed") {
     return (
-      <CrateChip className="border-state-warning/25 bg-state-warning/10 text-[11px] text-state-warning-text">
+      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
         Failed
-      </CrateChip>
+      </InfoBadge>
     );
   }
-  return <CrateChip className="text-[11px]">Idle</CrateChip>;
+  return <InfoBadge>Idle</InfoBadge>;
 }
 
 function MetricTile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/15 p-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-1 text-base font-semibold">{value}</div>
+    <div className="crate-form-field rounded-md border border-white/10 bg-black/15 p-3">
+      <MonoLabel as="div">{label}</MonoLabel>
+      <div className="font-mono font-normal text-base">{value}</div>
     </div>
   );
 }
@@ -398,15 +391,13 @@ function DistributionBlock({
   if (items.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
+    <div className="crate-form-field">
+      <MonoLabel as="div">{label}</MonoLabel>
       <div className="flex flex-wrap gap-1.5">
         {items.map(([name, count]) => (
-          <CrateChip key={name} className="text-[11px]">
+          <InfoBadge key={name}>
             {name} <span className="text-white/35">{count}</span>
-          </CrateChip>
+          </InfoBadge>
         ))}
       </div>
     </div>
@@ -883,8 +874,16 @@ export function PlaylistEditor() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading playlist editor"
+        className="flex items-center justify-center py-24"
+      >
+        <Loader2
+          data-admin-ux="editor-loading"
+          aria-hidden="true"
+          className="h-6 w-6 animate-spin text-primary"
+        />
       </div>
     );
   }
@@ -898,140 +897,153 @@ export function PlaylistEditor() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex flex-col gap-5 md:flex-row md:items-start">
-            <div className="space-y-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/playlists")}
-                className="w-fit"
+    <div className="min-w-0 space-y-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate("/playlists")}
+        className="w-fit min-h-11"
+      >
+        <ArrowLeft
+          data-admin-ux="editor-back"
+          aria-hidden="true"
+          size={14}
+          className="mr-1"
+        />{" "}
+        Back to playlists
+      </Button>
+      <section className="@container rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <PageHeaderLayout
+          artwork={
+            <PlaylistArtwork
+              name={playlist.name}
+              coverDataUrl={playlist.cover_data_url}
+              tracks={playlist.artwork_tracks}
+              className="h-28 w-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03]"
+              crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
+            />
+          }
+          actions={
+            <PageHeaderActions label="Playlist actions">
+              <PageHeaderAction label="Duplicate" onClick={handleDuplicate}>
+                <Copy
+                  data-admin-ux="editor-duplicate-action"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+              {isSmart ? (
+                <PageHeaderAction
+                  label="Preview"
+                  onClick={handlePreview}
+                  disabled={previewing}
+                  aria-busy={previewing || undefined}
+                >
+                  {previewing ? (
+                    <Loader2
+                      data-admin-ux="editor-preview"
+                      aria-hidden="true"
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <Eye
+                      data-admin-ux="editor-preview-action"
+                      aria-hidden="true"
+                    />
+                  )}
+                </PageHeaderAction>
+              ) : null}
+              {isSmart ? (
+                <PageHeaderAction
+                  label={smartRulesChanged ? "Save + generate" : "Generate"}
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  aria-busy={generating || undefined}
+                >
+                  {generating ? (
+                    <Loader2
+                      data-admin-ux="editor-generate"
+                      aria-hidden="true"
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <ListRestart
+                      data-admin-ux="editor-generate-action"
+                      aria-hidden="true"
+                    />
+                  )}
+                </PageHeaderAction>
+              ) : null}
+              <PageHeaderAction
+                label="Save changes"
+                onClick={handleSave}
+                disabled={saving}
+                aria-busy={saving || undefined}
               >
-                <ArrowLeft size={14} className="mr-1" /> Back to playlists
-              </Button>
-
-              <PlaylistArtwork
-                name={playlist.name}
-                coverDataUrl={playlist.cover_data_url}
-                tracks={playlist.artwork_tracks}
-                className="h-28 w-28 rounded-md border border-white/10 bg-white/[0.03]"
-                crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
-              />
+                {saving ? (
+                  <Loader2
+                    data-admin-ux="editor-save"
+                    aria-hidden="true"
+                    className="animate-spin"
+                  />
+                ) : (
+                  <Save data-admin-ux="editor-save-action" aria-hidden="true" />
+                )}
+              </PageHeaderAction>
+            </PageHeaderActions>
+          }
+        >
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <InfoBadge active={isSmart}>
+                {isSmart ? "smart" : "static"}
+              </InfoBadge>
+              <InfoBadge>{isCurated ? "curated" : "internal"}</InfoBadge>
+              <InfoBadge>{isActive ? "active" : "inactive"}</InfoBadge>
+              {isSmart ? (
+                <InfoBadge active={autoRefresh}>auto-refresh</InfoBadge>
+              ) : null}
+              <StatusChip status={playlist.generation_status} />
             </div>
 
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <CrateChip active={isSmart} className="text-[11px]">
-                  {isSmart ? "smart" : "static"}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {isCurated ? "curated" : "internal"}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {isActive ? "active" : "inactive"}
-                </CrateChip>
-                {isSmart ? (
-                  <CrateChip active={autoRefresh} className="text-[11px]">
-                    auto-refresh
-                  </CrateChip>
-                ) : null}
-                <StatusChip status={playlist.generation_status} />
-              </div>
+            <div className="space-y-2">
+              <h1 className="min-w-0 break-words font-display text-3xl font-semibold tracking-tight">
+                {name || playlist.name}
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                {description ||
+                  "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight">
-                  {name || playlist.name}
-                </h1>
-                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {description ||
-                    "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                <CrateChip className="text-[11px]">
-                  {playlist.track_count} tracks
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {formatMinutes(playlist.total_duration)}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {playlist.follower_count} follower
-                  {playlist.follower_count === 1 ? "" : "s"}
-                </CrateChip>
-                {category ? (
-                  <CrateChip className="text-[11px]">{category}</CrateChip>
-                ) : null}
-                {featuredRank != null ? (
-                  <CrateChip className="text-[11px]">
-                    Rank {featuredRank}
-                  </CrateChip>
-                ) : null}
-                {playlist.last_generated_at ? (
-                  <CrateChip className="text-[11px]">
-                    Generated {timeAgo(playlist.last_generated_at)}
-                  </CrateChip>
-                ) : null}
-              </div>
-
-              {playlist.generation_error ? (
-                <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
-                  {playlist.generation_error}
-                </div>
+            <div className="flex flex-wrap gap-1.5">
+              <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+              <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
+              <InfoBadge>
+                {playlist.follower_count} follower
+                {playlist.follower_count === 1 ? "" : "s"}
+              </InfoBadge>
+              {category ? <InfoBadge>{category}</InfoBadge> : null}
+              {featuredRank != null ? (
+                <InfoBadge>Rank {featuredRank}</InfoBadge>
+              ) : null}
+              {playlist.last_generated_at ? (
+                <InfoBadge>
+                  Generated {timeAgo(playlist.last_generated_at)}
+                </InfoBadge>
               ) : null}
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDuplicate}>
-              <Copy size={14} className="mr-1" /> Duplicate
-            </Button>
-            {isSmart ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePreview}
-                disabled={previewing}
-              >
-                {previewing ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                ) : (
-                  <Play size={14} className="mr-1" />
-                )}
-                Preview
-              </Button>
+            {playlist.generation_error ? (
+              <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
+                {playlist.generation_error}
+              </div>
             ) : null}
-            {isSmart ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerate}
-                disabled={generating}
-              >
-                {generating ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                ) : (
-                  <RefreshCw size={14} className="mr-1" />
-                )}
-                {smartRulesChanged ? "Save + generate" : "Generate"}
-              </Button>
-            ) : null}
-            <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <Loader2 size={14} className="mr-1 animate-spin" />
-              ) : (
-                <Save size={14} className="mr-1" />
-              )}
-              Save changes
-            </Button>
           </div>
-        </div>
+        </PageHeaderLayout>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
           <Card className="border-white/10 bg-card">
             <CardHeader className="space-y-1">
               <CardTitle className="text-base">Editorial</CardTitle>
@@ -1044,21 +1056,27 @@ export function PlaylistEditor() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_160px]">
                 <Field label="Name">
                   <Input
+                    aria-label="Name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
                 </Field>
                 <Field label="Category">
-                  <SegmentedControl
-                    as="radio"
-                    label="Category"
+                  <AdminSelect
+                    placeholder="Category"
                     value={category}
-                    onValueChange={setCategory}
-                    items={[{ value: "", label: "None" }, ...CATEGORY_OPTIONS]}
+                    onChange={setCategory}
+                    options={[
+                      { value: "", label: "None" },
+                      ...CATEGORY_OPTIONS,
+                    ]}
+                    allowClear={false}
+                    triggerClassName="w-full max-w-none"
                   />
                 </Field>
                 <Field label="Featured rank">
                   <Input
+                    aria-label="Featured rank"
                     type="number"
                     value={featuredRank ?? ""}
                     onChange={(event) =>
@@ -1073,12 +1091,13 @@ export function PlaylistEditor() {
 
               <Field label="Description">
                 <Textarea
+                  aria-label="Description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   rows={5}
                   placeholder="Editorial description shown in listen"
                 />
-                <div className="mt-2 flex justify-end">
+                <div className="flex justify-end">
                   <AIButton
                     type="button"
                     onClick={handleGenerateDescription}
@@ -1116,7 +1135,7 @@ export function PlaylistEditor() {
           <Card className="border-white/10 bg-card">
             <CardHeader className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
-                <ImagePlus size={16} /> Cover
+                Cover
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Upload a clean image-only hero asset. Listen renders the
@@ -1135,11 +1154,11 @@ export function PlaylistEditor() {
 
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    <CrateChip className="text-[11px]">
+                    <InfoBadge>
                       {playlist.cover_data_url
                         ? "Manual cover active"
                         : "Using auto-collage"}
-                    </CrateChip>
+                    </InfoBadge>
                   </div>
 
                   <p className="text-sm text-muted-foreground">
@@ -1151,21 +1170,26 @@ export function PlaylistEditor() {
                     <input
                       ref={coverInputRef}
                       type="file"
+                      aria-label="Cover image"
                       accept="image/*"
                       onChange={handleCoverUpload}
                       className="hidden"
                     />
                     <Button
+                      className="min-h-11"
                       variant="outline"
                       size="sm"
                       onClick={() => coverInputRef.current?.click()}
                       disabled={uploadingCover}
                     >
                       {uploadingCover ? (
-                        <Loader2 size={14} className="mr-1 animate-spin" />
-                      ) : (
-                        <Upload size={14} className="mr-1" />
-                      )}
+                        <Loader2
+                          data-admin-ux="editor-cover-upload"
+                          aria-hidden="true"
+                          size={14}
+                          className="mr-1 animate-spin"
+                        />
+                      ) : null}
                       {playlist.cover_data_url
                         ? "Replace cover"
                         : "Upload cover"}
@@ -1173,10 +1197,15 @@ export function PlaylistEditor() {
                     {playlist.cover_data_url ? (
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon-lg"
                         onClick={handleRemoveCover}
+                        aria-label="Remove cover"
+                        title="Remove cover"
                       >
-                        <Trash2 size={14} className="mr-1" /> Remove cover
+                        <Trash2
+                          data-admin-ux="editor-remove-cover"
+                          aria-hidden="true"
+                        />
                       </Button>
                     ) : null}
                   </div>
@@ -1189,7 +1218,7 @@ export function PlaylistEditor() {
             <Card className="border-white/10 bg-card">
               <CardHeader className="space-y-1">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Sparkles size={16} /> Smart rules
+                  Smart rules
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Keep the builder dense, but readable: editorial intent first,
@@ -1199,22 +1228,22 @@ export function PlaylistEditor() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-[180px_120px_180px]">
                   <Field label="Match">
-                    <SegmentedControl
-                      as="radio"
-                      label="Match"
+                    <AdminSelect
+                      placeholder="Match"
                       value={match}
-                      onValueChange={(value) =>
-                        setMatch(value as "all" | "any")
-                      }
-                      items={[
+                      onChange={(value) => setMatch(value as "all" | "any")}
+                      options={[
                         { value: "all", label: "All rules" },
                         { value: "any", label: "Any rule" },
                       ]}
+                      allowClear={false}
+                      triggerClassName="w-full max-w-none"
                     />
                   </Field>
 
                   <Field label="Limit">
                     <Input
+                      aria-label="Limit"
                       type="number"
                       min={1}
                       max={500}
@@ -1226,12 +1255,13 @@ export function PlaylistEditor() {
                   </Field>
 
                   <Field label="Sort">
-                    <SegmentedControl
-                      as="radio"
-                      label="Sort"
+                    <AdminSelect
+                      placeholder="Sort"
                       value={sort}
-                      onValueChange={setSort}
-                      items={SORT_OPTIONS}
+                      onChange={setSort}
+                      options={SORT_OPTIONS}
+                      allowClear={false}
+                      triggerClassName="w-full max-w-none"
                     />
                   </Field>
                 </div>
@@ -1250,23 +1280,26 @@ export function PlaylistEditor() {
                     return (
                       <div
                         key={index}
-                        className="rounded-md border border-white/10 bg-black/10 p-3"
+                        className="@container rounded-md border border-white/10 bg-black/10 p-3"
                       >
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <CrateChip className="text-[11px]">
-                            Rule {index + 1}
-                          </CrateChip>
-                          <ActionIconButton
-                            variant="row"
-                            tone="default"
-                            className="h-8 w-8"
+                          <InfoBadge>Rule {index + 1}</InfoBadge>
+                          <Button
+                            type="button"
+                            size="icon-lg"
+                            variant="ghost"
+                            aria-label={`Remove rule ${index + 1}`}
                             onClick={() => removeRule(index)}
+                            title={`Remove rule ${index + 1}`}
                           >
-                            <X size={14} />
-                          </ActionIconButton>
+                            <Trash2
+                              data-admin-ux="editor-remove-rule"
+                              aria-hidden="true"
+                            />
+                          </Button>
                         </div>
 
-                        <div className="grid gap-3 xl:grid-cols-[180px_160px_minmax(0,1fr)]">
+                        <div className="grid gap-3 @xl:grid-cols-[180px_160px_minmax(0,1fr)]">
                           <Field label="Field">
                             <AdminSelect
                               value={rule.field}
@@ -1300,6 +1333,7 @@ export function PlaylistEditor() {
                             {rule.op === "between" ? (
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <Input
+                                  aria-label={`Rule ${index + 1} minimum`}
                                   type="number"
                                   value={
                                     Array.isArray(rule.value)
@@ -1319,6 +1353,7 @@ export function PlaylistEditor() {
                                   }
                                 />
                                 <Input
+                                  aria-label={`Rule ${index + 1} maximum`}
                                   type="number"
                                   value={
                                     Array.isArray(rule.value)
@@ -1355,6 +1390,7 @@ export function PlaylistEditor() {
                               />
                             ) : (
                               <Input
+                                aria-label={`Rule ${index + 1} value`}
                                 value={String(rule.value ?? "")}
                                 placeholder="Value"
                                 onChange={(event) =>
@@ -1379,29 +1415,32 @@ export function PlaylistEditor() {
                     Use preview to sanity-check the shape of the result before
                     saving or generating again.
                   </p>
-                  <Button variant="outline" size="sm" onClick={addRule}>
-                    <Plus size={14} className="mr-1" /> Add rule
+                  <Button
+                    className="min-h-11"
+                    variant="outline"
+                    size="sm"
+                    onClick={addRule}
+                  >
+                    Add rule
                   </Button>
                 </div>
 
                 {preview ? (
                   <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <CrateChip active className="text-[11px]">
+                      <InfoBadge active>
                         {preview.total_matching} matching tracks
-                      </CrateChip>
-                      <CrateChip className="text-[11px]">
+                      </InfoBadge>
+                      <InfoBadge>
                         {formatMinutes(preview.duration_total_sec)}
-                      </CrateChip>
+                      </InfoBadge>
                       {preview.avg_year ? (
-                        <CrateChip className="text-[11px]">
-                          Avg year {preview.avg_year}
-                        </CrateChip>
+                        <InfoBadge>Avg year {preview.avg_year}</InfoBadge>
                       ) : null}
                       {preview.year_range ? (
-                        <CrateChip className="text-[11px]">
+                        <InfoBadge>
                           {preview.year_range[0]}-{preview.year_range[1]}
-                        </CrateChip>
+                        </InfoBadge>
                       ) : null}
                     </div>
 
@@ -1414,6 +1453,7 @@ export function PlaylistEditor() {
                       <div className="flex flex-wrap gap-2">
                         {smartRulesChanged ? (
                           <Button
+                            className="min-h-11"
                             variant="outline"
                             size="sm"
                             onClick={handleSave}
@@ -1421,25 +1461,29 @@ export function PlaylistEditor() {
                           >
                             {saving ? (
                               <Loader2
+                                data-admin-ux="editor-save-rules"
+                                aria-hidden="true"
                                 size={14}
                                 className="mr-1 animate-spin"
                               />
-                            ) : (
-                              <Save size={14} className="mr-1" />
-                            )}
+                            ) : null}
                             Save rules
                           </Button>
                         ) : null}
                         <Button
+                          className="min-h-11"
                           size="sm"
                           onClick={handleGenerate}
                           disabled={generating}
                         >
                           {generating ? (
-                            <Loader2 size={14} className="mr-1 animate-spin" />
-                          ) : (
-                            <RefreshCw size={14} className="mr-1" />
-                          )}
+                            <Loader2
+                              data-admin-ux="editor-apply-preview"
+                              aria-hidden="true"
+                              size={14}
+                              className="mr-1 animate-spin"
+                            />
+                          ) : null}
                           {smartRulesChanged
                             ? "Apply preview to playlist"
                             : "Generate playlist"}
@@ -1465,7 +1509,7 @@ export function PlaylistEditor() {
 
                     {preview.tracks.length > 0 ? (
                       <div className="mt-4 border-t border-primary/10 pt-4">
-                        <div className="mb-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                        <div className="mb-2 font-mono font-normal text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                           Matching track sample
                         </div>
                         <div className="space-y-1.5">
@@ -1476,7 +1520,7 @@ export function PlaylistEditor() {
                               }-${track.title ?? "track"}`}
                               className="flex items-center gap-3 rounded-md px-2 py-2 "
                             >
-                              <span className="w-6 text-right text-xs text-muted-foreground">
+                              <span className="w-6 text-right font-mono font-normal text-xs text-muted-foreground">
                                 {index + 1}
                               </span>
                               <div className="min-w-0 flex-1">
@@ -1491,19 +1535,15 @@ export function PlaylistEditor() {
                               </div>
                               <div className="flex shrink-0 gap-1.5">
                                 {track.format ? (
-                                  <CrateChip className="text-[10px]">
-                                    {track.format}
-                                  </CrateChip>
+                                  <InfoBadge>{track.format}</InfoBadge>
                                 ) : null}
                                 {track.year ? (
-                                  <CrateChip className="text-[10px]">
-                                    {track.year}
-                                  </CrateChip>
+                                  <InfoBadge>{track.year}</InfoBadge>
                                 ) : null}
                                 {track.duration != null ? (
-                                  <CrateChip className="text-[10px]">
+                                  <InfoBadge>
                                     {formatTrackDuration(track.duration)}
-                                  </CrateChip>
+                                  </InfoBadge>
                                 ) : null}
                               </div>
                             </div>
@@ -1522,7 +1562,7 @@ export function PlaylistEditor() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <ListMusic size={16} /> Tracks
+                    Tracks
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Curate the generated snapshot. Manual adds and dragged rows
@@ -1546,46 +1586,60 @@ export function PlaylistEditor() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-md border border-primary/15 bg-primary/[0.04] p-3">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-                  <div className="relative">
-                    <Search
-                      size={14}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-                    />
-                    <Input
-                      value={trackSearchQuery}
-                      onChange={(event) =>
-                        setTrackSearchQuery(event.target.value)
+                <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <Field label="Search tracks">
+                    <div className="relative">
+                      <Search
+                        data-admin-ux="editor-search"
+                        aria-hidden="true"
+                        size={14}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                      />
+                      <Input
+                        aria-label="Search tracks"
+                        value={trackSearchQuery}
+                        onChange={(event) =>
+                          setTrackSearchQuery(event.target.value)
+                        }
+                        placeholder={
+                          isSmart && trackSearchScope === "rules"
+                            ? "Search tracks matching this playlist..."
+                            : "Search library tracks..."
+                        }
+                        className="border-white/10 bg-black/25 pl-9"
+                      />
+                    </div>
+                  </Field>
+                  <Field label="Search scope">
+                    <AdminSelect
+                      placeholder="Search scope"
+                      value={trackSearchScope}
+                      onChange={(value) =>
+                        setTrackSearchScope(value as "rules" | "library")
                       }
-                      placeholder={
-                        isSmart
-                          ? "Search tracks matching this playlist..."
-                          : "Search library tracks..."
-                      }
-                      className="border-white/10 bg-black/25 pl-9"
+                      options={[
+                        {
+                          value: "rules",
+                          label: "Matching rules",
+                        },
+                        { value: "library", label: "Entire library" },
+                      ]}
+                      allowClear={false}
+                      disabled={!isSmart}
+                      triggerClassName="w-full max-w-none"
                     />
-                  </div>
-                  <SegmentedControl
-                    as="radio"
-                    label="Search scope"
-                    value={trackSearchScope}
-                    onValueChange={(value) =>
-                      setTrackSearchScope(value as "rules" | "library")
-                    }
-                    items={[
-                      {
-                        value: "rules",
-                        label: "Matching rules",
-                      },
-                      { value: "library", label: "Entire library" },
-                    ].map((item) => ({ ...item, disabled: !isSmart }))}
-                  />
+                  </Field>
                 </div>
 
                 {trackSearching ? (
                   <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 size={13} className="animate-spin" /> Searching
-                    candidates...
+                    <Loader2
+                      data-admin-ux="editor-search-loading"
+                      aria-hidden="true"
+                      size={13}
+                      className="animate-spin"
+                    />{" "}
+                    Searching candidates...
                   </div>
                 ) : trackSearchResults.length > 0 ? (
                   <div className="mt-3 space-y-1.5 border-t border-primary/10 pt-3">
@@ -1612,6 +1666,7 @@ export function PlaylistEditor() {
                             </span>
                           ) : null}
                           <Button
+                            className="min-h-11"
                             type="button"
                             size="sm"
                             variant="outline"
@@ -1620,12 +1675,12 @@ export function PlaylistEditor() {
                           >
                             {addingTrackId === trackId ? (
                               <Loader2
+                                data-admin-ux="editor-add-track"
+                                aria-hidden="true"
                                 size={13}
                                 className="mr-1.5 animate-spin"
                               />
-                            ) : (
-                              <Plus size={13} className="mr-1.5" />
-                            )}
+                            ) : null}
                             Add locked
                           </Button>
                         </div>
@@ -1652,19 +1707,24 @@ export function PlaylistEditor() {
                     </div>
                     {refineProposal.actions.length > 0 ? (
                       <Button
+                        className="min-h-11"
                         size="sm"
                         onClick={handleApplyRefinement}
                         disabled={applyingRefinement}
                       >
                         {applyingRefinement ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <Sparkles size={14} className="mr-1" />
-                        )}
+                          <Loader2
+                            data-admin-ux="editor-apply-refinement"
+                            aria-hidden="true"
+                            size={14}
+                            className="mr-1 animate-spin"
+                          />
+                        ) : null}
                         Apply safe fixes
                       </Button>
                     ) : null}
                     <Button
+                      className="min-h-11"
                       type="button"
                       size="sm"
                       variant="ghost"
@@ -1696,9 +1756,7 @@ export function PlaylistEditor() {
                   {refineProposal.actions.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {refineProposal.actions.slice(0, 10).map((action) => (
-                        <CrateChip key={action.id} className="text-[10px]">
-                          {action.label}
-                        </CrateChip>
+                        <InfoBadge key={action.id}>{action.label}</InfoBadge>
                       ))}
                     </div>
                   ) : null}
@@ -1732,10 +1790,12 @@ export function PlaylistEditor() {
                         }
                       >
                         <GripVertical
+                          data-admin-ux="editor-drag"
+                          aria-hidden="true"
                           size={14}
                           className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
                         />
-                        <span className="w-6 text-right text-xs text-muted-foreground">
+                        <span className="w-6 text-right font-mono font-normal text-xs text-muted-foreground">
                           {index + 1}
                         </span>
                         <div className="min-w-0 flex-1">
@@ -1747,33 +1807,33 @@ export function PlaylistEditor() {
                           </div>
                         </div>
                         <div className="hidden shrink-0 gap-1.5 xl:flex">
-                          <CrateChip
-                            active={Boolean(track.locked)}
-                            className="text-[10px]"
-                          >
+                          <InfoBadge active={Boolean(track.locked)}>
                             {trackSourceLabel(track)}
-                          </CrateChip>
+                          </InfoBadge>
                           {track.format ? (
-                            <CrateChip className="text-[10px]">
-                              {track.format}
-                            </CrateChip>
+                            <InfoBadge>{track.format}</InfoBadge>
                           ) : null}
                         </div>
                         {track.duration != null ? (
-                          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+                          <span className="w-12 text-right font-mono font-normal text-xs tabular-nums text-muted-foreground">
                             {formatTrackDuration(track.duration)}
                           </span>
                         ) : null}
-                        <ActionIconButton
-                          variant="row"
-                          tone="default"
-                          className="h-8 w-8 opacity-70 hover:opacity-100"
+                        <Button
+                          type="button"
+                          size="icon-lg"
+                          variant="ghost"
+                          aria-label={`Remove ${track.title}`}
                           onClick={() =>
                             void handleRemoveTrack(track, index + 1)
                           }
+                          title={`Remove ${track.title}`}
                         >
-                          <Trash2 size={14} />
-                        </ActionIconButton>
+                          <Trash2
+                            data-admin-ux="editor-remove-track"
+                            aria-hidden="true"
+                          />
+                        </Button>
                       </div>
                     );
                   })}
@@ -1830,17 +1890,17 @@ export function PlaylistEditor() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <StatusChip status={entry.status} />
-                        <span className="text-sm">
+                        <span className="font-mono font-normal text-sm">
                           {timeAgo(entry.started_at)}
                         </span>
                       </div>
                       {entry.track_count != null ? (
-                        <span className="text-xs tabular-nums text-muted-foreground">
+                        <span className="font-mono font-normal text-xs tabular-nums text-muted-foreground">
                           {entry.track_count} tracks
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
+                    <div className="mt-1 font-mono font-normal text-xs text-muted-foreground">
                       {entry.triggered_by}
                       {entry.duration_sec != null
                         ? ` · ${Math.round(entry.duration_sec)}s`

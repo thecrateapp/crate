@@ -44,7 +44,10 @@ for (const width of [1440, 768, 390]) {
       await expect(
         real.getByRole("link", { name: "Mareas", exact: true }),
       ).toHaveCount(0);
-      await expect(real.locator("svg")).toHaveCount(0);
+      await expect(real.locator("svg")).toHaveCount(1);
+      await expect(
+        real.locator('svg[data-admin-ux="header-refresh"]'),
+      ).toHaveCount(1);
       await expect(real.locator("button button,button a,a a")).toHaveCount(0);
       for (const control of await real.locator("button,a").all()) {
         const box = (await control.boundingBox())!;
@@ -91,7 +94,10 @@ for (const width of [1440, 768, 390]) {
         })
         .click();
       await expect(refresh).toBeEnabled();
-      await expect(real.locator("svg")).toHaveCount(0);
+      await expect(real.locator("svg")).toHaveCount(1);
+      await expect(
+        real.locator('svg[data-admin-ux="header-refresh"]'),
+      ).toHaveCount(1);
       await first.focus();
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/\/artists\/costa-norte\/luz-de-octubre$/);

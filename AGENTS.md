@@ -67,8 +67,12 @@ crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation
 - V3 uses one visual identity across Listen and Admin: the same tokens, primitives, recipes and
   interaction rules. Only domain components/workflows differ. Do not add app-specific foundation
   variants; converge legacy duplicates through the planned migrations.
+- V3 visual source of truth is Diego's approved persistent mockup at localhost:5186, including
+  his subsequently confirmed adjustments. Shared components and Storybook must reproduce it.
+  Flag doubts, visual deviations or mobile sizing conflicts and resolve them with Diego before
+  changing that criterion. Keep the historical app/web@258bbaee pin; do not silently replace it.
 - Keep `app/ui` and `app/listen` as separate apps. Their conventions differ: admin uses `sonner`
-  and `lucide-react`; Listen uses `notify` from `@crate/ui/lib/notify` and `@crate/ui/icons`.
+  and Solar through `@crate/ui/icons`; Listen uses `notify` from `@crate/ui/lib/notify` and the same icon catalogue. Existing registered Admin Lucide sites migrate by reviewed scope; all new glyph work uses Solar.
 - Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's
   token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps,
   mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS,
@@ -137,6 +141,11 @@ exist locally.
   `api.lespedants.org` (API; `/rest` is the Open Subsonic layer), `cratemusic.app` (site)
 
 ## Skills and references
+
+- Shared visual components have a mandatory live entry in `tools/crate-ui-showcase/`.
+  Every addition or change updates its registry entry and relevant contract/story in the same
+  change. Complete legacy pending coverage before changing that component; do not refresh
+  pending hashes alone. Run `npm run design-system:showcase:check`. See its README and scoped AGENTS.
 
 - Long-form technical docs: `docs/technical/` (rendered by `app/docs`).
 - Backend patterns: `.claude/skills/python-backend.md`.

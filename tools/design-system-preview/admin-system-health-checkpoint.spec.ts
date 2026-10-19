@@ -54,7 +54,10 @@ for (const width of [1440, 768, 390])
         exact: true,
       });
       await expect(refresh).toHaveCSS("font-family", /^Poppins/);
-      await expect(real.locator("svg.lucide")).toHaveCount(0);
+      await expect(real.locator("svg.lucide")).toHaveCount(1);
+      await expect(
+        real.locator('svg[data-admin-ux="header-refresh-metrics"]'),
+      ).toHaveCount(1);
       await expect(
         real.getByRole("meter", { name: "Transcode Slots" }),
       ).toHaveAttribute("aria-valuenow", "1");

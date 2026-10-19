@@ -46,7 +46,10 @@ for (const width of [1440, 1299, 768, 390]) {
       await expect(
         real.getByRole("heading", { name: "Analysis", exact: true }),
       ).toBeVisible();
-      await expect(real.locator("svg")).toHaveCount(0);
+      await expect(real.locator("svg")).toHaveCount(5);
+      await expect(real.locator('svg[data-admin-ux^="header-"]')).toHaveCount(
+        5,
+      );
       await page.evaluate(() => document.fonts.ready);
       await expect(
         real.getByRole("heading", { name: "Analysis", exact: true }),
@@ -104,7 +107,7 @@ for (const width of [1440, 1299, 768, 390]) {
       const summaries = real
         .getByRole("heading", { name: "Analysis", exact: true })
         .locator("xpath=ancestor::section[1]")
-        .locator("span");
+        .locator("span.font-mono");
       const geometry = await summaries.evaluateAll((nodes) =>
         nodes.map((node) => {
           const css = getComputedStyle(node);

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   CRATE_ICON_SIZE,
   ListMusic,
@@ -15,7 +16,6 @@ import { formatDuration } from "@/lib/utils";
 import type { JamQueueItem } from "@/pages/jam-reducer";
 
 import { HeroActionButton } from "./JamHeroButtons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface JamNowPlayingProps {
   t: TFunction;
@@ -195,11 +195,11 @@ function JamGuestPlaybackStatus({
             : t("jam.room.waitingForHost")
       }
     >
-      <CrateBadge size="md" icon={Zap}>
+      <InfoBadge icon={Zap}>
         {syncStatus === "synced"
           ? t("jam.room.synced")
           : t("jam.room.waitingForHost")}
-      </CrateBadge>
+      </InfoBadge>
     </div>
   );
 }

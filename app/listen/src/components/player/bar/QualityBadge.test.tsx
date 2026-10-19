@@ -14,7 +14,9 @@ describe("QualityBadge", () => {
     expect(container.textContent).toContain("HI-RES");
     expect(container.querySelector("svg")).toBeInTheDocument();
     expect(badge).toHaveClass(
-      "text-badge",
+      "text-info-badge",
+      "font-mono",
+      "font-normal",
       "border-state-warning/50",
       "text-state-warning",
       "bg-state-warning/10",
@@ -33,7 +35,9 @@ describe("QualityBadge", () => {
 
     expect(container.querySelector("svg")).toBeInTheDocument();
     expect(badge).toHaveClass(
-      "text-badge",
+      "text-info-badge",
+      "font-mono",
+      "font-normal",
       "border-accent-action/40",
       "text-accent-action",
       "bg-accent-action/8",
@@ -53,9 +57,11 @@ describe("QualityBadge", () => {
 
     expect(container.querySelector("svg")).toBeNull();
     expect(badge).toHaveClass(
-      "text-badge",
+      "text-info-badge",
+      "font-mono",
+      "font-normal",
       "border-border-quiet",
-      "text-text-muted",
+      "text-text-secondary",
       "bg-transparent",
     );
     expect(badge?.className).not.toMatch(

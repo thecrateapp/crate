@@ -23,6 +23,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/components/ui/AIButton.tsx",
     "app/ui/src/components/ui/AdminSelect.tsx",
     "app/ui/src/components/admin/ops-surfaces.tsx",
+    "app/ui/src/components/layout/PageHeader.tsx",
     "app/ui/src/pages/Logs.tsx",
     "app/ui/src/pages/Stack.tsx",
     "app/ui/src/pages/Analysis.tsx",
@@ -40,15 +41,98 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/I18nReview.tsx",
     "app/ui/src/pages/Upcoming.tsx",
     "app/ui/src/pages/Playlists.tsx",
+    "app/ui/src/pages/PlaylistEditor.tsx",
     "app/ui/src/components/playlists/PlaylistArtwork.tsx",
     "app/ui/src/components/shows/ShowCard.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  // Reviewed composition owns no glyph; its shared primitives are scanned directly.
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 4 },
+  ],
+  [
+    "app/ui/src/pages/Dashboard.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Analysis.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 5 },
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Trash.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Contributions.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Discover.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 3 },
+  ],
+  [
+    "app/ui/src/pages/GlobalCatalog.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 3 },
+  ],
+  [
+    "app/ui/src/pages/I18nReview.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Logs.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Stack.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Health.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Bandcamp.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 3 },
+  ],
+  [
+    "app/ui/src/pages/NewReleases.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 3 },
+  ],
+  [
+    "app/ui/src/pages/Users.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 5 },
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 5 },
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/ui/AdminSelect",
+    { component: "AdminSelect", limit: 7 },
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/ui/AIButton",
+    { component: "AIButton", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/playlists/PlaylistArtwork",
+    { component: "PlaylistArtwork", limit: 2 },
+  ],
+
   [
     "app/ui/src/pages/Playlists.tsx:@/components/ui/AdminSelect",
-    { component: "AdminSelect", limit: 4 },
+    { component: "AdminSelect", limit: 8 },
   ],
   [
     "app/ui/src/pages/Playlists.tsx:@crate/ui/composites/ConfirmDialog",
@@ -137,6 +221,67 @@ const approvedControls = new Map([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Playlists:playlists-open-editor", ["lucide-react", "Pencil"]],
+  ["Playlists:playlists-deactivate", ["lucide-react", "PowerOff"]],
+  ["Playlists:playlists-activate", ["lucide-react", "Power"]],
+  ["Playlists:playlists-delete", ["lucide-react", "Trash2"]],
+  // Explicit all-header adoption requested by Diego; one bounded site per action.
+  ["Dashboard:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Dashboard:header-maintenance", ["lucide-react", "Wrench"]],
+  ["Analysis:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Analysis:header-backfill-fingerprints", ["lucide-react", "Fingerprint"]],
+  ["Analysis:header-recompute-popularity", ["lucide-react", "TrendingUp"]],
+  ["Analysis:header-recompute-bliss", ["lucide-react", "Orbit"]],
+  ["Analysis:header-re-analyze-all", ["lucide-react", "AudioLines"]],
+  ["SystemHealth:header-refresh-metrics", ["lucide-react", "RefreshCw"]],
+  ["Trash:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Trash:header-empty-trash", ["lucide-react", "Trash2"]],
+  ["Contributions:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Discover:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Discover:header-recompute-gaps", ["lucide-react", "ChartNoAxesCombined"]],
+  ["Discover:header-check-releases", ["lucide-react", "Radar"]],
+  ["GlobalCatalog:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["GlobalCatalog:header-reconcile", ["lucide-react", "GitMerge"]],
+  ["GlobalCatalog:header-full-rebuild", ["lucide-react", "DatabaseBackup"]],
+  ["I18nReview:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Logs:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Stack:header-refresh", ["lucide-react", "RefreshCw"]],
+  ["Health:header-run-scan", ["lucide-react", "ScanSearch"]],
+  ["Bandcamp:header-sync-collection", ["lucide-react", "FolderSync"]],
+  ["Bandcamp:header-refresh-radar", ["lucide-react", "Radar"]],
+  ["Bandcamp:header-backfill-urls", ["lucide-react", "Link"]],
+  ["NewReleases:header-timeline", ["lucide-react", "List"]],
+  ["NewReleases:header-grid", ["lucide-react", "LayoutGrid"]],
+  ["NewReleases:header-check-now", ["lucide-react", "Radar"]],
+  ["Users:header-invite-user", ["lucide-react", "MailPlus"]],
+  ["Users:header-add-user", ["lucide-react", "UserPlus"]],
+  ["Upcoming:header-sync-shows", ["lucide-react", "CalendarSync"]],
+  ["Upcoming:header-clear-caches", ["lucide-react", "Eraser"]],
+  ["Playlists:header-new-static", ["lucide-react", "FilePlus2"]],
+  ["Playlists:header-new-smart", ["lucide-react", "ListPlus"]],
+  // Diego's explicit 1AQ header-action amendment; no global primary-action exemption.
+  ["PlaylistEditor:editor-duplicate-action", ["lucide-react", "Copy"]],
+  ["PlaylistEditor:editor-preview-action", ["lucide-react", "Eye"]],
+  ["PlaylistEditor:editor-generate-action", ["lucide-react", "ListRestart"]],
+  ["PlaylistEditor:editor-save-action", ["lucide-react", "Save"]],
+  ["PlaylistEditor:editor-remove-rule", ["lucide-react", "Trash2"]],
+  ["PlaylistEditor:editor-remove-track", ["lucide-react", "Trash2"]],
+  ["PlaylistEditor:editor-remove-cover", ["lucide-react", "Trash2"]],
+  ["Playlists:playlists-remove-rule", ["lucide-react", "Trash2"]],
+  ["PlaylistEditor:editor-loading", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-back", ["lucide-react", "ArrowLeft"]],
+  ["PlaylistEditor:editor-preview", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-generate", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-save", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-cover-upload", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-save-rules", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-apply-preview", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-search", ["lucide-react", "Search"]],
+  ["PlaylistEditor:editor-search-loading", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-add-track", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-apply-refinement", ["lucide-react", "Loader2"]],
+  ["PlaylistEditor:editor-drag", ["lucide-react", "GripVertical"]],
+
   ["Playlists:playlists-search", ["lucide-react", "Search"]],
   ["Playlists:playlists-loading", ["lucide-react", "Loader2"]],
   ["Playlists:playlists-static-close", ["lucide-react", "X"]],
@@ -149,7 +294,9 @@ const approvedUx = new Map([
   ["Upcoming:upcoming-search", ["lucide-react", "Search"]],
   ["Upcoming:upcoming-loading", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-download-loading", ["lucide-react", "Loader2"]],
-  ["Upcoming:upcoming-dismiss", ["lucide-react", "X"]],
+  ["Upcoming:upcoming-dismiss", ["@crate/ui/icons", "X"]],
+  ["Upcoming:upcoming-open-album", ["@crate/ui/icons", "ExternalLink"]],
+  ["Upcoming:upcoming-download", ["@crate/ui/icons", "Download"]],
   ["Upcoming:upcoming-previous", ["lucide-react", "ChevronLeft"]],
   ["Upcoming:upcoming-next", ["lucide-react", "ChevronRight"]],
   ["Upcoming:upcoming-popover-loading", ["lucide-react", "Loader2"]],
@@ -241,7 +388,8 @@ const approvedUx = new Map([
   ["SearchBar:search-field", ["lucide-react", "Search"]],
   ["SearchBar:search-loading", ["lucide-react", "Loader2"]],
   ["SearchBar:search-clear", ["lucide-react", "X"]],
-  ["AIButton:ai-loading", ["lucide-react", "Loader2"]],
+  ["AIButton:ai-loading", ["@crate/ui/icons", "Loader2"]],
+  ["AIButton:ai-bot", ["@crate/ui/icons", "Bot"]],
   [
     "CommandPalette:palette-close",
     ["@crate/ui/shadcn/overlay-close-button", "OverlayCloseButton"],
@@ -442,8 +590,12 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     }
     if (
       !unknownSpread &&
-      entry.source === "@crate/ui/primitives/CrateBadge" &&
-      ["CrateChip", "CratePill"].includes(entry.origin ?? entry.name) &&
+      ((entry.source === "@crate/ui/primitives/CrateBadge" &&
+        ["CrateChip", "CratePill"].includes(entry.origin ?? entry.name)) ||
+        (entry.source === "@crate/ui/primitives/InfoBadge" &&
+          (entry.origin ?? entry.name) === "InfoBadge") ||
+        (entry.source === "@crate/ui/primitives/FilterChip" &&
+          (entry.origin ?? entry.name) === "FilterChip")) &&
       !prop("icon")
     )
       continue; // Shared badges render no glyph without an explicit icon prop.
@@ -482,6 +634,22 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
+  });
+  it("treats the exact shared size token as data while still auditing Solar glyphs", () => {
+    const result = analyzeSource(
+      "fixture.tsx",
+      'import { CRATE_ICON_SIZE as Sizes, Download } from "@crate/ui/icons"; const view=<Download size={Sizes.lg}/>;',
+    );
+    expect(
+      result.entries.filter(
+        (e) => e.kind === "glyph-reference" && e.name === "Sizes",
+      ),
+    ).toEqual([]);
+    expect(
+      result.entries.filter(
+        (e) => e.kind === "glyph-jsx" && e.name === "Download",
+      ),
+    ).toHaveLength(1);
   });
   it("bounds the artwork opt-out to one exact imported wrapper with false after every spread", () => {
     const path = "app/ui/src/components/playlists/PlaylistArtwork.tsx";

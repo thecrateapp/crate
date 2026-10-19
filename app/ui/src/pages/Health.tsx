@@ -1,3 +1,16 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  ScanSearch as HeaderScanSearch,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import {
   useCallback,
@@ -10,13 +23,12 @@ import {
 import { Link } from "react-router";
 import { artistPagePath } from "@/lib/library-routes";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { timeAgo } from "@/lib/utils";
 import { Button } from "@crate/ui/shadcn/button";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { useTaskEvents } from "@/hooks/use-task-events";
@@ -623,7 +635,36 @@ export function Health() {
 
   return (
     <div className="mx-auto w-full max-w-[70.5rem] min-w-0">
-      <header className="flex flex-wrap items-center justify-between gap-6">
+      <PageHeaderLayout
+        as="header"
+        actions={
+          <PageHeaderActions>
+            {isAdmin ? (
+              <PageHeaderAction
+                label={scanning ? "Scanning..." : "Run scan"}
+                onClick={runScan}
+                disabled={scanning}
+                aria-busy={scanning}
+              >
+                {scanning ? (
+                  <Loader2
+                    data-admin-ux="health-scan-loading"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!scanning ? (
+                  <HeaderScanSearch
+                    data-admin-ux="header-run-scan"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            ) : null}
+          </PageHeaderActions>
+        }
+      >
         <div>
           <h1 className="font-display text-[clamp(2.25rem,4.3vw,3.375rem)] font-bold leading-[1.05] tracking-display text-text-primary">
             Library Health
@@ -632,25 +673,7 @@ export function Health() {
             Find problems in your library and how to resolve them.
           </p>
         </div>
-        {isAdmin ? (
-          <Button
-            className="min-h-11"
-            onClick={runScan}
-            disabled={scanning}
-            aria-busy={scanning}
-          >
-            {scanning ? (
-              <Loader2
-                data-admin-ux="health-scan-loading"
-                aria-hidden="true"
-                size={14}
-                className="mr-2 animate-spin"
-              />
-            ) : null}
-            {scanning ? "Scanning..." : "Run scan"}
-          </Button>
-        ) : null}
-      </header>
+      </PageHeaderLayout>
       <div className="mt-6 border-b border-border-quiet pb-8 text-text-muted">
         <p className="font-mono text-label">
           Latest check:{" "}
@@ -688,24 +711,24 @@ export function Health() {
                   role="group"
                   aria-label="Filter by check"
                 >
-                  <CratePill
+                  <FilterChip
                     active={filter === null}
                     onClick={() => setFilter(null)}
                   >
                     All{" "}
                     <span className="ml-1 text-text-muted">{totalOpen}</span>
-                  </CratePill>
+                  </FilterChip>
                   {Object.entries(counts)
                     .sort(([, a], [, b]) => b - a)
                     .map(([check, count]) => (
-                      <CratePill
+                      <FilterChip
                         key={check}
                         active={filter === check}
                         onClick={() => setFilter(check)}
                       >
                         {CHECK_LABELS[check] || check.replace(/_/g, " ")}{" "}
                         <span className="ml-1 text-text-muted">{count}</span>
-                      </CratePill>
+                      </FilterChip>
                     ))}
                 </div>
               </details>
@@ -911,14 +934,14 @@ export function Health() {
                                 level={catalogEntry.risk}
                                 label={riskLabel(catalogEntry.risk)}
                               />
-                              <CrateChip
+                              <InfoBadge
                                 className={
                                   SCOPE_TONES[catalogEntry.scope] ||
                                   SCOPE_TONES.hybrid
                                 }
                               >
                                 {scopeLabel(catalogEntry.scope)}
-                              </CrateChip>
+                              </InfoBadge>
                               <span className="font-mono text-label text-text-muted">
                                 {executionLane(catalogEntry)}
                               </span>
@@ -1049,9 +1072,9 @@ export function Health() {
                     "No description available."}
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <CrateChip className={executionLaneTone(entry)}>
+                  <InfoBadge className={executionLaneTone(entry)}>
                     {executionLane(entry)}
-                  </CrateChip>
+                  </InfoBadge>
                   <SeverityMeter
                     level={entry.risk}
                     label={riskLabel(entry.risk)}

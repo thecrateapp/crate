@@ -34,7 +34,10 @@ for (const width of [1440, 768, 390]) {
         main.getByText("Unknown user", { exact: true }),
       ).toBeVisible();
       await expect(main.getByText("withdrawn", { exact: true })).toBeVisible();
-      await expect(main.locator("svg")).toHaveCount(0);
+      await expect(main.locator("svg")).toHaveCount(1);
+      await expect(
+        main.locator('svg[data-admin-ux="header-refresh"]'),
+      ).toHaveCount(1);
       await expect(main.locator("button button,button a,a a")).toHaveCount(0);
       for (const control of await main.locator("button,a").all()) {
         const box = (await control.boundingBox())!;

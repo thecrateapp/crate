@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PageHeaderLayout } from "@/components/layout/PageHeader";
 
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -23,13 +24,28 @@ export function OpsPageHero({
   actions,
   children,
   className,
+  compactActions = false,
 }: {
   title: string;
   description: string;
   actions?: ReactNode;
   children?: ReactNode;
   className?: string;
+  compactActions?: boolean;
 }) {
+  const identity = (
+    <div className="space-y-4">
+      <div>
+        <h1 className="font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
+          {title}
+        </h1>
+        <p className="text-sm text-white/55">{description}</p>
+      </div>
+      {children ? (
+        <div className="flex flex-wrap items-center gap-2">{children}</div>
+      ) : null}
+    </div>
+  );
   return (
     <section
       className={cn(
@@ -37,24 +53,18 @@ export function OpsPageHero({
         className,
       )}
     >
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="space-y-4">
-          <div>
-            <h1 className="font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
-              {title}
-            </h1>
-            <p className="text-sm text-white/55">{description}</p>
-          </div>
-          {children ? (
-            <div className="flex flex-wrap items-center gap-2">{children}</div>
+      {compactActions ? (
+        <PageHeaderLayout actions={actions}>{identity}</PageHeaderLayout>
+      ) : (
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          {identity}
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              {actions}
+            </div>
           ) : null}
         </div>
-        {actions ? (
-          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-            {actions}
-          </div>
-        ) : null}
-      </div>
+      )}
     </section>
   );
 }

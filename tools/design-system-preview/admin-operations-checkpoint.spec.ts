@@ -29,7 +29,10 @@ for (const width of [1440, 768, 390])
           name: "Refresh",
           exact: true,
         });
-        await expect(refresh.locator("svg")).toHaveCount(0);
+        await expect(refresh.locator("svg")).toHaveAttribute(
+          "data-admin-ux",
+          "header-refresh",
+        );
         if (view === "logs") {
           const pause = real.getByRole("button", { name: "Pause live" });
           await expect(pause.locator("svg")).toHaveCount(1);

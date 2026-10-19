@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { CRATE_ICON_SIZE, ListMusic, Loader2, Zap } from "@crate/ui/icons";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
@@ -6,7 +7,6 @@ import { searchTrackToTrack, trackIdentity } from "@/pages/jam-session-utils";
 import { tracksMatch as playerTracksMatch } from "@/contexts/player-session";
 
 import type { JamQueuePanelProps } from "./JamQueueSections";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 type JamQueueToolbarProps = Pick<
   JamQueuePanelProps,
@@ -80,9 +80,9 @@ function JamQueueHeader({ t, queueMode, queueItems }: JamQueueHeaderProps) {
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <CrateBadge size="md" icon={ListMusic}>
+        <InfoBadge icon={ListMusic}>
           {t("jam.room.queueTrackCount", { count: queueItems.length })}
-        </CrateBadge>
+        </InfoBadge>
       </div>
     </div>
   );

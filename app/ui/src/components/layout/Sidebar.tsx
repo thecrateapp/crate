@@ -5,6 +5,7 @@ import { Link } from "react-router";
 
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { AdminSelect } from "@/components/ui/AdminSelect";
@@ -347,12 +348,12 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                   {item.label}
                 </span>
                 {badgeValue != null && badgeValue > 0 ? (
-                  <Badge
-                    variant="secondary"
-                    className="shrink-0 px-1.5 py-1 font-mono font-normal text-xs leading-3.5 tabular-nums"
+                  <InfoBadge
+                    variant="counter"
+                    className="shrink-0 tabular-nums"
                   >
                     {badgeValue}
-                  </Badge>
+                  </InfoBadge>
                 ) : null}
               </NavLink>
             </div>
@@ -428,12 +429,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                       {user.name}
                     </div>
                     <div className="mt-1">
-                      <Badge
-                        variant="secondary"
-                        className="px-1.5 py-0 text-[10px]"
-                      >
-                        {user.role}
-                      </Badge>
+                      <Badge variant="secondary">{user.role}</Badge>
                     </div>
                   </div>
                 </Link>

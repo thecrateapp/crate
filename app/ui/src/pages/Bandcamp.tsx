@@ -1,5 +1,17 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  FolderSync as HeaderFolderSync,
+  Radar as HeaderRadar,
+  Link as HeaderLink,
+  ArrowUpRight,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ArrowUpRight, ExternalLink, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -11,7 +23,7 @@ import {
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
@@ -200,62 +212,76 @@ export function Bandcamp() {
       <OpsPageHero
         title="Support layer for the collection"
         description="Connect purchases, match Bandcamp URLs to Crate entities and import owned releases without making the library messy."
+        compactActions
         actions={
-          <>
-            {" "}
-            <Button
-              onClick={() =>
-                queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
-              }
-              aria-busy={busyAction === "Bandcamp sync"}
-              disabled={!connected || busyAction !== null}
-              className="min-h-11 gap-2"
-            >
-              {busyAction === "Bandcamp sync" && (
-                <Loader2
-                  data-admin-ux="bandcamp-sync-loading"
+          <PageHeaderActions>
+            <>
+              {" "}
+              <PageHeaderAction
+                label="Sync collection"
+                onClick={() =>
+                  queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
+                }
+                aria-busy={busyAction === "Bandcamp sync"}
+                disabled={!connected || busyAction !== null}
+              >
+                {busyAction === "Bandcamp sync" && (
+                  <Loader2
+                    data-admin-ux="bandcamp-sync-loading"
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin"
+                  />
+                )}
+                {!(busyAction === "Bandcamp sync") ? (
+                  <HeaderFolderSync
+                    data-admin-ux="header-sync-collection"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Refresh Radar"
+                onClick={() =>
+                  queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
+                }
+                aria-busy={busyAction === "Bandcamp Radar"}
+                disabled={!connected || busyAction !== null}
+              >
+                <HeaderRadar
+                  data-admin-ux="header-refresh-radar"
                   aria-hidden="true"
-                  className="h-4 w-4 animate-spin"
                 />
-              )}
-              Sync collection
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
-              }
-              aria-busy={busyAction === "Bandcamp Radar"}
-              disabled={!connected || busyAction !== null}
-              className="min-h-11 gap-2"
-            >
-              Refresh Radar
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                queueTask(
-                  "/api/bandcamp/admin/backfill-urls?limit=250&public_search=true",
-                  "Bandcamp URL backfill",
-                )
-              }
-              aria-busy={busyAction === "Bandcamp URL backfill"}
-              disabled={busyAction !== null}
-              className="min-h-11 gap-2"
-            >
-              {busyAction === "Bandcamp URL backfill" && (
-                <Loader2
-                  data-admin-ux="bandcamp-backfill-loading"
-                  aria-hidden="true"
-                  className="h-4 w-4 animate-spin"
-                />
-              )}
-              Backfill URLs
-            </Button>
-          </>
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Backfill URLs"
+                onClick={() =>
+                  queueTask(
+                    "/api/bandcamp/admin/backfill-urls?limit=250&public_search=true",
+                    "Bandcamp URL backfill",
+                  )
+                }
+                aria-busy={busyAction === "Bandcamp URL backfill"}
+                disabled={busyAction !== null}
+              >
+                {busyAction === "Bandcamp URL backfill" && (
+                  <Loader2
+                    data-admin-ux="bandcamp-backfill-loading"
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin"
+                  />
+                )}
+                {!(busyAction === "Bandcamp URL backfill") ? (
+                  <HeaderLink
+                    data-admin-ux="header-backfill-urls"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CratePill>Bandcamp bridge</CratePill>
+        <InfoBadge>Bandcamp bridge</InfoBadge>
         <ConnectionStatus status={status.data} loading={status.loading} />
       </OpsPageHero>
 

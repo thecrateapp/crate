@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useMemo, useState, type ChangeEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -15,7 +16,6 @@ import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 
 import { ApiError, api } from "@/lib/api";
 import { formatBytes } from "@/lib/utils";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface UploadResponse {
   task_id: string;
@@ -194,9 +194,7 @@ export function Upload() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="space-y-2">
-        <CrateBadge size="md" icon={UploadIcon}>
-          {t("upload.badge")}
-        </CrateBadge>
+        <InfoBadge icon={UploadIcon}>{t("upload.badge")}</InfoBadge>
         <h1 className="text-3xl font-bold text-text-primary">
           {t("upload.title")}
         </h1>

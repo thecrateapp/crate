@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
@@ -30,7 +31,7 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
@@ -498,7 +499,7 @@ function ProgressSummary({
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/40">
           <div className="flex flex-wrap items-center gap-2">
             {progress.phase ? (
-              <CrateChip>{String(progress.phase)}</CrateChip>
+              <InfoBadge>{String(progress.phase)}</InfoBadge>
             ) : null}
             {progress.item ? (
               <span className="text-white/65">{String(progress.item)}</span>
@@ -668,14 +669,14 @@ function LiveTaskEvents({ taskId }: { taskId: string }) {
           {["info", "warning", "warn", "error"].includes(event.type) ? (
             <SeverityMeter level={event.type} label={event.type} />
           ) : (
-            <CrateChip
+            <InfoBadge
               className={
                 EVENT_BADGE_COLORS[event.type] ||
                 "border-white/10 bg-white/[0.04] text-white/60"
               }
             >
               {event.type.replace(/_/g, " ")}
-            </CrateChip>
+            </InfoBadge>
           )}
           <span className="text-white/70">{eventMessage(event)}</span>
         </div>
@@ -732,14 +733,14 @@ function TaskEventLog({
           {["info", "warning", "warn", "error"].includes(event.type) ? (
             <SeverityMeter level={event.type} label={event.type} />
           ) : (
-            <CrateChip
+            <InfoBadge
               className={
                 EVENT_BADGE_COLORS[event.type] ||
                 "border-white/10 bg-white/[0.04] text-white/60"
               }
             >
               {event.type.replace(/_/g, " ")}
-            </CrateChip>
+            </InfoBadge>
           )}
           <span className="text-white/70">{eventMessage(event)}</span>
         </div>
@@ -840,10 +841,10 @@ function WorkerControlPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <CrateChip active>{engine}</CrateChip>
-          <CrateChip>{running} running</CrateChip>
-          <CrateChip>{pending} pending</CrateChip>
-          <CrateChip>{slotLimit} slots</CrateChip>
+          <InfoBadge active>{engine}</InfoBadge>
+          <InfoBadge>{running} running</InfoBadge>
+          <InfoBadge>{pending} pending</InfoBadge>
+          <InfoBadge>{slotLimit} slots</InfoBadge>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -946,9 +947,9 @@ function WorkerControlPanel({
                   <span className={cn("text-sm font-medium", meta.accent)}>
                     {meta.label}
                   </span>
-                  <CratePill className="border-white/10 bg-black/20 text-white/70">
+                  <InfoBadge className="border-white/10 bg-black/20 text-white/70">
                     {runningForPool} active
-                  </CratePill>
+                  </InfoBadge>
                 </div>
                 <div className="mt-2 text-xs text-white/45">
                   {pendingForPool} queued
@@ -1054,7 +1055,7 @@ function PlaybackDeliveryPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <CrateChip
+          <InfoBadge
             className={
               (runtime?.active ?? 0) > 0
                 ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -1062,19 +1063,19 @@ function PlaybackDeliveryPanel({
             }
           >
             {runtime?.active ?? 0}/{runtime?.limit ?? 1} transcodes
-          </CrateChip>
-          <CrateChip>
+          </InfoBadge>
+          <InfoBadge>
             {stats?.pending_active ?? stats?.pending ?? 0} active pending
-          </CrateChip>
+          </InfoBadge>
           {(stats?.pending_unassigned ?? 0) > 0 ? (
-            <CrateChip>{stats?.pending_unassigned} unassigned</CrateChip>
+            <InfoBadge>{stats?.pending_unassigned} unassigned</InfoBadge>
           ) : null}
           {(stats?.pending_stale ?? 0) > 0 ? (
-            <CrateChip className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
+            <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
               {stats?.pending_stale} stale
-            </CrateChip>
+            </InfoBadge>
           ) : null}
-          <CrateChip>{stats?.failed ?? 0} failed</CrateChip>
+          <InfoBadge>{stats?.failed ?? 0} failed</InfoBadge>
         </div>
         <Button
           size="sm"
@@ -1146,9 +1147,9 @@ function PlaybackDeliveryPanel({
                     {variant.delivery_format} {variant.delivery_bitrate}k
                   </div>
                 </div>
-                <CrateChip className={variantStatusClass(variant.status)}>
+                <InfoBadge className={variantStatusClass(variant.status)}>
                   {variant.status}
-                </CrateChip>
+                </InfoBadge>
                 <div className="text-xs text-white/45">
                   {formatBytes(variant.bytes)}
                   {reduction ? (
@@ -1215,8 +1216,8 @@ function ActiveTaskCard({
                 {getTaskLabel(task)}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/40">
-                <CrateChip className={status.pill}>{status.label}</CrateChip>
-                {task.pool ? <CrateChip>{task.pool}</CrateChip> : null}
+                <InfoBadge className={status.pill}>{status.label}</InfoBadge>
+                {task.pool ? <InfoBadge>{task.pool}</InfoBadge> : null}
                 <span>
                   {liveStatus === "running" && task.started_at
                     ? `Running for ${formatDuration(
@@ -1325,19 +1326,19 @@ function HistoryTaskRow({
             <span className="truncate text-sm font-medium text-white">
               {getTaskLabel(task)}
             </span>
-            <CrateChip className={status.pill}>{status.label}</CrateChip>
-            <CrateChip className={familyMeta.chip}>
+            <InfoBadge className={status.pill}>{status.label}</InfoBadge>
+            <InfoBadge className={familyMeta.chip}>
               {familyMeta.label}
-            </CrateChip>
+            </InfoBadge>
             {needsAttention ? (
-              <CrateChip className="border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text">
+              <InfoBadge className="border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text">
                 Needs attention
-              </CrateChip>
+              </InfoBadge>
             ) : null}
             {highlightMeta ? (
-              <CrateChip className={highlightMeta.pill}>
+              <InfoBadge className={highlightMeta.pill}>
                 Just finished
-              </CrateChip>
+              </InfoBadge>
             ) : null}
           </div>
           <div className="mt-1 truncate text-xs text-white/40">
@@ -1893,24 +1894,24 @@ export function Tasks() {
           </>
         }
       >
-        <CrateChip active icon={Activity}>
+        <InfoBadge active icon={Activity}>
           {tasks.length} tasks
-        </CrateChip>
-        <CratePill icon={Loader2}>{activeTasks.length} active</CratePill>
-        <CratePill icon={Clock}>
+        </InfoBadge>
+        <InfoBadge icon={Loader2}>{activeTasks.length} active</InfoBadge>
+        <InfoBadge icon={Clock}>
           {activeTasks.filter((task) => task.status === "pending").length}{" "}
           queued
-        </CratePill>
-        <CratePill icon={CheckCircle2}>
+        </InfoBadge>
+        <InfoBadge icon={CheckCircle2}>
           {tasks.filter((task) => task.status === "completed").length} completed
-        </CratePill>
-        <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
+        </InfoBadge>
+        <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
           {tasks.filter((task) => task.status === "failed").length} failed
-        </CratePill>
+        </InfoBadge>
         {stats.needsAttention > 0 ? (
-          <CratePill className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
+          <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
             {stats.needsAttention} need attention
-          </CratePill>
+          </InfoBadge>
         ) : null}
       </OpsPageHero>
 

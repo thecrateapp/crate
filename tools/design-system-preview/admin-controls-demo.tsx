@@ -86,7 +86,9 @@ function Demo() {
         </p>
       </section>
       <section aria-label="Selector compartido" className="crate-form-field">
-        <span className="text-sm text-text-muted">Fuente de muestra</span>
+        <span data-slot="form-field-label" className="text-sm text-text-muted">
+          Fuente de muestra
+        </span>
         <AdminSelect
           placeholder="Fuente de muestra"
           value={source}

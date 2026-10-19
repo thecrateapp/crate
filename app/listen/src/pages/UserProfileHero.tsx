@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Link } from "react-router";
 import {
   BarChart3,
@@ -6,7 +7,7 @@ import {
   UserRoundCheck,
   UserCheck,
 } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
 
@@ -83,9 +84,7 @@ function UserProfileHeader({
               {displayName}
             </h1>
             {data.relationship_state.is_friend && !isOwnProfile ? (
-              <CrateBadge size="md" icon={UserCheck}>
-                {t("people.friends")}
-              </CrateBadge>
+              <InfoBadge icon={UserCheck}>{t("people.friends")}</InfoBadge>
             ) : null}
           </div>
           <div className="mt-1 text-sm text-text-muted">

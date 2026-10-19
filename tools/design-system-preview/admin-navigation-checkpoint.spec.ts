@@ -9,7 +9,9 @@ async function expectTouchTarget(target: Locator) {
 }
 
 async function expectBalancedCounter(link: Locator) {
-  const badge = link.locator('[data-slot="badge"]');
+  const badge = link.locator(
+    '[data-slot="info-badge"][data-variant="counter"]',
+  );
   const insets = await badge.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const style = getComputedStyle(element);

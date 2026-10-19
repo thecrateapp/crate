@@ -1,8 +1,8 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Check, Wrench } from "lucide-react";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { formatSize } from "@/lib/utils";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
@@ -108,20 +108,20 @@ export function ArtistCard({
         {name}
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-        {isFeatured ? <CrateChip active>Featured</CrateChip> : null}
+        {isFeatured ? <InfoBadge active>Featured</InfoBadge> : null}
         {isFeatured
           ? featuredDevices.map((device) => (
-              <CrateChip key={device}>{device}</CrateChip>
+              <InfoBadge key={device}>{device}</InfoBadge>
             ))
           : null}
         {primary_format ? (
-          <CrateChip>{primary_format.replace(".", "").toUpperCase()}</CrateChip>
+          <InfoBadge>{primary_format.replace(".", "").toUpperCase()}</InfoBadge>
         ) : null}
-        <CrateChip>
+        <InfoBadge>
           {albums} {albums === 1 ? "album" : "albums"}
-        </CrateChip>
-        <CrateChip>{tracks} tracks</CrateChip>
-        <CrateChip>{formatSize(size_mb)}</CrateChip>
+        </InfoBadge>
+        <InfoBadge>{tracks} tracks</InfoBadge>
+        <InfoBadge>{formatSize(size_mb)}</InfoBadge>
       </div>
     </div>
   );

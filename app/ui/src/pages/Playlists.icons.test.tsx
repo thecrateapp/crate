@@ -44,6 +44,59 @@ describe("System Playlists reviewed rendering and contracts", () => {
       return {};
     });
   });
+  it.each([false, true])(
+    "uses form selects for category and smart match/sort (smart=%s)",
+    async (smart) => {
+      const user = userEvent.setup();
+      mount();
+      await screen.findByRole("heading", { name: "Costa de noche" });
+      await user.click(
+        screen.getByRole("button", {
+          name: smart ? "New smart" : "New static",
+        }),
+      );
+      await user.click(screen.getByRole("combobox", { name: "Category" }));
+      await user.click(screen.getByRole("option", { name: "Genre" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Name" }),
+        "Nueva selección",
+      );
+      if (smart) {
+        for (const [name, option] of [
+          ["Match", "Any rule"],
+          ["Sort", "Popularity"],
+          ["Select genre", "Ambient"],
+        ]) {
+          await user.click(screen.getByRole("combobox", { name }));
+          await user.click(screen.getByRole("option", { name: option }));
+        }
+        const remove = screen.getByRole("button", { name: "Remove rule 1" });
+        expect(remove.textContent).toBe("");
+        expect(
+          remove.querySelector('svg[data-admin-ux="playlists-remove-rule"]'),
+        ).not.toBeNull();
+      }
+      await user.click(screen.getByRole("button", { name: "Create & open" }));
+      await waitFor(() =>
+        expect(mock).toHaveBeenCalledWith(
+          "/api/admin/system-playlists",
+          "POST",
+          expect.objectContaining({
+            category: "genre",
+            ...(smart
+              ? {
+                  smart_rules: expect.objectContaining({
+                    match: "any",
+                    sort: "popularity",
+                  }),
+                }
+              : {}),
+          }),
+        ),
+      );
+    },
+  );
+
   it("uses a bounded operator select and keeps numeric range creation", async () => {
     const user = userEvent.setup();
     mount();
@@ -84,20 +137,39 @@ describe("System Playlists reviewed rendering and contracts", () => {
     expect(
       screen.getByRole("heading", { name: "System Playlists" }),
     ).toHaveClass("font-display");
-    expect(
-      screen.getByRole("button", { name: "Deactivate Costa de noche" }),
-    ).toHaveTextContent("Deactivate");
-    expect(
-      screen.getByRole("button", { name: "Activate Archivo pausado" }),
-    ).toHaveTextContent("Activate");
-    expect(
-      screen.getByRole("button", { name: "Delete Costa de noche" }),
-    ).toHaveTextContent("Delete");
+    for (const name of [
+      "Edit Costa de noche",
+      "Deactivate Costa de noche",
+      "Activate Archivo pausado",
+      "Delete Costa de noche",
+    ]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAttribute("data-size", "icon-lg");
+      expect(button).toHaveAttribute("data-variant", "ghost");
+      expect(button).toHaveAttribute("title", name.split(" ")[0]);
+      expect(button.textContent).toBe("");
+      expect(button.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+    }
     expect(
       container.querySelectorAll(".playlist-artwork-placeholder svg"),
     ).toHaveLength(0);
     const search = screen.getByRole("textbox", { name: "Search playlists" });
     expect(search.closest(".crate-form-field")).toBeInTheDocument();
+  });
+  it("opens the correct editor from the row toolbar by keyboard without triggering its parent", async () => {
+    const user = userEvent.setup();
+    mount();
+    const open = await screen.findByRole("button", {
+      name: "Edit Archivo pausado",
+    });
+    open.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("destination")).toHaveTextContent(
+      "/playlists/13",
+    );
   });
   it("preserves search, category and mode filtering/counts plus keyboard editor navigation", async () => {
     const user = userEvent.setup();
@@ -243,7 +315,7 @@ describe("System Playlists reviewed rendering and contracts", () => {
     expect(
       screen.getByRole("heading", { name: "No playlists for this view yet" }),
     ).toBeInTheDocument();
-    expect(container.querySelectorAll("svg")).toHaveLength(2); // Search and shared category disclosure.
+    expect(container.querySelectorAll("svg")).toHaveLength(4); // Search, category disclosure and two compact creation actions.
   });
 });
 

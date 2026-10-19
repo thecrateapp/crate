@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
@@ -20,7 +21,6 @@ import {
   radioTypeLabel,
   type RadioStationLike,
 } from "./radio-station-view";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface RadioStationCardProps {
   station: RadioStationLike;
@@ -117,13 +117,13 @@ export const RadioStationCard = memo(function RadioStationCard({
           />
         )}
         <span className="home-radio-overlay absolute inset-0" />
-        <CrateBadge
+        <InfoBadge
           surface="overlay"
           icon={Radio}
           className="absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] whitespace-nowrap"
         >
           <span className="min-w-0 truncate">{typeLabel}</span>
-        </CrateBadge>
+        </InfoBadge>
         <span className="absolute inset-x-0 bottom-0 block p-4">
           <span className="home-radio-title block truncate text-sm font-semibold">
             {title}

@@ -1,6 +1,15 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Wrench as HeaderWrench,
+  Loader2,
+} from "lucide-react";
 import { useEffect, useReducer, useState } from "react";
 import { Link } from "react-router";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getDashboardModel } from "@/components/admin/dashboard-model";
 import { useAuth } from "@/contexts/AuthContext";
@@ -130,7 +139,33 @@ export function Dashboard() {
   );
   return (
     <div className="grid min-w-0 gap-8 pb-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <PageHeaderLayout
+        as="header"
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={() => void refresh(true)}
+            >
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            {canSync || canMaintain ? (
+              <PageHeaderAction
+                label="Maintenance"
+                onClick={() => setMaintenanceOpen(true)}
+              >
+                <HeaderWrench
+                  data-admin-ux="header-maintenance"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+            ) : null}
+          </PageHeaderActions>
+        }
+      >
         <div>
           <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance">
             Dashboard
@@ -139,25 +174,7 @@ export function Dashboard() {
             Service signals, reported work and interruptions.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="min-h-11"
-            onClick={() => void refresh(true)}
-          >
-            Refresh
-          </Button>
-          {canSync || canMaintain ? (
-            <Button
-              variant="ghost"
-              className="min-h-11"
-              onClick={() => setMaintenanceOpen(true)}
-            >
-              Maintenance
-            </Button>
-          ) : null}
-        </div>
-      </header>
+      </PageHeaderLayout>
       <InstrumentPanel
         as="section"
         headingLevel={2}

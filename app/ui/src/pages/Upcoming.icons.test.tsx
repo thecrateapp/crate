@@ -33,10 +33,15 @@ describe("Upcoming bounded icon retirement", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Clear caches" }),
-    ).toHaveTextContent("Clear caches");
+    ).toHaveAttribute("title", "Clear caches");
     expect(
       screen.getByRole("button", { name: "Download release" }),
-    ).toHaveTextContent("Download");
+    ).toHaveTextContent("");
+    expect(
+      screen
+        .getByRole("button", { name: "Download release" })
+        .querySelector("svg"),
+    ).toHaveAttribute("data-admin-ux", "upcoming-download");
     expect(
       container.querySelector('[data-admin-ux="upcoming-search"]'),
     ).toBeInTheDocument();
@@ -135,7 +140,7 @@ describe("Upcoming bounded icon retirement", () => {
     ).toBeInTheDocument();
     await act(async () => finish({ items: [] }));
     expect(screen.getByText("Nothing upcoming")).toBeInTheDocument();
-    expect(container.querySelectorAll("svg")).toHaveLength(3); // Functional search and two view controls remain.
+    expect(container.querySelectorAll("svg")).toHaveLength(5); // Search, two view controls and two compact header actions.
   });
 
   it("uses named icon-only view buttons with pressed state", async () => {

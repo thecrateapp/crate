@@ -1,11 +1,20 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  GitMerge as HeaderGitMerge,
+  DatabaseBackup as HeaderDatabaseBackup,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { OpsStatTile } from "@/components/admin/ops-surfaces";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Badge } from "@crate/ui/shadcn/badge";
-import { Button } from "@crate/ui/shadcn/button";
 import {
   Card,
   CardContent,
@@ -151,7 +160,62 @@ export function GlobalCatalog() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <PageHeaderLayout
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={() => void refetchStatus()}
+              disabled={loading}
+            >
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Reconcile"
+              aria-busy={reconciling === "incremental"}
+              disabled={!canManage || reconciling !== null}
+              onClick={() => void queueReconcile("incremental")}
+            >
+              {reconciling === "incremental" ? (
+                <Loader2
+                  aria-hidden="true"
+                  data-admin-ux="catalog-incremental-loading"
+                  className="h-4 w-4 animate-spin"
+                />
+              ) : null}
+              {!(reconciling === "incremental") ? (
+                <HeaderGitMerge
+                  data-admin-ux="header-reconcile"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Full rebuild"
+              aria-busy={reconciling === "full"}
+              disabled={!canManage || reconciling !== null}
+              onClick={() => void queueReconcile("full")}
+            >
+              {reconciling === "full" ? (
+                <Loader2
+                  aria-hidden="true"
+                  data-admin-ux="catalog-full-loading"
+                  className="h-4 w-4 animate-spin"
+                />
+              ) : null}
+              {!(reconciling === "full") ? (
+                <HeaderDatabaseBackup
+                  data-admin-ux="header-full-rebuild"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">
             Global Catalog
@@ -161,48 +225,7 @@ export function GlobalCatalog() {
             federated catalogs.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="min-h-11"
-            onClick={() => void refetchStatus()}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="outline"
-            className="min-h-11"
-            aria-busy={reconciling === "incremental"}
-            disabled={!canManage || reconciling !== null}
-            onClick={() => void queueReconcile("incremental")}
-          >
-            {reconciling === "incremental" ? (
-              <Loader2
-                aria-hidden="true"
-                data-admin-ux="catalog-incremental-loading"
-                className="mr-2 h-4 w-4 animate-spin"
-              />
-            ) : null}
-            Reconcile
-          </Button>
-          <Button
-            className="min-h-11"
-            aria-busy={reconciling === "full"}
-            disabled={!canManage || reconciling !== null}
-            onClick={() => void queueReconcile("full")}
-          >
-            {reconciling === "full" ? (
-              <Loader2
-                aria-hidden="true"
-                data-admin-ux="catalog-full-loading"
-                className="mr-2 h-4 w-4 animate-spin"
-              />
-            ) : null}
-            Full rebuild
-          </Button>
-        </div>
-      </div>
+      </PageHeaderLayout>
 
       <div className="flex gap-2 border-b border-white/10">
         {tabs.map((item) => (

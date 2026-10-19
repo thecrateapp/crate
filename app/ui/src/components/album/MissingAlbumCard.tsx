@@ -45,7 +45,7 @@ export function MissingAlbumCard({
         <span>{year || "?"}</span>
         <Badge
           variant="outline"
-          className="text-[10px] px-1 py-0 border-border-quiet text-text-secondary"
+          className="border-border-quiet text-text-secondary"
         >
           {type}
         </Badge>

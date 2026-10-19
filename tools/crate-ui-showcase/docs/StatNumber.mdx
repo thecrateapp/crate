@@ -1,0 +1,24 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/StatNumber.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">StatNumber</DocHeading>
+
+<EntryDetails id="stat-number" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Use for highlighted metrics, not every numeral in a table.
+- `sm/md/lg/xl`, units and labels above or below. The caller distinguishes missing data from zero.
+- No local font or weight overrides on the value. Full Admin adoption is still pending.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Controls />
+
+Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.

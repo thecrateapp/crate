@@ -1,6 +1,17 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  ChartNoAxesCombined as HeaderChartNoAxesCombined,
+  Radar as HeaderRadar,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -9,7 +20,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -131,14 +142,14 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
-              <CrateChip>
+              <InfoBadge>
                 {artist.local_count}/{artist.mb_count} releases
-              </CrateChip>
-              <CrateChip>{artist.missing.length} missing</CrateChip>
+              </InfoBadge>
+              <InfoBadge>{artist.missing.length} missing</InfoBadge>
               {artist.listeners > 0 ? (
-                <CrateChip>
+                <InfoBadge>
                   {formatCompact(artist.listeners)} listeners
-                </CrateChip>
+                </InfoBadge>
               ) : null}
             </div>
           </div>
@@ -161,12 +172,12 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
           {artist.missing.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {artist.missing.slice(0, 3).map((album) => (
-                <CrateChip key={`${artist.artist}-${album.title}`}>
+                <InfoBadge key={`${artist.artist}-${album.title}`}>
                   {album.year || "?"} · {album.title}
-                </CrateChip>
+                </InfoBadge>
               ))}
               {artist.missing.length > 3 ? (
-                <CrateChip>+{artist.missing.length - 3} more</CrateChip>
+                <InfoBadge>+{artist.missing.length - 3} more</InfoBadge>
               ) : null}
             </div>
           ) : null}
@@ -255,7 +266,7 @@ function ReleaseRadarRow({ release }: { release: Release }) {
         )}
       </div>
       <div className="hidden shrink-0 md:block">
-        <CrateChip>{release.release_type || "release"}</CrateChip>
+        <InfoBadge>{release.release_type || "release"}</InfoBadge>
       </div>
     </div>
   );
@@ -328,62 +339,72 @@ function DiscoverView({
       <OpsPageHero
         title="Discovery"
         description="A workspace for finding what to import next: incomplete artist catalogues, fresh releases, momentum signals and genres worth expanding."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={refreshAll}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={recomputeCompleteness}
-              aria-busy={recomputing || completenessTaskId !== null}
-              disabled={recomputing || completenessTaskId !== null}
-            >
-              {(recomputing || completenessTaskId !== null) && (
-                <Loader2
-                  data-admin-ux="discovery-recompute-loading"
+          <PageHeaderActions>
+            <>
+              <PageHeaderAction label="Refresh" onClick={refreshAll}>
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
                   aria-hidden="true"
-                  size={14}
-                  className="animate-spin"
                 />
-              )}
-              {recomputing || completenessTaskId !== null
-                ? "Recomputing..."
-                : "Recompute gaps"}
-            </Button>
-            <Button
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={checkReleases}
-              aria-busy={checking}
-              disabled={checking}
-            >
-              {checking && (
-                <Loader2
-                  data-admin-ux="discovery-check-loading"
-                  aria-hidden="true"
-                  size={14}
-                  className="animate-spin"
-                />
-              )}
-              Check releases
-            </Button>
-          </>
+              </PageHeaderAction>
+              <PageHeaderAction
+                label={
+                  recomputing || completenessTaskId !== null
+                    ? "Recomputing..."
+                    : "Recompute gaps"
+                }
+                onClick={recomputeCompleteness}
+                aria-busy={recomputing || completenessTaskId !== null}
+                disabled={recomputing || completenessTaskId !== null}
+              >
+                {(recomputing || completenessTaskId !== null) && (
+                  <Loader2
+                    data-admin-ux="discovery-recompute-loading"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                )}
+                {!(recomputing || completenessTaskId !== null) ? (
+                  <HeaderChartNoAxesCombined
+                    data-admin-ux="header-recompute-gaps"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Check releases"
+                onClick={checkReleases}
+                aria-busy={checking}
+                disabled={checking}
+              >
+                {checking && (
+                  <Loader2
+                    data-admin-ux="discovery-check-loading"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                )}
+                {!checking ? (
+                  <HeaderRadar
+                    data-admin-ux="header-check-releases"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CrateChip active>
+        <InfoBadge active>
           {summary.opportunityArtists} acquisition targets
-        </CrateChip>
-        <CratePill>{summary.detectedReleases} detected releases</CratePill>
-        <CratePill>{summary.incompleteArtists} incomplete artists</CratePill>
-        <CratePill>{trendingArtists.length} momentum signals</CratePill>
+        </InfoBadge>
+        <InfoBadge>{summary.detectedReleases} detected releases</InfoBadge>
+        <InfoBadge>{summary.incompleteArtists} incomplete artists</InfoBadge>
+        <InfoBadge>{trendingArtists.length} momentum signals</InfoBadge>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

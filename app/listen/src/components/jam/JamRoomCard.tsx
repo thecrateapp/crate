@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   CRATE_ICON_SIZE,
@@ -27,7 +28,6 @@ import {
 } from "@/pages/jam-session-utils";
 
 import { JamAvatarBubble } from "./JamAvatarBubble";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export const JamRoomCard = memo(function JamRoomCard({
   listedRoom,
@@ -191,21 +191,21 @@ function RoomCardBadges({
 }) {
   return (
     <span className="mt-2 flex flex-wrap gap-1.5 text-xs">
-      <CrateBadge icon={room.visibility === "public" ? Globe2 : Lock}>
+      <InfoBadge icon={room.visibility === "public" ? Globe2 : Lock}>
         {mode === "member"
           ? t("jam.roomCard.yourRoom")
           : t("jam.visibility.public")}
-      </CrateBadge>
+      </InfoBadge>
       {room.is_permanent ? (
-        <CrateBadge icon={Pin}>{t("jam.roomCard.permanent")}</CrateBadge>
+        <InfoBadge icon={Pin}>{t("jam.roomCard.permanent")}</InfoBadge>
       ) : null}
       {room.status !== "active" ? (
-        <CrateBadge icon={Pause} tone="warning">
+        <InfoBadge icon={Pause} tone="warning">
           {t("jam.roomCard.paused")}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
       {(room.tags || []).slice(0, 5).map((tag) => (
-        <CrateBadge key={`${room.id}-${tag}`}>{tag}</CrateBadge>
+        <InfoBadge key={`${room.id}-${tag}`}>{tag}</InfoBadge>
       ))}
     </span>
   );

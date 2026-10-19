@@ -113,7 +113,9 @@ describe("SystemHealth Resources instrument", () => {
       "/api/admin/metrics/dashboard?period=minute&minutes=60",
     );
     const refresh = screen.getByRole("button", { name: "Refresh metrics" });
-    expect(refresh).toHaveTextContent("Refresh metrics");
+    expect(refresh).toHaveAccessibleName("Refresh metrics");
+    expect(refresh).toHaveAttribute("title", "Refresh metrics");
+    expect(refresh.textContent).toBe("");
     await user.click(refresh);
     expect(refetchMock).toHaveBeenCalledOnce();
   });
@@ -143,7 +145,11 @@ describe("SystemHealth Resources instrument", () => {
     const { container } = renderWithAdminProviders(<SystemHealth />, {
       route: "/system",
     });
-    expect(container.querySelector("svg.lucide")).toBeNull();
+    expect(container.querySelectorAll("svg.lucide")).toHaveLength(1);
+    expect(container.querySelector("svg.lucide")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh-metrics",
+    );
     const score = screen.getByText("Health Score").parentElement!;
     expect(score).toHaveClass("crate-form-field");
     expect(score.children[0]).toHaveTextContent("Health Score");

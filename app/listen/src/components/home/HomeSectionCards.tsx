@@ -1,6 +1,6 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useTranslation } from "react-i18next";
 import { Check, Disc3, RadioTower } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
@@ -56,7 +56,7 @@ export function UpcomingPreviewRow({
             {item.type === "show" ? item.artist : item.title}
           </span>
           {item.user_attending && item.type === "show" ? (
-            <CrateBadge icon={Check}>{t("radar.show.going")}</CrateBadge>
+            <InfoBadge icon={Check}>{t("radar.show.going")}</InfoBadge>
           ) : null}
         </div>
         <div className="truncate text-xs text-text-muted">
@@ -65,14 +65,14 @@ export function UpcomingPreviewRow({
             : `${item.artist} · ${item.title}`}
         </div>
       </div>
-      <CrateBadge
+      <InfoBadge
         icon={item.type === "show" ? RadioTower : Disc3}
         className="relative"
       >
         {item.type === "show"
           ? t("home.radar.itemType.show")
           : t("home.radar.itemType.release")}
-      </CrateBadge>
+      </InfoBadge>
     </button>
   );
 }

@@ -92,3 +92,38 @@ npm run --workspace=app/listen-desktop typecheck
 - `library-routes.ts` builds URLs the backend and readplane serve; changing a path shape is a cross-stack change.
 - `api.ts` in-flight GET dedupe and abort semantics are relied on by both `useApi` instances; keep behavior stable.
 - AdminSelect and Admin card/grid/table skeleton subpaths are compatibility re-exports of shared implementations; loading/empty/error state foundations are shared (1b.4). Admin still keeps other local duplicates of composites/primitives (`app/ui/src/components/ui/`); consolidate instead of adding a third copy. Show cards and Ops surfaces remain app-local; the unused shared copies were removed in Task 1.12. Shared `domain/shows/show-types.ts` remains consumed by Admin.
+
+## Informative labels and controls — local 1AQ
+
+New consumers use `primitives/InfoBadge` for metadata/state/inline counts and
+`primitives/FilterChip` for toggle filters or explicit actions. InfoBadge: Mono40012/16,
+24px high, border1px, padding3px8px, capsule, semantic tone/surface; its counter variant uses
+6px horizontal inset for balanced numeral ink. FilterChip/SegmentedControl/GenrePill use12px
+and32px fine/44px coarse minimums. GenrePill remains the domain component with percentages,
+provenance and independent select/remove actions. CrateBadge/Chip/Pill and shadcn Badge are
+compatibility adapters/recipes, not separate foundations. No local typography/geometry overrides.
+See docs/plans/2026-10-19-crate-v3-ui-labels.md. Generic text-badge/text-label and the player queue
+counter keep their separate roles; do not change their global values to resize the collection.
+
+
+## Mandatory showcase maintenance — 1AQ
+
+Visual source of truth: Diego's approved persistent mockup (5186), with his later confirmed
+adjustments. The component catalogue documents the implementation of that reference. Flag doubts,
+drift or mobile sizing conflicts and resolve them with Diego; do not invent a competing reference.
+
+HairlineList/Row: the shared row owns 12 px horizontal inset, 10 px vertical padding and left text
+alignment, including asChild native links/buttons; gap14px and min32/44 remain. Long unbroken
+text wraps with truncate=false. Text owns Poppins400 at12/18 on desktop AND mobile, matching the
+mockup with Diego's confirmed mobile adjustment (the old11px reduction is retired);
+the previous inherited typography was confirmed as drift. Native refs/semantics/handlers remain
+unchanged. Do not restore geometry or font-size fixes in consumers or the historical mockup.
+Current production consumer is Listen's expanded show setlist; Admin adoption is still pending.
+
+Every added or changed visual component updates its entry in
+`tools/crate-ui-showcase/catalogue.json` and its contract/story evidence in the same change.
+Complete pending entries before modifying their component; new entries must be documented.
+Run `npm run design-system:showcase:refresh -- ID`, `design-system:showcase:check` and affected
+story/consumer tests. The staged hook and shared policy test enforce correspondence; semantic
+review remains required. Do not refresh pending hashes to bypass coverage. See the showcase
+README and AGENTS. Keep stories/docs outside shared tsup entry folders and app runtime imports.

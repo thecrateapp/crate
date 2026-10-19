@@ -1,0 +1,86 @@
+@import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/jetbrains-mono.css";
+@import "../../app/shared/fonts/poppins.css";
+@import "../../app/shared/ui/tokens/index.css";
+@import "tailwindcss";
+@source '../../app/shared/ui';
+@source './stories';
+@source './components';
+:root {
+  color-scheme: dark;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+body {
+  font-family: var(--font-brand), sans-serif;
+}
+/* Scene layout only. No selector below changes shared component internals. */
+.showcase-stack {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.showcase-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.showcase-narrow {
+  width: 280px;
+  max-width: 100%;
+}
+.showcase-panel {
+  padding: 16px;
+  background: var(--surface-container);
+  border: 1px solid var(--border-quiet);
+}
+.showcase-swatch {
+  width: 160px;
+  min-height: 90px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-quiet);
+}
+.showcase-heading {
+  font: 600 24px/1.2 var(--font-display-stack);
+  margin: 0;
+}
+.showcase-doc-heading {
+  font-family: var(--font-display-stack);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 24px 0 16px;
+}
+h1.showcase-doc-heading {
+  font-size: 40px;
+}
+h2.showcase-doc-heading {
+  font-size: 24px;
+}
+h3.showcase-doc-heading {
+  font-size: 18px;
+}
+.showcase-table {
+  border-collapse: collapse;
+  width: 100%;
+  font: 400 12px/1.5 var(--font-mono-stack);
+}
+.showcase-table :is(th, td) {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-quiet);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.showcase-table caption {
+  text-align: left;
+  padding-block: 12px;
+}
+.showcase-code {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono-stack);
+}

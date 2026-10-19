@@ -1,3 +1,5 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useState,
@@ -8,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useSearchParams } from "react-router";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -664,7 +666,7 @@ export function DownloadPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <CrateChip
+              <InfoBadge
                 className={
                   tidalAuthenticated
                     ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -672,8 +674,8 @@ export function DownloadPage() {
                 }
               >
                 Tidal {tidalAuthenticated ? "connected" : "disconnected"}
-              </CrateChip>
-              <CrateChip
+              </InfoBadge>
+              <InfoBadge
                 className={
                   activeQueue.length > 0
                     ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -681,9 +683,9 @@ export function DownloadPage() {
                 }
               >
                 {activeQueue.length} active
-              </CrateChip>
-              <CrateChip>{wishlist.length} wishlist</CrateChip>
-              <CrateChip>{slskDownloads.length} Soulseek downloads</CrateChip>
+              </InfoBadge>
+              <InfoBadge>{wishlist.length} wishlist</InfoBadge>
+              <InfoBadge>{slskDownloads.length} Soulseek downloads</InfoBadge>
             </div>
           </div>
 
@@ -738,7 +740,7 @@ export function DownloadPage() {
                 Artist requests from Listen, ready to search and triage.
               </p>
             </div>
-            <CrateChip>{suggestions.length} open</CrateChip>
+            <InfoBadge>{suggestions.length} open</InfoBadge>
           </div>
           <div className="grid gap-3 xl:grid-cols-2">
             {suggestions.slice(0, 6).map((suggestion) => {
@@ -757,10 +759,10 @@ export function DownloadPage() {
                         <h3 className="truncate text-sm font-semibold text-white">
                           {suggestion.artist_name}
                         </h3>
-                        <CrateChip className="text-[10px]">
+                        <InfoBadge>
                           {suggestion.supporter_count || 1} request
                           {(suggestion.supporter_count || 1) === 1 ? "" : "s"}
-                        </CrateChip>
+                        </InfoBadge>
                       </div>
                       <p className="mt-1 text-xs text-white/45">
                         Suggested by {requester}
@@ -842,7 +844,7 @@ export function DownloadPage() {
           <TabsTrigger value="queue">
             Queue{" "}
             {activeQueue.length + slskDownloads.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1">
+              <Badge variant="secondary" className="ml-1">
                 {activeQueue.length + slskDownloads.length}
               </Badge>
             )}
@@ -850,7 +852,7 @@ export function DownloadPage() {
           <TabsTrigger value="wishlist">
             Wishlist{" "}
             {wishlist.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1">
+              <Badge variant="secondary" className="ml-1">
                 {wishlist.length}
               </Badge>
             )}
@@ -862,7 +864,7 @@ export function DownloadPage() {
         <TabsContent value="search">
           {/* Source sub-tabs */}
           <div className="mt-4 mb-4 flex flex-wrap gap-2 border-b border-white/8 pb-3">
-            <CratePill
+            <FilterChip
               active={resultTab === "tidal"}
               onClick={() => setResultTab("tidal")}
             >
@@ -873,8 +875,8 @@ export function DownloadPage() {
                     (results.tracks?.length || 0)}
                 </span>
               )}
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               active={resultTab === "soulseek"}
               onClick={() => setResultTab("soulseek")}
             >
@@ -887,7 +889,7 @@ export function DownloadPage() {
               {searchingSlsk && (
                 <Loader2 size={12} className="ml-1 animate-spin" />
               )}
-            </CratePill>
+            </FilterChip>
           </div>
 
           {/* Tidal results */}
@@ -1255,7 +1257,7 @@ export function DownloadPage() {
                         {d.filename || d.album}
                       </div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Badge className="bg-accent-action/10 text-accent-action-hi border-0 text-[10px] px-1 py-0">
+                        <Badge className="bg-accent-action/10 text-accent-action-hi border-0">
                           SLSK
                         </Badge>
                         <span>from {d.username}</span>
@@ -1421,7 +1423,7 @@ function QueueRow({
           {item.source} · {item.quality}
         </div>
       </div>
-      <CrateChip
+      <InfoBadge
         className={
           item.status === "completed"
             ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -1433,7 +1435,7 @@ function QueueRow({
         }
       >
         {item.status}
-      </CrateChip>
+      </InfoBadge>
       {onPromote && item.status === "wishlist" && (
         <Button
           variant="ghost"
@@ -1684,14 +1686,14 @@ function TidalAlbumCard({
           )}
           {isLocal && !hasUpgrade && (
             <div className="absolute top-2 right-2">
-              <Badge className="bg-accent-action/90 text-white text-[10px] px-1.5 py-0">
+              <Badge className="bg-accent-action/90 text-white">
                 <CheckCircle2 size={10} className="mr-0.5" /> In library
               </Badge>
             </div>
           )}
           {hasUpgrade && (
             <div className="absolute top-2 right-2">
-              <Badge className="bg-surface-elevated text-text-secondary text-[10px] px-1.5 py-0">
+              <Badge className="bg-surface-elevated text-text-secondary">
                 <ArrowUp size={10} className="mr-0.5" /> Upgrade available
               </Badge>
             </div>
@@ -1744,9 +1746,7 @@ function TidalAlbumCard({
               {album.tracks} tracks
             </span>
             {(album as any).type && (album as any).type !== "ALBUM" && (
-              <Badge variant="outline" className="text-[9px] px-1 py-0">
-                {(album as any).type}
-              </Badge>
+              <Badge variant="outline">{(album as any).type}</Badge>
             )}
             {normalizedQuality.map((q) => (
               <span
@@ -1910,14 +1910,12 @@ function SlskResultCard({
               >
                 {r.quality}
               </span>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {r.files.length} tracks
-              </Badge>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              <Badge variant="secondary">{r.files.length} tracks</Badge>
+              <Badge variant="secondary">
                 {Math.round(r.totalSize / 1048576)} MB
               </Badge>
               {r.freeSlot && (
-                <Badge className="bg-accent-action/10 text-accent-action-hi border-accent-action/20 text-[10px] px-1.5 py-0">
+                <Badge className="bg-accent-action/10 text-accent-action-hi border-accent-action/20">
                   <Zap size={8} className="mr-0.5" /> Free
                 </Badge>
               )}

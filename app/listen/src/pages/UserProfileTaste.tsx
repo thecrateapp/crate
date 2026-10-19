@@ -1,7 +1,7 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useTranslation } from "react-i18next";
 
 import { Star } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 import {
   badgeTone,
@@ -83,14 +83,9 @@ function ProfileBadges({ badges }: { badges: PublicProfile["badges"] }) {
       {badges.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {badges.map((badge) => (
-            <CrateBadge
-              key={badge.key}
-              size="md"
-              icon={Star}
-              tone={badgeTone(badge.tone)}
-            >
+            <InfoBadge key={badge.key} icon={Star} tone={badgeTone(badge.tone)}>
               {badge.label}
-            </CrateBadge>
+            </InfoBadge>
           ))}
         </div>
       ) : (

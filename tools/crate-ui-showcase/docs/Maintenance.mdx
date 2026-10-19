@@ -1,0 +1,55 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta title="System/Maintenance" />
+
+<DocHeading as="h1">Mandatory entry updates</DocHeading>
+
+Every new or changed shared visual component updates its entry in the same change. The registry links source, MDX contract, stories and content fingerprints. Updating a timestamp is not evidence.
+
+1. Find the existing entry, primary category and consumers. An internal file may belong to a family.
+2. Add or update the contract and scenarios that express the change. Use real components without CSS that repairs their internals.
+3. Complete docs/story and mark a changed pending module as documented. Never refresh a pending fingerprint alone.
+4. Run `npm run design-system:showcase:refresh -- ID`, then `npm run design-system:showcase:check`.
+5. Run affected scenario and consumer tests with one worker. Check computed styles, long text and narrow layouts.
+6. Include source, entry, docs/stories and tests in the same change. The hook checks the Git index; an unstaged repair cannot hide stale staged source.
+
+<DocHeading as="h2">Functional categories</DocHeading>
+
+Each family has one primary category based on its purpose, independent of its source folder.
+Variants and states stay with that family. Compatibility is reserved for adapters; new work
+uses the canonical component in its functional category.
+
+| Category      | Responsibility                                                    |
+| ------------- | ----------------------------------------------------------------- |
+| Foundations   | Identity, tokens, type roles, motion and brand assets             |
+| Forms         | Data entry, field composition, filters and exclusive form choices |
+| Feedback      | State, progress, loading, empty and error information             |
+| Data Display  | Labels, metrics, metadata, identity, cards, rows and tables       |
+| Navigation    | Destinations, content tabs, back/skip links and global search     |
+| Actions       | Buttons and contextual commands                                   |
+| Overlays      | Dialogs, popovers, sheets, lightboxes and contextual help layers  |
+| Media         | Covers, artwork, playback and audio instruments                   |
+| Layout        | Page/section composition, containers, rails and separators        |
+| Compatibility | Legacy adapters with canonical replacements                       |
+
+For example, InfoBadge primarily displays metadata even when a tone conveys state. FilterChip
+and radio-mode SegmentedControl belong to Forms; content Tabs belong to Navigation. Category
+assignment does not imply that a pending component's contract has already been validated.
+
+Each CSF family has an explicit stable `meta.id` matching the registry's `storyId`. Preserve
+that id when renaming or moving a category; titles organize navigation without breaking links.
+
+<DocHeading as="h2">What the guard checks</DocHeading>
+
+Unregistered visual modules; removed or renamed sources; stale fingerprints; missing docs/stories; duplicate ownership; pending fingerprint refreshes that hide source changes; documented source changes without corresponding story or doc updates. It also rejects documented-to-pending downgrades and metadata that would break entry links or rendering.
+
+Locally the comparison uses HEAD; the hook reads staged files. CI passes `--base REF` with the PR base SHA or previous push SHA and fetches that history. An unknown comparison revision fails. The CI check never compares a committed catalogue with itself.
+
+The initial baseline explicitly records pre-existing 1AQ debt. Later additions must be documented. Semantic accuracy still needs human review: a fingerprint demonstrates correspondence, not design quality or visual approval.
+
+<DocHeading as="h2">Isolation and validation</DocHeading>
+
+Storybook stays outside production entry folders. Do not import it from app runtime code or place stories under shared tsup entry folders. The preview at 5186 and the 33 canonical 1M captures are preserved.
+
+Automated accessibility checks help; visual review, real keyboard use and assistive technology/native QA have separate completion criteria. Do not run full suites or CI per entry, or regenerate canonical baselines during iteration.

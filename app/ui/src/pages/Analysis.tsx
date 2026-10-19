@@ -1,5 +1,17 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Fingerprint as HeaderFingerprint,
+  TrendingUp as HeaderTrendingUp,
+  Orbit as HeaderOrbit,
+  AudioLines as HeaderAudioLines,
+  Loader2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -8,7 +20,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
 import {
   useOpsSnapshot,
@@ -124,10 +136,10 @@ function PipelineCoverage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CrateChip>{percent}% coverage</CrateChip>
-          {active > 0 ? <CrateChip active>{active} active</CrateChip> : null}
+          <InfoBadge>{percent}% coverage</InfoBadge>
+          {active > 0 ? <InfoBadge active>{active} active</InfoBadge> : null}
           {failed > 0 ? (
-            <CrateChip tone="warning">{failed} failed</CrateChip>
+            <InfoBadge tone="warning">{failed} failed</InfoBadge>
           ) : null}
         </div>
       </div>
@@ -229,21 +241,21 @@ function RecentTrackCard({
           {kind === "analysis" && "bpm" in track ? (
             <div className="flex flex-wrap gap-2">
               {track.bpm != null ? (
-                <CrateChip>{Math.round(track.bpm)} BPM</CrateChip>
+                <InfoBadge>{Math.round(track.bpm)} BPM</InfoBadge>
               ) : null}
               {"audio_key" in track && track.audio_key ? (
-                <CrateChip>{track.audio_key}</CrateChip>
+                <InfoBadge>{track.audio_key}</InfoBadge>
               ) : null}
               {"energy" in track && track.energy != null ? (
-                <CrateChip>{Math.round(track.energy * 100)}% energy</CrateChip>
+                <InfoBadge>{Math.round(track.energy * 100)}% energy</InfoBadge>
               ) : null}
               {"danceability" in track && track.danceability != null ? (
-                <CrateChip>
+                <InfoBadge>
                   {Math.round(track.danceability * 100)}% dance
-                </CrateChip>
+                </InfoBadge>
               ) : null}
               {"has_mood" in track ? (
-                <CrateChip
+                <InfoBadge
                   className={
                     track.has_mood
                       ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -251,7 +263,7 @@ function RecentTrackCard({
                   }
                 >
                   {track.has_mood ? "Mood extracted" : "Mood missing"}
-                </CrateChip>
+                </InfoBadge>
               ) : null}
             </div>
           ) : kind === "bliss" ? (
@@ -259,13 +271,13 @@ function RecentTrackCard({
               Similarity vectors refreshed and ready for related-track features.
             </div>
           ) : kind === "fingerprint" ? (
-            <CrateChip>
+            <InfoBadge>
               {"source" in track && track.source === "chromaprint-v1"
                 ? "Chromaprint"
                 : "source" in track && track.source === "pcm16-md5-v1"
                   ? "PCM fallback"
                   : ("source" in track && track.source) || "Source unavailable"}
-            </CrateChip>
+            </InfoBadge>
           ) : null}
         </div>
       ) : (
@@ -371,128 +383,145 @@ export function Analysis() {
       <OpsPageHero
         title="Analysis"
         description="Audio features, similarity vectors and background processing coverage across the whole library."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refresh(true)}
-              className="min-h-11 gap-2"
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/tasks/backfill-track-fingerprints",
-                  "fingerprints",
-                  "Audio fingerprint backfill queued",
-                )
-              }
-              disabled={activeAction !== null}
-              aria-busy={activeAction === "fingerprints" || undefined}
-              className="min-h-11 gap-2"
-            >
-              {activeAction === "fingerprints" ? (
-                <Loader2
-                  size={14}
+          <PageHeaderActions>
+            <>
+              <PageHeaderAction
+                label="Refresh"
+                onClick={() => void refresh(true)}
+              >
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
                   aria-hidden="true"
-                  data-admin-ux="analysis-action-fingerprints"
-                  className="animate-spin"
                 />
-              ) : null}
-              Backfill fingerprints
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/compute-popularity",
-                  "popularity",
-                  "Popularity recomputation queued",
-                )
-              }
-              disabled={activeAction !== null}
-              aria-busy={activeAction === "popularity" || undefined}
-              className="min-h-11 gap-2"
-            >
-              {activeAction === "popularity" ? (
-                <Loader2
-                  size={14}
-                  aria-hidden="true"
-                  data-admin-ux="analysis-action-popularity"
-                  className="animate-spin"
-                />
-              ) : null}
-              Recompute popularity
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/compute-bliss",
-                  "bliss",
-                  "Bliss recomputation queued",
-                )
-              }
-              disabled={activeAction !== null}
-              aria-busy={activeAction === "bliss" || undefined}
-              className="min-h-11 gap-2"
-            >
-              {activeAction === "bliss" ? (
-                <Loader2
-                  size={14}
-                  aria-hidden="true"
-                  data-admin-ux="analysis-action-bliss"
-                  className="animate-spin"
-                />
-              ) : null}
-              Recompute bliss
-            </Button>
-            <Button
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/analyze-all",
-                  "analysis",
-                  "Full audio re-analysis queued",
-                )
-              }
-              disabled={activeAction !== null}
-              aria-busy={activeAction === "analysis" || undefined}
-              className="min-h-11 gap-2"
-            >
-              {activeAction === "analysis" ? (
-                <Loader2
-                  size={14}
-                  aria-hidden="true"
-                  data-admin-ux="analysis-action-analysis"
-                  className="animate-spin"
-                />
-              ) : null}
-              Re-analyze all
-            </Button>
-          </>
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Backfill fingerprints"
+                onClick={() =>
+                  queueAction(
+                    "/api/tasks/backfill-track-fingerprints",
+                    "fingerprints",
+                    "Audio fingerprint backfill queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "fingerprints" || undefined}
+              >
+                {activeAction === "fingerprints" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-fingerprints"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "fingerprints") ? (
+                  <HeaderFingerprint
+                    data-admin-ux="header-backfill-fingerprints"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Recompute popularity"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/compute-popularity",
+                    "popularity",
+                    "Popularity recomputation queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "popularity" || undefined}
+              >
+                {activeAction === "popularity" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-popularity"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "popularity") ? (
+                  <HeaderTrendingUp
+                    data-admin-ux="header-recompute-popularity"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Recompute bliss"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/compute-bliss",
+                    "bliss",
+                    "Bliss recomputation queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "bliss" || undefined}
+              >
+                {activeAction === "bliss" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-bliss"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "bliss") ? (
+                  <HeaderOrbit
+                    data-admin-ux="header-recompute-bliss"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Re-analyze all"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/analyze-all",
+                    "analysis",
+                    "Full audio re-analysis queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "analysis" || undefined}
+              >
+                {activeAction === "analysis" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-analysis"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "analysis") ? (
+                  <HeaderAudioLines
+                    data-admin-ux="header-re-analyze-all"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CrateChip active>{status.total.toLocaleString()} tracks</CrateChip>
-        <CrateChip>{metrics.analysisPercent}% audio covered</CrateChip>
-        <CrateChip>{metrics.blissPercent}% bliss covered</CrateChip>
-        <CrateChip>{metrics.fingerprintPercent}% fingerprinted</CrateChip>
-        <CrateChip>{metrics.lyricsPercent}% lyrics cached</CrateChip>
-        <CrateChip>{metrics.portableSidecarPercent}% portable albums</CrateChip>
-        <CrateChip tone={status.chromaprint_available ? "accent" : "warning"}>
+        <InfoBadge active>{status.total.toLocaleString()} tracks</InfoBadge>
+        <InfoBadge>{metrics.analysisPercent}% audio covered</InfoBadge>
+        <InfoBadge>{metrics.blissPercent}% bliss covered</InfoBadge>
+        <InfoBadge>{metrics.fingerprintPercent}% fingerprinted</InfoBadge>
+        <InfoBadge>{metrics.lyricsPercent}% lyrics cached</InfoBadge>
+        <InfoBadge>{metrics.portableSidecarPercent}% portable albums</InfoBadge>
+        <InfoBadge tone={status.chromaprint_available ? "accent" : "warning"}>
           {status.chromaprint_available ? "Chromaprint ready" : "PCM fallback"}
-        </CrateChip>
+        </InfoBadge>
         {metrics.activeJobs > 0 ? (
-          <CrateChip>{metrics.activeJobs} active</CrateChip>
+          <InfoBadge>{metrics.activeJobs} active</InfoBadge>
         ) : null}
         {metrics.failedJobs > 0 ? (
-          <CrateChip tone="warning">{metrics.failedJobs} failed</CrateChip>
+          <InfoBadge tone="warning">{metrics.failedJobs} failed</InfoBadge>
         ) : null}
       </OpsPageHero>
 
@@ -568,8 +597,8 @@ export function Analysis() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <CrateChip>{metrics.fingerprintPercent}% coverage</CrateChip>
-                <CrateChip
+                <InfoBadge>{metrics.fingerprintPercent}% coverage</InfoBadge>
+                <InfoBadge
                   className={
                     status.chromaprint_available
                       ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -579,7 +608,7 @@ export function Analysis() {
                   {status.chromaprint_available
                     ? "Chromaprint active"
                     : "PCM fallback"}
-                </CrateChip>
+                </InfoBadge>
               </div>
             </div>
 
@@ -738,7 +767,7 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip>{metrics.lyricsPercent}% cache</CrateChip>
+              <InfoBadge>{metrics.lyricsPercent}% cache</InfoBadge>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <MiniMetric
@@ -770,7 +799,7 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip>{metrics.portableSidecarPercent}% albums</CrateChip>
+              <InfoBadge>{metrics.portableSidecarPercent}% albums</InfoBadge>
             </div>
             <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
               <MiniMetric
@@ -806,9 +835,9 @@ export function Analysis() {
                   </div>
                 </div>
               </div>
-              <CrateChip>
+              <InfoBadge>
                 {status.rich_export_tracks.toLocaleString()} tracks
-              </CrateChip>
+              </InfoBadge>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <MiniMetric

@@ -117,7 +117,17 @@ function parse(path, source) {
               item.propertyName?.text || item.name.text,
             ]);
       for (const [local, imported] of values) {
-        const item = { local, imported, source, glyph: GLYPH.test(source) };
+        const item = {
+          local,
+          imported,
+          source,
+          glyph:
+            GLYPH.test(source) &&
+            !(
+              source.startsWith("@crate/ui/icons") &&
+              imported === "CRATE_ICON_SIZE"
+            ),
+        };
         imports.push(item);
         bindings.set(local, item);
       }

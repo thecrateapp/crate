@@ -112,7 +112,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
       screen.queryByRole("link", { name: "Puerto sin fecha" }),
     ).not.toBeInTheDocument();
     for (const button of screen.getAllByRole("button"))
-      expect(button).toHaveClass("min-h-11");
+      if (button.closest('[data-slot="admin-page-header"]'))
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+      else expect(button).toHaveClass("min-h-11");
     expect(mockApi).toHaveBeenCalledTimes(1);
     expect(SampleStream.instances).toHaveLength(1);
     expect(SampleStream.instances[0]!.url).toBe(

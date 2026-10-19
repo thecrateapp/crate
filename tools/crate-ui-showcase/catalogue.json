@@ -1,0 +1,1720 @@
+{
+  "version": 1,
+  "baseline": "1AQ · 2026-10-19 · working-tree baseline before further component migrations",
+  "entries": [
+    {
+      "id": "fundamentals",
+      "name": "Foundations",
+      "purpose": "Tokens, one identity and design roles; actual CSS values.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "system-foundations",
+      "story": "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Fundamentals.mdx",
+      "sources": [
+        "app/shared/fonts/bricolage-grotesque.css",
+        "app/shared/fonts/jetbrains-mono.css",
+        "app/shared/fonts/poppins.css",
+        "app/shared/ui/icons/actions.tsx",
+        "app/shared/ui/icons/base.tsx",
+        "app/shared/ui/icons/bot.tsx",
+        "app/shared/ui/icons/index.tsx",
+        "app/shared/ui/icons/media.tsx",
+        "app/shared/ui/icons/navigation.tsx",
+        "app/shared/ui/icons/people.tsx",
+        "app/shared/ui/icons/status.tsx",
+        "app/shared/ui/icons/system.tsx",
+        "app/shared/ui/icons/translation.tsx",
+        "app/shared/ui/tokens/animations.css",
+        "app/shared/ui/tokens/colors.css",
+        "app/shared/ui/tokens/index.css",
+        "app/shared/ui/tokens/interactive.css",
+        "app/shared/ui/tokens/metrics.css",
+        "app/shared/ui/tokens/product.css",
+        "app/shared/ui/tokens/radius.css",
+        "app/shared/ui/tokens/recipes.css",
+        "app/shared/ui/tokens/semantic.css",
+        "app/shared/ui/tokens/surfaces.css",
+        "app/shared/ui/tokens/themes.css",
+        "app/shared/ui/tokens/typography.css",
+        "app/shared/ui/tokens/z-index.css"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
+        "app/shared/fonts/jetbrains-mono.css": "03d8e43bde9a8a9fc21310d2f6a1676a236c0cd6b2402b856d9527a42fa0c0af",
+        "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
+        "app/shared/ui/icons/actions.tsx": "f94bf38dade8a03bf9514314a1ccc43b38b70a3689fa9d57697c6af2f07b8882",
+        "app/shared/ui/icons/base.tsx": "38861e8bf92b09be4347d0fd73083becaf76e9b67cd0336a95c629020264e280",
+        "app/shared/ui/icons/bot.tsx": "74b735005caf1e102474f505b63099dbbd0598e62390f6308daab623b2e705e4",
+        "app/shared/ui/icons/index.tsx": "385bd55a47f85b1619a97400e5cd2f5c874a77bd4d667df5f1b70a9b90253242",
+        "app/shared/ui/icons/media.tsx": "7df5d1be40c0cdea5e11ecc15ae3e8f03abfa3fd3811a40f6704e5456ca0d0a0",
+        "app/shared/ui/icons/navigation.tsx": "e5fd936e732ca319e558b4e57d86f935fac38f080ea24b443e8459bbcbfe74ed",
+        "app/shared/ui/icons/people.tsx": "db52aa5819c858f25c2e29b27774cec3571a1bdc05b42870e60a16698553365f",
+        "app/shared/ui/icons/status.tsx": "39cc81510d8d9c4d8363931fdf0ceb00dfeb5dc7d9402fa178b5dae8bd977592",
+        "app/shared/ui/icons/system.tsx": "0f5c35d9292fb8dcf0988d7697e026deab3c85672a1348894011fa21c92c1730",
+        "app/shared/ui/icons/translation.tsx": "4fcd1ed0a70ed9526f73048e9c1003e7b56e7cc22bee5902ab3203616030269e",
+        "app/shared/ui/tokens/animations.css": "aec5fc762a96b85c70edd9ad835b55597b001d46abbd3b498fdad2db33d60cfa",
+        "app/shared/ui/tokens/colors.css": "6fbc24a733b64f5ae4288679fd9e2329c8c72bb8aaf8e582487685aa5f53b965",
+        "app/shared/ui/tokens/index.css": "f8d2752d17d286f270fdaa2a21cd2f5111e39620f3207ced101a4269629a2c79",
+        "app/shared/ui/tokens/interactive.css": "0ae7c11bd1321cd83065f39b354aa753232f8d39d24e2df59973bc81ba627e94",
+        "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
+        "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
+        "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
+        "app/shared/ui/tokens/recipes.css": "b4d3a6163322aedb93f971e5bfe4cdd36ddf0cab3299fee5253d9a421cab2d99",
+        "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
+        "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
+        "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
+        "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
+        "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
+        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "183c42a7aea8f9a14cbc2731547468c4aa66680b331725013151295f838ad6e3"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "mono-label",
+      "name": "MonoLabel",
+      "purpose": "Mono 400, uppercase labels; separate label, eyebrow and metadata roles.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-monolabel",
+      "story": "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MonoLabel.mdx",
+      "sources": [
+        "app/shared/ui/primitives/MonoLabel.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/MonoLabel.tsx": "741d163115b06b90f43662a7e3b8b2b11f1d1780947a5c861031e601ac42adda",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "5a66c7d1a2acfa6e81a9db785bc41d6aca7691f08140b1ab452698baacb7adc5",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "fd157f999f05e0b08d44041c67414419285312cdc52cfcedb680a29c6b6cfb9d"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "status-dot",
+      "name": "StatusDot",
+      "purpose": "State with text or an accessible title; optional motion-aware pulse.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-statusdot",
+      "story": "tools/crate-ui-showcase/stories/StatusDot.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/StatusDot.mdx",
+      "sources": [
+        "app/shared/ui/primitives/StatusDot.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StatusDot.tsx": "7c0c6108427bec5470eea8e9f19e459cca3052ecadc45d954131c0d33bf20e77",
+        "tools/crate-ui-showcase/stories/StatusDot.stories.tsx": "af224301204a4795850a9eb90e8c3487ea5fe9d333bd24f18a93aec795f8e892",
+        "tools/crate-ui-showcase/docs/StatusDot.mdx": "aa353354da7d0ccf31ba00c4c9b8c4f861dc3a7c3617b957dcf5ed95875681a2"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "stat-number",
+      "name": "StatNumber",
+      "purpose": "Display numerals for highlighted metrics, with units and labels.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-statnumber",
+      "story": "tools/crate-ui-showcase/stories/StatNumber.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/StatNumber.mdx",
+      "sources": [
+        "app/shared/ui/primitives/StatNumber.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StatNumber.tsx": "60abc91b5426e2c4759093a0b9886acf1a9d22fdeb842c032b16c4c54981954e",
+        "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "ac8008b434f2712c7eebafb760702b9dbaeff23c10589bcc478c38d8cbf61e36",
+        "tools/crate-ui-showcase/docs/StatNumber.mdx": "2899aca7bd235fa994967a825c2758276e50ad7b17ffd716fb9793469a6d2139"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "hairline-row",
+      "name": "HairlineList / HairlineRow",
+      "purpose": "Hairline list rows; active emphasis, optional index and trailing content.",
+      "coverage": "documented",
+      "adoption": "Shared geometry reconciled; Listen expanded setlist is the current production consumer; Admin adoption pending",
+      "storyId": "components-hairlinerow",
+      "story": "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/HairlineRow.mdx",
+      "sources": [
+        "app/shared/ui/primitives/HairlineList.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/HairlineList.tsx": "4bc7d4894d20e9bbbd3ff412e94212ad8cc8a19e567fb0b1ec85da051e4ce867",
+        "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx": "ed4ada8ed0081bdb269f85c5a3e7409029b9f7423fd74df462f45df179115c3d",
+        "tools/crate-ui-showcase/docs/HairlineRow.mdx": "02b709623db9b5e87e667505d66a099d8baca95730a2658c6b571c36f0fe3daa"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "info-badge",
+      "name": "InfoBadge / OfflineBadge",
+      "purpose": "Static metadata, state and inline counters; includes OfflineBadge.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-infobadge",
+      "story": "tools/crate-ui-showcase/stories/InfoBadge.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/InfoBadge.mdx",
+      "sources": [
+        "app/shared/ui/primitives/InfoBadge.tsx",
+        "app/shared/ui/domain/offline/OfflineBadge.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/InfoBadge.tsx": "d0872731a561c4c533942e8c8b993db0aa74bc74a2e6529241a28340ad3a51a8",
+        "app/shared/ui/domain/offline/OfflineBadge.tsx": "a78f0d4da39ebd543fc0bad3adaba47ebe6a2a7b34cff166b3051525dc464c18",
+        "tools/crate-ui-showcase/stories/InfoBadge.stories.tsx": "12c52bcd19c3e701f4b3daf85f2d1e648f6cb1cba4b890ce65baef58411a1c49",
+        "tools/crate-ui-showcase/docs/InfoBadge.mdx": "e6e489d69580ae46da9093751e38fe25cf003177a2b918584b7f9420df6c6ac8"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "filter-chip",
+      "name": "FilterChip",
+      "purpose": "Toggle filters or explicit actions; 12 px text and 32 / 44 px minimum targets.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-filterchip",
+      "story": "tools/crate-ui-showcase/stories/FilterChip.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FilterChip.mdx",
+      "sources": [
+        "app/shared/ui/primitives/FilterChip.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FilterChip.tsx": "eff73b75e83767f3db4738fba6898ba6cc0bf5ed5e507bed380a57d249cf8ffb",
+        "tools/crate-ui-showcase/stories/FilterChip.stories.tsx": "c27b8cf5ccdeeafbc218e88247963798407ad4a26320e8e33ef894e2d00a62b7",
+        "tools/crate-ui-showcase/docs/FilterChip.mdx": "fc7c64a1bdd900efbd720ca172f45db633a96b876ad8a5078ff3e830ec07c9e9"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "segmented-control",
+      "name": "SegmentedControl",
+      "purpose": "Exclusive selection with keyboard navigation; radio and tab contracts.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-segmentedcontrol",
+      "story": "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SegmentedControl.mdx",
+      "sources": [
+        "app/shared/ui/primitives/SegmentedControl.tsx"
+      ],
+      "knownIssues": [
+        "The initial example covers radio mode. Real-prop controls and the tabs scenario are pending expansion."
+      ],
+      "fingerprints": {
+        "app/shared/ui/primitives/SegmentedControl.tsx": "a1b4046fc7f65009e810d111916f5c316a2e71cd5cea0ddc541ed4f58f1d3d02",
+        "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx": "ce48dac92734091e34eab7621b256d1fbe1f04caeb34c33fca4a33631dae2828",
+        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "72d089a4a368f93aef87fbc61ac0fba93cd4f5b9bf73832f5df1962d2a3c0ef3"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "genre-pill",
+      "name": "GenrePill",
+      "purpose": "Music genre, optional percentage and provenance, independent select and remove actions.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-genrepill",
+      "story": "tools/crate-ui-showcase/stories/GenrePill.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/GenrePill.mdx",
+      "sources": [
+        "app/shared/ui/domain/genres/GenrePill.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/genres/GenrePill.tsx": "44477c22b46b54fdd3719511ea17a6ef0dbd026202261e76f16b59fe17d55363",
+        "tools/crate-ui-showcase/stories/GenrePill.stories.tsx": "5e225db11fee150b12772c13ae3490154bab0f8e0bf23e0d51c40d7edb1a606e",
+        "tools/crate-ui-showcase/docs/GenrePill.mdx": "908b5e4472bdaad839e7f61df019435e5b4549e168fbef8440ae8358bcb5a751"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "badge-compatibility",
+      "name": "Badge compatibility",
+      "purpose": "Compatibility adapters; new consumers use InfoBadge or FilterChip by role.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-badge-compatibility",
+      "story": "tools/crate-ui-showcase/stories/Compatibility.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Compatibility.mdx",
+      "sources": [
+        "app/shared/ui/primitives/CrateBadge.tsx",
+        "app/shared/ui/shadcn/badge.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/CrateBadge.tsx": "5c134170783a5126445239d7c00eb76ee10bcd992d8b3d4a5ce8b026e9ef4aef",
+        "app/shared/ui/shadcn/badge.tsx": "b991a28cb8704827aa52529cb8c69e8947206c04d9d586a0ec2cf15a36d56137",
+        "tools/crate-ui-showcase/stories/Compatibility.stories.tsx": "1f3119a1410139d180c0fe22b8a34eb5999162b6846b7f9c386f9e86bb2a4ccd",
+        "tools/crate-ui-showcase/docs/Compatibility.mdx": "57ddc606f85117dcc2c527e032c7f36530b0aa78b8290af6ff127008462d287e"
+      },
+      "category": "Compatibility"
+    },
+    {
+      "id": "composites-adminselect",
+      "name": "AdminSelect",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/composites/AdminSelect.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/AdminSelect.tsx": "0f13b8cabf08fa10a57507e431ba633367f8055141d031f1c0129688808d0bec"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "composites-cardskeleton",
+      "name": "CardSkeleton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/composites/CardSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/CardSkeleton.tsx": "9d4fb911dc7c6ad544c5f015d27b38dd6edfc90c1856c18247760e1399e09b00"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "composites-confirmdialog",
+      "name": "ConfirmDialog",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/composites/ConfirmDialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/ConfirmDialog.tsx": "7b1791a0cce721073d65f2049204dfce1a8acd29b53869b0049ca1f67ad52dad"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "composites-gridskeleton",
+      "name": "GridSkeleton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/composites/GridSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/GridSkeleton.tsx": "29c5d88bb02b4bc1987d81be53c3d2536fd9ef0ed58d55c5503305aa90614b5f"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "composites-tableskeleton",
+      "name": "TableSkeleton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/composites/TableSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/TableSkeleton.tsx": "1c2fefe6c0dcd211bef0716fb6c6dadc2c6f92a5c95ef612b250ad616aabf75b"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-artistbioprofile",
+      "name": "ArtistBioProfile",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/ArtistBioProfile.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistBioProfile.tsx": "303d3df6d17b8689473144fc29a54b80531fab0a9e4cb9d19a1fffaa82434e68"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-artistbiotext",
+      "name": "ArtistBioText",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/ArtistBioText.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistBioText.tsx": "9bb1a935c8ef9a7314f20bf40c85390a94a03b1821ec5c28c5ecda2d1e0d5ae0"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-artistheroframe",
+      "name": "ArtistHeroFrame",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/ArtistHeroFrame.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistHeroFrame.tsx": "62ea5350816b48658f1455ebeb376640a97a6c38a909aeceac060bb351db4cc0"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-artistheropresentation",
+      "name": "ArtistHeroPresentation",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "ecd16dcc62a2187873784a6c6446904e5126fc1f30d87c2e17fbbffd7b0f5f87"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-actions-contextmenu",
+      "name": "ContextMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/actions/ContextMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "97b3d1510528c76e02195538e19bbd104170c997c0b8188c1ca7b5de4e6d57f3"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-actions-itemactionmenu",
+      "name": "ItemActionMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/actions/ItemActionMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/ItemActionMenu.tsx": "d711bf068f5b27bd7d5e4fc029e89bc70c8d5b787709b8f0e387bd7ea421c9ec"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-actions-mobileactionsheet",
+      "name": "MobileActionSheet",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/actions/MobileActionSheet.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/MobileActionSheet.tsx": "37158444437ae7d218173e8637521a30a46bfff599b6ffa86776bd748bb1a024"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-auth-oauthbuttons",
+      "name": "OAuthButtons",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/auth/OAuthButtons.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/auth/OAuthButtons.tsx": "4feb0d251178f91bc3ff53199aa94cead7bd5ae75837569f6ea32920ec645460"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-brand-bandcamplogo",
+      "name": "BandcampLogo",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/brand/BandcampLogo.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/BandcampLogo.tsx": "41c859cd455ac6d5bb841d9024623e06cc35baacdaa85c8929300f590c5dc06d"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "domain-brand-crateloader",
+      "name": "CrateLoader",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/brand/CrateLoader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/CrateLoader.tsx": "9cec84ba332cced0d409b0d414d8df151cab5aedb77d7999e0cbd94a88bff45b"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-brand-cratelogo",
+      "name": "CrateLogo",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/brand/CrateLogo.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/CrateLogo.tsx": "1c4f1f7b980cee65ba9322e9bb32e34332810d8618519b4a1954272cc7e7096a"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "domain-entity-entityavatar",
+      "name": "EntityAvatar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/entity/EntityAvatar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityAvatar.tsx": "e594ba287fc9634dfef8588c491c75b0e3d45cad581198ed907882ee3ba178e1"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-entitycard",
+      "name": "EntityCard",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/entity/EntityCard.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityCard.tsx": "dd05a509f9ff9376c87798bdb8cc44cfb0ba43bac6d806f398f9805e3b2a8d74"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-entityprimaryaction",
+      "name": "EntityPrimaryAction",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx": "d27d1fe1e41f5fee78ca8053baa9b1ea8f26e7c866a0c3acc201275b23fbc850"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-entity-entityrow",
+      "name": "EntityRow",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/entity/EntityRow.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityRow.tsx": "c071cccc3053e9aec2ae6df3054144f290e6d7e48f1efbecb7e64a6167126b00"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-useentitymenu",
+      "name": "useEntityMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/entity/useEntityMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/useEntityMenu.tsx": "37b351b8fe5d716643cc7d6e6bfda63aa52173fcd228d920ed51455c57db99e2"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-filters-filterbar",
+      "name": "FilterBar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/filters/FilterBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/filters/FilterBar.tsx": "0759dcb756f8aafe2af2b2b17f5e61bb281d64dd1eb4298d49dc4c013e7846f4"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "domain-hero-heroactionbar",
+      "name": "HeroActionBar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/hero/HeroActionBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "3a00b5334f8f69a13d96f3308adc64d101d974d4f3bba9c46f50b7d38ab7ed36"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-hero-pagehero",
+      "name": "PageHero",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/hero/PageHero.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/hero/PageHero.tsx": "904706ada3a77da77bda8a42eb79b80e09358a5930458c60cb35ddec06661246"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-emptystate",
+      "name": "EmptyState",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/lists/EmptyState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/EmptyState.tsx": "f988e92499164aa02ab5a46f08c84b0934fc91aef4d36873d8acadd782c5097d"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-lists-mediagrid",
+      "name": "MediaGrid",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/lists/MediaGrid.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/MediaGrid.tsx": "a054e30a49791b6620a986eb2539b93c236da9e7163b4440bb309c2ab0846d86"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-mediarail",
+      "name": "MediaRail",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/lists/MediaRail.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/MediaRail.tsx": "ea042a69f1d64babbcb0bdca36954188d0598379dc18f1f00d01b466ab21e536"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-sectionheader",
+      "name": "SectionHeader",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/lists/SectionHeader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/SectionHeader.tsx": "4c25c26850afbaeac539c3811922bdca81cb5a2ce89c89739c781956eaff90a7"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-media-mediacover",
+      "name": "MediaCover",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/media/MediaCover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/media/MediaCover.tsx": "8eaf065193c0160ff56d16109f534e13f547a9d7d94637b761e99458391efc9f"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-media-playbutton",
+      "name": "PlayButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/media/PlayButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/media/PlayButton.tsx": "c57620db2ed47b0ba6c71e78c3896af23c5d3660e9649fd4de6cdddb6d00eefa"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-navigation-backlink",
+      "name": "BackLink",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/navigation/BackLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/BackLink.tsx": "446447c3a632cdb6c26987e63986a7d2eb75c381f72d4c35474d6b1bf501d528"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "domain-navigation-pageheader",
+      "name": "PageHeader",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/navigation/PageHeader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/PageHeader.tsx": "280268963f46767e5a38d713e01861c1352fb3790114311b891001e333a8a084"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-navigation-searchbar",
+      "name": "SearchBar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/navigation/SearchBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/SearchBar.tsx": "5ec43c77c0826ab0aba7c365437fcf4d5dcecdf814d5487081a1880886cd1707"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "domain-player-eqbands",
+      "name": "EqBands",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/player/EqBands.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/player/EqBands.tsx": "d3775585b841297d257ceca798b45af7b38cead38f6a9a1f259cbe0b9bab2c7a"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-playlists-playlistartwork",
+      "name": "PlaylistArtwork",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx": "3c04113a1e9a32e7226ff53e58f3a807c6fda868292ae63fc1fb5ef99533e2cb"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-states-loadingstate",
+      "name": "LoadingState",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/states/LoadingState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/states/LoadingState.tsx": "8c38accdcf65342375b5e1fe8003bb26fa0f1ef98d86a30b339c2e5325e54055"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-tracks-tracklist",
+      "name": "TrackList",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/tracks/TrackList.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/tracks/TrackList.tsx": "1ff5cf260e991c43e9e881449be7558025e6de5ad32644be2908a3c7e8409050"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-user-usermenu",
+      "name": "UserMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/user/UserMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/user/UserMenu.tsx": "155f5da051a5ce5f97ff2db837c5f6292b1c9b155bb646b4f8485a11515a31e5"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "primitives-actioniconbutton",
+      "name": "ActionIconButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/ActionIconButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ActionIconButton.tsx": "980761979268f348daf204d00390918a4ad27807cd90b9e8eec37cbbdce3d5c8"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "primitives-apperrorboundary",
+      "name": "AppErrorBoundary",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/AppErrorBoundary.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppErrorBoundary.tsx": "3304b4a1c2055d1300bb818b77251d5b29040c780fbea85ca596d8f13f5adc5f"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-appmodal",
+      "name": "AppModal",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/AppModal.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppModal.tsx": "491c3727d3785623c09f651a841ad03fe416f4d31e51f26ffd821156a43b24ce"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-apppopover",
+      "name": "AppPopover",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/AppPopover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppPopover.tsx": "bfa0ca2e9f19093db1ab499f3c7203201e41611d4b8d418136f4c15079dae97f"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-avatar",
+      "name": "Avatar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Avatar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Avatar.tsx": "831ccb752947bfdb3a7c739f1204adbd14d3abce07135d25df852f7c0eba8d63"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-checkbox",
+      "name": "Checkbox",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Checkbox.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-errorstate",
+      "name": "ErrorState",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/ErrorState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ErrorState.tsx": "91510d21eb0d4369010bae9d171d70292d6027017bb8fb07793fb7066f831b4a"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-followheartbutton",
+      "name": "FollowHeartButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/FollowHeartButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FollowHeartButton.tsx": "eb7cefbea8712f9041162ffa41cba5acd7e36ace2655d1fbc3811242fcc570d5"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "primitives-formfield",
+      "name": "FormField",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/FormField.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FormField.tsx": "cb021d82a71693a829c0e2b97fd85cc1a7cdeb54a78712380b766461a5d67b32"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-iconbutton",
+      "name": "IconButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/IconButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/IconButton.tsx": "24a800d8b1455fc8439b5e0a1782e83f5a5615fc248ce936590e6bfa1d2af7ce"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "primitives-imagelightbox",
+      "name": "ImageLightbox",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/ImageLightbox.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ImageLightbox.tsx": "025fb97ea116368e428f04b2840aa8f575c1426cb82e17e601f04e185edf0284"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-instrumentpanel",
+      "name": "InstrumentPanel",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/InstrumentPanel.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/InstrumentPanel.tsx": "3e524b50fe97eba813d3865501fc6b91270836a6cc1437af052e11883211dd7b"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "primitives-meter",
+      "name": "Meter",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Meter.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Meter.tsx": "4fceca0c287b61cb965424b0194e50fe998a710da34b484fd7388e31d5ee3417"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-progresshairline",
+      "name": "ProgressHairline",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/ProgressHairline.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ProgressHairline.tsx": "835c51f3f63606434350fe2695ef6d0fa260a03af0bc00c0db2a067577180912"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-pullindicator",
+      "name": "PullIndicator",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/PullIndicator.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/PullIndicator.tsx": "0194384bbf1b1048981be52fc979db1f4d7df8cfaab6bf8fa897c8be9157692d"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-qrcodeimage",
+      "name": "QrCodeImage",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/QrCodeImage.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/QrCodeImage.tsx": "b03cc9ff44cac888772168dc32ce7988a95a70076304871f5aec917988b22b42"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-radiogroup",
+      "name": "RadioGroup",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/RadioGroup.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/RadioGroup.tsx": "46520955d4705d046965f788042b1d3845f692cdc3d6d640974d5ec6126fa2f4"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-readout",
+      "name": "Readout",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Readout.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Readout.tsx": "6dfa035788e0a54757dc8095a33d346cfc3b96ce3d7d8cf81064e2a5bb155f69"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-searchinput",
+      "name": "SearchInput",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/SearchInput.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/SearchInput.tsx": "d21bdf9321c063bed8712199008bef3a6ffa2c05a10d971f27e298893c8faa7f"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-skiplink",
+      "name": "SkipLink",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/SkipLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/SkipLink.tsx": "1da215bcfa8015b04bab0968ef8dbd9876684a44e0c59224c1db4c3c4d6c7e5a"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "primitives-spinner",
+      "name": "Spinner",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Spinner.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Spinner.tsx": "392a91bd66b079bbd63681ddb487e288abd613d13eaff68c3347e5d006443973"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-starrating",
+      "name": "StarRating",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/StarRating.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StarRating.tsx": "0e3857752a818b31338e83b734e8f332637503b0d83ff0439df205950ffd7984"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-switch",
+      "name": "Switch",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Switch.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-vtnavlink",
+      "name": "VtNavLink",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/VtNavLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/VtNavLink.tsx": "f00774a4abefb0429396cedf6a44e691baf4484733fa2613485892310d6b0449"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "shadcn-alert-dialog",
+      "name": "alert-dialog",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/alert-dialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/alert-dialog.tsx": "137c968dad89d882a02582b0a868c3d7b31ba19b9c9fe42978f82ac9a13d6ec6"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-button",
+      "name": "button",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/button.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/button.tsx": "1452aadf522bdd1a383872a91a7ec7b2b8a5106f8edbb1302f7b3b22cee5e63c"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-card",
+      "name": "card",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/card.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/card.tsx": "059a06914443d40ac696b1159dc59cf464d1239a24ca0dc103987c75b1716aeb"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-context-menu",
+      "name": "context-menu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/context-menu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/context-menu.tsx": "dcd1c0f58dd99aa4116d2afdfb00e7de796e80a31abaf3e49783d3cb70893d65"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-dialog",
+      "name": "dialog",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/dialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/dialog.tsx": "7612e9cc72606926a6cd13fccdc55b25b81f52f85bab8093ec3609351920bc74"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-dropdown-menu",
+      "name": "dropdown-menu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/dropdown-menu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/dropdown-menu.tsx": "af0580f335f81f07039f41811d388bed80854fa786e26de53f42775287c201dd"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-input",
+      "name": "input",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/input.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-overlay-close-button",
+      "name": "overlay-close-button",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/overlay-close-button.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/overlay-close-button.tsx": "f94134a4c7001d88cb9b94ad8abf7893157ab7ac153b8087f8c6cada361a0e96"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-popover",
+      "name": "popover",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/popover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/popover.tsx": "4773a27453e4129c3203f5ae2b1beb47ee4594b28c75443371b660bc92900ee8"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-progress",
+      "name": "progress",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/progress.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/progress.tsx": "7972349e41e05e39a59a58223de6667725b70b4f55dd987848f9c6d388a3589b"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "shadcn-scroll-area",
+      "name": "scroll-area",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/scroll-area.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/scroll-area.tsx": "dcb32083e8000c31f1dde685f7b62c41f4eb2a7a5918749774593f5eeaced676"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-select",
+      "name": "select",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/select.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/select.tsx": "2668625e5e9cec7b58fedd851dab5f4cf5965982e6fd600f5e699f24aa273b14"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-separator",
+      "name": "separator",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/separator.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/separator.tsx": "1a3f00e6a66e2ff70aec58fcb8c8a5e274bb8d733b57c712d82a29fd15b68c72"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-sheet",
+      "name": "sheet",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/sheet.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/sheet.tsx": "0ee9560fbcfdf8a8ea38efe17c75f955e40d99cc920a7ea463de16c52fe31f3b"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-skeleton",
+      "name": "skeleton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/skeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/skeleton.tsx": "eedfaf6612ffc9f63bc07d060648d4307787374df7cd202bde5b31e9716a2cd5"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "shadcn-table",
+      "name": "table",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/table.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/table.tsx": "9ee0c610820b269fa9add6b825089a2ec37cfefdb314fc63839407b8293f55d2"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "shadcn-tabs",
+      "name": "tabs",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/tabs.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/tabs.tsx": "65ad50a81807ba99231c1bccf23e1900140ab6785c40e1e681e126ae83fb477a"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "shadcn-textarea",
+      "name": "textarea",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/textarea.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-tooltip",
+      "name": "tooltip",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/tooltip.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/tooltip.tsx": "17d90cc8bda59262493ea876d357c9e80d2e793f8a3d29bd910d44ec499fcd99"
+      },
+      "category": "Overlays"
+    }
+  ]
+}

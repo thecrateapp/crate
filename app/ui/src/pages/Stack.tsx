@@ -1,3 +1,17 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Play,
+  Square,
+  Search,
+} from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -6,14 +20,6 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ChevronDown,
-  ExternalLink,
-  Loader2,
-  Play,
-  Square,
-  Search,
-} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,7 +31,7 @@ import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -217,11 +223,11 @@ function ServiceCard({
               <span className="text-base font-semibold tracking-tight text-white">
                 {container.name}
               </span>
-              <CrateChip className={state.chip}>
+              <InfoBadge className={state.chip}>
                 <span className={cn("h-2 w-2 rounded-full", state.dot)} />
                 {container.state}
-              </CrateChip>
-              {hostname ? <CrateChip>{hostname}</CrateChip> : null}
+              </InfoBadge>
+              {hostname ? <InfoBadge>{hostname}</InfoBadge> : null}
             </div>
             <div className="text-sm text-white/40">
               {displayImage(container.image)}
@@ -347,7 +353,7 @@ function ServiceCard({
         >
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-medium text-white">Recent logs</div>
-            <CrateChip>{container.name}</CrateChip>
+            <InfoBadge>{container.name}</InfoBadge>
           </div>
           {logsLoading ? (
             <div
@@ -581,24 +587,28 @@ export function Stack() {
       <OpsPageHero
         title="Stack"
         description="Managed Docker services, their runtime state, and the quickest path to logs or restart when the platform starts wobbling."
+        compactActions
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11 gap-2"
-            onClick={() => void fetchSnapshot(true)}
-          >
-            Refresh
-          </Button>
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={() => void fetchSnapshot(true)}
+            >
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       >
-        <CrateChip active>
+        <InfoBadge active>
           {data?.running ?? 0}/{data?.total ?? 0} running
-        </CrateChip>
-        <CrateChip>{publicRoutes} public routes</CrateChip>
-        <CrateChip>
+        </InfoBadge>
+        <InfoBadge>{publicRoutes} public routes</InfoBadge>
+        <InfoBadge>
           {data?.available ? "Docker available" : "Docker unavailable"}
-        </CrateChip>
+        </InfoBadge>
       </OpsPageHero>
 
       {!data?.available ? (

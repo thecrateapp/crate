@@ -830,10 +830,9 @@ describe("JamSession active room - host", () => {
   it("shows the queue mode badge in the room header", () => {
     renderWithListenProviders(<JamSession />);
 
-    expect(screen.getByText("DJ mode")).toHaveClass(
-      "crate-badge",
-      "rounded-md",
-    );
+    expect(
+      screen.getByText("DJ mode").closest(".crate-info-badge"),
+    ).toHaveClass("crate-info-badge", "rounded-full");
   });
 
   it("shows tags as badges", () => {

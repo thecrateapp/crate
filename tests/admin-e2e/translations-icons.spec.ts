@@ -31,7 +31,10 @@ for (const width of [1440, 768, 390])
       await expect(
         main.getByRole("article", { name: "es locale health" }),
       ).toBeVisible();
-      await expect(main.locator("svg")).toHaveCount(0);
+      await expect(main.locator("svg")).toHaveCount(1);
+      await expect(
+        main.locator('svg[data-admin-ux="header-refresh"]'),
+      ).toHaveCount(1);
       await main.getByRole("tab", { name: "Bundles", exact: true }).click();
       await main
         .getByRole("combobox", { name: "Locale", exact: true })
@@ -91,7 +94,10 @@ for (const width of [1440, 768, 390])
       await expect(
         main.getByRole("button", { name: "Publish bundle", exact: true }),
       ).toBeDisabled();
-      await expect(main.locator("svg")).toHaveCount(0);
+      await expect(main.locator("svg")).toHaveCount(1);
+      await expect(
+        main.locator('svg[data-admin-ux="header-refresh"]'),
+      ).toHaveCount(1);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,

@@ -412,7 +412,10 @@ function NodeDetailPanel({
             </div>
           </div>
           <label htmlFor="genre-description" className="crate-form-field">
-            <span className="text-[11px] uppercase tracking-wider text-white/35">
+            <span
+              data-slot="form-field-label"
+              className="text-[11px] uppercase tracking-wider text-white/35"
+            >
               Description
             </span>
             <textarea
@@ -453,11 +456,7 @@ function NodeDetailPanel({
                 <div className="mt-2 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {proposal.aliases.map((alias) => (
-                      <Badge
-                        key={alias}
-                        variant="outline"
-                        className="text-[10px]"
-                      >
+                      <Badge key={alias} variant="outline">
                         alias: {alias}
                       </Badge>
                     ))}
@@ -604,7 +603,7 @@ function NodeDetailPanel({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {node.alias_names.map((alias) => (
-              <Badge key={alias} variant="outline" className="text-xs">
+              <Badge key={alias} variant="outline">
                 {alias}
               </Badge>
             ))}
@@ -715,11 +714,7 @@ function NodeDetailPanel({
                 {current.length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {current.slice(0, 8).map((slug) => (
-                      <Badge
-                        key={`${config.key}-${slug}`}
-                        variant="outline"
-                        className="text-[10px]"
-                      >
+                      <Badge key={`${config.key}-${slug}`} variant="outline">
                         {nodeMap.get(slug)?.name ?? slug}
                       </Badge>
                     ))}

@@ -411,7 +411,10 @@ function ResearchResultContent({
             htmlFor="artist-bio-proposal"
             className="crate-form-field text-sm"
           >
-            <span className="font-medium text-text-secondary-strong">
+            <span
+              data-slot="form-field-label"
+              className="font-medium text-text-secondary-strong"
+            >
               Proposed biography
             </span>
             <Textarea

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Link } from "react-router";
 
 import { ImageCropUpload } from "@/components/ImageCropUpload";
@@ -6,7 +7,7 @@ import {
   type GenreProfileItem,
 } from "@/components/genres/GenrePill";
 import { Button } from "@crate/ui/shadcn/button";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import {
   artistArtworkApiPath,
   artistBackgroundApiUrl,
@@ -346,9 +347,7 @@ export function ArtistHeroSection({
             ) : tags.length > 0 ? (
               <div className="hidden md:flex gap-1.5 flex-wrap mb-3">
                 {tags.slice(0, 8).map((tag) => (
-                  <CratePill key={tag} className="text-[11px]">
-                    {tag.toLowerCase()}
-                  </CratePill>
+                  <InfoBadge key={tag}>{tag.toLowerCase()}</InfoBadge>
                 ))}
               </div>
             ) : null}

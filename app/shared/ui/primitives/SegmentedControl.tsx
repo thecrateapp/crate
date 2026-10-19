@@ -134,7 +134,7 @@ export function SegmentedControl<T extends string = string>({
             }}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={cn(
-              "crate-form-chip relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-1 font-mono text-label tracking-chip disabled:pointer-events-none disabled:opacity-50",
+              "crate-form-chip relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border py-1 font-mono text-filter-chip tracking-chip disabled:pointer-events-none disabled:opacity-50",
               SIZE_CLASS_NAME[size],
               fullWidth && "flex-1",
               itemClassName,

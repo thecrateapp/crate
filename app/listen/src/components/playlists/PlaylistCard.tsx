@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   memo,
   useCallback,
@@ -25,7 +26,7 @@ import {
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { IconButton } from "@crate/ui/primitives/IconButton";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { action } from "@/components/actions/shared";
 import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
 import {
@@ -290,13 +291,13 @@ function PlaylistTileArtwork({
         className={className}
       />
       {badge ? (
-        <CrateBadge
+        <InfoBadge
           surface="overlay"
           icon={Sparkles}
           className="absolute bottom-2 left-2"
         >
           {badge}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
     </>
   );
@@ -539,7 +540,7 @@ function PlaylistRow(props: PlaylistCardProps) {
       title={name}
       titleAccessory={
         <>
-          {badge ? <CrateBadge icon={Sparkles}>{badge}</CrateBadge> : null}
+          {badge ? <InfoBadge icon={Sparkles}>{badge}</InfoBadge> : null}
           <OfflineBadge state={offlineState} compact />
         </>
       }

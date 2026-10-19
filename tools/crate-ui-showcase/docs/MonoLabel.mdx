@@ -1,0 +1,24 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/MonoLabel.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">MonoLabel</DocHeading>
+
+<EntryDetails id="mono-label" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Use for labels and metadata, not body copy or highlighted metrics.
+- `size=label|eyebrow`, a semantic `as`, `accent` and `meta`. Consumers must preserve its font, weight and case.
+- Wrapping is supported. Scene wrappers constrain width without correcting component internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Controls />
+
+Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.

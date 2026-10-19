@@ -3,9 +3,9 @@
 > Estado vigente: [tabla única de continuación](2026-10-19-crate-v3-current-state.md).
 > Los registros cronológicos conservan sus estados históricos; las aprobaciones posteriores los sustituyen.
 
-Current implementation: checkpoints through 1AO are approved and published (`ba63836d`).
+Current implementation: checkpoints through 1AP are approved and published (`d30b1c02`).
 Published 1AG removes Library Timeline; it is no longer a V3 page target.
-Local 1AP covers System Playlists/artwork, uniform row chips, quiet row surfaces and smart-rule operator selects, preserving actual data and actions.
+Local 1AQ covers PlaylistEditor, basic Remove glyphs, Category/Match/Sort Selects, typography and 8px fields, preserving data and UX glyphs.
 Stop for Diego before commit/push. See the final handover for evidence and limits.
 
 Status: specification and current design target, revised 2026-10-15. Canonical clone:
@@ -609,7 +609,18 @@ max(12vh, 96px)` becomes the shell's header height plus 24 px).
   conventional UX glyphs stay: back/forward, collapse/expand, menu, close, search, etc. Record the
   concrete retained sites in the migrated scope; each retains an accessible name, keyboard behaviour
   and the coarse-pointer target. `lucide-react` remains the source for any justified Admin exception,
-  not a requirement to render an icon. Task 1b.8 owns the inventory and remaining migration.
+  not a requirement to render an icon. Diego added on 2026-10-19: conventional basic item actions
+  such as Remove can use an icon-only control with descriptive name/title and a shared44px
+  target. Keep primary/combined/domain actions and final confirmations legible. The
+  [1AQ action inventory](2026-10-19-crate-v3-admin-action-icons.md) distinguishes applied sites
+  from proposals; this does not restore decorative labelled-action icons. Task1b.8 owns the
+  inventory and remaining migration.
+- **Admin page header actions** follow the [approved compact header standard](2026-10-19-crate-v3-admin-header-actions.md):
+  upper right, shared Button ghost/icon-lg44px, shared Tooltip, descriptive accessible names and
+  preserved busy/disabled/capability semantics. PlaylistEditor Copy/Eye/ListRestart/Save is the
+  current reference; navigation back is outside identity and layout responds to container width.
+  Final confirmations and ambiguous workflows keep concrete wording. The bounded source policy
+  records each glyph site; the18-page applicability audit is analysis, not a blanket migration.
 - Listen and Desktop retain `@crate/ui/icons` (Solar) sized with `CRATE_ICON_SIZE`; this Admin
   decision does not remove their player/navigation controls. The Linux titlebar must switch from
   undeclared `lucide-react` to `@crate/ui/icons`.
@@ -3759,8 +3770,11 @@ migration. New canonical Linux recording and native QA remain separate from loca
 - Search (`SearchInput`, Admin `SearchBar`): same recipe, glyph in `text-text-subtle`, mono `⌘K` tag in
   Admin, ghost clear button; debounced queries (fix the Radio seed search, which fetches full
   `/api/genres` per keystroke).
-- Select: 7 options or fewer become a chip group; more use a select whose trigger follows the field
-  and whose list follows 5.9.
+- Select: categorical form fields use the shared Select even with few choices (Diego,2026-10-19).
+  Category, Match and Sort in playlist creation/editor are the first7explicit sites. Filters
+  and binary state toggles retain their chips. This supersedes the earlier count-only rule
+  for such form fields; earlier chip consumers migrate in their own checkpoints. Triggers
+  follow the field and lists follow5.9; preserve8px label gaps and full keyboard behavior.
 - Switch: 32×18 hairline track; off thumb `text-text-subtle`; on track accent hi with a canvas thumb.
 - Segmented control: becomes a chip group.
 - Checkbox and radio: hairline box; checked = accent-hi fill with a canvas mark.
@@ -4984,3 +4998,153 @@ before publication metadata changes. The persistent1AP label/footer now say publ
 its embedding expectation changes. Earlier1AP local stops are historical. The next checkpoint
 is1AQ, to stop uncommitted for Diego; no PR/merge/rebase/deploy/release or fullCI/baselines.
 The resulting verified publication SHA is recorded in the subsequent1AQ continuation record.
+
+
+### 1AP published; 1AQ PlaylistEditor local — 2026-10-19
+
+Diego approved1AP. Commit/push `d30b1c0244e5f57026dea3f27aacae815c04b41b` verified on HEAD, origin and remote,
+with original53177736 ancestor preserved. Prior1AP local stops are historical.
+Local1AQ removes redundant editor heading/labelled-action glyphs and names rule/track removals.
+13direct UX sites remain (back/search/drag and10loaders); bounded Select3, AIButton2 and artwork2
+consumers preserve their shared functional glyphs. Header uses Bricolage, compact titles Poppins,
+labels/readings/track timing/history use Mono400; default static chip geometry,44px native
+controls and actual8px crate-form-field pairs. Narrow grid minima corrected at390px.
+Data/helpers/callbacks/effects/dependencies, route capability, API/SSE/drag/refinement contracts
+are preserved; no backend/shared/Listen change. New actual-page persistent/standalone specimen
+uses importer-only API/useApi/LLM/SSE boundaries and full local fixtures, manual pending/failure/
+stream controls. No global EventSource override or live requests. A5editor hero stays an exact
+owned6.8/A20 debt record, without increasing earlier budgets.
+Final scoped evidence and reviewer rulings are recorded in the main handover/current-state table.
+**Stop1AQ without commit/push. Previewactive5186; no next group, fullsuite/CI or canonical refresh.**
+
+
+### 1AQ later steering — basic actions and form Selects, 2026-10-19
+
+This supersedes the text-only Remove and count-only short-selector instructions above for the
+explicitly amended controls. Diego allows basic Remove icon-only actions and explicitly confirms
+Select for Category, Match and Sort, preserving filter/state chips. Creation+editor now use7
+sharedSelect sites with unchanged values, defaults, handlers and empty-category semantics.
+Four Remove sites (editor cover/rule/track and create-rule) use sharedButton icon-lg44px, Trash2,
+accessible name/title.16direct editor UX sites and119total bounded direct sites are reviewed;
+Select consumers are bounded at6editor/8creation-list page. Primary/combined actions retain text.
+The shared source policy has exact form-field cardinality/site allowances, not a file exemption;
+it also records the two previously approved dynamic operator sites missing from the old guard.
+Only the policy test changes in Listen; its runtime/player/shared primitives are untouched.
+
+Diego also requested an action inventory. See [action families and concrete locations](2026-10-19-crate-v3-admin-action-icons.md)
+and its42siteJSON:4implemented,23proposed,15existing/owning-phase. ASTscan142productionfiles
+finds159lexical candidates in52files; these are not159rendered controls or approved changes.
+A persistent1AQ disclosure shows the ten real glyph families and their usage. No broad restore
+of Admin icons, no decorative heading/navigation icons, and no Listen/Desktop migration.
+
+One reviewer Minor in the local fixture was reproduced: adding a candidate twice reused rowid3.
+Monotonic per-sample row identities now preserve repeated-add/reorder/remove; production
+callbacks remain unchanged. This is the same1AQ review, without commit or next-group work.
+
+### 1AQ search and form-height feedback — 2026-10-19
+
+The editor search icon was displaced14px because its wrapper stretched to stacked scope chips.
+Search scope now uses shared Select with the same values/callback/query and static-mode gate;
+two Field recipes retain8px label gaps. Search copy reflects the selected scope. This eighth
+amended form Select site is registered explicitly (editor7total shared Select consumers).
+Diego then confirmed the input/Select height mismatch in the other editor rows. Six Input-only
+min-h-11 overrides are removed, including range/text rule values: both controls use the shared
+40px fine-pointer/44px coarse-pointer form geometry. Creation already used that geometry and
+is covered by the same regression checks. Basic action buttons retain their44px targets.
+No shared runtime, backend, hook, data, playback, canonical or pin change. Still the same local
+1AQ, stopped before commit; previewactive5186. Final evidence follows in the current handover.
+
+### 1AQ responsive rule row feedback — 2026-10-19
+
+Campo, Operador y Valor comparten fila cuando la tarjeta dispone de 576 px; se apilan por debajo
+de ese ancho. La condición usa el contenedor real de cada regla en creación y edición, evitando
+el breakpoint de viewport que apilaba los campos dentro del iframe pese a tener espacio. Se
+conservan las columnas 180 px / 160 px / resto, los 8 px bajo etiquetas, las alturas compartidas,
+los glifos y todas las acciones/datos. Continúa el mismo 1AQ local sin commit, preview activo.
+
+### 1AQ header standard and applicability — 2026-10-19
+
+Diego approved compact header actions at the upper right, without border/permanent fill, using
+shared Button ghost/icon-lg44px, Tooltip and descriptive accessible names. PlaylistEditor moves
+Back outside identity, aligns its112px cover with copy, and uses Copy/Eye/ListRestart/Save with
+existing callbacks, smart/static gates and busy states. Header layout follows available width;
+Save + generate keeps its dynamic name. The later question about arrow-only Back is recorded
+as a proposal; the actual Back text/destination remain unchanged.
+The [standard and18-page applicability audit](2026-10-19-crate-v3-admin-header-actions.md) records
+1applied reference,10Refresh candidates,6workflow adaptations and1page without actions. Other
+headers are analysis only. The action inventory is now45sites:8applied,22proposed,15owning-phase;
+current scan163lexical candidates/52files, including Preview. No historical1V/1M rewrite.
+Keep the same local1AQ review stop, no commit/push or next group; preview remainsactive5186.
+
+## Enmienda local 1AQ — cabeceras y filas autorizadas, 2026-10-19
+
+Diego pidió migrar las18cabeceras revisadas antes del siguiente grupo y después aplicar el
+patrón a las3acciones de fila de playlists. La autorización supera las notas anteriores de
+«solo propuestas» de esas cabeceras. Se comparte la composición Admin PageHeaderLayout/
+PageHeaderActions/PageHeaderAction sobre Button ghost icon-lg44px y Tooltip existentes:
+38sitios en17páginas; Roles adopta solo composición read-only. OpsPageHero hace opt-in para
+ocho consumidores revisados; Tasks/Insights/Genres conservan el default. Sin nuevo @crate/ui
+export, contrato de datos/API/SSE ni cambio Listen/Desktop. La adaptación responde al ancho
+real del contenedor. Nombres precisos, busy/disabled/pressed, callbacks, permisos y peticiones
+permanecen; cada trabajo tiene un glifo distinto, sin usar Refresh para sincronizar/generar.
+
+Filas de playlists: Edit con Pencil, Activate/Deactivate con Power/PowerOff y Delete con
+Trash2, sin borde/fondo permanente, con tooltip solo de acción y aria-label con el objeto.
+Se corrige Card24px + fila16px duplicados: una sola capa16px. No se ilumina la fila al hover;
+navegación, stopPropagation y ConfirmDialog textual permanecen. Back del Editor sigue con
+flecha/texto fuera de la identidad: la pregunta de Diego fue una consulta, sin cambio de contrato.
+
+[Estándar y sitios aplicados](2026-10-19-crate-v3-admin-header-actions.md),
+[inventario general](crate-v3-analysis/admin-action-icons-1aq.json):71sitios,45aplicados,
+11propuestos y15existentes en su fase. El inventario de cabeceras tiene18archivos con hashes
+actuales; las propuestas restantes no se han aplicado. Datos manuales del preview no representan
+certificación backend vivo/AT/nativo/canónica. **Mismo1AQ local sin commit/push ni siguiente
+grupo; preview5186activo**. Evidencia final y límites: [estado vigente](2026-10-19-crate-v3-current-state.md).
+
+
+### Enmienda local1AQ: colección compartida y propuesta de filas — 2026-10-19
+
+La normalización de badges fue autorizada después de la auditoría inicial: InfoBadge24/12,
+FilterChip/SegmentedControl/GenrePill12px con32/44px de objetivo. Adaptadores anteriores
+conservan contratos; QualityBadge y OfflineBadge usan InfoBadge. Incoming release tiene
+acciones compactas y avatar88px; ShowCard conserva su desplegable. Labels de formulario en
+mayúsculas con valores protegidos; nuevo trabajo de iconos Solar, Bot AI visual20px/slot16px.
+Misma revisión1AQ sin commit/push; no equivale a cierre de fase ni QA completa.
+Diego pide ahora analizar y proponer la normalización de filas similares de ambas apps.
+[Propuesta e inventario](2026-10-19-crate-v3-row-normalization-proposal.md): HairlineRow depende
+de padding/alineación del CSS del mockup; fechas show/release y filas Upcoming/NewReleases
+siguen divergentes. La migración está PENDIENTE de aprobación. No aplicar el antiguo hover
+iluminado de notas históricas; se conserva la prohibición aprobada de iluminar filas al hover.
+El [estado vigente](2026-10-19-crate-v3-current-state.md) prevalece sobre stops y propuestas
+históricos. Preview5186activo, pin258bbaee y33PNG/manifest1M conservados.
+
+
+Última instrucción de Diego: pausar migraciones visuales para reconciliar el sistema completo.
+[Auditoría y catálogo propuesto](2026-10-19-crate-v3-component-reconciliation-audit.md): revisar
+contratos/adopción/overrides y aprobar el set común antes de seguir por pantallas. La propuesta
+de filas se integra en ese trabajo. No se considera aprobada la implementación del catálogo.
+Se preservan1AQlocal,preview5186y todos los checkpoints, sin commit/push.
+
+
+### 1AQ — Storybook y primera reconciliación (estado local vigente)
+
+Storybook R0 está implementado en inglés, con identidad Crate, categorías funcionales y enlaces
+estables. Catálogo: 10 fichas documentadas / 81 pendientes; mantenimiento obligatorio en el mismo
+cambio, hook staged y comparación histórica en CI. Después de revisarlo, Diego autorizó comenzar
+por HairlineRow: inset/alineación garantizados, texto largo contenido y ayudas del mockup retiradas.
+Admin aún no adopta esa fila; el resto de R1–R4 sigue pendiente. Previews 6006/5186 activos.
+[Estado y evidencia vigentes](2026-10-19-crate-v3-current-state.md),
+[tooling](2026-10-19-crate-v3-storybook.md) y
+[contrato Hairline](2026-10-19-crate-v3-hairline-reconciliation.md).
+**Misma parada local 1AQ, sin commit/push; no se cierra la fase ni su QA.**
+
+
+Enmienda de Diego en esta revisión: el mockup aprobado y sus ajustes confirmados son la fuente
+visual de verdad. Storybook/shared lo reproducen; dudas, drift o conflictos móviles se resuelven
+con Diego. HairlineRow queda Poppins40012/18también en móvil por su confirmación explícita,
+con mínimo táctil44px; se retiran los tamaños locales anteriores. Estado/evidencia en el enlace
+vigente anterior. El pin histórico258bbaee y los baselines canónicos se conservan.
+
+
+1AQ aprobado por Diego el 2026-10-19; commit/push autorizados. El siguiente bloque es FormField
+y roles tipográficos, con parada de revisión en 1AR. Prevalece el [estado vigente](2026-10-19-crate-v3-current-state.md).

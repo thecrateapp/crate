@@ -95,7 +95,7 @@ describe("Library Health text controls and preserved UX", () => {
     expect(container.querySelector("button button,button a")).toBeNull();
     expect(
       container.querySelector(
-        "svg:not(.lucide-chevron-down):not(.lucide-chevron-up)",
+        'svg:not(.lucide-chevron-down):not(.lucide-chevron-up):not([data-admin-ux="header-run-scan"])',
       ),
     ).toBeNull();
     expect(screen.getByRole("heading", { name: "Library Health" })).toHaveClass(
@@ -314,7 +314,11 @@ describe("Library Health text controls and preserved UX", () => {
     } as never);
     const empty = mount();
     await screen.findByText("No open issues recorded");
-    expect(empty.container.querySelector("svg.lucide")).toBeNull();
+    expect(empty.container.querySelectorAll("svg.lucide")).toHaveLength(1);
+    expect(empty.container.querySelector("svg.lucide")).toHaveAttribute(
+      "data-admin-ux",
+      "header-run-scan",
+    );
     empty.unmount();
     vi.mocked(api).mockRejectedValue(new Error("sample unavailable"));
     mount();

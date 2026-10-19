@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Sparkles } from "@crate/ui/icons";
@@ -8,7 +9,6 @@ import { TrackRow } from "@/components/cards/TrackRow";
 import type { Track } from "@/contexts/PlayerContext";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export const QueueTrackRow = memo(function QueueTrackRow({
   track,
@@ -56,7 +56,7 @@ export const QueueTrackRow = memo(function QueueTrackRow({
   const meta = useMemo(
     () =>
       track.isSuggested ? (
-        <CrateBadge icon={Sparkles}>{t("player.queue.suggested")}</CrateBadge>
+        <InfoBadge icon={Sparkles}>{t("player.queue.suggested")}</InfoBadge>
       ) : undefined,
     [track.isSuggested, t],
   );

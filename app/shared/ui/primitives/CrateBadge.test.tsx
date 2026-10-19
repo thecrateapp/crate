@@ -10,12 +10,12 @@ describe("CratePill", () => {
     expect(screen.getByText("Label")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass(
       "font-mono",
-      "text-label",
-      "tracking-chip",
-      "min-h-8",
-      "[@media(pointer:coarse)]:min-h-11",
+      "text-info-badge",
     );
-    expect(container.firstElementChild).toHaveAttribute("data-slot", "chip");
+    expect(container.firstElementChild).toHaveAttribute(
+      "data-slot",
+      "info-badge",
+    );
   });
 
   it("renders as a button when onClick is provided", () => {
@@ -50,8 +50,9 @@ describe("CratePill", () => {
 
   it("updates the pressed state and styling of an explicit toggle", () => {
     const { rerender } = render(<CratePill variant="toggle">Jazz</CratePill>);
-    expect(screen.getByRole("button", { pressed: false })).not.toHaveClass(
-      "bg-accent-action-hi",
+    expect(screen.getByRole("button", { pressed: false })).toHaveAttribute(
+      "data-state",
+      "inactive",
     );
     rerender(
       <CratePill variant="toggle" active>
@@ -59,9 +60,8 @@ describe("CratePill", () => {
       </CratePill>,
     );
     expect(screen.getByRole("button", { pressed: true })).toHaveClass(
-      "border-accent-action-hi",
-      "bg-accent-action-hi",
-      "text-accent-action-hi-foreground",
+      "crate-form-chip",
+      "text-filter-chip",
     );
   });
 
@@ -138,14 +138,11 @@ describe("CratePill", () => {
 
     const active = screen.getByRole("button", { name: "punk" });
     expect(active).toHaveAttribute("aria-pressed", "true");
-    expect(active).toHaveClass(
-      "font-mono",
-      "bg-accent-action-hi",
-      "text-accent-action-hi-foreground",
-    );
+    expect(active).toHaveClass("font-mono", "crate-form-chip");
     expect(active).not.toHaveClass("hover:text-text-primary");
-    expect(screen.getByRole("button", { name: "doom" })).not.toHaveClass(
-      "bg-accent-action-hi",
+    expect(screen.getByRole("button", { name: "doom" })).toHaveAttribute(
+      "data-state",
+      "inactive",
     );
   });
 
@@ -166,10 +163,8 @@ describe("CrateChip", () => {
     expect(container.firstElementChild).toHaveClass(
       "rounded-full",
       "border",
-      "px-2",
-      "py-0.5",
       "font-mono",
-      "text-badge",
+      "text-info-badge",
     );
   });
 
@@ -186,7 +181,7 @@ describe("CrateBadge tones", () => {
     expect(chip).toHaveClass(
       "bg-state-success/10",
       "text-state-success-text",
-      "text-badge",
+      "text-info-badge",
     );
     expect(chip).toHaveAttribute("data-tone", "success");
   });
@@ -211,7 +206,7 @@ describe("CrateBadge tones", () => {
     render(<CrateChip className="text-micro">Small</CrateChip>);
     const chip = screen.getByText("Small");
     expect(chip).toHaveClass("text-micro");
-    expect(chip).not.toHaveClass("text-badge");
+    expect(chip).not.toHaveClass("text-info-badge");
   });
 
   it("exposes aria-pressed on inferred toggle pills", () => {
@@ -233,33 +228,40 @@ describe("CrateBadge tones", () => {
 });
 
 describe("CrateBadge", () => {
-  it("renders a rectangular badge with primary text", () => {
+  it("renders the shared informative capsule with legible neutral text", () => {
     render(<CrateBadge>Next show</CrateBadge>);
     const badge = screen.getByText("Next show");
-    expect(badge).toHaveClass("crate-badge", "rounded-md", "text-badge");
-    expect(badge.className).not.toMatch(/uppercase|tracking-|rounded-full/);
-    expect(badge.className).not.toContain("text-accent-action");
+    expect(badge).toHaveClass(
+      "crate-info-badge",
+      "rounded-full",
+      "text-info-badge",
+    );
+    expect(badge.className).not.toMatch(/uppercase|tracking-/);
+    expect(badge).toHaveAttribute("data-tone", "neutral");
   });
 
-  it("puts the tone color on the icon only", () => {
+  it("keeps the semantic tone on the shared informative recipe", () => {
     const { container } = render(
       <CrateBadge icon={Sparkles} tone="warning">
         Crate DNA
       </CrateBadge>,
     );
-    const badge = screen.getByText("Crate DNA");
+    const badge = screen
+      .getByText("Crate DNA")
+      .closest("[data-slot=info-badge]")!;
     expect(badge).toHaveAttribute("data-tone", "warning");
-    expect(badge.className).not.toContain("text-state-warning-text");
-    expect(container.querySelector("svg")).toHaveClass(
-      "text-state-warning-text",
+    expect(badge).toHaveClass("text-state-warning-text");
+    expect(container.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
     );
   });
 
-  it("defaults the icon to the accent color", () => {
+  it("defaults information to a legible neutral color", () => {
     const { container } = render(
       <CrateBadge icon={Sparkles}>Crate DNA</CrateBadge>,
     );
-    expect(container.querySelector("svg")).toHaveClass("text-accent-action");
+    expect(container.firstElementChild).toHaveClass("text-text-secondary");
   });
 
   it("supports the larger size and the overlay surface", () => {
@@ -269,7 +271,7 @@ describe("CrateBadge", () => {
       </CrateBadge>,
     );
     const badge = screen.getByText("Pre-release");
-    expect(badge).toHaveClass("text-xs");
+    expect(badge).toHaveClass("text-info-badge");
     expect(badge).toHaveAttribute("data-surface", "overlay");
   });
 });

@@ -25,7 +25,18 @@ describe("AIButton", () => {
     expect(
       screen.getByRole("button", { name: /Generate/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button").querySelector("svg")).toBeNull();
+    expect(screen.getByRole("button").querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "ai-bot",
+    );
+    expect(screen.getByRole("button").querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(screen.getByRole("button").querySelector("svg")).toHaveClass(
+      "size-4",
+      "scale-125",
+    );
   });
 
   it("does not render when the LLM is unavailable", () => {

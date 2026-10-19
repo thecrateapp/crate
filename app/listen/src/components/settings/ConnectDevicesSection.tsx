@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -11,7 +12,7 @@ import {
   Clock,
 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { Switch } from "@crate/ui/primitives/Switch";
 import { Button } from "@crate/ui/shadcn/button";
 
@@ -233,16 +234,14 @@ function ConnectDevicesSectionContent() {
                       <span className="truncate">{label}</span>
                     </div>
                     {isCurrent ? (
-                      <CrateBadge icon={Check}>
-                        {t("common.current")}
-                      </CrateBadge>
+                      <InfoBadge icon={Check}>{t("common.current")}</InfoBadge>
                     ) : null}
-                    <CrateBadge
+                    <InfoBadge
                       icon={device.active ? Activity : Clock}
                       tone={device.active ? "success" : "neutral"}
                     >
                       {device.active ? t("common.active") : t("common.recent")}
-                    </CrateBadge>
+                    </InfoBadge>
                   </div>
                   <div className="mt-1 text-xs text-text-muted">
                     {t("settings.connectDevices.lastSeen", {

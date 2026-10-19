@@ -37,7 +37,7 @@ describe("Logs typographic controls", () => {
     await screen.findByRole("heading", { name: "Logs" });
     expect(
       screen.getByRole("button", { name: "Refresh" }).querySelector("svg"),
-    ).toBeNull();
+    ).toHaveAttribute("data-admin-ux", "header-refresh");
     expect(screen.getByText("3 lines").querySelector("svg")).toBeNull();
     expect(screen.getByText(/workers online/).querySelector("svg")).toBeNull();
     expect(screen.getByText("1 errors")).toHaveAttribute(

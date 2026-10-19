@@ -1,3 +1,9 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import { RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ResponsiveLine } from "@nivo/line";
@@ -7,10 +13,9 @@ import {
   OpsPanel,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
-import { Button } from "@crate/ui/shadcn/button";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { useApi } from "@/hooks/use-api";
@@ -583,9 +588,9 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                   >
                     <div className="col-span-2 min-w-0 xl:col-span-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <CrateChip className="shrink-0 font-mono">
+                        <InfoBadge className="shrink-0">
                           {route.method}
-                        </CrateChip>
+                        </InfoBadge>
                         <span className="min-w-0 truncate font-mono text-sm text-white/85">
                           {route.path}
                         </span>
@@ -599,7 +604,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       </div>
                     </div>
                     <div className="crate-form-field">
-                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
+                      <span
+                        data-slot="form-field-label"
+                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
+                      >
                         Count
                       </span>
                       <span className="text-sm font-medium tabular-nums text-white/75">
@@ -607,7 +615,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
+                      <span
+                        data-slot="form-field-label"
+                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
+                      >
                         Avg
                       </span>
                       <span className="text-sm font-medium tabular-nums text-white/75">
@@ -615,7 +626,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
+                      <span
+                        data-slot="form-field-label"
+                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
+                      >
                         p95 / p99
                       </span>
                       <span
@@ -631,7 +645,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle">
+                      <span
+                        data-slot="form-field-label"
+                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
+                      >
                         5xx
                       </span>
                       <span
@@ -776,9 +793,9 @@ function PlaybackTranscodingOverview({
                   records
                 </div>
               </div>
-              <CrateChip>
+              <InfoBadge>
                 {(stats?.variant_tracks ?? 0).toLocaleString()} tracks
-              </CrateChip>
+              </InfoBadge>
             </div>
             <div className="space-y-3">
               {statuses.map((status) => (
@@ -803,9 +820,9 @@ function PlaybackTranscodingOverview({
                   Latest playback cache writes and retries.
                 </div>
               </div>
-              <CrateChip>
+              <InfoBadge>
                 {(stats?.hires_tracks ?? 0).toLocaleString()} hi-res sources
-              </CrateChip>
+              </InfoBadge>
             </div>
             <div className="space-y-2">
               {(delivery?.recent_variants ?? []).length > 0 ? (
@@ -826,7 +843,7 @@ function PlaybackTranscodingOverview({
                         {formatBytes(variant.bytes)}
                       </div>
                     </div>
-                    <CrateChip
+                    <InfoBadge
                       className={
                         variant.status === "ready" ||
                         variant.status === "running"
@@ -837,7 +854,7 @@ function PlaybackTranscodingOverview({
                       }
                     >
                       {variant.status}
-                    </CrateChip>
+                    </InfoBadge>
                   </div>
                 ))
               ) : (
@@ -946,8 +963,9 @@ export function SystemHealth() {
       <OpsPageHero
         title="System Health"
         description="Runtime pressure, API performance, queue behavior and infrastructure saturation across the stack."
+        compactActions
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <PageHeaderActions>
             <SegmentedControl
               as="radio"
               label="Metrics window"
@@ -958,25 +976,27 @@ export function SystemHealth() {
                 { value: "hour", label: "24h" },
               ]}
             />
-            <Button
-              variant="outline"
-              className="min-h-11"
+            <PageHeaderAction
+              label="Refresh metrics"
               onClick={() => refetchDashboard()}
             >
-              Refresh metrics
-            </Button>
-          </div>
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh-metrics"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       >
-        <CrateChip>
+        <InfoBadge>
           {summary
             ? `${summary.api_requests.count} requests`
             : "Metrics loading"}
-        </CrateChip>
-        <CrateChip>{runningTasks} running tasks</CrateChip>
-        <CrateChip>{queueDepth} queued depth</CrateChip>
+        </InfoBadge>
+        <InfoBadge>{runningTasks} running tasks</InfoBadge>
+        <InfoBadge>{queueDepth} queued depth</InfoBadge>
         {summary ? (
-          <CrateChip
+          <InfoBadge
             className={
               Number(errorRate) > 1
                 ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
@@ -984,28 +1004,28 @@ export function SystemHealth() {
             }
           >
             {errorRate}% error rate
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {summary && homeCacheTotal > 0 ? (
-          <CrateChip>{homeCacheHitRate.toFixed(0)}% home core hit</CrateChip>
+          <InfoBadge>{homeCacheHitRate.toFixed(0)}% home core hit</InfoBadge>
         ) : null}
         {summary && homeEndpointCacheTotal > 0 ? (
-          <CrateChip>
+          <InfoBadge>
             {homeEndpointCacheHitRate.toFixed(0)}% home endpoint hit
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {playbackDelivery?.stats ? (
-          <CrateChip>
+          <InfoBadge>
             {playbackDelivery.stats.coverage_percent}% playback coverage
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {summary?.worker_resource_deferred?.count ? (
-          <CrateChip>
+          <InfoBadge>
             {summary.worker_resource_deferred.count} batch deferrals
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {system?.resource_pressure ? (
-          <CrateChip
+          <InfoBadge
             className={
               system.resource_pressure.allowed
                 ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -1013,7 +1033,7 @@ export function SystemHealth() {
             }
           >
             {system.resource_pressure.allowed ? "Batch open" : "Batch deferred"}
-          </CrateChip>
+          </InfoBadge>
         ) : null}
       </OpsPageHero>
 

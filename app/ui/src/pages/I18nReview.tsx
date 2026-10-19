@@ -1,8 +1,13 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -480,7 +485,32 @@ export function I18nReview() {
   return (
     <div className="min-w-0 space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              <PageHeaderAction
+                label="Refresh"
+                onClick={loadReviewData}
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2
+                    data-admin-ux="translations-refresh"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!loading ? (
+                  <HeaderRefreshCw
+                    data-admin-ux="header-refresh"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </PageHeaderActions>
+          }
+        >
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold tracking-tight text-white">
               Listen Translations
@@ -490,24 +520,7 @@ export function I18nReview() {
               remote translations.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11"
-            onClick={loadReviewData}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2
-                data-admin-ux="translations-refresh"
-                aria-hidden="true"
-                size={15}
-                className="animate-spin"
-              />
-            ) : null}
-            Refresh
-          </Button>
-        </div>
+        </PageHeaderLayout>
 
         <div
           role="tablist"
@@ -1243,7 +1256,10 @@ function FilterSelect({
 }) {
   return (
     <label className="crate-form-field">
-      <span className="block font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
+      <span
+        data-slot="form-field-label"
+        className="block font-mono text-meta uppercase tracking-[0.12em] text-text-muted"
+      >
         {label}
       </span>
       <select

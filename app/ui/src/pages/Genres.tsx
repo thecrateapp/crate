@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
@@ -6,7 +7,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+
 import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -165,7 +166,10 @@ interface TaxonomyTree {
 interface TaxonomyNodeProposal {
   source_kind?: "taxonomy_node" | "raw_genre";
   recommended_action?:
-    "create_node" | "alias_existing" | "delete_marginal" | "needs_review";
+    | "create_node"
+    | "alias_existing"
+    | "delete_marginal"
+    | "needs_review";
   recommended_target_slug?: string | null;
   description: string;
   aliases: string[];
@@ -332,7 +336,7 @@ function TaxonomyRelationField({
                   <Badge
                     key={`${config.key}-${slug}`}
                     variant="outline"
-                    className="gap-1 border-accent-action/20 bg-accent-action/10 pr-1 text-[10px] text-accent-action-hi"
+                    className="gap-1 border-accent-action/20 bg-accent-action/10 text-accent-action-hi"
                   >
                     <span>{option?.name ?? slug}</span>
                     <span className="font-mono text-accent-action-hi/45">
@@ -986,7 +990,10 @@ function TaxonomyNodeEditorialEditor({
 
               <div className="space-y-3">
                 <label className="crate-form-field">
-                  <span className="text-[11px] uppercase tracking-wider text-white/35">
+                  <span
+                    data-slot="form-field-label"
+                    className="text-[11px] uppercase tracking-wider text-white/35"
+                  >
                     Description
                   </span>
                   <textarea
@@ -1023,11 +1030,7 @@ function TaxonomyNodeEditorialEditor({
                 {proposal.aliases.length > 0 ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {proposal.aliases.map((alias) => (
-                      <Badge
-                        key={alias}
-                        variant="outline"
-                        className="text-[10px]"
-                      >
+                      <Badge key={alias} variant="outline">
                         alias: {alias}
                       </Badge>
                     ))}
@@ -1216,7 +1219,7 @@ function GenreList() {
           title="Genres"
           description="Taxonomy curation, raw tag cleanup and discovery of the genre graph that organizes the library."
         >
-          <CrateChip icon={Tag}>Loading taxonomy</CrateChip>
+          <InfoBadge icon={Tag}>Loading taxonomy</InfoBadge>
         </OpsPageHero>
         <GridSkeleton count={12} columns="grid-cols-4" />
       </div>
@@ -1353,9 +1356,9 @@ function GenreList() {
           ) : undefined
         }
       >
-        <CrateChip icon={Tag}>{genres?.length ?? 0} total genres</CrateChip>
-        <CrateChip icon={Users}>{mappedCount} mapped</CrateChip>
-        <CrateChip
+        <InfoBadge icon={Tag}>{genres?.length ?? 0} total genres</InfoBadge>
+        <InfoBadge icon={Users}>{mappedCount} mapped</InfoBadge>
+        <InfoBadge
           className={
             (unmappedGenres?.length || 0) > 0
               ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
@@ -1363,9 +1366,9 @@ function GenreList() {
           }
         >
           {unmappedGenres?.length || 0} unmapped
-        </CrateChip>
+        </InfoBadge>
         {canCurateGenres && invalidTaxonomy ? (
-          <CrateChip
+          <InfoBadge
             className={
               invalidTaxonomy.invalid_count > 0
                 ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
@@ -1375,7 +1378,7 @@ function GenreList() {
             {invalidTaxonomy.invalid_count > 0
               ? `${invalidTaxonomy.invalid_count} invalid nodes`
               : "taxonomy clean"}
-          </CrateChip>
+          </InfoBadge>
         ) : null}
       </OpsPageHero>
 
@@ -2024,9 +2027,9 @@ function GenreView({ slug }: { slug: string }) {
           ) : undefined
         }
       >
-        <CrateChip icon={Users}>{genre.artists.length} artists</CrateChip>
-        <CrateChip icon={Disc3}>{genre.albums.length} albums</CrateChip>
-        <CrateChip
+        <InfoBadge icon={Users}>{genre.artists.length} artists</InfoBadge>
+        <InfoBadge icon={Disc3}>{genre.albums.length} albums</InfoBadge>
+        <InfoBadge
           className={
             genre.mapped
               ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -2034,12 +2037,12 @@ function GenreView({ slug }: { slug: string }) {
           }
         >
           {genre.mapped ? "Mapped" : "Unmapped"}
-        </CrateChip>
+        </InfoBadge>
         {genre.canonical_name && genre.canonical_name !== genre.name ? (
-          <CrateChip>Alias of {genre.canonical_name}</CrateChip>
+          <InfoBadge>Alias of {genre.canonical_name}</InfoBadge>
         ) : null}
         {genre.top_level_name ? (
-          <CrateChip>{genre.top_level_name}</CrateChip>
+          <InfoBadge>{genre.top_level_name}</InfoBadge>
         ) : null}
       </OpsPageHero>
 
@@ -2184,10 +2187,7 @@ function GenreView({ slug }: { slug: string }) {
                     : ""}
                 </div>
                 {a.weight >= 0.8 && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] mt-1 px-1 py-0"
-                  >
+                  <Badge variant="outline" className="mt-1">
                     primary
                   </Badge>
                 )}

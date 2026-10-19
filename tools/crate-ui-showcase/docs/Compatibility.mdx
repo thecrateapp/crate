@@ -1,0 +1,24 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Compatibility.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">Badge compatibility</DocHeading>
+
+<EntryDetails id="badge-compatibility" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- CrateBadge, CrateChip, CratePill and shadcn Badge remain compatibility adapters.
+- Historical `sm` and `md` converge at 24 px. CratePill delegates static information to InfoBadge and toggles/actions to FilterChip.
+- New consumers import InfoBadge or FilterChip according to role. An adapter does not create another visual variant.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Controls />
+
+Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.

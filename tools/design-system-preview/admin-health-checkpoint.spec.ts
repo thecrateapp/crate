@@ -73,11 +73,12 @@ test("1AD embeds real Library Health and preserves the published System Health c
   const section = page.getByRole("region", {
     name: "Checkpoint 1AD, Library Health de Admin",
   });
+  await section.locator("iframe").scrollIntoViewIfNeeded();
   await expect(
     section
       .frameLocator("iframe")
       .getByRole("heading", { name: "Library Health", exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await expect(page.locator("#sistema-admin")).toHaveCount(1);
   await expect(page.locator("footer")).toContainText("1AC publicado");
   await expect(page.locator("footer")).toContainText("1AD publicado");
@@ -140,7 +141,7 @@ for (const width of [1440, 768, 390])
       await expect(real.locator("button button,button a")).toHaveCount(0);
       await expect(
         real.locator(
-          "svg:not(.lucide-chevron-down):not(.lucide-chevron-up):not(.lucide-loader-circle)",
+          "svg:not(.lucide-chevron-down):not(.lucide-chevron-up):not(.lucide-loader-circle):not([data-admin-ux=header-run-scan])",
         ),
       ).toHaveCount(0);
       await expect(

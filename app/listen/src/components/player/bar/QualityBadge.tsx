@@ -1,4 +1,5 @@
-import { CRATE_ICON_SIZE, Sparkles, Disc3, AudioLines } from "@crate/ui/icons";
+import { Sparkles, Disc3, AudioLines } from "@crate/ui/icons";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { QualityBadge as QualityBadgeData } from "./player-bar-utils";
 
 const tierStyles: Record<
@@ -23,12 +24,12 @@ const tierStyles: Record<
   },
   standard: {
     border: "border-border-quiet",
-    text: "text-text-muted",
+    text: "text-text-secondary",
     bg: "bg-transparent",
   },
   low: {
     border: "border-border-quiet",
-    text: "text-text-subtle",
+    text: "text-text-secondary",
     bg: "bg-transparent",
   },
 };
@@ -61,12 +62,8 @@ export function QualityBadge({
       : badge.detail || badge.label;
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-badge font-bold tracking-wider leading-none whitespace-nowrap border ${variantClass}`}
-      title={title}
-    >
-      {Icon && <Icon size={CRATE_ICON_SIZE.nano} />}
+    <InfoBadge icon={Icon ?? undefined} className={variantClass} title={title}>
       {badge.label}
-    </span>
+    </InfoBadge>
   );
 }

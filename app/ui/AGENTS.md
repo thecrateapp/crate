@@ -37,8 +37,32 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
   behaviour. Diego confirmed on 2026-10-17 that conventional UX glyphs stay: back/forward,
   collapse/expand, menu/close/search, etc. Record actual retained sites in the migrated scope;
   this does not retain redundant glyphs beside page destinations, labelled actions or metrics.
+  Diego added on 2026-10-19: conventional basic item actions such as Remove may be icon-only,
+  with a descriptive accessible name/title and the shared 44px target. Header actions follow the
+  approved compact recipe below; ambiguous domain operations and final confirmations keep text.
+  See the reviewed action inventory
+  in docs/plans/2026-10-19-crate-v3-admin-action-icons.md; proposals are not blanket migrations.
   Task 1b.8 / DS §1.7 owns the migration, which is not completed globally.
   Toasts: `toast` from `sonner`.
+- Page header actions use shared Button `variant="ghost"` / `size="icon-lg"`, shared Tooltip,
+  descriptive aria-label/title and aria-hidden glyphs, aligned at the upper right. Keep busy,
+  disabled, capability and dynamic action names. Back navigation stays outside the identity
+  block; narrow layouts respond to available container width without compressing the title.
+  PlaylistEditor is the approved reference (Copy, Eye, ListRestart, Save). Follow
+  docs/plans/2026-10-19-crate-v3-admin-header-actions.md and register concrete glyph sites;
+  Diego explicitly authorized all18inventoried headers and playlist row actions in local1AQ.
+  Other proposals are not a mass-migration instruction or a new backend contract. Use the Admin
+  PageHeader composition. Repeated-row tooltips name only the action (Edit/Delete/Activate/
+  Deactivate); accessible labels retain the object. Avoid duplicate Card + row padding.
+  Disabled icon actions must still expose their tooltip by pointer/keyboard while their native
+  Button remains disabled. Keep that Button node stable across busy/availability changes.
+- Categorical form fields use the shared Select even with few choices; Category, Match and Sort
+  in playlist creation/editor are the first explicit 1AQ sites. Filters and binary state toggles
+  keep their chips. Preserve values/defaults and register reviewed short form Select sites in
+  the shared source policy. Do not mass-migrate earlier consumers outside their checkpoints.
+- Input and Select share the form recipe: 40px with a fine pointer, 44px with a coarse pointer.
+  Preserve equal heights within form rows; do not force individual fields to 44px with local
+  overrides. Basic action buttons keep their shared 44px target.
 - No emojis in UI text.
 
 ## Snapshot streams and SSE
@@ -97,3 +121,21 @@ CI (`.github/workflows/test-frontend.yml`) runs lint, typecheck, test and build 
 - Large pages (`Tasks.tsx` ~2200 lines, `Download.tsx` ~2000, `Health.tsx` ~1200) own their own streams. Extract hooks rather than adding more effects inline.
 - Do not trigger heavy recomputation from the UI (aggregate counts, snapshot rebuilds). If data is missing, it belongs in a snapshot/projector change on the backend.
 - Filesystem-mutating actions (tags, delete, move) must call endpoints that enqueue worker tasks; track progress with `use-task-events` / `use-progress-toast`.
+
+Informative labels use shared `InfoBadge` (Mono12/16,24px,3px8px padding); standalone
+numeric counters use its `counter` variant (6px inline inset). FilterChip and SegmentedControl
+use12px with32/44px minimums; GenrePill remains the musical-domain component. Shadcn Badge
+retains its API with the common informative recipe. No local type/geometry overrides; see
+`docs/plans/2026-10-19-crate-v3-ui-labels.md`. This local1AQ rule supersedes earlier16px tags.
+
+
+## Official icon language — Diego, 2026-10-19
+
+Solar through `@crate/ui/icons` is the official icon set for Admin and Listen. New and newly
+reviewed glyph sites use that catalogue. Earlier registered Lucide sites remain bounded until
+migration in their owning groups; this is not a claim that all Admin glyphs have migrated.
+AIButton now uses the exact official Solar Bot Outline, with a16px layout slot scaled visually
+to20px, keeping button geometry. The catalogue carries the exact upstream Bot SVG because the
+installed Solar2.1.1 predates this newly added icon. Do not substitute Sparkles for AI actions.
+Field captions use the shared uppercase recipe; mark non-label captions explicitly with
+`data-slot="form-field-label"`. Preserve case in values, badges, filters and helper copy.

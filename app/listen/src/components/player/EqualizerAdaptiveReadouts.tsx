@@ -1,10 +1,10 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { CRATE_ICON_SIZE, Sun, Tag } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { getAdaptiveFeatureChipData } from "./equalizer-adaptive-feature-data";
 import type { EqFeatures } from "@/hooks/use-eq-features";
 import type { TrackGenre } from "@/hooks/use-track-genre";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 
 function FeatureChip({
   icon: Icon,
@@ -18,13 +18,9 @@ function FeatureChip({
   zone: "neutral" | "active";
 }) {
   return (
-    <CrateChip
-      active={zone === "active"}
-      icon={Icon}
-      className="font-mono tabular-nums"
-    >
+    <InfoBadge active={zone === "active"} icon={Icon} className="tabular-nums">
       <span title={label}>{value}</span>
-    </CrateChip>
+    </InfoBadge>
   );
 }
 

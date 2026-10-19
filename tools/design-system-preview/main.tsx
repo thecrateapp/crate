@@ -5,6 +5,8 @@ import { AdminHealthCheckpoint } from "./admin-health-checkpoint";
 import { AdminTrashCheckpoint } from "./admin-trash-checkpoint";
 import { AdminContributionsCheckpoint } from "./admin-contributions-checkpoint";
 import { AdminPlaylistsCheckpoint } from "./admin-playlists-checkpoint";
+import { BadgeNormalizationCheckpoint } from "./badge-normalization-checkpoint";
+import { AdminPlaylistEditorCheckpoint } from "./admin-playlist-editor-checkpoint";
 import { AdminUpcomingCheckpoint } from "./admin-upcoming-checkpoint";
 import { AdminTranslationsCheckpoint } from "./admin-translations-checkpoint";
 import { AdminUsersCheckpoint } from "./admin-users-checkpoint";
@@ -305,6 +307,17 @@ function App() {
           Ver primitivas <span aria-hidden="true">↘</span>
         </a>
       </header>
+      <p className="explanation">
+        <a
+          href="http://127.0.0.1:6006/?path=/docs/system-introduction--docs"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Crate UI — Storybook de componentes y sistema de diseño
+        </a>
+        {" · "}1AQ aprobado y publicado. Los checkpoints de esta página
+        conservan su historial.
+      </p>
       <section id="top" className="intro">
         <MonoLabel
           size="eyebrow"
@@ -1672,6 +1685,8 @@ function App() {
       <AdminTranslationsCheckpoint />
       <AdminUpcomingCheckpoint />
       <AdminPlaylistsCheckpoint />
+      <AdminPlaylistEditorCheckpoint />
+      <BadgeNormalizationCheckpoint />
       <AppModal
         open={sampleModalOpen}
         onClose={() => setSampleModalOpen(false)}
@@ -1768,7 +1783,7 @@ function App() {
             "1AJ publicado",
             "1AK publicado",
             "1AL publicado",
-            "1AM publicado · 1AN publicado · 1AO publicado · 1AP publicado",
+            "1AM publicado · 1AN publicado · 1AO publicado · 1AP publicado · 1AQ publicado",
           ]}
         />
         <p>Mockup de revisión · componentes reales · datos ficticios</p>

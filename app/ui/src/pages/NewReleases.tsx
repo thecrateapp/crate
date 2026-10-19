@@ -1,6 +1,20 @@
+import { EventDate } from "@/components/ui/EventDate";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  List as HeaderList,
+  LayoutGrid as HeaderLayoutGrid,
+  Radar as HeaderRadar,
+  Loader2,
+  Search,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -10,7 +24,7 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -86,25 +100,11 @@ function isUpcomingRelease(release: Release) {
 }
 
 function ReleaseDateBadge({ release }: { release: Release }) {
-  const raw = releaseDateValue(release);
-  if (!raw) {
-    return <span className="text-xs text-white/25">Unknown date</span>;
-  }
-
-  const date = new Date(`${raw}T12:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return <span className="text-xs text-white/25">{raw}</span>;
-  }
-
   return (
-    <div className="text-center">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-        {date.toLocaleDateString("en-US", { month: "short" })}
-      </div>
-      <div className="text-lg font-semibold leading-none text-white/75">
-        {date.getDate()}
-      </div>
-    </div>
+    <EventDate
+      date={releaseDateValue(release)}
+      labelPrefix={release.release_date ? undefined : "Detected"}
+    />
   );
 }
 
@@ -112,18 +112,18 @@ function ReleaseMeta({ release }: { release: Release }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
       {release.release_type ? (
-        <CrateChip>{release.release_type}</CrateChip>
+        <InfoBadge>{release.release_type}</InfoBadge>
       ) : null}
       {release.quality ? (
-        <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+        <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
           {release.quality}
-        </CrateChip>
+        </InfoBadge>
       ) : null}
-      {release.year ? <CrateChip>{release.year}</CrateChip> : null}
+      {release.year ? <InfoBadge>{release.year}</InfoBadge> : null}
       {release.tracks > 0 ? (
-        <CrateChip>{release.tracks} tracks</CrateChip>
+        <InfoBadge>{release.tracks} tracks</InfoBadge>
       ) : null}
-      <CrateChip>{timeAgo(release.detected_at)}</CrateChip>
+      <InfoBadge>{timeAgo(release.detected_at)}</InfoBadge>
     </div>
   );
 }
@@ -139,14 +139,14 @@ function ReleaseActions({
 }) {
   if (release.status === "downloaded") {
     return (
-      <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+      <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
         Downloaded
-      </CrateChip>
+      </InfoBadge>
     );
   }
   if (release.status === "downloading") {
     return (
-      <CrateChip active>
+      <InfoBadge active>
         <Loader2
           aria-hidden="true"
           data-admin-ux="releases-download-loading"
@@ -154,7 +154,7 @@ function ReleaseActions({
           className="animate-spin"
         />
         Downloading
-      </CrateChip>
+      </InfoBadge>
     );
   }
 
@@ -291,15 +291,15 @@ function ReleaseGridCard({
 
         <div className="absolute left-3 top-3">
           {release.status === "detected" ? (
-            <CrateChip active>Detected</CrateChip>
+            <InfoBadge active>Detected</InfoBadge>
           ) : null}
           {release.status === "downloading" ? (
-            <CrateChip active>Downloading</CrateChip>
+            <InfoBadge active>Downloading</InfoBadge>
           ) : null}
           {release.status === "downloaded" ? (
-            <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+            <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
               Downloaded
-            </CrateChip>
+            </InfoBadge>
           ) : null}
         </div>
       </div>
@@ -538,55 +538,68 @@ export function NewReleases() {
       <OpsPageHero
         title="New Releases"
         description="Release radar for library artists, with quick triage for what should land next in Crate."
+        compactActions
         actions={
-          <>
-            <div className="flex items-center gap-1 rounded-md border border-white/10 bg-black/20 p-1">
-              <Button
-                variant={view === "timeline" ? "default" : "ghost"}
-                size="sm"
-                className="min-h-11 px-3"
-                aria-pressed={view === "timeline"}
-                onClick={() => setView("timeline")}
+          <PageHeaderActions>
+            <>
+              <div
+                role="group"
+                aria-label="Release view"
+                className="flex items-center gap-1"
               >
-                Timeline
-              </Button>
-              <Button
-                variant={view === "grid" ? "default" : "ghost"}
-                size="sm"
-                className="min-h-11 px-3"
-                aria-pressed={view === "grid"}
-                onClick={() => setView("grid")}
-              >
-                Grid
-              </Button>
-            </div>
-            {canCurateReleases ? (
-              <Button
-                size="sm"
-                onClick={checkNow}
-                disabled={checking}
-                aria-busy={checking}
-                className="min-h-11 gap-2"
-              >
-                {checking ? (
-                  <Loader2
-                    size={14}
-                    className="animate-spin"
+                <PageHeaderAction
+                  label="Timeline"
+                  aria-pressed={view === "timeline"}
+                  onClick={() => setView("timeline")}
+                >
+                  <HeaderList
+                    data-admin-ux="header-timeline"
                     aria-hidden="true"
-                    data-admin-ux="releases-check-loading"
                   />
-                ) : null}
-                {checking ? "Checking…" : "Check now"}
-              </Button>
-            ) : null}
-          </>
+                </PageHeaderAction>
+                <PageHeaderAction
+                  label="Grid"
+                  aria-pressed={view === "grid"}
+                  onClick={() => setView("grid")}
+                >
+                  <HeaderLayoutGrid
+                    data-admin-ux="header-grid"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+              </div>
+              {canCurateReleases ? (
+                <PageHeaderAction
+                  label={checking ? "Checking…" : "Check now"}
+                  onClick={checkNow}
+                  disabled={checking}
+                  aria-busy={checking}
+                >
+                  {checking ? (
+                    <Loader2
+                      size={14}
+                      className="animate-spin"
+                      aria-hidden="true"
+                      data-admin-ux="releases-check-loading"
+                    />
+                  ) : null}
+                  {!checking ? (
+                    <HeaderRadar
+                      data-admin-ux="header-check-now"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </PageHeaderAction>
+              ) : null}
+            </>
+          </PageHeaderActions>
         }
       >
-        <CrateChip active>{releases.length} total</CrateChip>
-        <CratePill>{stats.detected} need action</CratePill>
-        <CratePill>{stats.downloading} downloading</CratePill>
-        <CratePill>{stats.downloaded} in library</CratePill>
-        <CratePill>{stats.upcoming} upcoming</CratePill>
+        <InfoBadge active>{releases.length} total</InfoBadge>
+        <InfoBadge>{stats.detected} need action</InfoBadge>
+        <InfoBadge>{stats.downloading} downloading</InfoBadge>
+        <InfoBadge>{stats.downloaded} in library</InfoBadge>
+        <InfoBadge>{stats.upcoming} upcoming</InfoBadge>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -641,41 +654,41 @@ export function NewReleases() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <CratePill
+            <FilterChip
               className="min-h-11"
               active={statusFilter === "all"}
               onClick={() => setStatusFilter("all")}
             >
               All
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               className="min-h-11"
               active={statusFilter === "detected"}
               onClick={() => setStatusFilter("detected")}
             >
               Needs action
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               className="min-h-11"
               active={statusFilter === "downloading"}
               onClick={() => setStatusFilter("downloading")}
             >
               Downloading
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               className="min-h-11"
               active={statusFilter === "downloaded"}
               onClick={() => setStatusFilter("downloaded")}
             >
               Downloaded
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               className="min-h-11"
               active={statusFilter === "upcoming"}
               onClick={() => setStatusFilter("upcoming")}
             >
               Upcoming
-            </CratePill>
+            </FilterChip>
           </div>
           <label className="crate-form-field">
             <MonoLabel as="span">Release type</MonoLabel>

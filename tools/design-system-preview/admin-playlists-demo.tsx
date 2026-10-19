@@ -24,10 +24,18 @@ function Destination() {
     <section className="grid gap-4">
       <h1 className="font-display text-3xl">Destino de muestra</h1>
       <p>
-        La ruta del editor se conserva. Su contenido se revisará en el siguiente
-        grupo.
+        Ruta de muestra conservada. El editor real está disponible en su muestra
+        de PlaylistEditor.
       </p>
       <p className="break-all font-mono">{location.pathname}</p>
+      <a
+        href="/admin-playlist-editor-demo.html"
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex min-h-11 items-center underline"
+      >
+        Abrir la muestra de PlaylistEditor
+      </a>
       <Link
         className="inline-flex min-h-11 items-center underline"
         to="/admin-playlists-demo.html"

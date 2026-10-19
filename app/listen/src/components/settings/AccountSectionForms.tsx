@@ -111,7 +111,9 @@ export function AccountProfileForm({
         </Button>
       </div>
       <div className="crate-form-field">
-        <span className="text-xs text-text-muted">{t("common.email")}</span>
+        <span data-slot="form-field-label" className="text-xs text-text-muted">
+          {t("common.email")}
+        </span>
         <p className="px-1 text-sm text-text-primary/60">{email || "—"}</p>
       </div>
     </div>

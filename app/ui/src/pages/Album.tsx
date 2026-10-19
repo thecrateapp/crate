@@ -639,10 +639,16 @@ export function SplitAlbumDialog({
                   <span className="w-8 shrink-0 text-right font-mono text-xs text-muted-foreground">
                     {track.tags.track || index + 1}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/88">
+                  <span
+                    data-slot="form-field-value"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-white/88"
+                  >
                     {title}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span
+                    data-slot="form-field-value"
+                    className="shrink-0 text-xs text-muted-foreground"
+                  >
                     {track.format}
                   </span>
                 </label>
@@ -1241,7 +1247,7 @@ export function Album() {
 
         {data.album_tags.musicbrainz_albumid && (
           <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline">
               MBID {data.album_tags.musicbrainz_albumid.slice(0, 8)}
             </Badge>
             <a
@@ -1277,7 +1283,7 @@ export function Album() {
                 <Badge
                   key={g}
                   variant="secondary"
-                  className="text-xs cursor-pointer hover:bg-primary/20"
+                  className="cursor-pointer hover:bg-primary/20"
                   onClick={() =>
                     navigate(
                       `/browse?genre=${encodeURIComponent(g.toLowerCase())}`,

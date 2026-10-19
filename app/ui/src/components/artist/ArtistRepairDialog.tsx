@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { api } from "@/lib/api";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { artistManagementApiPath } from "@/lib/library-routes";
@@ -374,9 +375,9 @@ export function ArtistRepairDialog({
       .toLowerCase();
     const latestMessageLooksSuccessful = Boolean(
       latestEventMessage &&
-      /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
-        latestEventMessage,
-      ),
+        /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
+          latestEventMessage,
+        ),
     );
     const success =
       doneStatus === "completed" ||
@@ -386,7 +387,8 @@ export function ArtistRepairDialog({
         doneStatus !== "cancelled");
     const errorMessage = done.error || latestEventMessage || "Task failed";
     const revalidation = done.result?.revalidation as
-      Record<string, unknown> | undefined;
+      | Record<string, unknown>
+      | undefined;
     const remainingIssues = Number(revalidation?.issue_count ?? NaN);
     const successMessage =
       latestEventMessage ||
@@ -571,13 +573,13 @@ export function ArtistRepairDialog({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-2">
-            <CrateChip>{plan?.total ?? 0} issues</CrateChip>
-            <CrateChip className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
+            <InfoBadge>{plan?.total ?? 0} issues</InfoBadge>
+            <InfoBadge className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
               {plan?.executable ?? 0} executable
-            </CrateChip>
-            <CrateChip>{plan?.manual_only ?? 0} manual</CrateChip>
+            </InfoBadge>
+            <InfoBadge>{plan?.manual_only ?? 0} manual</InfoBadge>
             {executableItems.length ? (
-              <CrateChip>{selectedExecutableItems.length} selected</CrateChip>
+              <InfoBadge>{selectedExecutableItems.length} selected</InfoBadge>
             ) : null}
             <Button
               size="sm"
@@ -698,8 +700,8 @@ export function ArtistRepairDialog({
                               level={item.severity || "low"}
                               label={item.severity || "low"}
                             />
-                            <CratePill>{checkLabel(item.check_type)}</CratePill>
-                            <CratePill
+                            <InfoBadge>{checkLabel(item.check_type)}</InfoBadge>
+                            <InfoBadge
                               className={
                                 item.executable
                                   ? "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
@@ -707,7 +709,7 @@ export function ArtistRepairDialog({
                               }
                             >
                               {supportLabel(item.support)}
-                            </CratePill>
+                            </InfoBadge>
                             {riskLabel(item.risk) ? (
                               <SeverityMeter
                                 level={item.risk}
@@ -715,19 +717,19 @@ export function ArtistRepairDialog({
                               />
                             ) : null}
                             {scopeLabel(item.scope) ? (
-                              <CratePill
+                              <InfoBadge
                                 className={
                                   SCOPE_TONES[item.scope || "hybrid"] ||
                                   SCOPE_TONES.hybrid
                                 }
                               >
                                 {scopeLabel(item.scope)}
-                              </CratePill>
+                              </InfoBadge>
                             ) : null}
                             {item.fs_write ? (
-                              <CratePill className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
+                              <InfoBadge className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
                                 Filesystem
-                              </CratePill>
+                              </InfoBadge>
                             ) : null}
                           </div>
                           <div className="mt-2 text-sm font-medium text-white">

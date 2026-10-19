@@ -28,9 +28,11 @@ for (const width of [1440, 768, 390]) {
       await expect(
         real.getByRole("button", { name: "Refresh", exact: true }),
       ).toHaveCSS("font-family", /^Poppins/);
-      await expect(real.locator("svg:not(.lucide-loader-circle)")).toHaveCount(
-        0,
-      );
+      await expect(
+        real.locator(
+          "svg:not(.lucide-loader-circle):not([data-admin-ux=header-refresh]):not([data-admin-ux=header-empty-trash])",
+        ),
+      ).toHaveCount(0);
       for (const control of await real.locator("button:visible").all()) {
         const box = (await control.boundingBox())!;
         expect(

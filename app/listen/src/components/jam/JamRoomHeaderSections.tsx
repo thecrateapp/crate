@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   CRATE_ICON_SIZE,
   Globe2,
@@ -15,7 +16,6 @@ import {
 
 import type { JamRoomHeroProps } from "./JamRoomHeroSections";
 import { HeroActionButton, HeroPrimaryButton } from "./JamHeroButtons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 type JamRoomHeaderProps = Pick<
   JamRoomHeroProps,
@@ -79,22 +79,20 @@ function JamRoomMetaBadges({ t, room, queueMode }: JamRoomMetaBadgesProps) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-2.5">
       <h1 className="text-3xl font-bold text-text-primary">{room.name}</h1>
-      <CrateBadge size="md" icon={Zap}>
+      <InfoBadge icon={Zap}>
         {queueMode === "auto_dj"
           ? t("jam.room.autoDjMode")
           : queueMode === "auto"
             ? t("jam.room.autoMode")
             : t("jam.room.djMode")}
-      </CrateBadge>
-      <CrateBadge size="md" icon={room.visibility === "public" ? Globe2 : Lock}>
+      </InfoBadge>
+      <InfoBadge icon={room.visibility === "public" ? Globe2 : Lock}>
         {room.visibility === "public"
           ? t("jam.room.publicRoom")
           : t("jam.visibility.inviteOnly")}
-      </CrateBadge>
+      </InfoBadge>
       {room.is_permanent ? (
-        <CrateBadge size="md" icon={Pin}>
-          {t("jam.roomCard.permanent")}
-        </CrateBadge>
+        <InfoBadge icon={Pin}>{t("jam.roomCard.permanent")}</InfoBadge>
       ) : null}
     </div>
   );
@@ -107,12 +105,11 @@ function JamRoomConnectionBadges(props: JamRoomConnectionBadgesProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       {isConnected ? (
-        <CrateBadge size="md" icon={Radio} tone="success">
+        <InfoBadge icon={Radio} tone="success">
           {t("jam.room.connected")}
-        </CrateBadge>
+        </InfoBadge>
       ) : (
-        <CrateBadge
-          size="md"
+        <InfoBadge
           icon={
             connectionProblem && !connectionProblem.includes("Retrying")
               ? Radio
@@ -126,24 +123,22 @@ function JamRoomConnectionBadges(props: JamRoomConnectionBadgesProps) {
           tone="warning"
         >
           {connectionProblem || t("jam.room.connecting")}
-        </CrateBadge>
+        </InfoBadge>
       )}
       {!roomIsActive ? (
-        <CrateBadge size="md" icon={Pause} tone="warning">
+        <InfoBadge icon={Pause} tone="warning">
           {t("jam.room.ended")}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
       {queueMode === "auto_dj" && (room.genre_filters || []).length ? (
-        <CrateBadge size="md" icon={Tag} tone="info">
+        <InfoBadge icon={Tag} tone="info">
           {t("jam.room.autoDjGenres", {
             genres: (room.genre_filters || []).join(", "),
           })}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
       {(room.tags || []).map((tag) => (
-        <CrateBadge key={tag} size="md">
-          {tag}
-        </CrateBadge>
+        <InfoBadge key={tag}>{tag}</InfoBadge>
       ))}
     </div>
   );

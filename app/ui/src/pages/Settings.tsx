@@ -1,3 +1,5 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useState,
@@ -17,7 +19,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Input } from "@crate/ui/shadcn/input";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import {
   Table,
   TableHeader,
@@ -483,16 +485,16 @@ export function Settings() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <CrateChip icon={Database}>
+              <InfoBadge icon={Database}>
                 {formatNumber(settings.about.tracks)} tracks indexed
-              </CrateChip>
-              <CrateChip icon={Clock}>
+              </InfoBadge>
+              <InfoBadge icon={Clock}>
                 Uptime {formatUptime(settings.about.uptime_seconds)}
-              </CrateChip>
-              <CrateChip icon={Zap}>
+              </InfoBadge>
+              <InfoBadge icon={Zap}>
                 {activeSchedules} active schedules
-              </CrateChip>
-              <CrateChip
+              </InfoBadge>
+              <InfoBadge
                 icon={Bot}
                 className={
                   settings.telegram?.enabled
@@ -501,7 +503,7 @@ export function Settings() {
                 }
               >
                 Telegram {settings.telegram?.enabled ? "enabled" : "idle"}
-              </CrateChip>
+              </InfoBadge>
             </div>
           </div>
 
@@ -577,13 +579,13 @@ export function Settings() {
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
               {NAV_ITEMS.map(({ id, label }) => (
-                <CratePill
+                <FilterChip
                   key={id}
                   active={section === id}
                   onClick={() => setSection(id)}
                 >
                   {label}
-                </CratePill>
+                </FilterChip>
               ))}
             </div>
           </div>
@@ -687,23 +689,19 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
           <FieldRow label="Status">
             <div className="flex items-center gap-3">
               {worker && worker.running_tasks.length > 0 ? (
-                <Badge className="border-primary/30 bg-primary/15 text-[10px] text-primary">
+                <Badge className="border-primary/30 bg-primary/15 text-primary">
                   <Activity size={10} className="mr-1" />
                   {worker.running_tasks.length} running
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="text-[10px]">
-                  Idle
-                </Badge>
+                <Badge variant="secondary">Idle</Badge>
               )}
               {pendingTasks > 0 && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {pendingTasks} pending
-                </Badge>
+                <Badge variant="secondary">{pendingTasks} pending</Badge>
               )}
               {dbHeavyGate &&
                 (dbHeavyGate.active > 0 || dbHeavyGate.pending > 0) && (
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary">
                     DB-heavy {dbHeavyGate.active}/{dbHeavyGate.pending}
                   </Badge>
                 )}
@@ -727,9 +725,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
                   <Loader2 size={10} className="animate-spin text-primary" />
                   <span className="font-mono">{t.type}</span>
                   <span className="text-white/20">{t.id}</span>
-                  <Badge variant="outline" className="px-1 py-0 text-[9px]">
-                    {t.pool}
-                  </Badge>
+                  <Badge variant="outline">{t.pool}</Badge>
                 </div>
               ))}
             </div>
@@ -1073,7 +1069,7 @@ function DownloadWindowCard() {
         {policy && (
           <FieldRow label="Current status">
             <Badge
-              className={`text-[10px] ${
+              className={`${
                 policy.downloads_allowed_now
                   ? "bg-accent-action/10 text-accent-action-hi border-accent-action/20"
                   : "bg-state-warning/10 text-state-warning-text border-state-warning/20"
@@ -1250,10 +1246,7 @@ function SchedulesSection({
                 }
               />
               <span className="text-xs text-muted-foreground">min</span>
-              <Badge
-                variant={active ? "default" : "secondary"}
-                className="text-[10px]"
-              >
+              <Badge variant={active ? "default" : "secondary"}>
                 {active ? "Active" : "Off"}
               </Badge>
               <Button
@@ -1427,10 +1420,7 @@ function EnrichmentSection({
               disabled={savingPaths}
               ariaLabel="LLM refinement"
             />
-            <Badge
-              variant={llmRefinementEnabled ? "default" : "secondary"}
-              className="text-[10px]"
-            >
+            <Badge variant={llmRefinementEnabled ? "default" : "secondary"}>
               {llmRefinementEnabled ? "Enabled" : "Disabled"}
             </Badge>
             {savingPaths ? (
@@ -1527,11 +1517,7 @@ function EnrichmentSection({
         >
           <div className="flex flex-wrap gap-1.5">
             {audioExts.map((ext) => (
-              <Badge
-                key={ext}
-                variant="secondary"
-                className="text-xs gap-1 font-mono"
-              >
+              <Badge key={ext} variant="secondary" className="gap-1">
                 {ext}
                 <button
                   type="button"
@@ -1624,10 +1610,7 @@ function NotificationsSection({
       >
         <FieldRow label="Enabled">
           <Toggle checked={enabled} onChange={setEnabled} />
-          <Badge
-            variant={enabled ? "default" : "secondary"}
-            className="text-[10px]"
-          >
+          <Badge variant={enabled ? "default" : "secondary"}>
             {enabled ? "Active" : "Disabled"}
           </Badge>
         </FieldRow>
@@ -1886,12 +1869,7 @@ function AuditSection() {
                       {formatTimestamp(entry.timestamp)}
                     </TableCell>
                     <TableCell className="py-1.5">
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-mono"
-                      >
-                        {entry.action}
-                      </Badge>
+                      <Badge variant="outline">{entry.action}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-1.5">
                       {entry.target_type}

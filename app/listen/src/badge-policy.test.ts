@@ -7,7 +7,10 @@ const SOURCE_ROOT = resolve(process.cwd(), "src");
 const SHARED_DOMAIN_ROOT = resolve(process.cwd(), "../shared/ui/domain");
 const RECIPES_PATH = resolve(process.cwd(), "../shared/ui/tokens/recipes.css");
 const IGNORED_DIRECTORIES = new Set(["dist", "node_modules"]);
-const BADGE_COMPONENT_TAG = /<(CrateBadge|CratePill|CrateChip)(?=[\s>])/g;
+const BADGE_COMPONENT_TAG =
+  /<(InfoBadge|FilterChip|CrateBadge|CratePill|CrateChip)(?=[\s>])/g;
+const INFORMATIVE_TYPE_OVERRIDE =
+  /(?:^|\s)(?:font-(?:sans|mono|normal|medium|bold)|text-(?:\[\d[^\]]*\]|xs|sm|base|badge|label|micro)|(?:p[xytrbl]?|h|min-h|max-h|leading|rounded)-[\w.[\]-]+)/;
 const PLAIN_TAG = /<(span|div)(?=[\s>])/g;
 const BADGE_COMPONENT_FORBIDDEN_CLASS =
   /\b(?:uppercase|tracking-[\w[\].-]+|text-accent-action|rounded-full)\b/;
@@ -91,7 +94,11 @@ function findBadgeOffenders(file: string, source: string): Offender[] {
 
   for (const match of source.matchAll(BADGE_COMPONENT_TAG)) {
     const classes = classLiterals(tagAttributes(source, match.index));
-    if (!BADGE_COMPONENT_FORBIDDEN_CLASS.test(classes)) continue;
+    if (
+      !BADGE_COMPONENT_FORBIDDEN_CLASS.test(classes) &&
+      !(match[1] === "InfoBadge" && INFORMATIVE_TYPE_OVERRIDE.test(classes))
+    )
+      continue;
     offenders.push({
       key: `${file}:${match[1]}`,
       location: `${file}:${lineOf(source, match.index)}`,
@@ -143,6 +150,7 @@ describe("badge policy", () => {
       <div className="home-replay-badge inline-flex rounded-full px-3 py-1 text-xs uppercase">DNA</div>
       <CratePill tone="accent" className="px-3 uppercase tracking-eyebrow">Show</CratePill>
       <CrateBadge className="text-accent-action">Smart</CrateBadge>
+      <InfoBadge className="py-0 text-[10px]">Tiny</InfoBadge>
     `;
 
     expect(
@@ -150,6 +158,7 @@ describe("badge policy", () => {
     ).toEqual([
       "fixture.tsx:CratePill",
       "fixture.tsx:CrateBadge",
+      "fixture.tsx:InfoBadge",
       "fixture.tsx:hand-made",
       "fixture.tsx:hand-made",
     ]);
@@ -166,7 +175,7 @@ describe("badge policy", () => {
     expect(findBadgeOffenders("fixture.tsx", allowed)).toEqual([]);
   });
 
-  it("renders badges through CrateBadge instead of hand-made pills", () => {
+  it("renders badges through InfoBadge instead of hand-made pills", () => {
     const offenders = scanAll().filter(
       ({ key }) => !HAND_MADE_BADGE_ALLOWLIST[key],
     );
@@ -174,13 +183,14 @@ describe("badge policy", () => {
     expect(offenders.map(({ location }) => location)).toEqual([]);
   }, 15_000);
 
-  it("keeps badge styling in the shared crate-badge recipe", () => {
+  it("keeps badge styling in the shared crate-info-badge recipe", () => {
     const selectors = badgeRecipeSelectors(readFileSync(RECIPES_PATH, "utf8"));
 
     expect(
       selectors.filter(
         (name) =>
-          name !== "crate-badge" &&
+          name !== "crate-info-badge" &&
+          name !== "crate-form-chip" &&
           name !== "genre-pill" &&
           !name.startsWith("quality-badge") &&
           !BADGE_RECIPE_ALLOWLIST[name],

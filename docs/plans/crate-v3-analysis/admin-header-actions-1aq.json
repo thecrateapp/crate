@@ -1,0 +1,614 @@
+{
+  "checkpoint": "1AQ local, no commit",
+  "scope": "18 Admin pages already present in the approved icon-retirement scope; no Listen/Desktop or unreviewed detail-page migration",
+  "method": "All18inventoried consumers migrated after explicit Diego authorization. AST before/after audit preserves non-render code, hooks/API, callbacks and all existing capability/render gates. Browser evidence covers actual page specimens; no live/native/canonical certification.",
+  "counts": {
+    "migrated": 17,
+    "read-only-layout": 1,
+    "actionSites": 38,
+    "playlistRowActions": 3
+  },
+  "pages": [
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "headerLine": 916,
+      "sourceSha256": "9c9b9d7ca68a8d082ddf9e5cb73f9bf82022011af30bfe7066f30fd94dce644c",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Duplicate",
+          "line": 928,
+          "glyphs": [
+            "Copy"
+          ],
+          "markers": [
+            "editor-duplicate-action"
+          ]
+        },
+        {
+          "label": "Preview",
+          "line": 935,
+          "glyphs": [
+            "Loader2",
+            "Eye"
+          ],
+          "markers": [
+            "editor-preview",
+            "editor-preview-action"
+          ]
+        },
+        {
+          "label": "smartRulesChanged ? \"Save + generate\" : \"Generate\"",
+          "line": 956,
+          "glyphs": [
+            "Loader2",
+            "ListRestart"
+          ],
+          "markers": [
+            "editor-generate",
+            "editor-generate-action"
+          ]
+        },
+        {
+          "label": "Save changes",
+          "line": 976,
+          "glyphs": [
+            "Loader2",
+            "Save"
+          ],
+          "markers": [
+            "editor-save",
+            "editor-save-action"
+          ]
+        }
+      ],
+      "notes": "Approved current reference. Back remains outside identity; icon-only back is a proposal from the subsequent question, not an applied change.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "headerLine": 142,
+      "sourceSha256": "2adbd2090b0cd7d6e9117bd96d5c86f9c4d96e9d37c20a4b82c3f1b7fcfa1e75",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 146,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        },
+        {
+          "label": "Maintenance",
+          "line": 156,
+          "glyphs": [
+            "Wrench"
+          ],
+          "markers": [
+            "header-maintenance"
+          ]
+        }
+      ],
+      "notes": "Refresh reads ops snapshot; Maintenance opens distinct sync/rebuild/wipe workflows and keeps capability gates.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "headerLine": 383,
+      "sourceSha256": "239afbe127e363acc703bb16d11e5fb8704310c3f9d17ddcfb3d4c368b842ae2",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 390,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        },
+        {
+          "label": "Backfill fingerprints",
+          "line": 399,
+          "glyphs": [
+            "Loader2",
+            "Fingerprint"
+          ],
+          "markers": [
+            "analysis-action-fingerprints",
+            "header-backfill-fingerprints"
+          ]
+        },
+        {
+          "label": "Recompute popularity",
+          "line": 426,
+          "glyphs": [
+            "Loader2",
+            "TrendingUp"
+          ],
+          "markers": [
+            "analysis-action-popularity",
+            "header-recompute-popularity"
+          ]
+        },
+        {
+          "label": "Recompute bliss",
+          "line": 453,
+          "glyphs": [
+            "Loader2",
+            "Orbit"
+          ],
+          "markers": [
+            "analysis-action-bliss",
+            "header-recompute-bliss"
+          ]
+        },
+        {
+          "label": "Re-analyze all",
+          "line": 480,
+          "glyphs": [
+            "Loader2",
+            "AudioLines"
+          ],
+          "markers": [
+            "analysis-action-analysis",
+            "header-re-analyze-all"
+          ]
+        }
+      ],
+      "notes": "Four queued library jobs must not collapse into identical refresh arrows.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "headerLine": 963,
+      "sourceSha256": "299228ab975e73ca25379e634f160ffbe8a4257bcb156de29cc8e8b539c1477b",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh metrics",
+          "line": 979,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh-metrics"
+          ]
+        }
+      ],
+      "notes": "Metrics-window segmented selection remains a separate filter, not a page action.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "headerLine": 235,
+      "sourceSha256": "ddb87e50aab3ad69c40564b889c79679c8996f2daf794a5a8b53d1f566d7653e",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 238,
+          "glyphs": [
+            "Loader2",
+            "RefreshCw"
+          ],
+          "markers": [
+            "trash-refresh-loading",
+            "header-refresh"
+          ]
+        },
+        {
+          "label": "Empty trash",
+          "line": 260,
+          "glyphs": [
+            "Loader2",
+            "Trash2"
+          ],
+          "markers": [
+            "trash-empty-loading",
+            "header-empty-trash"
+          ]
+        }
+      ],
+      "notes": "Final bulk deletion/ConfirmDialog remains explicit; row restore/delete is a separate inventory.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "headerLine": 87,
+      "sourceSha256": "3bcfa7ece7c76e714513c2cd19e4387ed575687de9d43cbe5fc821fd05a08eb2",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 90,
+          "glyphs": [
+            "Loader2",
+            "RefreshCw"
+          ],
+          "markers": [
+            "contributions-refresh-loading",
+            "header-refresh"
+          ]
+        }
+      ],
+      "notes": "Preserve loading, disabled and request handler.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "headerLine": 339,
+      "sourceSha256": "ac8733fc7d354a96209b9a7dbbcca8c1c1cc6e3e09ef62b6f87d20e0e6578123",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 346,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        },
+        {
+          "label": "recomputing || completenessTaskId !== null\n                    ? \"Recomputing...\"\n                    : \"Recompute gaps\"",
+          "line": 352,
+          "glyphs": [
+            "Loader2",
+            "ChartNoAxesCombined"
+          ],
+          "markers": [
+            "discovery-recompute-loading",
+            "header-recompute-gaps"
+          ]
+        },
+        {
+          "label": "Check releases",
+          "line": 377,
+          "glyphs": [
+            "Loader2",
+            "Radar"
+          ],
+          "markers": [
+            "discovery-check-loading",
+            "header-check-releases"
+          ]
+        }
+      ],
+      "notes": "Recompute/check requests have distinct busy states and effects.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "headerLine": 163,
+      "sourceSha256": "aae2970e9fc6ae1b7cdd6e6e38d80db02de5ec8a576a84b1bde355c5fc176eaf",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 166,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        },
+        {
+          "label": "Reconcile",
+          "line": 176,
+          "glyphs": [
+            "Loader2",
+            "GitMerge"
+          ],
+          "markers": [
+            "catalog-incremental-loading",
+            "header-reconcile"
+          ]
+        },
+        {
+          "label": "Full rebuild",
+          "line": 196,
+          "glyphs": [
+            "Loader2",
+            "DatabaseBackup"
+          ],
+          "markers": [
+            "catalog-full-loading",
+            "header-full-rebuild"
+          ]
+        }
+      ],
+      "notes": "Preserve canManage and independent incremental/full task semantics.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "headerLine": 488,
+      "sourceSha256": "3400700031e49690ccd39a29ef784ec2ff0dd417364868e49303667e85466745",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 491,
+          "glyphs": [
+            "Loader2",
+            "RefreshCw"
+          ],
+          "markers": [
+            "translations-refresh",
+            "header-refresh"
+          ]
+        }
+      ],
+      "notes": "Editor save/export/publish destinations remain named within their own surfaces.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "headerLine": 316,
+      "sourceSha256": "ed19fe79dcf5619aa32a9237d82ed6069af14a9ee2a244657d32a96830f0455b",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "autoRefresh ? \"Pause live\" : \"Resume live\"",
+          "line": 323,
+          "glyphs": [
+            "Pause",
+            "Play"
+          ],
+          "markers": [
+            "live-pause",
+            "live-resume"
+          ]
+        },
+        {
+          "label": "Refresh",
+          "line": 341,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        }
+      ],
+      "notes": "Keep live/frozen state readable and both accessible names distinct; filters stay separate.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "headerLine": 587,
+      "sourceSha256": "d85d2fff2b1c486b64aea7d5aba5f83d6cca90e4abf9beb0c7463e1c9b967100",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Refresh",
+          "line": 593,
+          "glyphs": [
+            "RefreshCw"
+          ],
+          "markers": [
+            "header-refresh"
+          ]
+        }
+      ],
+      "notes": "Service restart and per-service logs/state are different controls outside the page toolbar.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "headerLine": 638,
+      "sourceSha256": "8ec95b66ca9ac80bc746a740e96a61b8a96e92a11ad7ea780e1acd06ed486280",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "scanning ? \"Scanning...\" : \"Run scan\"",
+          "line": 643,
+          "glyphs": [
+            "Loader2",
+            "ScanSearch"
+          ],
+          "markers": [
+            "health-scan-loading",
+            "header-run-scan"
+          ]
+        }
+      ],
+      "notes": "Starts a real scan; preserve scanning text/status, capability gate and busy state.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "headerLine": 212,
+      "sourceSha256": "fac743360ff077b677b3a7be21b8d9426a81ad254a584799a7040dadbaaad7e7",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Sync collection",
+          "line": 220,
+          "glyphs": [
+            "Loader2",
+            "FolderSync"
+          ],
+          "markers": [
+            "bandcamp-sync-loading",
+            "header-sync-collection"
+          ]
+        },
+        {
+          "label": "Refresh Radar",
+          "line": 242,
+          "glyphs": [
+            "Radar"
+          ],
+          "markers": [
+            "header-refresh-radar"
+          ]
+        },
+        {
+          "label": "Backfill URLs",
+          "line": 255,
+          "glyphs": [
+            "Loader2",
+            "Link"
+          ],
+          "markers": [
+            "bandcamp-backfill-loading",
+            "header-backfill-urls"
+          ]
+        }
+      ],
+      "notes": "All three queue work. Refresh Radar is not a snapshot refresh; connection/task state remains legible.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "headerLine": 538,
+      "sourceSha256": "f2dcbe280caed3509d7942329341ebef09cda1bcc087551a10f063f4e3fe31a5",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Timeline",
+          "line": 550,
+          "glyphs": [
+            "List"
+          ],
+          "markers": [
+            "header-timeline"
+          ]
+        },
+        {
+          "label": "Grid",
+          "line": 560,
+          "glyphs": [
+            "LayoutGrid"
+          ],
+          "markers": [
+            "header-grid"
+          ]
+        },
+        {
+          "label": "checking ? \"Checking…\" : \"Check now\"",
+          "line": 572,
+          "glyphs": [
+            "Loader2",
+            "Radar"
+          ],
+          "markers": [
+            "releases-check-loading",
+            "header-check-now"
+          ]
+        }
+      ],
+      "notes": "View selection needs aria-pressed/selected state; check queues release work and retains capability gating.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "headerLine": 856,
+      "sourceSha256": "d07aae4e09863092e5fa86ebeffa898eb66eb28f09ce8cfe83e3a014d766bdfe",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Invite user",
+          "line": 861,
+          "glyphs": [
+            "MailPlus"
+          ],
+          "markers": [
+            "header-invite-user"
+          ]
+        },
+        {
+          "label": "Add user",
+          "line": 870,
+          "glyphs": [
+            "UserPlus"
+          ],
+          "markers": [
+            "header-add-user"
+          ]
+        }
+      ],
+      "notes": "Both open different dialogs; do not hide their distinction behind two identical Plus glyphs.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "headerLine": 303,
+      "sourceSha256": "17b119e7ae2892d3be9a01f7741bba09f2a741012ff15f2d567ae05e7d5a18e5",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "Sync shows",
+          "line": 307,
+          "glyphs": [
+            "Loader2",
+            "CalendarSync"
+          ],
+          "markers": [
+            "upcoming-sync",
+            "header-sync-shows"
+          ]
+        },
+        {
+          "label": "Clear caches",
+          "line": 329,
+          "glyphs": [
+            "Eraser"
+          ],
+          "markers": [
+            "header-clear-caches"
+          ]
+        }
+      ],
+      "notes": "Current List / Calendar view controls already use glyphs and remain separate from page actions.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "headerLine": 370,
+      "sourceSha256": "fee09c991369bedad4952fbb2273b091cb4f8de49b2a91226d1526e8a4de21a1",
+      "category": "migrated",
+      "actions": [
+        {
+          "label": "New static",
+          "line": 373,
+          "glyphs": [
+            "FilePlus2"
+          ],
+          "markers": [
+            "header-new-static"
+          ]
+        },
+        {
+          "label": "New smart",
+          "line": 387,
+          "glyphs": [
+            "ListPlus"
+          ],
+          "markers": [
+            "header-new-smart"
+          ]
+        }
+      ],
+      "notes": "Two different creation modes and their toggled state need recognition; no duplicate Plus icons.",
+      "implementation": "PageHeaderLayout (direct or OpsPageHero compactActions) + PageHeaderActions + PageHeaderAction; shared ghost icon-lg44/Tooltip."
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "headerLine": 55,
+      "sourceSha256": "d1fc97fa2e78da65cbb19610d147e9fc831db60b5ab631bb0ab520ab0240bd62",
+      "category": "read-only-layout",
+      "actions": [],
+      "notes": "Read-only, code-defined presets; do not invent editing/creation or backend capabilities.",
+      "implementation": "PageHeaderLayout; no invented action or toolbar."
+    }
+  ]
+}

@@ -85,8 +85,10 @@ export function analyzeAdminConsistency(path, source, debt = [], roles = true) {
         for (const item of imports.elements) {
           const name = (item.propertyName ?? item.name).text;
           if (
-            node.moduleSpecifier.text === "@crate/ui/primitives/CrateBadge" &&
-            name === "CrateChip"
+            (node.moduleSpecifier.text === "@crate/ui/primitives/CrateBadge" &&
+              name === "CrateChip") ||
+            (node.moduleSpecifier.text === "@crate/ui/primitives/InfoBadge" &&
+              name === "InfoBadge")
           )
             chips.add(item.name.text);
           if (
@@ -208,7 +210,7 @@ export function analyzeAdminConsistency(path, source, debt = [], roles = true) {
             issue(node, "compact-display", classes);
         }
         if (
-          chips.has(name) &&
+          (chips.has(name) || badges.has(name)) &&
           /(?:^|\s)(?:text-(?:\[(?:\d|var\(--text)[^\]]*\]|xs|sm|base|lg|badge|label|micro)|(?:p[xytrbl]?|h|min-h|max-h|leading|rounded|font)-)/.test(
             classes,
           )

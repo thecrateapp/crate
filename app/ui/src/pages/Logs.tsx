@@ -1,10 +1,21 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Loader2,
+  Pause,
+  Play,
+  Search,
+} from "lucide-react";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { Loader2, Pause, Play, Search } from "lucide-react";
 
 import {
   OpsPageHero,
@@ -12,8 +23,7 @@ import {
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
-import { Button } from "@crate/ui/shadcn/button";
+
 import { Input } from "@crate/ui/shadcn/input";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
@@ -142,8 +152,8 @@ function LogRow({ entry }: { entry: LogEntry }) {
           {entry.message}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/35">
-          <CrateChip className="font-sans">{entry.category}</CrateChip>
-          <CrateChip className="font-sans">{entry.worker_id}</CrateChip>
+          <InfoBadge>{entry.category}</InfoBadge>
+          <InfoBadge>{entry.worker_id}</InfoBadge>
           {entry.task_id ? (
             <Link
               to={`/tasks?task=${entry.task_id}`}
@@ -306,51 +316,52 @@ export function Logs() {
       <OpsPageHero
         title="Logs"
         description="Live worker stream for enrichment, analysis, sync and system activity. Built for triage, not archaeology."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={() => setAutoRefresh((current) => !current)}
-            >
-              {autoRefresh ? (
-                <Pause
-                  data-admin-ux="live-pause"
+          <PageHeaderActions>
+            <>
+              <PageHeaderAction
+                label={autoRefresh ? "Pause live" : "Resume live"}
+                onClick={() => setAutoRefresh((current) => !current)}
+              >
+                {autoRefresh ? (
+                  <Pause
+                    data-admin-ux="live-pause"
+                    aria-hidden="true"
+                    size={14}
+                  />
+                ) : (
+                  <Play
+                    data-admin-ux="live-resume"
+                    aria-hidden="true"
+                    size={14}
+                  />
+                )}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Refresh"
+                onClick={() => void fetchSnapshot(true)}
+              >
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
                   aria-hidden="true"
-                  size={14}
                 />
-              ) : (
-                <Play
-                  data-admin-ux="live-resume"
-                  aria-hidden="true"
-                  size={14}
-                />
-              )}
-              {autoRefresh ? "Pause live" : "Resume live"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={() => void fetchSnapshot(true)}
-            >
-              Refresh
-            </Button>
-          </>
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CrateChip active>{visibleLogs.length} lines</CrateChip>
-        <CrateChip>
+        <InfoBadge active>{visibleLogs.length} lines</InfoBadge>
+        <InfoBadge>
           {summary.onlineWorkers}/{workers.length} workers online
-        </CrateChip>
+        </InfoBadge>
         {summary.errors > 0 ? (
-          <CrateChip tone="warning">{summary.errors} errors</CrateChip>
+          <InfoBadge tone="warning">{summary.errors} errors</InfoBadge>
         ) : null}
         {summary.warnings > 0 ? (
-          <CrateChip tone="warning">{summary.warnings} warnings</CrateChip>
+          <InfoBadge tone="warning">{summary.warnings} warnings</InfoBadge>
         ) : null}
-        <CrateChip>{autoRefresh ? "Live mode" : "Frozen snapshot"}</CrateChip>
+        <InfoBadge>{autoRefresh ? "Live mode" : "Frozen snapshot"}</InfoBadge>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -482,15 +493,15 @@ export function Logs() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
               {level ? (
-                <CrateChip>
+                <InfoBadge>
                   <SeverityMeter level={level} label={level} />
-                </CrateChip>
+                </InfoBadge>
               ) : null}
-              {category ? <CrateChip>{category}</CrateChip> : null}
-              {workerId ? <CrateChip>{workerId}</CrateChip> : null}
-              {search ? <CrateChip>{search}</CrateChip> : null}
+              {category ? <InfoBadge>{category}</InfoBadge> : null}
+              {workerId ? <InfoBadge>{workerId}</InfoBadge> : null}
+              {search ? <InfoBadge>{search}</InfoBadge> : null}
               {!level && !category && !workerId && !search ? (
-                <CrateChip>All filters open</CrateChip>
+                <InfoBadge>All filters open</InfoBadge>
               ) : null}
             </div>
             <div className="text-xs text-white/35">

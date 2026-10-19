@@ -34,7 +34,10 @@ describe("Trash text controls and retained UX", () => {
     expect(screen.getByRole("heading", { name: "Library Trash" })).toHaveClass(
       "font-display",
     );
-    expect(document.querySelector("svg:not(.lucide-loader-circle)")).toBeNull();
+    expect(document.querySelectorAll("svg")).toHaveLength(2);
+    expect(
+      document.querySelectorAll('svg[data-admin-ux^="header-"]'),
+    ).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(2);
     expect(screen.getByText(first.quarantine_path)).toBeVisible();

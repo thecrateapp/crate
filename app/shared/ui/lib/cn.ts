@@ -36,6 +36,8 @@ const crateTwMerge = extendTailwindMerge({
       "font-size": [
         {
           text: [
+            "info-badge",
+            "filter-chip",
             "badge",
             "counter",
             "micro",

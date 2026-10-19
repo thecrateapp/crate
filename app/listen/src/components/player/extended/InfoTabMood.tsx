@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useTranslation } from "react-i18next";
 import { Sparkles } from "@crate/ui/icons";
 
@@ -5,7 +6,6 @@ import type { TrackInfo } from "@/lib/track-info";
 
 import { MetricBar, SectionCard } from "./InfoTabPrimitives";
 import type { MoodEntry } from "./info-tab-data";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function InfoTabMood({
   info,
@@ -28,9 +28,9 @@ export function InfoTabMood({
       {topMoods.length ? (
         <div className="flex flex-wrap gap-2">
           {topMoods.map((mood) => (
-            <CrateBadge key={mood.label} size="md">
+            <InfoBadge key={mood.label}>
               {mood.label} {Math.round(mood.value * 100)}%
-            </CrateBadge>
+            </InfoBadge>
           ))}
         </div>
       ) : null}

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Users, Gauge } from "@crate/ui/icons";
@@ -7,7 +8,6 @@ import { Link } from "react-router";
 import type { StatsPageController } from "@/pages/use-stats-page-controller";
 import type { StatsAffinity } from "@/components/stats/stats-model";
 import { cn } from "@/lib/utils";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export function StatsEmptyState({ t }: { t: StatsPageController["t"] }) {
   return (
@@ -77,16 +77,14 @@ export function AffinityCard({
             </p>
           </div>
         </div>
-        <CrateBadge size="md" icon={Gauge}>
+        <InfoBadge icon={Gauge}>
           {t(bandKey, { defaultValue: bandFallback })}
-        </CrateBadge>
+        </InfoBadge>
       </div>
       {reasons.length ? (
         <div className="mt-5 flex flex-wrap gap-2">
           {reasons.map((reason) => (
-            <CrateBadge key={reason} size="md">
-              {reason}
-            </CrateBadge>
+            <InfoBadge key={reason}>{reason}</InfoBadge>
           ))}
         </div>
       ) : null}

@@ -1,8 +1,9 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CRATE_ICON_SIZE, Clock, Disc } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { PageHero } from "@crate/ui/domain/hero";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
@@ -118,9 +119,9 @@ export function AlbumHero({
         isPreRelease || canPersistAlbum ? (
           <>
             {isPreRelease ? (
-              <CrateBadge size="md" icon={Clock}>
+              <InfoBadge icon={Clock}>
                 {t("radar.release.preRelease")}
-              </CrateBadge>
+              </InfoBadge>
             ) : null}
             {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
           </>

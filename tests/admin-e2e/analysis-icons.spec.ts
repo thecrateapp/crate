@@ -42,7 +42,10 @@ for (const width of [1440, 768, 390]) {
           /Bricolage Grotesque/,
         );
       }
-      await expect(main.locator("svg")).toHaveCount(0);
+      await expect(main.locator("svg")).toHaveCount(5);
+      await expect(main.locator('svg[data-admin-ux^="header-"]')).toHaveCount(
+        5,
+      );
       await expect(
         main.getByText("1,200 tracks", { exact: true }),
       ).toBeVisible();

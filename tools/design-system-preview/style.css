@@ -5,6 +5,10 @@
 @import "tailwindcss";
 @import "../../app/listen/src/components/player/bar/player-seek-bar.css";
 @source "./main.tsx";
+@source "./badge-normalization-checkpoint.tsx";
+@source "./badge-normalization-demo.tsx";
+@source "../../app/shared/ui/domain/offline/OfflineBadge.tsx";
+@source "../../app/listen/src/components/player/bar/QualityBadge.tsx";
 @source "./admin-icon-checkpoint.tsx";
 @source "./admin-navigation-checkpoint.tsx";
 @source "./admin-controls-checkpoint.tsx";
@@ -73,6 +77,8 @@
 @source "../../app/listen/src/components/settings/InterfacePreferencesSection.tsx";
 @source "../../app/shared/ui/primitives/HairlineList.tsx";
 @source "../../app/shared/ui/primitives/CrateBadge.tsx";
+@source "../../app/shared/ui/primitives/InfoBadge.tsx";
+@source "../../app/shared/ui/primitives/FilterChip.tsx";
 @source "../../app/shared/ui/domain/genres/GenrePill.tsx";
 @source "../../app/shared/ui/shadcn/button.tsx";
 @source "../../app/shared/ui/shadcn/input.tsx";
@@ -572,17 +578,6 @@ footer p {
 }
 .rows-preview {
   margin-top: 30px !important;
-  font-size: 12px;
-}
-.rows-preview button,
-.rows-preview a {
-  padding-left: 12px;
-  padding-right: 12px;
-  text-align: left;
-}
-.rows-preview [data-muted] {
-  padding-left: 12px;
-  padding-right: 12px;
 }
 .row-description {
   font-size: 11px;
@@ -643,9 +638,6 @@ footer p {
   }
   .next-specimen .specimen-title > span {
     display: none;
-  }
-  .rows-preview {
-    font-size: 11px;
   }
 }
 
@@ -782,12 +774,6 @@ footer p {
 }
 .focus-rows {
   margin-bottom: 34px !important;
-  font-size: 12px;
-}
-.focus-rows button {
-  padding-left: 12px;
-  padding-right: 12px;
-  text-align: left;
 }
 .selection-example {
   font-family: var(--font-display-stack);

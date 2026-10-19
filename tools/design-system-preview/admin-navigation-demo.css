@@ -28,5 +28,6 @@ body {
 @source "./admin-upcoming-demo.tsx";
 
 @source "./admin-playlists-demo.tsx";
+@source "./admin-playlist-editor-demo.tsx";
 
 @source "./row-interaction-sample.tsx";

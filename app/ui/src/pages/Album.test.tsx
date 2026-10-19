@@ -151,6 +151,10 @@ describe("SplitAlbumDialog", () => {
       />,
     );
 
+    expect(screen.getByText("First Song")).toHaveAttribute(
+      "data-slot",
+      "form-field-value",
+    );
     await userEvent.type(screen.getByRole("textbox"), "New Album");
     await userEvent.click(screen.getByLabelText(/First Song/));
     await userEvent.click(screen.getByRole("button", { name: "Split Album" }));

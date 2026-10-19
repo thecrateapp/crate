@@ -158,7 +158,7 @@ export function TagEditor({
         <div className="flex-1">
           <div className="flex gap-1.5 flex-wrap mb-2">
             {currentGenres.map((g) => (
-              <Badge key={g} variant="default" className="text-xs gap-1 pr-1">
+              <Badge key={g} variant="default" className="gap-1">
                 {g}
                 <button
                   type="button"
@@ -183,7 +183,7 @@ export function TagEditor({
                 <Badge
                   key={g}
                   variant="outline"
-                  className="text-[10px] cursor-pointer hover:bg-primary/20"
+                  className="cursor-pointer hover:bg-primary/20"
                   onClick={() => addGenre(g)}
                 >
                   + {g}

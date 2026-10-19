@@ -37,8 +37,8 @@ describe("PlaylistCard tile", () => {
       />,
     );
 
-    const badge = screen.getByText("Featured");
-    expect(badge).toHaveClass("crate-badge");
+    const badge = screen.getByText("Featured").closest(".crate-info-badge");
+    expect(badge).toHaveClass("crate-info-badge");
     expect(badge).toHaveAttribute("data-surface", "overlay");
   });
 

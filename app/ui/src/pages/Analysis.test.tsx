@@ -125,10 +125,13 @@ describe("Analysis typographic controls", () => {
     expect(loading).toHaveAttribute("aria-busy", "true");
     expect(loading.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
-  it("uses text for actions, coverage, sections and recent outputs", () => {
+  it("keeps named header actions and text coverage, sections and recent outputs", () => {
     const { container } = renderWithAdminProviders(<Analysis />);
     expect(screen.getByRole("heading", { name: "Analysis" })).toBeVisible();
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(5);
+    expect(
+      container.querySelectorAll('svg[data-admin-ux^="header-"]'),
+    ).toHaveLength(5);
     expect(screen.getByText("1,200 tracks").tagName).toBe("SPAN");
     for (const text of [
       "75% audio covered",
@@ -253,7 +256,15 @@ describe("Analysis typographic controls", () => {
       for (const [label] of actions)
         expect(screen.getByRole("button", { name: label })).toBeEnabled();
       expect(action).not.toHaveAttribute("aria-busy");
-      expect(action.querySelector("svg")).toBeNull();
+      if (action.closest('[data-slot="admin-page-header"]')) {
+        expect(action.querySelector("svg")).toHaveAttribute(
+          "aria-hidden",
+          "true",
+        );
+        expect(
+          action.querySelector("svg")?.getAttribute("data-admin-ux"),
+        ).toMatch(/^header-/);
+      } else expect(action.querySelector("svg")).toBeNull();
       expect(refresh).not.toHaveBeenCalled();
       const delayed = vi
         .mocked(window.setTimeout)

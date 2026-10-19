@@ -1,9 +1,10 @@
 # Crate V3 — auditoría de desviaciones al cerrar 1AP
 
-Fecha: 2026-10-19. Auditoría inicial conservada; correcciones A1–A4/A6–A8 autorizadas e implementadas localmente en 1AP.
+Fecha: 2026-10-19. Auditoría inicial conservada; correcciones A1–A4/A6–A8 autorizadas, implementadas y publicadas en 1AP.
 Estado vigente: [tabla única de continuación](2026-10-19-crate-v3-current-state.md).
-Base publicada: `ba63836d2a23bb774832c1703eab4e4116e1468f` (1AO).
-1AP permanece local, sin commit, pendiente de revisión de Diego.
+Base de la auditoría original: `ba63836d2a23bb774832c1703eab4e4116e1468f` (1AO).
+1AP aprobado y publicado como `d30b1c0244e5f57026dea3f27aacae815c04b41b`; 1AQ PlaylistEditor local en revisión.
+Las disposiciones y observaciones originales siguientes conservan su fecha.
 
 ## Resultado
 

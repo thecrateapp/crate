@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { TFunction } from "i18next";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -7,7 +8,6 @@ import type { JamRoom, JamTrackRequest } from "@/pages/jam-reducer";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { displayName } from "@/pages/jam-session-utils";
 import { Star, Users } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface JamMembersPanelProps {
   t: TFunction;
@@ -113,15 +113,14 @@ export function JamMembersPanel({
                 </div>
               </div>
             </div>
-            <CrateBadge
-              size="md"
+            <InfoBadge
               icon={member.user_id === room.host_user_id ? Star : Users}
               tone={member.user_id === room.host_user_id ? "accent" : "neutral"}
             >
               {member.user_id === room.host_user_id
                 ? t("jam.room.roles.host")
                 : t("jam.room.roles.collab")}
-            </CrateBadge>
+            </InfoBadge>
           </UserProfileLink>
         ))}
       </div>

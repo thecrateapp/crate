@@ -42,16 +42,29 @@ describe("cn", () => {
     expect(cn("leading-none", "leading-display")).toBe("leading-display");
   });
 
-  it.each(["eyebrow", "numeral-sm", "numeral-md", "numeral-lg", "numeral-xl"])(
-    "keeps the %s font size when its text colour is overridden",
-    (size) => {
-      expect(cn(`text-${size} text-text-subtle`, "text-text-primary")).toBe(
-        `text-${size} text-text-primary`,
-      );
-    },
-  );
+  it.each([
+    "info-badge",
+    "filter-chip",
+    "eyebrow",
+    "numeral-sm",
+    "numeral-md",
+    "numeral-lg",
+    "numeral-xl",
+  ])("keeps the %s font size when its text colour is overridden", (size) => {
+    expect(cn(`text-${size} text-text-subtle`, "text-text-primary")).toBe(
+      `text-${size} text-text-primary`,
+    );
+  });
 
-  it.each(["eyebrow", "numeral-sm", "numeral-md", "numeral-lg", "numeral-xl"])(
+  it.each([
+    "info-badge",
+    "filter-chip",
+    "eyebrow",
+    "numeral-sm",
+    "numeral-md",
+    "numeral-lg",
+    "numeral-xl",
+  ])(
     "resolves font-size conflicts for the %s token in either order",
     (size) => {
       expect(cn("text-lg", `text-${size}`)).toBe(`text-${size}`);

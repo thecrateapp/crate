@@ -52,7 +52,9 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     expect(screen.getByText("24")).toHaveClass("font-display");
     expect(screen.getByText("sample-run-20261018")).toHaveClass("font-mono");
     for (const button of screen.getAllByRole("button"))
-      expect(button).toHaveClass("min-h-11");
+      if (button.closest('[data-slot="admin-page-header"]'))
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+      else expect(button).toHaveClass("min-h-11");
     expect(mockApi.mock.calls.map(([path]) => path).sort()).toEqual(
       [statusUrl, runsUrl, duplicatesUrl].sort(),
     );

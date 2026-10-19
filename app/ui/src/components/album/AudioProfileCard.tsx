@@ -215,11 +215,7 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">Mood:</span>
               {topMoods.map(([mood, score]) => (
-                <Badge
-                  key={mood}
-                  variant="secondary"
-                  className="text-[11px] px-2 py-0.5"
-                >
+                <Badge key={mood} variant="secondary">
                   {mood}{" "}
                   <span className="text-muted-foreground ml-1">
                     {Math.round(score * 100)}%

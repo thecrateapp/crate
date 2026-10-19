@@ -22,7 +22,9 @@ export function AdminPlaylistsCheckpoint() {
       <p className="mt-6 text-sm text-text-muted">
         Página real con datos ficticios y acciones locales. Los filtros, reglas
         y creación conservan sus contratos. Listen mantiene sus portadas
-        actuales.
+        actuales. Enmienda local de 1AQ: Category, Match y Sort usan Select;
+        retirar una regla usa papelera. Pendiente de revisión en el grupo del
+        editor.
       </p>
       <iframe
         title="System Playlists real con datos de muestra"

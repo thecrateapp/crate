@@ -18,15 +18,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Contributions text and real contracts", () => {
-  it("uses a display heading and text refresh without idle glyphs", async () => {
+  it("uses a display heading and one precisely named compact refresh", async () => {
     renderWithAdminProviders(<Contributions />);
     await screen.findByText("Luz de octubre");
     expect(screen.getByRole("heading", { name: "Contributions" })).toHaveClass(
       "font-display",
     );
     const refresh = screen.getByRole("button", { name: "Refresh" });
-    expect(refresh).toHaveClass("min-h-11");
-    expect(document.querySelector("svg")).toBeNull();
+    expect(refresh).toHaveAttribute("data-size", "icon-lg");
+    expect(refresh).toHaveAttribute("data-variant", "ghost");
+    expect(refresh).toHaveAttribute("title", "Refresh");
+    expect(document.querySelectorAll("svg")).toHaveLength(1);
+    expect(refresh.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
     expect(mockApi).toHaveBeenCalledExactlyOnceWith(
       "/api/manage/contributions?limit=150",
     );
@@ -101,7 +107,11 @@ describe("Contributions text and real contracts", () => {
     await act(async () => resolve(fixture));
     expect(refresh).toBeEnabled();
     expect(refresh).toHaveAttribute("aria-busy", "false");
-    expect(document.querySelector("svg")).toBeNull();
+    expect(document.querySelectorAll("svg")).toHaveLength(1);
+    expect(refresh.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "header-refresh",
+    );
   });
 
   it("refreshes through the same GET from the keyboard", async () => {

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { CRATE_ICON_SIZE, Calendar, Play, Flame } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
@@ -16,7 +17,6 @@ import {
   UpcomingMonthGroup,
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface ArtistShowsSectionProps {
   shows: UpcomingItem[];
@@ -45,9 +45,9 @@ export function ArtistShowsSection({
             {t("artist.sections.shows")}
           </h2>
           {artistHotNow ? (
-            <CrateBadge size="md" icon={Flame}>
+            <InfoBadge icon={Flame}>
               {t("artist.sections.heavyRotation")}
-            </CrateBadge>
+            </InfoBadge>
           ) : null}
         </div>
 
@@ -55,9 +55,9 @@ export function ArtistShowsSection({
           <div className="artist-show-prep-surface rounded-panel border border-accent-action/15 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CrateBadge size="md" icon={Calendar}>
+                <InfoBadge icon={Calendar}>
                   {t("artist.sections.showPrep")}
-                </CrateBadge>
+                </InfoBadge>
                 <h3 className="mt-3 text-xl font-bold text-text-primary">
                   {nextAttendingShow.title}
                 </h3>

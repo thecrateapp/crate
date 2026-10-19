@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -11,7 +12,7 @@ import {
 } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { UserAvatar } from "@/components/social/UserAvatar";
 import { badgeTone, formatMinutes } from "@/pages/user-profile-model";
@@ -125,15 +126,13 @@ export function ProfileCardBody({
               </div>
             </div>
             {card.relationship_state.is_friend ? (
-              <CrateBadge icon={UserCheck}>
-                {t("profileHover.friend")}
-              </CrateBadge>
+              <InfoBadge icon={UserCheck}>{t("profileHover.friend")}</InfoBadge>
             ) : null}
           </div>
 
-          <CrateBadge size="md" icon={Star} className="mt-3">
+          <InfoBadge icon={Star} className="mt-3">
             {mainBadge(card, t)}
-          </CrateBadge>
+          </InfoBadge>
         </div>
 
         <div className="text-right">
@@ -187,13 +186,9 @@ export function ProfileCardBody({
       {card.badges.length ? (
         <div className="relative mt-3 flex flex-wrap gap-1.5">
           {card.badges.map((badge) => (
-            <CrateBadge
-              key={badge.key}
-              icon={Star}
-              tone={badgeTone(badge.tone)}
-            >
+            <InfoBadge key={badge.key} icon={Star} tone={badgeTone(badge.tone)}>
               {badge.label}
-            </CrateBadge>
+            </InfoBadge>
           ))}
         </div>
       ) : null}

@@ -128,7 +128,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
             key={type}
             variant="outline"
             className={cn(
-              "text-xs",
+              "",
               count > 0
                 ? (ISSUE_COLORS[type] ??
                     "text-state-warning-text border-state-warning/40")

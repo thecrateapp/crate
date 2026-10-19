@@ -1,8 +1,8 @@
 import { ChevronDown } from "lucide-react";
 import { Button } from "@crate/ui/shadcn/button";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { OpsPageHero, OpsPanel, OpsStatTile } from "./ops-surfaces";
 
@@ -150,4 +150,50 @@ it("preserves functional disclosure and loading glyphs supplied by action slots"
     "true",
   );
   expect(container.querySelectorAll("svg")).toHaveLength(2);
+});
+
+afterEach(cleanup);
+describe("OpsPageHero header layout opt-in", () => {
+  it("preserves the legacy contract for unreviewed consumers", () => {
+    const { container } = render(
+      <OpsPageHero
+        title="Tasks"
+        description="Existing description"
+        actions={<button>Existing action</button>}
+      >
+        <span>Existing status</span>
+      </OpsPageHero>,
+    );
+    expect(
+      container.querySelector('[data-slot="admin-page-header"]'),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Existing action" }).parentElement,
+    ).toHaveClass("xl:justify-end");
+    expect(screen.getByRole("heading", { name: "Tasks" })).toHaveClass(
+      "font-display",
+    );
+    expect(screen.getByText("Existing status")).toBeVisible();
+  });
+  it("opts reviewed pages into the common composition without dropping identity or actions", () => {
+    const { container } = render(
+      <OpsPageHero
+        compactActions
+        title="Analysis"
+        description="Existing description"
+        actions={<button>Existing action</button>}
+      >
+        <span>Existing status</span>
+      </OpsPageHero>,
+    );
+    const header = container.querySelector('[data-slot="admin-page-header"]')!;
+    expect(header).toContainElement(
+      screen.getByRole("button", { name: "Existing action" }),
+    );
+    expect(header).toContainElement(
+      screen.getByRole("heading", { name: "Analysis" }),
+    );
+    expect(header).toContainElement(screen.getByText("Existing description"));
+    expect(header).toContainElement(screen.getByText("Existing status"));
+  });
 });

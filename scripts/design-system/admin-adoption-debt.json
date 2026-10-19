@@ -11,7 +11,8 @@
     "app/ui/src/pages/Upcoming.tsx",
     "app/ui/src/pages/Bandcamp.tsx",
     "app/ui/src/pages/Analysis.tsx",
-    "app/ui/src/pages/Health.tsx"
+    "app/ui/src/pages/Health.tsx",
+    "app/ui/src/pages/PlaylistEditor.tsx"
   ],
   "pending": [
     {
@@ -147,6 +148,17 @@
       "tokens": {
         "backdrop-blur-sm": 1,
         "shadow-[0_20px_48px_rgba(0,0,0,0.28)]": 1
+      }
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "owner": "Admin curation / design-system maintainer",
+      "phase": "6.8 / A20",
+      "reason": "Existing editor hero retained during icon-only group; adopt shared solid surface in the page phase. No additions permitted.",
+      "tokens": {
+        "bg-panel-surface/95": 1,
+        "shadow-[0_28px_80px_rgba(0,0,0,0.28)]": 1,
+        "backdrop-blur-xl": 1
       }
     }
   ]

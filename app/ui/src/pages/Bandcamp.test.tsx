@@ -74,12 +74,14 @@ describe("Bandcamp text presentation and real contracts", () => {
     expect(document.querySelectorAll("svg:not([data-admin-ux])")).toHaveLength(
       0,
     );
-    expect(document.querySelectorAll("svg[data-admin-ux]")).toHaveLength(4);
+    expect(document.querySelectorAll("svg[data-admin-ux]")).toHaveLength(7);
     for (const glyph of document.querySelectorAll("svg"))
       expect(glyph).toHaveAttribute("aria-hidden", "true");
     for (const name of actions)
       for (const button of screen.getAllByRole("button", { name }))
-        expect(button).toHaveClass("min-h-11");
+        if (button.closest('[data-slot="admin-page-header"]'))
+          expect(button).toHaveAttribute("data-size", "icon-lg");
+        else expect(button).toHaveClass("min-h-11");
     expect(screen.getByText("12", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("92%", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("7 total", { exact: true })).toBeInTheDocument();

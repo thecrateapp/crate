@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -17,7 +18,7 @@ import { toast } from "sonner";
 
 import { ImageLightbox } from "@crate/ui/primitives/ImageLightbox";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -391,16 +392,16 @@ export function AlbumHeader({
 
             <div className="mb-4 flex flex-wrap gap-2">
               {hasCover ? (
-                <CratePill icon={Music}>Cover</CratePill>
+                <InfoBadge icon={Music}>Cover</InfoBadge>
               ) : (
-                <CrateChip active>No cover</CrateChip>
+                <InfoBadge active>No cover</InfoBadge>
               )}
               {albumTags.musicbrainz_albumid ? (
-                <CratePill>
+                <InfoBadge>
                   MBID {albumTags.musicbrainz_albumid.slice(0, 8)}
-                </CratePill>
+                </InfoBadge>
               ) : (
-                <CrateChip active>No MBID</CrateChip>
+                <InfoBadge active>No MBID</InfoBadge>
               )}
             </div>
 

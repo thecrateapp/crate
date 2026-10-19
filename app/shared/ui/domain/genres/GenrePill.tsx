@@ -42,7 +42,7 @@ export function GenrePill({
           {" "}
           <span
             data-slot="genre-percent"
-            className="shrink-0 border-l border-border-quiet pl-2 font-mono text-label font-normal text-accent-action-hi tabular-nums"
+            className="shrink-0 border-l border-border-quiet pl-2 font-mono text-filter-chip font-normal text-accent-action-hi tabular-nums"
           >
             {percent}%
           </span>
@@ -56,7 +56,7 @@ export function GenrePill({
   if (item.source) titleParts.push(item.source);
   const title = titleParts.join(" · ");
   const pillClassName =
-    "genre-pill inline-flex min-h-8 min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1 font-mono text-label font-normal tracking-chip pointer-coarse:min-h-11";
+    "genre-pill inline-flex min-h-8 min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1 font-mono text-filter-chip font-normal tracking-chip pointer-coarse:min-h-11";
 
   if (onRemove) {
     return (

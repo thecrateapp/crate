@@ -12,6 +12,14 @@ const path = "app/ui/src/pages/Users.tsx";
 describe("Admin consistency prevention", () => {
   it.each([
     [
+      'import { Badge as Tag } from "@crate/ui/shadcn/badge"; const view=<Tag className="py-0 text-[10px]"/>;',
+      "static-tag-geometry",
+    ],
+    [
+      'import { InfoBadge as Tag } from "@crate/ui/primitives/InfoBadge"; const view=<Tag className="py-0 text-[10px]"/>;',
+      "static-tag-geometry",
+    ],
+    [
       'import { CrateChip } from "@crate/ui/primitives/CrateBadge"; const view=<CrateChip className="md:text-xs"/>;',
       "static-tag-geometry",
     ],
@@ -44,7 +52,7 @@ describe("Admin consistency prevention", () => {
     '<h2 className="font-display text-xl"/>',
     '<div className="font-display text-base tabular-nums">12</div>',
     '<h3 className="font-sans text-base font-semibold"/>',
-    'import { Badge } from "@crate/ui/shadcn/badge"; const view=<Badge className="font-mono font-normal"/>;',
+    'import { Badge } from "@crate/ui/shadcn/badge"; const view=<Badge className="text-state-warning-text"/>;',
     'import { CrateChip } from "@crate/ui/primitives/CrateBadge"; const view=<CrateChip className="text-state-warning-text"/>;',
   ])("retains legitimate roles: %s", (source) => {
     expect(analyzeAdminConsistency(path, source)).toEqual([]);

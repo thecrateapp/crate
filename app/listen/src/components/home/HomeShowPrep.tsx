@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,7 +12,6 @@ import { SectionHeader } from "@crate/ui/domain/lists";
 import { Button } from "@crate/ui/shadcn/button";
 
 import type { HomeUpcomingInsight } from "./home-model";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 function insightLabel(type: HomeUpcomingInsight["type"], t: TFunction): string {
   if (type === "show_prep") return t("home.radar.insight.showPrep");
@@ -50,9 +50,9 @@ export function HomeShowPrepSection({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <CrateBadge size="md" icon={Sparkles}>
+                <InfoBadge icon={Sparkles}>
                   {insightLabel(insight.type, t)}
-                </CrateBadge>
+                </InfoBadge>
                 <h3 className="mt-3 text-lg font-bold text-text-primary">
                   {insight.title}
                 </h3>
@@ -61,9 +61,9 @@ export function HomeShowPrepSection({
                 </p>
               </div>
               {insight.weight === "high" ? (
-                <CrateBadge size="md" icon={Flame}>
+                <InfoBadge icon={Flame}>
                   {t("home.radar.showPrep.heavyRotation")}
-                </CrateBadge>
+                </InfoBadge>
               ) : null}
             </div>
 

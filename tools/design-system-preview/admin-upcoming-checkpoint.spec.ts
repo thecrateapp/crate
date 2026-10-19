@@ -234,7 +234,12 @@ test("Upcoming metadata uses JetBrains Mono at400 across cards and popovers", as
     expect(style.weight).toBe("400");
   };
   await check(root.getByText("October 2026", { exact: true }));
-  await check(root.getByText("Oct 20", { exact: true }));
+  for (const text of ["OCT", "20", "TUE"])
+    await check(
+      root
+        .locator('time[datetime="2026-10-20"]')
+        .getByText(text, { exact: true }),
+    );
   const show = root
     .locator('[role="button"][aria-expanded="false"]')
     .filter({ hasText: "Sala Puerto" });
@@ -306,4 +311,74 @@ for (const width of [1440, 768, 390])
     ).toBe(true);
     expect(unexpected).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+test("all local input captions use the shared uppercase language", async ({
+  page,
+}) => {
+  const { root } = await open(page);
+  for (const field of await root.locator(".crate-form-field").all()) {
+    const label = field.locator(":scope > :first-child");
+    await expect(label).toHaveCSS("text-transform", "uppercase");
+  }
+  await gaps(root);
+});
+
+for (const width of [1440, 768, 390])
+  test(`Incoming release row layout ${width}: avatar, date, badges and Solar actions`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1100 });
+    const { root } = await open(page);
+    const row = root.locator('[data-slot="event-row"]').filter({
+      has: page.getByRole("link", { name: "Luz de octubre", exact: true }),
+    });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('[data-slot="event-artwork"]')).toHaveCSS(
+      "width",
+      "88px",
+    );
+    await expect(row.locator('[data-slot="event-artwork"]')).toHaveCSS(
+      "height",
+      "88px",
+    );
+    await expect(row.locator("time")).toHaveAttribute("datetime", "2026-10-20");
+    const title = await row
+      .getByRole("link", { name: "Luz de octubre", exact: true })
+      .boundingBox();
+    const artist = await row
+      .getByRole("link", { name: "Costa Norte", exact: true })
+      .boundingBox();
+    for (const badge of await row.locator(".crate-info-badge").all())
+      expect((await badge.boundingBox())!.y).toBeGreaterThanOrEqual(
+        artist!.y + artist!.height,
+      );
+    expect(artist!.y).toBeGreaterThan(title!.y);
+    for (const [role, name] of [
+      ["link", "Open album"],
+      ["button", "Download release"],
+      ["button", "Dismiss release"],
+    ] as const) {
+      const action = row.getByRole(role, { name, exact: true });
+      await expect(action).toHaveText("");
+      await expect(action.locator("svg")).toHaveCount(1);
+      const box = await action.boundingBox();
+      expect(box!.height).toBe(44);
+      expect(box!.width).toBe(44);
+    }
+    await expect(
+      row.getByRole("link", { name: "Open album", exact: true }),
+    ).toHaveAttribute("href", /luz-de-octubre/);
+    const before = await row.evaluate(
+      (e) => getComputedStyle(e).backgroundColor,
+    );
+    await row.hover();
+    await expect(row).toHaveCSS("background-color", before);
+    const show = root
+      .locator('[role="button"][aria-expanded="false"]')
+      .filter({ hasText: "Sala Puerto" });
+    await show.press("Enter");
+    await expect(
+      root.getByRole("button", { name: "Close show details" }),
+    ).toBeVisible();
   });

@@ -1,8 +1,8 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useApi } from "@/hooks/use-api";
 import { useNavigate } from "react-router";
 import { ArrowUpRight, Music } from "lucide-react";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import {
   albumCoverApiUrl,
   albumPagePath,
@@ -90,9 +90,9 @@ export function RelatedAlbums({ albumId }: { albumId?: number }) {
               {album.artist}
             </div>
             <div className="mt-1.5">
-              <CrateChip>
+              <InfoBadge>
                 {REASON_LABELS[album.reason] || album.reason}
-              </CrateChip>
+              </InfoBadge>
             </div>
           </button>
         ))}

@@ -31,6 +31,21 @@ async function open(page: Page) {
   return { root, errors, unexpected };
 }
 async function geometry(page: Page, root: Locator) {
+  for (const remove of await root
+    .locator('svg[data-admin-ux="playlists-remove-rule"]')
+    .all()) {
+    const { width, tops } = await remove.evaluate((icon) => {
+      const rule = icon.closest("button")!.parentElement!.parentElement!;
+      const fields = Array.from(rule.querySelectorAll(".crate-form-field"));
+      return {
+        width: fields[0]!.parentElement!.getBoundingClientRect().width,
+        tops: fields.map((field) => field.getBoundingClientRect().top),
+      };
+    });
+    expect(tops).toHaveLength(3);
+    if (width >= 576) expect(new Set(tops).size).toBe(1);
+    else expect(tops[0]! < tops[1]! && tops[1]! < tops[2]!).toBe(true);
+  }
   for (const field of await root.locator(".crate-form-field").all())
     expect(
       await field.evaluate((e) => {
@@ -45,6 +60,15 @@ async function geometry(page: Page, root: Locator) {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+  const formHeight = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  for (const control of await root
+    .locator(
+      'input:not([type="checkbox"]):not([type="file"]),button[role="combobox"]',
+    )
+    .all())
+    expect((await control.boundingBox())!.height).toBe(formHeight);
 }
 for (const width of [1440, 768, 390])
   test(`System Playlists ${width}: identity, filters, forms and local payloads`, async ({
@@ -107,6 +131,8 @@ for (const width of [1440, 768, 390])
     await root
       .getByRole("textbox", { name: "Name", exact: true })
       .fill("  Puerto  ");
+    await root.getByRole("combobox", { name: "Category", exact: true }).click();
+    await page.getByRole("option", { name: "Genre", exact: true }).click();
     await root
       .getByRole("button", { name: "Create & open", exact: true })
       .click();
@@ -116,6 +142,9 @@ for (const width of [1440, 768, 390])
     await expect(page.getByRole("status").first()).toContainText(
       '"generation_mode":"static"',
     );
+    await expect(page.getByRole("status").first()).toContainText(
+      '"category":"genre"',
+    );
     await finish(page).click();
     await expect(page).toHaveURL(/\/playlists\/99$/);
     await page
@@ -123,6 +152,14 @@ for (const width of [1440, 768, 390])
       .click();
     await root.getByRole("button", { name: "New smart", exact: true }).click();
     await geometry(page, root);
+    for (const [name, option] of [
+      ["Category", "Genre"],
+      ["Match", "Any rule"],
+      ["Sort", "Popularity"],
+    ]) {
+      await root.getByRole("combobox", { name, exact: true }).click();
+      await page.getByRole("option", { name: option, exact: true }).click();
+    }
     const operator = root.getByRole("combobox", {
       name: "Operator",
       exact: true,
@@ -247,7 +284,9 @@ test("persistent 1AP keeps all earlier checkpoints and the exact existing brand 
   await expect(page.locator("#proximamente-admin")).toContainText(
     "Checkpoint 1AO · Publicado",
   );
-  await page.locator("#playlists-admin").scrollIntoViewIfNeeded();
+  await page
+    .locator('iframe[title="System Playlists real con datos de muestra"]')
+    .scrollIntoViewIfNeeded();
   await expect(
     page
       .frameLocator(

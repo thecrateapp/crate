@@ -53,7 +53,7 @@ describe("GenrePill", () => {
 
     expect(screen.getByTitle("Hardcore punk · 42%")).toHaveClass(
       "font-mono",
-      "text-label",
+      "text-filter-chip",
       "tracking-chip",
     );
     const percent = screen.getByText("42%");

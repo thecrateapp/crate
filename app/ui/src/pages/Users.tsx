@@ -1,3 +1,18 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+  PageHeaderLayout,
+} from "@/components/layout/PageHeader";
+import {
+  MailPlus as HeaderMailPlus,
+  UserPlus as HeaderUserPlus,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   useCallback,
@@ -8,7 +23,6 @@ import {
   type FormEvent,
 } from "react";
 import { Link, useSearchParams } from "react-router";
-import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 
 import { toast } from "sonner";
 
@@ -30,7 +44,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -566,7 +580,7 @@ function UserPresence({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      <CrateChip
+      <InfoBadge
         className={
           user.online_now
             ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -578,8 +592,8 @@ function UserPresence({
           : user.last_seen_at
             ? `Last seen ${formatRelativeTimestamp(user.last_seen_at)}`
             : "Offline"}
-      </CrateChip>
-      <CrateChip
+      </InfoBadge>
+      <InfoBadge
         className={
           user.listening_now
             ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -587,15 +601,15 @@ function UserPresence({
         }
       >
         {user.listening_now ? "Listening now" : "Not playing"}
-      </CrateChip>
-      <CrateChip>
+      </InfoBadge>
+      <InfoBadge>
         {user.active_devices ?? 0} device
         {(user.active_devices ?? 0) === 1 ? "" : "s"}
-      </CrateChip>
-      <CrateChip>
+      </InfoBadge>
+      <InfoBadge>
         {user.active_sessions ?? 0} active session
         {(user.active_sessions ?? 0) === 1 ? "" : "s"}
-      </CrateChip>
+      </InfoBadge>
     </div>
   );
 }
@@ -839,7 +853,34 @@ export function Users() {
   return (
     <div className="space-y-6">
       <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <PageHeaderLayout
+          actions={
+            <PageHeaderActions>
+              {canCreateUsers ? (
+                <>
+                  <PageHeaderAction
+                    label="Invite user"
+                    onClick={() => setInviteOpen(true)}
+                  >
+                    <HeaderMailPlus
+                      data-admin-ux="header-invite-user"
+                      aria-hidden="true"
+                    />
+                  </PageHeaderAction>
+                  <PageHeaderAction
+                    label="Add user"
+                    onClick={() => setAddOpen(true)}
+                  >
+                    <HeaderUserPlus
+                      data-admin-ux="header-add-user"
+                      aria-hidden="true"
+                    />
+                  </PageHeaderAction>
+                </>
+              ) : null}
+            </PageHeaderActions>
+          }
+        >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
               <div>
@@ -853,8 +894,8 @@ export function Users() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <CrateChip>{counts.total} total users</CrateChip>
-              <CrateChip
+              <InfoBadge>{counts.total} total users</InfoBadge>
+              <InfoBadge
                 className={
                   counts.online > 0
                     ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -862,8 +903,8 @@ export function Users() {
                 }
               >
                 {counts.online} active now
-              </CrateChip>
-              <CrateChip
+              </InfoBadge>
+              <InfoBadge
                 className={
                   counts.listening > 0
                     ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
@@ -871,33 +912,11 @@ export function Users() {
                 }
               >
                 {counts.listening} listening
-              </CrateChip>
-              <CrateChip>{counts.devices} active devices</CrateChip>
+              </InfoBadge>
+              <InfoBadge>{counts.devices} active devices</InfoBadge>
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {canCreateUsers ? (
-              <>
-                <Button
-                  className="min-h-11"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setInviteOpen(true)}
-                >
-                  Invite user
-                </Button>
-                <Button
-                  className="min-h-11"
-                  size="sm"
-                  onClick={() => setAddOpen(true)}
-                >
-                  Add user
-                </Button>
-              </>
-            ) : null}
-          </div>
-        </div>
+        </PageHeaderLayout>
       </section>
 
       <Card className="border-white/10 bg-panel-surface shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
@@ -964,7 +983,7 @@ export function Users() {
                   ).length,
                 },
               ].map((item) => (
-                <CratePill
+                <FilterChip
                   key={item.key}
                   active={filter === item.key}
                   onClick={() => {
@@ -973,7 +992,7 @@ export function Users() {
                   }}
                 >
                   {item.label} {item.count}
-                </CratePill>
+                </FilterChip>
               ))}
             </div>
           </div>
@@ -1024,11 +1043,7 @@ export function Users() {
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {rolesForUser(user).map((role) => (
-                            <Badge
-                              key={role}
-                              variant="outline"
-                              className="font-mono font-normal text-[10px]"
-                            >
+                            <Badge key={role} variant="outline">
                               {roleLabel(role)}
                             </Badge>
                           ))}
@@ -1550,9 +1565,9 @@ function UserDetailDialog({
                         ) : (
                           <div className="flex flex-wrap gap-2 text-sm text-white/70">
                             {rolesForUser(detail).map((role) => (
-                              <CrateChip key={role}>
+                              <InfoBadge key={role}>
                                 {roleLabel(role)}
-                              </CrateChip>
+                              </InfoBadge>
                             ))}
                           </div>
                         )}
@@ -1561,17 +1576,17 @@ function UserDetailDialog({
                         {(detail.capabilities || [])
                           .slice(0, 8)
                           .map((capability) => (
-                            <CrateChip
+                            <InfoBadge
                               key={capability}
                               className="text-white/55"
                             >
                               {capability}
-                            </CrateChip>
+                            </InfoBadge>
                           ))}
                         {(detail.capabilities?.length ?? 0) > 8 ? (
-                          <CrateChip className="text-white/40">
+                          <InfoBadge className="text-white/40">
                             +{(detail.capabilities?.length ?? 0) - 8} more
-                          </CrateChip>
+                          </InfoBadge>
                         ) : null}
                       </div>
                     </div>
@@ -1719,17 +1734,17 @@ function UserDetailDialog({
                     <div className="flex flex-wrap gap-2">
                       {(detail.connected_accounts || []).length > 0 ? (
                         (detail.connected_accounts || []).map((account) => (
-                          <CrateChip key={`${detail.id}-${account.provider}`}>
+                          <InfoBadge key={`${detail.id}-${account.provider}`}>
                             {account.provider}
                             {account.external_username
                               ? ` · ${account.external_username}`
                               : ""}
-                          </CrateChip>
+                          </InfoBadge>
                         ))
                       ) : (
-                        <CrateChip className="text-white/45">
+                        <InfoBadge className="text-white/45">
                           No linked providers
-                        </CrateChip>
+                        </InfoBadge>
                       )}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1806,24 +1821,24 @@ function UserDetailDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {source.online + source.connected > 0 ? (
-                                    <CrateChip className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+                                    <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
                                       {source.online + source.connected} active
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.recent > 0 ? (
-                                    <CrateChip>
+                                    <InfoBadge>
                                       {source.recent} recent
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.history > 0 ? (
-                                    <CrateChip className="text-white/55">
+                                    <InfoBadge className="text-white/55">
                                       {source.history} history
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.revoked > 0 ? (
-                                    <CrateChip className="text-white/45">
+                                    <InfoBadge className="text-white/45">
                                       {source.revoked} revoked
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                 </div>
                               </div>
@@ -1878,24 +1893,24 @@ function UserDetailDialog({
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <CratePill
+                      <FilterChip
                         active={sessionFilter === "active"}
                         onClick={() => setSessionFilter("active")}
                       >
                         Active
-                      </CratePill>
-                      <CratePill
+                      </FilterChip>
+                      <FilterChip
                         active={sessionFilter === "recent"}
                         onClick={() => setSessionFilter("recent")}
                       >
                         Recent
-                      </CratePill>
-                      <CratePill
+                      </FilterChip>
+                      <FilterChip
                         active={sessionFilter === "all"}
                         onClick={() => setSessionFilter("all")}
                       >
                         All history
-                      </CratePill>
+                      </FilterChip>
                     </div>
                   </div>
                 </CardHeader>
@@ -1929,7 +1944,7 @@ function UserDetailDialog({
                               <Badge className={status.className}>
                                 {status.label}
                               </Badge>
-                              <CrateChip>{session.app_id || "web"}</CrateChip>
+                              <InfoBadge>{session.app_id || "web"}</InfoBadge>
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm text-white/45">
                               <span>

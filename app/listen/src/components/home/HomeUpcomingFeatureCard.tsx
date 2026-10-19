@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,7 +15,6 @@ import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 
 import type { HomeUpcomingItem } from "./home-model";
 import { buildUpcomingPresentation } from "./home-upcoming-model";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 const LAZY_IMAGE_PROPS = { loading: "lazy" } as const;
 
@@ -162,15 +162,14 @@ export function HomeUpcomingFeature({
 
       <div className="relative flex min-h-[222px] flex-col justify-between">
         <div>
-          <CrateBadge
-            size="md"
+          <InfoBadge
             icon={presentation.isShow ? RadioTower : Disc3}
             className="mb-4"
           >
             {presentation.isShow
               ? t("home.radar.badge.nextShow")
               : t("home.radar.badge.nextRelease")}
-          </CrateBadge>
+          </InfoBadge>
 
           <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-text-primary sm:text-4xl">
             {presentation.isShow ? item.artist : item.title}
