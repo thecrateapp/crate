@@ -10,11 +10,9 @@ from crate.db.repositories.tasks import create_task_dedup
 
 
 def queue_refresh(id, expected_revision, actor_id):
-    conn = service._connection(id, persist=True)
-    # A virtual environment row has revision zero until explicitly materialized.
-    if expected_revision not in (
-        {0, conn["revision"]} if id.startswith("env:") else {conn["revision"]}
-    ):
+    conn = service._connection(id, persist=True, expected_revision=expected_revision)
+    # Environment CAS is checked atomically before its endpoint synchronization.
+    if conn["secret_source"] != "environment" and expected_revision != conn["revision"]:
         raise AIConfigurationError(
             "AI_CONFIGURATION_CONFLICT", "Connection changed; reload"
         )

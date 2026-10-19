@@ -53,27 +53,31 @@ def _env_id(provider):
     return str(uuid5(NAMESPACE_URL, f"crate:ai:env:{provider}"))
 
 
-def ensure_environment_connection(provider):
+def ensure_environment_connection(provider, *, expected_revision=None):
     if provider not in _PROVIDERS:
         _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
+    from crate.llm.provider import get_config
+
     endpoint = validate_endpoint(
-        provider,
-        os.environ.get("OLLAMA_URL", "http://ollama:11434")
-        if provider == "ollama"
-        else None,
+        provider, get_config()["ollama_url"] if provider == "ollama" else None
     )
-    row = store.ensure_environment_connection(provider, endpoint)
+    row = store.ensure_environment_connection(
+        provider, endpoint, expected_revision=expected_revision
+    )
     assert row is not None
     return row
 
 
-def _connection(id, *, persist=False) -> dict:
+def _connection(id, *, persist=False, expected_revision=None) -> dict:
+    symbolic_environment = id.startswith("env:")
     if id.startswith("env:"):
         provider = id[4:]
         if provider not in _PROVIDERS:
             _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
         id = (
-            ensure_environment_connection(provider)["id"]
+            ensure_environment_connection(
+                provider, expected_revision=expected_revision
+            )["id"]
             if persist
             else _env_id(provider)
         )
@@ -86,6 +90,10 @@ def _connection(id, *, persist=False) -> dict:
     row = store.get_connection(id, private=True)
     if row is None:
         _fail("AI_CONNECTION_UNKNOWN", "Connection does not exist")
+    if persist and row["secret_source"] == "environment" and not symbolic_environment:
+        return ensure_environment_connection(
+            row["provider"], expected_revision=expected_revision
+        )
     return row
 
 
@@ -144,7 +152,10 @@ def _public_connection(row, *, include_models=True):
 
 def snapshot():
     data = store.configuration_snapshot(bounded=True)
-    legacy_contexts = _legacy_contexts()
+    from crate.llm.provider import get_config
+
+    legacy_config = get_config()
+    legacy_contexts = _legacy_contexts(legacy_config)
     truncated = any(
         len(data[name]) > 1000 for name in ("connections", "profiles", "versions")
     )
@@ -164,7 +175,7 @@ def snapshot():
                 "label": f"Environment {provider}",
                 "provider": provider,
                 "revision": 0,
-                "endpoint": os.environ.get("OLLAMA_URL", "http://ollama:11434")
+                "endpoint": legacy_config["ollama_url"]
                 if provider == "ollama"
                 else None,
                 "enabled": True,
@@ -362,10 +373,10 @@ def apply_bindings(changes, actor_id):
     return store.apply_validated_bindings(values, actor_id, _validate_bindings)
 
 
-def _legacy_contexts():
+def _legacy_contexts(config=None):
     from crate.llm.provider import get_config
 
-    config = get_config()
+    config = config if config is not None else get_config()
     return {action_id: _legacy(action_id, config) for action_id in ACTIONS}
 
 
@@ -412,6 +423,8 @@ def activate(expected_revision, actor_id, expected_review_fingerprint):
 
 def _validate_legacy_or_normal(connection, version, action_id):
     config = version.get("config")
+    if config is None and connection["endpoint"] != version["endpoint"]:
+        _fail("AI_CONTEXT_STALE", "Refresh the catalog for the reviewed endpoint")
     if config is not None and config.get("kind") != "legacy_snapshot":
         return _validate_version(connection, version, action_id)
     if config is not None:

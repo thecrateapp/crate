@@ -523,22 +523,46 @@ def swap_connection_credential(
             return result
 
 
-def ensure_environment_connection(provider, endpoint, *, session=None):
+def ensure_environment_connection(
+    provider, endpoint, *, expected_revision=None, session=None
+):
     """Persist metadata only on explicit refresh, activation or execution acceptance."""
     from uuid import NAMESPACE_URL, uuid5
 
     id = str(uuid5(NAMESPACE_URL, f"crate:ai:env:{provider}"))
     with optional_scope(session) as s:
-        s.execute(
+        # Serialize metadata synchronization with the one-time activation boundary.
+        active = s.execute(
+            text("SELECT active FROM ai_configuration_state WHERE singleton FOR UPDATE")
+        ).scalar_one()
+        inserted = s.execute(
             text("""INSERT INTO ai_provider_connections(id,label,provider,secret_source,endpoint)
-        VALUES(:id,:label,:provider,'environment',:endpoint) ON CONFLICT(id) DO NOTHING"""),
+        VALUES(:id,:label,:provider,'environment',:endpoint) ON CONFLICT(id) DO NOTHING RETURNING id"""),
             {
                 "id": id,
                 "label": f"Environment {provider}",
                 "provider": provider,
                 "endpoint": endpoint,
             },
-        )
+        ).scalar_one_or_none()
+        current_revision = s.execute(
+            text(
+                "SELECT revision FROM ai_provider_connections WHERE id=:id FOR UPDATE"
+            ),
+            {"id": id},
+        ).scalar_one()
+        if expected_revision is not None and expected_revision != (
+            0 if inserted is not None else current_revision
+        ):
+            _conflict()
+        if not active:
+            s.execute(
+                text("""UPDATE ai_provider_connections SET endpoint=:endpoint,
+                revision=revision+1,updated_at=NOW(),model_catalog='[]'::jsonb,
+                catalog_status='pending',catalog_error_code=NULL,catalog_updated_at=NULL
+                WHERE id=:id AND secret_source='environment' AND endpoint IS DISTINCT FROM :endpoint"""),
+                {"id": id, "endpoint": endpoint},
+            )
         return get_connection(id, private=True, session=s)
 
 

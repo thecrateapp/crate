@@ -516,3 +516,85 @@ def test_activation_request_uses_whole_screen_review_fingerprint():
     assert request.expected_review_fingerprint == "a" * 64
     with pytest.raises(ValidationError):
         Activation(expected_revision=0, expected_legacy_fingerprint="a" * 64)
+
+
+def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeypatch):
+    from crate.ai import configuration as service
+    from crate.ai.capabilities import model_capabilities
+    from crate.db.cache_settings import set_setting
+
+    monkeypatch.setenv("OLLAMA_URL", "http://server-a:11434")
+    set_setting("llm_model", "ollama/model")
+    set_setting("llm_ollama_url", "http://server-b:11434")
+    conn = service.ensure_environment_connection("ollama")
+    assert conn["endpoint"] == "http://server-b:11434"
+    models = [
+        model_capabilities(
+            "ollama", "model", {"capabilities": ["completion", "vision"]}
+        ).model_dump(mode="json")
+    ]
+    store.save_model_catalog(conn["id"], models, "ready", conn["revision"])
+    set_setting("llm_ollama_url", "http://server-c:11434")
+    before_read = store.get_connection(conn["id"])
+    before = service.snapshot()
+    assert store.get_connection(conn["id"]) == before_read
+    with pytest.raises(AIConfigurationError):
+        service.activate(before["revision"], None, before["review_fingerprint"])
+    assert not store.configuration_state()["active"]
+    assert store.list_profiles() == []
+    assert store.get_connection(conn["id"]) == before_read
+    from crate.ai import operations
+
+    queued = []
+    monkeypatch.setattr(
+        operations,
+        "create_task_dedup",
+        lambda kind, params, **kwargs: queued.append(params) or "refresh-job",
+    )
+    assert (
+        operations.queue_refresh("env:ollama", before_read["revision"], 1)["task_id"]
+        == "refresh-job"
+    )
+    changed = store.get_connection(conn["id"])
+    assert changed["endpoint"] == "http://server-c:11434"
+    assert changed["revision"] == before_read["revision"] + 1
+    assert changed["model_catalog"] == []
+    assert changed["catalog_status"] == "pending"
+    store.save_model_catalog(conn["id"], models, "ready", changed["revision"])
+    before = service.snapshot()
+    service.activate(before["revision"], None, before["review_fingerprint"])
+    context = service.resolve_action("shows.extract.text")
+    assert context["endpoint"] == "http://server-c:11434"
+    set_setting("llm_ollama_url", "http://server-d:11434")
+    assert (
+        service.ensure_environment_connection("ollama")["endpoint"]
+        == "http://server-c:11434"
+    )
+    service.revalidate_context(context)
+
+
+def test_generic_ai_retry_requires_dedicated_human_request(test_app, monkeypatch):
+    from crate.api import tasks
+
+    monkeypatch.setattr(
+        tasks, "_require_task_operator", lambda request: {"id": 2, "role": "ops"}
+    )
+    monkeypatch.setattr(
+        tasks,
+        "create_task",
+        lambda *args, **kwargs: pytest.fail("AI generic retry enqueued"),
+    )
+    for kind in ("ai_catalog_refresh", "ai_profile_test"):
+        monkeypatch.setattr(
+            tasks,
+            "get_task",
+            lambda id: {
+                "id": id,
+                "type": kind,
+                "status": "failed",
+                "params": {"actor_id": 1},
+                "actor_user_id": 1,
+            },
+        )
+        response = test_app.post("/api/tasks/retry", json={"task_id": "original"})
+        assert response.status_code == 409

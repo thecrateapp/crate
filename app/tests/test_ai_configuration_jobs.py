@@ -28,6 +28,11 @@ def test_refresh_failure_keeps_last_good_catalog(pg_db, monkeypatch):
     old = [model_capabilities("gemini", "gemini-2.5-flash").model_dump(mode="json")]
     store.save_model_catalog(conn["id"], old, "ready", 1)
     monkeypatch.setattr(worker, "get_user_by_id", lambda uid: {"role": "admin"})
+    monkeypatch.setattr(
+        worker,
+        "get_task",
+        lambda task_id: {"type": "ai_catalog_refresh", "actor_user_id": 1},
+    )
     queued = []
     monkeypatch.setattr(
         operations,
@@ -88,6 +93,11 @@ def test_queued_probe_context_and_idempotency(pg_db, monkeypatch):
         sys.modules, "crate.ai.runtime", types.SimpleNamespace(execute_probe=execute)
     )
     monkeypatch.setattr(worker, "get_user_by_id", lambda uid: {"role": "admin"})
+    monkeypatch.setattr(
+        worker,
+        "get_task",
+        lambda task_id: {"type": "ai_profile_test", "actor_user_id": None},
+    )
     # actor_id None is valid for direct reservation; the worker capability recheck is mocked.
     params = {
         "profile_id": prof["id"],
@@ -231,3 +241,87 @@ def test_activity_provider_model_filters_and_bounded_usage(pg_db):
     assert summary["truncated"] is True
     assert len(summary["daily"]) == 1
     Usage.model_validate(summary)
+
+
+def test_persisted_retry_actor_cannot_borrow_original_ai_permissions(
+    pg_db, monkeypatch
+):
+    import sys
+    import types
+    from crate.ai import configuration as service, operations, discovery
+    from crate.ai.capabilities import model_capabilities
+    from crate.db.queries.tasks import get_task
+    from crate.db.repositories import ai_configuration as store, ai_usage as usage
+    from crate.db.repositories.auth_users import create_user
+    from crate.db.repositories.tasks import create_task, create_task_dedup
+    from crate.worker_handlers import ai_configuration as worker
+
+    admin = create_user("ai-admin@example.test", role="admin")
+    operator = create_user("ai-operator@example.test", role="ops")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    conn = service.ensure_environment_connection("gemini")
+    models = [model_capabilities("gemini", "gemini-2.5-flash").model_dump(mode="json")]
+    calls = []
+    monkeypatch.setattr(
+        discovery,
+        "discover_models",
+        lambda *args, **kwargs: calls.append("catalog") or models,
+    )
+    monkeypatch.setattr(
+        operations,
+        "create_task_dedup",
+        lambda *args, **kwargs: create_task_dedup(*args, dispatch=False, **kwargs),
+    )
+    queued = operations.queue_refresh("env:gemini", 1, admin["id"])
+    original = get_task(queued["task_id"])
+    assert original["actor_user_id"] == original["params"]["actor_id"] == admin["id"]
+    assert (
+        worker.handle_refresh(original["id"], original["params"], {})["status"]
+        == "succeeded"
+    )
+    assert calls == ["catalog"]
+    profile = service.create_profile(
+        {
+            "label": "Probe",
+            "connection_id": conn["id"],
+            "model_id": "gemini-2.5-flash",
+            "config": {},
+        },
+        admin["id"],
+    )
+    version = store.get_profile_version(profile["id"], 1)
+    probe = operations.queue_probe(
+        profile["id"], 1, version["fingerprint"], "before-reservation", admin["id"]
+    )
+    original_probe = get_task(probe["task_id"])
+    monkeypatch.setitem(sys.modules, "crate.ai.runtime", types.SimpleNamespace())
+    assert (
+        worker.handle_probe(original_probe["id"], original_probe["params"], {})[
+            "error_code"
+        ]
+        == "AI_RUNTIME_UNAVAILABLE"
+    )
+    assert usage.list_invocations({})["items"] == []
+    monkeypatch.setitem(
+        sys.modules,
+        "crate.ai.runtime",
+        types.SimpleNamespace(
+            execute_probe=lambda *args, **kwargs: calls.append("paid")
+        ),
+    )
+    calls.clear()
+    for original_task, handler in (
+        (original, worker.handle_refresh),
+        (original_probe, worker.handle_probe),
+    ):
+        retry = create_task(
+            original_task["type"],
+            original_task["params"],
+            dispatch=False,
+            actor_user_id=operator["id"],
+            retry_of=original_task["id"],
+        )
+        result = handler(retry, get_task(retry)["params"], {})
+        assert result == {"status": "failed", "error_code": "AI_TASK_PROVENANCE"}
+    assert calls == []
+    assert usage.list_invocations({})["items"] == []

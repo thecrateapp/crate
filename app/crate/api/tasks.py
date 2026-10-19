@@ -630,6 +630,13 @@ def api_retry_task(request: Request, body: TaskRetryRequest):
     if not task:
         return JSONResponse({"error": "Task not found"}, status_code=404)
 
+    if task["type"] in {"ai_catalog_refresh", "ai_profile_test"}:
+        raise HTTPException(
+            409,
+            "AI operations require a new dedicated human request",
+            headers={"X-Crate-Error": "AI_DEDICATED_REQUEST_REQUIRED"},
+        )
+
     params = task.get("params") or {}
     if isinstance(params, str):
         try:

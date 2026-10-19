@@ -7,9 +7,10 @@ from crate.api.permissions import get_user_capabilities
 from crate.credentials import load_secret
 from crate.db.repositories import ai_configuration as store
 from crate.db.repositories.auth_users import get_user_by_id
+from crate.db.queries.tasks import get_task
 
 
-def _actor(params, capability):
+def _actor(task_id, params, capability):
     user = get_user_by_id(params["actor_id"])
     if (
         not user
@@ -23,11 +24,24 @@ def _actor(params, capability):
         <= get_user_capabilities(user)
     ):
         raise AIConfigurationError("AI_PERMISSION_REVOKED", "Permission was revoked")
+    task = get_task(task_id)
+    expected_type = (
+        "ai_profile_test" if capability == "ai.tests.run" else "ai_catalog_refresh"
+    )
+    if (
+        not task
+        or task.get("actor_user_id") != params["actor_id"]
+        or task.get("type") != expected_type
+        or task.get("retry_of")
+    ):
+        raise AIConfigurationError(
+            "AI_TASK_PROVENANCE", "Use a new dedicated human request"
+        )
 
 
 def handle_refresh(task_id, params, config):
     try:
-        _actor(params, "ai.config.manage")
+        _actor(task_id, params, "ai.config.manage")
         conn = service._connection(params["connection_id"])
         if not conn["enabled"]:
             raise AIConfigurationError(
@@ -66,7 +80,7 @@ def handle_refresh(task_id, params, config):
 
 def handle_probe(task_id, params, config):
     try:
-        _actor(params, "ai.tests.run")
+        _actor(task_id, params, "ai.tests.run")
         context = service.resolve_profile(params["profile_id"], params["version"])
         if context["config_fingerprint"] != params["fingerprint"]:
             raise AIConfigurationError("AI_CONTEXT_STALE", "Profile changed")
