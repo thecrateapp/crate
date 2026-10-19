@@ -53,6 +53,7 @@ describe("Agents", () => {
     );
     const approvalsLink = screen.getByRole("link", { name: /Approvals/ });
     expect(approvalsLink).toHaveTextContent("2");
+    expect(approvalsLink).toHaveAccessibleName("Approvals 2 pending");
     expect(
       screen.getByRole("link", { name: "Connections" }),
     ).toBeInTheDocument();

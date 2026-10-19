@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { Link } from "react-router";
 
@@ -10,6 +10,7 @@ import { RelativeTime } from "@/components/admin/RelativeTime";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
+import { useNow } from "@/hooks/use-now";
 import type {
   AgentCollection,
   AgentPlanListItem,
@@ -71,6 +72,9 @@ function ApprovalsList({ view }: { view: PlanView }) {
   // useApi keeps `loading` false after the first page, so the next page's
   // request is tracked here.
   const [loadingMore, setLoadingMore] = useState(false);
+  // Rows re-check expiry on this clock, so a plan that lapses while the
+  // list is open reads «Expired» even though the snapshot said otherwise.
+  const now = useNow(15_000);
   const handled = useRef<AgentCollection<AgentPlanListItem> | null>(null);
   const { data, loading, error, refetch } = useApi<
     AgentCollection<AgentPlanListItem>
@@ -140,7 +144,7 @@ function ApprovalsList({ view }: { view: PlanView }) {
       {items.length > 0 ? (
         <ul className="space-y-3">
           {items.map((item) => (
-            <ApprovalRow key={item.plan_id} item={item} view={view} />
+            <ApprovalRow key={item.plan_id} item={item} view={view} now={now} />
           ))}
         </ul>
       ) : null}
@@ -163,40 +167,52 @@ function ApprovalsList({ view }: { view: PlanView }) {
 function ApprovalRow({
   item,
   view,
+  now,
 }: {
   item: AgentPlanListItem;
   view: PlanView;
+  now: number;
 }) {
+  const titleId = useId();
+  const detailsId = useId();
+  const statusId = useId();
   const title = planTitle({
     operation: item.operation ?? "",
     target_count: item.target_count,
   });
-  const state = planStateView(item.state, item.expired);
+  const expiry = Date.parse(item.expires_at);
+  const expired = item.expired || !Number.isFinite(expiry) || expiry <= now;
+  const state = planStateView(item.state, expired);
   const risk = riskView(item.risk);
 
   return (
     <li>
       <Link
         to={`/agents/approvals/${encodeURIComponent(item.plan_id)}`}
-        aria-label={title}
+        aria-labelledby={titleId}
+        aria-describedby={`${detailsId} ${statusId}`}
         className="flex flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-4 transition-colors hover:bg-white/5 md:flex-row md:items-center md:justify-between"
       >
         <div className="space-y-1">
-          <p className="font-medium text-white">{title}</p>
-          <p className="text-sm text-white/55">
-            {item.integration_name ?? "Unknown connection"} ·{" "}
-            {connectionKindLabel(item.integration_kind)}
+          <p id={titleId} className="font-medium text-white">
+            {title}
           </p>
-          <p className="text-sm text-white/45">
-            Requested <RelativeTime value={item.created_at} />
-          </p>
+          <div id={detailsId} className="space-y-1">
+            <p className="text-sm text-white/55">
+              {item.integration_name ?? "Unknown connection"} ·{" "}
+              {connectionKindLabel(item.integration_kind)}
+            </p>
+            <p className="text-sm text-white/45">
+              Requested <RelativeTime value={item.created_at} now={now} />
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div id={statusId} className="flex flex-wrap items-center gap-2">
           <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
           <StatusBadge tone={risk.tone}>{risk.label}</StatusBadge>
           {view === "pending" ? (
             <span className="text-sm text-white/45">
-              Expires <RelativeTime value={item.expires_at} />
+              Expires <RelativeTime value={item.expires_at} now={now} />
             </span>
           ) : null}
         </div>

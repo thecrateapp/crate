@@ -14,7 +14,7 @@ const AGENTS_PLANS_REVIEW = ["agents.plans.review"] as const;
 export function usePendingApprovals(): number {
   const { hasAnyCapability } = useAuth();
   const enabled = hasAnyCapability(AGENTS_PLANS_REVIEW);
-  const { data, loading, error, refetch } = useApi<{
+  const { data, refetch } = useApi<{
     awaiting_approval: number;
   }>(enabled ? "/api/admin/agent-plans/summary" : null);
 
@@ -29,6 +29,8 @@ export function usePendingApprovals(): number {
     // refetch is stable (useApi's refetch is useCallback([])); keyed on `enabled` only.
   }, [enabled]);
 
-  if (!enabled || loading || error) return 0;
+  if (!enabled) return 0;
+  // useApi keeps the last good payload when a refetch fails, so a transient
+  // error keeps the previous count instead of hiding the badge.
   return data?.awaiting_approval ?? 0;
 }

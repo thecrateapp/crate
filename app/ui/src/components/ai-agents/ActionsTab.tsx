@@ -82,8 +82,8 @@ const relatedEngines = [
     state: "Managed in client; model and reasoning unknown to Crate",
     description:
       "Read-only inventory. Crate manages principals, grants and activity; client models are configured externally.",
-    path: "/agent-integrations",
-    link: "Agent integrations",
+    path: "/agents/connections",
+    link: "Agent connections",
     capability: "agents.integrations.manage",
   },
 ];

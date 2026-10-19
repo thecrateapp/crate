@@ -187,6 +187,39 @@ describe("AgentApprovals", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("tells rows with the same title apart by their description", async () => {
+    mockList(() => ({
+      items: [
+        planItem(),
+        planItem({ plan_id: "plan-two", integration_name: "Other agent" }),
+      ],
+      next_cursor: null,
+    }));
+    renderWithAdminProviders(<AgentApprovals />);
+    const links = await screen.findAllByRole("link", {
+      name: "Import shows · 3 items",
+    });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAccessibleDescription(/Local lab MCP · Token/);
+    expect(links[0]).toHaveAccessibleDescription(/Needs approval/);
+    expect(links[1]).toHaveAccessibleDescription(/Other agent · Token/);
+  });
+
+  it("shows a pending plan whose expiry has passed as expired", async () => {
+    mockList(() => ({
+      items: [
+        planItem({
+          expires_at: new Date(Date.now() - 60_000).toISOString(),
+          expired: false,
+        }),
+      ],
+      next_cursor: null,
+    }));
+    renderWithAdminProviders(<AgentApprovals />);
+    expect(await screen.findByText("Expired")).toBeInTheDocument();
+    expect(screen.queryByText("Needs approval")).not.toBeInTheDocument();
+  });
+
   it("explains an empty pending queue", async () => {
     mockList(() => ({ items: [], next_cursor: null }));
     renderWithAdminProviders(<AgentApprovals />);

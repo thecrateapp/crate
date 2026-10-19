@@ -881,7 +881,8 @@ must be checked against the newly published exact HEAD.
 The final review against `main` identified five P2 defects on `36d7aa30`, whose 20 CI checks
 were successful. Each defect was reproduced before its correction:
 
-1. **Editorial approval content.** `AgentPlanReview` consumes the compiler's actual top-level
+1. **Editorial approval content.** The Admin plan review (now
+   `app/ui/src/pages/agents/AgentPlanDetail.tsx`) consumes the compiler's actual top-level
    `selection`, metadata, rules, exclusions, source revision, generation epoch and provenance.
    Review displays every track in order with local/global identity, title, artist, album,
    duration, selection source and manual lock. Missing/inconsistent content, including duplicate
@@ -1273,8 +1274,10 @@ cd app
 
 These runs passed 116, 171 and 44 cases respectively; the last adds one serialization control
 and 43 existing auth cases. The first command preceded that additional serialization test.
-From the repository root, `npm run --workspace=app/ui test -- src/pages/PlaylistEditor.test.tsx src/pages/AgentPlanReview.test.tsx`
-passed all 61 selected cases. Directed Ruff check/format, Pyright, ESLint, Prettier and Admin
+From the repository root, the playlist editor and plan review suites passed all 61 selected
+cases at that point. The plan review tests now live in
+`app/ui/src/pages/agents/AgentPlanDetail.test.tsx`:
+`npm run --workspace=app/ui test -- src/pages/PlaylistEditor.test.tsx src/pages/agents/AgentPlanDetail.test.tsx`. Directed Ruff check/format, Pyright, ESLint, Prettier and Admin
 typecheck passed. Documentation integrity passed for 44 canonical documents. Independent SPEC
 and QUALITY reviews found no remaining P1/P2 in this correction. No full local suite, migration,
 production provider/model call, deployment or

@@ -556,8 +556,8 @@ it("renders snapshot adapter support and a read-only related engine inventory wi
     screen.getByRole("row", { name: /Biography web search/ }),
   ).toHaveTextContent(/separate from LLM tokens/);
   expect(
-    screen.getByRole("link", { name: "Agent integrations" }),
-  ).toHaveAttribute("href", "/agent-integrations");
+    screen.getByRole("link", { name: "Agent connections" }),
+  ).toHaveAttribute("href", "/agents/connections");
   expect(
     screen.queryByRole("button", { name: /Run.*Tesseract|Run.*Bliss/ }),
   ).not.toBeInTheDocument();

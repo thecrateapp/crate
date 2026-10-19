@@ -64,6 +64,23 @@ describe("usePendingApprovals", () => {
     expect(apiMock).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps the last good count when a refetch fails", async () => {
+    apiMock.mockResolvedValue({ awaiting_approval: 4 });
+    const { result } = renderHook(() => usePendingApprovals(), {
+      wrapper: wrapperFor(["agents.plans.review"]),
+    });
+    await waitFor(() => expect(result.current).toBe(4));
+
+    apiMock.mockRejectedValue(new Error("Service unavailable"));
+    act(() => {
+      notifyAgentPlansChanged();
+    });
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current).toBe(4);
+  });
+
   it("never calls the API and returns 0 without the review capability", () => {
     const { result } = renderHook(() => usePendingApprovals(), {
       wrapper: wrapperFor([]),

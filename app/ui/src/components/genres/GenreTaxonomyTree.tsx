@@ -1112,7 +1112,8 @@ export function GenreTaxonomyTree({
       {/* Right: Detail */}
       <div className="flex-1 min-w-0">
         {selectedNode ? (
-          <div className="rounded-md border border-white/8 bg-white/[0.02] p-6 sticky top-6">
+          // Sticks 1.5rem below Shell's fixed header (--app-header-h).
+          <div className="rounded-md border border-white/8 bg-white/[0.02] p-6 sticky top-[calc(var(--app-header-h,0px)+1.5rem)]">
             <NodeDetailPanel
               node={selectedNode}
               nodeMap={nodeMap}

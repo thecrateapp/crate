@@ -37,7 +37,12 @@ export function Agents() {
           <NavLink to="/agents/approvals" className={sectionLinkClass}>
             Approvals
             {pendingApprovals > 0 ? (
-              <StatusBadge tone="warning">{pendingApprovals}</StatusBadge>
+              <>
+                {" "}
+                <StatusBadge tone="warning">
+                  {pendingApprovals} <span className="sr-only">pending</span>
+                </StatusBadge>
+              </>
             ) : null}
           </NavLink>
         ) : null}
