@@ -1,33 +1,14 @@
-"""Planning helpers for music paths."""
+"""Compatibility delegates to Music Paths service orchestration."""
 
 from __future__ import annotations
-
-from crate.db.paths_compute import (
-    compute_path,
-    resolve_bliss_centroid,
-    resolve_endpoint_label,
-)
-from crate.db.paths_scene import compute_scene_path
 
 
 def resolve_waypoints(
     waypoints: list[dict] | None,
 ) -> tuple[list[list[float]], list[dict]]:
-    waypoint_vecs: list[list[float]] = []
-    resolved_waypoints: list[dict] = []
-    for waypoint in waypoints or []:
-        waypoint_vec = resolve_bliss_centroid(waypoint["type"], waypoint["value"])
-        if waypoint_vec:
-            waypoint_vecs.append(waypoint_vec)
-            resolved_waypoints.append(
-                {
-                    **waypoint,
-                    "label": resolve_endpoint_label(
-                        waypoint["type"], waypoint["value"]
-                    ),
-                }
-            )
-    return waypoint_vecs, resolved_waypoints
+    from crate.music_paths import resolve_waypoints as implementation
+
+    return implementation(waypoints)
 
 
 def build_music_path_plan(
@@ -40,51 +21,17 @@ def build_music_path_plan(
     step_count: int = 20,
     user_id: int | None = None,
 ) -> dict | None:
-    origin_label = resolve_endpoint_label(origin_type, origin_value)
-    dest_label = resolve_endpoint_label(dest_type, dest_value)
+    from crate.music_paths import build_music_path_plan as implementation
 
-    if not waypoints:
-        scene_tracks = compute_scene_path(
-            origin_type=origin_type,
-            origin_value=origin_value,
-            dest_type=dest_type,
-            dest_value=dest_value,
-            step_count=step_count,
-            user_id=user_id,
-        )
-        if scene_tracks:
-            return {
-                "origin_label": origin_label,
-                "dest_label": dest_label,
-                "resolved_waypoints": [],
-                "tracks": scene_tracks,
-            }
-
-    origin_vec = resolve_bliss_centroid(origin_type, origin_value)
-    dest_vec = resolve_bliss_centroid(dest_type, dest_value)
-    if not origin_vec or not dest_vec:
-        return None
-
-    waypoint_vecs, resolved_waypoints = resolve_waypoints(waypoints)
-    tracks = compute_path(
+    return implementation(
         origin_type,
         origin_value,
-        origin_vec,
         dest_type,
         dest_value,
-        dest_vec,
-        step_count,
-        waypoint_vecs or None,
+        waypoints=waypoints,
+        step_count=step_count,
+        user_id=user_id,
     )
-    return {
-        "origin_label": origin_label,
-        "dest_label": dest_label,
-        "resolved_waypoints": resolved_waypoints,
-        "tracks": tracks,
-    }
 
 
-__all__ = [
-    "build_music_path_plan",
-    "resolve_waypoints",
-]
+__all__ = ["resolve_waypoints", "build_music_path_plan"]
