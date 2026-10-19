@@ -1,4 +1,7 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { RouteContent } from "@/components/layout/RouteContent";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,7 +81,7 @@ vi.mock("@/hooks/use-api", () => ({
           followed_artists: 2,
           saved_albums: 3,
           liked_tracks: 4,
-          playlists: 1,
+          playlists: 0,
           crates: 2,
         },
         loading: false,
@@ -157,6 +160,71 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 describe("Library", () => {
+  it("retains keyboard tab focus after a path-section change settles in the Shell frame", async () => {
+    isDesktop = true;
+    function InShellFrame() {
+      const location = useLocation();
+      return (
+        <RouteContent pathname={location.pathname}>
+          <Library />
+        </RouteContent>
+      );
+    }
+    renderWithListenProviders(<InShellFrame />, {
+      route: "/collection/artists",
+      path: "/collection/:section",
+    });
+    await userEvent.click(screen.getByRole("tab", { name: "Albums" }));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    expect(screen.getByRole("tab", { name: "Albums" })).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Liked" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+  it.each([
+    [
+      "/library?tab=artists&node=peer&tag=a&tag=b#saved",
+      "/library",
+      "/library?tab=albums&node=peer&tag=a&tag=b#saved",
+    ],
+    [
+      "/collection/artists?tab=untouched&node=peer#saved",
+      "/collection/:section",
+      "/collection/albums?tab=untouched&node=peer#saved",
+    ],
+  ])(
+    "preserves route context while switching %s",
+    async (route, path, expected) => {
+      isDesktop = true;
+      function LocationReadout() {
+        const location = useLocation();
+        return (
+          <output aria-label="Route">
+            {location.pathname}
+            {location.search}
+            {location.hash}
+          </output>
+        );
+      }
+      renderWithListenProviders(
+        <>
+          <Library />
+          <LocationReadout />
+        </>,
+        { route, path },
+      );
+      await userEvent.click(screen.getByRole("tab", { name: "Albums" }));
+      expect(screen.getByLabelText("Route")).toHaveTextContent(expected);
+      const tab = screen.getByRole("tab", { name: "Albums" });
+      expect(tab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tabpanel")).toHaveAttribute(
+        "aria-labelledby",
+        tab.id,
+      );
+    },
+  );
   beforeEach(() => {
     isDesktop = false;
     statsRefetch.mockReset();
@@ -209,21 +277,21 @@ describe("Library", () => {
     expect(screen.getByText("Your collection starts here")).toBeVisible();
   });
 
-  it("switches to Crates from the desktop collection tabs", () => {
+  it("switches to Crates from the desktop collection tabs", async () => {
     isDesktop = true;
 
     renderLibrary();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
 
-  it("switches collection section deep links when another desktop tab is chosen", () => {
+  it("switches collection section deep links when another desktop tab is chosen", async () => {
     isDesktop = true;
 
     renderLibrary("/collection/artists", "/collection/:section");
-    fireEvent.click(screen.getByRole("tab", { name: "Crates" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Crates" }));
 
     expect(screen.getByRole("button", { name: "New Crate" })).toBeVisible();
   });
@@ -307,7 +375,9 @@ describe("Library", () => {
 
     const tabButtons = screen.getAllByRole("tab");
 
-    expect(tabButtons.map((button) => button.textContent?.trim())).toEqual([
+    expect(
+      tabButtons.map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
       "Artists",
       "Crates",
       "Playlists",
@@ -318,14 +388,32 @@ describe("Library", () => {
     ]);
   });
 
-  it("shows the Crates count in the desktop library stats", () => {
+  it("associates real counts with desktop tabs without fabricating missing counts", () => {
     isDesktop = true;
 
     renderLibrary();
 
-    const cratesLabel = screen.getAllByText("Crates")[0]!;
-    expect(cratesLabel).toBeVisible();
-    expect(cratesLabel.parentElement).toHaveTextContent("2");
+    expect(
+      screen.getByRole("tab", { name: "Crates" }),
+    ).toHaveAccessibleDescription("2");
+    expect(
+      screen.getByRole("tab", { name: "Artists" }),
+    ).toHaveAccessibleDescription("2");
+    expect(
+      screen.getByRole("tab", { name: "Albums" }),
+    ).toHaveAccessibleDescription("3");
+    expect(
+      screen.getByRole("tab", { name: "Liked" }),
+    ).toHaveAccessibleDescription("4");
+    expect(
+      screen.getByRole("tab", { name: "Playlists" }),
+    ).toHaveAccessibleDescription("0");
+    expect(screen.getByRole("tab", { name: "Bandcamp" })).not.toHaveAttribute(
+      "aria-describedby",
+    );
+    expect(
+      screen.getByRole("tab", { name: "Contributions" }),
+    ).not.toHaveAttribute("aria-describedby");
   });
 
   it("refreshes the desktop library stats after creating a Crate", async () => {

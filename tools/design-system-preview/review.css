@@ -21,3 +21,11 @@ body {
 @source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";
 
 @source "../../app/listen/src/components/layout/topbar/TopBarSearchDropdownView.tsx";
+
+@source "../../app/listen/src/components/layout";
+@source "../../app/listen/src/pages/SearchFormView.tsx";
+
+@source "../../app/listen/src/pages/LibraryLikedView.tsx";
+@source "../../app/listen/src/pages/SearchTrackResultsView.tsx";
+@source "../../app/listen/src/pages/SearchAlbumResultsView.tsx";
+@source "../../app/listen/src/pages/SearchErrorState.tsx";

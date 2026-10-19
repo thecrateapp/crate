@@ -11,12 +11,12 @@
   },
   {
     "path": "app/shared/ui/domain/entity/EntityRow.tsx",
-    "prefix": "item-action-target group/row relative flex min-w-0 items-center rounded-lg text-left transition-colors",
+    "prefix": "crate-entity-row item-action-target group/row relative flex min-w-0 flex-wrap items-center rounded-lg text-left transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Playlists.tsx",
-    "prefix": "flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors",
+    "prefix": "flex cursor-pointer flex-col gap-4 p-4 @2xl:flex-row @2xl:items-start",
     "kind": "row"
   },
   {
@@ -205,8 +205,8 @@
     "kind": "row"
   },
   {
-    "path": "app/ui/src/pages/Upcoming.tsx",
-    "prefix": "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl",
+    "path": "app/ui/src/components/ui/EventRow.tsx",
+    "prefix": "@container relative w-full min-w-0 overflow-hidden rounded-md border border-border-quiet bg-transparent",
     "kind": "row"
   },
   {

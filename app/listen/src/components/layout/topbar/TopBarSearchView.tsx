@@ -204,7 +204,7 @@ function TopBarSearchContainer({
       ref={containerRef}
       className={cn(
         "group relative flex-1 shrink-0 overflow-visible md:flex-none md:origin-right",
-        "transition-[width,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+        "transition-[width] duration-200 ease-snap motion-reduce:transition-none",
         searchOpen
           ? "w-[min(22rem,calc(100vw-8.75rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
           : "w-[7.25rem] sm:w-[8rem] md:w-11",

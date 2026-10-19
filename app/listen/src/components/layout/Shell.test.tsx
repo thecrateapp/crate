@@ -47,6 +47,19 @@ function scrollWindowTo(y: number) {
 }
 
 describe("Shell", () => {
+  it("adds the ordinary header hairline after scrolling", async () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library" });
+    expect(screen.getByTestId("listen-header")).not.toHaveClass(
+      "border-border-quiet",
+    );
+    scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD + 1);
+    await waitFor(() =>
+      expect(screen.getByTestId("listen-header")).toHaveClass(
+        "border-border-quiet",
+      ),
+    );
+  });
   beforeEach(() => {
     viewportState.isDesktop = false;
     setWindowScroll(0);
@@ -73,7 +86,7 @@ describe("Shell", () => {
     expect(screen.getByText("Radar")).toBeInTheDocument();
   });
 
-  it("renders one unified glass backdrop for the mobile dock when a track is loaded", () => {
+  it("renders one unified solid backdrop for the mobile dock when a track is loaded", () => {
     const { container } = renderWithListenProviders(<Shell />, {
       playerActions: {
         currentTrack: {
@@ -84,11 +97,11 @@ describe("Shell", () => {
       },
     });
 
-    const dockBackdrop = container.querySelector(".listen-mobile-dock-glass");
+    const dockBackdrop = container.querySelector(".listen-mobile-dock-surface");
     const nav = screen.getByRole("navigation");
 
     expect(dockBackdrop).toBeInTheDocument();
-    expect(dockBackdrop).toHaveClass("listen-glass-panel");
+    expect(dockBackdrop).not.toHaveClass("listen-glass-panel");
     expect(nav).toHaveClass("bg-transparent");
   });
 
@@ -99,20 +112,16 @@ describe("Shell", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Collection" })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Playlists/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Artists/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Albums/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Crates/i })).toBeVisible();
-    expect(
-      screen.getByRole("menuitem", { name: /Liked tracks/i }),
-    ).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Bandcamp/i })).toBeVisible();
-    expect(
-      screen.getByRole("menuitem", { name: /Contributions/i }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("menuitem", { name: /Playlists/i }),
-    ).not.toHaveClass("rounded-2xl");
+    expect(screen.getByRole("link", { name: /Playlists/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Artists/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Albums/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Crates/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Liked tracks/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Bandcamp/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Contributions/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Playlists/i })).not.toHaveClass(
+      "rounded-2xl",
+    );
   });
 
   it("orders the mobile Collection sections consistently", () => {
@@ -120,7 +129,9 @@ describe("Shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collection" }));
 
-    const items = screen.getAllByRole("menuitem");
+    const items = screen
+      .getAllByRole("link")
+      .filter((el) => el.closest('[role="dialog"]'));
     expect(items.map((item) => item.textContent?.trim())).toEqual([
       "Artists",
       "Crates",
@@ -138,7 +149,7 @@ describe("Shell", () => {
     renderWithListenProviders(<Shell />);
     fireEvent.click(screen.getByRole("button", { name: "Collection" }));
 
-    expect(screen.getByRole("button", { name: /Crates/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Crates/i })).toBeVisible();
   });
 
   it("uses a transparent mobile header when the page declares a hero", () => {
@@ -192,7 +203,7 @@ describe("Shell", () => {
 
     const header = screen.getByTestId("listen-header");
     expect(header).toHaveAttribute("data-transparent", "false");
-    expect(header).toHaveClass("bg-surface-chrome", "shadow-chrome");
+    expect(header).toHaveClass("bg-surface-chrome");
     expect(header).not.toHaveClass("bg-transparent");
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",
@@ -363,16 +374,15 @@ describe("Shell", () => {
       "bg-surface-canvas",
     );
     expect(screen.getByTestId("listen-header")).toHaveClass(
-      "border-border-quiet",
+      "border-transparent",
       "bg-surface-chrome",
-      "shadow-chrome",
     );
     expect(screen.getByRole("link", { name: "Stats" })).toHaveClass(
-      "text-accent-action",
+      "listen-nav-item",
     );
   });
 
-  it("keeps the discovery-active brand label on the accent token", () => {
+  it("keeps the brand stable during discovery playback", () => {
     viewportState.isDesktop = true;
 
     renderWithListenProviders(<Shell />, {
@@ -395,8 +405,7 @@ describe("Shell", () => {
       .getAllByText("Crate")
       .find((element) => element.tagName === "SPAN");
 
-    expect(brandLabel).toHaveClass("text-accent-action");
-    expect(brandLabel).not.toHaveClass("text-text-primary");
+    expect(brandLabel).toHaveClass("text-text-primary");
   });
 
   it("keeps the inactive brand label on the primary text token", () => {

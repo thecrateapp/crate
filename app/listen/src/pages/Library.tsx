@@ -1,21 +1,15 @@
-import { type ComponentType, useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useCallback, useState } from "react";
+import { useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  CRATE_ICON_SIZE,
-  Plus,
-  Heart,
-  Users,
-  Disc,
-  CrateBox,
-  ListMusic,
-} from "@crate/ui/icons";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
-import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { PageHeader } from "@crate/ui/domain/navigation";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import {
+  CollectionTabs,
+  COLLECTION_SECTIONS,
+} from "@/components/layout/CollectionTabs";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import { LibraryBandcampTab } from "./LibraryBandcampTab";
@@ -26,7 +20,6 @@ import {
 } from "./LibraryCollectionTabs";
 import { LibraryContributionsTab } from "./LibraryContributionsTab";
 import { LibraryPlaylistsTab } from "./LibraryPlaylistsTab";
-import { StatBox } from "./LibraryPrimitives";
 import { Crates } from "@/pages/Crates";
 
 type Tab =
@@ -38,8 +31,6 @@ type Tab =
   | "crates"
   | "contributions";
 
-type TabIcon = ComponentType<{ size?: number; className?: string }>;
-
 interface MeStats {
   followed_artists: number;
   saved_albums: number;
@@ -48,25 +39,15 @@ interface MeStats {
   crates: number;
 }
 
-const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
-  { key: "artists", labelKey: "nav.collection.artists", icon: Users },
-  { key: "crates", labelKey: "nav.collection.crates", icon: CrateBox },
-  { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
-  { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
-  { key: "liked", labelKey: "library.tabs.liked", icon: Heart },
-  { key: "bandcamp", labelKey: "nav.collection.bandcamp", icon: BandcampLogo },
-  {
-    key: "contributions",
-    labelKey: "nav.collection.contributions",
-    icon: Plus,
-  },
+const tabs: { key: Tab; labelKey: string }[] = [
+  { key: "artists", labelKey: "nav.collection.artists" },
+  { key: "crates", labelKey: "nav.collection.crates" },
+  { key: "playlists", labelKey: "nav.collection.playlists" },
+  { key: "albums", labelKey: "nav.collection.albums" },
+  { key: "liked", labelKey: "library.tabs.liked" },
+  { key: "bandcamp", labelKey: "nav.collection.bandcamp" },
+  { key: "contributions", labelKey: "nav.collection.contributions" },
 ];
-
-const TAB_LIST_CLASS_NAME =
-  "flex scroll-px-4 gap-2 overflow-x-auto rounded-none p-0 pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0";
-
-const TAB_ITEM_CLASS_NAME =
-  "h-auto min-h-11 gap-1.5 bg-text-primary/5 px-4 py-2 text-sm text-text-muted transition-colors data-[state=inactive]:hover:bg-text-primary/10 data-[state=inactive]:hover:text-text-primary data-[state=active]:bg-accent-action data-[state=active]:text-accent-action-foreground";
 
 const tabTitleKeys: Record<Tab, string> = {
   playlists: "nav.collection",
@@ -78,29 +59,27 @@ const tabTitleKeys: Record<Tab, string> = {
   contributions: "nav.collection.contributions",
 };
 
-function parseTab(value: string | null): Tab {
-  if (
-    value === "artists" ||
-    value === "albums" ||
-    value === "liked" ||
-    value === "bandcamp" ||
-    value === "crates" ||
-    value === "contributions"
-  )
-    return value;
-  return "playlists";
-}
-
 export function Library() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
   const { data: stats, refetch: refetchStats } = useApi<MeStats>(
     isDesktop ? "/api/me" : null,
   );
-  const tab = section ? parseTab(section) : parseTab(searchParams.get("tab"));
+  const [tab, setTab] = useTabParam(COLLECTION_SECTIONS, "playlists", {
+    path: section
+      ? { value: section, pathname: (next) => `/collection/${next}` }
+      : undefined,
+  });
+  const counts: Partial<Record<Tab, number>> = stats
+    ? {
+        artists: stats.followed_artists,
+        albums: stats.saved_albums,
+        liked: stats.liked_tracks,
+        playlists: stats.playlists,
+        crates: stats.crates ?? 0,
+      }
+    : {};
   const [refreshKey, setRefreshKey] = useState(0);
 
   const onRefresh = useCallback(async () => {
@@ -114,24 +93,6 @@ export function Library() {
     refreshing,
   } = usePullToRefresh(onRefresh);
 
-  const tabItems = useMemo(
-    () =>
-      tabs.map(({ key, labelKey, icon: Icon }) => ({
-        value: key,
-        label: t(labelKey),
-        icon: <Icon size={CRATE_ICON_SIZE.xs} />,
-      })),
-    [t],
-  );
-
-  function setTab(tab: Tab) {
-    if (section) {
-      navigate(`/collection/${tab}`);
-      return;
-    }
-    setSearchParams({ tab });
-  }
-
   return (
     <div className="space-y-6" {...pullHandlers}>
       <PullIndicator distance={pullDistance} refreshing={refreshing} />
@@ -141,54 +102,29 @@ export function Library() {
         title={isDesktop ? t("library.title.desktop") : t(tabTitleKeys[tab])}
       />
 
-      {/* Stats */}
-      {stats && (
-        <div className="hidden gap-2 md:flex">
-          <StatBox
-            value={stats.followed_artists}
-            label={t("nav.collection.artists")}
-          />
-          <StatBox
-            value={stats.saved_albums}
-            label={t("nav.collection.albums")}
-          />
-          <StatBox value={stats.liked_tracks} label={t("common.tracks")} />
-          <StatBox
-            value={stats.playlists}
-            label={t("nav.collection.playlists")}
-          />
-          <StatBox
-            value={stats.crates ?? 0}
-            label={t("nav.collection.crates")}
-          />
-        </div>
-      )}
-
-      {/* Tab bar */}
-      {isDesktop ? (
-        <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
-          <SegmentedControl
-            items={tabItems}
-            value={tab}
-            onValueChange={setTab}
-            variant="tonal"
-            label={t("library.tabs.label")}
-            className={TAB_LIST_CLASS_NAME}
-            itemClassName={TAB_ITEM_CLASS_NAME}
-          />
-        </div>
-      ) : null}
-
-      {/* Tab content */}
-      {tab === "playlists" && <LibraryPlaylistsTab key={refreshKey} />}
-      {tab === "artists" && <LibraryArtistsTab key={refreshKey} />}
-      {tab === "albums" && <LibraryAlbumsTab key={refreshKey} />}
-      {tab === "liked" && <LibraryLikedTab key={refreshKey} />}
-      {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
-      {tab === "crates" && (
-        <Crates key={refreshKey} onCrateChange={refetchStats} />
-      )}
-      {tab === "contributions" && <LibraryContributionsTab key={refreshKey} />}
+      <CollectionTabs
+        value={tab}
+        onValueChange={setTab}
+        visible={isDesktop}
+        label={t("library.tabs.label")}
+        items={tabs.map(({ key, labelKey }) => ({
+          value: key,
+          label: t(labelKey),
+          count: counts[key],
+        }))}
+      >
+        {tab === "playlists" && <LibraryPlaylistsTab key={refreshKey} />}
+        {tab === "artists" && <LibraryArtistsTab key={refreshKey} />}
+        {tab === "albums" && <LibraryAlbumsTab key={refreshKey} />}
+        {tab === "liked" && <LibraryLikedTab key={refreshKey} />}
+        {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
+        {tab === "crates" && (
+          <Crates key={refreshKey} onCrateChange={refetchStats} />
+        )}
+        {tab === "contributions" && (
+          <LibraryContributionsTab key={refreshKey} />
+        )}
+      </CollectionTabs>
     </div>
   );
 }

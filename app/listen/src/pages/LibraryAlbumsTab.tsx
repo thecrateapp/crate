@@ -1,5 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -57,12 +57,21 @@ export function LibraryAlbumsTab() {
             <div
               data-slot="library-sort-placeholder"
               aria-hidden="true"
-              className="flex h-10 items-center justify-between gap-3"
+              inert
+              className="max-w-xs"
             >
-              <span className="font-mono text-label text-text-subtle">—</span>
-              <span className="flex h-10 w-43 items-center text-sm text-text-muted">
-                —
-              </span>
+              <FormField kind="group" label={t("library.sort.label")}>
+                {(group) => (
+                  <div {...group} role="group">
+                    <CollectionSortDropdown
+                      label={t("library.sort.albums")}
+                      value={sort}
+                      options={albumSortOptions}
+                      onChange={setSort}
+                    />
+                  </div>
+                )}
+              </FormField>
             </div>
           ) : null}
           <GridSkeleton density="default" variant="album" />
@@ -95,14 +104,19 @@ export function LibraryAlbumsTab() {
   return (
     <div className="space-y-4">
       {!isDesktop ? (
-        <div className="flex items-center justify-between gap-3">
-          <MonoLabel>{t("library.sort.label")}</MonoLabel>
-          <CollectionSortDropdown
-            label={t("library.sort.albums")}
-            value={sort}
-            options={albumSortOptions}
-            onChange={setSort}
-          />
+        <div className="max-w-xs">
+          <FormField kind="group" label={t("library.sort.label")}>
+            {(group) => (
+              <div {...group} role="group">
+                <CollectionSortDropdown
+                  label={t("library.sort.albums")}
+                  value={sort}
+                  options={albumSortOptions}
+                  onChange={setSort}
+                />
+              </div>
+            )}
+          </FormField>
         </div>
       ) : null}
       <MediaGrid aria-label={t("nav.collection.albums")}>

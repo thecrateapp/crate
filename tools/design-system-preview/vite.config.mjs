@@ -201,6 +201,7 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1ayShell: fileURLToPath(new URL("review-1ay-shell.html", import.meta.url)),
         main: fileURLToPath(new URL("index.html", import.meta.url)),
         review1axLayers: fileURLToPath(
           new URL("review-1ax-layers.html", import.meta.url),

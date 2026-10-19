@@ -39,6 +39,22 @@ export const Base: Story = {
     </Tabs>
   ),
 };
+export const MovingUnderline: Story = {
+  render: () => (
+    <Tabs defaultValue="artists">
+      <TabsList aria-label="Moving collection underline">
+        <TabsTrigger value="artists">Artists</TabsTrigger>
+        <TabsTrigger value="albums">Albums</TabsTrigger>
+        <TabsTrigger value="liked">Liked tracks</TabsTrigger>
+        <TabsTrigger value="contributions">Contributions</TabsTrigger>
+      </TabsList>
+      <TabsContent value="artists">Artist collection</TabsContent>
+      <TabsContent value="albums">Album collection</TabsContent>
+      <TabsContent value="liked">Liked tracks</TabsContent>
+      <TabsContent value="contributions">Contributions</TabsContent>
+    </Tabs>
+  ),
+};
 export const Vertical: Story = { ...Base, args: { orientation: "vertical" } };
 function UrlTabs() {
   const [tab, setTab] = useTabParam(values, "albums");

@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 
-interface TabParamOptions {
+interface TabParamOptions<T extends string> {
+  path?: { value: string; pathname: (value: T) => string };
   param?: string;
   replace?: boolean;
 }
 
 /** URL-backed panel selection. Unknown values fall back without rewriting links.
  * Changes push history unless replace is requested; other query values and the
- * current route/hash/state survive. Pages with path-based tabs keep their adapter.
+ * current route/hash/state survive. Path-based tabs may supply an explicit route adapter.
  */
 export function useTabParam<T extends string>(
   values: readonly T[],
   defaultValue: T,
-  { param = "tab", replace = false }: TabParamOptions = {},
+  { param = "tab", replace = false, path }: TabParamOptions<T> = {},
 ): readonly [T, (value: string) => void] {
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -22,27 +23,29 @@ export function useTabParam<T extends string>(
   useEffect(() => {
     pendingWrite.current = null;
   }, [location.key, location.search]);
-  const rawValue = searchParams.get(param);
+  const rawValue = path?.value ?? searchParams.get(param);
   const tab = values.find((value) => value === rawValue) ?? defaultValue;
 
   const setTab = useCallback(
     (value: string) => {
       if (
         !values.some((candidate) => candidate === value) ||
-        searchParams.get(param) === value
+        rawValue === value
       )
         return;
       const next = new URLSearchParams(searchParams);
-      next.set(param, value);
-      const destination = `${location.pathname}?${next}${location.hash}`;
+      if (!path) next.set(param, value);
+      const pathname = path ? path.pathname(value as T) : location.pathname;
+      const search = path ? location.search : `?${next}`;
+      const destination = `${pathname}${search}${location.hash}`;
       // Radix can emit the same selection on pointer-down and focus before the
       // router commits. One gesture must add only one history entry.
       if (pendingWrite.current === destination) return;
       pendingWrite.current = destination;
       void navigate(
         {
-          pathname: location.pathname,
-          search: `?${next}`,
+          pathname,
+          search,
           hash: location.hash,
         },
         {
@@ -54,6 +57,9 @@ export function useTabParam<T extends string>(
     },
     [
       values,
+      path,
+      rawValue,
+      location.search,
       searchParams,
       param,
       navigate,

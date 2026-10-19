@@ -146,6 +146,7 @@ export function ArtistHeroSection({
                     <CrateImage
                       src={heroBackgroundSrc}
                       alt=""
+                      style={{ objectPosition: "center calc(50% + 100px)" }}
                       className={`${artworkClassName} grayscale brightness-[0.5] contrast-110 opacity-[0.45]`}
                     />
                   ) : null

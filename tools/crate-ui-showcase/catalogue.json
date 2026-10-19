@@ -61,14 +61,14 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "c9c63d038433615e114b888a981814e8fa3ff286c4d40e27e0fb4c78116d12da",
+        "app/shared/ui/tokens/recipes.css": "80902a85808c68bc960ee513e644ae6a47ddc82d071171c8fe9a5a5f80977400",
         "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "36368019fc84ebd9ea8487494a321032288b9d54a7f822f7c7a95afa868660d2"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "6b643392834ae28ababe42c43fb2d158ad659c2dae78e962b5e317d334075410"
       },
       "category": "Foundations"
     },
@@ -651,18 +651,20 @@
     {
       "id": "domain-filters-filterbar",
       "name": "FilterBar",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Responsive filter composition with optional caption-aware bottom alignment.",
+      "coverage": "documented",
+      "adoption": "Listen liked collection opts into bottom alignment; existing consumers retain default center alignment",
+      "storyId": "components-filterbar",
+      "story": "tools/crate-ui-showcase/stories/FilterBar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FilterBar.mdx",
       "sources": [
         "app/shared/ui/domain/filters/FilterBar.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/filters/FilterBar.tsx": "0759dcb756f8aafe2af2b2b17f5e61bb281d64dd1eb4298d49dc4c013e7846f4"
+        "app/shared/ui/domain/filters/FilterBar.tsx": "d1e1187be06b63a79a486b9f7385af7748af463d85ca81d9fe93d3328affe191",
+        "tools/crate-ui-showcase/stories/FilterBar.stories.tsx": "8507b99445b34ee74e81a2abafc515f3052df560539ace71373dcf66e7a074c1",
+        "tools/crate-ui-showcase/docs/FilterBar.mdx": "cf9c3b2031cc5ffd39f5a8ec766fbf375bda073dc3d76b423100f7fbc84763ed"
       },
       "category": "Forms"
     },
@@ -1656,9 +1658,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/select.tsx": "2668625e5e9cec7b58fedd851dab5f4cf5965982e6fd600f5e699f24aa273b14",
-        "tools/crate-ui-showcase/stories/Select.stories.tsx": "015b9c0ab4d16d8a473a4522e230a9eee561165850a81498480ef9eea47e2316",
-        "tools/crate-ui-showcase/docs/Select.mdx": "203983f194f1f7bfc53492eccfefb9bfb2a860e2938a9b9f4c437f71150ac01f"
+        "app/shared/ui/shadcn/select.tsx": "ceed0ae676420f8b4000f71b7b43c9a43799339dd0cc4e3d8ebe4559bc0b58f0",
+        "tools/crate-ui-showcase/stories/Select.stories.tsx": "5004dc42f52345f342a701de3cf57efc0ab83a929fb8e3d47748fc2ffdc3f38a",
+        "tools/crate-ui-showcase/docs/Select.mdx": "3a33b102708725a4af8988b73c1bdcb02878d8588850b24f95d4041be427a757"
       },
       "category": "Forms"
     },
@@ -1750,9 +1752,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/tabs.tsx": "65ad50a81807ba99231c1bccf23e1900140ab6785c40e1e681e126ae83fb477a",
-        "tools/crate-ui-showcase/stories/Tabs.stories.tsx": "135dbc2d44411f3c9d4b6356d0ded5a1c24a0e3187307bc31f0188972d74fd6c",
-        "tools/crate-ui-showcase/docs/Tabs.mdx": "7b70c82a2affca0f3d52c1137f6f5fbe9fb4cd0a59aece5978b57df0617f482e"
+        "app/shared/ui/shadcn/tabs.tsx": "1e3ffa9f591b72805e6551682b4a9869f946c1dd354652a4e763ff8b8e067f5f",
+        "tools/crate-ui-showcase/stories/Tabs.stories.tsx": "353bf6d63cd9585681e5d0b44a321801b8df6583adf91563ac18b6094338f71c",
+        "tools/crate-ui-showcase/docs/Tabs.mdx": "d2f82a923cbc9f4a1f8d7b5f8fde08a00ec806e052eacbc13415f918d6c38ccb"
       },
       "category": "Navigation"
     },

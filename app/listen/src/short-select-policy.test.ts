@@ -12,6 +12,8 @@ type Control = {
 };
 
 const DYNAMIC_SELECTS: Record<string, string> = {
+  "app/listen/src/pages/LibraryCollectionSortDropdown.tsx:Select:selected.value":
+    "One shared collection Sort form adapter takes the typed artist/album/liked choice arrays; Sort uses Select by Diego's1AQ amendment, reconciled1AY.",
   'app/ui/src/components/layout/Sidebar.tsx:AdminSelect:previewRole ?? ""':
     "Available permission presets are supplied by the server and filtered for the current user.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:genre":
@@ -56,6 +58,13 @@ type FormSelect = { choices: number; sites: number; reason: string };
 // Diego's1AQ amendment: categorical form fields use Select, while existing filter chips stay.
 // Exact cardinality and site count prevent blanket exemptions or accidental extra controls.
 const FORM_SELECTS: Record<string, FormSelect> = {
+  "app/listen/src/components/playlists/PlaylistIdentitySection.tsx:Select:visibility":
+    {
+      choices: 2,
+      sites: 1,
+      reason:
+        "Existing private/public categorical form field (present before1AY); explicit form Select rule from1AQ/1AR, not a filter.",
+    },
   "app/ui/src/pages/Playlists.tsx:AdminSelect:category": {
     choices: 6,
     sites: 2,

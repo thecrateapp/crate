@@ -31,7 +31,6 @@ export function CollectionSortDropdown<T extends string>({
       onValueChange={(next) => onChange(next as T)}
     >
       <SelectTrigger
-        className="min-w-43"
         aria-label={t("library.sort.selectedAria", {
           label,
           value: selectedLabel,

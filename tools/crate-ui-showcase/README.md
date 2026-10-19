@@ -141,3 +141,14 @@ active/selection, full titles,0/1/many, profiles and loaded/reserved grids remai
 MediaCover owns the48px minimum; legacy managed/raw thumbnails use the same `crate-media-thumbnail`
 recipe until their page adoption. Person avatars and internal collage tiles are separate roles.
 V2 track identity stays white18px play glyph in a24px visual slot over artwork48px, active ring40px with effects/progress.
+
+
+## Listen Shell, search and collection — local1AY
+
+Reviews/1AY/Shell and review-1ay-shell.html share the actual Listen frame/navigation,
+collection tabs/sort/liked presentation and search form/result/state views. No API/provider
+writes are introduced by the fixture; live Listen5174 validates authenticated artwork separately.
+Collection counts use InfoBadge beside each tab, including0. FilterBar has an end alignment for
+stacked fields; Select owns a stable12rem default width. Tabs owns a single moving cyan indicator
+with spring-snappy450ms and reduced-motion fallbacks. Their live entries document these amendments.
+Player internals remain1AZ. Catalogue coverage and consumer adoption remain separate.

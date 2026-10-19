@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@crate/ui/lib/cn";
 
 export interface FilterBarProps {
+  align?: "center" | "end";
   search?: ReactNode;
   sort?: ReactNode;
   chips?: ReactNode;
@@ -14,6 +15,7 @@ export interface FilterBarProps {
 }
 
 export function FilterBar({
+  align = "center",
   search,
   sort,
   chips,
@@ -33,7 +35,12 @@ export function FilterBar({
       className={cn("flex flex-col gap-3", className)}
     >
       {hasControls ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className={cn(
+            "flex flex-wrap gap-2",
+            align === "end" ? "items-end" : "items-center",
+          )}
+        >
           {leading ? (
             <div className="flex shrink-0 items-center gap-2">{leading}</div>
           ) : null}

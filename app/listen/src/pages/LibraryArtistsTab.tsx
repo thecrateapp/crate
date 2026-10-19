@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,9 +21,12 @@ import {
 
 export function LibraryArtistsTab() {
   const { t } = useTranslation();
-  const { data: artists, loading } = useApi<FollowedArtist[]>(
-    "/api/catalog/me/artists",
-  );
+  const {
+    data: artists,
+    loading,
+    error,
+    refetch,
+  } = useApi<FollowedArtist[]>("/api/catalog/me/artists");
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<ArtistSort>("recent");
 
@@ -50,17 +55,34 @@ export function LibraryArtistsTab() {
             <div
               data-slot="library-sort-placeholder"
               aria-hidden="true"
-              className="flex h-10 items-center justify-between gap-3"
+              inert
+              className="max-w-xs"
             >
-              <span className="font-mono text-label text-text-subtle">—</span>
-              <span className="flex h-10 w-43 items-center text-sm text-text-muted">
-                —
-              </span>
+              <FormField kind="group" label={t("library.sort.label")}>
+                {(group) => (
+                  <div {...group} role="group">
+                    <CollectionSortDropdown
+                      label={t("library.sort.artists")}
+                      value={sort}
+                      options={artistSortOptions}
+                      onChange={setSort}
+                    />
+                  </div>
+                )}
+              </FormField>
             </div>
           ) : null}
           <GridSkeleton density="default" variant="artist" />
         </div>
       </LoadingState>
+    );
+  if (error && !artists)
+    return (
+      <ErrorState
+        message={error}
+        onRetry={refetch}
+        retryLabel={t("common.retry")}
+      />
     );
   if (!artists || artists.length === 0) {
     return (
@@ -80,16 +102,19 @@ export function LibraryArtistsTab() {
   return (
     <div className="space-y-4">
       {!isDesktop ? (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold uppercase tracking-kicker text-text-primary/40">
-            {t("library.sort.label")}
-          </span>
-          <CollectionSortDropdown
-            label={t("library.sort.artists")}
-            value={sort}
-            options={artistSortOptions}
-            onChange={setSort}
-          />
+        <div className="max-w-xs">
+          <FormField kind="group" label={t("library.sort.label")}>
+            {(group) => (
+              <div {...group} role="group">
+                <CollectionSortDropdown
+                  label={t("library.sort.artists")}
+                  value={sort}
+                  options={artistSortOptions}
+                  onChange={setSort}
+                />
+              </div>
+            )}
+          </FormField>
         </div>
       ) : null}
       <MediaGrid>

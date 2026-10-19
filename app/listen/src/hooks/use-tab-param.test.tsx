@@ -6,7 +6,10 @@ import type { ReactNode } from "react";
 import { useTabParam } from "./use-tab-param";
 
 const values = ["overview", "albums", "shows"] as const;
-function setup(entry = "/artist?tab=albums", options = {}) {
+function setup(
+  entry = "/artist?tab=albums",
+  options: { param?: string; replace?: boolean; path?: boolean } = {},
+) {
   const router = createMemoryRouter([{ path: "*", element: <Slot /> }], {
     initialEntries: [
       "/previous",
@@ -27,7 +30,19 @@ function setup(entry = "/artist?tab=albums", options = {}) {
   }
   const hook = renderHook(
     () => {
-      const [tab, setTab] = useTabParam(values, "overview", options);
+      const location = useLocation();
+      const { path, ...queryOptions } = options;
+      const [tab, setTab] = useTabParam(values, "overview", {
+        ...queryOptions,
+        ...(path
+          ? {
+              path: {
+                value: location.pathname.split("/").slice(-1)[0]!,
+                pathname: (value: string) => `/collection/${value}`,
+              },
+            }
+          : {}),
+      });
       return { tab, setTab, location: useLocation() };
     },
     {
@@ -41,6 +56,29 @@ function setup(entry = "/artist?tab=albums", options = {}) {
 }
 
 describe("app-local URL tabs", () => {
+  it("supports path sections while retaining query, hash, state and navigation history", async () => {
+    const { result, router } = setup(
+      "/collection/albums?tab=untouched&tag=a&tag=b#saved",
+      { path: true },
+    );
+    expect(result.current.tab).toBe("albums");
+    act(() => {
+      result.current.setTab("shows");
+      result.current.setTab("shows");
+    });
+    await waitFor(() => expect(result.current.tab).toBe("shows"));
+    expect(result.current.location.pathname).toBe("/collection/shows");
+    expect(result.current.location.search).toBe("?tab=untouched&tag=a&tag=b");
+    expect(result.current.location.hash).toBe("#saved");
+    expect(result.current.location.state).toEqual({ origin: "library" });
+    await act(() => router.navigate(-1));
+    expect(result.current.tab).toBe("albums");
+    await act(() => router.navigate(1));
+    expect(result.current.tab).toBe("shows");
+    await act(() => router.navigate("/collection/unknown?node=peer"));
+    expect(result.current.tab).toBe("overview");
+    expect(result.current.location.pathname).toBe("/collection/unknown");
+  });
   it.each([
     ["/artist", "overview"],
     ["/artist?tab=", "overview"],

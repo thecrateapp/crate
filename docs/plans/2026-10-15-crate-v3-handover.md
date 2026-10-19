@@ -4943,3 +4943,24 @@ No avanzar a1AY antes de revisión. No se cierran QA nativa/AT ni los33baselines
 Diego aprueba 1AX y autoriza commit/push y continuar con 1AY (Shell, búsqueda y colección),
 con el mockup aprobado como referencia, Storybook actualizado y las tres instancias activas.
 1AY se detiene para revisión antes de su commit/push. Se mantienen los límites de QA registrados.
+
+
+### 1AY local para revisión — 2026-10-19
+
+1AX publicado5bc683d8. Shell, búsqueda y colección de1AY implementados usando las views reales
+en la escena pequeña5186/Storybook. Enmiendas de Diego: imagen desktop de artista100px más abajo,
+degradado original; contadores reales en tabs; Select estable; controles liked alineados;
+subrayado cian móvil con aceleración/rebote y movimiento reducido. Cuatro hallazgos de la revisión
+independiente corregidos.227pruebas focalizadas y11casos distintos de navegador verdes, tipos/
+lint/builds y presupuestos verdes. [Validación completa y límites](2026-10-19-crate-v3-current-state.md).
+Catálogo53/93documentadas,40pendientes; no se cierra adopción por tener ficha.
+
+Revisión: `http://127.0.0.1:5186/review-1ay-shell.html` y
+`http://127.0.0.1:6006/?path=/story/reviews-1ay-shell--complete`; Listen5174 sigue activo.
+Sin commit/push de1AY. Esperar aprobación de Diego antes de publicar y avanzar a1AZ.
+Mantener las tres instancias, el worktree, pin app/web@258bbaee,33PNG/manifest1M y deuda explícita.
+
+### Aprobación de1AY — 2026-10-19
+
+Diego aprueba1AY; autoriza commit/push y continuar con1AZ, reproductor, con mockup como referencia,
+Storybook actualizado y tres instancias activas. El próximo stop es1AZ antes de commit/push.

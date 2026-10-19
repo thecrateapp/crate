@@ -18,7 +18,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
       data-testid="public-shell"
       className="flex min-h-dvh flex-col bg-surface-canvas"
     >
-      <header className="z-app-header sticky top-0 border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl pt-[env(safe-area-inset-top)]">
+      <header className="z-app-header sticky top-0 border-b border-border-quiet bg-surface-chrome pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-16 w-full max-w-content items-center justify-between gap-4 px-4 sm:px-6">
           <Link
             to="/"

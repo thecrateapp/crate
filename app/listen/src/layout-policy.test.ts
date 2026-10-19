@@ -18,7 +18,10 @@ describe("Listen layout policy", () => {
   it("derives desktop dock panel clearance from the floating player bar geometry", () => {
     const read = (path: string) =>
       readFileSync(resolve(process.cwd(), path), "utf8");
-    const listenStyles = read("src/index.css");
+    const listenStyles = read("src/components/layout/listen-shell-metrics.css");
+    expect(read("src/index.css")).toContain(
+      '@import "./components/layout/listen-shell-metrics.css"',
+    );
     const playerBar = read("src/components/player/bar/PlayerBarView.tsx");
 
     expect(listenStyles).toMatch(

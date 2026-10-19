@@ -31,6 +31,12 @@ function Specimen({
 }
 
 describe("shared text tabs", () => {
+  it("owns one decorative moving indicator without changing tab semantics", () => {
+    const { container } = render(<Specimen />);
+    const indicator = container.querySelector('[data-slot="tabs-indicator"]');
+    expect(indicator).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+  });
   it("names the tablist and connects the selected tab to its panel", () => {
     render(<Specimen />);
     expect(

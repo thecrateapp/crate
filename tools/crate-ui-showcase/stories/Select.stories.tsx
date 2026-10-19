@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { useArgs } from "storybook/preview-api";
+import { useState } from "react";
 import {
   Select,
   SelectTrigger,
@@ -52,6 +53,30 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Base: Story = {};
+export const StableWidth: Story = {
+  render: function WidthExample() {
+    const [value, setValue] = useState("short");
+    return (
+      <div className="max-w-sm">
+        <FormField label="Stable select">
+          {(control) => (
+            <Select value={value} onValueChange={setValue}>
+              <SelectTrigger {...control}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="short">Name</SelectItem>
+                <SelectItem value="long">
+                  Recently added to the collection
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </FormField>
+      </div>
+    );
+  },
+};
 export const Disabled: Story = { args: { disabled: true } };
 export const Placeholder: Story = { args: { value: "" } };
 export const UnknownValue: Story = { args: { value: "unknown" } };

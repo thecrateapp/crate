@@ -4,6 +4,18 @@ import { render, screen } from "@testing-library/react";
 import { FilterBar } from "./index";
 
 describe("FilterBar", () => {
+  it("can align labelled fields and unlabelled actions along their bottom edge", () => {
+    render(
+      <FilterBar
+        align="end"
+        leading={<button type="button">Play</button>}
+        search={<input aria-label="Search" />}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Play" }).parentElement?.parentElement,
+    ).toHaveClass("items-end");
+  });
   it("renders search, sort, chips, leading and actions slots", () => {
     render(
       <FilterBar

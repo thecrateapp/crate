@@ -24,16 +24,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "text-[0.68rem]": 1,
   },
   "components/home/HomeListeningHistory.tsx": { "tracking-[-0.035em]": 1 },
-  "components/layout/MobileBottomNav.tsx": { "text-[0.59375rem]": 3 },
-  "components/layout/sidebar/SidebarBrand.tsx": {
-    "rounded-[18px]": 1,
-    "rounded-[22px]": 1,
-  },
-  "components/layout/sidebar/SidebarNavigation.tsx": { "text-[0.75rem]": 1 },
-  "components/layout/topbar/TopBarSearchView.tsx": {
-    "text-[16px]": 1,
-    "tracking-[-0.01em]": 1,
-  },
   "components/player/ExtendedPlayerTabs.tsx": { "text-[0.75rem]": 1 },
   "components/player/FullscreenPlayerTabs.tsx": {
     "text-[1.45rem]": 1,
@@ -86,7 +76,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
   "pages/Paths.tsx": { "22": 1 },
-  "pages/SearchAlbumResults.tsx": { "32": 1 },
   "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -19,7 +19,9 @@ import {
 
 export function SearchResults() {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const query = searchParams.get("q") || "";
   const [emptyQuery, setEmptyQuery] = useState("");
   const [data, setData] = useState<SearchData | null>(null);
@@ -68,7 +70,18 @@ export function SearchResults() {
       <EmptySearchState
         value={emptyQuery}
         onChange={setEmptyQuery}
-        onSearch={(nextQuery) => setSearchParams({ q: nextQuery })}
+        onSearch={(nextQuery) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("q", nextQuery);
+          void navigate(
+            {
+              pathname: location.pathname,
+              search: `?${next}`,
+              hash: location.hash,
+            },
+            { state: location.state },
+          );
+        }}
       />
     );
   }

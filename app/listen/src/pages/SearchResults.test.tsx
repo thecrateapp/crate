@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", async () => {
@@ -30,6 +31,30 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { SearchResults } from "./SearchResults";
 
 describe("SearchResults", () => {
+  it("retains other query parameters and the fragment when submitting search", async () => {
+    vi.mocked(api).mockResolvedValue({ artists: [], albums: [], tracks: [] });
+    function LocationReadout() {
+      const location = useLocation();
+      return (
+        <output aria-label="Route">
+          {location.search}
+          {location.hash}
+        </output>
+      );
+    }
+    renderWithListenProviders(
+      <>
+        <SearchResults />
+        <LocationReadout />
+      </>,
+      { path: "/search", route: "/search?node=peer&tag=a&tag=b#results" },
+    );
+    await userEvent.type(screen.getByRole("searchbox"), "Converge");
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByLabelText("Route")).toHaveTextContent(
+      "?node=peer&tag=a&tag=b&q=Converge#results",
+    );
+  });
   it("offers a functional search form when opened without a query", async () => {
     vi.mocked(api).mockResolvedValue({
       artists: [],
@@ -48,8 +73,7 @@ describe("SearchResults", () => {
     const surface = screen
       .getByRole("heading", { name: "Search" })
       .closest(".shadow-card");
-    expect(surface).not.toBeNull();
-    expect(surface).toHaveClass("shadow-card");
+    expect(surface).toBeNull();
     await user.type(input, "Converge");
     expect(screen.getByRole("button", { name: "Search" })).toHaveClass(
       "shadow-action",

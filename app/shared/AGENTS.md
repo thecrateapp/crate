@@ -213,3 +213,14 @@ fallbacks. Route LoadingState retains its200ms threshold; SkipLink targets the a
 Tabs retain1Q; each app owns its URL helper and coalesces duplicate pre-render selection writes.
 PageHero stretches its inner frame through the used hero height; do not restore percentage height
 inside a minimum-height-only parent or compensate the resulting clipping in individual pages.
+
+
+## Shell/collection amendments — local1AY
+
+Select defaults to a stable12rem width capped by its container; selected text must not determine
+trigger width. Explicit w-full/fixed form columns remain valid. FilterBar align="end" aligns
+labelled fields with unlabelled actions at their bottom edge; center remains the default.
+TabsList owns one decorative cyan indicator with spring-snappy450ms travel and overshoot,
+initial static placement, responsive/RTL/vertical alignment and OS/Crate reduced-motion fallback.
+Do not duplicate underline positioning or margins in consumers. Radix retains activation,
+keyboard, focus and panel semantics. See the three live contracts and Reviews/1AY/Shell.

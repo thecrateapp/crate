@@ -3634,6 +3634,7 @@ label
 
 /* Text panel tabs: the same recipe for both apps and both legacy variants. */
 .crate-tabs-list {
+  position: relative;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -3642,6 +3643,40 @@ label
   overflow-x: auto;
   padding: 4px 4px 0;
   border-bottom: 1px solid var(--border-subtle);
+}
+.crate-tabs-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--accent-action-hi);
+}
+.crate-tabs-list[data-moving-indicator] > .crate-tabs-indicator {
+  opacity: 1;
+}
+.crate-tabs-list[data-moving-indicator] > .crate-tab-trigger::after {
+  opacity: 0;
+}
+.crate-tabs-list[data-indicator-ready] > .crate-tabs-indicator {
+  transition:
+    transform 450ms var(--ease-spring-snappy),
+    width 450ms var(--ease-spring-snappy),
+    height 450ms var(--ease-spring-snappy);
+}
+:root[data-crate-motion="reduced"] .crate-tabs-list > .crate-tabs-indicator {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .crate-tabs-list[data-indicator-ready] > .crate-tabs-indicator {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .crate-tabs-indicator {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
 }
 .crate-tab-trigger {
   position: relative;

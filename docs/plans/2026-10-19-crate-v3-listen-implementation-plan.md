@@ -267,3 +267,13 @@ reales, completa siete fichas (incluida Tabs pendiente desde1Q) y corrige el rec
 reportado por Diego. [Plan1AX](2026-10-19-crate-v3-layers-feedback-navigation.md) y
 [validación vigente](2026-10-19-crate-v3-current-state.md). La aprobación visual de1AX aún no está
 concedida; sin commit/push local ni avance a1AY. H0 no certifica Listen completo ni QA de fase.
+
+
+## Estado posterior — 1AY local para revisión
+
+1AX aprobado y publicado en5bc683d8. 1AY reconcilia Shell, búsqueda y colección con la referencia
+aprobada y sus enmiendas: fondo desktop de artista100px más abajo con degradado original,
+contadores en tabs, Select estable y subrayado con viaje/rebote. Views reales en la escena pequeña
+5186/Storybook, sin ampliar el mockup histórico. [Alcance y decisiones](2026-10-19-crate-v3-shell-search-collection.md)
+y [validación vigente](2026-10-19-crate-v3-current-state.md). Se detiene antes de commit/push;
+1AZ queda pendiente de aprobación. Se conservan las tres instancias y los límites nativos/AT/1M.

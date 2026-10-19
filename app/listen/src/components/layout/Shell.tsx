@@ -39,7 +39,7 @@ export function Shell({ children }: { children?: ReactNode }) {
     location.pathname.startsWith("/collection");
   const headerScrolled = useScrolledPast(
     HEADER_SOLID_SCROLL_THRESHOLD,
-    isDesktop ? desktopOverlayHeader : overlayHeader || homeMobileOverlay,
+    true,
     location.key,
   );
   const headerOffsetClass = desktopOverlayHeader ? "" : "pt-24";
@@ -48,8 +48,7 @@ export function Shell({ children }: { children?: ReactNode }) {
     overlayHeader || homeMobileOverlay
       ? "pt-0 pb-4"
       : "py-4 pt-[var(--listen-mobile-page-top)]";
-  const headerChromeClass =
-    "border-b border-border-quiet bg-surface-chrome shadow-chrome backdrop-blur-xl";
+  const headerChromeClass = `border-b ${headerScrolled ? "border-border-quiet" : "border-transparent"} bg-surface-chrome`;
 
   useEffect(() => {
     const sync = () => setSidebarExpanded(getStoredExpanded());

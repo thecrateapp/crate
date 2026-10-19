@@ -5,13 +5,21 @@ import { DocHeading } from "../components/DocHeading";
 
 <Meta of={Stories} />
 <DocHeading as="h1">Tabs</DocHeading>
-<EntryDetails id="shadcn-tabs" review="Visual review approved · 1AX" />
+<EntryDetails id="shadcn-tabs" review="Visual review approved by Diego · 1AY" />
 <DocHeading as="h2">Contract</DocHeading>
 
-Text tabs preserve the approved 1Q recipe: 2 px accent-action-hi underline, uppercase Mono labels,
+Text tabs preserve the approved 1Q geometry: 2 px accent-action-hi underline, uppercase Mono labels,
 roving focus, Home/End and orientation-aware arrow keys. Radix owns tab/tablist/tabpanel roles,
 relationships, disabled choices and automatic activation. Both legacy variant names use this recipe.
 Tabs select panels; they do not perform app navigation themselves.
+
+The list owns one decorative cyan indicator. Diego's 1AY amendment moves it between selected
+options with acceleration and a restrained spring overshoot (450ms, spring-snappy token).
+It starts at the current selection without an entrance flight; repeated changes retarget from
+its current position. Resize, label/count changes, font load, horizontal overflow, RTL and vertical
+lists retain alignment. OS reduced motion and Crate's reduced motion setting change immediately.
+The effect never changes focus, panel activation, tab hit areas or URL behavior. Native/asChild
+lists keep a static underline fallback.
 
 Each app owns its URL helper. Unknown or empty values fall back without rewriting the link. A
 valid change retains path, query (including repeated parameters), hash and location state. It pushes
@@ -21,6 +29,7 @@ segments keep their adapters until their own phase; no mass page migration is in
 The URL story exercises Listen's actual helper; Admin has its separate tested implementation.
 
 <Canvas of={Stories.Base} />
+<Canvas of={Stories.MovingUnderline} />
 <Canvas of={Stories.Vertical} />
 <Canvas of={Stories.UrlState} />
 <Controls of={Stories.Base} />

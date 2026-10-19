@@ -6,7 +6,7 @@ import { cn } from "@crate/ui/lib/cn";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export const SELECT_TRIGGER_BASE_CLASS =
-  "crate-form-control flex w-fit items-center justify-between gap-2 px-3 py-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-subtle";
+  "crate-form-control flex w-48 max-w-full items-center justify-between gap-2 px-3 py-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:overflow-hidden *:data-[slot=select-value]:text-left *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-subtle";
 export const SELECT_TRIGGER_ICON_CLASS = "size-4 text-text-subtle";
 export const SELECT_CONTENT_BASE_CLASS =
   "crate-overlay-surface relative z-app-dropdown max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto";
