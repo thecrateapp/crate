@@ -19,6 +19,9 @@ import {
   usageToday,
 } from "@/lib/ai-models";
 
+// useApi errors carry the raw response body, which can be JSON; never render it.
+const LOAD_ERROR = "Couldn't load AI settings. Try again.";
+
 export function AiModels() {
   const { hasCapability } = useAuth();
   const canReadConfig = hasCapability("ai.config.read");
@@ -69,7 +72,7 @@ export function AiModels() {
       ) : null}
 
       {loading ? <p>Loading AI settings…</p> : null}
-      {error ? <ErrorState message={error} onRetry={refetch} /> : null}
+      {error ? <ErrorState message={LOAD_ERROR} onRetry={refetch} /> : null}
 
       {usage && today ? (
         <div className="grid gap-3 sm:grid-cols-3">

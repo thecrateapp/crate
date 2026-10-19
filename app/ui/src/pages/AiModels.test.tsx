@@ -103,17 +103,24 @@ describe("AiModels", () => {
     expect(screen.getByText("Loading AI settings…")).toBeVisible();
   });
 
-  it("shows an error state with a retry control", () => {
+  it("shows a readable error state with a retry control", () => {
     const refetch = vi.fn();
     useApiMock.mockReset().mockImplementation((url: string | null) => ({
       data: null,
       loading: false,
-      error: url?.endsWith("/snapshot") ? "Request failed" : null,
+      error: url?.endsWith("/snapshot")
+        ? '{"detail":"Internal Server Error","code":"AI_STORE_DOWN"}'
+        : null,
       refetch,
     }));
     renderWithAdminProviders(<AiModels />);
 
-    expect(screen.getByText("Request failed")).toBeVisible();
+    expect(
+      screen.getByText("Couldn't load AI settings. Try again."),
+    ).toBeVisible();
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain("detail");
+    expect(text).not.toContain("AI_STORE_DOWN");
     fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });

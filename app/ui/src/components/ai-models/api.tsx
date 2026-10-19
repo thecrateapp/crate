@@ -23,8 +23,26 @@ export function reportFailure(error: unknown) {
 
 type JobKind = "refresh" | "test";
 
+const TERMINAL_STATUSES = ["completed", "failed", "cancelled"];
+
+// useApi errors carry the raw response body; never render them.
+const JOB_READ_ERROR =
+  "Couldn't check progress. Reload the page to see the latest state.";
+
 function progressMessage(kind: JobKind): string {
   return kind === "refresh" ? "Refreshing models…" : "Testing…";
+}
+
+function outcomeMessage(kind: JobKind, job: Job): string {
+  const result = job.result;
+  if (kind === "refresh") {
+    return result?.status === "succeeded"
+      ? `Loaded ${result.model_count ?? 0} models`
+      : "Couldn't refresh models";
+  }
+  if (result?.compatible === true) return "Compatible";
+  if (result?.compatible === false) return "Not compatible";
+  return "Test failed";
 }
 
 function JobStatusReader({
@@ -47,7 +65,7 @@ function JobStatusReader({
 
   useEffect(() => {
     if (!data || finished) return;
-    if (["completed", "failed", "cancelled"].includes(data.status)) {
+    if (TERMINAL_STATUSES.includes(data.status)) {
       setFinished(true);
       onComplete();
       return;
@@ -62,28 +80,16 @@ function JobStatusReader({
         ? "A refresh is already running."
         : "A test is already running."
       : progressMessage(kind);
-    return <p role="status">{error ?? message}</p>;
+    return <p role="status">{message}</p>;
   }
 
-  const result = data?.result;
-  let message = progressMessage(kind);
-  if (result) {
-    if (kind === "refresh") {
-      message =
-        result.status === "succeeded"
-          ? `Loaded ${result.model_count ?? 0} models`
-          : "Couldn't refresh models";
-    } else {
-      message =
-        result.compatible === true
-          ? "Compatible"
-          : result.compatible === false
-            ? "Not compatible"
-            : "Test failed";
-    }
-  }
+  const message = error
+    ? JOB_READ_ERROR
+    : data && (data.result || TERMINAL_STATUSES.includes(data.status))
+      ? outcomeMessage(kind, data)
+      : progressMessage(kind);
 
-  return <p role="status">{error ?? message}</p>;
+  return <p role="status">{message}</p>;
 }
 
 export function JobProgress({
