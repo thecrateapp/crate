@@ -158,7 +158,7 @@ def plan_transition(
     )
 
     if fallback_reason is None:
-        tempo_ratio = round(_tempo_ratio(outgoing.bpm, incoming.bpm), 6)
+        tempo_ratio = round(_cue_tempo_ratio(outgoing, incoming), 6)
         window = _fit_window(
             outgoing,
             incoming,
@@ -245,7 +245,7 @@ def _beatmatch_fallback_reason(
         or outgoing.time_signature != incoming.time_signature
     ):
         return TransitionFallbackReason.INCOMPATIBLE_METER
-    adjustment = abs(_tempo_ratio(outgoing.bpm, incoming.bpm) - 1.0)
+    adjustment = abs(_cue_tempo_ratio(outgoing, incoming) - 1.0)
     maximum_adjustment = min(
         policy.maximum_tempo_adjustment,
         policy.hard_maximum_tempo_adjustment,
@@ -476,6 +476,22 @@ def _tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> floa
     return float(outgoing_bpm) / normalized_incoming
 
 
+def _cue_tempo_ratio(outgoing: TrackMixProfile, incoming: TrackMixProfile) -> float:
+    return _tempo_ratio(_outro_beat(outgoing)[0], _intro_beat(incoming)[0])
+
+
+def _intro_beat(profile: TrackMixProfile) -> tuple[float | None, int | None]:
+    if profile.intro_bpm and profile.intro_beat_ms is not None:
+        return profile.intro_bpm, profile.intro_beat_ms
+    return profile.bpm, profile.downbeat_anchor_ms
+
+
+def _outro_beat(profile: TrackMixProfile) -> tuple[float | None, int | None]:
+    if profile.outro_bpm and profile.outro_beat_ms is not None:
+        return profile.outro_bpm, profile.outro_beat_ms
+    return profile.bpm, profile.downbeat_anchor_ms
+
+
 def _normalized_tempo(reference_bpm: float, candidate_bpm: float) -> float:
     options = (candidate_bpm * 0.5, candidate_bpm, candidate_bpm * 2.0)
     return min(options, key=lambda value: abs(value - reference_bpm))
@@ -580,20 +596,20 @@ def _beat_phase_offset(
     incoming_cue_ms: int,
     tempo_ratio: float,
 ) -> int:
+    outgoing_bpm, outgoing_reference_ms = _outro_beat(outgoing)
+    incoming_bpm, incoming_reference_ms = _intro_beat(incoming)
     if (
-        not outgoing.bpm
-        or not incoming.bpm
-        or outgoing.downbeat_anchor_ms is None
-        or incoming.downbeat_anchor_ms is None
+        not outgoing_bpm
+        or not incoming_bpm
+        or outgoing_reference_ms is None
+        or incoming_reference_ms is None
     ):
         return 0
-    outgoing_beat_ms = 60_000.0 / outgoing.bpm
-    incoming_beat_ms = 60_000.0 / _normalized_tempo(outgoing.bpm, incoming.bpm)
-    outgoing_phase_ms = (
-        outgoing_cue_ms - outgoing.downbeat_anchor_ms
-    ) % outgoing_beat_ms
+    outgoing_beat_ms = 60_000.0 / outgoing_bpm
+    incoming_beat_ms = 60_000.0 / _normalized_tempo(outgoing_bpm, incoming_bpm)
+    outgoing_phase_ms = (outgoing_cue_ms - outgoing_reference_ms) % outgoing_beat_ms
     incoming_phase_ms = (
-        (incoming_cue_ms - incoming.downbeat_anchor_ms) % incoming_beat_ms
+        (incoming_cue_ms - incoming_reference_ms) % incoming_beat_ms
     ) / tempo_ratio
     offset_ms = round((outgoing_phase_ms - incoming_phase_ms) % outgoing_beat_ms)
     return int(offset_ms) % max(1, round(outgoing_beat_ms))

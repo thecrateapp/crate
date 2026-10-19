@@ -26,6 +26,9 @@ const MEASUREMENT_WINDOW_MS: u64 = 5_000;
 const DOWNBEAT_MIN_CONFIDENCE: f32 = 0.65;
 const FULL_SCAN_HEAD_SECONDS: u32 = 600;
 const FULL_SCAN_TAIL_SECONDS: u32 = 120;
+const LOCAL_TEMPO_BEATS: usize = 16;
+const LOCAL_TEMPO_MIN_BEATS: usize = 8;
+const LOCAL_TEMPO_OUTLIER_MS: f64 = 6.0;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -627,24 +630,98 @@ fn median(values: &[f32]) -> f32 {
 /// whole track, which the planner then extrapolates from the downbeat anchor
 /// to a cue minutes later. Fitting the refined grid keeps that drift sub-ms.
 fn grid_bpm(beat_grid_ms: &[u64]) -> Option<f32> {
-    if beat_grid_ms.len() < 4 {
+    let beats: Vec<(f64, f64)> = beat_grid_ms
+        .iter()
+        .enumerate()
+        .map(|(index, time)| (index as f64, *time as f64))
+        .collect();
+    fit_beats(&beats).map(|fit| (60_000.0 / fit.period) as f32)
+}
+
+struct BeatFit {
+    period: f64,
+    mean_index: f64,
+    mean_time: f64,
+}
+
+impl BeatFit {
+    fn time_at(&self, index: f64) -> f64 {
+        self.mean_time + (index - self.mean_index) * self.period
+    }
+}
+
+fn fit_beats(beats: &[(f64, f64)]) -> Option<BeatFit> {
+    if beats.len() < 4 {
         return None;
     }
-    let count = beat_grid_ms.len() as f64;
-    let mean_index = (count - 1.0) / 2.0;
-    let mean_time = beat_grid_ms.iter().map(|value| *value as f64).sum::<f64>() / count;
-    let (covariance, variance) = beat_grid_ms.iter().enumerate().fold(
+    let count = beats.len() as f64;
+    let mean_index = beats.iter().map(|(index, _)| index).sum::<f64>() / count;
+    let mean_time = beats.iter().map(|(_, time)| time).sum::<f64>() / count;
+    let (covariance, variance) = beats.iter().fold(
         (0.0_f64, 0.0_f64),
         |(covariance, variance), (index, time)| {
-            let di = index as f64 - mean_index;
-            (
-                covariance + di * (*time as f64 - mean_time),
-                variance + di * di,
-            )
+            let di = index - mean_index;
+            (covariance + di * (time - mean_time), variance + di * di)
         },
     );
     let period = covariance / variance;
-    (period > 0.0).then(|| (60_000.0 / period) as f32)
+    (period > 0.0).then_some(BeatFit {
+        period,
+        mean_index,
+        mean_time,
+    })
+}
+
+/// Tempo and a fitted beat position from the beats around a cue.
+///
+/// The planner phases the decks at the cues, so a tempo that drifts across
+/// the track must be measured where the mix happens instead of extrapolated
+/// from the global tempo and the downbeat anchor.
+fn local_tempo(beat_grid_ms: &[u64], cue_ms: Option<u64>) -> (Option<f32>, Option<u64>) {
+    let Some(cue_ms) = cue_ms else {
+        return (None, None);
+    };
+    if beat_grid_ms.len() < 4 {
+        return (None, None);
+    }
+    let nearest = beat_grid_ms
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, position)| position.abs_diff(cue_ms))
+        .map_or(0, |(index, _)| index);
+    let count = LOCAL_TEMPO_BEATS.min(beat_grid_ms.len());
+    let start = nearest
+        .saturating_sub(count / 2)
+        .min(beat_grid_ms.len() - count);
+    let mut beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
+        .iter()
+        .enumerate()
+        .map(|(offset, time)| ((start + offset) as f64, *time as f64))
+        .collect();
+    let Some(mut fit) = fit_beats(&beats) else {
+        return (None, None);
+    };
+    while beats.len() > LOCAL_TEMPO_MIN_BEATS {
+        let (worst, residual) = beats
+            .iter()
+            .enumerate()
+            .map(|(position, (index, time))| (position, (time - fit.time_at(*index)).abs()))
+            .max_by(|left, right| left.1.total_cmp(&right.1))
+            .unwrap_or((0, 0.0));
+        if residual <= LOCAL_TEMPO_OUTLIER_MS {
+            break;
+        }
+        beats.remove(worst);
+        match fit_beats(&beats) {
+            Some(refit) => fit = refit,
+            None => return (None, None),
+        }
+    }
+    let reference = fit.time_at(nearest as f64);
+    (
+        Some((60_000.0 / fit.period) as f32),
+        (reference >= 0.0).then(|| reference.round() as u64),
+    )
 }
 
 fn tempo_features(
@@ -879,6 +956,12 @@ pub fn analyze_smart_mix_segments(
             sample_rate,
         ),
     };
+    let (intro_bpm, intro_beat_ms) = local_tempo(&beat_grid_ms, intro_cue_ms);
+    let (outro_bpm, outro_beat_ms) = if tail.is_none() {
+        local_tempo(&beat_grid_ms, outro_cue_ms)
+    } else {
+        (None, None)
+    };
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -916,6 +999,10 @@ pub fn analyze_smart_mix_segments(
         key_confidence: Some(key_confidence),
         intro_cue_ms,
         outro_cue_ms,
+        intro_bpm,
+        intro_beat_ms,
+        outro_bpm,
+        outro_beat_ms,
         intro_lufs: intro_lufs.map(|value| value as f32),
         outro_lufs: outro_lufs.map(|value| value as f32),
         true_peak_dbfs: loudness

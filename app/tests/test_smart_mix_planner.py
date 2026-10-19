@@ -433,6 +433,49 @@ def test_phase_offset_uses_both_beat_grids() -> None:
     )
 
 
+def test_local_cue_tempo_drives_the_ratio_and_the_phase() -> None:
+    outgoing = _profile(
+        "outgoing",
+        bpm=121.3,
+        outro_cue_ms=165_100,
+        outro_bpm=121.6,
+        outro_beat_ms=165_037,
+    )
+    incoming = _profile(
+        "incoming",
+        bpm=121.3,
+        intro_cue_ms=8_000,
+        intro_bpm=121.0,
+        intro_beat_ms=7_811,
+    )
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.incoming_tempo_ratio == round(121.6 / 121.0, 6)
+    outgoing_beat_ms = 60_000 / 121.6
+    outgoing_phase = (plan.outgoing_cue_ms - 165_037) % outgoing_beat_ms
+    incoming_phase = (
+        (plan.incoming_cue_ms - 7_811) % (60_000 / 121.0)
+    ) / plan.incoming_tempo_ratio
+    assert plan.beat_phase_offset_ms == round(
+        (outgoing_phase - incoming_phase) % outgoing_beat_ms
+    )
+
+
+def test_incomplete_local_tempo_falls_back_to_the_global_grid() -> None:
+    outgoing = _profile("outgoing", outro_bpm=121.6, outro_beat_ms=None)
+    incoming = _profile("incoming", intro_bpm=None, intro_beat_ms=7_811)
+    baseline = plan_transition(
+        _profile("outgoing"), _profile("incoming"), _context(source="radio")
+    )
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.incoming_tempo_ratio == 1.0
+    assert plan.beat_phase_offset_ms == baseline.beat_phase_offset_ms
+
+
 def test_half_time_incoming_grid_is_normalized_before_phase() -> None:
     outgoing = _profile("outgoing", downbeat_anchor_ms=500)
     incoming = _profile("incoming", bpm=60.0, downbeat_anchor_ms=0)

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class PlannerPolicy:
     version: int = 2
     identifier: str = "smart-mix-v2"
-    rules_revision: int = 2
+    rules_revision: int = 3
     minimum_bpm_confidence: float = 0.75
     minimum_tempo_stability: float = 0.80
     maximum_tempo_adjustment: float = 0.04

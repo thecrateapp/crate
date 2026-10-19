@@ -53,6 +53,10 @@ class TrackMixProfileDraft:
     key_confidence: float | None = None
     intro_cue_ms: int | None = None
     outro_cue_ms: int | None = None
+    intro_bpm: float | None = None
+    intro_beat_ms: int | None = None
+    outro_bpm: float | None = None
+    outro_beat_ms: int | None = None
     intro_lufs: float | None = None
     outro_lufs: float | None = None
     true_peak_dbfs: float | None = None
@@ -77,6 +81,8 @@ class TrackMixProfileDraft:
             "downbeat_anchor_ms",
             "intro_cue_ms",
             "outro_cue_ms",
+            "intro_beat_ms",
+            "outro_beat_ms",
         ):
             _require_non_negative_ms(field_name, getattr(self, field_name))
         object.__setattr__(
@@ -138,6 +144,10 @@ class TrackMixProfile:
     key_confidence: float | None = None
     intro_cue_ms: int | None = None
     outro_cue_ms: int | None = None
+    intro_bpm: float | None = None
+    intro_beat_ms: int | None = None
+    outro_bpm: float | None = None
+    outro_beat_ms: int | None = None
     intro_lufs: float | None = None
     outro_lufs: float | None = None
     true_peak_dbfs: float | None = None
@@ -168,6 +178,8 @@ class TrackMixProfile:
             "downbeat_anchor_ms",
             "intro_cue_ms",
             "outro_cue_ms",
+            "intro_beat_ms",
+            "outro_beat_ms",
         ):
             _require_non_negative_ms(field_name, getattr(self, field_name))
         object.__setattr__(
@@ -231,6 +243,10 @@ class TrackMixProfile:
             "keyConfidence": self.key_confidence,
             "introCueMs": self.intro_cue_ms,
             "outroCueMs": self.outro_cue_ms,
+            "introBpm": self.intro_bpm,
+            "introBeatMs": self.intro_beat_ms,
+            "outroBpm": self.outro_bpm,
+            "outroBeatMs": self.outro_beat_ms,
             "introLufs": self.intro_lufs,
             "outroLufs": self.outro_lufs,
             "truePeakDbfs": self.true_peak_dbfs,
@@ -388,6 +404,10 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
         key_confidence=value("key_confidence", "keyConfidence"),
         intro_cue_ms=value("intro_cue_ms", "introCueMs"),
         outro_cue_ms=value("outro_cue_ms", "outroCueMs"),
+        intro_bpm=value("intro_bpm", "introBpm"),
+        intro_beat_ms=value("intro_beat_ms", "introBeatMs"),
+        outro_bpm=value("outro_bpm", "outroBpm"),
+        outro_beat_ms=value("outro_beat_ms", "outroBeatMs"),
         intro_lufs=value("intro_lufs", "introLufs"),
         outro_lufs=value("outro_lufs", "outroLufs"),
         true_peak_dbfs=value("true_peak_dbfs", "truePeakDbfs"),
@@ -406,8 +426,10 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
 
 
 def _validate_measurements(profile: Any) -> None:
-    if profile.bpm is not None and not (math.isfinite(profile.bpm) and profile.bpm > 0):
-        raise ValueError("bpm must be a positive finite number")
+    for field_name in ("bpm", "intro_bpm", "outro_bpm"):
+        value = getattr(profile, field_name)
+        if value is not None and not (math.isfinite(value) and value > 0):
+            raise ValueError(f"{field_name} must be a positive finite number")
     for field_name in (
         "intro_lufs",
         "outro_lufs",

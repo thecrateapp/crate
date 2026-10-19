@@ -246,6 +246,28 @@ def test_requests_without_bass_handoff_keep_their_plan_cache_key() -> None:
     )
 
 
+def test_planner_rule_changes_split_the_plan_cache(monkeypatch) -> None:
+    from dataclasses import replace
+
+    from crate.api import smart_mix
+    from crate.api.schemas.smart_mix import TransitionEdgeRequest
+
+    edge = TransitionEdgeRequest.model_validate(
+        _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    )
+    current = smart_mix._plan_cache_key(edge, None, None)
+    monkeypatch.setattr(
+        smart_mix,
+        "PLANNER_POLICY",
+        replace(
+            smart_mix.PLANNER_POLICY,
+            rules_revision=smart_mix.PLANNER_POLICY.rules_revision + 1,
+        ),
+    )
+
+    assert smart_mix._plan_cache_key(edge, None, None) != current
+
+
 def test_missing_profile_returns_per_edge_fallback(test_app, monkeypatch) -> None:
     from crate.api import smart_mix
 

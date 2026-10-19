@@ -11,6 +11,7 @@ from crate.smart_mix.models import (
     TransitionFallbackReason,
     TransitionMode,
     TransitionPlan,
+    mix_profile_draft_from_payload,
 )
 
 
@@ -61,6 +62,8 @@ def test_clamps_profile_and_plan_confidences() -> None:
         ("duration_ms", -1),
         ("beat_anchor_ms", -1),
         ("intro_cue_ms", 1.5),
+        ("intro_beat_ms", -1),
+        ("outro_beat_ms", 2.5),
     ],
 )
 def test_profile_milliseconds_are_non_negative_integers(
@@ -140,10 +143,41 @@ def transition_plan(**overrides) -> TransitionPlan:
     return TransitionPlan(**values)
 
 
+@pytest.mark.parametrize("field_name", ["bpm", "intro_bpm", "outro_bpm"])
 @pytest.mark.parametrize("bpm", [float("nan"), float("inf"), 0.0, -120.0])
-def test_profile_rejects_non_finite_or_non_positive_bpm(bpm: float) -> None:
+def test_profile_rejects_non_finite_or_non_positive_bpm(
+    field_name: str, bpm: float
+) -> None:
     with pytest.raises(ValueError):
-        profile(bpm=bpm)
+        profile(**{field_name: bpm})
+
+
+def test_summary_exposes_the_local_cue_tempo() -> None:
+    payload = profile(
+        intro_bpm=121.0, intro_beat_ms=7_811, outro_bpm=121.6, outro_beat_ms=165_037
+    ).to_summary_dict()
+
+    assert payload["introBpm"] == 121.0
+    assert payload["introBeatMs"] == 7_811
+    assert payload["outroBpm"] == 121.6
+    assert payload["outroBeatMs"] == 165_037
+
+
+def test_rust_payload_carries_the_local_cue_tempo() -> None:
+    draft = mix_profile_draft_from_payload(
+        {
+            "durationMs": 150_000,
+            "quality": "full",
+            "bpm": 121.3,
+            "introBpm": 121.0,
+            "introBeatMs": 7_811,
+            "outroBpm": 121.6,
+            "outroBeatMs": 145_930,
+        }
+    )
+
+    assert (draft.intro_bpm, draft.intro_beat_ms) == (121.0, 7_811)
+    assert (draft.outro_bpm, draft.outro_beat_ms) == (121.6, 145_930)
 
 
 @pytest.mark.parametrize(

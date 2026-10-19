@@ -59,6 +59,25 @@ def test_repository_keeps_the_decoder_duration_and_measurements(pg_db) -> None:
     assert stored.measurement_version == "bs1770-v1"
 
 
+def test_repository_keeps_the_local_cue_tempo(pg_db) -> None:
+    del pg_db
+    track_id, track_uid = _create_track("local-tempo")
+    mix_profile = replace(
+        _profile(track_uid),
+        intro_bpm=121.0,
+        intro_beat_ms=7_811,
+        outro_bpm=121.6,
+        outro_beat_ms=165_037,
+    )
+
+    assert upsert_track_mix_profile(track_id, mix_profile) is True
+    stored = get_track_mix_profile_by_entity_uid(track_uid)
+
+    assert stored is not None
+    assert (stored.intro_bpm, stored.intro_beat_ms) == (121.0, 7_811)
+    assert (stored.outro_bpm, stored.outro_beat_ms) == (121.6, 165_037)
+
+
 def test_legacy_profile_without_decoder_duration_is_marked_as_library(pg_db) -> None:
     del pg_db
     track_id, track_uid = _create_track("legacy-duration")

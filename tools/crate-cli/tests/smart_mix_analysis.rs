@@ -82,6 +82,75 @@ fn rust_tempo_is_precise_enough_to_extrapolate_to_late_cues() {
     }
 }
 
+fn click_times_ms(start_bpm: f32, end_bpm: f32, duration_seconds: f32) -> Vec<f64> {
+    let mut times = Vec::new();
+    let mut beat_time = 0.0_f32;
+    while beat_time < duration_seconds {
+        times.push(f64::from(beat_time) * 1_000.0);
+        let bpm = start_bpm + (end_bpm - start_bpm) * beat_time / duration_seconds;
+        beat_time += 60.0 / bpm;
+    }
+    times
+}
+
+#[test]
+fn rust_measures_local_tempo_at_the_cues_of_a_drifting_track() {
+    let samples = click_track(121.0, 121.6, 150.0, 0.0, 0.0);
+    let truth = click_times_ms(121.0, 121.6, 150.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    for (bpm, reference) in [
+        (profile.intro_bpm, profile.intro_beat_ms),
+        (profile.outro_bpm, profile.outro_beat_ms),
+    ] {
+        let beat_ms = 60_000.0 / f64::from(bpm.unwrap());
+        let reference = reference.unwrap() as f64;
+        let last = *truth.last().unwrap();
+        for beat in 0..24 {
+            let predicted = reference + f64::from(beat) * beat_ms;
+            if predicted > last {
+                break;
+            }
+            let error = truth
+                .iter()
+                .map(|time| predicted - time)
+                .min_by(|left, right| left.abs().total_cmp(&right.abs()))
+                .unwrap();
+            assert!(
+                error.abs() <= 4.0,
+                "beat {beat} after {reference} ms is {error} ms off"
+            );
+        }
+    }
+    assert!(profile.outro_bpm.unwrap() > profile.intro_bpm.unwrap() + 0.3);
+}
+
+#[test]
+fn rust_local_tempo_ignores_a_misplaced_hit_near_the_cue() {
+    let mut samples = click_track(122.0, 122.0, 150.0, 0.0, 0.0);
+    let beat_ms = 60_000.0_f64 / 122.0;
+    let beat = (147_000.0 / beat_ms).round();
+    let start = (beat * beat_ms / 1_000.0 * SAMPLE_RATE as f64) as usize;
+    let pulse: Vec<f32> = samples[start..start + 600].to_vec();
+    samples[start..start + 600].fill(0.0);
+    let shifted = start + (0.040 * SAMPLE_RATE as f64) as usize;
+    for (offset, value) in pulse.iter().enumerate() {
+        samples[shifted + offset] += value;
+    }
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    let outro_bpm = f64::from(profile.outro_bpm.unwrap());
+    assert!((outro_bpm - 122.0).abs() <= 0.02, "outro tempo {outro_bpm}");
+    let reference = profile.outro_beat_ms.unwrap() as f64;
+    let error = reference - (reference / beat_ms).round() * beat_ms;
+    assert!(
+        error.abs() <= 3.0,
+        "outro beat {reference} is {error} ms off"
+    );
+}
+
 fn syncopated_band(bpm: f32, duration_seconds: f32) -> Vec<f32> {
     let mut samples = vec![0.0_f32; (duration_seconds * SAMPLE_RATE as f32) as usize];
     let mut seed = 0x2545_f491_u32;
