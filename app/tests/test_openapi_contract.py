@@ -1745,6 +1745,7 @@ def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app)
         ("/api/admin/agent-integrations", "get"): "AgentCollectionResponse",
         ("/api/admin/agent-integrations", "post"): "AgentCredentialSecretResponse",
         ("/api/admin/agent-plans", "get"): "AgentCollectionResponse",
+        ("/api/admin/agent-plans/summary", "get"): "AgentPlanCountsResponse",
     }
     assert "agents" in {tag["name"] for tag in admin_schema["tags"]}
     for (path, method), model in expected.items():

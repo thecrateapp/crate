@@ -17,6 +17,7 @@ from crate.api.schemas.show_imports import (
 from crate.api.schemas.agents import (
     AgentCollectionResponse,
     AgentCredentialSecretResponse,
+    AgentPlanCountsResponse,
     CredentialExpiry,
     IntegrationCreate,
     IntegrationUpdate,

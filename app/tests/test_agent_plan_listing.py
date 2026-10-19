@@ -4,9 +4,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from crate.api.agent_plans import router
+from crate.api.permissions import ROLE_CAPABILITIES
 from crate.db.repositories import agent_plans as plans
+from crate.db.repositories.agent_requests import _hash
+from crate.db.repositories.auth_user_roles import set_user_roles
 
 from tests.agent_command_fixtures import change
+from tests.test_agent_admin import ORIGIN, human_token
 from tests.test_agent_plan_approvals import pending_plan
 
 pytest_plugins = ["tests.agent_command_fixtures", "tests.test_agent_admin"]
@@ -167,3 +175,97 @@ def test_count_pending_plans_respects_visible_operations(command_world):
     assert plans.count_pending_plans(operations=["shows_import"]) == 1
     assert plans.count_pending_plans(operations=["shows_import", "repairs"]) == 2
     assert plans.count_pending_plans(operations=[]) == 0
+
+
+def test_http_summary_counts_pending_plans_visible_to_the_reviewer(
+    command_world, human_actor, monkeypatch
+):
+    now = datetime.now(UTC)
+    shows_plan_id = insert_plan(
+        command_world,
+        created_at=now,
+        expires_at=now + timedelta(minutes=30),
+        operation="shows_import",
+    )
+    insert_plan(
+        command_world,
+        created_at=now,
+        expires_at=now + timedelta(minutes=30),
+        operation="repairs",
+    )
+
+    app = FastAPI()
+    app.include_router(router)
+    with TestClient(app, base_url="https://api.example.test") as client:
+        client.cookies.set("crate_session", human_token(human_actor))
+        client.headers["Origin"] = ORIGIN
+
+        summary = client.get("/api/admin/agent-plans/summary")
+        assert summary.status_code == 200
+        assert summary.json() == {"awaiting_approval": 2}
+        assert summary.headers["Cache-Control"] == "no-store"
+
+        monkeypatch.setitem(
+            ROLE_CAPABILITIES,
+            "ops",
+            (*ROLE_CAPABILITIES["ops"], "agents.plans.review", "curation.shows.write"),
+        )
+        set_user_roles(human_actor["id"], ["ops"])
+
+        restricted = client.get("/api/admin/agent-plans/summary")
+        assert restricted.status_code == 200
+        assert restricted.json() == {"awaiting_approval": 1}
+
+        pending = client.get("/api/admin/agent-plans?view=pending")
+        assert pending.status_code == 200
+        assert {row["plan_id"] for row in pending.json()["items"]} == {shows_plan_id}
+
+
+def test_http_rejects_unknown_view(command_world, human_actor):
+    app = FastAPI()
+    app.include_router(router)
+    with TestClient(app, base_url="https://api.example.test") as client:
+        client.cookies.set("crate_session", human_token(human_actor))
+        client.headers["Origin"] = ORIGIN
+        response = client.get("/api/admin/agent-plans?view=everything")
+        assert response.status_code == 422
+
+
+def test_plan_document_names_connection_and_requester(command_world, human_actor):
+    plan = pending_plan(command_world)
+    document = plans.get_plan(plan["plan_id"])
+    assert document["integration_name"] == "Command agent"
+    assert document["integration_kind"] == "service"
+    assert document["requester_name"] is None
+
+    change("UPDATE users SET name='Operator' WHERE id=:id", {"id": human_actor["id"]})
+    change(
+        """UPDATE agent_repair_plans
+               SET authorization_context = jsonb_build_object('human_actor_id', CAST(:uid AS int))
+             WHERE id=:id""",
+        {"uid": human_actor["id"], "id": plan["plan_id"]},
+    )
+
+    updated = plans.get_plan(plan["plan_id"])
+    assert updated["requester_name"] == "Operator"
+
+
+def test_identity_fields_do_not_change_review_hashes(command_world):
+    now = datetime.now(UTC)
+    plan_id = insert_plan(
+        command_world, created_at=now, expires_at=now + timedelta(minutes=30)
+    )
+
+    got = plans.get_plan(plan_id)
+    assert got["integration_name"] == "Command agent"
+    assert got["integration_kind"] == "service"
+    assert got["requester_name"] is None
+    assert got["content_hash"] == _hash(
+        {
+            **plan_document(),
+            "authorization_context": {},
+            "policy_revision": 1,
+            "approval_required": True,
+            "expires_at": got["expires_at"],
+        }
+    )

@@ -12,6 +12,10 @@ class AgentCollectionResponse(BaseModel):
     next_cursor: str | None = None
 
 
+class AgentPlanCountsResponse(BaseModel):
+    awaiting_approval: int
+
+
 class ClosedBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

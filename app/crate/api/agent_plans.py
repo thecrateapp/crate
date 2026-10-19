@@ -1,5 +1,6 @@
 """Complete exact-plan review by independent human cookie sessions."""
 
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -10,7 +11,11 @@ from crate.api.agent_integrations import (
     private_response,
 )
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
-from crate.api.schemas import AgentCollectionResponse, PlanDecision
+from crate.api.schemas import (
+    AgentCollectionResponse,
+    AgentPlanCountsResponse,
+    PlanDecision,
+)
 from crate.db.repositories import agent_plans as store
 from crate.agent_operation_catalog import OPERATIONS
 
@@ -28,6 +33,17 @@ def _reviewer(request, capability="agents.plans.review"):
     return actor
 
 
+def _visible_operations(actor) -> list[str]:
+    operations = [
+        operation
+        for operation, (_grant, capability) in OPERATIONS.items()
+        if capability in actor["capabilities"]
+    ]
+    if "library.repair.run" in actor["capabilities"]:
+        operations.append("repair_photo_flag")
+    return operations
+
+
 @router.get(
     "",
     response_model=AgentCollectionResponse,
@@ -38,26 +54,37 @@ def _reviewer(request, capability="agents.plans.review"):
 def plans(
     request: Request,
     state: str | None = Query(None, max_length=40),
+    view: Literal["pending", "history"] | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     cursor: UUID | None = None,
 ):
     actor = _reviewer(request)
-    operations = [
-        operation
-        for operation, (_grant, capability) in OPERATIONS.items()
-        if capability in actor["capabilities"]
-    ]
-    if "library.repair.run" in actor["capabilities"]:
-        operations.append("repair_photo_flag")
     rows = store.list_plans(
         state=state,
+        view=view,
         limit=limit + 1,
         before=str(cursor) if cursor else None,
-        operations=operations,
+        operations=_visible_operations(actor),
     )
     return {
         "items": rows[:limit],
         "next_cursor": rows[limit - 1]["plan_id"] if len(rows) > limit else None,
+    }
+
+
+@router.get(
+    "/summary",
+    response_model=AgentPlanCountsResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    openapi_extra={"security": [{"cookieAuth": []}]},
+    summary="Count agent plans waiting for this reviewer",
+)
+def plans_summary(request: Request):
+    actor = _reviewer(request)
+    return {
+        "awaiting_approval": store.count_pending_plans(
+            operations=_visible_operations(actor)
+        )
     }
 
 

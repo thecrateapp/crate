@@ -38,6 +38,9 @@ def _document(row):
             "returned_count": count,
             "truncated": False,
             "result": row["result"],
+            "integration_name": row.get("principal_name"),
+            "integration_kind": row.get("principal_kind"),
+            "requester_name": row.get("requester_name"),
         }
     observation = row["observation"]
     content = {
@@ -82,6 +85,9 @@ def _document(row):
         "returned_count": 1,
         "truncated": False,
         "result": row["result"],
+        "integration_name": row.get("principal_name"),
+        "integration_kind": row.get("principal_kind"),
+        "requester_name": row.get("requester_name"),
         **content,
     }
 
@@ -97,10 +103,18 @@ def _get(current, plan_id, *, lock=False):
                 """
         SELECT p.*, p.id::text AS id, p.artist_uid::text AS artist_uid, o.observation,
                p.expires_at > NOW() AS unexpired,
-               j.operation AS job_operation, j.effect_started_at, t.status AS task_status
+               j.operation AS job_operation, j.effect_started_at, t.status AS task_status,
+               pr.name AS principal_name, pr.kind AS principal_kind,
+               COALESCE(NULLIF(u.name, ''), u.username, u.email) AS requester_name
         FROM agent_repair_plans p LEFT JOIN agent_photo_observations o ON o.id = p.observation_id
         LEFT JOIN agent_jobs j ON j.task_id = p.task_id
         LEFT JOIN tasks t ON t.id = j.task_id
+        JOIN agent_principals pr ON pr.id = p.principal_id
+        LEFT JOIN users u ON u.id = COALESCE(
+            (p.authorization_context->>'human_actor_id')::int,
+            (p.authorization_context->>'actor_user_id')::int,
+            pr.human_owner_user_id
+        )
         WHERE p.id = :id
     """
                 + (" FOR UPDATE OF p" if lock else "")
