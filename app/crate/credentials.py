@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 from crate.db.repositories.credential_secrets import (
     delete_expired_credential_secrets,
@@ -18,6 +18,7 @@ from crate.db.repositories.credential_secrets import (
     insert_credential_secret,
     revoke_credential_scope,
     revoke_credential_secret,
+    rewrap_credential_secrets,
 )
 from crate.db.repositories.settings import get_setting
 
@@ -30,7 +31,7 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _credential_key(*, session=None) -> bytes:
+def _credential_key(*, require_strong_key=False, session=None) -> bytes:
     configured = os.environ.get("CRATE_CREDENTIAL_KEY", "").strip()
     if configured:
         try:
@@ -38,6 +39,9 @@ def _credential_key(*, session=None) -> bytes:
             return configured.encode("utf-8")
         except Exception as exc:
             raise CredentialSecretError("Invalid CRATE_CREDENTIAL_KEY") from exc
+
+    if require_strong_key:
+        raise CredentialSecretError("AI credentials require CRATE_CREDENTIAL_KEY")
 
     try:
         root_secret = (
@@ -57,6 +61,31 @@ def _fernet(*, session=None) -> Fernet:
     return Fernet(_credential_key(session=session))
 
 
+def _reader(*, session=None) -> MultiFernet:
+    keys = [_credential_key(session=session)]
+    previous = os.environ.get("CRATE_CREDENTIAL_PREVIOUS_KEYS", "")
+    for value in previous.replace(",", " ").split():
+        try:
+            Fernet(value.encode())
+        except (ValueError, TypeError) as exc:
+            raise CredentialSecretError(
+                "Invalid CRATE_CREDENTIAL_PREVIOUS_KEYS"
+            ) from exc
+        keys.append(value.encode())
+    # Legacy secrets may use either environment or DB JWT. Accept both during migration.
+    roots = [os.environ.get("JWT_SECRET", "")]
+    try:
+        roots.append(get_setting("jwt_secret", session=session) or "")
+    except Exception:
+        pass
+    for root in roots:
+        if root:
+            keys.append(
+                base64.urlsafe_b64encode(hashlib.sha256(root.encode()).digest())
+            )
+    return MultiFernet([Fernet(key) for key in dict.fromkeys(keys)])
+
+
 def _secret_ref(scope: str) -> str:
     clean_scope = "".join(ch for ch in scope.lower() if ch.isalnum() or ch in "-_")
     return f"{clean_scope}:{secrets.token_urlsafe(24)}"
@@ -67,6 +96,7 @@ def store_secret(
     payload: dict[str, Any],
     *,
     ttl_seconds: int | None = None,
+    require_strong_key: bool = False,
     session=None,
 ) -> str:
     """Encrypt and store a credential payload, returning an opaque reference."""
@@ -74,7 +104,11 @@ def store_secret(
     now = _utc_now()
     expires_at = now + timedelta(seconds=ttl_seconds) if ttl_seconds else None
     plaintext = json.dumps(payload, sort_keys=True).encode("utf-8")
-    ciphertext = _fernet(session=session).encrypt(plaintext).decode("utf-8")
+    ciphertext = (
+        Fernet(_credential_key(require_strong_key=require_strong_key, session=session))
+        .encrypt(plaintext)
+        .decode("utf-8")
+    )
     insert_credential_secret(
         secret_ref=ref,
         scope=scope,
@@ -99,13 +133,42 @@ def load_secret(
     if expires_at and expires_at <= _utc_now():
         raise CredentialSecretError("Credential secret expired")
     try:
-        data = _fernet(session=session).decrypt(str(row["ciphertext"]).encode("utf-8"))
+        data = _reader(session=session).decrypt(str(row["ciphertext"]).encode("utf-8"))
     except InvalidToken as exc:
         raise CredentialSecretError("Credential secret cannot be decrypted") from exc
     payload = json.loads(data.decode("utf-8"))
     if not isinstance(payload, dict):
         raise CredentialSecretError("Credential secret payload is invalid")
     return payload
+
+
+def rewrap_secrets(
+    *, limit: int = 100, after_ref: str | None = None, session=None
+) -> dict:
+    """Reencrypt at most 500 rows with explicit current key; caller drives cursor.
+
+    Returns {scanned,rewrapped,next_cursor}. No secrets or refs besides the paging
+    cursor are returned. Failure rolls back the batch; never invokes providers.
+    """
+    writer = Fernet(_credential_key(require_strong_key=True, session=session))
+
+    def transform(ciphertext, current):
+        raw = ciphertext.encode()
+        try:
+            writer.decrypt(raw)
+            return ciphertext
+        except InvalidToken:
+            try:
+                clear = _reader(session=current).decrypt(raw)
+            except InvalidToken as exc:
+                raise CredentialSecretError(
+                    "Credential secret cannot be decrypted"
+                ) from exc
+            return writer.encrypt(clear).decode()
+
+    return rewrap_credential_secrets(
+        transform, limit=limit, after_ref=after_ref, session=session
+    )
 
 
 def revoke_secret(secret_ref: str, *, session=None) -> None:
@@ -142,6 +205,7 @@ __all__ = [
     "load_secret",
     "purge_expired_secrets",
     "redacted",
+    "rewrap_secrets",
     "revoke_scope",
     "revoke_secret",
     "store_secret",

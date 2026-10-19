@@ -1,5 +1,8 @@
 """Idempotent schema bootstrap for fresh installs and bridge upgrades."""
 
+from crate.db.schema_sections.ai_configuration_v120 import (
+    create_ai_configuration_v120_schema,
+)
 from crate.db.schema_sections.show_extraction_v119 import (
     create_show_extraction_v119_schema,
 )
@@ -79,3 +82,17 @@ def create_schema(cur):
     create_shows_v117_schema(cur)
     create_show_plans_v118_schema(cur)
     create_show_extraction_v119_schema(cur)
+
+    # The shared vault was introduced by migration029; bootstrap now needs it
+    # before AI connection FKs. Keep the existing029 definition compatible.
+    cur.execute("""CREATE TABLE IF NOT EXISTS credential_secrets (
+        secret_ref TEXT PRIMARY KEY, scope TEXT NOT NULL, ciphertext TEXT NOT NULL,
+        expires_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL, revoked_at TIMESTAMPTZ)""")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_credential_secrets_scope ON credential_secrets(scope)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_credential_secrets_expires ON credential_secrets(expires_at) WHERE expires_at IS NOT NULL"
+    )
+    create_ai_configuration_v120_schema(cur)
