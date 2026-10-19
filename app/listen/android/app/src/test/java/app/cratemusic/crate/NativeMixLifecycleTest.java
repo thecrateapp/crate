@@ -370,6 +370,7 @@ public class NativeMixLifecycleTest {
     @Test
     public void theHeldStartIsScheduledWhereTheIncomingCueMeetsTheOutgoingCue() {
         preroll();
+        deckB.positionMs = beatmatchPlan().prepareIncomingCueMs();
         deckA.positionMs = 167600L;
         deckB.busFrame = 1_000L;
 
@@ -382,6 +383,7 @@ public class NativeMixLifecycleTest {
     @Test
     public void theHeldStartUsesTheMedianOfItsEstimates() {
         preroll();
+        deckB.positionMs = beatmatchPlan().prepareIncomingCueMs();
         deckB.busFrame = 0L;
         deckA.positionMs = 167600L;
         controller.scheduleHeldStart();
@@ -560,10 +562,28 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void aPrerollRebuffersTheHeldDeckAtItsTempoRatio() {
+        controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
+        deckB.calls.clear();
+
+        assertTrue(controller.beginPreroll(beatmatchPlan()));
+        assertFalse(deckB.calls.contains("seek:" + beatmatchPlan().prepareIncomingCueMs()));
+        rebuffer();
+
+        int speed = deckB.calls.indexOf("speed:1.04");
+        int play = deckB.calls.indexOf("play");
+        int seek = deckB.calls.indexOf("seek:" + (beatmatchPlan().prepareIncomingCueMs() + 1L));
+        assertTrue(speed >= 0);
+        assertTrue(play > speed);
+        assertTrue(seek > play);
+    }
+
+    @Test
     public void aPrerollSeeksAStandbyPreparedElsewhereToTheHeldCue() {
         controller.prepareStandbyAt(0L, 0L);
 
         assertTrue(controller.beginPreroll(beatmatchPlan()));
+        rebuffer();
 
         assertEquals(8104L - 1040L, deckB.positionMs);
     }
@@ -620,6 +640,13 @@ public class NativeMixLifecycleTest {
         controller.prepareStandbyAt(beatmatchPlan().prepareIncomingCueMs(), 0L);
         deckA.positionMs = 167500L;
         assertTrue(controller.beginPreroll(beatmatchPlan()));
+        rebuffer();
+    }
+
+    private void rebuffer() {
+        for (int tick = 0; tick < NativeMixController.PREROLL_REBUFFER_TICKS; tick++) {
+            assertFalse(controller.scheduleHeldStart());
+        }
     }
 
     private void alignPositions(long incomingLagMs) {

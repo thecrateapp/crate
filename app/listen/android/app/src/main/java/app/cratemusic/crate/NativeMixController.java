@@ -37,8 +37,8 @@ final class NativeMixController {
     static final long STANDBY_RETRY_MS = 10_000L;
     static final long PREROLL_MS = 2_500L;
     static final long PREROLL_LEAD_MS = 1_000L;
-    static final long PREROLL_SEEK_TOLERANCE_MS = 20L;
     static final long PREROLL_STARTED_MS = 5L;
+    static final int PREROLL_REBUFFER_TICKS = 5;
     static final float MAX_START_PHASE_ERROR_MS = 10.0f;
     static final int MIN_PHASE_SAMPLES_TO_ENGAGE = 3;
     @Nullable
@@ -46,6 +46,8 @@ final class NativeMixController {
     private long phaseOutgoingCueMs;
     private long phaseIncomingCueMs;
     private long prerollIncomingStartMs;
+    private long prerollHeldIncomingMs;
+    private int prerollRebufferTicks;
     private final long[] startFrameEstimates = new long[15];
     private int startEstimates;
     private long scheduledStartFrame;
@@ -296,9 +298,6 @@ final class NativeMixController {
             return false;
         }
         long heldIncomingMs = plan.prepareIncomingCueMs();
-        if (Math.abs(standbyDeck.positionMs() - heldIncomingMs) > PREROLL_SEEK_TOLERANCE_MS) {
-            standbyDeck.seekTo(heldIncomingMs);
-        }
         try {
             standbyDeck.setSpeed(plan.incomingTempoRatio);
         } catch (RuntimeException error) {
@@ -311,6 +310,8 @@ final class NativeMixController {
         phaseOutgoingCueMs = plan.outgoingCueMs;
         phaseIncomingCueMs = plan.startIncomingCueMs();
         prerollIncomingStartMs = heldIncomingMs;
+        prerollHeldIncomingMs = heldIncomingMs;
+        prerollRebufferTicks = PREROLL_REBUFFER_TICKS;
         startEstimates = 0;
         beatmatchSpeed = plan.incomingTempoRatio;
         lastPhaseErrorMs = 0.0f;
@@ -320,6 +321,16 @@ final class NativeMixController {
 
     boolean scheduleHeldStart() {
         if (prerollPlan == null || activePlan != null) return false;
+        if (prerollRebufferTicks > 0) {
+            prerollRebufferTicks--;
+            if (prerollRebufferTicks == 0) {
+                long target = standbyDeck.positionMs() == prerollHeldIncomingMs
+                    ? prerollHeldIncomingMs + 1L
+                    : prerollHeldIncomingMs;
+                standbyDeck.seekTo(target);
+            }
+            return false;
+        }
         if (!standbyDeck.isReadyFor(queue.get(logicalIndex + 1))) return false;
         long incomingPositionMs = standbyDeck.positionMs();
         if (startEstimates > 0 && incomingPositionMs >= prerollIncomingStartMs + PREROLL_STARTED_MS) {
