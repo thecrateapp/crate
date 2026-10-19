@@ -41,7 +41,7 @@ sources:
     app/crate/db/repositories/agent_integrations.py,
     app/crate/db/repositories/agent_human_sessions.py,
     app/ui/src/pages/AgentIntegrations.tsx,
-    app/ui/src/pages/AgentPlanReview.tsx,
+    app/ui/src/pages/agents/AgentPlanDetail.tsx,
     app/crate/mcp/tools.py,
     app/crate/mcp/schemas.py,
     app/crate/agent_credentials_cli.py,
@@ -160,7 +160,7 @@ The issuer is configured, never inferred from untrusted forwarded headers.
 | `/oauth/revoke`                             | Revoke the delegated authorization, including pending jobs' authority.                     |
 | `/oauth/connections`                        | Human owners inspect and revoke their own connections without global Admin permissions.    |
 
-Register public clients in **Admin → Agent integrations** before connecting. Supply the exact
+Register public clients in **Admin → Agents → Connections** before connecting. Supply the exact
 client ID, callback URIs and scope ceiling. A URL client ID explicitly opts into Client ID Metadata
 Documents: its public HTTPS document must match the registration. Fetches pin validated public IPs,
 retain TLS hostname verification, reject redirects/internal destinations and cap time and body size.
@@ -205,7 +205,7 @@ impact, risk, expiry, reversibility and authorization context. The current opera
 there is no hidden sample or implicit approval of further artists.
 
 An integration can require human review. Preview then returns `awaiting_approval`; an authorized
-human reviews all changes at **Admin → Agent plans** and approves or rejects. Approval binds the
+human reviews all changes at **Admin → Agents → Approvals** and approves or rejects. Approval binds the
 principal, authorization context, plan version, canonical content hash and policy revision. It does
 not grant missing scopes, and MCP exposes no approval tool. Incomplete, expired or changed plans
 must be prepared/reviewed again. A policy change invalidates existing plans even when a previously
@@ -1624,7 +1624,7 @@ Human Admin plans have an internal user-owned principal/proof that cannot be iss
 as a remote credential. Cookie session and origin are checked in the API. Workers check current
 user status/capabilities at each stage/effect. Admin works with MCP disabled; remote actions retain
 the existing MCP gates and service/delegated authorization. Internal human contexts cannot run
-non-show operations. Review/approval uses the existing Agent Plans page and exact hashes.
+non-show operations. Review/approval uses the existing Agents → Approvals page and exact hashes.
 
 Selected writes, revision rechecks, private per-item results and common job completion commit
 in one transaction. A conflict rolls back the selection; an unexpected write failure reports every

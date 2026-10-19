@@ -18,7 +18,7 @@ sources:
   - app/crate/db/repositories/agent_plans.py
   - app/crate/db/repositories/show_identities.py
   - app/crate/show_extraction.py
-  - app/ui/src/pages/AgentPlanReview.tsx
+  - app/ui/src/pages/agents/AgentPlanDetail.tsx
   - .agents/skills/crate-editorial-playlists/SKILL.md
 ---
 
@@ -77,7 +77,7 @@ artist identity stable while observations are persisted.
 | Crate cookie session       | Human consent, management and plan review in Admin | Current human capabilities, session and Origin checks; it does not authenticate MCP calls.                     |
 
 Register OAuth clients with exact redirect URIs and a scope ceiling in
-**Admin → Agent integrations**. The server supports authorization code with
+**Admin → Agents → Connections**. The server supports authorization code with
 PKCE S256 and rotating refresh tokens. Dynamic Client Registration is not
 enabled. Service credentials are separate from Listen passwords and appear
 only when created or rotated. See the operational guide for provisioning and
@@ -103,7 +103,7 @@ ordinary delegated access-token expiry while their authorization stays valid.
    every cursor. Check identities, ordered selection, effects, source versions,
    risks, exclusions and expiry. A task summary is not the plan.
 5. If human approval is required, an authorized reviewer approves that exact
-   plan/version in **Admin → Agent plans**. The agent has no approval tool.
+   plan/version in **Admin → Agents → Approvals**. The agent has no approval tool.
    Approval cannot supply a missing grant.
 6. Apply the exact plan ID and version with a stable idempotency key. After a
    lost response, replay the same key and payload to recover the accepted job.
@@ -214,7 +214,7 @@ rollout budget remain explicit release gates.
 | Transport, authentication and finite tool schemas     | `app/crate/mcp/`                                                                             |
 | Scope/capability intersection                         | `app/crate/agent_access.py`                                                                  |
 | Common plan/job admission, execution and verification | `app/crate/agent_operations.py`, `app/crate/db/repositories/agent_operation_jobs.py`         |
-| Human approval and policy/version binding             | `app/crate/db/repositories/agent_plans.py`, `app/ui/src/pages/AgentPlanReview.tsx`           |
+| Human approval and policy/version binding             | `app/crate/db/repositories/agent_plans.py`, `app/ui/src/pages/agents/AgentPlanDetail.tsx`    |
 | Domain adapters                                       | `app/crate/agent_health.py`, `agent_editorial.py`, `agent_shows.py` and maintenance adapters |
 | Shared show identity and durable provenance           | `app/crate/db/repositories/show_identities.py`, `show_import_selection.py`                   |
 | Reproducible acceptance and exported contract         | `scripts/evaluate-crate-mcp.py`, `app/crate/mcp/contract.py`                                 |
