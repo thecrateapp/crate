@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { Link } from "react-router";
 
@@ -15,6 +15,7 @@ import type {
   AgentPlanListItem,
 } from "@/lib/agent-integrations";
 import {
+  apiErrorText,
   connectionKindLabel,
   planStateView,
   planTitle,
@@ -67,14 +68,24 @@ export function AgentApprovals() {
 function ApprovalsList({ view }: { view: PlanView }) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [items, setItems] = useState<AgentPlanListItem[]>([]);
-  const { data, loading, error } = useApi<AgentCollection<AgentPlanListItem>>(
+  // useApi keeps `loading` false after the first page, so the next page's
+  // request is tracked here.
+  const [loadingMore, setLoadingMore] = useState(false);
+  const handled = useRef<AgentCollection<AgentPlanListItem> | null>(null);
+  const { data, loading, error, refetch } = useApi<
+    AgentCollection<AgentPlanListItem>
+  >(
     `${base}?view=${view}&limit=20${
       cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
     }`,
   );
 
   useEffect(() => {
-    if (!data) return;
+    // A cursor change alone re-runs this effect with the previous page; only
+    // a newly arrived page is merged.
+    if (!data || data === handled.current) return;
+    handled.current = data;
+    setLoadingMore(false);
     setItems((previous) => {
       const next = cursor ? [...previous] : [];
       const seen = new Set(next.map((entry) => entry.plan_id));
@@ -88,6 +99,10 @@ function ApprovalsList({ view }: { view: PlanView }) {
     // `cursor` decides replace-vs-append for this page's arrival; it is read,
     // not written, here, and is intentionally part of the dependency list.
   }, [data, cursor]);
+
+  useEffect(() => {
+    if (error) setLoadingMore(false);
+  }, [error]);
 
   const emptyMessage =
     view === "pending"
@@ -103,9 +118,21 @@ function ApprovalsList({ view }: { view: PlanView }) {
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-red-300">
-          {error}
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p role="alert" className="text-sm text-red-300">
+            {apiErrorText(error, "The plans could not be loaded.")}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (cursor) setLoadingMore(true);
+              refetch();
+            }}
+          >
+            Try again
+          </Button>
+        </div>
       ) : null}
       {!loading && !error && items.length === 0 ? (
         <p className="text-sm text-white/55">{emptyMessage}</p>
@@ -117,13 +144,16 @@ function ApprovalsList({ view }: { view: PlanView }) {
           ))}
         </ul>
       ) : null}
-      {nextCursor ? (
+      {nextCursor && !error ? (
         <Button
           variant="outline"
-          disabled={loading}
-          onClick={() => setCursor(nextCursor)}
+          disabled={loading || loadingMore}
+          onClick={() => {
+            setLoadingMore(true);
+            setCursor(nextCursor);
+          }}
         >
-          Load more
+          {loadingMore ? "Loading more…" : "Load more"}
         </Button>
       ) : null}
     </div>

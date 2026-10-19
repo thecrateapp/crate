@@ -117,6 +117,13 @@ describe("AgentIntegrations", () => {
     ).toBe(false);
   });
 
+  it("links plan reviewers to the Agents approvals section", async () => {
+    renderWithAdminProviders(<AgentIntegrations />);
+    expect(
+      await screen.findByRole("link", { name: "Review plans" }),
+    ).toHaveAttribute("href", "/agents/approvals");
+  });
+
   it("reveals a provisioned token once and clears it when the dialog closes", async () => {
     const user = userEvent.setup();
     renderWithAdminProviders(<AgentIntegrations />);
@@ -413,7 +420,7 @@ describe("AgentIntegrations", () => {
     ).toBeInTheDocument();
     expect(
       within(dialog).getByRole("link", { name: "View plan" }),
-    ).toHaveAttribute("href", "/agent-plans/plan%20%2Fone");
+    ).toHaveAttribute("href", "/agents/approvals/plan%20%2Fone");
     expect(
       within(dialog).getByRole("link", { name: "View job" }),
     ).toHaveAttribute("href", "/tasks?task=job%20%2Fone");

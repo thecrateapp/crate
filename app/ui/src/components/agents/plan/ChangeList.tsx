@@ -13,57 +13,9 @@ import {
 
 import { StructuredValue } from "@/components/admin/StructuredValue";
 import type { AgentPlan } from "@/lib/agent-integrations";
-import { fieldDiff, type FieldDiffRow } from "@/lib/agent-plan-presentation";
-import { isRecord, targetIdentity } from "@/lib/agent-plan-review";
+import type { FieldDiffRow } from "@/lib/agent-plan-presentation";
+import { changeView, type ChangeBody } from "@/lib/agent-plan-technical";
 import { humanizeKey } from "@/lib/humanize";
-
-type Change = AgentPlan["changes"][number];
-type Target = AgentPlan["targets"][number];
-
-// Keys that only say which target a change applies to; the card header shows
-// the target, so they are left out of the generic change body.
-const TARGET_KEYS = new Set([
-  "targets",
-  "entity_uid",
-  "artist_uid",
-  "entity_type",
-]);
-
-const hasOwn = (value: object, key: string) =>
-  Object.prototype.hasOwnProperty.call(value, key);
-
-const nonemptyText = (value: unknown): string | null =>
-  typeof value === "string" && value ? value : null;
-
-function nestedTarget(change: Change): Record<string, unknown> | null {
-  const nested = Array.isArray(change.targets) ? change.targets[0] : null;
-  return isRecord(nested) ? nested : null;
-}
-
-/** Readable name of the target a change applies to; never an identity. */
-export function changeTargetLabel(change: Change, targets: Target[]): string {
-  const nested = nestedTarget(change);
-  const identity =
-    targetIdentity(change) ?? (nested ? targetIdentity(nested) : null);
-  if (identity === "library:global") return "Whole library";
-  if (identity === null)
-    return change.scope === "global" ? "Whole library" : "Unknown target";
-  const target: Record<string, unknown> | null =
-    targets.find((entry) => targetIdentity(entry) === identity) ?? nested;
-  const label = nonemptyText(target?.label) ?? nonemptyText(target?.name);
-  if (label) return label;
-  const kind = nonemptyText(target?.entity_type);
-  return kind ? humanizeKey(kind) : "Unknown target";
-}
-
-function changeSubject(change: Change): string {
-  const subject = change.field ?? change.action ?? change.pipeline;
-  return humanizeKey(typeof subject === "string" ? subject : "operation");
-}
-
-function photoText(value: unknown): string {
-  return value ? "Photo present" : "No photo";
-}
 
 function BeforeAfter({
   current,
@@ -120,7 +72,7 @@ function FieldDiffTable({ rows }: { rows: FieldDiffRow[] }) {
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[30%]">Field</TableHead>
+                <TableHead className="w-[36%]">Field</TableHead>
                 <TableHead>Current</TableHead>
                 <TableHead>Proposed</TableHead>
               </TableRow>
@@ -175,80 +127,68 @@ function FieldDiffTable({ rows }: { rows: FieldDiffRow[] }) {
   );
 }
 
-function ChangeBody({
-  change,
-  operation,
-}: {
-  change: Change;
-  operation: string;
-}) {
-  if (operation === "repair_photo_flag")
-    return (
-      <BeforeAfter
-        current={photoText(change.before)}
-        proposed={photoText(change.after)}
-      />
-    );
-
-  if (hasOwn(change, "before") || hasOwn(change, "after")) {
-    const rows = fieldDiff(change.before, change.after);
-    if (rows) return <FieldDiffTable rows={rows} />;
-    const cleared =
-      hasOwn(change, "after") &&
-      change.after === null &&
-      change.before !== null &&
-      change.before !== undefined;
-    return (
-      <BeforeAfter
-        current={<StructuredValue value={change.before} />}
-        proposed={
-          cleared ? (
-            <span className="text-red-200">Cleared</span>
-          ) : (
-            <StructuredValue value={change.after} />
-          )
-        }
-      />
-    );
+function ChangeBodyView({ body }: { body: ChangeBody }) {
+  switch (body.kind) {
+    case "photo":
+      return <BeforeAfter current={body.current} proposed={body.proposed} />;
+    case "diff":
+      return <FieldDiffTable rows={body.rows} />;
+    case "scalar":
+      return (
+        <BeforeAfter
+          current={<StructuredValue value={body.current} />}
+          proposed={
+            body.cleared ? (
+              <span className="text-red-200">Cleared</span>
+            ) : (
+              <StructuredValue value={body.proposed} />
+            )
+          }
+        />
+      );
+    case "details":
+      return body.details ? (
+        <div className="text-sm text-white/80">
+          <StructuredValue value={body.details} />
+        </div>
+      ) : null;
   }
-
-  const details = Object.fromEntries(
-    Object.entries(change).filter(([key]) => !TARGET_KEYS.has(key)),
-  );
-  if (Object.keys(details).length === 0) return null;
-  return (
-    <div className="text-sm text-white/80">
-      <StructuredValue value={details} />
-    </div>
-  );
 }
 
 export function ChangeList({ plan }: { plan: AgentPlan }) {
   // Preserve every proposed change, including identical entries, with keys
   // that do not depend on unrelated rows' positions.
   const occurrences = new Map<string, number>();
-  const changes = plan.changes.map((change) => {
+  const changes = plan.changes.map((change, index) => {
     const content = JSON.stringify(change);
     const occurrence = occurrences.get(content) ?? 0;
     occurrences.set(content, occurrence + 1);
-    return { change, key: `${content}/${occurrence}` };
+    return {
+      view: changeView(change, index, plan),
+      key: `${content}/${occurrence}`,
+    };
   });
 
   return (
     <div className="space-y-2">
       <ul role="list" aria-label="Proposed changes" className="space-y-3">
-        {changes.map(({ change, key }) => (
+        {changes.map(({ view, key }) => (
           <li
             key={key}
             className="min-w-0 space-y-3 rounded-md border border-white/10 bg-white/[0.02] p-4"
           >
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <p className="font-medium break-words text-white">
-                {changeTargetLabel(change, plan.targets)}
+                {view.targets.map((label, index) => (
+                  <span key={`${index}:${label}`}>
+                    {index > 0 ? ", " : null}
+                    <span>{label}</span>
+                  </span>
+                ))}
               </p>
-              <p className="text-sm text-white/55">{changeSubject(change)}</p>
+              <p className="text-sm text-white/55">{view.subject}</p>
             </div>
-            <ChangeBody change={change} operation={plan.operation} />
+            <ChangeBodyView body={view.body} />
           </li>
         ))}
       </ul>

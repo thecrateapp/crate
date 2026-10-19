@@ -351,6 +351,11 @@ describe("AgentPlanDetail", () => {
     });
     // Track identities are exact review data but live in Technical details.
     expect(details).not.toHaveTextContent("track-second");
+    expect(details).not.toHaveTextContent("excluded-new");
+    expect(details).toHaveTextContent(/New exclusions\s*1 excluded track/);
+    expect(details).toHaveTextContent(/Existing exclusions\s*1 excluded track/);
+    expect(details).toHaveTextContent(/Copied exclusions\s*No excluded tracks/);
+    expect(details).not.toHaveTextContent("service-one");
     await user.click(
       within(details).getByRole("button", { name: "Track identities" }),
     );
@@ -384,13 +389,19 @@ describe("AgentPlanDetail", () => {
         copied_exclusions: item.existing_exclusions,
       }),
     );
+    const user = userEvent.setup();
     renderReview();
     const details = await screen.findByRole("region", {
       name: "Complete editorial details",
     });
-    expect(details).toHaveTextContent(
-      /Copied exclusions\s*Track uid\s*excluded-existing\s*Global track uid\s*Empty/,
+    expect(details).toHaveTextContent(/Copied exclusions\s*1 excluded track/);
+    expect(details).not.toHaveTextContent("excluded-existing");
+    await user.click(
+      within(details).getByRole("button", { name: "Track identities" }),
     );
+    expect(
+      within(details).getByText("Copied exclusion 1 · Track ID").parentElement,
+    ).toHaveTextContent("excluded-existing");
   });
 
   it.each([
@@ -553,7 +564,24 @@ describe("AgentPlanDetail", () => {
       name: "Proposed changes",
     });
     expect(list).toHaveTextContent("user_liked_tracks");
-    expect(list).toHaveTextContent(trackUid);
+    // Every target of the change is named on the card, not only the first.
+    expect(within(list).getByText("Echo")).toBeInTheDocument();
+    expect(within(list).getAllByText("Missing track").length).toBeGreaterThan(
+      0,
+    );
+    // Identifiers (uids, issue id, row keys, source hash) leave the card.
+    expect(list).not.toHaveTextContent(trackUid);
+    expect(list).not.toHaveTextContent("f".repeat(64));
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    expect(document.body.textContent).toContain(trackUid);
+    expect(
+      screen.getByText(
+        "Change 1 · Dependent relations 1 › Rows 1 › Source hash",
+      ).parentElement,
+    ).toHaveTextContent("f".repeat(64));
+    expect(
+      screen.getByText("Change 1 · Issue id").parentElement,
+    ).toHaveTextContent("42");
     const approve = screen.getByRole("button", { name: "Approve" });
     await user.click(screen.getByRole("checkbox"));
     expect(approve).toBeEnabled();
@@ -783,12 +811,17 @@ describe("AgentPlanDetail", () => {
   });
 
   it("keeps a manual-only plan reviewable without granting execution approval", async () => {
+    const user = userEvent.setup();
     apiMock.mockResolvedValue(metadataPlan({ executable: false }));
     renderReview();
     expect(
       await screen.findByRole("list", { name: "Proposed changes" }),
     ).toHaveTextContent("New biography");
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
   });
 
   it("rejects a complete manual-only diagnostic repair using its exact review hashes", async () => {
@@ -826,6 +859,8 @@ describe("AgentPlanDetail", () => {
     await screen.findByRole("list", { name: "Proposed changes" });
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     await user.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Reject" }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -919,7 +954,7 @@ describe("AgentPlanDetail", () => {
       expect(button).toBeDisabled();
       await user.click(
         screen.getByRole("checkbox", {
-          name: "I reviewed all 1 changes and their effects.",
+          name: "I reviewed this change and its effects.",
         }),
       );
       expect(button).toBeEnabled();
@@ -1156,13 +1191,24 @@ describe("AgentPlanDetail presentation", () => {
       "Coilguns",
     );
 
+    expect(
+      screen.queryByRole("row", { name: /Item id/ }),
+    ).not.toBeInTheDocument();
+
     const text = document.body.textContent ?? "";
     expect(text).not.toContain('{"');
     expect(text).not.toMatch(/[0-9a-f]{64}/i);
+    expect(text).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
 
     await user.click(screen.getByRole("button", { name: "Technical details" }));
     expect(document.body.textContent).toContain(item.content_hash);
     expect(document.body.textContent).toContain(`show:${showTarget.name}`);
+    expect(
+      screen.getByText("Coilguns · 2027-03-14 · Proposed › Item id")
+        .parentElement,
+    ).toHaveTextContent("6cff6a09-f56b-45ef-aaf4-7e9a4836ff0d");
   });
 
   it("disables the decision when the plan expires while open", async () => {
@@ -1176,11 +1222,43 @@ describe("AgentPlanDetail presentation", () => {
     await user.click(screen.getByRole("checkbox"));
     expect(approve).toBeEnabled();
 
+    expect(screen.getByText("Needs approval")).toBeInTheDocument();
+
     act(() => {
       vi.advanceTimersByTime(20_000);
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent("This plan expired");
+    // The header badge reads the same clock as the decision bar.
+    expect(screen.getByText("Expired")).toBeInTheDocument();
+    expect(screen.queryByText("Needs approval")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Approve" }),
+    ).not.toBeInTheDocument();
+    expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
+      false,
+    );
+  });
+
+  it("treats a click after expiry as expired before the next clock tick", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    apiMock.mockResolvedValue(
+      plan({ expires_at: new Date(Date.now() + 5_000).toISOString() }),
+    );
+    renderReview();
+    await user.click(await screen.findByRole("checkbox"));
+    const approve = screen.getByRole("button", { name: "Approve" });
+    expect(approve).toBeEnabled();
+
+    // The wall clock passes the expiry without the 15 s tick firing.
+    vi.setSystemTime(Date.now() + 10_000);
+    await user.click(approve);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This plan expired",
+    );
+    expect(screen.getByText("Expired")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Approve" }),
     ).not.toBeInTheDocument();

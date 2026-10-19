@@ -13,6 +13,11 @@ import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
 import type { AgentPlan } from "@/lib/agent-integrations";
 import { formatTrackDuration } from "@/lib/agent-plan-presentation";
 import { isRecord } from "@/lib/agent-plan-review";
+import {
+  editorialTrackIdentities,
+  editorialView,
+  redactTechnical,
+} from "@/lib/agent-plan-technical";
 
 const nonemptyText = (value: unknown): string | null =>
   typeof value === "string" && value ? value : null;
@@ -21,22 +26,6 @@ function lockText(locked: unknown): string {
   if (locked === true) return "Locked";
   if (locked === false) return "Unlocked";
   return "Missing lock state";
-}
-
-function trackIdentityItems(selection: unknown[]) {
-  const items: { label: string; value: string | number }[] = [];
-  selection.forEach((track, index) => {
-    if (!isRecord(track)) return;
-    const name = `${index + 1}. ${nonemptyText(track.title) ?? "Untitled"}`;
-    const trackUid = nonemptyText(track.track_uid);
-    const globalTrackUid = nonemptyText(track.global_track_uid);
-    if (trackUid) items.push({ label: `${name} · Track ID`, value: trackUid });
-    if (globalTrackUid)
-      items.push({ label: `${name} · Global track ID`, value: globalTrackUid });
-    if (typeof track.row_id === "number")
-      items.push({ label: `${name} · Row ID`, value: track.row_id });
-  });
-  return items;
 }
 
 function TrackRow({ track }: { track: Record<string, unknown> }) {
@@ -73,7 +62,8 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
   const selection: unknown[] = Array.isArray(plan.selection)
     ? plan.selection
     : [];
-  const identities = trackIdentityItems(selection);
+  const identities = editorialTrackIdentities(plan);
+  const details = editorialView(plan).visible;
   const policyOnly =
     plan.kind === "visibility" || plan.kind === "refresh_policy";
 
@@ -101,7 +91,7 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
               ) : (
                 <TableRow key={index}>
                   <TableCell colSpan={5} className="whitespace-normal">
-                    <StructuredValue value={track} />
+                    <StructuredValue value={redactTechnical(track).visible} />
                   </TableCell>
                 </TableRow>
               ),
@@ -116,18 +106,7 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
         </p>
       )}
       <div className="text-sm text-white/80">
-        <StructuredValue
-          value={{
-            metadata: plan.metadata,
-            smart_rules: plan.smart_rules,
-            new_exclusions: plan.new_exclusions,
-            existing_exclusions: plan.existing_exclusions,
-            copied_exclusions: plan.copied_exclusions,
-            source_revision: plan.source_revision,
-            generation_epoch: plan.generation_epoch,
-            provenance: plan.provenance,
-          }}
-        />
+        <StructuredValue value={details} />
       </div>
       {identities.length > 0 ? (
         <TechnicalDetails title="Track identities" items={identities} />

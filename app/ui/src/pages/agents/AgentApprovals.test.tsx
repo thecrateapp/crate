@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -128,6 +128,63 @@ describe("AgentApprovals", () => {
     expect(
       screen.getByRole("link", { name: "Import shows · 3 items" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows loading more, then a readable error that can be retried", async () => {
+    const user = userEvent.setup();
+    const pending: { reject?: (error: Error) => void } = {};
+    let failNextPage = true;
+    apiMock.mockImplementation((url: string) => {
+      if (!String(url).includes("cursor=plan-one"))
+        return Promise.resolve({
+          items: [planItem()],
+          next_cursor: "plan-one",
+        });
+      if (failNextPage) {
+        failNextPage = false;
+        return new Promise((_resolve, reject) => {
+          pending.reject = reject;
+        });
+      }
+      return Promise.resolve({
+        items: [
+          planItem({
+            plan_id: "plan-two",
+            operation: "editorial_change",
+            target_count: 1,
+          }),
+        ],
+        next_cursor: null,
+      });
+    });
+    renderWithAdminProviders(<AgentApprovals />);
+    await screen.findByRole("link", { name: "Import shows · 3 items" });
+
+    await user.click(screen.getByRole("button", { name: "Load more" }));
+    expect(
+      await screen.findByRole("button", { name: "Loading more…" }),
+    ).toBeDisabled();
+
+    await act(async () => {
+      pending.reject?.(new Error('{"detail":"Plan listing is unavailable"}'));
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /^Plan listing is unavailable$/,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Load more|Loading more/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByRole("link", {
+        name: "Change editorial playlist · 1 item",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Import shows · 3 items" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("explains an empty pending queue", async () => {

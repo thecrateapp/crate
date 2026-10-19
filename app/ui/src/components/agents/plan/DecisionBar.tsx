@@ -6,7 +6,6 @@ import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { RelativeTime } from "@/components/admin/RelativeTime";
-import { useNow } from "@/hooks/use-now";
 import { notifyAgentPlansChanged } from "@/hooks/use-pending-approvals";
 import type { AgentPlan } from "@/lib/agent-integrations";
 import { apiErrorText } from "@/lib/agent-plan-presentation";
@@ -18,14 +17,18 @@ const STALE_PLAN_MESSAGE = "The plan changed. Reload and review it again.";
 
 // Sticks to the bottom of the content column; the page adds bottom padding so
 // it never hides the last change or the Technical details toggle.
+// `--surface-panel` is a CSS variable, not a theme colour, so the translucent
+// background is spelled as an arbitrary value.
 const barClassName =
-  "sticky bottom-0 z-10 rounded-t-md border-t border-white/10 bg-panel-surface/95 px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
+  "sticky bottom-0 z-10 rounded-t-md border-t border-white/10 bg-[color-mix(in_srgb,var(--surface-panel)_95%,transparent)] px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
 
 export function DecisionBar({
   plan,
   canDecide,
   canApprove,
   complete,
+  now,
+  onLapsed,
   onDecided,
   onReload,
 }: {
@@ -33,21 +36,20 @@ export function DecisionBar({
   canDecide: boolean;
   canApprove: boolean;
   complete: boolean;
+  /** The page clock (`useNow`), shared with the header state badge. */
+  now: number;
+  /** Called when a click finds the plan expired before the next clock tick. */
+  onLapsed: (at: number) => void;
   onDecided: () => void;
   onReload: () => void;
 }) {
-  const now = useNow(15_000);
   const checkboxId = useId();
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
   const [reviewedIdentity, setReviewedIdentity] = useState<string | null>(null);
-  // Set when a click finds the plan already expired between clock ticks.
-  const [lapsedAt, setLapsedAt] = useState<number | null>(null);
-
-  const effectiveNow = Math.max(now, lapsedAt ?? 0);
   const expiry = new Date(plan.expires_at).getTime();
   const validExpiry = Number.isFinite(expiry);
-  const expired = !validExpiry || expiry <= effectiveNow;
+  const expired = !validExpiry || expiry <= now;
   const currentReviewIdentity = reviewIdentity(plan);
   const reviewed = reviewedIdentity === currentReviewIdentity;
 
@@ -64,7 +66,7 @@ export function DecisionBar({
       return;
     const clickedAt = Date.now();
     if (expiry <= clickedAt) {
-      setLapsedAt(clickedAt);
+      onLapsed(clickedAt);
       return;
     }
     setBusy(true);
@@ -101,8 +103,8 @@ export function DecisionBar({
           {validExpiry ? (
             <p className="text-white/80">
               This plan expired{" "}
-              <RelativeTime value={plan.expires_at} now={effectiveNow} />. Ask
-              the agent to prepare it again.
+              <RelativeTime value={plan.expires_at} now={now} />. Ask the agent
+              to prepare it again.
             </p>
           ) : (
             <p className="text-white/80">
@@ -165,7 +167,9 @@ export function DecisionBar({
             <label htmlFor={checkboxId} className="text-sm text-white/80">
               {plan.operation === "editorial_change"
                 ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
-                : `I reviewed all ${plan.changes.length} changes and their effects.`}
+                : plan.changes.length === 1
+                  ? "I reviewed this change and its effects."
+                  : `I reviewed all ${plan.changes.length} changes and their effects.`}
             </label>
           </div>
           <div className="flex shrink-0 gap-2">

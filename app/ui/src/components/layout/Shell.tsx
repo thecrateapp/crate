@@ -154,8 +154,13 @@ export function Shell() {
         </div>
       </div>
 
+      {/* overflow-x-clip (not hidden) keeps wide banners from scrolling the
+          page sideways without turning <main> into a scroll container, so
+          sticky children (decision bars, tab rows) stick to the viewport.
+          TEST_GAP: jsdom has no layout engine, so sticky behaviour cannot be
+          asserted in Vitest; verified in Chrome at 390 and 1440 px. */}
       <main
-        className={`overflow-x-hidden transition-[margin-left] duration-200 ${sidebarWidthClass}`}
+        className={`overflow-x-clip transition-[margin-left] duration-200 ${sidebarWidthClass}`}
       >
         <div
           className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${

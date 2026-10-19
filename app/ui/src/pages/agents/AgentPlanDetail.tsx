@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
   ArrowLeft,
@@ -45,7 +45,14 @@ import {
   planIsComplete,
   targetIdentity,
 } from "@/lib/agent-plan-review";
-import { humanizeKey } from "@/lib/humanize";
+import {
+  changeView,
+  editorialView,
+  redactTechnical,
+  targetDisplayName,
+  technicalItems,
+  type TechnicalItem,
+} from "@/lib/agent-plan-technical";
 
 const base = "/api/admin/agent-plans";
 
@@ -68,17 +75,6 @@ const operationIcons: Record<string, LucideIcon> = {
   metadata_rehydrate: Tags,
   analysis: AudioWaveform,
 };
-
-type TechnicalItem = { label: string; value: string | number | null };
-
-function targetName(target: AgentPlan["targets"][number]): string {
-  if (targetIdentity(target) === "library:global") return "Whole library";
-  return (
-    target.label ||
-    target.name ||
-    (target.entity_type ? humanizeKey(target.entity_type) : "Unknown target")
-  );
-}
 
 function sourceItems(sources: Record<string, unknown> | undefined) {
   const items: TechnicalItem[] = [];
@@ -104,7 +100,7 @@ function sourceItems(sources: Record<string, unknown> | undefined) {
 }
 
 /** Every identifier of the plan; the only place hashes and ids are shown. */
-function technicalItems(item: AgentPlan): TechnicalItem[] {
+function planTechnicalItems(item: AgentPlan): TechnicalItem[] {
   const items: TechnicalItem[] = [
     { label: "Plan ID", value: item.plan_id },
     { label: "Plan version", value: item.plan_version },
@@ -114,9 +110,19 @@ function technicalItems(item: AgentPlan): TechnicalItem[] {
     { label: "Job ID", value: item.job_id ?? null },
     ...sourceItems(item.source_versions),
     ...item.targets.map((target) => ({
-      label: `Target: ${targetName(target)}`,
+      label: `Target: ${targetDisplayName(target)}`,
       value: targetIdentity(target),
     })),
+    ...item.changes.flatMap(
+      (change, index) => changeView(change, index, item).technical,
+    ),
+    ...(item.operation === "editorial_change"
+      ? editorialView(item).technical
+      : []),
+    ...technicalItems(
+      "Conflicts",
+      redactTechnical(item.conflicts ?? [], []).hidden,
+    ),
   ];
   // TechnicalDetails keys rows by label, so repeated labels get a suffix.
   const seen = new Map<string, number>();
@@ -143,7 +149,11 @@ function PlanDetail({ planId }: { planId?: string }) {
   const plan = useApi<AgentPlan>(
     planId && canReview ? `${base}/${encodeURIComponent(planId)}` : null,
   );
-  const now = useNow(15_000);
+  // One clock for the header and the decision bar; `lapsedAt` records a
+  // click that found the plan expired between ticks.
+  const tick = useNow(15_000);
+  const [lapsedAt, setLapsedAt] = useState<number | null>(null);
+  const now = Math.max(tick, lapsedAt ?? 0);
   const changesHeadingId = useId();
   const reversibilityHeadingId = useId();
   const conflictsHeadingId = useId();
@@ -258,7 +268,7 @@ function PlanDetail({ planId }: { planId?: string }) {
                 Conflicts
               </h3>
               <div className="text-sm text-white/80">
-                <StructuredValue value={conflicts} />
+                <StructuredValue value={redactTechnical(conflicts).visible} />
               </div>
             </section>
           ) : null}
@@ -276,7 +286,7 @@ function PlanDetail({ planId }: { planId?: string }) {
               {reversibilityText(item.reversibility)}
             </p>
           </section>
-          <TechnicalDetails items={technicalItems(item)} />
+          <TechnicalDetails items={planTechnicalItems(item)} />
         </div>
       </OpsPanel>
       {awaiting && !canDecide && !complete ? (
@@ -312,6 +322,8 @@ function PlanDetail({ planId }: { planId?: string }) {
           canDecide={canDecide}
           canApprove={canApprove}
           complete={complete}
+          now={now}
+          onLapsed={setLapsedAt}
           onDecided={plan.refetch}
           onReload={plan.refetch}
         />

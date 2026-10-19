@@ -326,7 +326,7 @@ export function AgentIntegrations() {
             </p>
             {hasCapability("agents.plans.review") ? (
               <Button variant="link" asChild>
-                <Link to="/agent-plans">Review plans</Link>
+                <Link to="/agents/approvals">Review plans</Link>
               </Button>
             ) : null}
           </CardContent>
@@ -786,7 +786,7 @@ export function AgentIntegrations() {
                 {entry.evidence.plan_id ? (
                   <Link
                     className="underline"
-                    to={`/agent-plans/${encodeURIComponent(
+                    to={`/agents/approvals/${encodeURIComponent(
                       entry.evidence.plan_id,
                     )}`}
                   >
