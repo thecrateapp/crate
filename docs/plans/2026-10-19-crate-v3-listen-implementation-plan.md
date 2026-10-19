@@ -308,3 +308,12 @@ No certifica dispositivos nativos, AT, escrituras reales ni cierra toda la migra
 Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
 usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
 manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.
+
+## 1BA publicado;1BB primer lote local
+
+1BA aprobado/publicado43e34284. Se aplica la regla H2 de lotes revisables: primer lote1BB
+Home y listas de Library (cabeceras, acciones, métricas, contribuciones y estados de lectura).
+Detalles/editores de Playlist/Curated/HomePlaylist/HomeSection/Crate, coverflow y colaboradores
+continúan en el próximo lote1BB; no están cerrados. [Plan y matriz de alcance](2026-10-19-crate-v3-home-library.md).
+Enmienda de Diego: métricas contextuales (plays, albums/tracks, duración, match) usan MonoLabel
+con mayúsculas del componente; identidad y prosa conservan su escritura. Stop1BB sin commit.

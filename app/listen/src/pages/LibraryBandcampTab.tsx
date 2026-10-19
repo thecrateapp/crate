@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { Button } from "@crate/ui/shadcn/button";
 import { notify } from "@crate/ui/lib/notify";
 import { useApi } from "@/hooks/use-api";
@@ -12,7 +12,7 @@ import { openExternalUrl } from "@/lib/external-links";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
 import { LibraryBandcampImported } from "./LibraryBandcampImported";
 import { LibraryBandcampPurchases } from "./LibraryBandcampPurchases";
-import { ContributionWithdrawDialog } from "./LibraryPrimitives";
+import { ContributionWithdrawDialog } from "@/components/library/ContributionWithdrawDialog";
 import type {
   BandcampCollectionResponse,
   BandcampItem,
@@ -26,15 +26,21 @@ export function LibraryBandcampTab() {
   const {
     data: collection,
     loading: collectionLoading,
+    error: collectionError,
     refetch: refetchCollection,
   } = useApi<BandcampCollectionResponse>("/api/bandcamp/me/collection");
   const {
     data: contributions,
     loading: contributionsLoading,
+    error: contributionsError,
     refetch: refetchContributions,
   } = useApi<ContributionsResponse>("/api/me/contributions?source=bandcamp");
-  const { data: wishlist, loading: wishlistLoading } =
-    useApi<BandcampCollectionResponse>("/api/bandcamp/me/wishlist");
+  const {
+    data: wishlist,
+    loading: wishlistLoading,
+    error: wishlistError,
+    refetch: refetchWishlist,
+  } = useApi<BandcampCollectionResponse>("/api/bandcamp/me/wishlist");
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
   const [withdrawTarget, setWithdrawTarget] =
     useState<LibraryContribution | null>(null);
@@ -107,6 +113,24 @@ export function LibraryBandcampTab() {
 
   if (collectionLoading || wishlistLoading || contributionsLoading) {
     return <LoadingState label={t("common.loadingShort")} />;
+  }
+
+  if (
+    (collectionError && !collection) ||
+    (contributionsError && !contributions) ||
+    (wishlistError && !wishlist)
+  ) {
+    return (
+      <ErrorState
+        message={t("search.errors.tryAgain")}
+        retryLabel={t("common.retry")}
+        onRetry={() => {
+          refetchCollection();
+          refetchContributions();
+          refetchWishlist();
+        }}
+      />
+    );
   }
 
   return (

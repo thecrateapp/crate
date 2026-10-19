@@ -837,6 +837,24 @@ describe("HomeTasteHero", () => {
 });
 
 describe("RecentEntityRow", () => {
+  it("keeps the canonical EntityRow title weight without a local typography override", () => {
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={
+          {
+            type: "album",
+            album_name: "Sample record",
+            artist_name: "Sample artist",
+            album_id: 7,
+          } as HomeRecentItem
+        }
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Sample record")).toHaveClass("font-medium");
+    expect(screen.getByText("Sample record")).not.toHaveClass("font-semibold");
+  });
+
   it("shows only the first four recently played rows on mobile and keeps view all", () => {
     mockMobilePointer();
     const onViewAll = vi.fn();

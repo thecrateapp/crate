@@ -239,9 +239,12 @@ describe("Library", () => {
       screen.getByRole("heading", { name: "Collection" }),
     ).toBeInTheDocument();
     expect(screen.getByText("New Playlist")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New Playlist" })).toHaveClass(
-      "library-new-playlist",
-    );
+    expect(
+      screen.getByRole("button", { name: "New Playlist" }),
+    ).toHaveAttribute("data-slot", "button");
+    expect(
+      screen.getByRole("button", { name: "New Playlist" }),
+    ).not.toHaveClass("library-new-playlist");
     expect(
       screen.queryByRole("tab", { name: /Playlists/i }),
     ).not.toBeInTheDocument();

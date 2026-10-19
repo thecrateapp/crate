@@ -324,6 +324,30 @@ describe("ArtistCard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(["tile", "row", "editorial"] as const)(
+    "uses uppercase MonoLabel for %s artist context, preserving the name",
+    (variant) => {
+      renderWithListenProviders(
+        <ArtistCard
+          variant={variant}
+          name="Chelsea Wolfe"
+          subtitle="84 plays · 2 albums · 0 tracks"
+          meta="93% match"
+        />,
+      );
+      expect(screen.getByText("84 plays · 2 albums · 0 tracks")).toHaveClass(
+        "font-mono",
+        "uppercase",
+        "text-label",
+      );
+      expect(screen.getByText("93% match")).toHaveClass(
+        "font-mono",
+        "uppercase",
+      );
+      expect(screen.getByText("Chelsea Wolfe")).not.toHaveClass("uppercase");
+    },
+  );
+
   it("renders the row variant with rank, meta and the artist menu", async () => {
     renderWithListenProviders(
       <ArtistCard

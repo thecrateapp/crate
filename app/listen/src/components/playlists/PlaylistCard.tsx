@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   memo,
@@ -70,7 +71,10 @@ export interface PlaylistCardProps {
   description?: string;
   tracks?: PlaylistArtworkTrack[];
   coverDataUrl?: string | null;
+  /** Technical context such as track count or duration. */
   meta?: string;
+  /** Person identity preserves its case beside row metadata. */
+  ownerLabel?: string;
   badge?: string;
   systemPlaylist?: boolean;
   crateManaged?: boolean;
@@ -329,7 +333,8 @@ function PlaylistTile(props: PlaylistCardProps) {
       title={name}
       subtitle={
         <>
-          {description || meta}
+          {description ||
+            (meta ? <MonoLabel as="span">{meta}</MonoLabel> : null)}
           <OfflineMeta meta={offlineMeta} state={offlineState} />
         </>
       }
@@ -383,9 +388,9 @@ function PlaylistFeatured(props: PlaylistCardProps) {
       }
       meta={
         meta && !artworkOnly ? (
-          <span className="home-discovery-meta mt-2 block uppercase tracking-eyebrow">
+          <MonoLabel as="span" className="mt-2 block">
             {meta}
-          </span>
+          </MonoLabel>
         ) : undefined
       }
       artwork={props.renderArtwork?.(FEATURED_ARTWORK_CLASS_NAME)}
@@ -486,6 +491,7 @@ function PlaylistRow(props: PlaylistCardProps) {
     name,
     description,
     meta,
+    ownerLabel,
     badge,
     trackCount = 0,
     detailEndpoint,
@@ -518,7 +524,10 @@ function PlaylistRow(props: PlaylistCardProps) {
     [extraActions],
   );
   const trackCountLabel = t("common.trackCountLabel", { count: trackCount });
-  const subtitleText = meta ? `${trackCountLabel} · ${meta}` : trackCountLabel;
+  const contextText = meta ? `${trackCountLabel} · ${meta}` : trackCountLabel;
+  const subtitleText = ownerLabel
+    ? `${contextText} · ${ownerLabel}`
+    : contextText;
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId,
@@ -546,7 +555,13 @@ function PlaylistRow(props: PlaylistCardProps) {
       }
       subtitle={
         <>
-          {subtitleText}
+          <MonoLabel as="span">{contextText}</MonoLabel>
+          {ownerLabel ? (
+            <>
+              {" "}
+              · <span>{ownerLabel}</span>
+            </>
+          ) : null}
           <OfflineMeta meta={offlineMeta} state={offlineState} />
         </>
       }

@@ -7,19 +7,19 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                  | Estado vigente                                                                                                                                                              |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace                 | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado                 | 1AZ aprobado y publicado: `18a880c2`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
-| Checkpoint local          | **1BA local para revisión**: Álbum, acceso y primer recorrido offline; sin commit/push                                                                                             |
+| Publicado                 | 1BA aprobado y publicado: `43e34284`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
+| Checkpoint local          | **1BB primer lote local para revisión**: Home y listas de Library; detalles/editores de playlists y crates siguen en el siguiente lote de1BB; sin commit/push                                                                                             |
 | Enmiendas de revisión     | Columnas fijas y QualityBadge común a hero/fila/player; porcentajes GenrePill en shows del artista. Backend local conserva calidad en Top Tracks; producción requiere desplegar esa corrección. |
 | Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.                           |
-| Revisión actual           | `http://127.0.0.1:5186/review-1ba-artist-player.html`; misma escena en Storybook `Reviews/1BA/Artist and player refinements`; revisiones player-motion y album-access conservadas; Listen vivo en5174 |
+| Revisión actual           | `http://127.0.0.1:5186/review-1bb-home-library.html`; misma escena en Storybook `Reviews/1BB/Home and Library`; revisiones1BA conservadas; Listen vivo en5174 |
 | Auditoría                 | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                   | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1ba-artist-player--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                      |
+| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1bb-home-library--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                      |
 | Próximo grupo de iconos   | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia    | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica        | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente          | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción               | 1AZ publicado18a880c2. Parar en1BA para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
+| Restricción               | 1BA publicado43e34284. Parar en el primer lote1BB para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -846,3 +846,22 @@ sin commit/push y sin avanzar de checkpoint.
 Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
 usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
 manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.
+
+## 1BB — primer lote Home/Library para revisión
+
+1BA publicado43e34284; primer lote H2 según límite revisable. HomeGreeting/HeroActions y recientes
+usando recetas canónicas; LibrarySection, Bandcamp con StatNumber y contribuciones con fila/arte
+56px/acciones comunes; Crates conserva geometríaV2 y ofrece estados de lectura/retry reales.
+Enmienda MonoLabel aplicada a contexto de ArtistCard, contadores de playlists e historial/replay;
+propietarios conservan su escritura mediante ownerLabel. Detalles/editores/coverflow siguen
+explícitamente en el próximo lote1BB, sin declarar Home/colecciones completos.
+[Alcance, validación, revisión y límites](2026-10-19-crate-v3-home-library.md).
+Tipos3apps, builds3hosts, pruebas focalizadas,4casos browser375/1200 y catálogo verdes. Bundle
+inicial202217Bgzip/307200. No nuevas entradas en el mockup histórico; misma escena pequeña y
+Storybook. Tres servicios activos. Stop1BB sin commit/push para Diego.
+
+## 2026-10-20 — primer lote1BB aprobado
+
+Diego aprueba este lote y autoriza commit/push. Continuar con detalles y editores de playlists
+y crates, mockup como referencia y Storybook actualizado; mantener5186/6006/5174 y detener el
+siguiente lote para revisión antes de commit. La aprobación sustituye el stop local anterior.

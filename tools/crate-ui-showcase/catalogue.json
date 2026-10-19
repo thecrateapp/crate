@@ -87,8 +87,8 @@
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/MonoLabel.tsx": "1ff67ba85f1955f2312d797a6680339e8b56b3e8d9fc947cd4a86865dbfa2f62",
-        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "68fb231024277e8a40f261760aec0c26eac82c159780b4efc3860e61c0b76012",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "9ddaed29b17113a618bf33ec7c2375b219432f6bb0c2f2d2b5e1620215a23c27"
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "983c6ab60008f318207426145aff5340527e22a0e3024e26b4a5b5b44e7811d0",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "20fb7082f8ee1765cdbdb7cff4513e97ad9b6e386466dc7145542c21fa26ec1f"
       },
       "category": "Data Display"
     },

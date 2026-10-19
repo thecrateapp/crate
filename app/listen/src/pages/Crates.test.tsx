@@ -94,6 +94,23 @@ describe("Collection Crates", () => {
     }));
   });
 
+  it.each(["/api/me/crates", "/api/me/crates/followed"])(
+    "keeps %s failures retryable instead of claiming empty data",
+    (failedUrl) => {
+      const retry = vi.fn();
+      mocks.useApi.mockImplementation((url: string) => ({
+        data: null,
+        loading: false,
+        error: url === failedUrl ? new Error("Read failed") : null,
+        refetch: retry,
+      }));
+      renderWithListenProviders(<Crates />);
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(retry).toHaveBeenCalled();
+    },
+  );
+
   it("shows crates owned by the listener and crates shared with them", () => {
     mocks.crates = [
       ownedCrate("Year-end records", "owner"),

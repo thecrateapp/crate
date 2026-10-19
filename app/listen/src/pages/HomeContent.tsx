@@ -24,6 +24,7 @@ import {
   HomeUpcomingSection,
 } from "@/components/home/HomeUpcomingSections";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
+import { HomeGreeting } from "@/components/home/HomeGreeting";
 
 import type { HomePageController } from "@/pages/use-home-page-controller";
 import type { HomePageViewModel } from "@/pages/home-page-model";
@@ -41,14 +42,10 @@ interface HomeSectionProps {
 function HomeHero({ page }: HomeSectionProps) {
   const { heroes, currentDiscovery } = page.view;
   const homeIntro = (
-    <div>
-      <h1 className="text-3xl font-bold text-text-primary">
-        {getHomeGreeting(page.t)}
-      </h1>
-      <p className="mt-1 text-sm text-text-muted">
-        {getHomeDateString(page.i18nLanguage)}
-      </p>
-    </div>
+    <HomeGreeting
+      greeting={getHomeGreeting(page.t)}
+      date={getHomeDateString(page.i18nLanguage)}
+    />
   );
 
   return (

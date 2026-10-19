@@ -5014,3 +5014,11 @@ actualizados en plan1BA/estado vigente. Checkpoint local, pendiente de Diego ant
 Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
 usando el mockup y las correcciones confirmadas como referencia, actualizando Storybook y
 manteniendo5186/6006/5174 activos. Detener1BB para revisión antes de su commit/push.
+
+## 1BB — primer lote Home/Library local, publicación1BA confirmada
+
+1BA aprobado y publicado43e34284322c9fb2ab555d16bdcec0f56fd312dc en feat/crate_v3.
+Primer lote1BB queda local para revisión, según H2/límite de tamaño revisable. Continuar por
+[plan y matriz](2026-10-19-crate-v3-home-library.md); no confundir este lote con el cierre de
+Home/colecciones completo. Preview review-1bb-home-library.html y Storybook Reviews/1BB/Home
+and Library reutilizan las vistas locales reales. Mantener5186/6006/5174 y parar antes de commit.

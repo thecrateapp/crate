@@ -22,7 +22,9 @@ describe("Listen layout policy", () => {
     expect(read("src/index.css")).toContain(
       '@import "./components/layout/listen-shell-metrics.css"',
     );
-    const playerBar = read("src/components/player/bar/PlayerBarView.tsx");
+    const playerBarView = read("src/components/player/bar/PlayerBarView.tsx");
+    const playerBar = read("src/components/player/bar/PlayerBarFrame.tsx");
+    expect(playerBarView).toContain("<PlayerBarFrame");
 
     expect(listenStyles).toMatch(
       /--listen-desktop-player-clearance:\s*calc\(\s*var\(--listen-desktop-player-height\)\s*\+\s*var\(--listen-desktop-player-bottom-offset\)/s,
@@ -30,8 +32,11 @@ describe("Listen layout policy", () => {
     expect(playerBar).toContain("md:h-(--listen-desktop-player-height)");
     expect(playerBar).toContain('"var(--listen-desktop-player-bottom-offset)"');
 
+    expect(read("src/components/player/QueuePanel.tsx")).toContain(
+      "<PlayerQueueFrame",
+    );
     for (const panel of [
-      "src/components/player/QueuePanel.tsx",
+      "src/components/player/PlayerQueueFrame.tsx",
       "src/components/player/LyricsPanel.tsx",
     ]) {
       const source = read(panel);

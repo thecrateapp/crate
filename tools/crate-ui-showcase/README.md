@@ -207,3 +207,14 @@ width, the real ExtendedPlayerHeaderBar without an added caption and PlayerLyric
 a colored background. Listen/Album and access, Listen/Player, MediaGrid and AppModal expose the
 same examples. EQ access is separate from the persisted enable preference; actual effects/panels
 stay in Listen. Browser cases cover375/1200/1920px in both hosts, plus affected modal consumers.
+
+### 1BB Home and Library — first batch
+
+`Reviews/1BB/Home and Library` and `review-1bb-home-library.html` share HomeLibraryReview.
+Listen/Home and Library documents actual app-local HomeGreeting/HeroActions, LibrarySection,
+LibraryContributionRow/ContributionWithdrawDialog, LibraryBandcampHeader and CrateIndexGrid.
+Read-state controls and local callbacks cover ready/loading/error/retry/empty, missing export
+capability and confirmation/pending/cancel. Grid slots document geometry, not a replacement 3D
+CrateCard. Details/editors/coverflow/collaborators remain next; see the scope matrix in the plan.
+MonoLabel/ContextualMetrics documents Diego's counts/captions amendment. Only mono-label's
+documented catalogue entry is refreshed; no pending baseline is regenerated.

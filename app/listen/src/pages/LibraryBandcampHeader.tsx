@@ -1,7 +1,8 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 
-import { StatBox } from "./LibraryPrimitives";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { LibrarySection } from "../components/library/LibrarySection";
 
 export function LibraryBandcampHeader({
   purchases,
@@ -23,19 +24,16 @@ export function LibraryBandcampHeader({
   wishlistLabel: string;
 }) {
   return (
-    <div className="rounded-panel border border-accent-action/20 bg-accent-action/10 p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <InfoBadge icon={BandcampLogo}>Bandcamp</InfoBadge>
-          <h2 className="mt-3 text-xl font-black text-text-primary">{title}</h2>
-          <p className="mt-1 text-sm text-text-muted">{description}</p>
-        </div>
-        <div className="flex gap-2">
-          <StatBox value={purchases} label={purchasesLabel} />
-          <StatBox value={importedCount} label={importedLabel} />
-          <StatBox value={wishlistCount} label={wishlistLabel} />
-        </div>
+    <LibrarySection
+      title={title}
+      subtitle={description}
+      actions={<InfoBadge icon={BandcampLogo}>Bandcamp</InfoBadge>}
+    >
+      <div className="grid grid-cols-3 gap-4">
+        <StatNumber value={purchases} label={purchasesLabel} size="sm" />
+        <StatNumber value={importedCount} label={importedLabel} size="sm" />
+        <StatNumber value={wishlistCount} label={wishlistLabel} size="sm" />
       </div>
-    </div>
+    </LibrarySection>
   );
 }

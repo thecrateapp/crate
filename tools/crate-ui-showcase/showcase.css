@@ -118,3 +118,9 @@ h3.showcase-doc-heading {
 @source "../../app/listen/src/components/artist/ArtistLibraryFrames.tsx";
 @source "../../app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx";
 @source "../../app/listen/src/components/upcoming/UpcomingMonthGroupView.tsx";
+
+@source "../../app/listen/src/components/home/HomeGreeting.tsx";
+@source "../../app/listen/src/components/home/HomeHeroActions.tsx";
+@source "../../app/listen/src/components/library";
+@source "../../app/listen/src/components/crates/CrateIndexGrid.tsx";
+@source "../../app/listen/src/pages/LibraryBandcampHeader.tsx";

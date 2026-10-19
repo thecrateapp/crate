@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { memo, useCallback, useMemo } from "react";
 import {
   EntityCard,
@@ -134,8 +135,16 @@ export const ArtistCard = memo(function ArtistCard({
     return (
       <EntityRow
         title={name}
-        subtitle={subtitle}
-        meta={meta}
+        subtitle={
+          subtitle ? <MonoLabel as="span">{subtitle}</MonoLabel> : undefined
+        }
+        meta={
+          typeof meta === "string" || typeof meta === "number" ? (
+            <MonoLabel as="span">{meta}</MonoLabel>
+          ) : (
+            meta
+          )
+        }
         rank={rank}
         shape="circle"
         leading={
@@ -163,8 +172,16 @@ export const ArtistCard = memo(function ArtistCard({
   return (
     <EntityCard
       title={name}
-      subtitle={subtitle}
-      meta={meta}
+      subtitle={
+        subtitle ? <MonoLabel as="span">{subtitle}</MonoLabel> : undefined
+      }
+      meta={
+        typeof meta === "string" || typeof meta === "number" ? (
+          <MonoLabel as="span">{meta}</MonoLabel>
+        ) : (
+          meta
+        )
+      }
       rank={rank}
       shape="circle"
       layout={layout}

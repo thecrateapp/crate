@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useTranslation } from "react-i18next";
 import { Clock3, CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
 import { SectionHeader } from "@crate/ui/domain/lists";
@@ -137,7 +138,7 @@ export function HomeReplaySection({
                 <dd className="text-2xl font-extrabold tabular-nums text-text-primary">
                   {formatInteger(metric.value)}
                 </dd>
-                <dt className="text-xs text-text-muted">{metric.label}</dt>
+                <MonoLabel as="dt">{metric.label}</MonoLabel>
               </div>
             ))}
           </dl>
@@ -151,10 +152,10 @@ export function HomeReplaySection({
         </div>
 
         <div className="home-replay-panel overflow-hidden rounded-panel p-4">
-          <div className="home-replay-panel-kicker mb-3 flex items-center gap-2 text-xs uppercase tracking-wider">
+          <MonoLabel as="div" className="mb-3 flex items-center gap-2">
             <Clock3 size={CRATE_ICON_SIZE.micro} />
             {t("home.replay.title")}
-          </div>
+          </MonoLabel>
           <div className="space-y-1">
             {replayPreview.map((item) => (
               <TrackRow

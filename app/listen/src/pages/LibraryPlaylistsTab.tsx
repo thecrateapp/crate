@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Pencil, Plus, Trash2 } from "@crate/ui/icons";
 
+import { LibrarySection } from "@/components/library/LibrarySection";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
@@ -42,7 +43,7 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 export function LibraryPlaylistsTab() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>(
+  const { data, loading, error, refetch } = useApi<LibraryPlaylistsPageData>(
     "/api/me/playlists-page",
   );
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -64,6 +65,14 @@ export function LibraryPlaylistsTab() {
     !followedCurated?.length;
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (error && !data)
+    return (
+      <ErrorState
+        message={t("search.errors.tryAgain")}
+        retryLabel={t("common.retry")}
+        onRetry={refetch}
+      />
+    );
 
   async function toggleSystemPlaylistFollow(playlist: CuratedPlaylist) {
     try {
@@ -97,7 +106,7 @@ export function LibraryPlaylistsTab() {
         coverDataUrl={playlist.cover_data_url}
         tracks={playlist.artwork_tracks}
         trackCount={playlist.track_count}
-        meta={playlistOwnerLabel(playlist) ?? undefined}
+        ownerLabel={playlistOwnerLabel(playlist) ?? undefined}
         href={`/playlist/${playlist.id}`}
         detailEndpoint={`/api/playlists/${playlist.id}`}
         isFollowed={followedRow || undefined}
@@ -203,12 +212,8 @@ export function LibraryPlaylistsTab() {
 
   return (
     <div className="space-y-3">
-      <Button
-        variant="secondary"
-        onClick={() => openCreatePlaylist()}
-        className="library-new-playlist w-full justify-start rounded-lg bg-text-primary/5 px-4 hover:bg-text-primary/10 has-[>svg]:px-4"
-      >
-        <Plus size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+      <Button variant="secondary" onClick={() => openCreatePlaylist()}>
+        <Plus size={CRATE_ICON_SIZE.md} />
         {t("library.playlists.new")}
       </Button>
 
@@ -221,10 +226,7 @@ export function LibraryPlaylistsTab() {
       ) : null}
 
       {owned.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.yours")}
-          </div>
+        <LibrarySection title={t("library.playlists.yours")}>
           {owned.map((pl) => (
             <PlaylistCard
               variant="row"
@@ -261,32 +263,23 @@ export function LibraryPlaylistsTab() {
               ]}
             />
           ))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {shared.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.shared")}
-          </div>
+        <LibrarySection title={t("library.playlists.shared")}>
           {shared.map((playlist) => renderReadOnlyRow(playlist, false))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {followed.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.followed")}
-          </div>
+        <LibrarySection title={t("library.playlists.followed")}>
           {followed.map((playlist) => renderReadOnlyRow(playlist, true))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {followedCurated && followedCurated.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("explore.fromCrate.title")}
-          </div>
+        <LibrarySection title={t("explore.fromCrate.title")}>
           {followedCurated.map((playlist) => (
             <PlaylistCard
               variant="row"
@@ -316,7 +309,7 @@ export function LibraryPlaylistsTab() {
               onToggleFollow={() => toggleSystemPlaylistFollow(playlist)}
             />
           ))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       <PlaylistCreateModal

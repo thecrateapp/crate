@@ -8,7 +8,7 @@ named `review-<checkpoint>-<scope>.html`. Reuse a scene from
 or import Storybook runtime/CSF into the standalone page. Keep older checkpoints available.
 Component inventory/docs remain mandatory in Storybook. Match the view against the complete
 approved checkpoint scope before sharing, including all component families and agreed states.
-Current amendment review: `review-1ba-artist-player.html`; `review-1ba-player-motion.html`
+Current first-batch review: `review-1bb-home-library.html`; prior `review-1ba-artist-player.html`; `review-1ba-player-motion.html`
 retains the disc/navigation amendment, and the full1BA scope remains in
 `review-1ba-album-access.html`. The approved forms review and its labels alias remain available.
 

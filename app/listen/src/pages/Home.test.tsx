@@ -213,6 +213,11 @@ describe("Home", () => {
         name: /Good (morning|afternoon|evening)/,
       }),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
+        name: /Good (morning|afternoon|evening)/,
+      }),
+    ).toHaveClass("font-display");
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
       "max-w-content",
       "relative",

@@ -60,12 +60,6 @@ export function RecentEntityRow({
       onOpen={onClick}
       renderMenu={renderMenu}
       menuLabel={t("actions.menu.more")}
-      className="home-discovery-card gap-3 p-3"
-      classNames={{
-        action: "gap-3",
-        title: "font-semibold",
-        subtitle: "mt-1",
-      }}
     />
   );
 }

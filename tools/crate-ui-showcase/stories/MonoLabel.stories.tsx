@@ -54,3 +54,14 @@ export const LongLabel: Story = {
     </div>
   ),
 };
+
+export const ContextualMetrics: Story = {
+  render: () => (
+    <div className="showcase-stack">
+      <MonoLabel>84 plays</MonoLabel>
+      <MonoLabel>2 albums · 0 tracks</MonoLabel>
+      <MonoLabel>12 tracks · 52m</MonoLabel>
+      <MonoLabel>93% match</MonoLabel>
+    </div>
+  ),
+};

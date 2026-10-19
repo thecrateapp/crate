@@ -50,7 +50,11 @@ describe("HomeReplaySection", () => {
     expect(screen.getByText("Replay June 2026")).toBeInTheDocument();
     expect(screen.getByText("Play month replay")).toBeInTheDocument();
     expect(screen.getByText("Month replay")).toBeInTheDocument();
-    expect(screen.getByText("Tracks")).toBeInTheDocument();
+    expect(screen.getByText("Tracks")).toHaveClass(
+      "font-mono",
+      "uppercase",
+      "text-label",
+    );
     expect(container.querySelector(".home-replay-card")).toBeInTheDocument();
     expect(container.querySelector(".home-replay-panel")).toBeInTheDocument();
     expect(container.querySelector(".stats-mini-tape")).not.toBeInTheDocument();

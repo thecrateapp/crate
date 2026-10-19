@@ -191,3 +191,17 @@ Fullscreen EQ access follows renderer capability, independently of whether the e
 Opening the existing EQ panel does not enable processing or alter preferences. The desktop
 header has no added Now Playing caption. Both fullscreen lyrics renderers use the flat
 PlayerLyricsSurface; keep timed text, seek, masks and scroll behavior without a colored backdrop.
+
+## Home/Library — local1BB first batch
+
+HomeGreeting composes PageHeader; HeroActions keeps Button and ActionButton/FollowHeartButton
+contracts without local visual skins. LibrarySection composes SectionHeader. Contributions and
+Bandcamp imports share LibraryContributionRow plus managed ContributionArtwork56px; icon actions
+retain short tooltips, contextual accessible names and the existing withdrawal confirmation.
+StatNumber receives actual counts including0. Read failures without cached data use ErrorState
+and existing refetch; never silently turn a failed source into empty/zero. CrateIndexGrid keeps
+V2 2/3/6 columns and20px gap. Details/editors/coverflow/card variants remain the next1BB batch.
+ArtistCard contextual subtitles/counts, scalar metadata and PlaylistCard count slots use actual
+MonoLabel; the component forces uppercase. Titles, artist names, summaries and descriptions keep
+their case. Home history and replay metric captions use the same role. Do not globally uppercase
+EntityCard/EntityRow subtitles: they also carry identity and prose.

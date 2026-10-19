@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { SectionHeader } from "@crate/ui/domain/lists";
@@ -132,10 +133,10 @@ function ListeningHistoryCard({
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-text-muted">
           {artists}
         </p>
-        <div className="home-history-meta mt-auto text-xs font-bold uppercase tracking-caps">
+        <MonoLabel className="mt-auto">
           {t("common.playCount", { count: item.play_count })} ·{" "}
           {formatHistoryMinutes(item.minutes_listened)}
-        </div>
+        </MonoLabel>
       </div>
     </button>
   );

@@ -27,6 +27,31 @@ function renderWithRoutes(element: ReactElement, options = {}) {
 }
 
 describe("PlaylistCard tile", () => {
+  it.each(["tile", "featured", "row"] as const)(
+    "uses MonoLabel for %s playlist counts, preserving prose",
+    (variant) => {
+      renderWithListenProviders(
+        <PlaylistCard
+          variant={variant}
+          name="Night music"
+          meta="12 tracks"
+          summary="Birds In Row, High Vis"
+          onClick={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/12 tracks/)).toHaveClass(
+        "font-mono",
+        "uppercase",
+        "text-label",
+      );
+      expect(screen.getByText("Night music")).not.toHaveClass("uppercase");
+      if (variant === "featured")
+        expect(screen.getByText("Birds In Row, High Vis")).not.toHaveClass(
+          "uppercase",
+        );
+    },
+  );
+
   it("renders the playlist badge as an overlay crate badge", () => {
     renderWithListenProviders(
       <PlaylistCard
