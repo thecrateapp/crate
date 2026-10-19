@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { AI_ROOT } from "@/components/ai-models/api";
 import { DefaultModelPanel } from "@/components/ai-models/DefaultModelPanel";
 import { FeaturesPanel } from "@/components/ai-models/FeaturesPanel";
+import { ProvidersPanel } from "@/components/ai-models/ProvidersPanel";
 import type {
   Activity as ActivityLog,
   Snapshot,
@@ -114,10 +115,11 @@ export function AiModels() {
             activity={canReadUsage ? activity : null}
             refresh={refetch}
           />
+          <ProvidersPanel snapshot={snapshot} refresh={refetch} />
         </>
       ) : null}
 
-      {/* The Providers, Advanced and Activity panels are added in Tasks 6-7. */}
+      {/* The Advanced and Activity panels are added in Task 7. */}
     </div>
   );
 }
