@@ -176,3 +176,14 @@ not an InstrumentPanel caption. PageHero preserves its four roles and compact-ti
 height="content" is the shared contract for content-sized CrateHero, without per-caller min-height
 repairs. HeroActionBar preserves playback/menu semantics and bounds long labels within its
 available width. Preserve existing native Album/safe-area composition until its owning phase.
+
+## Image and identity — local 1AV
+
+MediaCover owns the media frame, clipping and technical fallback; renderImage injects an app's
+managed renderer without moving authentication, srcSet/sizes or credential recovery into shared.
+Managed transports retain fallback/ready artwork and own retry; do not report transient recovery
+as a final native image error. Avatar/EntityAvatar retain person size/shape/ring/badge roles and
+React19 native refs. PlaylistArtwork owns native cover/collage/generated fallback and named
+collage/placeholder semantics; app buildCoverUrl/renderImage remain transport boundaries. Brand
+logos are assets, not avatar variants. All six have live English catalogue entries; outer
+placement/dimensions remain composition, not a reason to override internal typography or states.

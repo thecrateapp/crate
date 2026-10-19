@@ -1,0 +1,35 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/PlaylistArtwork.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">PlaylistArtwork</DocHeading>
+<EntryDetails
+  id="domain-playlists-playlistartwork"
+  review="Visual review approved · 1AV"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Retains precedence: supplied cover, up to four unique usable track covers, then deterministic name-based gradient. One image fills the frame; two use two columns, three use two columns with the third across the bottom, four use a2×2grid, all with2px gutters. Placement size and clipping stay with its outer composition. Collage/placeholder has one accessible playlist identity; tile images and Crate mark are decorative. Single/custom cover retains its named image. Native frame attributes/ref forward; native broken images move to the next source/placeholder. New source URLs can load.
+
+buildCoverUrl belongs to the app. renderImage is the existing transport injection: Listen keeps canonical URLs for CrateImage to resolve, including credentials/retry; the shared component does not drop a managed renderer on its transient transport errors. Native fallback and managed recovery are different contracts. Admin retains its approved showFallbackIcon=false adapter; Listen retains its existing default glyph. showCrateMark remains optional with a supplied logo asset. Preserve content gradients and artwork marks; the solid-surface rule does not remove artwork.
+
+The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
+real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Cover} />
+
+<Canvas of={Stories.Collages} />
+
+<Canvas of={Stories.Duplicates} />
+
+<Canvas of={Stories.FailedCover} />
+
+<Canvas of={Stories.AdminFallback} />
+
+<Canvas of={Stories.BrandMark} />
+
+<Controls of={Stories.Base} />

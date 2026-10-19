@@ -1,0 +1,29 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/CrateLogo.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">CrateLogo</DocHeading>
+<EntryDetails
+  id="domain-brand-cratelogo"
+  review="Visual review approved · 1AV"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+The existing vector and1052×1120viewBox are unchanged. A supplied title names the image; omission makes it decorative. Each mounted instance owns unique gradient/title IDs, so multiple logos cannot steal each other's gradients. Color uses brand tokens. effects and reducedMotion expose the existing CSS motion/effects policy; CSS also respects OS reduced motion. Size changes the bounding box without changing mark geometry. This is a brand asset, not an avatar or a destination button. Listen and Admin already use it; no brand redesign is introduced.
+
+The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
+real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Decorative} />
+
+<Canvas of={Stories.WithoutEffects} />
+
+<Canvas of={Stories.ReducedMotion} />
+
+<Canvas of={Stories.Multiple} />
+
+<Controls of={Stories.Base} />

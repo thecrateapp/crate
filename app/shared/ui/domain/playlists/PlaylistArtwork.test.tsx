@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PlaylistArtwork } from "./PlaylistArtwork";
 describe("PlaylistArtwork optional decorative fallback", () => {
@@ -74,4 +74,45 @@ describe("PlaylistArtwork optional decorative fallback", () => {
     ).toEqual(["/sample/1", "/sample/2"]);
     expect(image).toHaveBeenCalled();
   });
+});
+
+it("names a collage and a placeholder without exposing decorative tile names", () => {
+  const view = render(
+    <PlaylistArtwork
+      name="Night tide"
+      tracks={[{ album_id: 1 }, { album_id: 2 }]}
+      buildCoverUrl={(track) => `/cover/${track.album_id}`}
+      id="playlist-cover"
+    />,
+  );
+  expect(view.getByRole("img", { name: "Night tide" })).toHaveAttribute(
+    "id",
+    "playlist-cover",
+  );
+  expect(view.getAllByRole("img")).toHaveLength(1);
+  view.rerender(
+    <PlaylistArtwork name="Night tide" buildCoverUrl={() => null} />,
+  );
+  expect(view.getByRole("img", { name: "Night tide" })).toBeInTheDocument();
+});
+
+it("falls back from a failed native cover to unique collage sources and then the generated artwork", () => {
+  const view = render(
+    <PlaylistArtwork
+      name="Night tide"
+      coverDataUrl="bad.jpg"
+      tracks={[{ album_id: 1 }, { album_id: 1 }]}
+      buildCoverUrl={(track) => `/cover/${track.album_id}`}
+    />,
+  );
+  fireEvent.error(view.container.querySelector('img[alt="Night tide"]')!);
+  expect(view.container.querySelector('img[alt="Night tide"]')).toHaveAttribute(
+    "src",
+    "/cover/1",
+  );
+  fireEvent.error(view.container.querySelector('img[alt="Night tide"]')!);
+  expect(view.container.querySelector('img[alt="Night tide"]')).toBeNull();
+  expect(view.getByRole("img", { name: "Night tide" })).toHaveClass(
+    "playlist-artwork-placeholder",
+  );
 });

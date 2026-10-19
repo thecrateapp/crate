@@ -7,18 +7,18 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AT publicado: `67486e4c7414d7c6bca7a6701b35c73440f0dfce`; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AU en revisión local**: familia de cabeceras y consumidores iniciales; sin commit                                                                                          |
-| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos en revisión documental.           |
-| Revisión actual         | `http://127.0.0.1:5186/review-1au-headers.html`; misma escena en Storybook `Reviews/1AU/Headers`; vistas anteriores conservadas                                           |
+| Publicado               | 1AU publicado: `5593d68d`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AV en revisión local**: imagen e identidad; sin commit                                                                                          |
+| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.           |
+| Revisión actual         | `http://127.0.0.1:5186/review-1av-images.html`; misma escena en Storybook `Reviews/1AV/Images`; vistas anteriores conservadas                                           |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 33 entradas documentadas / 60 pendientes                                       |
+| Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 39 entradas documentadas / 54 pendientes                                       |
 | Próximo grupo de iconos | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | 1AT publicado; 1AU se revisa antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Restricción             | 1AU publicado; 1AV se revisa antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                                                 |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -473,3 +473,42 @@ Diego aprueba1AU y el plan de Listen, autoriza commit/push y ejecutar1AV Imagen 
 La nueva prioridad Listen primero ya está aprobada; Admin conserva sus contratos y comprobaciones
 de consumidores afectados.1AV usa mockup/Storybook y review pequeña, con stop antes de commit.
 Se solicita además Listen vivo en5174 con API habitual `https://api.lespedants.org`.
+
+## 1AU publicado; 1AV — imagen e identidad
+
+1AU y el plan de Listen publicados en `5593d68d`.1AV completa seis fichas: Avatar, EntityAvatar,
+MediaCover, PlaylistArtwork, CrateLogo y BandcampLogo. Conserva medidas/activos/roles existentes;
+las geometrías se miden contra los tokens del mockup, sin inventar una nueva escala. MediaCover
+acepta un renderer inyectado y AlbumCardArtwork adopta el frame común sin una segunda portada
+de fallback. ArtworkSurface/CrateImage conserva srcSet/sizes, lazy/decode, identidad lógica,
+ready y reintentos de credenciales. UserAvatar y PlaylistArtwork conservan sus adaptadores.
+PlaylistArtwork nativo recupera errores y nombra collages/placeholders; no desmonta el renderer
+gestionado por los errores transitorios de su transporte. Admin conserva su opt-out del glyph.
+
+[Review pequeña](http://127.0.0.1:5186/review-1av-images.html), Storybook `Reviews/1AV/Images` y
+[plan/evidencia](2026-10-19-crate-v3-image-identity-reconciliation.md). Catálogo39/93/120;54pendientes.
+Misma escena, captions FormField8px y controles equivalentes; no se amplía el mockup histórico.
+
+Listen vivo: `http://127.0.0.1:5174/`, servicio `crate-v3-listen-live.service`, proxy a la API
+habitual autorizado por Diego. El login volvía sin error porque las cookies de producción no
+servían en la dirección local. Corrección solo del proxy dev y solo para loopback: host-only,
+HttpOnly intacto, SameSite=Lax y sin Secure para HTTP local; HTTPS conserva Secure.6regresiones
+y smoke real de Vite con upstream ficticio verdes; Diego confirma que ya entra. No se inspeccionan
+credenciales ni se ejecutan mutaciones de producción. La app viva aún contiene vistas legacy
+pendientes: verla abierta no certifica ListenV3 ni todos sus consumidores.
+
+**1AV local, sin commit/push; previews5186/6006 y Listen5174 permanecen activos.**
+
+Validación final1AV:173unitarias/políticas (92shared,56Listen,25Admin),9browser,5typechecks,
+lint y builds de ambas apps y herramientas verdes. Admin527169/532480Bgzip,margen5311B;
+Listen200105/307200B. Revisión fresca sin defecto de producción P1/P2; la marca ausente en la
+escena se reprodujo y corrigió con el caso browser. Premisa de radio8px corregida a6px según
+tokens sin modificar runtime. No queda menor accionable pendiente de ese pase. Límites nativos/
+AT/backendvivo/canónicos y adopción amplia siguen explícitos en el plan1AV. **Detenido para
+Diego, sin commit/push de1AV; los tres servicios siguen activos.**
+
+### Aprobación de 1AV — 2026-10-19
+
+Diego aprueba1AV y autoriza commit/push. Continúa1AW: entidades, pistas y colecciones según el
+plan Listen aprobado, con el mockup como referencia, Storybook y review pequeña compartida.
+Mantener5186/6006/5174 activos y detener1AW antes de commit/push para revisión de Diego.

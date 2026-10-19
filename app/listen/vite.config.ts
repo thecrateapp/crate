@@ -3,13 +3,14 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
+import { loopbackProxyCookies } from "./dev/proxy-cookies";
 
 import { translationDevPlugin } from "./src/i18n/dev/translation-dev-plugin";
 
 const sentryUploadEnabled = Boolean(
   process.env.SENTRY_AUTH_TOKEN &&
-    process.env.SENTRY_ORG &&
-    process.env.SENTRY_PROJECT,
+  process.env.SENTRY_ORG &&
+  process.env.SENTRY_PROJECT,
 );
 const sentryRelease =
   process.env.SENTRY_RELEASE ||
@@ -99,6 +100,17 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true,
+        configure(proxy) {
+          proxy.on("proxyRes", (response, request) => {
+            response.headers["set-cookie"] = loopbackProxyCookies(
+              response.headers["set-cookie"],
+              request.headers.host,
+              Boolean(
+                "encrypted" in request.socket && request.socket.encrypted,
+              ),
+            );
+          });
+        },
       },
       "/share": {
         target: process.env.API_URL || "http://localhost:8585",

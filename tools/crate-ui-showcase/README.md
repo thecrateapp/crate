@@ -16,7 +16,7 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1au-headers.html and Storybook `Reviews/1AU/Headers`.
+Current: http://127.0.0.1:5186/review-1av-images.html and Storybook `Reviews/1AV/Images`.
 Both import `reviews/HeadersReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
@@ -85,7 +85,7 @@ Navigation, Actions, Overlays, Media and Layout hold canonical components; Compa
 legacy adapters. Foundations remains in System. Category definitions live in Maintenance.
 Pending entries are categorized too; a category does not imply validated documentation.
 
-93 entries link 120 sources: 33 documented entries and 60 pending by family. Adoption and visual
+93 entries link 120 sources: 39 documented entries and 54 pending by family. Adoption and visual
 review remain explicitly separate; these are not counts of certified consumers. SegmentedControl
 demonstrates real-prop controls, radio mode and tabs with persistent linked panels. HairlineRow
 owns its inset/alignment and supports wrapping
@@ -122,3 +122,13 @@ playback/menu composition; BackLink preserves text and native router/button beha
 coarse targets. See five live entries and Reviews/1AU/Headers. Slot gaps live in shared components,
 including action/metadata fragments. Native Album/safe-area overrides and broader page adoption
 remain separate; this group does not certify them.
+
+## Image and identity family — local 1AV
+
+Avatar/EntityAvatar, MediaCover/PlaylistArtwork and CrateLogo/BandcampLogo now have six live
+English contracts. Existing functional categories are preserved: Data Display, Media and
+Foundations. One scene powers Reviews/1AV/Images and review-1av-images.html; captions use
+FormField8px and equivalent artwork controls share their geometry. Listen AlbumCardArtwork
+adopts the shared cover frame while ArtworkSurface/CrateImage retains authenticated recovery
+and responsive assets. UserAvatar and PlaylistArtwork retain their real app adapters. This is
+initial adoption; other image consumers/native/live/AT QA remain separate.

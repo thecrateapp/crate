@@ -1,0 +1,25 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/BandcampLogo.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">BandcampLogo</DocHeading>
+<EntryDetails
+  id="domain-brand-bandcamplogo"
+  review="Visual review approved · 1AV"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+The existing24×24vector uses currentColor and defaults to an image named Bandcamp. Native SVG props allow a contextual aria-label or aria-hidden when adjacent text already names it. Size controls its bounding box. Do not redraw the mark or replace its shape with a generic icon. Existing Listen uses remain; documenting this asset does not add decorative Admin glyphs or alter content/actions.
+
+The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
+real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Decorative} />
+
+<Canvas of={Stories.Named} />
+
+<Controls of={Stories.Base} />

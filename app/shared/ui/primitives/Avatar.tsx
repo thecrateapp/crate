@@ -1,4 +1,4 @@
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -19,7 +19,7 @@ export function getInitials(name?: string | null): string {
   if (!firstWord) return "?";
   const lastWord = words.length > 1 ? words[words.length - 1] : undefined;
   const first = Array.from(firstWord)[0] ?? "";
-  const last = lastWord ? Array.from(lastWord)[0] ?? "" : "";
+  const last = lastWord ? (Array.from(lastWord)[0] ?? "") : "";
   return `${first}${last}`.toUpperCase();
 }
 
@@ -30,8 +30,10 @@ export interface AvatarImageRenderProps {
   onError: () => void;
 }
 
-export interface AvatarProps
-  extends Omit<HTMLAttributes<HTMLSpanElement>, "children"> {
+export interface AvatarProps extends Omit<
+  ComponentPropsWithRef<"span">,
+  "children"
+> {
   src?: string | null;
   name?: string | null;
   alt?: string;

@@ -1,9 +1,21 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import type { CrateIcon } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import type { MediaImageShape } from "./MediaEntity";
 
-export interface MediaCoverProps {
+export interface MediaCoverImageProps {
+  src: string;
+  alt: string;
+  className: string;
+  onError: () => void;
+  /** Managed transports own loading/recovery and can keep this visible until ready. */
+  fallback: ReactNode;
+}
+
+export interface MediaCoverProps extends Omit<
+  ComponentPropsWithRef<"div">,
+  "children"
+> {
   src?: string | null;
   fallbackUrl?: string | null;
   alt?: string;
@@ -11,7 +23,7 @@ export interface MediaCoverProps {
   fallback?: ReactNode;
   iconSize?: number;
   shape?: MediaImageShape;
-  className?: string;
+  renderImage?: (image: MediaCoverImageProps) => ReactNode;
 }
 
 export function MediaCover({
@@ -23,79 +35,89 @@ export function MediaCover({
   iconSize = 18,
   shape = "square",
   className,
+  renderImage,
+  ...props
 }: MediaCoverProps) {
-  const [primaryErrored, setPrimaryErrored] = useState(false);
-  const [fallbackErrored, setFallbackErrored] = useState(false);
-
-  useEffect(() => {
-    setPrimaryErrored(false);
-    setFallbackErrored(false);
-  }, [fallbackUrl, src]);
-
-  const showingPrimary = Boolean(src && !primaryErrored);
+  const [erroredSrc, setErroredSrc] = useState<string | null>(null);
+  const [erroredFallback, setErroredFallback] = useState<string | null>(null);
+  const showingPrimary = Boolean(src && src !== erroredSrc);
   const imageSrc = showingPrimary
     ? src
-    : fallbackUrl && !fallbackErrored
+    : fallbackUrl && fallbackUrl !== erroredFallback
       ? fallbackUrl
       : null;
-
+  const Icon = fallbackIcon;
+  const hasCustomFallback =
+    fallback !== undefined && fallback !== null && fallback !== false;
+  const fallbackContent = hasCustomFallback ? (
+    typeof fallback === "string" || typeof fallback === "number" ? (
+      <span aria-hidden="true" className="crate-media-initials">
+        {fallback}
+      </span>
+    ) : (
+      fallback
+    )
+  ) : Icon ? (
+    <Icon aria-hidden="true" size={iconSize} className="text-text-muted" />
+  ) : (
+    <span aria-hidden="true" className="crate-media-initials">
+      {initials(alt)}
+    </span>
+  );
   const baseClasses = cn(
     "crate-media-cover overflow-hidden",
     shapeClass(shape),
     className,
   );
-
-  if (!imageSrc) {
-    const Icon = fallbackIcon;
-    const hasCustomFallback =
-      fallback !== undefined && fallback !== null && fallback !== false;
-
-    return (
-      <div
-        className={cn(baseClasses, "flex items-center justify-center")}
-        data-testid="media-cover-fallback"
-        role={alt ? "img" : undefined}
-        aria-label={alt || undefined}
-      >
-        {hasCustomFallback ? (
-          typeof fallback === "string" || typeof fallback === "number" ? (
-            <span aria-hidden="true" className="crate-media-initials">
-              {fallback}
-            </span>
-          ) : (
-            fallback
-          )
-        ) : Icon ? (
-          <Icon
-            aria-hidden="true"
-            size={iconSize}
-            className="text-text-muted"
-          />
-        ) : (
-          <span aria-hidden="true" className="crate-media-initials">
-            {initials(alt)}
-          </span>
-        )}
-      </div>
-    );
-  }
+  const handleError = () => {
+    if (showingPrimary) setErroredSrc(src ?? null);
+    else setErroredFallback(fallbackUrl ?? null);
+  };
 
   return (
-    <div className={baseClasses}>
-      <img
-        src={imageSrc}
-        alt={alt}
-        loading="lazy"
-        className=" size-full object-cover"
-        onError={() => {
-          if (showingPrimary) {
-            setPrimaryErrored(true);
-          } else {
-            setFallbackErrored(true);
-          }
-        }}
-        data-testid="media-cover-image"
-      />
+    <div
+      {...props}
+      data-slot="media-cover"
+      data-shape={shape}
+      data-state={imageSrc ? "image" : "fallback"}
+      className={cn(
+        baseClasses,
+        !imageSrc && "flex items-center justify-center",
+      )}
+      data-testid={imageSrc ? undefined : "media-cover-fallback"}
+      role={!imageSrc && alt ? "img" : props.role}
+      aria-label={!imageSrc && alt ? alt : props["aria-label"]}
+    >
+      {imageSrc ? (
+        renderImage ? (
+          renderImage({
+            src: imageSrc,
+            alt,
+            className: "size-full object-cover",
+            onError: handleError,
+            fallback: (
+              <div
+                aria-hidden="true"
+                className="flex size-full items-center justify-center"
+              >
+                {fallbackContent}
+              </div>
+            ),
+          })
+        ) : (
+          <img
+            src={imageSrc}
+            alt={alt}
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover"
+            onError={handleError}
+            data-testid="media-cover-image"
+          />
+        )
+      ) : (
+        fallbackContent
+      )}
     </div>
   );
 }

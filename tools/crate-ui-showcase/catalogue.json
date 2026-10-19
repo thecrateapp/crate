@@ -495,18 +495,20 @@
     {
       "id": "domain-brand-bandcamplogo",
       "name": "BandcampLogo",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Canonical Bandcamp brand asset with explicit decorative use.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-bandcamplogo",
+      "story": "tools/crate-ui-showcase/stories/BandcampLogo.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/BandcampLogo.mdx",
       "sources": [
         "app/shared/ui/domain/brand/BandcampLogo.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/brand/BandcampLogo.tsx": "41c859cd455ac6d5bb841d9024623e06cc35baacdaa85c8929300f590c5dc06d"
+        "app/shared/ui/domain/brand/BandcampLogo.tsx": "41c859cd455ac6d5bb841d9024623e06cc35baacdaa85c8929300f590c5dc06d",
+        "tools/crate-ui-showcase/stories/BandcampLogo.stories.tsx": "624ae3b6456f9fe7b04e8021f12667afce4cb39a1fa8e85e3da27e11ac1307d5",
+        "tools/crate-ui-showcase/docs/BandcampLogo.mdx": "02620c262e2708b65aed92b5392d56ad2dd8675b83e8cd8653035b6c4ecfb3ff"
       },
       "category": "Foundations"
     },
@@ -531,36 +533,40 @@
     {
       "id": "domain-brand-cratelogo",
       "name": "CrateLogo",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Canonical Crate brand mark with instance-safe SVG gradients.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-cratelogo",
+      "story": "tools/crate-ui-showcase/stories/CrateLogo.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/CrateLogo.mdx",
       "sources": [
         "app/shared/ui/domain/brand/CrateLogo.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/brand/CrateLogo.tsx": "1c4f1f7b980cee65ba9322e9bb32e34332810d8618519b4a1954272cc7e7096a"
+        "app/shared/ui/domain/brand/CrateLogo.tsx": "1c4f1f7b980cee65ba9322e9bb32e34332810d8618519b4a1954272cc7e7096a",
+        "tools/crate-ui-showcase/stories/CrateLogo.stories.tsx": "47dc0aea176fd2c318a460f88bb5165f5dd844eb5ae16302041e34e7bca753c9",
+        "tools/crate-ui-showcase/docs/CrateLogo.mdx": "61a4dec6cab96053af35963151df3b779f522102f309bfeb0c2f74baeaa24343"
       },
       "category": "Foundations"
     },
     {
       "id": "domain-entity-entityavatar",
       "name": "EntityAvatar",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Avatar identity with optional state ring and independently named badge.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-entityavatar",
+      "story": "tools/crate-ui-showcase/stories/EntityAvatar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityAvatar.mdx",
       "sources": [
         "app/shared/ui/domain/entity/EntityAvatar.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/entity/EntityAvatar.tsx": "e594ba287fc9634dfef8588c491c75b0e3d45cad581198ed907882ee3ba178e1"
+        "app/shared/ui/domain/entity/EntityAvatar.tsx": "e594ba287fc9634dfef8588c491c75b0e3d45cad581198ed907882ee3ba178e1",
+        "tools/crate-ui-showcase/stories/EntityAvatar.stories.tsx": "8c8661a58faf4562fa40f7eba21345623cddf59b32c8afc81d32ba7012f07c01",
+        "tools/crate-ui-showcase/docs/EntityAvatar.mdx": "881b01cd7686d6c76e886bcc5fe9a5395187295c55810d0109c60f471adb82cf"
       },
       "category": "Data Display"
     },
@@ -670,7 +676,7 @@
       "fingerprints": {
         "app/shared/ui/domain/hero/HeroActionBar.tsx": "1e1cfefd9d685be06d8f50d84ddf8870c461cfef12b00611e2df9e50c5c3b4aa",
         "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
-        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "781281139fa0575b0a1c648d9381ffa688c132f75577c9858ff90bf47b341ad3"
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "f50095d0e2b8c7e3da8b5a79e54d212de04e3562bc855cc3dddb8481bcfed245"
       },
       "category": "Actions"
     },
@@ -690,7 +696,7 @@
       "fingerprints": {
         "app/shared/ui/domain/hero/PageHero.tsx": "12d61794c3f466e53c0e4ffd801a12c05e0bd1f30aa024ecc7a32ad77fb755e7",
         "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "f1aa60bedcbe624d99a963b92e22b374dc4dc7a963a8d4917bf54617b6e9684c",
-        "tools/crate-ui-showcase/docs/PageHero.mdx": "b62f9cf90117c518281cc121fa32a674b279830d66bac6199cdc7ca817b475b5"
+        "tools/crate-ui-showcase/docs/PageHero.mdx": "119351bbf78158c80e0de762dc8b3a43666ddbf0a3b3d568e15e99071a89e4c7"
       },
       "category": "Layout"
     },
@@ -764,25 +770,27 @@
       "fingerprints": {
         "app/shared/ui/domain/lists/SectionHeader.tsx": "903421ed6dd21b140560b5824288f1e05cee1d198cd9d5491d727e63903acb68",
         "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx": "86199fb03beb6710bc2dd7097af0b9a0a06d097e4989a097449549381ec5d340",
-        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "2ff1505ce0f16db2c15a1efdf2907970e9e4beeda8644e991f3cdbb48addad59"
+        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "bede11427716368ebfd28e228f4dde51635bbab76a744e4e83d01b73f9022627"
       },
       "category": "Layout"
     },
     {
       "id": "domain-media-mediacover",
       "name": "MediaCover",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Media image frame, technical fallback and optional managed image renderer.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-mediacover",
+      "story": "tools/crate-ui-showcase/stories/MediaCover.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaCover.mdx",
       "sources": [
         "app/shared/ui/domain/media/MediaCover.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/media/MediaCover.tsx": "8eaf065193c0160ff56d16109f534e13f547a9d7d94637b761e99458391efc9f"
+        "app/shared/ui/domain/media/MediaCover.tsx": "846d7cdfc7c5af95490f3f054ab5da3bb024eea839cb85f37bd8b79cc69baedf",
+        "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "ed2fe17826f7486ae5f4d9a2c34f9fd2cabe2c2df2a0b39f8be61748cb832798",
+        "tools/crate-ui-showcase/docs/MediaCover.mdx": "80a4a6b1fdcb100467de9ac6bcc28c9feb8a3c9b43b26fb2826b7ceafd1dc93c"
       },
       "category": "Media"
     },
@@ -820,7 +828,7 @@
       "fingerprints": {
         "app/shared/ui/domain/navigation/BackLink.tsx": "ff7f5fb182bc4648501693a31f81067f8bd897b10b8de96aed712ab3ce0c8be7",
         "tools/crate-ui-showcase/stories/BackLink.stories.tsx": "2f21da1d2ee3cb3926083db104f3b7c7b897ff76fdf19b6e185280f4b2f20d00",
-        "tools/crate-ui-showcase/docs/BackLink.mdx": "6ce3f1907c263282634589f19aed74c3c845d45167fd37b02153fbf9e17c9504"
+        "tools/crate-ui-showcase/docs/BackLink.mdx": "8d9b4f43935f6125268bd1bda98140b971153dc070d75bd8a89622f26853b9ac"
       },
       "category": "Navigation"
     },
@@ -840,7 +848,7 @@
       "fingerprints": {
         "app/shared/ui/domain/navigation/PageHeader.tsx": "d808bd201d58fc4f54f0961ef09b4605200e783d7c391807caa09b3ff4ab0c76",
         "tools/crate-ui-showcase/stories/PageHeader.stories.tsx": "52db7c47c382316cd9678b900c11fc206a86983bb325d9620737206b27844ddd",
-        "tools/crate-ui-showcase/docs/PageHeader.mdx": "b7e9eba3877e9e4ffa561b6903c25503b7f11328313d1cfb2c5d567e2d831115"
+        "tools/crate-ui-showcase/docs/PageHeader.mdx": "2995fed50efa608e88f46e478e1800351c91cbf7fc376ceda42c29faa7603438"
       },
       "category": "Layout"
     },
@@ -883,18 +891,20 @@
     {
       "id": "domain-playlists-playlistartwork",
       "name": "PlaylistArtwork",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Playlist cover, unique-source collage and deterministic generated artwork.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-playlistartwork",
+      "story": "tools/crate-ui-showcase/stories/PlaylistArtwork.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PlaylistArtwork.mdx",
       "sources": [
         "app/shared/ui/domain/playlists/PlaylistArtwork.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx": "3c04113a1e9a32e7226ff53e58f3a807c6fda868292ae63fc1fb5ef99533e2cb"
+        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx": "ab21047751ccd8641ec25385fa72062b17cd24b7f4f4ba6529ccc5363cac1b7e",
+        "tools/crate-ui-showcase/stories/PlaylistArtwork.stories.tsx": "655eaf43b3f26156faa6062b5b3ebc9e7cfd4d88bb627eddc8f9d6b35c666d0e",
+        "tools/crate-ui-showcase/docs/PlaylistArtwork.mdx": "6c5694d029ae1426002bcabeca4936b2e9575561a38be064f3c85b75db90389d"
       },
       "category": "Media"
     },
@@ -1029,18 +1039,20 @@
     {
       "id": "primitives-avatar",
       "name": "Avatar",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Person identity with a fixed frame, image renderer and initials fallback.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-avatar",
+      "story": "tools/crate-ui-showcase/stories/Avatar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Avatar.mdx",
       "sources": [
         "app/shared/ui/primitives/Avatar.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/Avatar.tsx": "831ccb752947bfdb3a7c739f1204adbd14d3abce07135d25df852f7c0eba8d63"
+        "app/shared/ui/primitives/Avatar.tsx": "52e64008385d7fa54cd695b3c3e32c9a6a318d4270decb96dbe80b2d9e229175",
+        "tools/crate-ui-showcase/stories/Avatar.stories.tsx": "662baa58c291e617ced5b32c4bb4b7c9021eb08d8a8860b2a2b10cba57c7a904",
+        "tools/crate-ui-showcase/docs/Avatar.mdx": "b16825d4281a783928fe361d25365a054953a1badac279bf044aea97a83f226d"
       },
       "category": "Data Display"
     },

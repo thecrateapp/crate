@@ -6423,3 +6423,13 @@ CrateHero content sizing is preserved through a shared option. Actions/metadata 
 [Current state](2026-10-19-crate-v3-current-state.md) and
 [1AU plan/evidence](2026-10-19-crate-v3-headers-reconciliation.md) supersede older stops.
 Both previews active; stop before1AU commit/push. No main-mockup growth, baselines or full CI.
+
+## 2026-10-19 — 1AU published; local 1AV image and identity
+
+Diego approved1AU and the Listen-first plan; published `5593d68d`.1AV reconciles the six existing
+image/identity/brand families and their English Storybook entries, with initial real Listen
+adoption and a shared small review scene. Managed artwork transport stays local to the app.
+Live Listen5174 uses the authorized habitual API; Diego confirmed login after the dev-only
+loopback cookie proxy fix. [Current state](2026-10-19-crate-v3-current-state.md) and
+[1AV evidence](2026-10-19-crate-v3-image-identity-reconciliation.md) govern continuation.
+Both original previews remain active. Stop1AV before commit/push; no full CI or canonical refresh.

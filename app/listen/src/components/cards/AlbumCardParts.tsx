@@ -199,18 +199,24 @@ export function AlbumCardArtwork({
   iconSize?: number;
 }) {
   return (
-    <ArtworkSurface
-      source={{
-        ...coverArtwork,
-        sizes: coverArtwork.srcSet ? coverSizes : undefined,
-      }}
+    <MediaCover
+      src={coverArtwork.src}
       alt={album}
+      iconSize={iconSize}
       className={className}
-      fallback={
-        <MediaCover alt={album} iconSize={iconSize} className="size-full" />
-      }
-      imageProps={{ loading: "lazy", decoding: "async" }}
-      imageClassName="object-cover"
+      renderImage={(image) => (
+        <ArtworkSurface
+          source={{
+            ...coverArtwork,
+            sizes: coverArtwork.srcSet ? coverSizes : undefined,
+          }}
+          alt={image.alt}
+          className="size-full"
+          fallback={image.fallback}
+          imageProps={{ loading: "lazy", decoding: "async" }}
+          imageClassName={image.className}
+        />
+      )}
     />
   );
 }

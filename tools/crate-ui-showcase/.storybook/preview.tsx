@@ -22,6 +22,7 @@ const preview: Preview = {
           ["Introduction", "Inventory", "Foundations", "Maintenance"],
           "Components",
           [
+            "Foundations",
             "Forms",
             "Feedback",
             "Data Display",

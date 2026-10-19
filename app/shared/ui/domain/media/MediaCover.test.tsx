@@ -133,3 +133,42 @@ it("uses technical initials and a shared inset hairline when artwork is absent",
   expect(getByRole("img")).toHaveClass("crate-media-cover");
   expect(container.querySelector("svg")).toBeNull();
 });
+
+it("keeps the failed primary failed when only its fallback URL changes", () => {
+  const view = render(
+    <MediaCover src="bad.jpg" fallbackUrl="old.jpg" alt="Album" />,
+  );
+  fireEvent.error(view.getByTestId("media-cover-image"));
+  view.rerender(<MediaCover src="bad.jpg" fallbackUrl="new.jpg" alt="Album" />);
+  expect(view.getByRole("img", { name: "Album" })).toHaveAttribute(
+    "src",
+    "new.jpg",
+  );
+});
+
+it("injects a managed image renderer with its shared fallback and forwards frame attributes", () => {
+  const view = render(
+    <MediaCover
+      src="canonical.jpg"
+      alt="Costa Norte"
+      id="managed-cover"
+      aria-describedby="cover-hint"
+      renderImage={({ fallback, ...image }) => (
+        <div data-testid="managed-image">
+          {fallback}
+          <img {...image} />
+        </div>
+      )}
+    />,
+  );
+  expect(view.getByTestId("managed-image")).toBeInTheDocument();
+  expect(view.container.querySelector("#managed-cover")).toHaveAttribute(
+    "aria-describedby",
+    "cover-hint",
+  );
+  expect(view.getByRole("img", { name: "Costa Norte" })).toHaveAttribute(
+    "src",
+    "canonical.jpg",
+  );
+  expect(view.getByTestId("managed-image")).toHaveTextContent("CN");
+});
