@@ -1,12 +1,16 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AgentCatalog } from "@/lib/agent-integrations";
+import type { AgentCatalog, AgentSecret } from "@/lib/agent-integrations";
 
+import { ConnectAgentDialog } from "./ConnectAgentDialog";
 import { ConnectionSnippets } from "./ConnectionSnippets";
 import { PermissionPicker } from "./PermissionPicker";
 
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
+
+vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -288,5 +292,131 @@ describe("ConnectionSnippets", () => {
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining("bearer_token_env_var"),
     );
+  });
+});
+
+describe("ConnectAgentDialog", () => {
+  const secret: AgentSecret = {
+    token: "crate_mcp_visible-once",
+    credential_id: "credential-1",
+    expires_at: "2030-01-01T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
+
+  it("runs the full flow and sends the exact creation request", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(secret);
+    const onCreated = vi.fn();
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={onCreated}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Night operator");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("radio", { name: /Shows curator/ }));
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/agent-integrations",
+        "POST",
+        {
+          name: "Night operator",
+          grants: [
+            "curation.shows.read",
+            "curation.shows.write",
+            "ops.status.read",
+            "ops.jobs.read",
+          ],
+          expires_in_days: 90,
+          require_approval: true,
+        },
+      ),
+    );
+    expect(onCreated).toHaveBeenCalled();
+    expect(await screen.findByRole("textbox", { name: "Token" })).toHaveValue(
+      secret.token,
+    );
+    expect(screen.getByText(/claude mcp add/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(secret.token))).toBeInTheDocument();
+  });
+
+  it("resets to step 1 with no token once closed and reopened", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(secret);
+    const { rerender } = render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Temporary name");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+    expect(await screen.findByRole("textbox", { name: "Token" })).toHaveValue(
+      secret.token,
+    );
+
+    rerender(
+      <ConnectAgentDialog
+        open={false}
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+    rerender(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Name")).toHaveValue("");
+    expect(
+      screen.queryByRole("textbox", { name: "Token" }),
+    ).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(secret.token);
+  });
+
+  it("keeps the name and grants and shows the error when creation fails", async () => {
+    const user = userEvent.setup();
+    apiMock.mockRejectedValueOnce(new Error("Credential service unavailable"));
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Retry this proposal");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("radio", { name: /Shows curator/ }));
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Credential service unavailable",
+    );
+    expect(screen.getByRole("radio", { name: /Shows curator/ })).toBeChecked();
+    expect(
+      screen.getByRole("button", { name: "Create connection" }),
+    ).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Name")).toHaveValue("Retry this proposal");
   });
 });

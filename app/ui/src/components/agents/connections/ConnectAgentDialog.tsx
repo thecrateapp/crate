@@ -1,0 +1,221 @@
+import { useEffect, useState } from "react";
+
+import { Button } from "@crate/ui/shadcn/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@crate/ui/shadcn/dialog";
+import { Input } from "@crate/ui/shadcn/input";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { Switch } from "@crate/ui/primitives/Switch";
+
+import { CopyButton } from "@/components/admin/CopyButton";
+import { RelativeTime } from "@/components/admin/RelativeTime";
+import { api } from "@/lib/api";
+import type { AgentCatalog, AgentSecret } from "@/lib/agent-integrations";
+
+import { ConnectionSnippets } from "./ConnectionSnippets";
+import { PermissionPicker } from "./PermissionPicker";
+
+const base = "/api/admin/agent-integrations";
+
+type TokenLifetime = "30" | "90" | "365";
+
+const LIFETIME_ITEMS: { value: TokenLifetime; label: string }[] = [
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "365", label: "1 year" },
+];
+
+function readOnlyGrants(catalog: AgentCatalog): string[] {
+  return (
+    catalog.presets.find((preset) => preset.id === "read_only")?.scopes ?? []
+  );
+}
+
+/**
+ * Three-step guided flow for connecting a new agent: name and token
+ * lifetime, permissions and approval policy, then the one-time token with
+ * client configuration snippets.
+ */
+export function ConnectAgentDialog({
+  open,
+  onOpenChange,
+  catalog,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  catalog: AgentCatalog;
+  onCreated: () => void;
+}) {
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [name, setName] = useState("");
+  const [lifetime, setLifetime] = useState<TokenLifetime>("90");
+  const [grants, setGrants] = useState<string[]>(() => readOnlyGrants(catalog));
+  const [requireApproval, setRequireApproval] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [secret, setSecret] = useState<AgentSecret | null>(null);
+
+  useEffect(() => {
+    if (open) return;
+    setStep(1);
+    setName("");
+    setLifetime("90");
+    setGrants(readOnlyGrants(catalog));
+    setRequireApproval(true);
+    setBusy(false);
+    setError(null);
+    setSecret(null);
+  }, [open]);
+
+  function requestOpenChange(next: boolean) {
+    if (!next && busy) return;
+    onOpenChange(next);
+  }
+
+  async function createConnection() {
+    if (busy || grants.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api<AgentSecret>(base, "POST", {
+        name,
+        grants,
+        expires_in_days: Number(lifetime),
+        require_approval: requireApproval,
+      });
+      setSecret(result);
+      setStep(3);
+      onCreated();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not create the connection",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={requestOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Connect your agent</DialogTitle>
+          <DialogDescription>Step {step} of 3</DialogDescription>
+        </DialogHeader>
+
+        {step === 1 ? (
+          <div className="space-y-4">
+            <label className="grid gap-1 text-sm">
+              Name
+              <Input
+                required
+                maxLength={120}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">Token lifetime</p>
+              <SegmentedControl
+                as="radio"
+                label="Token lifetime"
+                items={LIFETIME_ITEMS}
+                value={lifetime}
+                onValueChange={setLifetime}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                disabled={!name.trim()}
+                onClick={() => setStep(2)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {step === 2 ? (
+          <div className="space-y-4">
+            <PermissionPicker
+              catalog={catalog}
+              value={grants}
+              onChange={setGrants}
+              disabled={busy}
+            />
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  checked={requireApproval}
+                  onCheckedChange={setRequireApproval}
+                  disabled={busy}
+                />
+                Require approval before changes
+              </label>
+              <p className="text-sm text-muted-foreground">
+                High-risk and whole-library changes always need approval.
+              </p>
+            </div>
+            {error ? (
+              <p role="alert" className="text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <div className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setStep(1)}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                disabled={busy || grants.length === 0}
+                onClick={() => void createConnection()}
+              >
+                {busy ? "Creating…" : "Create connection"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {step === 3 && secret ? (
+          <div className="space-y-4">
+            <p className="text-sm text-destructive">
+              This token is shown only once. Copy it now.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                aria-label="Token"
+                value={secret.token}
+                className="font-mono"
+              />
+              <CopyButton value={secret.token} label="token" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Expires <RelativeTime value={secret.expires_at} />
+            </p>
+            <ConnectionSnippets url={catalog.mcp_url} token={secret.token} />
+            <div className="flex justify-end">
+              <Button type="button" onClick={() => requestOpenChange(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
