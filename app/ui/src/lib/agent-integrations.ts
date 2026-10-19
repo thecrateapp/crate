@@ -1,35 +1,27 @@
-export const permissionLabels: Record<string, string> = {
-  "library.health.read": "Inspect library health",
-  "library.health.run": "Run selected library health checks",
-  "library.repair.photo_flag": "Update an artist's photo flag",
-  "library.quality.run": "Refresh library quality evidence",
-  "library.repair.run": "Apply reviewed library repairs",
-  "library.metadata.write": "Edit library metadata",
-  "library.enrichment.run": "Enrich selected library metadata",
-  "library.analysis.run": "Schedule track analysis",
-  "library.sync.run": "Synchronize selected library albums",
-  "library.metadata.export": "Export library metadata",
-  "library.metadata.rehydrate": "Import portable metadata",
-  "ops.status.read": "Read instance status",
-  "ops.jobs.read": "Read job history",
-  "ops.jobs.retry": "Retry reviewed maintenance jobs",
-  "ops.jobs.cancel_pending": "Cancel owned pending jobs",
-  "ops.logs.read": "Read worker logs",
-  "ops.audit.read": "Read sanitized audit history",
-  "ops.jobs.cancel": "Request cooperative job cancellation",
-  "ops.jobs.manage_instance": "Control reviewed Admin and scheduler jobs",
-  "ops.schedules.read": "Read schedules and execution evidence",
-  "ops.schedules.run": "Run reviewed scheduled maintenance",
-  "ops.schedules.write": "Update reviewed schedule intervals",
-  "ops.runtime.read": "Read runtime policy and worker adoption",
-  "ops.runtime.write": "Update reviewed runtime policy",
-};
+export interface AgentScope {
+  scope: string;
+  capability: string;
+  can_grant: boolean;
+  label: string;
+  group: string;
+  access: "read" | "change";
+}
+
+export interface AgentScopePreset {
+  id: string;
+  label: string;
+  description: string;
+  scopes: string[];
+}
 
 export interface AgentCatalog {
   mcp_enabled: boolean;
   actions_enabled: boolean;
   oauth_enabled: boolean;
-  scopes: { scope: string; can_grant: boolean }[];
+  scopes: AgentScope[];
+  scope_groups: { id: string; label: string }[];
+  presets: AgentScopePreset[];
+  mcp_url: string | null;
   tools: {
     name: string;
     grant: string | null;

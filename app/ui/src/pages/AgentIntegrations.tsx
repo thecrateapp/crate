@@ -22,12 +22,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError } from "@/lib/api";
-import {
-  permissionLabels,
-  type AgentCatalog,
-  type AgentCollection,
-  type AgentIntegration,
-  type AgentSecret,
+import { scopeLabel } from "@/lib/agent-connections";
+import type {
+  AgentCatalog,
+  AgentCollection,
+  AgentIntegration,
+  AgentSecret,
 } from "@/lib/agent-integrations";
 
 const base = "/api/admin/agent-integrations";
@@ -236,7 +236,7 @@ export function AgentIntegrations() {
                 )
               }
             />
-            {permissionLabels[scope] ?? scope}
+            {scopeLabel(scope, catalog.data?.scopes ?? [])}
             {!can_grant ? (
               <span className="text-muted-foreground">
                 Requires additional permission
@@ -360,7 +360,7 @@ export function AgentIntegrations() {
               <div className="flex flex-wrap gap-2">
                 {item.grants.map((grant) => (
                   <Badge key={grant} variant="outline">
-                    {permissionLabels[grant] ?? grant}
+                    {scopeLabel(grant, catalog.data?.scopes ?? [])}
                   </Badge>
                 ))}
               </div>

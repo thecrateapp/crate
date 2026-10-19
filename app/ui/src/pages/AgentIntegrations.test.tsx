@@ -27,9 +27,26 @@ const catalog: AgentCatalog = {
   actions_enabled: false,
   oauth_enabled: true,
   scopes: [
-    { scope: "library.health.read", can_grant: true },
-    { scope: "library.repair.photo_flag", can_grant: false },
+    {
+      scope: "library.health.read",
+      capability: "agents.integrations.manage",
+      can_grant: true,
+      label: "Inspect library health",
+      group: "library",
+      access: "read",
+    },
+    {
+      scope: "library.repair.photo_flag",
+      capability: "agents.repair.apply",
+      can_grant: false,
+      label: "Update an artist's photo flag",
+      group: "library",
+      access: "change",
+    },
   ],
+  scope_groups: [{ id: "library", label: "Library" }],
+  presets: [],
+  mcp_url: null,
   tools: [],
   limits: {
     calls_per_minute: 60,
@@ -441,7 +458,14 @@ describe("AgentIntegrations", () => {
           ...catalog,
           scopes: [
             ...catalog.scopes,
-            { scope: "ops.status.read", can_grant: true },
+            {
+              scope: "ops.status.read",
+              capability: "agents.integrations.manage",
+              can_grant: true,
+              label: "Read instance status",
+              group: "instance",
+              access: "read",
+            },
           ],
         });
       if (path === `${base}/oauth-clients`)
