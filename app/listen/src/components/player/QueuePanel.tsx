@@ -68,10 +68,10 @@ export const QueuePanel = memo(function QueuePanel({
               <CrateImage
                 src={currentTrack.albumCover}
                 alt=""
-                className="size-10  rounded object-cover shrink-0"
+                className="crate-media-thumbnail size-12 rounded object-cover shrink-0"
               />
             ) : (
-              <div className=" size-10 shrink-0 rounded bg-surface-control-hover" />
+              <div className="crate-media-thumbnail size-12 shrink-0 rounded bg-surface-control-hover" />
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-caption font-medium text-accent-action">

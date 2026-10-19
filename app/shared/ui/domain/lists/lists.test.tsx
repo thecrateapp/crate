@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Disc, Music } from "@crate/ui/icons";
 
@@ -274,4 +274,34 @@ describe("lists", () => {
       expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
   });
+});
+
+it("keeps native rail labelling and ignores invalid custom minimum widths", () => {
+  const view = render(
+    <>
+      <MediaRail aria-label="Native rail">
+        <span>Album</span>
+      </MediaRail>
+      <MediaGrid minItemWidth={NaN}>
+        <span>Grid item</span>
+      </MediaGrid>
+    </>,
+  );
+  expect(screen.getByRole("region", { name: "Native rail" })).toBeVisible();
+  expect(screen.getByTestId("media-grid")).toHaveAttribute(
+    "data-density",
+    "default",
+  );
+  expect(screen.getByTestId("media-grid")).not.toHaveStyle(
+    "grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
+  );
+  view.rerender(
+    <MediaRail labelledBy="heading" aria-describedby="hint">
+      <h2 id="heading">Albums</h2>
+    </MediaRail>,
+  );
+  expect(screen.getByRole("region", { name: "Albums" })).toHaveAttribute(
+    "aria-describedby",
+    "hint",
+  );
 });

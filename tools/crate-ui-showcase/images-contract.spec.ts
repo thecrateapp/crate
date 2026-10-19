@@ -209,7 +209,12 @@ test("six image and identity entries load their live English contracts", async (
       frame.getByRole("heading", { name: "Contract", exact: true }),
     ).toBeVisible();
     await expect(
-      frame.getByText("Visual review pending · 1AV", { exact: true }),
+      frame.getByText(
+        family === "mediacover"
+          ? "Visual review approved · 1AW"
+          : "Visual review approved · 1AV",
+        { exact: true },
+      ),
     ).toBeVisible();
     await expect(frame.getByText(/The approved mockup/)).toBeVisible();
   }

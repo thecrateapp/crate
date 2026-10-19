@@ -15,3 +15,7 @@ body {
   color: var(--text-primary);
   font-family: var(--font-brand), sans-serif;
 }
+
+@source "../../app/listen/src/components/cards/TrackRowView.tsx";
+@source "../../app/listen/src/components/cards/TrackRowContent.tsx";
+@source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";

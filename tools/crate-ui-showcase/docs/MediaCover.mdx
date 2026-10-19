@@ -7,11 +7,11 @@ import { DocHeading } from "../components/DocHeading";
 <DocHeading as="h1">MediaCover</DocHeading>
 <EntryDetails
   id="domain-media-mediacover"
-  review="Visual review approved · 1AV"
+  review="Visual review approved · 1AW"
 />
 <DocHeading as="h2">Contract</DocHeading>
 
-The approved existing frame has a quiet inset hairline and an accent-tinted fallback. Square/rounded/circle retain6px/16px/circular clipping. Dimensions belong to outer composition; MediaCover owns crop, clipping and fallback. Technical initials are uppercase JetBrains Mono40014px; a one-word title takes its first two characters, multiword titles first/last initials, missing text an em dash. A named absent image keeps the same accessible name; empty alt stays decorative. Native image loading is lazy with async decode. Native failure tries fallbackUrl, then content/icon/initials. Changing only fallbackUrl does not retry a failed primary. Native frame attributes/ref are forwarded.
+The approved existing frame has a quiet inset hairline and an accent-tinted fallback. Square/rounded/circle retain6px/16px/circular clipping. Standalone track/album/artist thumbnails enforce a48px minimum in both dimensions. Outer composition can enlarge them; MediaCover owns crop, clipping and fallback. Technical initials are uppercase JetBrains Mono40014px; a one-word title takes its first two characters, multiword titles first/last initials, missing text an em dash. A named absent image keeps the same accessible name; empty alt stays decorative. Native image loading is lazy with async decode. Native failure tries fallbackUrl, then content/icon/initials. Changing only fallbackUrl does not retry a failed primary. Native frame attributes/ref are forwarded.
 
 renderImage receives canonical src/alt, image classes, a final-error callback and decorative fallback content. Managed transports own loading, ready preservation and credential recovery; they can retain the fallback until decoded and must not call the final-error callback for a recoverable credential change. AlbumCardArtwork adopts the shared frame while ArtworkSurface/CrateImage retains its existing lifecycle, responsive srcSet/sizes and lazy loading. This is a frame and lifecycle boundary, not an alternative API client.
 
@@ -31,3 +31,11 @@ real shared components. Local1AV evidence is separate from adoption on all route
 <Canvas of={Stories.ManagedRenderer} />
 
 <Controls of={Stories.Base} />
+
+<Canvas of={Stories.MinimumThumbnail} />
+
+Legacy managed/raw frames use the shared `crate-media-thumbnail` minimum recipe until their
+owning page adopts MediaCover. TrackCoverThumb deliberately retains ArtworkSurface/CrateImage;
+wrapping that renderer in an auto-height frame caused invisible artwork and was withdrawn.
+The focused browser fixture mounts the actual Listen renderer and checks decoded, visible48px
+artwork in both densities. It does not certify production credentials or every native runtime.

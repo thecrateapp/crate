@@ -8,6 +8,7 @@ import { cn } from "@crate/ui/lib/cn";
 import { EntityPrimaryAction } from "./EntityPrimaryAction";
 import type {
   EntityCover,
+  EntityFrameAttributes,
   EntityMenuButtonMode,
   EntityMenuProps,
   EntityPrimaryActionProps,
@@ -29,8 +30,10 @@ export interface EntityRowClassNames {
 
 export interface EntityRowProps
   extends EntityPrimaryActionProps,
-    EntityMenuProps {
+    EntityMenuProps,
+    EntityFrameAttributes {
   title: string;
+  truncate?: boolean;
   subtitle?: ReactNode;
   meta?: ReactNode;
   titleAccessory?: ReactNode;
@@ -82,6 +85,8 @@ export const EntityRow = memo(function EntityRow({
   menuLabel = "More actions",
   className,
   classNames,
+  truncate = true,
+  ...props
 }: EntityRowProps) {
   const compact = density === "compact";
   const { controller, targetProps, menu } = useEntityMenu({
@@ -107,14 +112,16 @@ export const EntityRow = memo(function EntityRow({
         alt={cover.alt ?? ""}
         iconSize={cover.iconSize ?? CRATE_ICON_SIZE.md}
         shape={shape}
-        className={cn("shrink-0", compact ? "size-10" : "size-12")}
+        className="size-12 shrink-0"
       />
     ) : null);
 
   return (
     <article
+      {...props}
+      data-slot="entity-row"
       className={cn(
-        "item-action-target group/row relative flex min-w-0 items-center rounded-lg text-left transition-colors ",
+        "crate-entity-row item-action-target group/row relative flex min-w-0 flex-wrap items-center rounded-lg text-left transition-colors",
         compact
           ? "gap-2 px-2 py-1.5"
           : "gap-[var(--content-row-gap)] px-3 py-[var(--content-row-padding-y)]",
@@ -132,7 +139,7 @@ export const EntityRow = memo(function EntityRow({
       {rank != null ? (
         <span
           data-slot="entity-rank"
-          className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted"
+          className="w-6 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted"
         >
           {rank}
         </span>
@@ -152,10 +159,16 @@ export const EntityRow = memo(function EntityRow({
       >
         {leadingNode}
         <span className="block min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-[var(--content-row-inline-gap)]">
+          <span
+            className={cn(
+              "flex min-w-0 items-center gap-[var(--content-row-inline-gap)]",
+              !truncate && "flex-wrap",
+            )}
+          >
             <span
               className={cn(
-                "block min-w-0 truncate text-sm font-medium",
+                "crate-entity-title block min-w-0 text-sm font-medium",
+                truncate ? "truncate" : "wrap-anywhere",
                 active ? "text-accent-action" : "text-text-primary",
                 classNames?.title,
               )}
@@ -167,7 +180,8 @@ export const EntityRow = memo(function EntityRow({
           {subtitle != null ? (
             <span
               className={cn(
-                "block truncate text-xs text-text-muted",
+                "block text-xs text-text-muted",
+                truncate ? "truncate" : "wrap-anywhere",
                 classNames?.subtitle,
               )}
             >
@@ -177,7 +191,8 @@ export const EntityRow = memo(function EntityRow({
           {meta != null ? (
             <span
               className={cn(
-                "block truncate text-xs tabular-nums text-text-muted",
+                "crate-media-meta block tabular-nums text-text-muted",
+                truncate ? "truncate" : "wrap-anywhere",
                 classNames?.meta,
               )}
             >
@@ -190,7 +205,7 @@ export const EntityRow = memo(function EntityRow({
         <div
           data-slot="entity-trailing"
           className={cn(
-            "flex shrink-0 items-center gap-2",
+            "flex min-w-0 max-w-full flex-wrap items-center gap-2",
             classNames?.trailing,
           )}
         >

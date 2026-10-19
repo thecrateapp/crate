@@ -138,7 +138,7 @@ export function AlbumHero({
             source={artistPhotoUrl}
             alt={data.artist}
             fallback={null}
-            className="size-6 shrink-0 rounded-full bg-text-primary/5"
+            className="crate-media-thumbnail size-12 shrink-0 rounded-full bg-text-primary/5"
             imageClassName="object-cover"
           />
           {data.artist}

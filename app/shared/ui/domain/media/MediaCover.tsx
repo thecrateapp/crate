@@ -12,10 +12,8 @@ export interface MediaCoverImageProps {
   fallback: ReactNode;
 }
 
-export interface MediaCoverProps extends Omit<
-  ComponentPropsWithRef<"div">,
-  "children"
-> {
+export interface MediaCoverProps
+  extends Omit<ComponentPropsWithRef<"div">, "children"> {
   src?: string | null;
   fallbackUrl?: string | null;
   alt?: string;
@@ -79,6 +77,7 @@ export function MediaCover({
       {...props}
       data-slot="media-cover"
       data-shape={shape}
+      data-min-size="48"
       data-state={imageSrc ? "image" : "fallback"}
       className={cn(
         baseClasses,

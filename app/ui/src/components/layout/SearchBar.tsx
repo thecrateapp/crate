@@ -95,7 +95,7 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${
+        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover bg-white/5 ${
           item.type === "artist" ? "rounded-md" : "rounded"
         }`}
         onError={(event) => {

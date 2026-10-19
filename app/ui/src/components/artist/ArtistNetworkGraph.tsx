@@ -120,11 +120,11 @@ export function ArtistNetworkGraph({
               const s =
                 typeof l.source === "string"
                   ? l.source
-                  : (l.source as any)?.id ?? "";
+                  : ((l.source as any)?.id ?? "");
               const t =
                 typeof l.target === "string"
                   ? l.target
-                  : (l.target as any)?.id ?? "";
+                  : ((l.target as any)?.id ?? "");
               return `${s.toLowerCase()}||${t.toLowerCase()}`;
             }),
           );
@@ -347,12 +347,12 @@ export function ArtistNetworkGraph({
           const sId = (
             typeof link.source === "string"
               ? link.source
-              : link.source?.id ?? ""
+              : (link.source?.id ?? "")
           ).toLowerCase();
           const tId = (
             typeof link.target === "string"
               ? link.target
-              : link.target?.id ?? ""
+              : (link.target?.id ?? "")
           ).toLowerCase();
           const sNode = nodeSet.get(sId);
           const tNode = nodeSet.get(tId);
@@ -382,7 +382,7 @@ export function ArtistNetworkGraph({
             <div style="display:flex;align-items:center;gap:8px;padding:10px 12px">
               ${
                 photoUrl
-                  ? `<img src="${photoUrl}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;background:#1c1c28" onerror="this.style.display='none'" />`
+                  ? `<img src="${photoUrl}" class="crate-media-thumbnail" style="width:48px;height:48px;border-radius:6px;object-fit:cover;background:#1c1c28" onerror="this.style.display='none'" />`
                   : ""
               }
               <div style="min-width:0;flex:1">

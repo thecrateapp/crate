@@ -16,8 +16,8 @@ The historical preview remains at 5186. Preserve its checkpoints and canonical c
 
 Each review step now has a small standalone page with only the components and states under
 review. Cover the full approved checkpoint scope. Do not grow the historical main mockup.
-Current: http://127.0.0.1:5186/review-1av-images.html and Storybook `Reviews/1AV/Images`.
-Both import `reviews/HeadersReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
+Current: http://127.0.0.1:5186/review-1aw-collections.html and Storybook `Reviews/1AW/Collections`.
+Both import `reviews/CollectionsReview.tsx`; earlier actions/forms/labels review URLs stay available. No copied
 markup, local component repairs or Storybook runtime in the standalone page. Component entries
 and their documentation still require updates in the same change.
 
@@ -85,7 +85,7 @@ Navigation, Actions, Overlays, Media and Layout hold canonical components; Compa
 legacy adapters. Foundations remains in System. Category definitions live in Maintenance.
 Pending entries are categorized too; a category does not imply validated documentation.
 
-93 entries link 120 sources: 39 documented entries and 54 pending by family. Adoption and visual
+93 entries link 120 sources: 45 documented entries and 48 pending by family. Adoption and visual
 review remain explicitly separate; these are not counts of certified consumers. SegmentedControl
 demonstrates real-prop controls, radio mode and tabs with persistent linked panels. HairlineRow
 owns its inset/alignment and supports wrapping
@@ -132,3 +132,12 @@ FormField8px and equivalent artwork controls share their geometry. Listen AlbumC
 adopts the shared cover frame while ArtworkSurface/CrateImage retains authenticated recovery
 and responsive assets. UserAvatar and PlaylistArtwork retain their real app adapters. This is
 initial adoption; other image consumers/native/live/AT QA remain separate.
+
+## Collection family — local 1AW
+
+EntityRow/Card/PrimaryAction, TrackList, MediaGrid and MediaRail have live English contracts.
+Listen uses its real local TrackRowView/Content/PlaybackControl in both hosts. Native actions,
+active/selection, full titles,0/1/many, profiles and loaded/reserved grids remain distinct roles.
+MediaCover owns the48px minimum; legacy managed/raw thumbnails use the same `crate-media-thumbnail`
+recipe until their page adoption. Person avatars and internal collage tiles are separate roles.
+V2 track identity stays white18px play glyph in a24px visual slot over artwork48px, active ring40px with effects/progress.

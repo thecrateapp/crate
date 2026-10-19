@@ -45,7 +45,7 @@ function getArtworkInteractionProps({
       : hasAlbum
         ? "Open album"
         : undefined,
-    className: `listen-player-artwork relative size-10 shrink-0 overflow-hidden rounded-md md:size-12 ${
+    className: `listen-player-artwork relative size-12 shrink-0 overflow-hidden rounded-md ${
       isDesktop && hasAlbum ? "cursor-pointer" : ""
     }`,
   };

@@ -63,3 +63,30 @@ describe("PlaylistTrackList", () => {
     expect(firstPlay).not.toHaveBeenCalled();
   });
 });
+
+it("keeps repeated recordings as distinct playlist entries when ordering changes", () => {
+  trackRowProps.length = 0;
+  const play = vi.fn();
+  const repeated = { ...tracks[0]!, id: 12 };
+  const props = {
+    onActionMenuOpen: vi.fn(),
+    onAddToPlaylist: vi.fn(),
+    onCreatePlaylist: vi.fn(),
+    playlistOptions: [],
+    onPlayTrack: play,
+  };
+  const view = render(
+    <PlaylistTrackList {...props} filteredTracks={[tracks[0]!, repeated]} />,
+  );
+  const [first, second] = trackRowProps.slice(-2);
+  (first!.onPlayOverride as () => void)();
+  (second!.onPlayOverride as () => void)();
+  expect(play.mock.calls).toEqual([[11], [12]]);
+  view.rerender(
+    <PlaylistTrackList {...props} filteredTracks={[repeated, tracks[0]!]} />,
+  );
+  const [nextSecond, nextFirst] = trackRowProps.slice(-2);
+  (nextSecond!.onPlayOverride as () => void)();
+  (nextFirst!.onPlayOverride as () => void)();
+  expect(play.mock.calls).toEqual([[11], [12], [12], [11]]);
+});

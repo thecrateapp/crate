@@ -1,0 +1,28 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EntityCard.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">EntityCard</DocHeading>
+<EntryDetails
+  id="domain-entity-entitycard"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Entity titles retain the body role: 14 px, weight 500, with technical mono metadata. Rail, grid, compact and square/circle artwork retain their roles. `profileSize` owns the existing 100/140/156 px artist width plus twice the card padding; grid constrains it unless `fillGrid` is set. Disable `truncate` for full text. Selection is separate from playback: only `active` sets `aria-current`. Native article identity, ARIA and refs are forwarded. Play, follow and menu controls remain siblings of the primary destination. Apps inject managed artwork, data and callbacks.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Active} />
+
+<Canvas of={Stories.Selected} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.FullText} />

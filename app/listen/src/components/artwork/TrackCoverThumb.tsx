@@ -19,7 +19,7 @@ export function TrackCoverThumb({
     <ArtworkSurface
       source={src}
       alt={alt}
-      className={`${className ?? ""} overflow-hidden bg-text-primary/5`.trim()}
+      className={`crate-media-thumbnail ${className ?? ""} overflow-hidden bg-text-primary/5`.trim()}
       fallback={
         <div className="flex size-full items-center justify-center">
           <ListMusic size={iconSize} className="text-text-primary/25" />

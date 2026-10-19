@@ -202,6 +202,9 @@ export default defineConfig({
     rolldownOptions: {
       input: {
         main: fileURLToPath(new URL("index.html", import.meta.url)),
+        review1awCollections: fileURLToPath(
+          new URL("review-1aw-collections.html", import.meta.url),
+        ),
         review1avImages: fileURLToPath(
           new URL("review-1av-images.html", import.meta.url),
         ),

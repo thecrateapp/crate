@@ -1,4 +1,9 @@
-import type { MouseEvent, ReactNode } from "react";
+import type {
+  AriaAttributes,
+  ComponentPropsWithRef,
+  MouseEvent,
+  ReactNode,
+} from "react";
 
 import type {
   ContextMenuHeader,
@@ -63,3 +68,9 @@ export interface EntityMenuProps {
   menuButton?: EntityMenuButtonMode;
   menuLabel?: string;
 }
+
+export type EntityFrameAttributes = AriaAttributes &
+  Pick<
+    ComponentPropsWithRef<"article">,
+    "id" | "ref" | "style" | "lang" | "dir"
+  >;

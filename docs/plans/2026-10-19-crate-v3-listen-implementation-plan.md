@@ -217,3 +217,45 @@ Diego aprueba 1AU y este plan, autoriza commit/push y continuar con 1AV Imagen e
 con referencia en el mockup, Storybook actualizado y ambos previews activos. 1AV se detiene
 para revisión antes de commit. Solicita además una instancia viva de Listen, conectada a su
 API habitual `https://api.lespedants.org`; no autoriza mutaciones de datos por el agente.
+
+## 1AW — Entidades, pistas y colecciones · revisión local · 2026-10-19
+
+1AV aprobado y publicado en `a2b374f3`. 1AW sigue **sin commit/push**, detenido para revisión de
+Diego. Vista pequeña: http://127.0.0.1:5186/review-1aw-collections.html; misma escena en Storybook
+`Reviews/1AW/Collections`. Listen sigue en http://127.0.0.1:5174 con la API habitual autorizada.
+
+Se completan las seis fichas existentes EntityCard, EntityRow, EntityPrimaryAction, TrackList,
+MediaGrid y MediaRail. Selección y reproducción actual se separan; ARIA/ref nativos, texto largo,
+perfiles de artista y metadatos quedan en sus componentes. ArtistCard retira sus mapas locales de
+anchura; AlbumTrackList usa TrackList conservando discos/IDs/selección; PlaylistTrackList conserva
+IDs de entrada y virtualizador; LibraryAlbumsTab distingue error inicial de colección vacía.
+
+Enmiendas de Diego: glyph blanco de18px dentro de un slot visual de24px sobre la portada, sin disco azul; control activo de40px
+con ring2px, aura, efectos y suscripción de progreso solo en la hoja activa. Todas las miniportadas
+independientes de pista/álbum/artista tienen mínimo48px, también compactas. MediaCover posee el
+mínimo y la receta shared `crate-media-thumbnail` lo aplica a marcos managed/raw heredados de
+ambas apps hasta su adopción por fase. Avatares de personas, marcas y celdas internas de collage
+son roles separados. Se mantienen HairlineRow12/18 y título de entidad14/500; ningún hover rellena
+el fondo de las filas revisadas.
+
+Incidencia corregida durante la iteración: envolver TrackCoverThumb en un marco de altura auto
+hizo desaparecer sus imágenes. Se retiró ese wrapper; ArtworkSurface/CrateImage conservan su
+renderer y recuperación anteriores. La nueva prueba de navegador monta el renderer real con
+una imagen local, verifica decode/pintado48x48 en ambas densidades y el WindowVirtualList real
+con80entradas y scroll hasta la última. No necesita sesión ni escribe en producción.
+
+La revisión independiente encontró tres mínimos pendientes (CrateAlbumPicker, ArtistRow y tooltip
+HTML de ArtistNetworkGraph) y una story Callback que heredaba href. Se corrigen con regresiones
+RED→GREEN. La guarda inspecciona marcos JSX y el tooltip HTML conocido; no sustituye QA visual.
+Catálogo:45documentadas/93entradas/120fuentes;48pendientes. Las fichas y la adopción siguen siendo
+estados distintos.
+
+Decisiones conservadoras: mantener los roles14/500 y12/18 ya aprobados (otro tamaño requiere
+revisión medida); no inventar imports Admin para bases existentes sin consumidor directo (la
+adopción real de Admin queda pendiente); conservar la semántica y el teclado nativos de filas,
+sin introducir un nuevo modelo grid (AT y runtime nativo siguen pendientes). No se reescribe
+el renderer, la autenticación, el motor, el drag ni la virtualización.
+
+Las validaciones focalizadas y sus límites finales se consolidan en el estado vigente. Sin suites
+completas/CI, sin regenerar33PNG/manifest1M, sin PR/merge/rebase/deploy/release. Las tres instancias
+permanecen activas; conservar los checkpoints y el pin histórico app/web@258bbaee.

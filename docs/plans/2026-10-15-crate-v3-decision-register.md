@@ -1528,3 +1528,13 @@ CrateHero content sizing is preserved through a shared option. Actions/metadata 
 [Current state](2026-10-19-crate-v3-current-state.md) and
 [1AU plan/evidence](2026-10-19-crate-v3-headers-reconciliation.md) supersede older stops.
 Both previews active; stop before1AU commit/push. No main-mockup growth, baselines or full CI.
+
+## Enmienda 1AW — 2026-10-19 · local para revisión
+
+Diego confirma que la miniportada independiente de pista, álbum o artista nunca baja de48px,
+también en filas compactas; MediaCover y la receta de compatibilidad shared poseen ese mínimo.
+Avatares personales, marcas y celdas de collage son roles separados. El track play conserva V2:
+glyph blanco18px (slot24px) sobre cover48px y control activo40px con ring2px, aura/efectos y progreso en
+hoja activa. Sin círculo azul que tape la portada. Selección no implica aria-current; títulos
+de entidad mantienen14/500 y HairlineRow12/18. Catálogo y consumidores actualizados, adopción
+completa y QA de fase pendientes. Ver el estado vigente y la reconciliación de1AW; sin commit.

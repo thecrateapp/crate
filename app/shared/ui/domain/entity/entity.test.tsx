@@ -366,7 +366,7 @@ describe("EntityRow", () => {
     expect(article()).toHaveClass("py-1.5");
     expect(
       article().querySelector("[data-testid='media-cover-fallback']"),
-    ).toHaveClass("size-10");
+    ).toHaveClass("size-12");
     expect(screen.getByRole("button", { name: "More actions" })).toHaveClass(
       "size-8",
     );
@@ -487,4 +487,46 @@ describe("EntityAvatar", () => {
     expect(badge).toHaveTextContent("live");
     expect(badge.parentElement).toHaveClass("custom");
   });
+});
+
+it("does not announce selection as the current destination", () => {
+  const view = render(
+    <MemoryRouter>
+      <EntityCard title="Selected album" href="/album" selected />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByRole("link", { name: "Selected album" }),
+  ).not.toHaveAttribute("aria-current");
+  view.rerender(
+    <MemoryRouter>
+      <EntityCard title="Selected album" href="/album" selected active />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Selected album" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+});
+
+it("forwards native article attributes without nesting trailing actions in the primary", () => {
+  render(
+    <EntityRow
+      id="entity-row"
+      aria-describedby="entity-note"
+      title="Zero"
+      meta={0}
+      truncate={false}
+      trailing={<button type="button">Select</button>}
+    />,
+  );
+  expect(screen.getByRole("article")).toHaveAttribute("id", "entity-row");
+  expect(screen.getByRole("article")).toHaveAttribute(
+    "aria-describedby",
+    "entity-note",
+  );
+  expect(screen.getByText("0")).toBeVisible();
+  expect(
+    screen.getByRole("article").querySelector('[data-slot="entity-primary"]'),
+  ).not.toContainElement(screen.getByRole("button", { name: "Select" }));
 });

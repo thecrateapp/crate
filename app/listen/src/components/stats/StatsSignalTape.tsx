@@ -196,7 +196,7 @@ function TapeCursor({
           <CrateImage
             src={cover}
             alt=""
-            className="size-11 rounded-sm object-cover"
+            className="crate-media-thumbnail size-12 shrink-0 rounded-sm object-cover"
           />
         ) : null}
         <div className="min-w-0">

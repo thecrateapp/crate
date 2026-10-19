@@ -92,3 +92,7 @@ h3.showcase-doc-heading {
   gap: 24px;
   min-width: 0;
 }
+
+@source "../../app/listen/src/components/cards/TrackRowView.tsx";
+@source "../../app/listen/src/components/cards/TrackRowContent.tsx";
+@source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";

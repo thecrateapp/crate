@@ -22,7 +22,7 @@ export function TrackRowPlaybackProgressView({
 
   return (
     <span
-      className="group/track-progress track-row-playback-progress relative isolate flex size-10 items-center justify-center overflow-visible rounded-full backdrop-blur-md"
+      className="group/track-progress track-row-playback-progress relative isolate flex size-full items-center justify-center overflow-visible rounded-full backdrop-blur-md"
       data-testid="track-row-playback-progress"
       aria-hidden="true"
     >
@@ -147,7 +147,10 @@ export function TrackRowPlaybackControl({
           {isActive && activeGlyph ? (
             activeGlyph
           ) : (
-            <Icon size={CRATE_ICON_SIZE.sm} fill="currentColor" />
+            <Icon
+              size={artwork != null ? CRATE_ICON_SIZE.md : CRATE_ICON_SIZE.sm}
+              fill="currentColor"
+            />
           )}
         </span>
       ) : null}

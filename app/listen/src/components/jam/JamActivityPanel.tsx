@@ -63,10 +63,10 @@ export function JamActivityPanel({ t, room, user }: JamActivityPanelProps) {
                           <CrateImage
                             src={track.albumCover}
                             alt=""
-                            className=" size-9 rounded-lg object-cover"
+                            className="crate-media-thumbnail size-12 shrink-0 rounded-lg object-cover"
                           />
                         ) : (
-                          <div className="jam-artwork-placeholder flex size-9 items-center justify-center rounded-lg">
+                          <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 items-center justify-center rounded-lg">
                             <ListMusic size={CRATE_ICON_SIZE.xs} />
                           </div>
                         )}

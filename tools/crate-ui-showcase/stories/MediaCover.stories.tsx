@@ -38,3 +38,5 @@ export const ManagedRenderer: Story = {
     ),
   },
 };
+
+export const MinimumThumbnail: Story = { args: { className: "size-8" } };

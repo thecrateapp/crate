@@ -38,12 +38,20 @@ export function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
         alt=""
         fallback={fallback}
         imageClassName="object-cover"
-        className={cn("size-8 shrink-0 bg-text-primary/5", shapeClassName)}
+        className={cn(
+          "crate-media-thumbnail size-12 shrink-0 bg-text-primary/5",
+          shapeClassName,
+        )}
       />
     );
   }
   return (
-    <span className={cn("size-8 shrink-0 bg-text-primary/5", shapeClassName)}>
+    <span
+      className={cn(
+        "crate-media-thumbnail size-12 shrink-0 bg-text-primary/5",
+        shapeClassName,
+      )}
+    >
       {fallback}
     </span>
   );

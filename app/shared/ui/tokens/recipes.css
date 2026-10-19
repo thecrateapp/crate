@@ -3831,7 +3831,8 @@ label
 .track-row[data-selected="true"] {
   background: color-mix(in srgb, var(--accent-action) 8%, transparent);
 }
-.track-row[data-active="true"]::before {
+.track-row[data-active="true"]::before,
+.crate-entity-row[data-active="true"]::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -3862,18 +3863,28 @@ label
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+.crate-entity-row .crate-entity-title,
+.crate-entity-card .crate-entity-title,
+.track-row .crate-track-title {
+  font-family: var(--font-brand), system-ui, sans-serif;
+}
+/* V2 identity: white play on artwork, smaller active ring. Hit target is independent. */
 .crate-track-glyph {
   display: none;
   position: relative;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--accent-action);
-  color: var(--accent-action-foreground);
+  background: transparent;
+  color: var(--text-primary);
+}
+.crate-track-leading-artwork .crate-track-glyph > svg {
+  filter: drop-shadow(0 1px 3px var(--surface-canvas));
 }
 .crate-track-glyph-progress {
-  background: transparent;
+  width: 40px;
+  height: 40px;
 }
 .crate-track-leading-active .crate-track-glyph,
 .track-row:not([data-disabled="true"]):hover .crate-track-glyph,
@@ -3885,6 +3896,8 @@ label
   display: none;
 }
 .crate-track-leading-artwork {
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
 }
 .crate-track-leading-artwork .crate-track-glyph {
@@ -3892,7 +3905,7 @@ label
 }
 .crate-media-meta,
 .crate-track-analysis,
-.crate-track-quality,
+.crate-track-quality:not(.crate-info-badge),
 .crate-track-table th {
   font-family: var(--font-mono-stack);
   font-size: var(--type-meta-size);
@@ -3900,12 +3913,12 @@ label
   font-variant-numeric: tabular-nums;
 }
 .crate-track-analysis,
-.crate-track-quality {
+.crate-track-quality:not(.crate-info-badge) {
   white-space: nowrap;
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.crate-track-quality {
+.crate-track-quality:not(.crate-info-badge) {
   padding: 0 4px;
   border: 1px solid var(--border-quiet);
 }
@@ -3935,6 +3948,11 @@ label
 }
 .crate-media-grid > * {
   min-width: 0;
+}
+.crate-media-thumbnail,
+.crate-media-cover {
+  min-width: 48px;
+  min-height: 48px;
 }
 .crate-media-cover {
   position: relative;
@@ -4055,7 +4073,7 @@ label
 }
 @container crate-track (min-width: 480px) {
   .track-row > .crate-track-quality:not(.crate-track-explicit) {
-    display: inline;
+    display: inline-flex;
   }
 }
 @container crate-track (min-width: 620px) {

@@ -1,3 +1,4 @@
+import { TrackRowView } from "./TrackRowView";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { TrackRowContent } from "./TrackRowContent";
 import {
@@ -10,7 +11,7 @@ import { useNavigate } from "react-router";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
-import { cn, formatDuration } from "@/lib/utils";
+import { formatDuration } from "@/lib/utils";
 import { useItemActionTarget } from "@/components/actions/ItemActionMenu";
 import {
   TrackRowActions,
@@ -95,16 +96,11 @@ export const TrackRow = memo(function TrackRow({
   }
 
   return (
-    <div
-      className={cn(
-        "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] transition-colors",
-        compact ? "px-2 py-1.5" : "px-3 py-[var(--content-row-padding-y)]",
-      )}
-      aria-current={isActive ? "true" : undefined}
-      data-active={isActive}
-      data-density={density}
-      data-disabled={model.disabled}
-      data-selected={selected}
+    <TrackRowView
+      active={isActive}
+      selected={selected}
+      disabled={model.disabled}
+      density={density}
       aria-label={track.title}
       aria-selected={selectable ? selected : undefined}
       onContextMenu={actionTarget.onContextMenu}
@@ -135,8 +131,6 @@ export const TrackRow = memo(function TrackRow({
         }
         void playback.handleActivate();
       }}
-      role="row"
-      tabIndex={model.disabled ? -1 : 0}
       onDoubleClick={
         selectable
           ? (event) => {
@@ -241,6 +235,6 @@ export const TrackRow = memo(function TrackRow({
           />
         }
       />
-    </div>
+    </TrackRowView>
   );
 });

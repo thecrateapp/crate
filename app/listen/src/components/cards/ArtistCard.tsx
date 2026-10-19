@@ -15,21 +15,8 @@ import {
   type ArtistCardProps,
 } from "./ArtistCardParts";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { cn } from "@/lib/utils";
 
 export type { ArtistCardProps, ArtistCardVariant } from "./ArtistCardParts";
-
-const RAIL_WIDTH_CLASS_NAME = {
-  compact: "w-[calc(100px+2*var(--content-card-padding))]",
-  tile: "w-[calc(140px+2*var(--content-card-padding))]",
-  editorial: "w-[calc(156px+2*var(--content-card-padding))]",
-} as const;
-
-const GRID_MAX_WIDTH_CLASS_NAME = {
-  compact: "mx-auto max-w-[calc(100px+2*var(--content-card-padding))]",
-  tile: "mx-auto max-w-[calc(140px+2*var(--content-card-padding))]",
-  editorial: "mx-auto max-w-[calc(156px+2*var(--content-card-padding))]",
-} as const;
 
 export const ArtistCard = memo(function ArtistCard({
   name,
@@ -181,14 +168,9 @@ export const ArtistCard = memo(function ArtistCard({
       rank={rank}
       shape="circle"
       layout={layout}
-      className={cn(
-        layout === "grid"
-          ? cn(
-              "listen-deferred-grid-item",
-              !fillGrid && GRID_MAX_WIDTH_CLASS_NAME[sizeKey],
-            )
-          : RAIL_WIDTH_CLASS_NAME[sizeKey],
-      )}
+      profileSize={sizeKey}
+      fillGrid={fillGrid}
+      className={layout === "grid" ? "listen-deferred-grid-item" : undefined}
       artwork={
         <ArtistCardArtwork
           photoArtwork={model.photoArtwork}

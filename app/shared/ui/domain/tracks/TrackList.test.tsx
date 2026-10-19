@@ -128,3 +128,21 @@ describe("TrackList", () => {
     expect(screen.queryByText("Title")).not.toBeInTheDocument();
   });
 });
+
+it("retains native labels/attributes and a zero header for nonempty data", () => {
+  render(
+    <TrackList
+      items={[{ id: 1, title: "One" }]}
+      itemKey={(row) => row.id}
+      renderRow={(row) => row.title}
+      header={0}
+      aria-label="Album tracks"
+      id="disc-one"
+    />,
+  );
+  expect(screen.getByRole("group", { name: "Album tracks" })).toHaveAttribute(
+    "id",
+    "disc-one",
+  );
+  expect(screen.getByText("0")).toBeVisible();
+});

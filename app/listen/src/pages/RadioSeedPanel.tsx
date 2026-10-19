@@ -70,12 +70,12 @@ export function RadioSeedPanel({
                 <CrateImage
                   src={result.imageUrl}
                   alt=""
-                  className={`radio-seed-result-image size-9 shrink-0 object-cover ${
+                  className={`crate-media-thumbnail radio-seed-result-image size-12 shrink-0 object-cover ${
                     result.type === "artist" ? "rounded-full" : "rounded-md"
                   }`}
                 />
               ) : (
-                <div className="radio-seed-result-placeholder flex size-9 shrink-0 items-center justify-center rounded-md">
+                <div className="crate-media-thumbnail radio-seed-result-placeholder flex size-12 shrink-0 items-center justify-center rounded-md">
                   <Music size={CRATE_ICON_SIZE.sm} />
                 </div>
               )}

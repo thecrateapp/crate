@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { ReactNode } from "react";
 
 // The real row's visual composition, separate from playback, selection and menu controllers.
@@ -53,14 +54,16 @@ export function TrackRowContent({
         ) : null}
       </div>
       {explicitLabel ? (
-        <span
+        <InfoBadge
           className="crate-track-quality crate-track-explicit"
           title={explicitLabel}
         >
           E
-        </span>
+        </InfoBadge>
       ) : null}
-      {quality ? <span className="crate-track-quality">{quality}</span> : null}
+      {quality ? (
+        <InfoBadge className="crate-track-quality">{quality}</InfoBadge>
+      ) : null}
       {analysis ? (
         <span className="crate-track-analysis">{analysis}</span>
       ) : null}

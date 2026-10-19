@@ -97,7 +97,7 @@ export function PathRouteVisualization({
                   { size: 80 },
                 )}
                 alt=""
-                className=" size-10 shrink-0 rounded-lg bg-text-primary/5 object-cover shadow-md"
+                className="crate-media-thumbnail size-12 shrink-0 rounded-lg bg-text-primary/5 object-cover shadow-md"
               />
             ) : null}
             <div className="min-w-0 flex-1">

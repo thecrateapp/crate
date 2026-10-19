@@ -177,10 +177,10 @@ function JamAutoDjSuggestions({
                   <CrateImage
                     src={track.albumCover}
                     alt=""
-                    className=" size-9 shrink-0 rounded-md object-cover"
+                    className="crate-media-thumbnail size-12 shrink-0 rounded-md object-cover"
                   />
                 ) : (
-                  <div className="jam-artwork-placeholder flex size-9 shrink-0 items-center justify-center rounded-md">
+                  <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 shrink-0 items-center justify-center rounded-md">
                     <ListMusic size={CRATE_ICON_SIZE.xs} />
                   </div>
                 )}
@@ -266,10 +266,10 @@ function JamQueueSearch(props: JamQueueSearchProps) {
                   <CrateImage
                     src={playable.albumCover}
                     alt=""
-                    className=" size-10 rounded-lg object-cover"
+                    className="crate-media-thumbnail size-12 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="jam-artwork-placeholder flex size-10 items-center justify-center rounded-lg">
+                  <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 items-center justify-center rounded-lg">
                     <ListMusic size={CRATE_ICON_SIZE.sm} />
                   </div>
                 )}

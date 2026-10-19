@@ -250,7 +250,7 @@ function CompactCard({ show }: { show: ShowEvent }) {
   const normalized = normalizeShow(show);
   return (
     <div className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors ">
-      <div className="h-[18px] w-[18px] flex-shrink-0 overflow-hidden rounded-sm bg-white/5">
+      <div className="crate-media-thumbnail size-12 flex-shrink-0 overflow-hidden rounded-sm bg-white/5">
         {normalized.artistPhotoUrl ? (
           <img
             src={normalized.artistPhotoUrl}
@@ -462,7 +462,7 @@ function ExpandedShowCardBody({
               <img
                 src={show.artistPhotoUrl}
                 alt=""
-                className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"
+                className="crate-media-thumbnail h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"
                 onError={(event) => {
                   (event.target as HTMLImageElement).style.display = "none";
                 }}

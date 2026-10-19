@@ -1413,7 +1413,7 @@ function QueueRow({
         <img
           src={item.cover_url}
           alt=""
-          className="h-11 w-11 flex-shrink-0 rounded-md object-cover shadow-[0_12px_26px_rgba(0,0,0,0.18)]"
+          className="crate-media-thumbnail h-12 w-12 flex-shrink-0 rounded-md object-cover shadow-[0_12px_26px_rgba(0,0,0,0.18)]"
         />
       )}
       <div className="flex-1 min-w-0">

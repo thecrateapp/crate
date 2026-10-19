@@ -1,0 +1,28 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EntityPrimaryAction.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">EntityPrimaryAction</DocHeading>
+<EntryDetails
+  id="domain-entity-entityprimaryaction"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+This semantic helper renders an internal router link, a safe external link, a callback button, a disabled native button or static content according to its props. External links retain `noopener noreferrer`. The parent entity owns layout and typography; this is not another generic Button. `current` announces current playback independently of selection. Keep play, follow and menu controls outside the primary destination.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.InternalLink} />
+
+<Canvas of={Stories.ExternalLink} />
+
+<Canvas of={Stories.Callback} />
+
+<Canvas of={Stories.Disabled} />

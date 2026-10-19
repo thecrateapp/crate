@@ -1,0 +1,22 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/MediaRail.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">MediaRail</DocHeading>
+<EntryDetails
+  id="domain-lists-mediarail"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+The content fit preserves item widths; the columns fit retains the existing responsive column formulas. Native scrolling and snap align to the section start without added leading insets. Native `aria-label`/`aria-labelledby` and the `label`/`labelledBy` aliases name a focusable region. Native attributes and refs are forwarded. Children retain independent native link/action focus. This is a layout component, not a carousel, data or player controller.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Columns} />

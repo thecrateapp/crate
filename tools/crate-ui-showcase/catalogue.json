@@ -61,14 +61,14 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "1b5b918e29db45b729ccd3e0d89af01786f3b8495d68ab2c1ad84d1135bd960c",
+        "app/shared/ui/tokens/recipes.css": "c9c63d038433615e114b888a981814e8fa3ff286c4d40e27e0fb4c78116d12da",
         "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "e0db11fdd48259ff5d1e41749bf2ed3e4bfd4dd53589311ed06c4c0f89436c99",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "723dc4dc0cfedaa05b89ca7d3b74a7b618fc5dac462f502ac33a9470714a2078"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "36368019fc84ebd9ea8487494a321032288b9d54a7f822f7c7a95afa868660d2"
       },
       "category": "Foundations"
     },
@@ -573,54 +573,60 @@
     {
       "id": "domain-entity-entitycard",
       "name": "EntityCard",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Media identity with independent navigation, overlay and menu.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-entitycard",
+      "story": "tools/crate-ui-showcase/stories/EntityCard.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityCard.mdx",
       "sources": [
         "app/shared/ui/domain/entity/EntityCard.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/entity/EntityCard.tsx": "dd05a509f9ff9376c87798bdb8cc44cfb0ba43bac6d806f398f9805e3b2a8d74"
+        "app/shared/ui/domain/entity/EntityCard.tsx": "0d2461f64f1fd9b2d95b051df79311e985f021925e383bdb96d18ba874226810",
+        "tools/crate-ui-showcase/stories/EntityCard.stories.tsx": "de6dcd749abb0fe70a13552ecbdd3e6da1a970a98f2457b3a5110f4d385cc34d",
+        "tools/crate-ui-showcase/docs/EntityCard.mdx": "1316efd17d5c7aa797f267bdda4234b17c9924eac66afdc408176cb48d676f85"
       },
       "category": "Data Display"
     },
     {
       "id": "domain-entity-entityprimaryaction",
       "name": "EntityPrimaryAction",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Semantic adapter for native entity destinations and callbacks.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-entityprimaryaction",
+      "story": "tools/crate-ui-showcase/stories/EntityPrimaryAction.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityPrimaryAction.mdx",
       "sources": [
         "app/shared/ui/domain/entity/EntityPrimaryAction.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx": "d27d1fe1e41f5fee78ca8053baa9b1ea8f26e7c866a0c3acc201275b23fbc850"
+        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx": "d27d1fe1e41f5fee78ca8053baa9b1ea8f26e7c866a0c3acc201275b23fbc850",
+        "tools/crate-ui-showcase/stories/EntityPrimaryAction.stories.tsx": "2edc33797be09f969dcbf906553db4a42373da9784cd4ce5c85679ce48c9266b",
+        "tools/crate-ui-showcase/docs/EntityPrimaryAction.mdx": "05a68c2a92ff8544d3f1295d8bfe6097852a609bf2cd854cff5d97d4745d2be1"
       },
       "category": "Actions"
     },
     {
       "id": "domain-entity-entityrow",
       "name": "EntityRow",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Entity list identity with separate trailing actions.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-entityrow",
+      "story": "tools/crate-ui-showcase/stories/EntityRow.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityRow.mdx",
       "sources": [
         "app/shared/ui/domain/entity/EntityRow.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/entity/EntityRow.tsx": "c071cccc3053e9aec2ae6df3054144f290e6d7e48f1efbecb7e64a6167126b00"
+        "app/shared/ui/domain/entity/EntityRow.tsx": "09970ba6d3b55baf675b87c161d6eb734151e4a57152a56966d634e1a0e0da11",
+        "tools/crate-ui-showcase/stories/EntityRow.stories.tsx": "88e3469fe715d260e7ceb4ecdb80aca81b6ef82186996a6ed67a0d39efde7473",
+        "tools/crate-ui-showcase/docs/EntityRow.mdx": "0f1b440cec5ab1b24449cd5946e5662575f46551d555846344866496e640d12b"
       },
       "category": "Data Display"
     },
@@ -721,36 +727,40 @@
     {
       "id": "domain-lists-mediagrid",
       "name": "MediaGrid",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Responsive geometry for loaded media and reserved skeletons.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-mediagrid",
+      "story": "tools/crate-ui-showcase/stories/MediaGrid.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaGrid.mdx",
       "sources": [
         "app/shared/ui/domain/lists/MediaGrid.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/lists/MediaGrid.tsx": "a054e30a49791b6620a986eb2539b93c236da9e7163b4440bb309c2ab0846d86"
+        "app/shared/ui/domain/lists/MediaGrid.tsx": "eccf83128ff9d39df54e876fbd03ca90903293894f4fd78fb1b95955e8fd5fc5",
+        "tools/crate-ui-showcase/stories/MediaGrid.stories.tsx": "41e9408cc00866a55bb5b21d350417320ad0dda7029488183c3da4c4b6fe1f0c",
+        "tools/crate-ui-showcase/docs/MediaGrid.mdx": "b0aed986ff08e0ce56cfb0f90fb477738b5608fa343fcbe2539e86c5e72f0dd5"
       },
       "category": "Layout"
     },
     {
       "id": "domain-lists-mediarail",
       "name": "MediaRail",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Scrollable media sequence with content and column fits.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-mediarail",
+      "story": "tools/crate-ui-showcase/stories/MediaRail.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaRail.mdx",
       "sources": [
         "app/shared/ui/domain/lists/MediaRail.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/lists/MediaRail.tsx": "ea042a69f1d64babbcb0bdca36954188d0598379dc18f1f00d01b466ab21e536"
+        "app/shared/ui/domain/lists/MediaRail.tsx": "5112502d1eb28fb1e25482bc540548725e25de34df91c0518382c5a76705b191",
+        "tools/crate-ui-showcase/stories/MediaRail.stories.tsx": "507258c8ecbadb2c7854e70ff9ac40f8590741c40ffa714f9c64add404f0cefd",
+        "tools/crate-ui-showcase/docs/MediaRail.mdx": "742a86cc9b518d672e4415dcc77f52862dc59cb18b6438bb0d6b561ab5a92ebf"
       },
       "category": "Layout"
     },
@@ -779,7 +789,7 @@
       "name": "MediaCover",
       "purpose": "Media image frame, technical fallback and optional managed image renderer.",
       "coverage": "documented",
-      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "adoption": "Shared48px minimum; Listen managed transport preserved and legacy music thumbnails in both apps aligned (1AW). Broader frame adoption/native QA pending.",
       "storyId": "components-mediacover",
       "story": "tools/crate-ui-showcase/stories/MediaCover.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/MediaCover.mdx",
@@ -788,9 +798,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/media/MediaCover.tsx": "846d7cdfc7c5af95490f3f054ab5da3bb024eea839cb85f37bd8b79cc69baedf",
-        "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "ed2fe17826f7486ae5f4d9a2c34f9fd2cabe2c2df2a0b39f8be61748cb832798",
-        "tools/crate-ui-showcase/docs/MediaCover.mdx": "80a4a6b1fdcb100467de9ac6bcc28c9feb8a3c9b43b26fb2826b7ceafd1dc93c"
+        "app/shared/ui/domain/media/MediaCover.tsx": "36a3fa15858255fc9d3f01395f3cbd29594490264004c8e63c3a81299b3f7bf0",
+        "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "06775dc68a8e18501c05252c2ad3bb6d2ecbf13f3e3aa276c0ff84226ce23da6",
+        "tools/crate-ui-showcase/docs/MediaCover.mdx": "06269ca8c2248fa4d51f3f63d717eded4ff018d5c425e70c246d92a1d06c27ab"
       },
       "category": "Media"
     },
@@ -929,18 +939,20 @@
     {
       "id": "domain-tracks-tracklist",
       "name": "TrackList",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Stable-key track collection with injected virtualization.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-tracklist",
+      "story": "tools/crate-ui-showcase/stories/TrackList.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/TrackList.mdx",
       "sources": [
         "app/shared/ui/domain/tracks/TrackList.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/tracks/TrackList.tsx": "1ff5cf260e991c43e9e881449be7558025e6de5ad32644be2908a3c7e8409050"
+        "app/shared/ui/domain/tracks/TrackList.tsx": "b42f47c80ffbc139a05a22971fcdb0ba38e431cfe14899626292e1388da3dda7",
+        "tools/crate-ui-showcase/stories/TrackList.stories.tsx": "ac0e0452eb56fbcb220b718a22088e3b112697216923ab6da2a231cae7dc9368",
+        "tools/crate-ui-showcase/docs/TrackList.mdx": "fb0aacd254daa883a5afc259edd9d922b0c19ca825b78159fe2af8bbddb85f8e"
       },
       "category": "Data Display"
     },

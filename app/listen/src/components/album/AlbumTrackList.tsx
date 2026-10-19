@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { TrackList } from "@crate/ui/domain/tracks/TrackList";
 import type { RefObject, MouseEvent } from "react";
 import type { TFunction } from "i18next";
 
@@ -207,19 +209,38 @@ export function AlbumTrackList({
         open={selectionMenuController.open && selectedAlbumTracks.length > 0}
         position={selectionMenuController.position}
       />
-      {hasMultipleDiscs
-        ? [...tracksByDisc.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([disc, tracks]) => (
-              <div key={disc} className="mb-4">
-                <div className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted">
+      {hasMultipleDiscs ? (
+        [...tracksByDisc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([disc, tracks]) => (
+            <FormField
+              key={disc}
+              kind="group"
+              className="mb-4"
+              label={
+                <span className="flex items-center gap-1.5">
                   <Disc size={CRATE_ICON_SIZE.micro} />
                   {t("album.disc", { disc })}
-                </div>
-                {tracks.map(renderTrack)}
-              </div>
-            ))
-        : data.tracks.map(renderTrack)}
+                </span>
+              }
+            >
+              {(group) => (
+                <TrackList
+                  {...group}
+                  items={tracks}
+                  itemKey={(track) => track.id}
+                  renderRow={renderTrack}
+                />
+              )}
+            </FormField>
+          ))
+      ) : (
+        <TrackList
+          items={data.tracks}
+          itemKey={(track) => track.id}
+          renderRow={renderTrack}
+        />
+      )}
     </div>
   );
 }

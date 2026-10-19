@@ -7,10 +7,10 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Concepto                | Estado vigente                                                                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace               | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado               | 1AU publicado: `5593d68d`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
-| Checkpoint local        | **1AV en revisión local**: imagen e identidad; sin commit                                                                                          |
+| Publicado               | 1AV publicado: `a2b374f3`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                  |
+| Checkpoint local        | **1AW aprobado por Diego**: publicación autorizada; siguiente bloque1AX                                                                                          |
 | Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.           |
-| Revisión actual         | `http://127.0.0.1:5186/review-1av-images.html`; misma escena en Storybook `Reviews/1AV/Images`; vistas anteriores conservadas                                           |
+| Revisión actual         | `http://127.0.0.1:5186/review-1aw-collections.html`; misma escena en Storybook `Reviews/1AW/Collections`; vistas anteriores conservadas                                           |
 | Auditoría               | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
 | Preview                 | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
 | Storybook               | `http://127.0.0.1:6006/?path=/docs/system-introduction--docs`; `crate-ui-storybook.service`; 39 entradas documentadas / 54 pendientes                                       |
@@ -18,7 +18,7 @@ sus stops locales anteriores quedan superados por las aprobaciones y publicacion
 | Identidad y referencia  | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
 | Evidencia canónica      | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
 | Cierre pendiente        | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción             | 1AU publicado; 1AV se revisa antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                                                 |
+| Restricción             | 1AW aprobado; commit/push autorizados.1AX se revisará antes de publicar. Sin PR, merge, rebase, deploy ni release                                                                                 |
 
 La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
 los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
@@ -512,3 +512,74 @@ Diego, sin commit/push de1AV; los tres servicios siguen activos.**
 Diego aprueba1AV y autoriza commit/push. Continúa1AW: entidades, pistas y colecciones según el
 plan Listen aprobado, con el mockup como referencia, Storybook y review pequeña compartida.
 Mantener5186/6006/5174 activos y detener1AW antes de commit/push para revisión de Diego.
+
+## 1AW — Entidades, pistas y colecciones · revisión local · 2026-10-19
+
+1AV aprobado y publicado en `a2b374f3`. 1AW sigue **sin commit/push**, detenido para revisión de
+Diego. Vista pequeña: http://127.0.0.1:5186/review-1aw-collections.html; misma escena en Storybook
+`Reviews/1AW/Collections`. Listen sigue en http://127.0.0.1:5174 con la API habitual autorizada.
+
+Se completan las seis fichas existentes EntityCard, EntityRow, EntityPrimaryAction, TrackList,
+MediaGrid y MediaRail. Selección y reproducción actual se separan; ARIA/ref nativos, texto largo,
+perfiles de artista y metadatos quedan en sus componentes. ArtistCard retira sus mapas locales de
+anchura; AlbumTrackList usa TrackList conservando discos/IDs/selección; PlaylistTrackList conserva
+IDs de entrada y virtualizador; LibraryAlbumsTab distingue error inicial de colección vacía.
+
+Enmiendas de Diego: glyph blanco de18px dentro de un slot visual de24px sobre la portada, sin disco azul; control activo de40px
+con ring2px, aura, efectos y suscripción de progreso solo en la hoja activa. Todas las miniportadas
+independientes de pista/álbum/artista tienen mínimo48px, también compactas. MediaCover posee el
+mínimo y la receta shared `crate-media-thumbnail` lo aplica a marcos managed/raw heredados de
+ambas apps hasta su adopción por fase. Avatares de personas, marcas y celdas internas de collage
+son roles separados. Se mantienen HairlineRow12/18 y título de entidad14/500; ningún hover rellena
+el fondo de las filas revisadas.
+
+Incidencia corregida durante la iteración: envolver TrackCoverThumb en un marco de altura auto
+hizo desaparecer sus imágenes. Se retiró ese wrapper; ArtworkSurface/CrateImage conservan su
+renderer y recuperación anteriores. La nueva prueba de navegador monta el renderer real con
+una imagen local, verifica decode/pintado48x48 en ambas densidades y el WindowVirtualList real
+con80entradas y scroll hasta la última. No necesita sesión ni escribe en producción.
+
+La revisión independiente encontró tres mínimos pendientes (CrateAlbumPicker, ArtistRow y tooltip
+HTML de ArtistNetworkGraph) y una story Callback que heredaba href. Se corrigen con regresiones
+RED→GREEN. La guarda inspecciona marcos JSX y el tooltip HTML conocido; no sustituye QA visual.
+Catálogo:45documentadas/93entradas/120fuentes;48pendientes. Las fichas y la adopción siguen siendo
+estados distintos.
+
+Decisiones conservadoras: mantener los roles14/500 y12/18 ya aprobados (otro tamaño requiere
+revisión medida); no inventar imports Admin para bases existentes sin consumidor directo (la
+adopción real de Admin queda pendiente); conservar la semántica y el teclado nativos de filas,
+sin introducir un nuevo modelo grid (AT y runtime nativo siguen pendientes). No se reescribe
+el renderer, la autenticación, el motor, el drag ni la virtualización.
+
+Las validaciones focalizadas y sus límites finales se consolidan en el estado vigente. Sin suites
+completas/CI, sin regenerar33PNG/manifest1M, sin PR/merge/rebase/deploy/release. Las tres instancias
+permanecen activas; conservar los checkpoints y el pin histórico app/web@258bbaee.
+
+### Cierre de validación local1AW
+
+99pruebas shared,289Listen,13Admin y12de escritorio:413unitarias/política focalizadas; tipos
+shared/Listen/Admin/Desktop/Storybook y lint de archivos modificados verdes.20comprobaciones de
+navegador de colecciones e imagen/identidad (11+9), más9históricas de pistas:8pasaron en la
+cadena inicial; el arrastre390px falló por movimiento al hacer scrollIntoView y pasó en el
+reintento aislado1/1. No se cambió el control de seek para ese reintento. Se conserva este límite
+de estabilidad del mockup grande; las escenas nuevas y el renderer real tienen evidencia propia.
+
+Builds Admin/Listen/Storybook/preview verdes; presupuestos bajo532480/307200Bgzip. La medida final
+se registra en los logs1aw-final-*-budget. Catálogo45/93/120,48pendientes. Revisión fuente independiente
+más regresiones de sus hallazgos cerradas. La auditoría de tamaños arbitrarios amplió la guarda
+y detectó ShowCard compacto18px: ahora48px, con el aumento de altura correspondiente en calendario.
+El mínimo de miniaturas tiene cobertura para marcos JSX y el tooltip HTML existente; no equivale
+a una certificación de todas las rutas ni de credenciales/imágenes reales de producción.
+
+Tres servicios persistentes activos5186/6006/5174. 1AVpublicadoa2b374f3;1AWsin commit ni push,
+parado para Diego. Pendientes QA nativa/AT y grabación/comparación canónicaLinux de fases previas.
+
+Medida final tras el último ajuste: Admin527199/532480Bgzip (margen5281B), Listen200128/307200B.
+Los cuatro builds están verdes; la documentación de MediaCover queda pendiente de revisión1AW,
+conservando la aprobación1AV de las otras familias de imagen. No se ha cambiado ningún baseline.
+
+## Aprobación y continuación — 2026-10-19
+
+Diego aprueba1AW y autoriza commit/push. Continúa1AX: capas, feedback y navegación mínima
+según el plan Listen aprobado. Mantener5186/6006/5174 activos y detener1AX antes de commit/push.
+La aprobación visual1AW no cierra QA nativa/AT ni los baselines pendientes.

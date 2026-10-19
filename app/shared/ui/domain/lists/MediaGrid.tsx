@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -9,10 +9,8 @@ import {
 } from "@crate/ui/lib/media-layout";
 export type { MediaGridDensity } from "@crate/ui/lib/media-layout";
 
-export interface MediaGridProps extends Omit<
-  ComponentPropsWithoutRef<"div">,
-  "children"
-> {
+export interface MediaGridProps
+  extends Omit<ComponentPropsWithRef<"div">, "children"> {
   children: ReactNode;
   density?: MediaGridDensity;
   minItemWidth?: number;
@@ -26,11 +24,19 @@ export function MediaGrid({
   style,
   ...props
 }: MediaGridProps) {
-  const usesMinWidth = minItemWidth !== undefined;
+  const usesMinWidth =
+    minItemWidth !== undefined &&
+    Number.isFinite(minItemWidth) &&
+    minItemWidth > 0;
 
   return (
     <div
       {...props}
+      data-slot="media-grid"
+      role={
+        props.role ??
+        (props["aria-label"] || props["aria-labelledby"] ? "group" : undefined)
+      }
       data-testid="media-grid"
       data-density={usesMinWidth ? undefined : density}
       className={cn(

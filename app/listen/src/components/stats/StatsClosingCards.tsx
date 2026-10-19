@@ -154,7 +154,7 @@ export function StatsDiscoveriesCard({
                   <CrateImage
                     src={artistPhotoApiUrl(route, { size: 128 })}
                     alt=""
-                    className="size-10 shrink-0 rounded-full object-cover"
+                    className="crate-media-thumbnail size-12 shrink-0 rounded-full object-cover"
                     loading="lazy"
                   />
                   <div className="min-w-0 flex-1">

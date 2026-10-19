@@ -146,11 +146,11 @@ export function PlayerTrackIdentity({
             <CrateImage
               src={artistAvatarUrl}
               alt={currentTrack.artist}
-              className=" size-7 rounded-full object-cover"
+              className="crate-media-thumbnail size-12 shrink-0 rounded-full object-cover"
               onError={onArtistAvatarError}
             />
           ) : (
-            <div className="flex size-7 items-center justify-center rounded-full bg-surface-control-hover text-xs font-semibold text-text-secondary">
+            <div className="crate-media-thumbnail flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-control-hover text-xs font-semibold text-text-secondary">
               {currentTrack.artist.slice(0, 1).toUpperCase()}
             </div>
           )}

@@ -187,3 +187,17 @@ React19 native refs. PlaylistArtwork owns native cover/collage/generated fallbac
 collage/placeholder semantics; app buildCoverUrl/renderImage remain transport boundaries. Brand
 logos are assets, not avatar variants. All six have live English catalogue entries; outer
 placement/dimensions remain composition, not a reason to override internal typography or states.
+
+## Entities, tracks and collections — local 1AW
+
+MediaCover owns a48px minimum in both dimensions for standalone track/album/artist thumbnails,
+including compact rows. The shared `crate-media-thumbnail` recipe gives legacy managed/raw
+frames the same minimum until their owning page adopts MediaCover; user avatars, logos and
+internal collage tiles keep their separate roles. New media consumers use the component.
+EntityRow/Card own14px/500 body titles and technical mono metadata; HairlineRow remains12/18.
+Selection does not imply current playback. Optional full text wraps inside the frame. EntityCard
+profileSize owns the existing finite artist widths; do not restore local width maps.
+TrackList keeps injected virtualization at80 and stable entry keys; Grid/Rail retain native
+navigation and reserve geometry. Listen playback remains local: white18px glyph in a24px visual slot over48px cover,
+40px active ring with aura/core/effects, real coarse hit area and progress-only leaf subscriptions.
+No row hover background. Do not replace the specialized player/EQ controls.

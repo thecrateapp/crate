@@ -153,7 +153,7 @@ export function CrateAlbumPicker({
                 }
                 className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
               >
-                <div className="size-11 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
+                <div className="crate-media-thumbnail size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
                   {cover ? (
                     <CrateImage
                       src={cover}

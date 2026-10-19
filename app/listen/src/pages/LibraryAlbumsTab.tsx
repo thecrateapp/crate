@@ -1,3 +1,5 @@
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,9 +21,12 @@ import {
 
 export function LibraryAlbumsTab() {
   const { t } = useTranslation();
-  const { data: albums, loading } = useApi<SavedAlbum[]>(
-    "/api/catalog/me/albums",
-  );
+  const {
+    data: albums,
+    loading,
+    error,
+    refetch,
+  } = useApi<SavedAlbum[]>("/api/catalog/me/albums");
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<AlbumSort>("recent");
 
@@ -64,6 +69,14 @@ export function LibraryAlbumsTab() {
         </div>
       </LoadingState>
     );
+  if (error && !albums)
+    return (
+      <ErrorState
+        message={error}
+        onRetry={refetch}
+        retryLabel={t("common.retry")}
+      />
+    );
   if (!albums || albums.length === 0) {
     return (
       <EmptyState
@@ -83,9 +96,7 @@ export function LibraryAlbumsTab() {
     <div className="space-y-4">
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold uppercase tracking-kicker text-text-primary/40">
-            {t("library.sort.label")}
-          </span>
+          <MonoLabel>{t("library.sort.label")}</MonoLabel>
           <CollectionSortDropdown
             label={t("library.sort.albums")}
             value={sort}
@@ -94,7 +105,7 @@ export function LibraryAlbumsTab() {
           />
         </div>
       ) : null}
-      <MediaGrid>
+      <MediaGrid aria-label={t("nav.collection.albums")}>
         {sortedAlbums.map((album) => (
           <AlbumCard
             key={album.global_album_uid ?? album.id}

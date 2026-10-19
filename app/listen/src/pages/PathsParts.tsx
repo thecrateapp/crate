@@ -229,14 +229,14 @@ export function EndpointPanel({
                       <CrateImage
                         src={result.imageUrl}
                         alt=""
-                        className={` size-8 shrink-0 bg-text-primary/5 object-cover ${
+                        className={`crate-media-thumbnail size-12 shrink-0 bg-text-primary/5 object-cover ${
                           result.type === "artist"
                             ? "rounded-full"
                             : "rounded-md"
                         }`}
                       />
                     ) : (
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent-action/10 text-accent-action">
+                      <div className="crate-media-thumbnail flex size-12 shrink-0 items-center justify-center rounded-md bg-accent-action/10 text-accent-action">
                         <Music size={CRATE_ICON_SIZE.xs} />
                       </div>
                     )}

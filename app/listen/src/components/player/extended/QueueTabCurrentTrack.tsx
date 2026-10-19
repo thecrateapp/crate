@@ -44,10 +44,10 @@ export function QueueTabCurrentTrack({
             src={currentTrack.albumCover}
             alt=""
             loading="lazy"
-            className=" size-8 shrink-0 rounded object-cover"
+            className="crate-media-thumbnail size-12 shrink-0 rounded object-cover"
           />
         ) : (
-          <div className=" size-8 shrink-0 rounded bg-surface-control-hover" />
+          <div className=" crate-media-thumbnail size-12 shrink-0 rounded bg-surface-control-hover" />
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[0.75rem] font-medium text-accent-action">

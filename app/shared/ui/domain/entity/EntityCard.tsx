@@ -11,6 +11,7 @@ import { EntityPrimaryAction } from "./EntityPrimaryAction";
 import type {
   EntityCardOverlay,
   EntityCover,
+  EntityFrameAttributes,
   EntityFollowOverlay,
   EntityMenuButtonMode,
   EntityMenuProps,
@@ -32,8 +33,14 @@ export interface EntityCardClassNames {
 }
 
 export interface EntityCardProps
-  extends EntityPrimaryActionProps, EntityMenuProps {
+  extends EntityPrimaryActionProps,
+    EntityMenuProps,
+    EntityFrameAttributes {
   title: string;
+  active?: boolean;
+  truncate?: boolean;
+  profileSize?: "compact" | "tile" | "editorial";
+  fillGrid?: boolean;
   subtitle?: ReactNode;
   meta?: ReactNode;
   titleAccessory?: ReactNode;
@@ -174,6 +181,10 @@ function EntityCardOverlayControls({
 
 export const EntityCard = memo(function EntityCard({
   title,
+  active = false,
+  truncate = true,
+  profileSize,
+  fillGrid = false,
   subtitle,
   meta,
   titleAccessory,
@@ -198,8 +209,19 @@ export const EntityCard = memo(function EntityCard({
   menuLabel = "More actions",
   className,
   classNames,
+  ...props
 }: EntityCardProps) {
   const centered = shape === "circle";
+  const profileWidths = {
+    compact: "w-[calc(100px+2*var(--content-card-padding))]",
+    tile: "w-[calc(140px+2*var(--content-card-padding))]",
+    editorial: "w-[calc(156px+2*var(--content-card-padding))]",
+  } as const;
+  const profileMaxWidths = {
+    compact: "mx-auto max-w-[calc(100px+2*var(--content-card-padding))]",
+    tile: "mx-auto max-w-[calc(140px+2*var(--content-card-padding))]",
+    editorial: "mx-auto max-w-[calc(156px+2*var(--content-card-padding))]",
+  } as const;
   const { controller, targetProps, menu } = useEntityMenu({
     actionMenu,
     renderMenu,
@@ -218,11 +240,20 @@ export const EntityCard = memo(function EntityCard({
 
   return (
     <article
+      {...props}
+      data-slot="entity-card"
+      data-active={active || undefined}
+      data-profile-size={centered ? profileSize : undefined}
       className={cn(
         "crate-entity-card item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
         layout === "grid"
           ? "w-full min-w-0"
           : cn("shrink-0", compact ? "w-[120px]" : "w-[160px]"),
+        centered &&
+          profileSize &&
+          (layout === "grid"
+            ? !fillGrid && profileMaxWidths[profileSize]
+            : profileWidths[profileSize]),
         selected && "bg-text-primary/5",
         disabled && "opacity-50",
         className,
@@ -240,7 +271,7 @@ export const EntityCard = memo(function EntityCard({
         external={external}
         openLabel={openLabel}
         disabled={disabled}
-        current={selected}
+        current={active}
         className={cn(
           "group block w-full rounded-xl text-left transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent",
           centered ? "p-0" : "p-[var(--content-card-padding)]",
@@ -274,7 +305,9 @@ export const EntityCard = memo(function EntityCard({
         >
           <span
             className={cn(
-              "crate-entity-title block min-w-0 truncate text-sm font-medium text-text-primary",
+              "crate-entity-title block min-w-0 text-sm font-medium",
+              active ? "text-accent-action-hi" : "text-text-primary",
+              truncate ? "truncate" : "wrap-anywhere",
               classNames?.title,
             )}
           >
@@ -293,7 +326,8 @@ export const EntityCard = memo(function EntityCard({
         {subtitle != null ? (
           <span
             className={cn(
-              "crate-media-meta block truncate text-text-muted",
+              "crate-media-meta block text-text-muted",
+              truncate ? "truncate" : "wrap-anywhere",
               centered && "text-center",
               classNames?.subtitle,
             )}
@@ -304,7 +338,8 @@ export const EntityCard = memo(function EntityCard({
         {meta != null ? (
           <span
             className={cn(
-              "crate-media-meta block truncate tabular-nums text-text-muted",
+              "crate-media-meta block tabular-nums text-text-muted",
+              truncate ? "truncate" : "wrap-anywhere",
               centered && "text-center",
               classNames?.meta,
             )}

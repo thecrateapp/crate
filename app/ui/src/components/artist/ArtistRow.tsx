@@ -84,7 +84,7 @@ export function ArtistRow({
         </div>
       ) : null}
 
-      <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md bg-white/5">
+      <div className="crate-media-thumbnail relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-white/5">
         {!imgError ? (
           <img
             src={artistPhotoApiUrl({ artistId, artistSlug, artistName: name })}
