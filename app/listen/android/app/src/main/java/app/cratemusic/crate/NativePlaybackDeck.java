@@ -30,7 +30,8 @@ interface NativePlaybackDeck {
     void startEnvelope(
         NativeMixAudioProcessor.Role role,
         long durationMs,
-        float stagingGainDb
+        float stagingGainDb,
+        float bassHandoffAt
     );
 
     void clearEnvelope();

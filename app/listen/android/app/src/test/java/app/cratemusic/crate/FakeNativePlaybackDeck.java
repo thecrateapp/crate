@@ -23,6 +23,7 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     long bufferedAheadMs = 30_000L;
     NativeMixAudioProcessor.Role envelopeRole;
     float envelopeProgress;
+    float bassHandoffAt = Float.NaN;
 
     FakeNativePlaybackDeck(String name) {
         this.name = name;
@@ -136,9 +137,11 @@ final class FakeNativePlaybackDeck implements NativePlaybackDeck {
     public void startEnvelope(
         NativeMixAudioProcessor.Role role,
         long durationMs,
-        float stagingGainDb
+        float stagingGainDb,
+        float bassHandoffAt
     ) {
         calls.add("envelope:" + role + ":" + durationMs + ":" + stagingGainDb);
+        this.bassHandoffAt = bassHandoffAt;
         envelopeRole = role;
         envelopeProgress = 0.0f;
     }

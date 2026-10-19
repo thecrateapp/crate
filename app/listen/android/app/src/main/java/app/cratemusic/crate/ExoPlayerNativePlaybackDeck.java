@@ -215,9 +215,10 @@ final class ExoPlayerNativePlaybackDeck implements NativePlaybackDeck {
     public void startEnvelope(
         NativeMixAudioProcessor.Role role,
         long durationMs,
-        float stagingGainDb
+        float stagingGainDb,
+        float bassHandoffAt
     ) {
-        audioProcessor.startEnvelope(role, durationMs, stagingGainDb);
+        audioProcessor.startEnvelope(role, durationMs, stagingGainDb, bassHandoffAt);
     }
 
     @Override

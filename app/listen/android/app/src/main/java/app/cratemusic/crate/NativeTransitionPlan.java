@@ -183,6 +183,10 @@ final class NativeTransitionPlan {
         );
     }
 
+    boolean hasBassHandoff() {
+        return "balanced".equals(bassHandoff);
+    }
+
     boolean isBeatmatch() {
         return mode == Mode.BEATMATCH;
     }

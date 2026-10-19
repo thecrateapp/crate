@@ -421,6 +421,31 @@ public class NativeMixLifecycleTest {
     }
 
     @Test
+    public void anEngagedBeatmatchSwapsBassAtTheHandoff() {
+        preroll();
+        controller.scheduleHeldStart();
+        alignPositions(0L);
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertEquals(0.5f, deckA.bassHandoffAt, 0.0f);
+        assertEquals(0.5f, deckB.bassHandoffAt, 0.0f);
+    }
+
+    @Test
+    public void anAdaptiveFallbackKeepsBothBasses() {
+        preroll();
+
+        assertTrue(controller.beginTransition(mixPlan()));
+
+        assertTrue(Float.isNaN(deckA.bassHandoffAt));
+        assertTrue(Float.isNaN(deckB.bassHandoffAt));
+    }
+
+    @Test
     public void anOutOfPhasePrerollMixesAsAdaptive() {
         preroll();
         controller.scheduleHeldStart();

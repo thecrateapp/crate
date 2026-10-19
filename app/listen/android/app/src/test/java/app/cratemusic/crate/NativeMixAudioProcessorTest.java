@@ -114,6 +114,33 @@ public class NativeMixAudioProcessorTest {
         }
     }
 
+    @Test
+    public void anIncomingBassHandoffCutsTheBassBeforeTheSwap() throws Exception {
+        NativeMixAudioProcessor processor = new NativeMixAudioProcessor();
+        processor.configure(new AudioProcessor.AudioFormat(48_000, 1, C.ENCODING_PCM_16BIT));
+        processor.flush();
+        processor.setGainImmediate(1.0f);
+        processor.startEnvelope(NativeMixAudioProcessor.Role.INCOMING, 10_000L, 0.0f, 0.5f);
+        ByteBuffer input = ByteBuffer.allocateDirect(48_000 * 2).order(ByteOrder.nativeOrder());
+        for (int frame = 0; frame < 48_000; frame++) {
+            input.putShort((short) Math.round(8_000 * Math.sin(2.0 * Math.PI * 40 * frame / 48_000)));
+        }
+        input.flip();
+
+        processor.queueInput(input);
+        ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
+
+        double energy = 0.0;
+        output.position(24_000 * 2);
+        while (output.hasRemaining()) {
+            short sample = output.getShort();
+            energy += sample * (double) sample;
+        }
+        double rms = Math.sqrt(energy / 24_000);
+        double envelopeGain = Math.sin(0.1 * Math.PI * 0.5);
+        assertTrue("rms " + rms, rms < 8_000 * envelopeGain * 0.1);
+    }
+
     private static ByteBuffer constantPcm16(
         int frames,
         int channels,

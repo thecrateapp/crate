@@ -252,15 +252,20 @@ final class NativeMixController {
             if (!beatmatch) mixIncomingDeck.setSpeed(1.0f);
         }
         beatmatchSpeed = beatmatch ? plan.incomingTempoRatio : 1.0f;
+        float bassHandoffAt = beatmatch && plan.hasBassHandoff()
+            ? plan.handoffProgress
+            : Float.NaN;
         mixOutgoingDeck.startEnvelope(
             NativeMixAudioProcessor.Role.OUTGOING,
             plan.durationMs,
-            plan.outgoingGainDb
+            plan.outgoingGainDb,
+            bassHandoffAt
         );
         mixIncomingDeck.startEnvelope(
             NativeMixAudioProcessor.Role.INCOMING,
             Math.round(plan.durationMs * (double) beatmatchSpeed),
-            plan.incomingGainDb
+            plan.incomingGainDb,
+            bassHandoffAt
         );
         mixIncomingDeck.setVolume(effectiveOutputVolume());
         mixIncomingDeck.play();

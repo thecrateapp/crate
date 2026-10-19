@@ -21,11 +21,13 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         final Role role;
         final long durationMs;
         final float stagingGain;
+        final float bassHandoffAt;
 
-        Envelope(Role role, long durationMs, float stagingGain) {
+        Envelope(Role role, long durationMs, float stagingGain, float bassHandoffAt) {
             this.role = role;
             this.durationMs = durationMs;
             this.stagingGain = stagingGain;
+            this.bassHandoffAt = bassHandoffAt;
         }
     }
 
@@ -36,7 +38,9 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     }
 
     private volatile EnvelopeReporter envelopeReporter;
-    private static final Envelope NO_ENVELOPE = new Envelope(Role.INCOMING, 0L, 1.0f);
+    private static final Envelope NO_ENVELOPE = new Envelope(Role.INCOMING, 0L, 1.0f, Float.NaN);
+
+    private final BassHandoffFilter bassFilter = new BassHandoffFilter();
 
     private final AtomicReference<Envelope> requestedEnvelope =
         new AtomicReference<>(NO_ENVELOPE);
@@ -84,11 +88,17 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     }
 
     void startEnvelope(Role role, long durationMs, float stagingGainDb) {
+        startEnvelope(role, durationMs, stagingGainDb, Float.NaN);
+    }
+
+    void startEnvelope(Role role, long durationMs, float stagingGainDb, float bassHandoffAt) {
         float stagingGain = Float.isFinite(stagingGainDb)
             ? (float) Math.pow(10.0, Math.min(0.0f, stagingGainDb) / 20.0)
             : 1.0f;
         envelopeProgressBits.set(Float.floatToIntBits(0.0f));
-        requestedEnvelope.set(new Envelope(role, Math.max(1L, durationMs), stagingGain));
+        requestedEnvelope.set(
+            new Envelope(role, Math.max(1L, durationMs), stagingGain, bassHandoffAt)
+        );
     }
 
     void clearEnvelope() {
@@ -139,6 +149,7 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
             if (pcm16Scratch.length < samples) pcm16Scratch = new short[samples];
             input.get(pcm16Scratch, 0, samples);
             boolean trackLevel = activeEnvelope != NO_ENVELOPE;
+            long envelopeStartFrame = envelopeFrame;
             for (int index = 0; index < samples; index += channelCount) {
                 float gain = gainForNextFrame();
                 for (int channel = 0; channel < channelCount; channel++) {
@@ -146,6 +157,18 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
                     if (trackLevel) trackEnvelopeLevel(Math.abs(sample) / (float) Short.MAX_VALUE);
                     pcm16Scratch[index + channel] = clampPcm16(sample);
                 }
+            }
+            if (trackLevel && !Float.isNaN(activeEnvelope.bassHandoffAt)) {
+                bassFilter.process(
+                    pcm16Scratch,
+                    samples / channelCount,
+                    envelopeStartFrame,
+                    envelopeFrames,
+                    activeEnvelope.role,
+                    activeEnvelope.bassHandoffAt
+                );
+            } else if (bassFilter.isReleasing()) {
+                bassFilter.processRelease(pcm16Scratch, samples / channelCount);
             }
             output.asShortBuffer().put(pcm16Scratch, 0, samples);
             output.position(samples * 2);
@@ -162,8 +185,19 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    private String bassSummary() {
+        if (Float.isNaN(activeEnvelope.bassHandoffAt)) return " bass=none";
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT) return " bass=unsupported";
+        return " bassAt=" + activeEnvelope.bassHandoffAt + " " + bassFilter.summary();
+    }
+
     private boolean isUnityGain() {
-        return activeEnvelope == NO_ENVELOPE && remainingRampFrames == 0 && currentGain == 1.0f;
+        return (
+            activeEnvelope == NO_ENVELOPE &&
+            remainingRampFrames == 0 &&
+            currentGain == 1.0f &&
+            !bassFilter.isReleasing()
+        );
     }
 
     void setEnvelopeReporter(EnvelopeReporter reporter) {
@@ -186,6 +220,7 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
                 + " stagingGain=" + activeEnvelope.stagingGain
                 + " peak=" + envelopePeak
                 + " clippedSamples=" + envelopeClippedSamples
+                + bassSummary()
         );
     }
 
@@ -209,6 +244,7 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     @Override
     protected void onFlush() {
         reportEnvelope();
+        bassFilter.configure(inputAudioFormat.sampleRate, inputAudioFormat.channelCount);
         appliedRevision = -1;
         applyPendingTarget();
     }
@@ -267,13 +303,16 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         if (requested == activeEnvelope) {
             return;
         }
+        reportEnvelope();
         if (requested == NO_ENVELOPE) {
+            bassFilter.release();
             currentGain *= envelopeFactor;
             targetGain *= envelopeFactor;
             envelopeFactor = 1.0f;
             activeEnvelope = NO_ENVELOPE;
             return;
         }
+        bassFilter.reset();
         int sampleRate = Math.max(1, inputAudioFormat.sampleRate);
         activeEnvelope = requested;
         envelopeFrame = 0L;

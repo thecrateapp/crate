@@ -2023,6 +2023,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     + " engaged=" + mixController.isBeatmatching()
                     + " phaseErrorMs=" + mixController.lastPhaseErrorMs()
                     + " ratio=" + boundedPlan.incomingTempoRatio
+                    + " bassHandoff=" + boundedPlan.bassHandoff
             );
         }
         emit("transitionStarted", transitionPayload(boundedPlan, 0.0f));
