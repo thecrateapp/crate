@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { Button } from "@crate/ui/shadcn/button";
 
 import {
   presetForGrants,
@@ -150,6 +151,9 @@ export function PermissionPicker({
 }) {
   const [customChosen, setCustomChosen] = useState(false);
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  // The custom set in place before a preset was picked, restored when Custom
+  // is chosen again so trying a preset does not lose it.
+  const lastCustom = useRef<string[] | null>(null);
   const matchedPreset = presetForGrants(value, catalog.presets);
   const selected = customChosen ? "custom" : matchedPreset;
   const grantSet = new Set(value);
@@ -171,7 +175,7 @@ export function PermissionPicker({
       description: "Choose individual permissions.",
       reason: null,
       disabled: Boolean(disabled),
-      select: () => setCustomChosen(true),
+      select: () => chooseCustom(),
     },
   ];
   // Roving tabindex, as in SegmentedControl: the group is one Tab stop, on
@@ -182,9 +186,22 @@ export function PermissionPicker({
       ? selectedIndex
       : cards.findIndex((card) => !card.disabled);
 
+  // Grants the catalog does not describe (removed since they were stored).
+  // They would be sent back on save and refused, so Custom lists them with a
+  // way to remove them.
+  const knownScopes = new Set(catalog.scopes.map((scope) => scope.scope));
+  const unknownGrants = value.filter((grant) => !knownScopes.has(grant));
+
   function choosePreset(preset: AgentScopePreset) {
+    if (selected === "custom") lastCustom.current = [...value];
     setCustomChosen(false);
     onChange(preset.scopes);
+  }
+
+  function chooseCustom() {
+    setCustomChosen(true);
+    const previous = lastCustom.current;
+    if (selected !== "custom" && previous) onChange(previous);
   }
 
   function toggleScope(scope: string, checked: boolean) {
@@ -295,6 +312,34 @@ export function PermissionPicker({
               </fieldset>
             );
           })}
+          {unknownGrants.length > 0 ? (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Other</legend>
+              <ul className="space-y-1.5">
+                {unknownGrants.map((grant) => (
+                  <li
+                    key={grant}
+                    className="flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <span title={grant}>Unknown permission</span>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      title={grant}
+                      aria-label="Remove unknown permission"
+                      disabled={disabled}
+                      onClick={() =>
+                        onChange(value.filter((other) => other !== grant))
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </fieldset>
+          ) : null}
         </div>
       ) : null}
     </div>

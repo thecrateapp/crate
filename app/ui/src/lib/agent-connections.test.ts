@@ -10,6 +10,7 @@ import {
   activityText,
   approvalPolicyText,
   connectionStatus,
+  defaultPresetScopes,
   mcpSnippets,
   permissionSummary,
   presetForGrants,
@@ -317,18 +318,22 @@ describe("mcpSnippets", () => {
     expect(snippets.claudeCode).toContain("Bearer crate_mcp_x");
   });
 
-  it("builds the exact claude code command", () => {
+  it("builds the exact claude code command with the URL quoted", () => {
     const snippets = mcpSnippets("https://api.example.com/mcp", "tok");
     expect(snippets.claudeCode).toBe(
-      'claude mcp add --transport http crate https://api.example.com/mcp --header "Authorization: Bearer tok"',
+      'claude mcp add --transport http crate "https://api.example.com/mcp" --header "Authorization: Bearer tok"',
     );
   });
 
-  it("builds the codex snippet with the bearer token env var", () => {
+  it("splits codex into a token export and a TOML block without the token", () => {
     const snippets = mcpSnippets("https://api.example.com/mcp", "tok");
-    expect(snippets.codex).toBe(
-      'export CRATE_MCP_TOKEN="tok"\n\n# ~/.codex/config.toml\n[mcp_servers.crate]\nurl = "https://api.example.com/mcp"\nbearer_token_env_var = "CRATE_MCP_TOKEN"',
+    expect(snippets.codex.shell).toBe('export CRATE_MCP_TOKEN="tok"');
+    expect(snippets.codex.toml).toBe(
+      '[mcp_servers.crate]\nurl = "https://api.example.com/mcp"\nbearer_token_env_var = "CRATE_MCP_TOKEN"',
     );
+    expect(
+      mcpSnippets("https://api.example.com/mcp", "crate_mcp_secret").codex.toml,
+    ).not.toContain("crate_mcp_secret");
   });
 
   it("builds the plain http snippet", () => {
@@ -336,5 +341,64 @@ describe("mcpSnippets", () => {
     expect(snippets.http).toBe(
       "URL: https://api.example.com/mcp\nHeader: Authorization: Bearer tok",
     );
+  });
+});
+
+describe("defaultPresetScopes", () => {
+  const scopes = [
+    {
+      scope: "library.health.read",
+      capability: "agents.integrations.manage",
+      can_grant: true,
+      label: "Inspect library health",
+      group: "library",
+      access: "read" as const,
+    },
+    {
+      scope: "editorial.publish",
+      capability: "agents.editorial.publish",
+      can_grant: false,
+      label: "Change editorial playlist visibility",
+      group: "editorial",
+      access: "change" as const,
+    },
+  ];
+
+  it("uses the first preset the caller can grant in full", () => {
+    expect(
+      defaultPresetScopes(
+        [
+          {
+            id: "read_only",
+            label: "Read only",
+            description: "",
+            scopes: ["library.health.read", "editorial.publish"],
+          },
+          {
+            id: "health",
+            label: "Health",
+            description: "",
+            scopes: ["library.health.read"],
+          },
+        ],
+        scopes,
+      ),
+    ).toEqual(["library.health.read"]);
+  });
+
+  it("is empty when no preset can be granted", () => {
+    expect(
+      defaultPresetScopes(
+        [
+          {
+            id: "read_only",
+            label: "Read only",
+            description: "",
+            scopes: ["editorial.publish"],
+          },
+        ],
+        scopes,
+      ),
+    ).toEqual([]);
   });
 });

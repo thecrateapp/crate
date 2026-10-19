@@ -47,8 +47,13 @@ export function useCursorList<T>(
   const [error, setError] = useState<string | null>(null);
   const [moreFailed, setMoreFailed] = useState(false);
   // Bumped whenever a newer read supersedes the ones in flight (a new URL, a
-  // reload, unmount); a response from an older generation is dropped.
+  // reload, a replaced row, unmount); a response from an older generation is
+  // dropped.
   const generation = useRef(0);
+  // The range read currently in flight, so a replaced row can re-issue it.
+  const pendingRead = useRef<{ pageCount: number; initial: boolean } | null>(
+    null,
+  );
 
   function pageUrl(base: string, cursor: string | null): string {
     if (!cursor) return base;
@@ -89,6 +94,7 @@ export function useCursorList<T>(
   function startRead(pageCount: number, initial: boolean) {
     if (!url) return;
     const token = ++generation.current;
+    pendingRead.current = { pageCount, initial };
     if (initial) setLoading(true);
     setLoadingMore(false);
     setError(null);
@@ -101,7 +107,9 @@ export function useCursorList<T>(
         if (token === generation.current) setError(errorMessage(caught));
       })
       .finally(() => {
-        if (token === generation.current) setLoading(false);
+        if (token !== generation.current) return;
+        pendingRead.current = null;
+        setLoading(false);
       });
   }
 
@@ -114,6 +122,7 @@ export function useCursorList<T>(
     startRead(1, true);
     return () => {
       generation.current += 1;
+      pendingRead.current = null;
     };
     // Only the URL identifies the collection; the read helpers are recreated
     // every render and are intentionally left out.
@@ -162,6 +171,10 @@ export function useCursorList<T>(
         idOf(current) === id ? item : current,
       ),
     }));
+    // A read sent before this row changed would bring the old copy back:
+    // drop it and read the same range again.
+    const pending = pendingRead.current;
+    if (pending) startRead(pending.pageCount, pending.initial);
   }
 
   return {

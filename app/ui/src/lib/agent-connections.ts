@@ -150,15 +150,42 @@ export function activityText(entry: {
     : base;
 }
 
-/** Client configuration snippets for connecting to Crate's MCP server. */
+/**
+ * Client configuration snippets for connecting to Crate's MCP server. Codex
+ * takes two pieces: a shell export holding the token, and a TOML block for
+ * `~/.codex/config.toml` that only names the variable, so the token never
+ * lands in a config file.
+ */
 export function mcpSnippets(
   url: string | null,
   token: string,
-): { claudeCode: string; codex: string; http: string } {
+): {
+  claudeCode: string;
+  codex: { shell: string; toml: string };
+  http: string;
+} {
   const u = url ?? MCP_URL_PLACEHOLDER;
   return {
-    claudeCode: `claude mcp add --transport http crate ${u} --header "Authorization: Bearer ${token}"`,
-    codex: `export CRATE_MCP_TOKEN="${token}"\n\n# ~/.codex/config.toml\n[mcp_servers.crate]\nurl = "${u}"\nbearer_token_env_var = "CRATE_MCP_TOKEN"`,
+    claudeCode: `claude mcp add --transport http crate "${u}" --header "Authorization: Bearer ${token}"`,
+    codex: {
+      shell: `export CRATE_MCP_TOKEN="${token}"`,
+      toml: `[mcp_servers.crate]\nurl = "${u}"\nbearer_token_env_var = "CRATE_MCP_TOKEN"`,
+    },
     http: `URL: ${u}\nHeader: Authorization: Bearer ${token}`,
   };
+}
+
+/**
+ * Scopes of the first preset the caller can grant in full, used as the
+ * default access for a new connection or OAuth app; none when every preset
+ * needs a permission the caller lacks.
+ */
+export function defaultPresetScopes(
+  presets: AgentScopePreset[],
+  scopes: AgentScope[],
+): string[] {
+  const available = presets.find(
+    (preset) => presetUnavailableReason(preset, scopes) === null,
+  );
+  return available ? [...available.scopes] : [];
 }

@@ -288,6 +288,51 @@ describe("PermissionPicker", () => {
     expect(document.body).toHaveFocus();
   });
 
+  it("restores the custom selection after trying a preset", async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledPicker
+        initial={["library.health.read", "curation.shows.write"]}
+      />,
+    );
+    const custom = screen.getByRole("radio", { name: "Custom" });
+    expect(custom).toBeChecked();
+    custom.focus();
+
+    // Custom is last, so ArrowRight wraps to «Read only».
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: "Read only" })).toBeChecked();
+    await user.keyboard("{ArrowLeft}");
+
+    expect(custom).toBeChecked();
+    expect(screen.getByLabelText("Inspect library health")).toBeChecked();
+    expect(screen.getByLabelText("Import reviewed shows")).toBeChecked();
+    expect(screen.getByLabelText("Read instance status")).not.toBeChecked();
+  });
+
+  it("lists a stored grant the catalog no longer has and lets it be removed", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <PermissionPicker
+        catalog={catalog}
+        value={["library.health.read", "ops.future.read"]}
+        onChange={onChange}
+      />,
+    );
+
+    const other = screen.getByRole("group", { name: "Other" });
+    expect(within(other).getByText("Unknown permission")).toHaveAttribute(
+      "title",
+      "ops.future.read",
+    );
+    expect(screen.queryByText("ops.future.read")).not.toBeInTheDocument();
+    await user.click(
+      within(other).getByRole("button", { name: "Remove unknown permission" }),
+    );
+    expect(onChange).toHaveBeenCalledWith(["library.health.read"]);
+  });
+
   it("disables an ungrantable scope checkbox in the custom editor", async () => {
     const user = userEvent.setup();
     render(
@@ -340,6 +385,22 @@ describe("ConnectionSnippets", () => {
 
     await user.click(screen.getByRole("tab", { name: "Codex" }));
     expect(screen.getByText(/bearer_token_env_var/)).toBeInTheDocument();
+    // The token is exported in the shell, never written into the TOML.
+    expect(screen.getByText(/bearer_token_env_var/)).not.toHaveTextContent(
+      "crate_mcp_tok",
+    );
+    expect(
+      screen.getByText('export CRATE_MCP_TOKEN="crate_mcp_tok"'),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Copy shell command" }),
+    );
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        'export CRATE_MCP_TOKEN="crate_mcp_tok"',
+      ),
+    );
+    writeText.mockClear();
 
     await user.click(
       screen.getByRole("button", { name: "Copy configuration" }),
@@ -348,6 +409,26 @@ describe("ConnectionSnippets", () => {
     expect(writeText).toHaveBeenCalledWith(
       expect.stringContaining("bearer_token_env_var"),
     );
+  });
+});
+
+describe("ConnectionSnippets warning", () => {
+  it("warns that agents cannot connect while MCP is turned off", () => {
+    const { rerender } = render(
+      <ConnectionSnippets
+        url={null}
+        token="crate_mcp_tok"
+        mcpEnabled={false}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "MCP is turned off on this server. Agents can't connect until it is enabled.",
+      ),
+    ).toBeInTheDocument();
+
+    rerender(<ConnectionSnippets url={null} token="crate_mcp_tok" />);
+    expect(screen.queryByText(/MCP is turned off/)).not.toBeInTheDocument();
   });
 });
 
@@ -403,6 +484,119 @@ describe("ConnectAgentDialog", () => {
     );
     expect(screen.getByText(/claude mcp add/)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(secret.token))).toBeInTheDocument();
+  });
+
+  it("keeps Next disabled until the name has text", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Name"), "   ");
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Name"), "{Enter}");
+    expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Name"), "x");
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+  });
+
+  it("sends the trimmed name", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(secret);
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={catalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "  Night operator  ");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/agent-integrations",
+        "POST",
+        expect.objectContaining({ name: "Night operator" }),
+      ),
+    );
+  });
+
+  it("defaults to the first preset the admin can grant in full", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(secret);
+    const restricted: AgentCatalog = {
+      ...catalog,
+      presets: catalog.presets.map((preset) =>
+        preset.id === "read_only"
+          ? { ...preset, scopes: [...preset.scopes, "editorial.publish"] }
+          : preset,
+      ),
+    };
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={restricted}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Night operator");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("radio", { name: "Read only" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Shows curator" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/agent-integrations",
+        "POST",
+        expect.objectContaining({
+          grants: [
+            "curation.shows.read",
+            "curation.shows.write",
+            "ops.status.read",
+            "ops.jobs.read",
+          ],
+        }),
+      ),
+    );
+  });
+
+  it("warns on the token step when MCP is turned off", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(secret);
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={{ ...catalog, mcp_enabled: false }}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Night operator");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    expect(await screen.findByRole("textbox", { name: "Token" })).toHaveValue(
+      secret.token,
+    );
+    expect(
+      screen.getByText(
+        "MCP is turned off on this server. Agents can't connect until it is enabled.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("goes to the permissions step when Enter is pressed in the name field", async () => {

@@ -1004,4 +1004,166 @@ describe("AgentConnections", () => {
       }),
     );
   });
+
+  it("locks the sheet when the approval switch conflicts and keeps the draft on reload", async () => {
+    const user = userEvent.setup();
+    let current = integration;
+    apiMock.mockImplementation((path: string, method = "GET") => {
+      if (method === "PATCH")
+        return Promise.reject(
+          Object.assign(new Error("Integration policy changed"), {
+            status: 409,
+          }),
+        );
+      return readDefault(path, [current]);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    const sheet = await openConnection(user);
+    await user.click(
+      within(sheet).getByRole("button", { name: "Edit permissions" }),
+    );
+    await user.click(within(sheet).getByRole("radio", { name: "Custom" }));
+    await user.click(within(sheet).getByLabelText("Read instance status"));
+
+    await user.click(
+      within(sheet).getByLabelText("Require approval before changes"),
+    );
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      "This connection changed since you opened it.",
+    );
+    expect(apiMock).toHaveBeenCalledWith(`${base}/service-one`, "PATCH", {
+      grants: ["library.health.read"],
+      require_approval: true,
+      expected_policy_revision: 4,
+    });
+    expect(within(sheet).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      within(sheet).getByLabelText("Require approval before changes"),
+    ).toBeDisabled();
+    expect(within(sheet).getByLabelText("Read instance status")).toBeChecked();
+
+    current = { ...integration, policy_revision: 6 };
+    await user.click(
+      within(sheet).getByRole("button", { name: "Reload policy" }),
+    );
+    expect(
+      await within(sheet).findByText(
+        "Policy reloaded. Your proposed permissions are preserved; review them before saving.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(sheet).getByLabelText("Read instance status")).toBeChecked();
+    expect(within(sheet).getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(
+      within(sheet).getByLabelText("Require approval before changes"),
+    ).toBeEnabled();
+  });
+
+  it("warns beside a rotated token when MCP is turned off", async () => {
+    const user = userEvent.setup();
+    apiMock.mockImplementation((path: string, method = "GET") => {
+      if (method !== "GET") return Promise.resolve(secret);
+      if (path === `${base}/catalog`)
+        return Promise.resolve({ ...catalog, mcp_enabled: false });
+      return readDefault(path, [integration]);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    const sheet = await openConnection(user);
+
+    await user.click(
+      within(sheet).getByRole("button", { name: "Rotate token" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Rotate token",
+      }),
+    );
+
+    expect(
+      await within(sheet).findByRole("textbox", { name: "New token" }),
+    ).toHaveValue(secret.token);
+    expect(
+      within(sheet).getByText(
+        "MCP is turned off on this server. Agents can't connect until it is enabled.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("starts a new OAuth app with no access when no preset can be granted", async () => {
+    const user = userEvent.setup();
+    apiMock.mockImplementation((path: string, method = "GET") => {
+      if (method === "POST") return Promise.resolve({ registered: true });
+      if (path === `${base}/catalog`)
+        return Promise.resolve({
+          ...catalog,
+          presets: [
+            {
+              ...catalog.presets[0],
+              scopes: ["library.health.read", "library.repair.photo_flag"],
+            },
+          ],
+        });
+      return readDefault(path, [integration]);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    await screen.findByText(
+      "Register an app before anyone can connect with OAuth.",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Register app" }));
+    const dialog = screen.getByRole("dialog", { name: "Register OAuth app" });
+    await user.type(within(dialog).getByLabelText("Client ID"), "remote");
+    await user.type(within(dialog).getByLabelText("App name"), "Remote agent");
+    await user.type(
+      within(dialog).getByLabelText("Redirect URIs (one per line)"),
+      "https://agent.example/callback",
+    );
+    expect(
+      within(dialog).getByRole("radio", { name: "Read only" }),
+    ).toBeDisabled();
+    expect(within(dialog).getByRole("radio", { name: "Custom" })).toBeChecked();
+    expect(
+      within(dialog).getByRole("button", { name: "Register app" }),
+    ).toBeDisabled();
+
+    await user.click(within(dialog).getByLabelText("Inspect library health"));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Register app" }),
+    );
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        `${base}/oauth-clients`,
+        "POST",
+        expect.objectContaining({ scopes: ["library.health.read"] }),
+      ),
+    );
+  });
+
+  it("reports a failed reload as such, not as a failed next page", async () => {
+    const user = userEvent.setup();
+    let failList = false;
+    apiMock.mockImplementation((path: string) => {
+      if (path === `${base}?limit=20`)
+        return failList
+          ? Promise.reject(new Error("Service unavailable"))
+          : Promise.resolve({ items: [integration], next_cursor: null });
+      return readDefault(path, []);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+    await screen.findByRole("button", { name: "Library reader" });
+
+    failList = true;
+    await user.click(
+      screen.getByRole("button", { name: "Refresh connections" }),
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Service unavailable");
+    expect(alert).not.toHaveTextContent(
+      "More connections could not be loaded.",
+    );
+    expect(
+      screen.getByRole("button", { name: "Library reader" }),
+    ).toBeInTheDocument();
+  });
 });

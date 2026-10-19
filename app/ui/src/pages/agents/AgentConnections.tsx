@@ -156,7 +156,7 @@ export function AgentConnections() {
     : null;
   const error = catalog.error
     ? catalog.error
-    : connections.error && connections.items.length > 0
+    : connections.moreFailed
       ? "More connections could not be loaded."
       : connections.error;
   // Rows summarise grants with the catalog's access levels, so they wait for

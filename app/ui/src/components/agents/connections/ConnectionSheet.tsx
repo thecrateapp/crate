@@ -189,7 +189,7 @@ function GrantedPermissions({
                   className="flex flex-wrap items-center gap-2 text-sm"
                 >
                   <span title={grant}>
-                    {scope?.label ?? "Unrecognised permission"}
+                    {scope?.label ?? "Unknown permission"}
                   </span>
                   {!scope || scope.access === "change" ? (
                     <StatusBadge tone="warning">Can change</StatusBadge>
@@ -207,10 +207,12 @@ function GrantedPermissions({
 function TokenReveal({
   secret,
   mcpUrl,
+  mcpEnabled,
   onDone,
 }: {
   secret: AgentSecret;
   mcpUrl: string | null;
+  mcpEnabled: boolean;
   onDone: () => void;
 }) {
   return (
@@ -230,7 +232,11 @@ function TokenReveal({
       <p className="text-sm text-muted-foreground">
         Expires <RelativeTime value={secret.expires_at} />
       </p>
-      <ConnectionSnippets url={mcpUrl} token={secret.token} />
+      <ConnectionSnippets
+        url={mcpUrl}
+        token={secret.token}
+        mcpEnabled={mcpEnabled}
+      />
       <div className="flex justify-end">
         <Button type="button" size="sm" onClick={onDone}>
           Done
@@ -741,6 +747,7 @@ export function ConnectionSheet({
                   <TokenReveal
                     secret={secret}
                     mcpUrl={catalog.mcp_url}
+                    mcpEnabled={catalog.mcp_enabled}
                     onDone={() => setSecret(null)}
                   />
                 ) : null}

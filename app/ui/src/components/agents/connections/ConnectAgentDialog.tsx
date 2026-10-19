@@ -15,6 +15,7 @@ import { Switch } from "@crate/ui/primitives/Switch";
 import { CopyButton } from "@/components/admin/CopyButton";
 import { RelativeTime } from "@/components/admin/RelativeTime";
 import { api } from "@/lib/api";
+import { defaultPresetScopes } from "@/lib/agent-connections";
 import type { AgentCatalog, AgentSecret } from "@/lib/agent-integrations";
 
 import { ConnectionSnippets } from "./ConnectionSnippets";
@@ -30,10 +31,8 @@ const LIFETIME_ITEMS: { value: TokenLifetime; label: string }[] = [
   { value: "365", label: "1 year" },
 ];
 
-function readOnlyGrants(catalog: AgentCatalog): string[] {
-  return (
-    catalog.presets.find((preset) => preset.id === "read_only")?.scopes ?? []
-  );
+function defaultGrants(catalog: AgentCatalog): string[] {
+  return defaultPresetScopes(catalog.presets, catalog.scopes);
 }
 
 /**
@@ -55,7 +54,7 @@ export function ConnectAgentDialog({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [name, setName] = useState("");
   const [lifetime, setLifetime] = useState<TokenLifetime>("90");
-  const [grants, setGrants] = useState<string[]>(() => readOnlyGrants(catalog));
+  const [grants, setGrants] = useState<string[]>(() => defaultGrants(catalog));
   const [requireApproval, setRequireApproval] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +65,7 @@ export function ConnectAgentDialog({
     setStep(1);
     setName("");
     setLifetime("90");
-    setGrants(readOnlyGrants(catalog));
+    setGrants(defaultGrants(catalog));
     setRequireApproval(true);
     setBusy(false);
     setError(null);
@@ -90,7 +89,7 @@ export function ConnectAgentDialog({
     setError(null);
     try {
       const result = await api<AgentSecret>(base, "POST", {
-        name,
+        name: name.trim(),
         grants,
         expires_in_days: Number(lifetime),
         require_approval: requireApproval,
@@ -205,7 +204,11 @@ export function ConnectAgentDialog({
             <p className="text-sm text-muted-foreground">
               Expires <RelativeTime value={secret.expires_at} />
             </p>
-            <ConnectionSnippets url={catalog.mcp_url} token={secret.token} />
+            <ConnectionSnippets
+              url={catalog.mcp_url}
+              token={secret.token}
+              mcpEnabled={catalog.mcp_enabled}
+            />
             <div className="flex justify-end">
               <Button type="button" onClick={() => requestOpenChange(false)}>
                 Done

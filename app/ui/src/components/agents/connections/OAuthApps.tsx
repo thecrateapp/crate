@@ -18,7 +18,10 @@ import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { api } from "@/lib/api";
-import { permissionSummary } from "@/lib/agent-connections";
+import {
+  defaultPresetScopes,
+  permissionSummary,
+} from "@/lib/agent-connections";
 import type { AgentCatalog } from "@/lib/agent-integrations";
 import { apiErrorText } from "@/lib/agent-plan-presentation";
 
@@ -32,12 +35,6 @@ export interface AgentOAuthClient {
   name: string;
   enabled: boolean;
   scopes: string[];
-}
-
-function readOnlyScopes(catalog: AgentCatalog): string[] {
-  return (
-    catalog.presets.find((preset) => preset.id === "read_only")?.scopes ?? []
-  );
 }
 
 /**
@@ -61,7 +58,9 @@ function OAuthAppDialog({
   const [redirects, setRedirects] = useState("");
   const [useMetadata, setUseMetadata] = useState(false);
   const [scopes, setScopes] = useState<string[]>(() =>
-    client ? [...client.scopes] : readOnlyScopes(catalog),
+    client
+      ? [...client.scopes]
+      : defaultPresetScopes(catalog.presets, catalog.scopes),
   );
   const [saving, setSaving] = useState(false);
   const clientIdField = useId();
