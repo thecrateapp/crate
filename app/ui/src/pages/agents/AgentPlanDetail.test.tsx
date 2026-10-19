@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, Route, Routes } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentPlan } from "@/lib/agent-integrations";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({
   toast: { success: toastSuccessMock, error: vi.fn() },
 }));
 
-import { AgentPlanReview } from "./AgentPlanReview";
+import { AgentPlanDetail } from "./AgentPlanDetail";
 
 const base = "/api/admin/agent-plans";
 const uid = "10000000-0000-0000-0000-000000000001";
@@ -205,21 +205,86 @@ function editorialPlan(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const showTarget = {
+  entity_type: "show",
+  name: "c806cc6aac1892d0f55080693074769aff9f8e9d321c82755196e80977eb7812",
+  label: "Coilguns · 2027-03-14",
+};
+
+// Mirrors the lab shows_import plan: an existing show (before) and the
+// reviewed candidate (after), targeted by a hashed show identity.
+function showImportPlan(overrides: Partial<AgentPlan> = {}): AgentPlan {
+  const itemId = "6cff6a09-f56b-45ef-aaf4-7e9a4836ff0d";
+  return plan({
+    operation: "shows_import",
+    risk: "safe",
+    integration_name: "Local lab MCP",
+    integration_kind: "service",
+    created_at: new Date(Date.now() - 120_000).toISOString(),
+    targets: [showTarget],
+    changes: [
+      {
+        item_id: itemId,
+        field: "show",
+        targets: [showTarget],
+        before: {
+          artist_name: "Coilguns",
+          date: "2027-03-14",
+          local_time: null,
+          doors_time: "21:00",
+          timezone: null,
+          venue: "Wurlitzer Ballroom",
+          city: "Madrid",
+          region: null,
+          country: "Spain",
+          country_code: "ES",
+          address_line1: "Calle de las Tres Cruces, 12",
+          postal_code: "28013",
+          latitude: null,
+          longitude: null,
+          url: null,
+          tickets_url: null,
+          image_url: null,
+          lineup: ["Coilguns"],
+          price_range: "€17.54",
+          status: "scheduled",
+        },
+        after: {
+          city: "Madrid",
+          date: "2027-03-14",
+          venue: "WURLITZER BALLROOM",
+          item_id: itemId,
+          timezone: "Europe/Madrid",
+          local_time: "21:00",
+          artist_name: "Coilguns",
+          country_code: "ES",
+        },
+      },
+    ],
+    impact: { scope: "selected", filesystem: false, public: true, shows: 1 },
+    reversibility: "new_plan_required",
+    source_versions: {
+      shows: "fea51baa1103b3b5747f345868815ebfb60d53dbfbe033935f325795e281f4ca",
+    },
+    ...overrides,
+  });
+}
+
 function renderReview(capabilities?: string[]) {
   return renderWithAdminProviders(
     <Routes>
       <Route
-        path="/agent-plans/:planId"
+        path="/agents/approvals/:planId"
         element={
           <>
-            <Link to="/agent-plans/plan-two">Next review target</Link>
-            <AgentPlanReview />
+            <Link to="/agents/approvals/plan-two">Next review target</Link>
+            <AgentPlanDetail />
           </>
         }
       />
     </Routes>,
     {
-      route: "/agent-plans/plan-one",
+      route: "/agents/approvals/plan-one",
       auth: capabilities
         ? { hasCapability: (capability) => capabilities.includes(capability) }
         : undefined,
@@ -249,7 +314,12 @@ beforeEach(() => {
   toastSuccessMock.mockReset();
 });
 
-describe("AgentPlanReview", () => {
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe("AgentPlanDetail", () => {
   it("reviews the real editorial selection in order with locks, rules, exclusions and metadata", async () => {
     const user = userEvent.setup();
     const item = editorialPlan();
@@ -266,34 +336,37 @@ describe("AgentPlanReview", () => {
     const rows = within(selection).getAllByRole("row");
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveTextContent("1");
-    expect(rows[1]).toHaveTextContent("track-second");
     expect(rows[1]).toHaveTextContent("Second track");
     expect(rows[1]).toHaveTextContent("Second artist");
     expect(rows[1]).toHaveTextContent("Second album");
-    expect(rows[1]).toHaveTextContent("240");
+    expect(rows[1]).toHaveTextContent("4:00");
     expect(rows[1]).toHaveTextContent("generated");
     expect(rows[1]).toHaveTextContent("Unlocked");
     expect(rows[2]).toHaveTextContent("2");
-    expect(rows[2]).toHaveTextContent("global-first");
     expect(rows[2]).toHaveTextContent("First track");
     expect(rows[2]).toHaveTextContent("manual");
     expect(rows[2]).toHaveTextContent("Locked");
     const details = screen.getByRole("region", {
       name: "Complete editorial details",
     });
+    // Track identities are exact review data but live in Technical details.
+    expect(details).not.toHaveTextContent("track-second");
+    await user.click(
+      within(details).getByRole("button", { name: "Track identities" }),
+    );
+    expect(details).toHaveTextContent("track-second");
+    expect(details).toHaveTextContent("global-first");
     expect(details).toHaveTextContent("A complete evening selection");
-    expect(details).toHaveTextContent('"generation_mode": "smart"');
-    expect(details).toHaveTextContent('"auto_refresh_enabled": false');
+    expect(details).toHaveTextContent(/Generation mode\s*smart/);
+    expect(details).toHaveTextContent(/Auto refresh enabled\s*No/);
     expect(details).toHaveTextContent("Ambient");
     expect(details).toHaveTextContent("excluded-new");
     expect(details).toHaveTextContent("excluded-existing");
-    expect(details).toHaveTextContent('"source_revision": 4');
-    expect(details).toHaveTextContent('"generation_epoch": 2');
+    expect(details).toHaveTextContent(/Source revision\s*4/);
+    expect(details).toHaveTextContent(/Generation epoch\s*2/);
     expect(details).toHaveTextContent("crate_worker");
     await user.click(screen.getByRole("checkbox"));
-    await user.click(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Approve" }));
     expect(apiMock).toHaveBeenCalledWith(
       `${base}/plan-one/approve`,
       "POST",
@@ -316,7 +389,7 @@ describe("AgentPlanReview", () => {
       name: "Complete editorial details",
     });
     expect(details).toHaveTextContent(
-      '"copied_exclusions": [ { "track_uid": "excluded-existing", "global_track_uid": null } ]',
+      /Copied exclusions\s*Track uid\s*excluded-existing\s*Global track uid\s*Empty/,
     );
   });
 
@@ -383,7 +456,7 @@ describe("AgentPlanReview", () => {
       apiMock.mockResolvedValue(editorialPlan(invalid));
       renderReview();
       const approve = await screen.findByRole("button", {
-        name: "Approve exact plan",
+        name: "Approve",
       });
       await user.click(screen.getByRole("checkbox"));
       expect(approve).toBeDisabled();
@@ -409,11 +482,9 @@ describe("AgentPlanReview", () => {
         }),
       );
       renderReview();
-      await screen.findByRole("table", { name: "Complete proposed changes" });
+      await screen.findByRole("list", { name: "Proposed changes" });
       await user.click(screen.getByRole("checkbox"));
-      expect(
-        screen.getByRole("button", { name: "Approve exact plan" }),
-      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     },
   );
@@ -434,11 +505,9 @@ describe("AgentPlanReview", () => {
       }),
     );
     renderReview();
-    await screen.findByRole("table", { name: "Complete proposed changes" });
+    await screen.findByRole("list", { name: "Proposed changes" });
     await user.click(screen.getByRole("checkbox"));
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
   });
 
   it("reviews a repair issue with several exact nested targets and dependent losses", async () => {
@@ -480,12 +549,12 @@ describe("AgentPlanReview", () => {
     });
     apiMock.mockResolvedValue(item);
     renderReview();
-    const table = await screen.findByRole("table", {
-      name: "Complete proposed changes",
+    const list = await screen.findByRole("list", {
+      name: "Proposed changes",
     });
-    expect(table).toHaveTextContent("user_liked_tracks");
-    expect(table).toHaveTextContent(trackUid);
-    const approve = screen.getByRole("button", { name: "Approve exact plan" });
+    expect(list).toHaveTextContent("user_liked_tracks");
+    expect(list).toHaveTextContent(trackUid);
+    const approve = screen.getByRole("button", { name: "Approve" });
     await user.click(screen.getByRole("checkbox"));
     expect(approve).toBeEnabled();
     await user.click(approve);
@@ -517,7 +586,7 @@ describe("AgentPlanReview", () => {
     );
     renderReview();
     const approve = await screen.findByRole("button", {
-      name: "Approve exact plan",
+      name: "Approve",
     });
     await user.click(screen.getByRole("checkbox"));
     expect(approve).toBeDisabled();
@@ -533,15 +602,16 @@ describe("AgentPlanReview", () => {
       "library.metadata.write",
     ]);
 
-    const table = await screen.findByRole("table", {
-      name: "Complete proposed changes",
+    const list = await screen.findByRole("list", {
+      name: "Proposed changes",
     });
-    expect(table).toHaveTextContent("Old biography");
-    expect(table).toHaveTextContent("New biography");
-    expect(table).toHaveTextContent("Old tag");
-    expect(table).toHaveTextContent("New tag");
-    expect(screen.getAllByRole("row")).toHaveLength(3);
-    const approve = screen.getByRole("button", { name: "Approve exact plan" });
+    expect(list).toHaveTextContent("Old biography");
+    expect(list).toHaveTextContent("New biography");
+    expect(list).toHaveTextContent("Old tag");
+    expect(list).toHaveTextContent("New tag");
+    // One card per proposed change (the old table had a header plus two rows).
+    expect(list.children).toHaveLength(2);
+    const approve = screen.getByRole("button", { name: "Approve" });
     expect(approve).toBeDisabled();
     await user.click(screen.getByRole("checkbox"));
     expect(approve).toBeEnabled();
@@ -565,7 +635,7 @@ describe("AgentPlanReview", () => {
     await waitFor(() => expect(apiMock).toHaveBeenCalled());
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "Approve exact plan" }),
+        screen.queryByRole("button", { name: "Approve" }),
       ).not.toBeInTheDocument(),
     );
     expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
@@ -576,12 +646,12 @@ describe("AgentPlanReview", () => {
   it("allows metadata reviewers to inspect without granting approval", async () => {
     apiMock.mockResolvedValue(metadataPlan());
     renderReview(["agents.plans.review", "library.metadata.write"]);
-    const table = await screen.findByRole("table", {
-      name: "Complete proposed changes",
+    const list = await screen.findByRole("list", {
+      name: "Proposed changes",
     });
-    expect(table).toHaveTextContent("New biography");
+    expect(list).toHaveTextContent("New biography");
     expect(
-      screen.queryByRole("button", { name: "Approve exact plan" }),
+      screen.queryByRole("button", { name: "Approve" }),
     ).not.toBeInTheDocument();
   });
 
@@ -595,7 +665,7 @@ describe("AgentPlanReview", () => {
       "library.analysis.manage",
     ]);
     const approve = await screen.findByRole("button", {
-      name: "Approve exact plan",
+      name: "Approve",
     });
     expect(approve).toBeDisabled();
     await user.click(screen.getByRole("checkbox"));
@@ -617,12 +687,12 @@ describe("AgentPlanReview", () => {
       "agents.plans.approve",
       "library.metadata.write",
     ]);
-    await screen.findByRole("table", { name: "Complete proposed changes" });
+    await screen.findByRole("list", { name: "Proposed changes" });
     expect(
-      screen.queryByRole("button", { name: "Approve exact plan" }),
+      screen.queryByRole("button", { name: "Approve" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Reject plan" }),
+      screen.queryByRole("button", { name: "Reject" }),
     ).not.toBeInTheDocument();
   });
 
@@ -653,7 +723,7 @@ describe("AgentPlanReview", () => {
       apiMock.mockResolvedValue(item);
       renderReview();
       const approve = await screen.findByRole("button", {
-        name: "Approve exact plan",
+        name: "Approve",
       });
       expect(approve).toBeDisabled();
       await user.click(screen.getByRole("checkbox"));
@@ -685,13 +755,13 @@ describe("AgentPlanReview", () => {
       }),
     );
     renderReview();
-    const table = await screen.findByRole("table", {
-      name: "Complete proposed changes",
+    const list = await screen.findByRole("list", {
+      name: "Proposed changes",
     });
-    expect(table.textContent).toContain(biography);
+    expect(list.textContent).toContain(biography);
   });
 
-  it("shows an explicit cleared value as null in the After column", async () => {
+  it("shows an explicit cleared value as Cleared in the proposed value", async () => {
     apiMock.mockResolvedValue(
       metadataPlan({
         changes: [
@@ -705,20 +775,20 @@ describe("AgentPlanReview", () => {
       }),
     );
     renderReview();
-    await screen.findByRole("table", { name: "Complete proposed changes" });
-    const row = screen.getByRole("row", { name: /Old biography/ });
-    expect(row.querySelectorAll("td")[2]).toHaveTextContent(/^null$/);
+    const list = await screen.findByRole("list", { name: "Proposed changes" });
+    const card = within(list).getByText("Old biography").closest("li");
+    expect(card).not.toBeNull();
+    const proposed = within(card!).getByText("Proposed").nextElementSibling;
+    expect(proposed).toHaveTextContent(/^Cleared$/);
   });
 
   it("keeps a manual-only plan reviewable without granting execution approval", async () => {
     apiMock.mockResolvedValue(metadataPlan({ executable: false }));
     renderReview();
     expect(
-      await screen.findByRole("table", { name: "Complete proposed changes" }),
+      await screen.findByRole("list", { name: "Proposed changes" }),
     ).toHaveTextContent("New biography");
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
   });
 
   it("rejects a complete manual-only diagnostic repair using its exact review hashes", async () => {
@@ -753,12 +823,10 @@ describe("AgentPlanReview", () => {
       return current;
     });
     renderReview();
-    await screen.findByRole("table", { name: "Complete proposed changes" });
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeDisabled();
+    await screen.findByRole("list", { name: "Proposed changes" });
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     await user.click(screen.getByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: "Reject plan" }));
+    await user.click(screen.getByRole("button", { name: "Reject" }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
         `${base}/plan-one/reject`,
@@ -792,7 +860,7 @@ describe("AgentPlanReview", () => {
       apiMock.mockResolvedValue(metadataPlan(invalid));
       renderReview();
       const approve = await screen.findByRole("button", {
-        name: "Approve exact plan",
+        name: "Approve",
       });
       await user.click(screen.getByRole("checkbox"));
       expect(approve).toBeDisabled();
@@ -817,16 +885,16 @@ describe("AgentPlanReview", () => {
     apiMock.mockResolvedValue(plan());
     renderReview(["agents.plans.review", "library.repair.run"]);
     expect(
-      await screen.findByRole("table", { name: "Complete proposed changes" }),
+      await screen.findByRole("list", { name: "Proposed changes" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Echo")).toBeInTheDocument();
     expect(screen.getByText("No photo")).toBeInTheDocument();
     expect(screen.getByText("Photo present")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Approve exact plan" }),
+      screen.queryByRole("button", { name: "Approve" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Reject plan" }),
+      screen.queryByRole("button", { name: "Reject" }),
     ).not.toBeInTheDocument();
   });
 
@@ -846,12 +914,12 @@ describe("AgentPlanReview", () => {
       });
       renderReview();
       const button = await screen.findByRole("button", {
-        name: decision === "approve" ? "Approve exact plan" : "Reject plan",
+        name: decision === "approve" ? "Approve" : "Reject",
       });
       expect(button).toBeDisabled();
       await user.click(
         screen.getByRole("checkbox", {
-          name: "I reviewed all 1 proposed changes and their effects.",
+          name: "I reviewed all 1 changes and their effects.",
         }),
       );
       expect(button).toBeEnabled();
@@ -866,7 +934,7 @@ describe("AgentPlanReview", () => {
       );
       await waitFor(() =>
         expect(
-          screen.queryByRole("button", { name: "Approve exact plan" }),
+          screen.queryByRole("button", { name: "Approve" }),
         ).not.toBeInTheDocument(),
       );
       expect(toastSuccessMock).toHaveBeenCalledWith(
@@ -890,8 +958,6 @@ describe("AgentPlanReview", () => {
       "empty target selection",
       { targets: [], changes: [], target_count: 0, returned_count: 0 },
     ],
-    ["expired plan", { expires_at: "2020-01-01T00:00:00Z" }],
-    ["invalid expiry", { expires_at: "invalid-timestamp" }],
   ] satisfies [string, Partial<AgentPlan>][])(
     "blocks approval for %s",
     async (_label, invalid) => {
@@ -899,14 +965,39 @@ describe("AgentPlanReview", () => {
       apiMock.mockResolvedValue(plan(invalid));
       renderReview();
       const button = await screen.findByRole("button", {
-        name: "Approve exact plan",
+        name: "Approve",
       });
       const checkbox = screen.getByRole("checkbox");
       if (!checkbox.hasAttribute("disabled")) await user.click(checkbox);
       expect(button).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled();
+      expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
+        false,
+      );
+    },
+  );
+
+  // An expired plan replaces the whole decision bar with an alert: there is
+  // no checkbox, Approve or Reject to enable at all.
+  it.each([
+    ["expired plan", { expires_at: "2020-01-01T00:00:00Z" }],
+    ["invalid expiry", { expires_at: "invalid-timestamp" }],
+  ] satisfies [string, Partial<AgentPlan>][])(
+    "blocks any decision for %s",
+    async (_label, invalid) => {
+      apiMock.mockResolvedValue(plan(invalid));
+      renderReview();
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "This plan expired",
+      );
+      expect(screen.getByText("Expired")).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: "Reject plan" }),
-      ).toBeDisabled();
+        screen.queryByRole("button", { name: "Approve" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Reject" }),
+      ).not.toBeInTheDocument();
       expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
         false,
       );
@@ -931,15 +1022,11 @@ describe("AgentPlanReview", () => {
     renderReview();
     await screen.findByText("Echo");
     await user.click(screen.getByRole("checkbox"));
-    await user.click(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Approve" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The reviewed plan or policy is no longer current",
     );
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     expect(screen.getByText("Echo")).toBeInTheDocument();
 
     current = {
@@ -950,15 +1037,16 @@ describe("AgentPlanReview", () => {
     };
     conflict = false;
     await user.click(screen.getByRole("button", { name: "Reload plan" }));
-    await screen.findByText(/Policy revision 8/);
-    expect(screen.getByRole("checkbox")).not.toBeChecked();
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeDisabled();
-    await user.click(screen.getByRole("checkbox"));
-    await user.click(
-      screen.getByRole("button", { name: "Approve exact plan" }),
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Policy revision").parentElement,
+      ).toHaveTextContent(/^Policy revision\s*8$/),
     );
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Approve" }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenLastCalledWith(
         `${base}/plan-one`,
@@ -989,16 +1077,12 @@ describe("AgentPlanReview", () => {
     renderReview();
     await screen.findByText("Echo");
     await user.click(screen.getByRole("checkbox"));
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
 
     await user.click(screen.getByRole("link", { name: "Next review target" }));
     await screen.findByText("Second artist");
     expect(screen.getByRole("checkbox")).not.toBeChecked();
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
       false,
     );
@@ -1029,14 +1113,10 @@ it.each([
     });
     apiMock.mockResolvedValue(item);
     renderReview(["agents.plans.review", "agents.plans.approve", capability]);
-    await screen.findByRole("table", { name: "Complete proposed changes" });
+    await screen.findByRole("list", { name: "Proposed changes" });
     await user.click(screen.getByRole("checkbox"));
-    expect(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    ).toBeEnabled();
-    await user.click(
-      screen.getByRole("button", { name: "Approve exact plan" }),
-    );
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Approve" }));
     expect(apiMock).toHaveBeenCalledWith(
       base + "/plan-one/approve",
       "POST",
@@ -1044,3 +1124,213 @@ it.each([
     );
   },
 );
+
+describe("AgentPlanDetail presentation", () => {
+  it("summarises a show import without hashes or raw JSON", async () => {
+    const user = userEvent.setup();
+    const item = showImportPlan();
+    apiMock.mockResolvedValue(item);
+    renderReview();
+
+    expect(
+      await screen.findByRole("heading", { name: "Import shows · 1 item" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Requested by Local lab MCP/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Can't be undone automatically. Undoing it needs a new plan.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Coilguns · 2027-03-14")).toBeInTheDocument();
+    expect(screen.getByText("Visible to listeners")).toBeInTheDocument();
+    const venue = screen.getByRole("row", { name: /Venue/ });
+    expect(venue).toHaveTextContent("Wurlitzer Ballroom");
+    expect(venue).toHaveTextContent("WURLITZER BALLROOM");
+    expect(
+      screen.queryByRole("row", { name: /Artist name/ }),
+    ).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "17 unchanged fields" }),
+    );
+    expect(screen.getByRole("row", { name: /Artist name/ })).toHaveTextContent(
+      "Coilguns",
+    );
+
+    const text = document.body.textContent ?? "";
+    expect(text).not.toContain('{"');
+    expect(text).not.toMatch(/[0-9a-f]{64}/i);
+
+    await user.click(screen.getByRole("button", { name: "Technical details" }));
+    expect(document.body.textContent).toContain(item.content_hash);
+    expect(document.body.textContent).toContain(`show:${showTarget.name}`);
+  });
+
+  it("disables the decision when the plan expires while open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    apiMock.mockResolvedValue(
+      plan({ expires_at: new Date(Date.now() + 5_000).toISOString() }),
+    );
+    renderReview();
+    const approve = await screen.findByRole("button", { name: "Approve" });
+    await user.click(screen.getByRole("checkbox"));
+    expect(approve).toBeEnabled();
+
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("This plan expired");
+    expect(
+      screen.queryByRole("button", { name: "Approve" }),
+    ).not.toBeInTheDocument();
+    expect(apiMock.mock.calls.some(([, method]) => method === "POST")).toBe(
+      false,
+    );
+  });
+
+  it("renders nested arrays of records in a change", async () => {
+    apiMock.mockResolvedValue(
+      metadataPlan({
+        changes: [
+          {
+            entity_uid: uid,
+            field: "lineup",
+            before: [{ name: "A" }],
+            after: [{ name: "A" }, { name: "B", role: "support" }],
+          },
+        ],
+      }),
+    );
+    renderReview();
+    const list = await screen.findByRole("list", { name: "Proposed changes" });
+    expect(within(list).getAllByText("A")).toHaveLength(2);
+    expect(within(list).getByText("B")).toBeInTheDocument();
+    expect(within(list).getByText("Role")).toBeInTheDocument();
+    expect(within(list).getByText("support")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("[object Object]");
+  });
+
+  it("tells the sidebar when a decision is made", async () => {
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const changed = () =>
+      dispatchSpy.mock.calls.some(
+        ([event]) => event.type === "crate:agent-plans-changed",
+      );
+    apiMock.mockResolvedValue(plan());
+    renderReview();
+    await user.click(await screen.findByRole("checkbox"));
+    expect(changed()).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(changed()).toBe(true));
+  });
+
+  it("shows a conflict body as text and does not tell the sidebar", async () => {
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    apiMock.mockImplementation((_path: string, method = "GET") =>
+      method === "POST"
+        ? Promise.reject(
+            Object.assign(
+              new Error('{"detail":"The reviewed plan is no longer current"}'),
+              { status: 409 },
+            ),
+          )
+        : Promise.resolve(plan()),
+    );
+    renderReview();
+    await user.click(await screen.findByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      /^The reviewed plan is no longer current\s*Reload plan$/,
+    );
+    expect(
+      dispatchSpy.mock.calls.some(
+        ([event]) => event.type === "crate:agent-plans-changed",
+      ),
+    ).toBe(false);
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+  });
+
+  it("explains a plan the connection policy already allows", async () => {
+    apiMock.mockResolvedValue(
+      plan({ state: "ready", approval_required: false }),
+    );
+    renderReview();
+    expect(
+      await screen.findByText(
+        "Already allowed by this connection's policy. The agent can apply it without approval.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Approve" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains an incomplete plan to reviewers who cannot decide", async () => {
+    apiMock.mockResolvedValue(metadataPlan({ truncated: true }));
+    renderReview(["agents.plans.review", "library.metadata.write"]);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The complete change list is not available. This plan cannot be approved.",
+    );
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("names the person behind a delegated plan", async () => {
+    apiMock.mockResolvedValue(
+      showImportPlan({
+        requester_name: "Diego",
+        authorization_context: { actor_user_id: 4 },
+      }),
+    );
+    renderReview();
+    expect(await screen.findByText("Delegated by Diego")).toBeInTheDocument();
+  });
+
+  it("highlights cleared fields and folds a single unchanged field", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(
+      metadataPlan({
+        changes: [
+          {
+            entity_uid: uid,
+            field: "profile",
+            before: { bio: "Old biography", country: "ES" },
+            after: { bio: null, country: "ES" },
+          },
+        ],
+      }),
+    );
+    renderReview();
+    const cleared = await screen.findByRole("row", { name: /Bio/ });
+    expect(cleared).toHaveAttribute("data-status", "cleared");
+    expect(cleared).toHaveTextContent("Old biography");
+    expect(cleared).toHaveTextContent("Cleared");
+    expect(
+      screen.queryByRole("row", { name: /Country/ }),
+    ).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "1 unchanged field" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("row", { name: /Country/ })).toHaveAttribute(
+      "data-status",
+      "unchanged",
+    );
+  });
+
+  it("links back to approvals and to the execution of a decided plan", async () => {
+    apiMock.mockResolvedValue(plan({ state: "applied", job_id: "job-9" }));
+    renderReview();
+    expect(
+      await screen.findByRole("link", { name: "View execution" }),
+    ).toHaveAttribute("href", "/tasks?task=job-9");
+    expect(
+      screen.getByRole("link", { name: "Back to approvals" }),
+    ).toHaveAttribute("href", "/agents/approvals");
+    expect(screen.getByText("Applied")).toBeInTheDocument();
+  });
+});

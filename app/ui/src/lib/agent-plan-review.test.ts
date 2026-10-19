@@ -9,7 +9,7 @@ import {
 
 const uid = "10000000-0000-0000-0000-000000000001";
 
-// Mirrors the plan() fixture in src/pages/AgentPlanReview.test.tsx.
+// Mirrors the plan() fixture in src/pages/agents/AgentPlanDetail.test.tsx.
 function plan(overrides: Partial<AgentPlan> = {}): AgentPlan {
   return {
     plan_id: "plan-one",

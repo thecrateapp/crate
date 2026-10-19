@@ -260,3 +260,29 @@ export function formatTrackDuration(
   const remainder = total % 60;
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
+
+/**
+ * Readable text for a failed API call. The admin client puts the raw
+ * response body in `Error.message`, so a FastAPI `{"detail": "..."}` body is
+ * unwrapped and any other JSON falls back instead of reaching the UI.
+ */
+export function apiErrorText(error: unknown, fallback: string): string {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+  if (!message.trim()) return fallback;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(message);
+  } catch {
+    return message;
+  }
+  if (isPlainObject(parsed)) {
+    const detail = parsed.detail;
+    return typeof detail === "string" && detail.trim() ? detail : fallback;
+  }
+  return Array.isArray(parsed) ? fallback : message;
+}

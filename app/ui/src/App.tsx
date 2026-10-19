@@ -65,9 +65,9 @@ const AgentIntegrations = lazy(() =>
     default: m.AgentIntegrations,
   })),
 );
-const AgentPlanReview = lazy(() =>
-  import("@/pages/AgentPlanReview").then((m) => ({
-    default: m.AgentPlanReview,
+const AgentPlanDetail = lazy(() =>
+  import("@/pages/agents/AgentPlanDetail").then((m) => ({
+    default: m.AgentPlanDetail,
   })),
 );
 const AgentApprovals = lazy(() =>
@@ -278,7 +278,7 @@ export default function App() {
                     path="approvals/:planId"
                     element={
                       <RequireCapabilities anyOf={AGENT_PLANS}>
-                        <AgentPlanReview />
+                        <AgentPlanDetail />
                       </RequireCapabilities>
                     }
                   />

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  apiErrorText,
   connectionKindLabel,
   fieldDiff,
   formatTrackDuration,
@@ -277,5 +278,26 @@ describe("formatTrackDuration", () => {
     [null, "—"],
   ] as const)("formats %s as %s", (seconds, expected) => {
     expect(formatTrackDuration(seconds)).toBe(expected);
+  });
+});
+
+describe("apiErrorText", () => {
+  const fallback = "The plan changed. Reload and review it again.";
+
+  it.each([
+    [
+      "a FastAPI detail body",
+      new Error('{"detail":"Plan is stale"}'),
+      "Plan is stale",
+    ],
+    ["a plain message", new Error("Network down"), "Network down"],
+    ["a plain string", "Request failed", "Request failed"],
+    ["a JSON body without detail", new Error('{"error":{"code":1}}'), fallback],
+    ["a non-text detail", new Error('{"detail":[{"msg":"bad"}]}'), fallback],
+    ["a JSON array", new Error("[1,2]"), fallback],
+    ["an empty message", new Error(""), fallback],
+    ["a non-error value", { status: 409 }, fallback],
+  ])("reads %s", (_label, error, expected) => {
+    expect(apiErrorText(error, fallback)).toBe(expected);
   });
 });
