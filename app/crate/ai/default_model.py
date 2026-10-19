@@ -32,7 +32,9 @@ class DerivedConfig:
     adjustments: tuple[Literal["reasoning", "image_detail"], ...] = ()
 
 
-def require_supported_reasoning(model: ModelCapabilities, reasoning: ReasoningConfig) -> None:
+def require_supported_reasoning(
+    model: ModelCapabilities, reasoning: ReasoningConfig
+) -> None:
     """Validate a requested reasoning configuration against a model, with no action."""
     max_output_tokens = min(
         16000,
@@ -104,8 +106,12 @@ def derive_action_config(
     if input_tokens < MIN_INPUT_TOKENS:
         return DerivedConfig(action_id, None, "AI_CONTEXT_TOO_SMALL")
 
-    image_detail, image_detail_adjusted = _image_detail(model, action_id, is_image_action)
-    resolved_reasoning, reasoning_adjusted = _resolve_reasoning(reasoning, model, output)
+    image_detail, image_detail_adjusted = _image_detail(
+        model, action_id, is_image_action
+    )
+    resolved_reasoning, reasoning_adjusted = _resolve_reasoning(
+        reasoning, model, output
+    )
 
     adjustments: list[Literal["reasoning", "image_detail"]] = []
     if reasoning_adjusted:

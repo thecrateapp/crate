@@ -5,7 +5,11 @@ import pytest
 from crate.ai.actions import ACTIONS
 from crate.ai.capabilities import model_capabilities, validate_profile
 from crate.ai.contracts import AIConfigurationError, ReasoningConfig
-from crate.ai.default_model import derive_action_config, derive_all, require_supported_reasoning
+from crate.ai.default_model import (
+    derive_action_config,
+    derive_all,
+    require_supported_reasoning,
+)
 
 GEMINI_38 = model_capabilities("gemini", "gemini-3.8-flash")
 GEMINI_25 = model_capabilities("gemini", "gemini-2.5-flash")
@@ -43,7 +47,11 @@ def test_features_take_their_action_maxima_within_model_bounds():
     results = {d.action_id: d for d in derive_all(GEMINI_38, HIGH)}
 
     refine = results["music_paths.refine"].config
-    assert (refine.timeout_seconds, refine.max_output_tokens, refine.max_input_tokens) == (
+    assert (
+        refine.timeout_seconds,
+        refine.max_output_tokens,
+        refine.max_input_tokens,
+    ) == (
         8,
         4096,
         131072,
@@ -66,12 +74,13 @@ def test_features_take_their_action_maxima_within_model_bounds():
 
 
 def test_model_output_and_context_bound_the_derived_limits():
-    results = {
-        d.action_id: d for d in derive_all(DEEPSEEK_VISION, PROVIDER_DEFAULT)
-    }
+    results = {d.action_id: d for d in derive_all(DEEPSEEK_VISION, PROVIDER_DEFAULT)}
 
     extract_text = results["shows.extract.text"].config
-    assert (extract_text.max_output_tokens, extract_text.max_input_tokens) == (8192, 122880)
+    assert (extract_text.max_output_tokens, extract_text.max_input_tokens) == (
+        8192,
+        122880,
+    )
 
     eq = results["genres.eq.propose"].config
     assert (eq.max_output_tokens, eq.max_input_tokens) == (2048, 129024)
@@ -81,9 +90,7 @@ def test_text_only_models_cannot_take_image_features():
     results = derive_all(OLLAMA_TEXT, PROVIDER_DEFAULT)
     by_id = {d.action_id: d for d in results}
 
-    incompatible = {
-        d.action_id for d in results if d.config is None
-    }
+    incompatible = {d.action_id for d in results if d.config is None}
     assert incompatible == IMAGE_ACTIONS
     for action_id in IMAGE_ACTIONS:
         assert by_id[action_id].reason == "AI_ACTION_NEEDS_IMAGE"
@@ -115,7 +122,9 @@ def test_poster_import_prefers_the_highest_image_detail():
     gemini_hero = _derived(GEMINI_38, PROVIDER_DEFAULT, "artwork.hero.analyze")
     assert gemini_hero.config.image_detail == "default"
 
-    deepseek_vision = _derived(DEEPSEEK_VISION, PROVIDER_DEFAULT, "shows.extract.vision")
+    deepseek_vision = _derived(
+        DEEPSEEK_VISION, PROVIDER_DEFAULT, "shows.extract.vision"
+    )
     assert deepseek_vision.config.image_detail == "default"
     assert deepseek_vision.adjustments == ("image_detail",)
 
@@ -166,11 +175,15 @@ def test_small_context_windows_are_reported():
 
 def test_request_reasoning_must_be_native_to_the_model():
     with pytest.raises(AIConfigurationError) as excinfo:
-        require_supported_reasoning(GEMINI_38, ReasoningConfig(mode="level", level="minimal"))
+        require_supported_reasoning(
+            GEMINI_38, ReasoningConfig(mode="level", level="minimal")
+        )
     assert excinfo.value.code == "AI_PROFILE_INCOMPATIBLE"
 
     with pytest.raises(AIConfigurationError) as excinfo:
-        require_supported_reasoning(GEMINI_25, ReasoningConfig(mode="level", level="high"))
+        require_supported_reasoning(
+            GEMINI_25, ReasoningConfig(mode="level", level="high")
+        )
     assert excinfo.value.code == "AI_PROFILE_INCOMPATIBLE"
 
     with pytest.raises(AIConfigurationError) as excinfo:
@@ -213,9 +226,7 @@ def test_derive_action_config_matches_the_single_action_entry_from_derive_all():
 
 
 def test_derive_all_keeps_action_order_and_rejects_unknown_actions():
-    results = derive_all(
-        GEMINI_38, HIGH, ["genres.eq.propose", "shows.extract.vision"]
-    )
+    results = derive_all(GEMINI_38, HIGH, ["genres.eq.propose", "shows.extract.vision"])
     assert [d.action_id for d in results] == [
         "shows.extract.vision",
         "genres.eq.propose",
