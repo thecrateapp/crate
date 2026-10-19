@@ -160,11 +160,14 @@ The issuer is configured, never inferred from untrusted forwarded headers.
 | `/oauth/revoke`                             | Revoke the delegated authorization, including pending jobs' authority.                     |
 | `/oauth/connections`                        | Human owners inspect and revoke their own connections without global Admin permissions.    |
 
-Register public clients in **Admin → Agents → Connections** before connecting. Supply the exact
-client ID, callback URIs and scope ceiling. A URL client ID explicitly opts into Client ID Metadata
-Documents: its public HTTPS document must match the registration. Fetches pin validated public IPs,
-retain TLS hostname verification, reject redirects/internal destinations and cap time and body size.
-Dynamic Client Registration is not enabled; clients requiring it need a separate compatibility decision.
+Register public clients in **Admin → Agents → Connections** before connecting, from that page's
+OAuth apps panel. Supply the exact client ID, callback URIs and scope ceiling. A URL client ID
+explicitly opts into Client ID Metadata Documents: its public HTTPS document must match the
+registration. Fetches pin validated public IPs, retain TLS hostname verification, reject
+redirects/internal destinations and cap time and body size. Dynamic Client Registration is not
+enabled; clients requiring it need a separate compatibility decision. Connecting an agent with a
+Bearer service token instead of OAuth uses **Connect an agent** on the same page; see
+Provision an integration below.
 
 The authorization server uses **Authlib 1.9.1** grant validation, PKCE S256, exact redirect/resource
 validation, one-use codes and opaque access/refresh tokens stored as digests. Access tokens expire;
@@ -235,8 +238,17 @@ PostgreSQL stores only a SHA-256 digest. Grants are a nonempty subset of:
 Read credentials retain their existing four scopes. Action grants must be provisioned explicitly;
 there is no automatic escalation or inheritance from an Admin role.
 
-An instance owner provisions credentials through the CLI in the API runtime. For example, in
-the development profile:
+An instance admin with `agents.integrations.manage` can also create a service connection from
+**Admin → Agents → Connections → Connect an agent**. Its three-step dialog collects a name and
+token lifetime, then one of four access presets — **Read only**, **Shows curator**, **Editorial
+curator**, **Library maintainer** — or **Custom** grants, plus **Require approval before
+changes** (on by default; high-risk and whole-library operations always require approval
+regardless of this setting). The last step shows the one-time token together with ready-to-paste
+Claude Code, Codex and HTTP/other-client configuration. The MCP URL in that configuration comes
+from `CRATE_MCP_OAUTH_ISSUER`; a placeholder address is shown instead when that variable is unset.
+
+An instance owner can instead provision credentials through the CLI in the API runtime. For
+example, in the development profile:
 
 ```bash
 docker compose -f docker-compose.dev.yaml exec api \
