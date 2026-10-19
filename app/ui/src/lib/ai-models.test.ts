@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   aiSnapshot,
   catalog,
+  ENV_GEMINI_PERSISTENT_ID,
   migratedSnapshot,
   PROFILE_ID,
   STUDIO_ID,
@@ -12,31 +13,42 @@ import type {
   Action,
   AssignmentOutcome,
   Config,
+  Model,
+  ReasoningConfig,
   Snapshot,
 } from "@/components/ai-models/types";
 import {
   activeFeatureCount,
   aiErrorText,
+  assignmentSummary,
   configSummary,
   connectionName,
   dailyTokenBudget,
   dailyUsageSeries,
+  eligibleModels,
   FEATURE_AREAS,
   featureAreaLabel,
   featureModelView,
   featureSends,
+  findConnection,
   formatCount,
   formatDuration,
   formatTokens,
   imageDetailLabel,
+  initialDefaultChoice,
+  initialFeatureChoice,
   invocationStatusView,
   isUsableConnection,
   outcomeGroups,
   providerLabel,
+  PROVIDER_DEFAULT_REASONING,
   providerStatus,
   reasonText,
+  reasoningFromValue,
   reasoningLabel,
   reasoningPresets,
+  reasoningValue,
+  savedProfileOptions,
   splitConnections,
   summaryModel,
   usageToday,
@@ -344,6 +356,12 @@ describe("reasonText", () => {
     ["AI_PROVIDER_UNSUPPORTED", "Its provider is not supported"],
     ["AI_PROFILE_INCOMPATIBLE", "Not compatible with this model"],
     ["AI_ACTION_DISABLED", "Turned off"],
+    [
+      "AI_CONNECTION_UNAVAILABLE",
+      "Its connection is turned off or was removed",
+    ],
+    ["AI_MODEL_INCOMPATIBLE", "The model can't run Crate's features"],
+    ["AI_CONFIGURATION_INVALID", "Its saved settings can't be read"],
   ];
 
   it.each(cases)("maps %s", (code, expected) => {
@@ -654,5 +672,229 @@ describe("outcomeGroups", () => {
       },
     ];
     expect(outcomeGroups(outcomes)).toEqual({ uses: 2, kept: 2, blocked: 1 });
+  });
+});
+
+describe("reasoningValue / reasoningFromValue", () => {
+  const cases: [string, ReasoningConfig][] = [
+    ["provider_default", PROVIDER_DEFAULT_REASONING],
+    ["disabled", { mode: "disabled", level: null, budget_tokens: null }],
+    ["enabled", { mode: "enabled", level: null, budget_tokens: null }],
+    ["level:high", { mode: "level", level: "high", budget_tokens: null }],
+    ["budget:1024", { mode: "budget", level: null, budget_tokens: 1024 }],
+  ];
+
+  it.each(cases)("round-trips %s", (value, reasoning) => {
+    expect(reasoningFromValue(value)).toEqual(reasoning);
+    expect(reasoningValue(reasoning)).toBe(value);
+  });
+
+  it("matches the preset values", () => {
+    for (const preset of reasoningPresets(catalog.models[1]!)) {
+      expect(reasoningValue(reasoningFromValue(preset.value))).toBe(
+        preset.value,
+      );
+    }
+  });
+
+  it("falls back to the provider default for unknown values", () => {
+    expect(reasoningFromValue("budget:abc")).toEqual(
+      PROVIDER_DEFAULT_REASONING,
+    );
+    expect(reasoningFromValue("budget:0")).toEqual(PROVIDER_DEFAULT_REASONING);
+    expect(reasoningFromValue("whatever")).toEqual(PROVIDER_DEFAULT_REASONING);
+  });
+});
+
+describe("eligibleModels", () => {
+  const connection = aiSnapshot().connections[0]!;
+  const models: Model[] = [
+    ...catalog.models,
+    { ...catalog.models[0]!, model_id: "unvalidated", validated: false },
+    {
+      ...catalog.models[0]!,
+      model_id: "free-text",
+      structured_output: false,
+    },
+    { ...catalog.models[0]!, model_id: "other", provider: "deepseek" },
+  ];
+
+  it("keeps validated structured models of the connection's provider", () => {
+    expect(eligibleModels(models, connection).map((m) => m.model_id)).toEqual([
+      "gemini-3.8-flash",
+      "budget",
+    ]);
+  });
+
+  it("requires image input for image features only", () => {
+    const vision = { ...action("shows.extract.vision"), input: "image" };
+    expect(
+      eligibleModels(models, connection, vision).map((m) => m.model_id),
+    ).toEqual(["gemini-3.8-flash"]);
+    expect(
+      eligibleModels(models, connection, action("genres.eq.propose")).map(
+        (m) => m.model_id,
+      ),
+    ).toEqual(["gemini-3.8-flash", "budget"]);
+  });
+});
+
+describe("findConnection", () => {
+  it("finds a connection by public or persistent id", () => {
+    const snapshot = aiSnapshot();
+    expect(findConnection(snapshot, "env:gemini")?.id).toBe("env:gemini");
+    expect(findConnection(snapshot, ENV_GEMINI_PERSISTENT_ID)?.id).toBe(
+      "env:gemini",
+    );
+    expect(findConnection(snapshot, "missing")).toBeUndefined();
+  });
+});
+
+describe("initialDefaultChoice", () => {
+  it("starts from the default model", () => {
+    expect(initialDefaultChoice(migratedSnapshot())).toEqual({
+      connectionId: STUDIO_ID,
+      modelId: "gemini-3.8-flash",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    });
+  });
+
+  it("drops a default whose connection is not usable", () => {
+    const snapshot = migratedSnapshot();
+    snapshot.connections = snapshot.connections.map((connection) => ({
+      ...connection,
+      enabled: false,
+    }));
+    expect(initialDefaultChoice(snapshot)).toEqual({
+      connectionId: "",
+      modelId: "",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    });
+  });
+
+  it("starts from the server's provider and model before setup", () => {
+    expect(initialDefaultChoice(aiSnapshot())).toEqual({
+      connectionId: "env:gemini",
+      modelId: "gemini-3.8-flash",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    });
+  });
+
+  it("starts empty when the server's connection is not usable", () => {
+    const snapshot = aiSnapshot();
+    snapshot.connections = snapshot.connections.map((connection) =>
+      connection.id === "env:gemini"
+        ? { ...connection, has_key: false }
+        : connection,
+    );
+    expect(initialDefaultChoice(snapshot).connectionId).toBe("");
+    expect(initialDefaultChoice(snapshot).modelId).toBe("");
+  });
+});
+
+describe("initialFeatureChoice", () => {
+  it("starts from the feature's current connection without a model", () => {
+    expect(
+      initialFeatureChoice(migratedSnapshot(), "genres.eq.propose"),
+    ).toEqual({
+      connectionId: STUDIO_ID,
+      modelId: "",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    });
+  });
+
+  it("maps a persistent connection id to its public id", () => {
+    const snapshot = migratedSnapshot();
+    snapshot.profiles[0]!.versions[0]!.connection_id = ENV_GEMINI_PERSISTENT_ID;
+    expect(
+      initialFeatureChoice(snapshot, "genres.eq.propose").connectionId,
+    ).toBe("env:gemini");
+  });
+
+  it("falls back to the default connection, then to none", () => {
+    const snapshot = migratedSnapshot();
+    snapshot.bindings = [];
+    expect(
+      initialFeatureChoice(snapshot, "genres.eq.propose").connectionId,
+    ).toBe(STUDIO_ID);
+    expect(initialFeatureChoice(aiSnapshot(), "genres.eq.propose")).toEqual({
+      connectionId: "",
+      modelId: "",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    });
+  });
+});
+
+describe("savedProfileOptions", () => {
+  it("offers each profile's current version and legacy snapshots of the same feature", () => {
+    const snapshot = migratedSnapshot();
+    const legacyId = "99999999-9999-4999-8999-999999999999";
+    snapshot.profiles[0]!.versions.push({
+      ...snapshot.profiles[0]!.versions[0]!,
+      version: 2,
+      model_id: "budget",
+    });
+    snapshot.profiles.push({
+      id: legacyId,
+      label: "Kept",
+      current_version: 1,
+      created_at: snapshot.profiles[0]!.created_at,
+      versions: [
+        {
+          profile_id: legacyId,
+          version: 1,
+          connection_id: STUDIO_ID,
+          model_id: "old",
+          config: {
+            kind: "legacy_snapshot",
+            action_id: "shows.extract.vision",
+            legacy_model: "gemini/old",
+            legacy_options: {
+              timeout_seconds: 90,
+              max_tokens: 16000,
+              image_detail: "default",
+            },
+          },
+          fingerprint: "c".repeat(64),
+          created_at: snapshot.profiles[0]!.created_at,
+        },
+      ],
+    });
+
+    const forText = savedProfileOptions(snapshot, "genres.eq.propose");
+    expect(
+      forText.map((option) => [option.profile.id, option.version.version]),
+    ).toEqual([[PROFILE_ID, 1]]);
+    const forVision = savedProfileOptions(snapshot, "shows.extract.vision");
+    expect(forVision.map((option) => option.profile.label)).toEqual([
+      "Poster",
+      "Kept",
+    ]);
+  });
+});
+
+describe("assignmentSummary", () => {
+  const outcome = (kind: AssignmentOutcome["outcome"]): AssignmentOutcome => ({
+    action_id: kind,
+    outcome: kind,
+    reason: null,
+    adjustments: [],
+  });
+
+  it("counts the features that run the model and those kept", () => {
+    expect(
+      assignmentSummary("m", [
+        outcome("applied"),
+        outcome("unchanged"),
+        outcome("applied"),
+        outcome("kept_current"),
+      ]),
+    ).toBe("m now runs 3 features. 1 kept their current model.");
+  });
+
+  it("omits the kept sentence and uses the singular for one feature", () => {
+    expect(assignmentSummary("m", [outcome("applied")])).toBe(
+      "m now runs 1 feature.",
+    );
   });
 });

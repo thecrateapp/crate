@@ -4,6 +4,8 @@ import { OpsPageHero, OpsStatTile } from "@/components/admin/ops-surfaces";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ErrorState } from "@/components/ui/error-state";
 import { AI_ROOT } from "@/components/ai-models/api";
+import { DefaultModelPanel } from "@/components/ai-models/DefaultModelPanel";
+import { FeaturesPanel } from "@/components/ai-models/FeaturesPanel";
 import type {
   Activity as ActivityLog,
   Snapshot,
@@ -36,7 +38,9 @@ export function AiModels() {
   const { data: usage } = useApi<Usage>(
     canReadUsage ? `${AI_ROOT}/usage` : null,
   );
-  useApi<ActivityLog>(canReadUsage ? `${AI_ROOT}/activity?limit=50` : null);
+  const { data: activity } = useApi<ActivityLog>(
+    canReadUsage ? `${AI_ROOT}/activity?limit=50` : null,
+  );
 
   const today = usage ? usageToday(usage, new Date()) : null;
   const budget = snapshot ? dailyTokenBudget(snapshot) : null;
@@ -102,7 +106,18 @@ export function AiModels() {
         </div>
       ) : null}
 
-      {/* Panels are added in Tasks 5-7. */}
+      {snapshot ? (
+        <>
+          <DefaultModelPanel snapshot={snapshot} refresh={refetch} />
+          <FeaturesPanel
+            snapshot={snapshot}
+            activity={canReadUsage ? activity : null}
+            refresh={refetch}
+          />
+        </>
+      ) : null}
+
+      {/* The Providers, Advanced and Activity panels are added in Tasks 6-7. */}
     </div>
   );
 }

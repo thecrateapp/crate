@@ -7,6 +7,8 @@ import type {
   Connection,
   LegacyConfig,
   Model,
+  ModelChoice,
+  Profile,
   ReasoningConfig,
   Snapshot,
   Usage,
@@ -123,6 +125,173 @@ export function splitConnections(snapshot: Snapshot): {
   return { shown, hidden };
 }
 
+export const PROVIDER_DEFAULT_REASONING: ReasoningConfig = {
+  mode: "provider_default",
+  level: null,
+  budget_tokens: null,
+};
+
+/** The select value of a reasoning config, matching `reasoningPresets`. */
+export function reasoningValue(reasoning: ReasoningConfig): string {
+  if (reasoning.mode === "level") return `level:${reasoning.level ?? ""}`;
+  if (reasoning.mode === "budget") {
+    return `budget:${reasoning.budget_tokens ?? 0}`;
+  }
+  return reasoning.mode;
+}
+
+export function reasoningFromValue(value: string): ReasoningConfig {
+  if (value.startsWith("level:")) {
+    return { mode: "level", level: value.slice(6), budget_tokens: null };
+  }
+  if (value.startsWith("budget:")) {
+    const tokens = Number(value.slice(7));
+    if (Number.isInteger(tokens) && tokens > 0) {
+      return { mode: "budget", level: null, budget_tokens: tokens };
+    }
+    return PROVIDER_DEFAULT_REASONING;
+  }
+  if (value === "enabled" || value === "disabled") {
+    return { mode: value, level: null, budget_tokens: null };
+  }
+  return PROVIDER_DEFAULT_REASONING;
+}
+
+/** Catalog models a connection can run for Crate, optionally for one feature. */
+export function eligibleModels(
+  models: Model[],
+  connection: Connection,
+  feature?: Action,
+): Model[] {
+  return models.filter(
+    (model) =>
+      model.validated &&
+      model.structured_output &&
+      model.provider === connection.provider &&
+      (feature?.input !== "image" || model.input_modalities.includes("image")),
+  );
+}
+
+/** The snapshot connection a stored connection id (public or persistent) refers to. */
+export function findConnection(
+  snapshot: Snapshot,
+  connectionId: string,
+): Connection | undefined {
+  return snapshot.connections.find(
+    (connection) =>
+      connection.id === connectionId ||
+      connection.persistent_id === connectionId,
+  );
+}
+
+function usableConnectionId(
+  snapshot: Snapshot,
+  connectionId: string | null | undefined,
+): string | null {
+  if (!connectionId) return null;
+  const connection = findConnection(snapshot, connectionId);
+  return connection && isUsableConnection(connection) ? connection.id : null;
+}
+
+/** What «Default model» starts with: the default, else the server's model. */
+export function initialDefaultChoice(snapshot: Snapshot): ModelChoice {
+  const current = snapshot.default_model;
+  if (current) {
+    const connectionId = usableConnectionId(snapshot, current.connection_id);
+    return connectionId
+      ? {
+          connectionId,
+          modelId: current.model_id,
+          reasoning: current.reasoning,
+        }
+      : {
+          connectionId: "",
+          modelId: "",
+          reasoning: PROVIDER_DEFAULT_REASONING,
+        };
+  }
+  const legacy = snapshot.legacy_actions[0];
+  const environment = legacy
+    ? snapshot.connections.find(
+        (connection) =>
+          connection.source === "environment" &&
+          connection.provider === legacy.provider &&
+          isUsableConnection(connection),
+      )
+    : undefined;
+  if (!legacy || !environment) {
+    return {
+      connectionId: "",
+      modelId: "",
+      reasoning: PROVIDER_DEFAULT_REASONING,
+    };
+  }
+  return {
+    connectionId: environment.id,
+    modelId: legacy.model_id,
+    reasoning: PROVIDER_DEFAULT_REASONING,
+  };
+}
+
+/** What a feature's «Choose a model» starts with: its current connection. */
+export function initialFeatureChoice(
+  snapshot: Snapshot,
+  actionId: string,
+): ModelChoice {
+  const binding = snapshot.bindings.find(
+    (candidate) => candidate.action_id === actionId,
+  );
+  const version = binding
+    ? findVersion(snapshot, binding.profile_id, binding.profile_version)
+    : undefined;
+  const connectionId =
+    usableConnectionId(snapshot, version?.connection_id) ??
+    usableConnectionId(snapshot, snapshot.default_model?.connection_id) ??
+    "";
+  return { connectionId, modelId: "", reasoning: PROVIDER_DEFAULT_REASONING };
+}
+
+export interface SavedProfileOption {
+  profile: Profile;
+  version: Version;
+}
+
+/** Each profile's current version a feature can be bound to. */
+export function savedProfileOptions(
+  snapshot: Snapshot,
+  actionId: string,
+): SavedProfileOption[] {
+  const options: SavedProfileOption[] = [];
+  for (const profile of snapshot.profiles) {
+    const version = profile.versions.find(
+      (candidate) => candidate.version === profile.current_version,
+    );
+    if (!version) continue;
+    if ("kind" in version.config && version.config.action_id !== actionId) {
+      continue;
+    }
+    options.push({ profile, version });
+  }
+  return options;
+}
+
+function featureCount(n: number): string {
+  return `${formatCount(n)} ${n === 1 ? "feature" : "features"}`;
+}
+
+/** The toast description after «Use for all features». */
+export function assignmentSummary(
+  modelId: string,
+  outcomes: AssignmentOutcome[],
+): string {
+  const groups = outcomeGroups(outcomes);
+  const kept =
+    groups.kept > 0
+      ? ` ${formatCount(groups.kept)} kept their current model.`
+      : "";
+  return `${modelId} now runs ${featureCount(groups.uses)}.${kept}`;
+}
+
 export interface ReasoningPreset {
   value: string;
   label: string;
@@ -206,6 +375,9 @@ const REASON_TEXT: Record<string, string> = {
   AI_PROVIDER_UNSUPPORTED: "Its provider is not supported",
   AI_PROFILE_INCOMPATIBLE: "Not compatible with this model",
   AI_ACTION_DISABLED: "Turned off",
+  AI_CONNECTION_UNAVAILABLE: "Its connection is turned off or was removed",
+  AI_MODEL_INCOMPATIBLE: "The model can't run Crate's features",
+  AI_CONFIGURATION_INVALID: "Its saved settings can't be read",
 };
 
 export function reasonText(code: string | null): string {

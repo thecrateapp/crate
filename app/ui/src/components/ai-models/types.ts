@@ -20,6 +20,11 @@ export interface ReasoningConfig {
   level: string | null;
   budget_tokens: number | null;
 }
+export interface ModelChoice {
+  connectionId: string;
+  modelId: string;
+  reasoning: ReasoningConfig;
+}
 export interface Config {
   reasoning: ReasoningConfig;
   image_detail: string;
