@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from crate.db.jobs.instance_listening_rollups import queue_instance_listening_rebuild
 from crate.db.jobs.user_listening_projections import (
     rebuild_user_listening_projections,
     refresh_user_listening_projections,
@@ -9,17 +10,21 @@ from crate.db.tx import read_scope, transaction_scope
 
 
 def recompute_user_listening_aggregates_in_session(session, user_id: int):
-    return rebuild_user_listening_projections(session, user_id)
+    result = rebuild_user_listening_projections(session, user_id)
+    queue_instance_listening_rebuild(result, session=session)
+    return result
 
 
 def recompute_user_listening_aggregates(user_id: int) -> dict:
     with transaction_scope() as session:
-        return rebuild_user_listening_projections(session, user_id)
+        return recompute_user_listening_aggregates_in_session(session, user_id)
 
 
 def refresh_user_listening_aggregates(user_id: int) -> dict:
     with transaction_scope() as session:
-        return refresh_user_listening_projections(session, user_id)
+        result = refresh_user_listening_projections(session, user_id)
+        queue_instance_listening_rebuild(result, session=session)
+        return result
 
 
 def ensure_user_listening_aggregates(user_id: int) -> dict | None:

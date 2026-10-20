@@ -150,6 +150,17 @@ def _queue_stats_dashboard_backfill() -> None:
         log.info("Queued %s missing user stats dashboard snapshots", queued)
 
 
+def _queue_instance_listening_backfill() -> None:
+    """Fill the instance listening rollups once when they lack history."""
+    from crate.db.jobs.instance_listening_rollups import (
+        queue_instance_listening_backfill_if_needed,
+    )
+
+    task_id = queue_instance_listening_backfill_if_needed()
+    if task_id:
+        log.info("Queued instance listening rollup backfill %s", task_id)
+
+
 def _queue_artist_top_track_ranking_backfill() -> None:
     """Refresh persisted remote ranks after ranking semantics change."""
     from crate.db.cache_settings import get_setting
@@ -188,6 +199,7 @@ async def lifespan(app: FastAPI):
     _queue_artwork_variant_backfill()
     _queue_artwork_manifest_permission_repair()
     _queue_stats_dashboard_backfill()
+    _queue_instance_listening_backfill()
     _queue_artist_top_track_ranking_backfill()
     from crate.utils import init_musicbrainz
 

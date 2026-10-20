@@ -120,6 +120,10 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
+    # Idempotent rebuilds from user_track_daily; one retry keeps the days of a
+    # transient failure, since the task params are their only record.
+    "rebuild_instance_listening_days": TaskPoolConfig("fast", 1, 300, 1),
+    "backfill_instance_listening_rollups": TaskPoolConfig("fast", 3, 600, 1),
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
     "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),

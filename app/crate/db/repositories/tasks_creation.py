@@ -94,6 +94,42 @@ def create_task(
     return task_id
 
 
+def _dedup_lock_key(task_type: str, dedup_identity: str) -> str:
+    return f"{task_type}:{dedup_identity}"
+
+
+def release_task_dedup_key(task_id: str, *, session=None) -> bool:
+    """Stop an active task from suppressing new tasks with its dedup key.
+
+    ``create_task_dedup`` skips a new task while one with the same key is
+    pending or running. A handler that reads state which may change while it
+    runs calls this before reading: the key is cleared under the advisory
+    lock ``create_task_dedup`` holds until its caller commits, so writers
+    that were deduplicated against this task have committed before it reads,
+    and later writers enqueue a new task instead of being swallowed.
+    """
+    with optional_scope(session) as current:
+        row = (
+            current.execute(
+                text("SELECT type, dedup_key FROM tasks WHERE id = :id"),
+                {"id": task_id},
+            )
+            .mappings()
+            .first()
+        )
+        if not row or not row["dedup_key"]:
+            return False
+        current.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:dedup_lock_key))"),
+            {"dedup_lock_key": _dedup_lock_key(row["type"], row["dedup_key"])},
+        )
+        current.execute(
+            text("UPDATE tasks SET dedup_key = NULL WHERE id = :id"),
+            {"id": task_id},
+        )
+    return True
+
+
 def create_task_dedup(
     task_type: str,
     params: dict | None = None,
@@ -111,7 +147,7 @@ def create_task_dedup(
     params_json = dumps_fn(payload, sort_keys=True)
     explicit_dedup_key = dedup_key.strip()
     dedup_identity = explicit_dedup_key or params_json
-    dedup_lock_key = f"{task_type}:{dedup_identity}"
+    dedup_lock_key = _dedup_lock_key(task_type, dedup_identity)
     task_id = new_task_id()
     now = utc_now_iso()
 
@@ -255,4 +291,5 @@ __all__ = [
     "create_task",
     "create_task_dedup",
     "find_active_task_by_type_params",
+    "release_task_dedup_key",
 ]

@@ -110,6 +110,8 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
 - Day boundaries use `users.timezone`; never bucket listening by UTC date.
 - `rebuild_user_listening_projections` is the reference result. Change the incremental path and the
   rebuild together; `tests/test_user_listening_projections.py` compares them.
+- Instance rollups (`jobs/instance_listening_rollups.py`) follow the same rule: the day rebuild
+  must match `rebuild_instance_listening(None)` (`tests/test_instance_listening_rollups.py`).
 - Stats queries read the projections, never `user_play_events` or `library_tracks` aggregates per
   request.
 

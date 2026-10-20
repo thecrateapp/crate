@@ -137,6 +137,8 @@ def _handle_refresh_user_listening_stats(
 
     p = TaskProgress(phase="stats", phase_count=1, total=1, item=f"user:{user_id}")
     emit_progress(task_id, p, force=True)
+    # Enqueues the instance rollup rebuild for the refreshed days in the same
+    # transaction, so the task exists exactly when the new days are committed.
     refresh_user_listening_aggregates(user_id)
     append_domain_event(
         "user.listening_aggregates.updated",
@@ -148,6 +150,45 @@ def _handle_refresh_user_listening_stats(
         task_id, "info", {"message": f"Listening stats refreshed for user {user_id}"}
     )
     return {"ok": True, "user_id": user_id}
+
+
+def _handle_rebuild_instance_listening_days(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from datetime import date
+
+    from crate.db.jobs.instance_listening_rollups import rebuild_instance_listening
+
+    raw_days = params.get("days")
+    if not isinstance(raw_days, list) or not raw_days:
+        return {"status": "skipped", "reason": "no days"}
+    try:
+        days = sorted({date.fromisoformat(str(day)) for day in raw_days})
+    except ValueError:
+        return {"ok": False, "error": "Invalid days"}
+    keys = params.get("keys")
+    result = rebuild_instance_listening(
+        days, keys if isinstance(keys, dict) else {}, task_id=task_id
+    )
+    return {"ok": True, "days": len(days), **result}
+
+
+def _handle_backfill_instance_listening_rollups(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del params, config
+    from crate.db.jobs.instance_listening_rollups import rebuild_instance_listening
+
+    p = TaskProgress(phase="stats", phase_count=1, total=1, item="instance")
+    emit_progress(task_id, p, force=True)
+    result = rebuild_instance_listening(None, task_id=task_id)
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Instance listening rollups rebuilt: {result['track_rows']} rows"},
+    )
+    return {"ok": True, **result}
 
 
 def _handle_refresh_home_discovery_snapshot(
@@ -1124,6 +1165,8 @@ register_parent_finalizer("compute_popularity", _popularity_finalize)
 ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "compute_analytics": _handle_compute_analytics,
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
+    "rebuild_instance_listening_days": _handle_rebuild_instance_listening_days,
+    "backfill_instance_listening_rollups": _handle_backfill_instance_listening_rollups,
     "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,
     "refresh_user_stats_dashboard_snapshot": _handle_refresh_user_stats_dashboard_snapshot,
     "refresh_instance_stats_dashboard_snapshot": _handle_refresh_instance_stats_dashboard_snapshot,

@@ -5,6 +5,7 @@ from crate.db.repositories.tasks_creation import create_task_dedup as _create_ta
 from crate.db.repositories.tasks_creation import (
     find_active_task_by_type_params as _find_active_task_by_type_params,
 )
+from crate.db.repositories.tasks_creation import release_task_dedup_key
 from crate.db.repositories.tasks_scan_results import (
     save_scan_result as _save_scan_result,
 )
@@ -124,6 +125,7 @@ __all__ = [
     "fail_or_retry_task",
     "find_active_task_by_type_params",
     "heartbeat_task",
+    "release_task_dedup_key",
     "save_scan_result",
     "start_task",
     "update_task",

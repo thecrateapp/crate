@@ -157,7 +157,40 @@ def test_changing_the_timezone_triggers_a_rebuild(pg_db):
     _set_timezone("Asia/Tokyo")
 
     result = refresh_user_listening_aggregates(1)
-    assert result == {"mode": "rebuild", "timezone": "Asia/Tokyo", "days": None}
+    assert result == {
+        "mode": "rebuild",
+        "timezone": "Asia/Tokyo",
+        "days": None,
+        "keys": None,
+        "full": True,
+    }
+
+
+def test_refresh_reports_rebuilt_days_and_keys(pg_db):
+    _set_timezone("UTC")
+    history = seed_listening_history(events=200, days=30)
+    recompute_user_listening_aggregates(1)
+    _play(pg_db, history.track_ids[3], "2026-10-06T21:40:00+00:00")
+
+    result = refresh_user_listening_aggregates(1)
+
+    with read_scope() as session:
+        touched = session.execute(
+            text(
+                "SELECT DISTINCT entity_key, artist, album FROM user_track_daily "
+                "WHERE user_id = 1 AND day = '2026-10-06'"
+            )
+        ).all()
+    assert result["full"] is False
+    assert result["days"] == ["2026-10-06"]
+    assert result["keys"] == {
+        "track": sorted({row.entity_key for row in touched}),
+        "artist": sorted({row.artist for row in touched}),
+        "album": sorted({f"{row.artist}||{row.album}" for row in touched}),
+    }
+
+    idle = refresh_user_listening_aggregates(1)
+    assert (idle["days"], idle["keys"], idle["full"]) == ([], {}, False)
 
 
 def test_sessions_split_on_thirty_minute_gaps(pg_db):

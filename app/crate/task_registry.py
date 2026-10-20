@@ -155,6 +155,12 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "cleanup_invalid_genre_taxonomy": TaskTypeInfo("Taxonomy Cleanup", "enrichment"),
     "compute_analytics": TaskTypeInfo("Library Analytics", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
+    "rebuild_instance_listening_days": TaskTypeInfo(
+        "Instance Listening Days Rebuild", "analysis"
+    ),
+    "backfill_instance_listening_rollups": TaskTypeInfo(
+        "Instance Listening Backfill", "analysis"
+    ),
     "refresh_home_discovery_snapshot": TaskTypeInfo(
         "Home Discovery Refresh", "analysis"
     ),

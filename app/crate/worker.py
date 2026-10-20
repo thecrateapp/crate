@@ -576,6 +576,8 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "compute_analytics",
             "refresh_user_listening_stats",
+            "rebuild_instance_listening_days",
+            "backfill_instance_listening_rollups",
             "refresh_home_discovery_snapshot",
             "refresh_user_stats_dashboard_snapshot",
             "refresh_instance_stats_dashboard_snapshot",

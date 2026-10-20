@@ -47,6 +47,20 @@ minutes come from `played_seconds`, and completions and skips are separate metri
 Rule: anything that writes `user_play_events` must call `mark_listening_day_dirty` in the same
 transaction, or the projections drift until the next full rebuild.
 
+## Instance rollups (migration `109`)
+
+`instance_track_daily` is `user_track_daily` summed across users per user-local day, with
+`listener_count`; `instance_entity_firsts` keeps the first day anyone played an artist, album or
+track. `crate/db/jobs/instance_listening_rollups.py` owns the writes:
+
+- The runner enqueues them in the refresh transaction: an incremental refresh queues
+  `rebuild_instance_listening_days` (dedup `instance-listening-days:<sha1 of the days>`); a full
+  user rebuild queues `backfill_instance_listening_rollups` (dedup `instance-listening-backfill`).
+- A day task rebuilds those days and refreshes firsts for its keys plus every key on those days,
+  so a task shared by several listeners stays complete. It releases its dedup key before reading,
+  so a refresh that commits while it runs enqueues a new task instead of being swallowed.
+- API startup queues the backfill while the rollups miss the earliest listening day.
+
 ## Dashboard contract v2
 
 `GET /api/me/stats/dashboard` serves the persisted `stats:dashboard` snapshot (stale-first, cold
