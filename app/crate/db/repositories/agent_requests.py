@@ -332,18 +332,29 @@ def _accept(
         raise DiagnosticError(
             "TARGET_BUSY", "The artist already has active maintenance work"
         )
-    if current.execute(
-        text("""
+    # A show readiness probe is a non-billable worker check that runs on its own
+    # when the import view opens. It neither takes nor waits for the editor's one
+    # outstanding job; it still counts toward the extraction allowance.
+    probe = operation == "extract_shows" and payload.get("readiness_probe") is True
+    outstanding = (
+        not probe
+        and current.execute(
+            text("""
         SELECT 1 FROM agent_jobs j JOIN tasks t ON t.id = j.task_id
         WHERE j.principal_id = :principal_id AND t.status = ANY(:active)
-        AND (:control = FALSE OR j.payload->>'domain_operation'='job_cancel') LIMIT 1
+        AND (:control = FALSE OR j.payload->>'domain_operation'='job_cancel')
+        AND NOT (j.operation = 'extract_shows'
+                 AND COALESCE(j.payload->>'readiness_probe', 'false') = 'true')
+        LIMIT 1
     """),
-        {
-            "principal_id": principal.id,
-            "active": list(_ACTIVE),
-            "control": payload.get("domain_operation") == "job_cancel",
-        },
-    ).first():
+            {
+                "principal_id": principal.id,
+                "active": list(_ACTIVE),
+                "control": payload.get("domain_operation") == "job_cancel",
+            },
+        ).first()
+    )
+    if outstanding:
         raise DiagnosticError(
             "LIMIT_EXCEEDED",
             "This integration already has an active maintenance job",

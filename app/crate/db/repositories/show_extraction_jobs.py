@@ -182,6 +182,7 @@ def accept_show_extraction(
                 "domain_operation": "shows_extract",
                 "draft_id": draft_id,
                 **({"ai_acceptance": accepted_ai} if accepted_ai else {}),
+                **({"readiness_probe": True} if source["mode"] == "probe" else {}),
             },
             key,
             request_hash=fingerprint,

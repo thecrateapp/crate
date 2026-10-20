@@ -327,3 +327,51 @@ def test_recent_drafts_skip_readiness_checks_and_summarise_each_import(show_worl
         == 2
     )
     assert isinstance(items[0]["created_at"], datetime)
+
+
+def test_pending_readiness_probe_never_blocks_the_editors_next_extraction(
+    show_world,
+):
+    actor = show_world["principal"]
+    probe = accept_show_extraction(actor, {"mode": "probe"}, "readiness-pending")
+
+    real = accept_show_extraction(
+        actor, {"mode": "parse", "raw_text": "2027-03-02"}, "real-after-probe"
+    )
+
+    assert real["job_id"] != probe["job_id"]
+    assert (
+        accept_show_extraction(actor, {"mode": "probe"}, "readiness-pending")["job_id"]
+        == probe["job_id"]
+    )
+
+
+def test_pending_readiness_probe_never_blocks_a_plan_review(show_world):
+    from tests.test_show_import_plans import prepare
+
+    actor = show_world["principal"]
+    accept_show_extraction(actor, {"mode": "probe"}, "readiness-pending")
+
+    _, plan = prepare(show_world, key="review-after-probe")
+
+    assert plan["executable"] is True
+
+
+def test_outstanding_extraction_still_blocks_a_second_one(show_world):
+    actor = show_world["principal"]
+    accept_show_extraction(actor, {"mode": "parse", "raw_text": "2027-03-02"}, "a")
+
+    with pytest.raises(DiagnosticError, match="active maintenance job") as refused:
+        accept_show_extraction(actor, {"mode": "parse", "raw_text": "2027-03-04"}, "b")
+    assert refused.value.code == "LIMIT_EXCEEDED"
+
+
+def test_readiness_probes_still_count_toward_the_extraction_allowance(show_world):
+    actor = show_world["principal"]
+    for index in range(10):
+        accept_show_extraction(actor, {"mode": "probe"}, f"readiness-{index}")
+
+    with pytest.raises(DiagnosticError, match="ten jobs per editor"):
+        accept_show_extraction(
+            actor, {"mode": "parse", "raw_text": "2027-03-02"}, "eleventh"
+        )
