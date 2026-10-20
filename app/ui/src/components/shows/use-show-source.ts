@@ -169,7 +169,8 @@ export function useShowSource({
   // Readiness probe bookkeeping. The probe counts against the editor's
   // extraction allowance, so an accepted job is waited on rather than
   // re-posted, a lost acceptance is retried with the same key, and the
-  // automatic check posts at most once per 15-minute window per mount.
+  // automatic check posts at most once per 15-minute window and AI
+  // configuration per mount.
   const probeRun = useRef<{ signal: AbortSignal } | null>(null);
   const probeJob = useRef<string | null>(null);
   const probeKey = useRef<string | null>(null);
@@ -257,7 +258,11 @@ export function useShowSource({
     if (signal && !signal.aborted) void loadRecent(signal);
   }
 
-  async function checkReadiness(signal: AbortSignal, manual: boolean) {
+  /** `automaticKey` is the window key of an automatic check; null is manual. */
+  async function checkReadiness(
+    signal: AbortSignal,
+    automaticKey: string | null,
+  ) {
     if (probeRun.current && !probeRun.current.signal.aborted) return;
     const run = { signal };
     probeRun.current = run;
@@ -267,9 +272,8 @@ export function useShowSource({
       if (!probeJob.current) {
         const idempotencyKey =
           probeKey.current ??
-          (manual
-            ? `readiness-manual-${crypto.randomUUID()}`
-            : readinessKey(Date.now()));
+          automaticKey ??
+          `readiness-manual-${crypto.randomUUID()}`;
         probeKey.current = idempotencyKey;
         try {
           const accepted = await api<{ job_id: string }>(
@@ -312,11 +316,13 @@ export function useShowSource({
     }
   }
 
-  // The automatic check posts at most once per window, unless an accepted
-  // job or a kept key is pending: waiting or replaying costs nothing.
+  // The automatic check posts at most once per window and configuration,
+  // unless an accepted job or a kept key is pending: waiting or replaying
+  // costs nothing. A configuration change makes readiness stale on the
+  // server, so it gets a new key rather than a replay of the old check.
   function checkWhenStale(value: ShowAvailability | null, signal: AbortSignal) {
     if (!value || value.checked_at || signal.aborted) return;
-    const windowKey = readinessKey(Date.now());
+    const windowKey = readinessKey(Date.now(), value.configuration_fingerprint);
     if (
       !probeJob.current &&
       !probeKey.current &&
@@ -324,7 +330,7 @@ export function useShowSource({
     )
       return;
     autoProbeWindow.current = windowKey;
-    void checkReadiness(signal, false);
+    void checkReadiness(signal, windowKey);
   }
 
   const activate = useEffectEvent((signal: AbortSignal) => {
@@ -631,7 +637,7 @@ export function useShowSource({
     },
     recheck() {
       const signal = activation.current?.signal;
-      if (signal && !signal.aborted) void checkReadiness(signal, true);
+      if (signal && !signal.aborted) void checkReadiness(signal, null);
     },
     recover(row) {
       if (active && !busy) void reopen(row);

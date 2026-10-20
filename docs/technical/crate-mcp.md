@@ -1676,15 +1676,15 @@ flyer, text or link» takes dropped or pasted images, text or one public URL. Me
 cost and model, and what an image method sends along with the image (pasted text, the linked
 page's text). AI methods that are off or incompatible link to AI models for editors with
 `ai.config.read`; anyone else is told an admin can turn them on. Opening the import view runs the
-non-billable worker readiness check at most once per editor per 15 minutes, and readiness checks
-are not listed as recent imports. «Pasted text» holds only what the editor typed or pasted: the
-text Crate read stays in each row's evidence, and reopening an import restores only the editor's
-own text. Running an import again skips a show already in the draft as an unsaved row (same
+non-billable worker readiness check at most once per editor per 15 minutes and AI configuration, and
+readiness checks are not listed as recent imports. «Pasted text» holds only what the editor typed or
+pasted: the text Crate read stays in each row's evidence, and reopening an import restores only the
+editor's own text. Running an import again skips a show already in the draft as an unsaved row (same
 artist, date, time, venue and city, trimmed and case-insensitive). Every candidate is edited in
-place; filling a field for several shows affects the selected shows, or every unsaved show when
-none is selected. «Start over» discards the draft and its source, after a confirmation when
-unsaved rows hold anything; shows already saved stay in Crate. Excluded dates remain pending.
-Changing any selected content invalidates the preview.
+place; filling a field for several shows affects the selected shows, or every unsaved show when none
+is selected. «Start over» discards the draft and its source, after a confirmation when unsaved rows
+hold anything; shows already saved stay in Crate. Excluded dates remain pending. Changing any
+selected content invalidates the preview.
 
 Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming: from the
 toolbar with typed show IDs, or from a show's detail, which loads that show and the other upcoming
@@ -1750,13 +1750,16 @@ Gemini 2.5 and non-Gemini providers retain their default detail. See the provide
 
 Configuration, connectivity and model vision support are exposed separately to curators by the
 narrow show API. Worker readiness is checked automatically when the import view opens (at most
-once per editor per 15 minutes), without a billable model request. The readiness probe never takes
-or waits for the editor's one outstanding job, so it can't block an import, a show review or a
-merge review; it still counts toward the ten-jobs allowance and replays its window key. A key
-alone is not a connectivity/vision probe. Model and endpoint configuration are bound to the
-configuration fingerprint reviewed by the user; changes before acceptance/execution stop the
-call, preserving the draft. The selected Ollama endpoint is frozen for the actual call. Ollama uses model capabilities; an unavailable registry
-leaves other vision support unknown. Manual/OCR paths remain usable independently.
+once per editor per 15 minutes and AI configuration), without a billable model request. The
+readiness probe never takes or waits for the editor's one outstanding job, so it can't block an
+import, a show review or a merge review; it still counts toward the ten-jobs allowance and replays
+its key, which holds the window and the configuration fingerprint. Readiness checked under another
+configuration reads as not checked, so a configuration change gets one new check instead of a replay
+of the old one. A key alone is not a connectivity/vision probe. Model and endpoint configuration are
+bound to the configuration fingerprint reviewed by the user; changes before acceptance/execution
+stop the call, preserving the draft. The selected Ollama endpoint is frozen for the actual call.
+Ollama uses model capabilities; an unavailable registry leaves other vision support unknown.
+Manual/OCR paths remain usable independently.
 
 URL evidence uses the existing pinned-public-address resolver/fetcher from artist bio research,
 with validated redirects, byte/time bounds and no cookies/private login. Actual fetched text is

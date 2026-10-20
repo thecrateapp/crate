@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { AuthContext } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { reasonText } from "@/lib/ai-models";
@@ -76,6 +76,7 @@ function availability(
   return {
     ocr: { available: true },
     checked_at: "2026-10-20T10:00:00Z",
+    configuration_fingerprint: "config-1",
     actions: {
       vision: { ...CONFIGURED },
       text_llm: { ...CONFIGURED },
@@ -156,6 +157,19 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/** Lets pending responses and the work chained on them run to completion. */
+async function flush() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
+/** Pins Date.now so every automatic check falls in one readiness window. */
+function pinClock(iso = "2026-10-20T10:05:00Z") {
+  const now = vi.spyOn(Date, "now").mockReturnValue(Date.parse(iso));
+  onTestFinished(() => now.mockRestore());
+}
+
 function png(name = "flyer.png") {
   return new File([name], name, { type: "image/png" });
 }
@@ -225,7 +239,7 @@ it("lets the editor retry a lost readiness acceptance with the same key", async 
   expect(first).toEqual(
     expect.objectContaining({
       mode: "probe",
-      idempotency_key: expect.stringMatching(/^readiness-\d+$/),
+      idempotency_key: expect.stringMatching(/^readiness-\d+-config-1$/),
     }),
   );
   expect(second).toEqual(first);
@@ -564,7 +578,7 @@ it("checks the worker once when readiness is stale and shows the result", async 
     source_url: null,
     expected_model: null,
     expected_configuration: null,
-    idempotency_key: expect.stringMatching(/^readiness-\d+$/),
+    idempotency_key: expect.stringMatching(/^readiness-\d+-config-1$/),
   });
   for (const status of screen.queryAllByRole("status"))
     expect(status.textContent).not.toMatch(/readiness|OCR|worker/i);
@@ -599,6 +613,79 @@ it("reuses the running readiness check after closing and reopening", async () =>
   expect(probeBodies()).toHaveLength(1);
   for (const [url] of requests("/jobs/"))
     expect(url).toBe("/api/show-imports/jobs/probe-1");
+});
+
+it("checks the worker once more in the same window when the AI configuration changes", async () => {
+  pinClock();
+  let fingerprint = "config-a";
+  sourceApi({
+    availability: () => ({
+      ...stale(),
+      configuration_fingerprint: fingerprint,
+    }),
+  });
+  const { rerender } = render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(2));
+  await flush();
+  expect(probeBodies()).toHaveLength(1);
+
+  // Same configuration, same window: reopening does not post again.
+  rerender(<Harness active={false} />);
+  rerender(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(3));
+  await flush();
+  expect(probeBodies()).toHaveLength(1);
+
+  // The server reports readiness unchecked for the new configuration.
+  fingerprint = "config-b";
+  rerender(<Harness active={false} />);
+  rerender(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(5));
+  await flush();
+  expect(probeBodies()).toHaveLength(2);
+  const [first, second] = probeBodies();
+  expect(first!.idempotency_key).toMatch(/^readiness-\d+-config-a$/);
+  expect(second!.idempotency_key).toMatch(/^readiness-\d+-config-b$/);
+  const windowOf = (key: unknown) => String(key).split("-")[1];
+  expect(windowOf(second!.idempotency_key)).toBe(
+    windowOf(first!.idempotency_key),
+  );
+
+  // Once per configuration: reopening again does not post a third probe.
+  rerender(<Harness active={false} />);
+  rerender(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(6));
+  await flush();
+  expect(probeBodies()).toHaveLength(2);
+});
+
+it("replays the same configuration's check after a remount and keys a new one apart", async () => {
+  pinClock();
+  let fingerprint = "config-a";
+  sourceApi({
+    availability: () => ({
+      ...stale(),
+      configuration_fingerprint: fingerprint,
+    }),
+  });
+  const mounts = [render(<Harness />)];
+  await waitFor(() => expect(probeBodies()).toHaveLength(1));
+  await flush();
+  mounts.pop()!.unmount();
+  mounts.push(render(<Harness />));
+  await waitFor(() => expect(probeBodies()).toHaveLength(2));
+  await flush();
+  mounts.pop()!.unmount();
+  fingerprint = "config-b";
+  render(<Harness />);
+  await waitFor(() => expect(probeBodies()).toHaveLength(3));
+  const [first, replay, changed] = probeBodies().map(
+    (body) => body.idempotency_key,
+  );
+  // The server answers a replayed key with the job it already accepted.
+  expect(replay).toBe(first);
+  expect(changed).not.toBe(first);
+  expect(changed).toMatch(/^readiness-\d+-config-b$/);
 });
 
 it("adds dropped and pasted images and rejects more than three", async () => {

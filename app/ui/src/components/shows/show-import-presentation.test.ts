@@ -368,13 +368,64 @@ describe("showLinkPath", () => {
 });
 
 describe("readinessKey", () => {
-  it("buckets into 15-minute windows", () => {
-    const start = Date.parse("2026-10-20T10:00:00Z");
-    const almostNext = Date.parse("2026-10-20T10:14:59Z");
-    const next = Date.parse("2026-10-20T10:15:00Z");
-    expect(readinessKey(start)).toBe(readinessKey(almostNext));
-    expect(readinessKey(start)).not.toBe(readinessKey(next));
-    expect(readinessKey(start)).toMatch(/^readiness-\d+$/);
+  const start = Date.parse("2026-10-20T10:00:00Z");
+  const almostNext = Date.parse("2026-10-20T10:14:59Z");
+  const next = Date.parse("2026-10-20T10:15:00Z");
+  const sha = "a".repeat(64);
+  // The server's idempotency key contract (ShowExtractionRequest).
+  const SERVER_KEY = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  it.each([
+    [
+      "alike in one window and configuration",
+      [start, "fp-a"],
+      [almostNext, "fp-a"],
+      true,
+    ],
+    ["apart in the next window", [start, "fp-a"], [next, "fp-a"], false],
+    [
+      "apart for another configuration in one window",
+      [start, "fp-a"],
+      [start, "fp-b"],
+      false,
+    ],
+    [
+      "alike without a configuration",
+      [start, null],
+      [almostNext, undefined],
+      true,
+    ],
+    [
+      "apart with and without a configuration",
+      [start, null],
+      [start, "fp-a"],
+      false,
+    ],
+  ] as const)(
+    "keys checks %s",
+    (_case, [nowA, fingerprintA], [nowB, fingerprintB], same) => {
+      const a = readinessKey(nowA, fingerprintA);
+      const b = readinessKey(nowB, fingerprintB);
+      if (same) expect(a).toBe(b);
+      else expect(a).not.toBe(b);
+    },
+  );
+
+  it.each([
+    ["a sha256 fingerprint", sha],
+    ["no fingerprint", null],
+    ["characters the server refuses", "fp a/b?c"],
+    ["an overlong fingerprint", "f".repeat(300)],
+  ])("is a valid server key for %s", (_case, fingerprint) => {
+    const key = readinessKey(next, fingerprint);
+    expect(key).toMatch(SERVER_KEY);
+    expect(key).toMatch(/^readiness-\d+-[A-Za-z0-9._:-]+$/);
+  });
+
+  it("keeps a sha256 fingerprint whole", () => {
+    expect(readinessKey(start, sha)).toBe(
+      `readiness-${Math.floor(start / 900_000)}-${sha}`,
+    );
   });
 });
 

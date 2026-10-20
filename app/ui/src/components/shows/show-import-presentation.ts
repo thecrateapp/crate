@@ -216,8 +216,22 @@ export function aiSendNote(
   }
 }
 
-export function readinessKey(now: number): string {
-  return `readiness-${Math.floor(now / 900_000)}`;
+/**
+ * Idempotency key of the automatic readiness check: one per 15-minute window
+ * and AI configuration. The server reads readiness from another configuration
+ * as unchecked, so a configuration change gets its own check instead of
+ * replaying the one that ran before it.
+ */
+export function readinessKey(
+  now: number,
+  configurationFingerprint: string | null | undefined,
+): string {
+  // Bounded to the server's key alphabet; a sha256 fingerprint stays whole.
+  const configuration =
+    (configurationFingerprint ?? "")
+      .replace(/[^A-Za-z0-9._:-]/g, "")
+      .slice(0, 64) || "none";
+  return `readiness-${Math.floor(now / 900_000)}-${configuration}`;
 }
 
 export function readinessState(

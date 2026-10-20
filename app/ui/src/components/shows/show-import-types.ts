@@ -59,6 +59,8 @@ export interface ShowModelAvailability {
 export interface ShowAvailability {
   ocr: { available: boolean; reason?: string | null };
   checked_at?: string;
+  /** The current configuration; readiness checked under another reads as unchecked. */
+  configuration_fingerprint?: string | null;
   actions?: Partial<Record<ModelMethod, ShowModelAvailability>>;
 }
 
