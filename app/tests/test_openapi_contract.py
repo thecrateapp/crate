@@ -1220,6 +1220,11 @@ def test_openapi_types_browse_shows_upcoming_and_media_routes(test_app):
     assert upcoming_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/UpcomingResponse")
+    upcoming_item = data["components"]["schemas"]["UpcomingItemResponse"]
+    assert upcoming_item["properties"]["show_id"]["anyOf"] == [
+        {"type": "integer"},
+        {"type": "null"},
+    ]
 
     assert external_network_operation["security"] == [
         {"cookieAuth": []},

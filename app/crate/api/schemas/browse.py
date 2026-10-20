@@ -315,6 +315,8 @@ class UpcomingItemResponse(BaseModel):
 
     type: str
     date: str | None = None
+    # Canonical show ID, set on `type: "show"` items only.
+    show_id: int | None = None
 
     @field_validator("date", mode="before")
     @classmethod

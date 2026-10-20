@@ -2042,6 +2042,7 @@ def api_upcoming(request: Request, limit: int = Query(5000, ge=1, le=10000)):
         items.append(
             {
                 "type": "show",
+                "show_id": show.get("id"),
                 "date": show_date.isoformat() if show_date else "",
                 "time": show.get("local_time"),
                 "artist": artist,

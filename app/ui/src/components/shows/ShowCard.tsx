@@ -404,10 +404,12 @@ function ExpandedShowCardBody({
   show,
   closeable,
   onClose,
+  actions,
 }: {
   show: NormalizedShow;
   closeable?: boolean;
   onClose?: () => void;
+  actions?: ReactNode;
 }) {
   const { dateLabel, timeLabel } = formatDateParts(
     show.date,
@@ -541,6 +543,9 @@ function ExpandedShowCardBody({
             tone="primary"
           />
         </div>
+        {actions ? (
+          <div className="mt-2 flex flex-wrap gap-2">{actions}</div>
+        ) : null}
       </div>
     </div>
   );
@@ -551,12 +556,15 @@ export function ShowCard({
   compact,
   expanded,
   onToggle,
+  actions,
   className,
 }: {
   show: ShowCardInput;
   compact?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
+  /** Extra controls for the expanded detail, e.g. curator actions. */
+  actions?: ReactNode;
   className?: string;
 }) {
   const normalized = useMemo(() => normalizeShow(show), [show]);
@@ -633,6 +641,7 @@ export function ShowCard({
             show={normalized}
             closeable
             onClose={onToggle}
+            actions={actions}
           />
         )}
       </div>
