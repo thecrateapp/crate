@@ -326,63 +326,6 @@ describe("AddShowDialog", () => {
     ).not.toEqual((first as { idempotency_key: string }).idempotency_key);
   });
 
-  it.each(["canonical", "duplicates", "ids"])(
-    "invalidates a reviewed consolidation after editing %s",
-    async (change) => {
-      const implementation = vi.mocked(api).getMockImplementation()!;
-      vi.mocked(api).mockImplementation(async (...args) => {
-        if (args[0].includes("/shows?"))
-          return {
-            items: [7, 8].map((id) => ({
-              id,
-              revision: 2,
-              artist_name: "Band",
-              date: "2027-03-02",
-              venue: "Hall",
-              city: "City",
-              attendance_count: 1,
-              reminder_count: 0,
-            })),
-          };
-        if (args[0].endsWith("/plans") && args[1] === "POST")
-          return { job_id: "prepare-1", status: "pending" };
-        return implementation(...args);
-      });
-      renderWithAdminProviders(
-        <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
-      );
-      const user = userEvent.setup();
-      await user.click(screen.getByText("Consolidate existing shows"));
-      await user.type(
-        screen.getByLabelText("Existing show IDs, separated by commas"),
-        "7,8",
-      );
-      await user.click(
-        screen.getByRole("button", { name: "Load shows for consolidation" }),
-      );
-      await user.click(await screen.findByLabelText("Transfer this duplicate"));
-      await user.click(
-        screen.getByRole("button", { name: "Review exact consolidation" }),
-      );
-      await screen.findByRole("button", { name: "Save selected shows" });
-      if (change === "canonical")
-        await user.click(
-          screen.getAllByLabelText("Keep this canonical show")[1]!,
-        );
-      else if (change === "duplicates")
-        await user.click(screen.getByLabelText("Transfer this duplicate"));
-      else
-        await user.type(
-          screen.getByLabelText("Existing show IDs, separated by commas"),
-          ",9",
-        );
-      expect(
-        screen.queryByRole("button", { name: "Save selected shows" }),
-      ).not.toBeInTheDocument();
-      expect(screen.getByText(/review again/i)).toBeInTheDocument();
-    },
-  );
-
   it("does not expose the editor without the show-writing capability", () => {
     renderWithAdminProviders(
       <AddShowDialog open onOpenChange={vi.fn()} onSaved={vi.fn()} />,

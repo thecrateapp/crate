@@ -10,7 +10,6 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShowConsolidationEditor } from "./ShowConsolidationEditor";
 import { ShowSourceImport } from "./ShowSourceImport";
 import { Input } from "@crate/ui/shadcn/input";
 import { ShowImportReview } from "./ShowImportReview";
@@ -329,37 +328,6 @@ export function AddShowDialog({ open, onOpenChange, onSaved }: Props) {
               }}
             />
           ) : null}
-          <ShowConsolidationEditor
-            disabled={locked}
-            onChange={invalidate}
-            onReview={(consolidation) => {
-              invalidate();
-              pending.current = {
-                kind: "prepare",
-                path: "/api/show-imports/plans",
-                payload: {
-                  consolidation,
-                  idempotency_key: keys.current.prepare,
-                },
-              };
-              void runPending();
-            }}
-          />
-          {outcomes
-            .filter((item) => item.item_id === "consolidation")
-            .map((item) => (
-              <p key={item.item_id} role="status">
-                Consolidation: {item.status}{" "}
-                {item.show_id ? (
-                  <a
-                    className="underline"
-                    href={`/shows?show_id=${item.show_id}`}
-                  >
-                    Open show {item.show_id}
-                  </a>
-                ) : null}
-              </p>
-            ))}
           {coverage ? (
             <p role="status" className="text-sm">
               Source coverage: {coverage}. Only selected dates are saved;

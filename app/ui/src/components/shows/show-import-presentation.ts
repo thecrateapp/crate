@@ -547,7 +547,7 @@ export interface MergeShowView {
   people: string;
 }
 
-interface ConsolidationShow {
+export interface ConsolidationShow {
   id: number;
   artist_name?: string | null;
   date?: string | null;
@@ -558,7 +558,7 @@ interface ConsolidationShow {
   reminder_count: number;
 }
 
-function mergeShowView(show: ConsolidationShow): MergeShowView {
+export function mergeShowView(show: ConsolidationShow): MergeShowView {
   const dateLabel = formatShowDateParts(show.date ?? "", "").dateLabel;
   const timeLabel = formatShowDateParts(
     show.date ?? "",

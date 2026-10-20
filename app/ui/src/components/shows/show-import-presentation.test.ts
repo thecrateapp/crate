@@ -8,6 +8,7 @@ import {
   draftRowView,
   issueText,
   mergePlanView,
+  mergeShowView,
   methodOptions,
   missingText,
   modelDisplayName,
@@ -730,5 +731,27 @@ describe("mergePlanView", () => {
         people: "1 going · 0 reminders",
       },
     ]);
+  });
+});
+
+describe("mergeShowView", () => {
+  it("describes one saved show with its time and people", () => {
+    expect(
+      mergeShowView({
+        id: 8,
+        artist_name: "Band",
+        date: "2027-03-02",
+        local_time: "21:00",
+        venue: "Hall",
+        city: "City",
+        attendance_count: 3,
+        reminder_count: 1,
+      }),
+    ).toEqual({
+      id: 8,
+      title: "Band · Tue, Mar 2, 2027",
+      detail: expect.stringMatching(/^Hall, City · (?!Time unknown)/),
+      people: "3 going · 1 reminder",
+    });
   });
 });

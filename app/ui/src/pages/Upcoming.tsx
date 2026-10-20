@@ -1,4 +1,5 @@
 import { AddShowButton } from "@/components/shows/AddShowButton";
+import { MergeShowsButton } from "@/components/shows/MergeShowsButton";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
@@ -339,6 +340,7 @@ export function Upcoming() {
               </CratePill>
             </div>
             <AddShowButton onSaved={() => void fetchItems()} />
+            <MergeShowsButton onMerged={() => void fetchItems()} />
             {canCurateShows ? (
               <Button size="sm" onClick={syncShows} disabled={syncing}>
                 <RefreshCw
