@@ -1342,6 +1342,9 @@ function AIRefinementStatus({
         {savingPaths ? (
           <Loader2 size={13} className="animate-spin text-muted-foreground" />
         ) : null}
+        <span className="text-sm">
+          <ManageInAiModelsLink canManageAi={canManageAi} />
+        </span>
       </FieldRow>
     );
   }

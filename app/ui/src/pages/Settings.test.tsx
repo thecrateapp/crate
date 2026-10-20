@@ -181,6 +181,49 @@ describe("Settings", () => {
     ).toBeVisible();
   });
 
+  it("links the server-settings state to AI models for AI readers", async () => {
+    const user = userEvent.setup();
+    pathStatus = {
+      available: true,
+      status: "legacy",
+      model_id: "paths-model",
+      error_code: null,
+    };
+
+    render(<Settings />);
+
+    await user.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Manage in AI models" }),
+    ).toHaveAttribute("href", "/ai");
+  });
+
+  it("names AI models without a link before setup when AI settings are not readable", async () => {
+    const user = userEvent.setup();
+    pathStatus = {
+      available: true,
+      status: "legacy",
+      model_id: "paths-model",
+      error_code: null,
+    };
+
+    render(<Settings />, {
+      auth: { hasCapability: (cap) => cap !== "ai.config.read" },
+    });
+
+    await user.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+
+    expect(screen.getByText("Manage in AI models")).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Manage in AI models" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("exposes a targeted Music Paths AI cache clear action", async () => {
     const user = userEvent.setup();
     apiMock.mockResolvedValue({ ok: true });
