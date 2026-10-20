@@ -192,9 +192,16 @@ def update_user_location(user_id: int, *, session=None, **fields) -> dict | None
 
 
 def delete_user(user_id: int, *, session=None):
+    # Local import: the rollups module imports the task repositories, which
+    # load the auth repositories through crate.db.repositories.
+    from crate.db.jobs.instance_listening_rollups import (
+        queue_instance_listening_backfill_for_removed_user,
+    )
+
     def _impl(s) -> None:
         user = s.get(User, user_id)
         if user is not None:
+            queue_instance_listening_backfill_for_removed_user(s, user_id)
             s.delete(user)
 
     with optional_scope(session) as s:

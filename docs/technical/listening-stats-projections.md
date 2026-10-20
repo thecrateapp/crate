@@ -56,10 +56,13 @@ track. `crate/db/jobs/instance_listening_rollups.py` owns the writes:
 - The runner enqueues them in the refresh transaction: an incremental refresh queues
   `rebuild_instance_listening_days` (dedup `instance-listening-days:<sha1 of the days>`); a full
   user rebuild queues `backfill_instance_listening_rollups` (dedup `instance-listening-backfill`).
+  Batch rebuilds of several users queue one backfill after the loop, and a hard user delete
+  queues it in the delete transaction.
 - A day task rebuilds those days and refreshes firsts for its keys plus every key on those days,
   so a task shared by several listeners stays complete. It releases its dedup key before reading,
   so a refresh that commits while it runs enqueues a new task instead of being swallowed.
-- API startup queues the backfill while the rollups miss the earliest listening day.
+- API startup queues the backfill while `instance_listening_rollups_incomplete`: listening exists
+  but the rollups miss its earliest day.
 
 ## Dashboard contract v2
 

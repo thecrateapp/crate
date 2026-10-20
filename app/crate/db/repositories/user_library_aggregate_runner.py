@@ -15,6 +15,22 @@ def recompute_user_listening_aggregates_in_session(session, user_id: int):
     return result
 
 
+def recompute_users_listening_aggregates_in_session(
+    session, user_ids: list[int]
+) -> int:
+    """Fully rebuild several users in one transaction, then queue one backfill.
+
+    The backfill is queued after every user projection lock is taken: queuing
+    per user would hold its dedup lock while waiting for the next user's lock,
+    the reverse of a single user's refresh.
+    """
+    for user_id in user_ids:
+        rebuild_user_listening_projections(session, user_id)
+    if user_ids:
+        queue_instance_listening_rebuild({"full": True}, session=session)
+    return len(user_ids)
+
+
 def recompute_user_listening_aggregates(user_id: int) -> dict:
     with transaction_scope() as session:
         return recompute_user_listening_aggregates_in_session(session, user_id)
@@ -39,5 +55,6 @@ __all__ = [
     "ensure_user_listening_aggregates",
     "recompute_user_listening_aggregates",
     "recompute_user_listening_aggregates_in_session",
+    "recompute_users_listening_aggregates_in_session",
     "refresh_user_listening_aggregates",
 ]

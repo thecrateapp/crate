@@ -5,8 +5,8 @@ user-local, the same semantics as the instance tape) and
 ``instance_entity_firsts`` holds the first day anyone on the instance played
 an artist, album or track. A user refresh enqueues a deduplicated
 ``rebuild_instance_listening_days`` task for the days it rebuilt; a full user
-rebuild, or rollups that never covered history, enqueue the full
-``backfill_instance_listening_rollups``. Both run ``rebuild_instance_listening``,
+rebuild, a deleted listener, or rollups that never covered history enqueue the
+full ``backfill_instance_listening_rollups``. Both run ``rebuild_instance_listening``,
 whose ``days=None`` path is the reference result for the incremental one.
 """
 
@@ -190,20 +190,38 @@ def queue_instance_listening_rebuild(result: dict, *, session=None) -> str | Non
     )
 
 
-def instance_listening_rollups_empty(session) -> bool:
-    """True until the rollups cover the earliest listening day.
+def queue_instance_listening_backfill_for_removed_user(
+    session, user_id: int
+) -> str | None:
+    """Queue the full rebuild that drops a user's share of the rollups.
+
+    Call it in the transaction that deletes the user, before the delete
+    cascades their projections away; users without listening queue nothing.
+    """
+    has_listening = session.execute(
+        text("SELECT EXISTS (SELECT 1 FROM user_track_daily WHERE user_id = :user_id)"),
+        {"user_id": user_id},
+    ).scalar()
+    if not has_listening:
+        return None
+    return queue_instance_listening_rebuild({"full": True}, session=session)
+
+
+def instance_listening_rollups_incomplete(session) -> bool:
+    """True while listening exists but the rollups miss its earliest day.
 
     Incremental tasks only fill recent days, so "has any row" would hide a
-    missing backfill; both lookups are index probes.
+    missing backfill. No listening at all leaves nothing to backfill. Both
+    lookups are index probes.
     """
     return bool(
         session.execute(
             text(
                 """
-                SELECT NOT EXISTS (
-                    SELECT 1 FROM instance_track_daily
-                    WHERE day = (SELECT MIN(day) FROM user_track_daily)
+                SELECT earliest.day IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM instance_track_daily WHERE day = earliest.day
                 )
+                FROM (SELECT MIN(day) AS day FROM user_track_daily) earliest
                 """
             )
         ).scalar()
@@ -212,12 +230,7 @@ def instance_listening_rollups_empty(session) -> bool:
 
 def queue_instance_listening_backfill_if_needed() -> str | None:
     with read_scope() as session:
-        has_listening = bool(
-            session.execute(
-                text("SELECT EXISTS (SELECT 1 FROM user_track_daily)")
-            ).scalar()
-        )
-        needed = has_listening and instance_listening_rollups_empty(session)
+        needed = instance_listening_rollups_incomplete(session)
     if not needed:
         return None
     return create_task_dedup(BACKFILL_TASK_TYPE, {}, dedup_key=BACKFILL_DEDUP_KEY)
@@ -228,7 +241,8 @@ __all__ = [
     "BACKFILL_TASK_TYPE",
     "DAYS_TASK_TYPE",
     "instance_listening_days_dedup_key",
-    "instance_listening_rollups_empty",
+    "instance_listening_rollups_incomplete",
+    "queue_instance_listening_backfill_for_removed_user",
     "queue_instance_listening_backfill_if_needed",
     "queue_instance_listening_rebuild",
     "rebuild_instance_entity_firsts",

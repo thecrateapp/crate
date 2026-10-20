@@ -880,7 +880,7 @@ def backfill_legacy_user_library_refs_batch(
             result["play_events"] = _row_count(play_events)
             if rebuild_listening_stats or result["play_events"] > 0:
                 from crate.db.repositories.user_library_aggregate_runner import (
-                    recompute_user_listening_aggregates_in_session,
+                    recompute_users_listening_aggregates_in_session,
                 )
 
                 listening_user_ids = [
@@ -899,9 +899,11 @@ def backfill_legacy_user_library_refs_batch(
                     .mappings()
                     .all()
                 ]
-                for user_id in listening_user_ids:
-                    recompute_user_listening_aggregates_in_session(session, user_id)
-                result["listening_stats_users"] = len(listening_user_ids)
+                result["listening_stats_users"] = (
+                    recompute_users_listening_aggregates_in_session(
+                        session, listening_user_ids
+                    )
+                )
 
     completed = len(candidate_user_ids) <= capped
     result.update(

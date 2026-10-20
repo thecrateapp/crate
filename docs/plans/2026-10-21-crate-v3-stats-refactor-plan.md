@@ -131,7 +131,7 @@
 - Produces:
   - `rebuild_instance_listening_days(session, days: list[date] | None) -> int` — advisory lock `pg_advisory_xact_lock(hashtext('instance_listening_rollups'))`, delete + insert from `user_track_daily` grouped by `(day, entity_key, artist, album)`, `listener_count = COUNT(DISTINCT user_id)`; `None` = all days.
   - `rebuild_instance_entity_firsts(session, keys: dict[str, list[str]] | None) -> int` — `MIN(first_day)` from `user_entity_firsts`, removing keys no user has.
-  - `instance_listening_rollups_empty(session) -> bool`; `queue_instance_listening_backfill_if_needed() -> str | None`.
+  - `instance_listening_rollups_incomplete(session) -> bool`; `queue_instance_listening_backfill_if_needed() -> str | None`.
   - Task types `rebuild_instance_listening_days` (params `{"days": [iso], "keys": {...}}`, dedup key `instance-listening-days:` + sha1 of sorted days) and `backfill_instance_listening_rollups` (dedup `instance-listening-backfill`), same pool as `refresh_user_listening_stats`.
   - `refresh_user_listening_projections(...)` result gains `"days": [iso]` and `"keys": {...}` (empty on no-op; full rebuild reports `"full": True`).
 
@@ -145,7 +145,7 @@
 - Test: `app/tests/test_stats_range_api.py`, `app/tests/test_openapi_contract.py`
 
 **Interfaces:**
-- Produces: `get_instance_stats_range(start: date, end: date, *, limit: int = 3, session=None) -> dict` (UTC `today`; same shape; `available=False` and empty lists when `instance_listening_rollups_empty`); route `GET /api/stats/range` (`api_instance_listening_stats_range`, tags `analytics`, `AUTH_ERROR_RESPONSES`).
+- Produces: `get_instance_stats_range(start: date, end: date, *, limit: int = 3, session=None) -> dict` (UTC `today`; same shape; `available=False` and empty lists when `instance_listening_rollups_incomplete`); route `GET /api/stats/range` (`api_instance_listening_stats_range`, tags `analytics`, `AUTH_ERROR_RESPONSES`).
 
 - [ ] **Step 1: Failing tests** — `test_instance_range_sums_listeners` (two users), `test_instance_range_unavailable_before_backfill`, OpenAPI ref. **Step 2–4:** run, implement, run → PASS. **Step 5: Commit** `feat(stats): add the instance range summary`.
 

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import text
 
 from crate.db.jobs.instance_listening_rollups import (
-    instance_listening_rollups_empty,
+    instance_listening_rollups_incomplete,
     queue_instance_listening_backfill_if_needed,
     rebuild_instance_entity_firsts,
     rebuild_instance_listening_days,
@@ -363,15 +363,17 @@ def test_instance_firsts_take_the_earliest_listener(pg_db):
     assert dict(shared_day) == {"play_count": 2, "listener_count": 2}
 
 
-def test_backfill_is_queued_only_when_rollups_are_empty(pg_db, monkeypatch):
+def test_backfill_is_queued_only_when_rollups_are_incomplete(pg_db, monkeypatch):
     calls = _record_enqueues(monkeypatch)
+    with read_scope() as session:
+        assert not instance_listening_rollups_incomplete(session)
     assert queue_instance_listening_backfill_if_needed() is None
     assert calls == []
 
     _seed_two_listeners()
     calls.clear()
     with read_scope() as session:
-        assert instance_listening_rollups_empty(session)
+        assert instance_listening_rollups_incomplete(session)
     assert queue_instance_listening_backfill_if_needed() == "task-1"
     assert calls == [
         ("backfill_instance_listening_rollups", {}, "instance-listening-backfill")
@@ -381,13 +383,13 @@ def test_backfill_is_queued_only_when_rollups_are_empty(pg_db, monkeypatch):
     with transaction_scope() as session:
         rebuild_instance_listening_days(session, [date(2026, 10, 5)])
     with read_scope() as session:
-        assert instance_listening_rollups_empty(session)
+        assert instance_listening_rollups_incomplete(session)
     assert queue_instance_listening_backfill_if_needed() is not None
 
     calls.clear()
     _rebuild_all()
     with read_scope() as session:
-        assert not instance_listening_rollups_empty(session)
+        assert not instance_listening_rollups_incomplete(session)
     assert queue_instance_listening_backfill_if_needed() is None
     assert calls == []
 
@@ -505,3 +507,62 @@ def test_two_listeners_refreshing_one_day_share_a_complete_rebuild(pg_db, monkey
     assert [row["id"] for row in later] != [task["id"]]
     assert len(later) == 1
     assert _instance_day_tasks()[0] == {**task, "dedup_key": None}
+
+
+BACKFILL_CALL = (
+    "backfill_instance_listening_rollups",
+    {},
+    "instance-listening-backfill",
+)
+
+
+def test_global_ref_backfill_enqueues_one_instance_backfill_for_all_listeners(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs_batch,
+    )
+
+    _seed_two_listeners()
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE user_play_events SET global_track_uid = gen_random_uuid()")
+        )
+    calls = _record_enqueues(monkeypatch)
+
+    result = backfill_legacy_user_library_refs_batch(rebuild_listening_stats=True)
+
+    assert result["listening_stats_users"] == 2
+    assert calls == [BACKFILL_CALL]
+
+
+def test_deleting_a_listener_queues_the_backfill_that_drops_them(pg_db, monkeypatch):
+    from crate.db.jobs.instance_listening_rollups import rebuild_instance_listening
+    from crate.db.repositories.auth_user_admin import delete_user
+
+    other, _ = _seed_two_listeners()
+    silent = _create_listener("silent", tz="UTC")
+    _rebuild_all()
+    calls = _record_enqueues(monkeypatch)
+
+    delete_user(silent)
+    delete_user(987654)
+    assert calls == []
+
+    delete_user(other)
+    assert calls == [BACKFILL_CALL]
+
+    rebuild_instance_listening(None)
+    with read_scope() as session:
+        remaining = session.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COALESCE(SUM(play_count), 0) FROM instance_track_daily),
+                    (SELECT COALESCE(SUM(play_count), 0) FROM user_track_daily),
+                    (SELECT MAX(listener_count) FROM instance_track_daily)
+                """
+            )
+        ).one()
+    assert remaining[0] == remaining[1]
+    assert remaining[2] == 1
