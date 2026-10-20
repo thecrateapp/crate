@@ -94,6 +94,13 @@ async function reviewMerge() {
   return user;
 }
 
+function footerButton(name: string) {
+  const footer = document.querySelector<HTMLElement>(
+    '[data-slot="sheet-footer"]',
+  )!;
+  return within(footer).getByRole("button", { name });
+}
+
 function ReopenableSheet({ onMerged }: { onMerged: () => void }) {
   const [open, setOpen] = useState(true);
   return (
@@ -144,6 +151,28 @@ describe("MergeShowsSheet", () => {
       screen.getByText("The selection changed. Review again before merging."),
     ).toBeInTheDocument();
     expect(posts("/apply")).toHaveLength(0);
+  });
+
+  it("hides the changed note while the new review runs", async () => {
+    renderWithAdminProviders(
+      <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
+    );
+    const user = await reviewMerge();
+    await user.click(screen.getByRole("radio", { name: "Keep show 8" }));
+    expect(
+      screen.getByText("The selection changed. Review again before merging."),
+    ).toBeVisible();
+    vi.mocked(api).mockImplementation(async (...args) =>
+      args[0].endsWith("/jobs/prepare-1")
+        ? new Promise(() => {})
+        : routes(...args),
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Merge show 7" }));
+    await user.click(screen.getByRole("button", { name: "Review merge" }));
+    expect(await screen.findByText("Checking the merge…")).toBeVisible();
+    expect(
+      screen.queryByText("The selection changed. Review again before merging."),
+    ).toBeNull();
   });
 
   it("explains that a merge needs approval and links to it", async () => {
@@ -268,7 +297,7 @@ describe("MergeShowsSheet", () => {
     const user = await reviewMerge();
     await user.click(screen.getByRole("button", { name: "Merge shows" }));
     await screen.findByText("Shows merged.");
-    await user.click(screen.getAllByRole("button", { name: "Close" })[0]!);
+    await user.click(footerButton("Close"));
     await waitFor(() =>
       expect(screen.queryByText("Shows merged.")).not.toBeInTheDocument(),
     );

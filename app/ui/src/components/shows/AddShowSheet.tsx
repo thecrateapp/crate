@@ -96,18 +96,25 @@ export function AddShowSheet({
     open,
     onApplied(rows: ShowOutcome[], outcomes: ShowOutcome[]) {
       const saved = savedItemIds(outcomes);
-      const remaining = draft.candidates.filter(
-        (candidate) => !saved.has(candidate.item_id),
-      ).length;
+      const unsavedIds = draft.candidates
+        .filter((candidate) => !saved.has(candidate.item_id))
+        .map((candidate) => candidate.item_id);
+      const remaining = unsavedIds.length;
       toast.success(
         `${countLabel(rows.length, "show")} saved${
           remaining ? ` · ${remaining} still to review` : ""
         }`,
       );
       onSaved();
-      setDraft((current) => ({ ...current, selected: [] }));
+      // A lone unsaved row is what «Review show» sends, so it shows selected.
+      setDraft((current) => ({
+        ...current,
+        selected: remaining === 1 ? unsavedIds : [],
+      }));
       return remaining ? "editing" : "saved";
     },
+    // Rows that did save are already in Crate, so the list refreshes.
+    onPartlySaved: () => onSaved(),
   });
   // Manual entry never activates the source: no availability, no probe.
   const source = useShowSource({
@@ -115,25 +122,31 @@ export function AddShowSheet({
     // A functional update, so an import that finishes later never drops
     // edits made since it started.
     onDraft(imported: ShowDraft) {
+      const published = Object.values(imported.publication ?? {});
+      // An import that found nothing changes nothing, so a review stands.
+      if (!imported.candidates.length && !published.length) return;
       setDraft((current) => mergeImportedDraft(current, imported));
-      flow.addOutcomes(Object.values(imported.publication ?? {}));
+      flow.addOutcomes(published);
       flow.invalidate();
     },
   });
 
   function reset() {
     flow.reset();
+    source.reset();
     setMode("manual");
     setDraft(newDraft());
     setAttempted(false);
     setNotice("");
   }
 
-  const opened = useEffectEvent(() => {
+  // However the panel closes after everything was saved (corner button,
+  // Escape, «Close»), the next opening starts fresh.
+  const closed = useEffectEvent(() => {
     if (flow.phase === "saved") reset();
   });
   useEffect(() => {
-    if (open) opened();
+    if (!open) closed();
   }, [open]);
 
   const locked = flow.locked || source.busy || linking;
@@ -313,7 +326,7 @@ export function AddShowSheet({
                 : `${countLabel(savedCount, "show")} saved.`}
             </p>
           ) : null}
-          {flow.changed ? (
+          {flow.changed && !flow.busy ? (
             <p role="status" className="text-sm">
               The draft changed. Review again before saving.
             </p>

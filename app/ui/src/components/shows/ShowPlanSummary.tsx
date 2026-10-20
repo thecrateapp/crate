@@ -124,6 +124,12 @@ function IssueRow({
 }) {
   const matches = issue.matches ?? [];
   const artists = issue.artist_matches ?? [];
+  // Several issues repeat the same visible text, so each accessible name
+  // adds its row and, when needed, which match it is.
+  const named = (text: string, detail?: string) => {
+    const context = [detail, label].filter(Boolean).join(", ");
+    return context ? `${text} (${context})` : text;
+  };
   return (
     <li className="space-y-2 rounded-md border border-state-warning/25 bg-state-warning/5 p-3 text-sm">
       <p role="alert">{issueText(issue, label)}</p>
@@ -135,6 +141,11 @@ function IssueRow({
                 type="button"
                 variant="outline"
                 size="sm"
+                aria-label={named(
+                  matches.length > 1
+                    ? `Update existing show ${index + 1}`
+                    : "Update the existing show",
+                )}
                 disabled={disabled}
                 onClick={() => onUseExisting(issue.item_id, showId)}
               >
@@ -146,6 +157,10 @@ function IssueRow({
                 href={`/shows?show_id=${showId}`}
                 target="_blank"
                 rel="noreferrer"
+                aria-label={named(
+                  "View it",
+                  matches.length > 1 ? `existing show ${index + 1}` : undefined,
+                )}
                 className="text-foreground underline underline-offset-2"
               >
                 View it
@@ -159,6 +174,7 @@ function IssueRow({
               variant="outline"
               size="sm"
               title={artist.artist_uid}
+              aria-label={named(`Use ${artist.name}`)}
               disabled={disabled}
               onClick={() => onUseArtist(issue.item_id, artist)}
             >

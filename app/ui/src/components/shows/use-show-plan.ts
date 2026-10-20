@@ -3,7 +3,12 @@ import { api } from "@/lib/api";
 import { waitForShowJob } from "./show-import-jobs";
 import { showErrorText } from "./show-import-presentation";
 import type { ShowConsolidation } from "./ShowConsolidationEditor";
-import type { ShowCandidate, ShowOutcome, ShowPlan } from "./show-import-types";
+import {
+  isShowSaved,
+  type ShowCandidate,
+  type ShowOutcome,
+  type ShowPlan,
+} from "./show-import-types";
 
 export type ShowPlanPhase =
   "editing" | "preparing" | "reviewed" | "applying" | "uncertain" | "saved";
@@ -68,12 +73,15 @@ function jobFailure(execution?: { error?: string; error_code?: string }) {
 export function useShowPlan({
   open,
   onApplied,
+  onPartlySaved,
 }: {
   open: boolean;
   onApplied: (
     rows: ShowOutcome[],
     outcomes: ShowOutcome[],
   ) => "editing" | "saved";
+  /** A save that failed or wasn't verified, but still saved these rows. */
+  onPartlySaved?: (rows: ShowOutcome[]) => void;
 }): ShowPlanFlow {
   const [phase, setPhase] = useState<ShowPlanPhase>("editing");
   const [plan, setPlan] = useState<ShowPlan | null>(null);
@@ -172,6 +180,8 @@ export function useShowPlan({
           showErrorText(jobFailure(job.result?.execution), APPLY_FAILED_TEXT),
           null,
         );
+        const savedRows = rows.filter(isShowSaved);
+        if (savedRows.length) onPartlySaved?.(savedRows);
         return;
       }
       setPending(null);

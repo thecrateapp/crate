@@ -130,11 +130,12 @@ export function MergeShowsSheet({
     setSelection(emptyConsolidationDraft());
   }
 
-  const opened = useEffectEvent(() => {
+  // However the panel closes after a merge, the next opening starts fresh.
+  const closed = useEffectEvent(() => {
     if (flow.phase === "saved") reset();
   });
   useEffect(() => {
-    if (open) opened();
+    if (!open) closed();
   }, [open]);
 
   const kept = flow.outcomes.find(
@@ -189,7 +190,7 @@ export function MergeShowsSheet({
                 onReview={(consolidation) => flow.prepare({ consolidation })}
               />
               {flow.plan ? <MergeReview plan={flow.plan} /> : null}
-              {flow.changed ? (
+              {flow.changed && !flow.busy ? (
                 <p role="status" className="text-sm">
                   The selection changed. Review again before merging.
                 </p>

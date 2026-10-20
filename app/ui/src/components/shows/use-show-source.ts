@@ -55,6 +55,7 @@ export interface ShowSourceState {
   recheck(): void;
   recover(row: ShowDraftRow): void;
   reloadAvailability(): void;
+  reset(): void;
 }
 
 interface PendingExtraction {
@@ -635,6 +636,20 @@ export function useShowSource({
     },
     recover(row) {
       if (active && !busy) void reopen(row);
+    },
+    reset() {
+      // Clears the source and its result; availability, readiness and recent
+      // imports are kept, so a fresh start spends no extra request.
+      controller.current?.abort();
+      changed();
+      setTextValue("");
+      setUrlValue("");
+      setImages([]);
+      setStoredImages([]);
+      setChosen(null);
+      setWarnings([]);
+      setBusy(false);
+      setStoppable(false);
     },
     reloadAvailability() {
       const signal = activation.current?.signal;
