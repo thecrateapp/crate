@@ -57,6 +57,10 @@ class TrackMixProfileDraft:
     intro_beat_ms: int | None = None
     outro_bpm: float | None = None
     outro_beat_ms: int | None = None
+    intro_tempo_stability: float | None = None
+    outro_tempo_stability: float | None = None
+    intro_downbeat_ms: int | None = None
+    outro_downbeat_ms: int | None = None
     intro_lufs: float | None = None
     outro_lufs: float | None = None
     true_peak_dbfs: float | None = None
@@ -83,6 +87,8 @@ class TrackMixProfileDraft:
             "outro_cue_ms",
             "intro_beat_ms",
             "outro_beat_ms",
+            "intro_downbeat_ms",
+            "outro_downbeat_ms",
         ):
             _require_non_negative_ms(field_name, getattr(self, field_name))
         object.__setattr__(
@@ -105,6 +111,8 @@ class TrackMixProfileDraft:
         for field_name in (
             "bpm_confidence",
             "tempo_stability",
+            "intro_tempo_stability",
+            "outro_tempo_stability",
             "key_confidence",
             "intro_energy",
             "outro_energy",
@@ -148,6 +156,10 @@ class TrackMixProfile:
     intro_beat_ms: int | None = None
     outro_bpm: float | None = None
     outro_beat_ms: int | None = None
+    intro_tempo_stability: float | None = None
+    outro_tempo_stability: float | None = None
+    intro_downbeat_ms: int | None = None
+    outro_downbeat_ms: int | None = None
     intro_lufs: float | None = None
     outro_lufs: float | None = None
     true_peak_dbfs: float | None = None
@@ -180,6 +192,8 @@ class TrackMixProfile:
             "outro_cue_ms",
             "intro_beat_ms",
             "outro_beat_ms",
+            "intro_downbeat_ms",
+            "outro_downbeat_ms",
         ):
             _require_non_negative_ms(field_name, getattr(self, field_name))
         object.__setattr__(
@@ -200,6 +214,8 @@ class TrackMixProfile:
         for field_name in (
             "bpm_confidence",
             "tempo_stability",
+            "intro_tempo_stability",
+            "outro_tempo_stability",
             "key_confidence",
             "intro_energy",
             "outro_energy",
@@ -247,6 +263,10 @@ class TrackMixProfile:
             "introBeatMs": self.intro_beat_ms,
             "outroBpm": self.outro_bpm,
             "outroBeatMs": self.outro_beat_ms,
+            "introTempoStability": self.intro_tempo_stability,
+            "outroTempoStability": self.outro_tempo_stability,
+            "introDownbeatMs": self.intro_downbeat_ms,
+            "outroDownbeatMs": self.outro_downbeat_ms,
             "introLufs": self.intro_lufs,
             "outroLufs": self.outro_lufs,
             "truePeakDbfs": self.true_peak_dbfs,
@@ -408,6 +428,10 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
         intro_beat_ms=value("intro_beat_ms", "introBeatMs"),
         outro_bpm=value("outro_bpm", "outroBpm"),
         outro_beat_ms=value("outro_beat_ms", "outroBeatMs"),
+        intro_tempo_stability=value("intro_tempo_stability", "introTempoStability"),
+        outro_tempo_stability=value("outro_tempo_stability", "outroTempoStability"),
+        intro_downbeat_ms=value("intro_downbeat_ms", "introDownbeatMs"),
+        outro_downbeat_ms=value("outro_downbeat_ms", "outroDownbeatMs"),
         intro_lufs=value("intro_lufs", "introLufs"),
         outro_lufs=value("outro_lufs", "outroLufs"),
         true_peak_dbfs=value("true_peak_dbfs", "truePeakDbfs"),

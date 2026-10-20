@@ -277,9 +277,7 @@ fn best_phase(scores: &[f32], indices: std::ops::Range<usize>) -> Option<(usize,
     Some((phase, ordered[0] - ordered[1]))
 }
 
-/// Index of the first downbeat in `beats` (4/4 assumed) when bass onsets and harmonic
-/// changes consistently favor one bar phase across both halves of the track.
-pub fn downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize> {
+fn downbeat_scores(features: &FrameFeatures, beats: &[usize]) -> Option<Vec<f32>> {
     if beats.len() < DOWNBEAT_MIN_BEATS {
         return None;
     }
@@ -307,9 +305,17 @@ pub fn downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize
             })
             .collect(),
     );
-    let scores: Vec<f32> = (0..beats.len())
-        .map(|index| low[index] + harmonic[index] + 0.5 * broad[index])
-        .collect();
+    Some(
+        (0..beats.len())
+            .map(|index| low[index] + harmonic[index] + 0.5 * broad[index])
+            .collect(),
+    )
+}
+
+/// Index of the first downbeat in `beats` (4/4 assumed) when bass onsets and harmonic
+/// changes consistently favor one bar phase across both halves of the track.
+pub fn downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize> {
+    let scores = downbeat_scores(features, beats)?;
     let (phase, margin) = best_phase(&scores, 0..beats.len())?;
     if margin < DOWNBEAT_MARGIN {
         return None;
@@ -318,6 +324,15 @@ pub fn downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize
     let (first, _) = best_phase(&scores, 0..middle)?;
     let (second, _) = best_phase(&scores, middle..beats.len())?;
     (first == phase && second == phase).then_some(phase)
+}
+
+/// Bar phase of a short window of beats. The window is local by construction, so a
+/// clear margin is enough; requiring both halves to agree would leave each half with
+/// only a few bars per phase.
+pub fn window_downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Option<usize> {
+    let scores = downbeat_scores(features, beats)?;
+    let (phase, margin) = best_phase(&scores, 0..beats.len())?;
+    (margin >= DOWNBEAT_MARGIN).then_some(phase)
 }
 
 fn frames_per_second(sample_rate: u32) -> f32 {

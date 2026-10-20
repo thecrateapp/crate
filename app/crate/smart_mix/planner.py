@@ -167,7 +167,9 @@ def plan_transition(
             policy,
             snap_to_beats=True,
         )
-        if window.fits:
+        if window.fits and window.duration_ms < _minimum_beatmatch_ms(outgoing, policy):
+            fallback_reason = TransitionFallbackReason.INSUFFICIENT_WINDOW
+        elif window.fits:
             return _base_plan(
                 outgoing_uid,
                 incoming_uid,
@@ -216,9 +218,10 @@ def _beatmatch_fallback_reason(
 ) -> TransitionFallbackReason | None:
     if not context.allow_beatmatch:
         return TransitionFallbackReason.LOW_CONFIDENCE
-    if (
-        outgoing.quality is not MixProfileQuality.FULL
-        or incoming.quality is not MixProfileQuality.FULL
+    if not _has_beat_reference(
+        outgoing, _outro_beat(outgoing), outgoing.outro_beat_ms
+    ) or not _has_beat_reference(
+        incoming, _intro_beat(incoming), incoming.intro_beat_ms
     ):
         return TransitionFallbackReason.LOW_CONFIDENCE
     if (
@@ -228,21 +231,24 @@ def _beatmatch_fallback_reason(
         or incoming.bpm_confidence is None
         or min(outgoing.bpm_confidence, incoming.bpm_confidence)
         < policy.minimum_bpm_confidence
-        or outgoing.downbeat_anchor_ms is None
-        or incoming.downbeat_anchor_ms is None
     ):
         return TransitionFallbackReason.LOW_CONFIDENCE
+    outgoing_stability = _cue_stability(
+        outgoing.outro_tempo_stability, outgoing.tempo_stability
+    )
+    incoming_stability = _cue_stability(
+        incoming.intro_tempo_stability, incoming.tempo_stability
+    )
     if (
-        outgoing.tempo_stability is None
-        or incoming.tempo_stability is None
-        or min(outgoing.tempo_stability, incoming.tempo_stability)
-        < policy.minimum_tempo_stability
+        outgoing_stability is None
+        or incoming_stability is None
+        or min(outgoing_stability, incoming_stability) < policy.minimum_tempo_stability
     ):
         return TransitionFallbackReason.UNSTABLE_TEMPO
     if (
-        outgoing.time_signature is None
-        or incoming.time_signature is None
-        or outgoing.time_signature != incoming.time_signature
+        outgoing.time_signature is not None
+        and incoming.time_signature is not None
+        and outgoing.time_signature != incoming.time_signature
     ):
         return TransitionFallbackReason.INCOMPATIBLE_METER
     adjustment = abs(_cue_tempo_ratio(outgoing, incoming) - 1.0)
@@ -474,6 +480,30 @@ def _tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> floa
         return 1.0
     normalized_incoming = _normalized_tempo(float(outgoing_bpm), float(incoming_bpm))
     return float(outgoing_bpm) / normalized_incoming
+
+
+def _minimum_beatmatch_ms(outgoing: TrackMixProfile, policy: PlannerPolicy) -> int:
+    bpm = _outro_beat(outgoing)[0] or outgoing.bpm
+    if not bpm:
+        return 0
+    return math.ceil(policy.minimum_beatmatch_beats * 60_000.0 / bpm)
+
+
+def _cue_stability(local: float | None, track: float | None) -> float | None:
+    return local if local is not None else track
+
+
+def _has_beat_reference(
+    profile: TrackMixProfile,
+    reference: tuple[float | None, int | None],
+    local_beat_ms: int | None,
+) -> bool:
+    bpm, beat_ms = reference
+    if not bpm or beat_ms is None:
+        return False
+    if profile.quality is MixProfileQuality.FULL:
+        return True
+    return profile.quality is MixProfileQuality.PARTIAL and local_beat_ms is not None
 
 
 def _cue_tempo_ratio(outgoing: TrackMixProfile, incoming: TrackMixProfile) -> float:

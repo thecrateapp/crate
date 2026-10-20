@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import uuid
@@ -474,24 +475,69 @@ def set_smart_mix_campaign_status(
     *,
     allowed_from: set[str],
 ) -> dict[str, Any] | None:
-    campaign = get_smart_mix_campaign()
-    if not campaign or campaign.get("status") not in allowed_from:
-        return None
-    campaign = {**campaign, "status": status}
-    save_smart_mix_campaign(campaign)
-    return campaign
+    return _update_smart_mix_campaign(
+        "payload_json || jsonb_build_object('status', CAST(:status AS text))",
+        "payload_json->>'status' = ANY(:allowed_from)",
+        {"status": status, "allowed_from": sorted(allowed_from)},
+    )
 
 
-def queue_next_smart_mix_batch(campaign: dict[str, Any]) -> str | None:
+def queue_next_smart_mix_batch(*, batches: int = 0, claimed: int = 0) -> str | None:
     from crate.db.repositories.tasks import create_task_dedup
 
-    sequence = int(campaign.get("sequence") or 0) + 1
-    save_smart_mix_campaign({**campaign, "sequence": sequence})
+    campaign = _update_smart_mix_campaign(
+        """
+        payload_json || jsonb_build_object(
+            'batches', COALESCE((payload_json->>'batches')::int, 0) + CAST(:batches AS int),
+            'claimed', COALESCE((payload_json->>'claimed')::int, 0) + CAST(:claimed AS int),
+            'sequence', COALESCE((payload_json->>'sequence')::int, 0) + 1
+        )
+        """,
+        "payload_json->>'status' = 'running'",
+        {"batches": int(batches), "claimed": int(claimed)},
+    )
+    if campaign is None:
+        return None
     return create_task_dedup(
         BACKFILL_TASK_TYPE,
         {"triggered_by": "smart-mix-campaign"},
-        dedup_key=f"smart-mix:backfill:{campaign.get('target')}:{sequence}",
+        dedup_key=(
+            f"smart-mix:backfill:{campaign.get('target')}:{campaign.get('sequence')}"
+        ),
     )
+
+
+def complete_smart_mix_campaign() -> bool:
+    return (
+        _update_smart_mix_campaign(
+            "payload_json || jsonb_build_object('status', 'completed')",
+            "payload_json->>'status' = 'running'",
+            {},
+        )
+        is not None
+    )
+
+
+def _update_smart_mix_campaign(
+    payload_sql: str, condition_sql: str, params: dict[str, Any]
+) -> dict[str, Any] | None:
+    with optional_scope(None) as session:
+        payload = session.execute(
+            text(
+                f"""
+                UPDATE ops_runtime_state
+                SET payload_json = {payload_sql},
+                    updated_at = NOW()
+                WHERE key = :key
+                  AND {condition_sql}
+                RETURNING payload_json
+                """
+            ),
+            {"key": CAMPAIGN_STATE_KEY, **params},
+        ).scalar_one_or_none()
+    if payload is None:
+        return None
+    return payload if isinstance(payload, dict) else json.loads(payload)
 
 
 def save_smart_mix_campaign(campaign: dict[str, Any]) -> None:
@@ -505,6 +551,7 @@ __all__ = [
     "CAMPAIGN_STATE_KEY",
     "COVERAGE_STATE_KEY",
     "claim_smart_mix_backfill_batch",
+    "complete_smart_mix_campaign",
     "count_smart_mix_in_flight",
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",

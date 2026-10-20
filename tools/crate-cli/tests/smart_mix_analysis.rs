@@ -151,6 +151,112 @@ fn rust_local_tempo_ignores_a_misplaced_hit_near_the_cue() {
     );
 }
 
+fn accented_clicks(beat_times: &[f32], duration_seconds: f32) -> Vec<f32> {
+    let mut samples = vec![0.0_f32; (duration_seconds * SAMPLE_RATE as f32) as usize];
+    let pulse_samples = (0.025 * SAMPLE_RATE as f32) as usize;
+    for (index, time) in beat_times.iter().enumerate() {
+        let amplitude = if index % 4 == 0 { 0.9 } else { 0.35 };
+        let start = (time * SAMPLE_RATE as f32) as usize;
+        for offset in 0..pulse_samples {
+            if let Some(sample) = samples.get_mut(start + offset) {
+                *sample += amplitude * (-7.0 * offset as f32 / pulse_samples as f32).exp();
+            }
+        }
+    }
+    samples
+}
+
+fn sections(parts: &[(f32, f32)]) -> (Vec<f32>, f32) {
+    let mut times = Vec::new();
+    let mut time = 0.0_f32;
+    for (bpm, seconds) in parts {
+        let end = time + seconds;
+        while time < end {
+            times.push(time);
+            time += 60.0 / bpm;
+        }
+    }
+    (times, time)
+}
+
+#[test]
+fn v5_judges_tempo_where_the_mix_happens() {
+    let (times, duration) = sections(&[(120.0, 60.0), (140.0, 60.0)]);
+    let profile = analyze_smart_mix_samples(&accented_clicks(&times, duration), SAMPLE_RATE);
+
+    assert!(
+        profile.tempo_stability.unwrap() < 0.8,
+        "global {:?}",
+        profile.tempo_stability
+    );
+    assert!(profile.intro_tempo_stability.unwrap() >= 0.8);
+    assert!(profile.outro_tempo_stability.unwrap() >= 0.8);
+    let ratio = f64::from(profile.outro_bpm.unwrap()) / f64::from(profile.intro_bpm.unwrap());
+    assert!((ratio - 140.0 / 120.0).abs() < 0.01, "tempo ratio {ratio}");
+    assert_eq!(profile.quality, "full");
+}
+
+#[test]
+fn v5_covers_the_longest_mix_at_fast_tempos() {
+    let (times, duration) = sections(&[(170.0, 78.0), (150.0, 2.5), (170.0, 9.5)]);
+    let profile = analyze_smart_mix_samples(&accented_clicks(&times, duration), SAMPLE_RATE);
+
+    assert!(
+        profile.outro_tempo_stability.unwrap() < 0.8,
+        "a tempo change 9-12 s before the end must be inside the outro window, got {:?}",
+        profile.outro_tempo_stability
+    );
+}
+
+#[test]
+fn v5_keeps_an_irregular_outro_partial() {
+    let mut seed = 0x2545_f491_u32;
+    let mut jitter = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed as f32 / u32::MAX as f32 * 2.0 - 1.0) * 0.060
+    };
+    let (mut times, duration) = sections(&[(120.0, 90.0)]);
+    for time in times.iter_mut().filter(|time| **time > 66.0) {
+        *time += jitter();
+    }
+    let profile = analyze_smart_mix_samples(&accented_clicks(&times, duration), SAMPLE_RATE);
+
+    assert!(profile.intro_tempo_stability.unwrap() >= 0.8);
+    assert!(
+        profile.outro_tempo_stability.unwrap() < 0.8,
+        "outro {:?}",
+        profile.outro_tempo_stability
+    );
+    assert_eq!(profile.quality, "partial");
+}
+
+#[test]
+fn v5_finds_each_cue_downbeat_across_a_dropped_beat() {
+    let (mut times, duration) = sections(&[(120.0, 90.0)]);
+    times.remove(81);
+    let accents: Vec<f64> = times
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| index % 4 == 0)
+        .map(|(_, time)| f64::from(*time) * 1_000.0)
+        .collect();
+    let profile = analyze_smart_mix_samples(&accented_clicks(&times, duration), SAMPLE_RATE);
+
+    for downbeat in [profile.intro_downbeat_ms, profile.outro_downbeat_ms] {
+        let downbeat = downbeat.expect("cue downbeat") as f64;
+        let error = accents
+            .iter()
+            .map(|accent| (downbeat - accent).abs())
+            .fold(f64::INFINITY, f64::min);
+        assert!(
+            error <= 30.0,
+            "downbeat {downbeat} is {error} ms from an accent"
+        );
+    }
+}
+
 fn syncopated_band(bpm: f32, duration_seconds: f32) -> Vec<f32> {
     let mut samples = vec![0.0_f32; (duration_seconds * SAMPLE_RATE as f32) as usize];
     let mut seed = 0x2545_f491_u32;
@@ -274,7 +380,6 @@ fn rust_places_the_downbeat_on_bar_starts_after_a_pickup() {
     let samples = rock_bars(120.0, 12, 1);
 
     let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
-
     let anchor = profile.downbeat_anchor_ms.expect("downbeat");
     let bar_ms = 2_000_i64;
     let offset = (anchor as i64 - 500).rem_euclid(bar_ms);
@@ -322,7 +427,7 @@ fn rust_profile_serializes_the_shared_camel_case_schema() {
     let payload = serde_json::to_value(profile).unwrap();
 
     assert_eq!(payload["schemaVersion"], 1);
-    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v4");
+    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v5");
     assert!(payload.get("measurementVersion").is_some());
     assert!(payload.get("integratedLufs").is_some());
     assert!(payload.get("activeStartMs").is_some());
