@@ -59,6 +59,12 @@ _PAYLOAD = {
 _PROFILE = {"id": 42, "username": "ana", "display_name": "Ana", "avatar": None}
 
 
+def _today_for(user_id):
+    # The viewer (id 1) is far behind the profile owner (id 42): only the
+    # owner's "today" lets the 2026-10 ranges through.
+    return TODAY if user_id == 42 else date(2026, 1, 1)
+
+
 def _me(test_app, qs):
     with (
         patch("crate.api.me.user_stats_today", return_value=TODAY),
@@ -73,12 +79,14 @@ def _user(test_app, qs, profile=_PROFILE):
             "crate.api.social.get_public_user_profile_by_username",
             return_value=profile,
         ),
-        patch("crate.api.social.user_stats_today", return_value=TODAY),
+        patch("crate.api.social.user_stats_today", side_effect=_today_for) as today,
         patch(
             "crate.api.social.get_user_stats_range", return_value=dict(_PAYLOAD)
         ) as q,
     ):
-        return test_app.get(f"/api/users/ana/stats/range?{qs}"), q
+        resp = test_app.get(f"/api/users/ana/stats/range?{qs}")
+    q.today_mock = today
+    return resp, q
 
 
 def _assert_shape(data):
@@ -131,3 +139,22 @@ def test_user_range_404s_for_unknown_username(test_app):
     resp, q = _user(test_app, "start=2026-10-01&end=2026-10-21", profile=None)
     assert resp.status_code == 404
     q.assert_not_called()
+
+
+def test_user_range_uses_the_profile_owners_today(test_app):
+    resp, q = _user(test_app, "start=2026-10-01&end=2026-10-21")
+    assert resp.status_code == 200
+    q.today_mock.assert_called_once_with(42)
+    # Same range is future for the viewer's timezone, so the check must follow
+    # the profile owner and nobody else.
+    assert _today_for(1) < date(2026, 10, 21)
+
+
+def test_user_stats_today_follows_the_listener_timezone():
+    from crate.db.queries import user_library_stats_range as mod
+
+    with patch.object(mod, "user_stats_timezone", return_value="Pacific/Kiritimati"):
+        ahead = mod.user_stats_today(5)
+    with patch.object(mod, "user_stats_timezone", return_value="Pacific/Pago_Pago"):
+        behind = mod.user_stats_today(5)
+    assert ahead > behind
