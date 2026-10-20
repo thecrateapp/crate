@@ -1670,10 +1670,15 @@ only candidate/outcome counts, without actors, source text, URLs or arbitrary me
 
 ### Admin and worker extraction
 
-`Add show` in Shows and Upcoming opens the same capability-gated editor. Manual entry has no
-LLM dependency. Assisted import accepts uploaded/pasted static images, pasted text or one public
-URL. Every candidate is editable in the review table; shared tour corrections affect only selected
-rows. Excluded dates remain pending. Changing any selected content invalidates the preview.
+`Add show` in Shows and Upcoming opens a side panel gated by `curation.shows.write`. «Enter
+manually» is a one-show form; «Add another date» adds rows with explicit selection. «Import from
+flyer, text or link» takes dropped or pasted images, text or one public URL. Methods show their
+cost and model, and AI methods that are off or incompatible link to AI models. Opening the import
+view runs the non-billable worker readiness check at most once per editor per 15 minutes, and
+readiness checks are not listed as recent imports. Every candidate is edited in place; filling a
+field for several shows affects the selected shows, or every unsaved show when none is selected.
+Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming. Excluded dates
+remain pending. Changing any selected content invalidates the preview.
 Results retain canonical links and saved-row locks; a network-uncertain request retries its exact
 key. Owned private drafts can be resumed, including pending/failed jobs and staged image references.
 A stop request is distinct from the worker's actual acknowledgement.
