@@ -1,6 +1,6 @@
-"""Immutable additive AI configuration and bounded usage schema (revision 129, section id v120)."""
+"""Immutable additive AI configuration and bounded usage schema (revision 130, section id v120)."""
 
-# Keep this closed list frozen with revision 129; runtime registry validation is additional.
+# Keep this closed list frozen with revision 130; runtime registry validation is additional.
 ACTIONS_SQL = "'shows.extract.vision','shows.extract.text','shows.extract.ocr_text','artwork.hero.analyze','artists.bio.research','genres.description.generate','genres.taxonomy.propose','genres.eq.propose','playlists.description.generate','music_paths.refine','i18n.listen.draft'"
 
 

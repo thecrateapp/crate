@@ -66,6 +66,14 @@ class MixProfileResponse(SmartMixApiModel):
     intro_beat_ms: int | None = Field(default=None, alias="introBeatMs", ge=0)
     outro_bpm: float | None = Field(default=None, alias="outroBpm", gt=0)
     outro_beat_ms: int | None = Field(default=None, alias="outroBeatMs", ge=0)
+    intro_tempo_stability: float | None = Field(
+        default=None, alias="introTempoStability", ge=0.0, le=1.0
+    )
+    outro_tempo_stability: float | None = Field(
+        default=None, alias="outroTempoStability", ge=0.0, le=1.0
+    )
+    intro_downbeat_ms: int | None = Field(default=None, alias="introDownbeatMs", ge=0)
+    outro_downbeat_ms: int | None = Field(default=None, alias="outroDownbeatMs", ge=0)
     intro_lufs: float | None = Field(default=None, alias="introLufs")
     outro_lufs: float | None = Field(default=None, alias="outroLufs")
     true_peak_dbfs: float | None = Field(default=None, alias="truePeakDbfs")

@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use serde::Serialize;
 
 pub const FORMAT_NAME: &str = "delta-ms-v1";
-pub const ANALYZER_VERSION: &str = "smart-mix-audio-v4";
+pub const ANALYZER_VERSION: &str = "smart-mix-audio-v5";
 pub const FORMAT_VERSION: u8 = 1;
 pub const MAX_BEAT_COUNT: usize = 100_000;
 pub const MAX_GRID_DURATION_MS: u64 = 24 * 60 * 60 * 1_000;
@@ -35,6 +35,10 @@ pub struct SmartMixProfileResult {
     pub intro_beat_ms: Option<u64>,
     pub outro_bpm: Option<f32>,
     pub outro_beat_ms: Option<u64>,
+    pub intro_tempo_stability: Option<f32>,
+    pub outro_tempo_stability: Option<f32>,
+    pub intro_downbeat_ms: Option<u64>,
+    pub outro_downbeat_ms: Option<u64>,
     pub intro_lufs: Option<f32>,
     pub outro_lufs: Option<f32>,
     pub true_peak_dbfs: Option<f32>,
@@ -74,6 +78,10 @@ impl SmartMixProfileResult {
             intro_beat_ms: None,
             outro_bpm: None,
             outro_beat_ms: None,
+            intro_tempo_stability: None,
+            outro_tempo_stability: None,
+            intro_downbeat_ms: None,
+            outro_downbeat_ms: None,
             intro_lufs: None,
             outro_lufs: None,
             true_peak_dbfs: None,

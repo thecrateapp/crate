@@ -4,8 +4,8 @@ from alembic import op
 
 from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
 
-revision = "123"
-down_revision = "122"
+revision = "124"
+down_revision = "123"
 branch_labels = None
 depends_on = None
 
@@ -16,7 +16,7 @@ def upgrade():
 
 def downgrade():
     op.execute("DROP TABLE IF EXISTS admin_repair_preparations")
-    # Preserve historic photo jobs/plans; newer operation records cannot run on 122.
+    # Preserve historic photo jobs/plans; newer operation records cannot run on 123.
     op.execute(
         "DELETE FROM agent_requests WHERE operation IN ('prepare_operation','apply_operation')"
     )

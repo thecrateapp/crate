@@ -104,7 +104,7 @@ actual results and fix actionable findings before continuing.
   delegated OAuth, Admin integration management and exact human plan approval.
 - Phase 4: the shared immutable plan/job engine, reviewed health/repair catalog, metadata,
   enrichment, generation-bound DSP, indexed-album sync, quality snapshots and portable metadata.
-- Phase 5: **40 tools, 24 explicitly provisioned grants**, migration **124**;
+- Phase 5: **40 tools, 24 explicitly provisioned grants**, migration **125**;
   sanitized audit and enumerated metric reads; provenance/ancestry/children/partial-effects in
   `get_job`; exact-context job controls; shared typed schedules/runtime operations and real
   Dramatiq admission/adoption evidence; truthful Admin cancellation/concurrency.
@@ -151,9 +151,9 @@ Keep these invariants:
 - Admin old interval maps remain accepted. Unsupported `min_slots>1` now returns 422 because
   Dramatiq has no minimum-process autoscaling. UI uses configured admission separately from
   observed process capacity.
-- Migrations **118–124 are now published and immutable** (published as 109–115 and renumbered
-  when main's deployed Smart Mix 109–117 merged). New schema work starts at the next
-  actual head. Rollback 124 fences phase-5 tasks before dropping authorization fields.
+- Migrations **119–125 are now published and immutable** (published as 109–115 and renumbered
+  when main's deployed Smart Mix 109–118 merged). New schema work starts at the next
+  actual head. Rollback 125 fences phase-5 tasks before dropping authorization fields.
 - Keep the existing full private plan/result and compact/paginated MCP outputs. Do not expose
   arbitrary task params, audit details, secrets or large provider responses on shared surfaces.
 

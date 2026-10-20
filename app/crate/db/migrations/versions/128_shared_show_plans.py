@@ -7,8 +7,8 @@ from crate.db.schema_sections.show_plans_v118 import (
     PREVIOUS_GRANTS,
 )
 
-revision = "127"
-down_revision = "126"
+revision = "128"
+down_revision = "127"
 branch_labels = None
 depends_on = None
 

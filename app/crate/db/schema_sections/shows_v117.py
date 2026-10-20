@@ -46,7 +46,8 @@ def create_shows_v117_schema(cur):
     WHERE s.id=c.id AND s.identity_key IS NULL""")
     # The 'migration:117' literal below is a frozen provenance identifier already
     # persisted in shows.field_provenance rows; it must not change even though this
-    # DDL now ships as migration 126 (renumbered from 117 in commit 6b13b5a0).
+    # DDL now ships as migration 127 (renumbered from 117 to 126 in commit 6b13b5a0,
+    # then to 127 when main's 118 merged).
     cur.execute("""UPDATE shows s SET field_provenance=(
         SELECT coalesce(jsonb_object_agg(key,jsonb_build_object('provider',coalesce(s.source,'legacy'),
             'actor','migration:117')), '{}'::jsonb)

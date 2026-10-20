@@ -24,13 +24,13 @@ from crate.db.jobs.analysis_storage import (
 )
 from crate.db.jobs.smart_mix_backfill import (
     claim_smart_mix_backfill_batch,
+    complete_smart_mix_campaign,
     count_smart_mix_in_flight,
     get_smart_mix_campaign,
     queue_next_smart_mix_batch,
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
-    save_smart_mix_campaign,
 )
 from crate.db.events import emit_task_event
 from crate.db.repositories.library import (
@@ -1291,7 +1291,7 @@ def _handle_backfill_smart_mix_profiles(
             "claimed": 0,
             "queued": 0,
             "deferred": True,
-            "next_task_id": queue_next_smart_mix_batch(campaign),
+            "next_task_id": queue_next_smart_mix_batch(),
         }
 
     offline_ids = [
@@ -1332,18 +1332,15 @@ def _handle_backfill_smart_mix_profiles(
     refresh_smart_mix_coverage(max_attempts=max_attempts)
 
     if not claimed and in_flight == 0:
-        save_smart_mix_campaign({**campaign, "status": "completed"})
+        complete_smart_mix_campaign()
         return {"claimed": 0, "queued": 0, "completed": True}
-    campaign = {
-        **campaign,
-        "batches": int(campaign.get("batches") or 0) + (1 if claimed else 0),
-        "claimed": int(campaign.get("claimed") or 0) + len(claimed),
-    }
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
-        "next_task_id": queue_next_smart_mix_batch(campaign),
+        "next_task_id": queue_next_smart_mix_batch(
+            batches=1 if claimed else 0, claimed=len(claimed)
+        ),
     }
 
 

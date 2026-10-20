@@ -1,4 +1,4 @@
-"""Revision 123 is additive and has an ordered rollback to the shipped contract."""
+"""Revision 124 is additive and has an ordered rollback to the shipped contract."""
 
 from importlib import import_module
 
@@ -36,7 +36,7 @@ LIBRARY_V114_GRANTS = {
 
 def test_library_migration_and_bootstrap_use_identical_frozen_ddl(monkeypatch):
     migration = import_module(
-        "crate.db.migrations.versions.123_agent_library_operations"
+        "crate.db.migrations.versions.124_agent_library_operations"
     )
     migrated, section, bootstrap = (RecordingExecutor() for _ in range(3))
     monkeypatch.setattr(migration, "op", migrated)
@@ -44,7 +44,7 @@ def test_library_migration_and_bootstrap_use_identical_frozen_ddl(monkeypatch):
     create_agent_library_v114_schema(section)
     create_schema(bootstrap)
 
-    assert (migration.revision, migration.down_revision) == ("123", "122")
+    assert (migration.revision, migration.down_revision) == ("124", "123")
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
     assert any("effect_started_at" in statement for statement in section.statements)
@@ -102,10 +102,10 @@ def test_library_migration_rollback_preserves_legacy_photo_plans_and_removes_new
         },
     )
     migration = import_module(
-        "crate.db.migrations.versions.123_agent_library_operations"
+        "crate.db.migrations.versions.124_agent_library_operations"
     )
     instance_migration = import_module(
-        "crate.db.migrations.versions.124_agent_instance_operations"
+        "crate.db.migrations.versions.125_agent_instance_operations"
     )
 
     with get_engine().connect() as connection:

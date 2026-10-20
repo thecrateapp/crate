@@ -1,4 +1,4 @@
-"""Revision 126 preserves old identities and leaves ambiguous duplicates untouched."""
+"""Revision 127 preserves old identities and leaves ambiguous duplicates untouched."""
 
 from importlib import import_module
 
@@ -37,7 +37,7 @@ def test_show_migration_backfills_aliases_and_only_unique_semantic_keys(pg_db):
 
 
 def test_show_migration_downgrade_keeps_canonical_show_rows(pg_db, monkeypatch):
-    migration = import_module("crate.db.migrations.versions.126_canonical_shows")
+    migration = import_module("crate.db.migrations.versions.127_canonical_shows")
     with transaction_scope() as session:
         session.execute(
             text("""INSERT INTO shows(artist_name,date,created_at,updated_at)
@@ -63,7 +63,7 @@ def test_shared_plan_rollback_removes_internal_proofs_and_restores_previous_gran
 
     user = create_user("migration-editor@example.test", role="curator")
     get_show_editor_principal(user["id"])
-    migration = import_module("crate.db.migrations.versions.127_shared_show_plans")
+    migration = import_module("crate.db.migrations.versions.128_shared_show_plans")
     with transaction_scope() as session:
 
         class Executor:
@@ -91,7 +91,7 @@ def test_private_extraction_migration_can_rollback_without_changing_shows(
     pg_db, monkeypatch
 ):
     migration = import_module(
-        "crate.db.migrations.versions.128_private_show_extraction"
+        "crate.db.migrations.versions.129_private_show_extraction"
     )
     with transaction_scope() as session:
         session.execute(

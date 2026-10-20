@@ -1,4 +1,4 @@
-"""DDL for Alembic revision 118 (section id v109); keep immutable after the revision ships."""
+"""DDL for Alembic revision 119 (section id v109); keep immutable after the revision ships."""
 
 from typing import Any
 

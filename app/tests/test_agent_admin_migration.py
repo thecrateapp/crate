@@ -1,4 +1,4 @@
-"""Revision 122 preserves existing plans and supports real downgrade/upgrade."""
+"""Revision 123 preserves existing plans and supports real downgrade/upgrade."""
 
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -38,7 +38,7 @@ class MigrationRecorder(RecordingExecutor):
 
 
 def test_admin_schema_and_migration_share_bootstrap_ddl(monkeypatch):
-    migration = import_module("crate.db.migrations.versions.122_agent_admin")
+    migration = import_module("crate.db.migrations.versions.123_agent_admin")
     migrated, section, bootstrap = (
         MigrationRecorder(),
         RecordingExecutor(),
@@ -48,7 +48,7 @@ def test_admin_schema_and_migration_share_bootstrap_ddl(monkeypatch):
     migration.upgrade()
     create_agent_admin_v113_schema(section, include_index=False)
     create_schema(bootstrap)
-    assert (migration.revision, migration.down_revision) == ("122", "121")
+    assert (migration.revision, migration.down_revision) == ("123", "122")
     assert migrated.statements[:-1] == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
     assert len(migrated.concurrent_statements) == 1
@@ -66,7 +66,7 @@ def test_admin_migration_real_downgrade_upgrade_preserves_credentials(
     )
     from crate.db.tx import transaction_scope
 
-    migration = import_module("crate.db.migrations.versions.122_agent_admin")
+    migration = import_module("crate.db.migrations.versions.123_agent_admin")
     issued = create_credential(
         "Reader", ["library.health.read"], datetime.now(UTC) + timedelta(days=1)
     )

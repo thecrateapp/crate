@@ -3,8 +3,8 @@
 from alembic import op
 from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
 
-revision = "121"
-down_revision = "120"
+revision = "122"
+down_revision = "121"
 branch_labels = None
 depends_on = None
 

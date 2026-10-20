@@ -61,7 +61,7 @@ Discovery can be followed by a target-specific conflict.
 ## Remote connection and skill
 
 Use the exact HTTPS API `/mcp` endpoint, without a trailing slash or `/sse`. Apply migrations
-through **128** and configure the canonical issuer, TLS proxy and explicit Host/Origin allowlists
+through **129** and configure the canonical issuer, TLS proxy and explicit Host/Origin allowlists
 as described in the connection guide. Do not send human cookies or forward-auth headers to MCP.
 
 For human-delegated access, register the client's exact ID and redirect URIs in Admin. Discover

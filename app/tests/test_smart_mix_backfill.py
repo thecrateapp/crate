@@ -742,7 +742,12 @@ def test_in_flight_counts_only_fresh_claims_of_the_current_target(
 def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
     from crate.worker_handlers import analysis
 
-    calls: dict[str, list] = {"claims": [], "children": [], "saved": [], "next": []}
+    calls: dict[str, list] = {
+        "claims": [],
+        "children": [],
+        "completed": [],
+        "next": [],
+    }
     campaign_values = iter(campaigns)
     current = {"value": None}
 
@@ -776,13 +781,13 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
     )
     monkeypatch.setattr(
         analysis,
-        "save_smart_mix_campaign",
-        lambda campaign: calls["saved"].append(campaign),
+        "complete_smart_mix_campaign",
+        lambda: calls["completed"].append(True) or True,
     )
     monkeypatch.setattr(
         analysis,
         "queue_next_smart_mix_batch",
-        lambda campaign: calls["next"].append(campaign) or "task-next",
+        lambda **kwargs: calls["next"].append(kwargs) or "task-next",
     )
     monkeypatch.setattr(analysis, "_sleep", lambda _seconds: None)
     return analysis, calls
@@ -833,8 +838,7 @@ def test_backfill_handler_claims_free_capacity_and_chains_the_next_batch(
     ]
     assert result["claimed"] == 2
     assert result["next_task_id"] == "task-next"
-    assert calls["next"][0]["batches"] == 2
-    assert calls["next"][0]["claimed"] == 12
+    assert calls["next"] == [{"batches": 1, "claimed": 2}]
 
 
 def test_backfill_handler_promotes_python_profiles_only_with_crate_cli(
@@ -868,7 +872,7 @@ def test_backfill_handler_completes_the_campaign_when_nothing_is_left(
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
     assert result == {"claimed": 0, "queued": 0, "completed": True}
-    assert calls["saved"][-1]["status"] == "completed"
+    assert calls["completed"] == [True]
     assert calls["next"] == []
 
 
@@ -899,6 +903,62 @@ def test_pausing_during_the_wait_stops_before_claiming(monkeypatch) -> None:
     assert result == {"claimed": 0, "queued": 0, "control": "paused"}
     assert calls["claims"] == []
     assert calls["next"] == []
+
+
+def test_a_pause_during_a_batch_survives_the_batch_finishing(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        complete_smart_mix_campaign,
+        get_smart_mix_campaign,
+        queue_next_smart_mix_batch,
+        save_smart_mix_campaign,
+        set_smart_mix_campaign_status,
+    )
+
+    save_smart_mix_campaign(_running_campaign(batches=4, claimed=40, sequence=7))
+    assert set_smart_mix_campaign_status("paused", allowed_from={"running"})
+
+    assert queue_next_smart_mix_batch(batches=1, claimed=25) is None
+    assert complete_smart_mix_campaign() is False
+
+    campaign = get_smart_mix_campaign()
+    assert campaign["status"] == "paused"
+    assert (campaign["batches"], campaign["claimed"], campaign["sequence"]) == (
+        4,
+        40,
+        7,
+    )
+
+
+def test_a_running_campaign_counts_the_batch_and_queues_the_next(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        complete_smart_mix_campaign,
+        get_smart_mix_campaign,
+        queue_next_smart_mix_batch,
+        save_smart_mix_campaign,
+        set_smart_mix_campaign_status,
+    )
+
+    save_smart_mix_campaign(_running_campaign(batches=4, claimed=40, sequence=7))
+
+    task_id = queue_next_smart_mix_batch(batches=1, claimed=25)
+
+    campaign = get_smart_mix_campaign()
+    assert task_id is not None
+    assert (campaign["batches"], campaign["claimed"], campaign["sequence"]) == (
+        5,
+        65,
+        8,
+    )
+    with transaction_scope() as session:
+        dedup_key = session.execute(
+            text("SELECT dedup_key FROM tasks WHERE id = :id"), {"id": task_id}
+        ).scalar_one()
+    assert dedup_key == f"smart-mix:backfill:{ANALYZER_VERSION}:8"
+    assert set_smart_mix_campaign_status("running", allowed_from={"paused"}) is None
+    assert complete_smart_mix_campaign() is True
+    assert get_smart_mix_campaign()["status"] == "completed"
 
 
 def test_campaign_start_resets_counters_for_a_new_target_and_keeps_a_paused_one(

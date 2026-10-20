@@ -116,7 +116,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("128").down_revision == "127"
     assert scripts.get_revision("129").down_revision == "128"
     assert scripts.get_revision("130").down_revision == "129"
-    assert scripts.get_heads() == ["130"]
+    assert scripts.get_revision("131").down_revision == "130"
+    assert scripts.get_heads() == ["131"]
 
 
 def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> None:
@@ -134,19 +135,20 @@ def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> No
         "115": "115_playback_continuation_tokens",
         "116": "116_playback_continuation_descriptor",
         "117": "117_smart_mix_local_tempo",
-        "118": "118_agent_access",
-        "119": "119_agent_diagnostic_reads",
-        "120": "120_agent_commands",
-        "121": "121_mcp_oauth",
-        "122": "122_agent_admin",
-        "123": "123_agent_library_operations",
-        "124": "124_agent_instance_operations",
-        "125": "125_editorial_playlists",
-        "126": "126_canonical_shows",
-        "127": "127_shared_show_plans",
-        "128": "128_private_show_extraction",
-        "129": "129_ai_configuration",
-        "130": "130_ai_default_model",
+        "118": "118_smart_mix_cue_beats",
+        "119": "119_agent_access",
+        "120": "120_agent_diagnostic_reads",
+        "121": "121_agent_commands",
+        "122": "122_mcp_oauth",
+        "123": "123_agent_admin",
+        "124": "124_agent_library_operations",
+        "125": "125_agent_instance_operations",
+        "126": "126_editorial_playlists",
+        "127": "127_canonical_shows",
+        "128": "128_shared_show_plans",
+        "129": "129_private_show_extraction",
+        "130": "130_ai_configuration",
+        "131": "131_ai_default_model",
     }
 
     for revision, stem in expected.items():

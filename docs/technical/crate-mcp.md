@@ -57,7 +57,7 @@ sources:
     app/crate/agent_portability.py,
     app/crate/admin_repairs.py,
     app/crate/db/repositories/agent_operation_jobs.py,
-    app/crate/db/migrations/versions/123_agent_library_operations.py,
+    app/crate/db/migrations/versions/124_agent_library_operations.py,
     app/crate/agent_quality.py,
     app/crate/repair_selection.py,
     app/crate/quality.py,
@@ -109,7 +109,7 @@ producer. Existing migrations must be applied before issuing credentials. Keepin
 disabled leaves the endpoint unavailable and does not start its health snapshot producer.
 Actions additionally require `CRATE_MCP_ACTIONS_ENABLED=true` in the API and maintenance worker.
 Both flags default to false; granting an action scope alone does not enable actions.
-Apply migrations through 128 before using the current catalog. Migration 123 extends the existing
+Apply migrations through 129 before using the current catalog. Migration 124 extends the existing
 plan/job tables and adds private artifacts and DSP generation/claim provenance; it does not create
 a second agent execution engine.
 
@@ -472,7 +472,7 @@ performance. Public TLS/proxy acceptance remains a deployment check before enabl
 ## Phase 2 validation — 2026-10-16
 
 The final combined backend suite passed all 866 cases. Coverage includes real PostgreSQL transactions,
-concurrent acceptance and cancellation, migration 120 downgrade/reupgrade, credential revocation,
+concurrent acceptance and cancellation, migration 121 downgrade/reupgrade, credential revocation,
 expired/stale plans, audit rollback, retained idempotency after task cleanup and Admin photo repair.
 The seven documentation tests, documentation build/integrity and all three Compose configurations
 also pass. Independent specification and code-quality reviews found no outstanding blockers.
@@ -533,7 +533,7 @@ Admin tests cover fresh cookie sessions, scope/domain permissions, one-time secr
 secret-free bounded activity, client registration/scope changes, exact approval hashes, expiry,
 policy conflicts, single reservation and concurrent decisions. UI tests cover complete diffs,
 review reset across plans/versions, conflict reload with the proposal retained and token cleanup
-on dialog dismissal. Schema tests cover bootstrap and ordered downgrade/reupgrade through 122,
+on dialog dismissal. Schema tests cover bootstrap and ordered downgrade/reupgrade through 123,
 including retained credentials and reviewer deletion. OpenAPI exposes these human routes in the
 Admin variant with cookie-only security. All three Compose profiles retain disabled flags and
 pass matching issuer/OAuth settings to the API and action workers.
@@ -624,7 +624,7 @@ where the actor never returned. The legacy directed-photo recovery limitation re
 ## Phase 4 foundation checkpoint — 2026-10-16 (historical)
 
 This is a local review checkpoint within phase 4, not completion of its gate. It adds no broad MCP
-write wrapper and requires no migration after 122. The complete feature plan retains metadata,
+write wrapper and requires no migration after 123. The complete feature plan retains metadata,
 enrichment, analysis, sync, portability and editorial work.
 
 The operation catalog distinguishes actual MCP support from legacy automatic repair labels.
@@ -1393,7 +1393,7 @@ Reproduce the focused benchmark from `app/` with
 ## Phase 5 instance operations — 2026-10-16
 
 Phase 5 adds 12 tools (40 total) and eight explicitly provisioned grants (24 total).
-Migrations through **124** are required. Both MCP flags still default to false; no deployment
+Migrations through **125** are required. Both MCP flags still default to false; no deployment
 or production activation is included.
 
 | Tools                                               | Required grant                         | Contract                                                                                                               |
@@ -1495,7 +1495,7 @@ No complete backend/frontend suite was run for this cut.
 ## Phase 6 editorial playlists — 2026-10-16
 
 Phase 6 uses Admin's `playlists`, `playlist_tracks`, `playlist_track_exclusions`, smart-rule
-engine and blueprints. Migration 125 adds four grants (`editorial.read`, `editorial.prepare`,
+engine and blueprints. Migration 126 adds four grants (`editorial.read`, `editorial.prepare`,
 `editorial.write`, `editorial.publish`), a playlist revision and generation epoch, plus private
 revision-bound Admin refinement proposals. No separate playlist draft table is created. New system
 playlists become visible only in the atomic apply transaction. An agent's system playlist remains
@@ -1616,7 +1616,7 @@ fixtures rather than a connected production agent. Cover upload remains an Admin
 
 Phase 8 extends the existing `shows` table and the shared operation engine. Admin and MCP
 prepare/apply `shows_import`; provider syncs use the same identity repository. Migrations
-117–119 are additive to the published 109–116 history. No library entity is created for an
+127–129 are additive to the published history through 126. No library entity is created for an
 external artist and no `/music` write is performed by an API request.
 
 ### Identity, authority and exact effects

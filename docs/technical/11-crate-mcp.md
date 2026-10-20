@@ -198,7 +198,7 @@ high-risk plan with mandatory human approval.
 
 For remote connections use the exact HTTPS API `/mcp` path, without a trailing
 slash or `/sse`. MCP, actions and OAuth have separate flags, all disabled by
-default. The current implementation requires migrations through 128. Follow
+default. The current implementation requires migrations through 129. Follow
 the connection guide for issuer, TLS proxy, Host/Origin allowlists and worker
 configuration; this chapter does not activate them.
 

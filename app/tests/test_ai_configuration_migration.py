@@ -15,7 +15,7 @@ from tests.test_agent_access_migration import RecordingExecutor, SessionExecutor
 
 
 def test_ai_migration_bootstrap_idempotency_and_roundtrip(pg_db, monkeypatch):
-    migration = import_module("crate.db.migrations.versions.129_ai_configuration")
+    migration = import_module("crate.db.migrations.versions.130_ai_configuration")
     migrated, section, bootstrap = (
         RecordingExecutor(),
         RecordingExecutor(),
@@ -27,7 +27,7 @@ def test_ai_migration_bootstrap_idempotency_and_roundtrip(pg_db, monkeypatch):
     create_schema(bootstrap)
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
-    assert migration.down_revision == "128"
+    assert migration.down_revision == "129"
     joined = "\n".join(bootstrap.statements)
     assert joined.index("CREATE TABLE IF NOT EXISTS credential_secrets") < joined.index(
         "CREATE TABLE IF NOT EXISTS ai_provider_connections"
@@ -69,7 +69,7 @@ def test_ai_migration_bootstrap_idempotency_and_roundtrip(pg_db, monkeypatch):
 
 
 def test_default_model_migration_is_idempotent_and_bootstrapped(pg_db, monkeypatch):
-    migration = import_module("crate.db.migrations.versions.130_ai_default_model")
+    migration = import_module("crate.db.migrations.versions.131_ai_default_model")
     migrated, section, bootstrap = (
         RecordingExecutor(),
         RecordingExecutor(),
@@ -81,7 +81,7 @@ def test_default_model_migration_is_idempotent_and_bootstrapped(pg_db, monkeypat
     create_schema(bootstrap)
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
-    assert migration.down_revision == "129"
+    assert migration.down_revision == "130"
 
     with transaction_scope() as session:
         monkeypatch.setattr(migration, "op", SessionExecutor(session))

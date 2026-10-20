@@ -45,6 +45,39 @@ def test_run_analyze_returns_none_when_binary_lacks_analyze(monkeypatch):
     assert calls == [["/usr/local/bin/crate-cli", "--help"]]
 
 
+def test_run_analyze_runs_at_background_priority(monkeypatch):
+    from crate import crate_cli, resource_governor
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _name: True)
+    monkeypatch.setattr(crate_cli, "_find_panns_model", lambda: None)
+    monkeypatch.setattr(
+        resource_governor.shutil, "which", lambda name: f"/usr/bin/{name}"
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        return SimpleNamespace(returncode=0, stdout='{"bpm": 120}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+
+    assert crate_cli.run_analyze(file="/music/track.flac") == {"bpm": 120}
+    assert calls == [
+        [
+            "nice",
+            "-n",
+            "12",
+            "ionice",
+            "-c3",
+            "/usr/local/bin/crate-cli",
+            "analyze",
+            "--file",
+            "/music/track.flac",
+        ]
+    ]
+
+
 def test_run_quality_uses_quality_subcommand(monkeypatch):
     from crate import crate_cli
 

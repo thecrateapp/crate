@@ -1,4 +1,4 @@
-"""Delegated OAuth identity and single-use authorization state for revision 121 (section id v112)."""
+"""Delegated OAuth identity and single-use authorization state for revision 122 (section id v112)."""
 
 
 def create_mcp_oauth_v112_schema(cur) -> None:

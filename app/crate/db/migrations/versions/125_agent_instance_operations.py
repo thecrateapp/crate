@@ -6,8 +6,8 @@ from crate.db.schema_sections.agent_operations_v115 import (
     create_agent_operations_v115_schema,
 )
 
-revision = "124"
-down_revision = "123"
+revision = "125"
+down_revision = "124"
 branch_labels = None
 depends_on = None
 

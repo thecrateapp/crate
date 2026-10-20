@@ -1,4 +1,4 @@
-"""Revision 124 shares additive frozen DDL with fresh schema bootstrap."""
+"""Revision 125 shares additive frozen DDL with fresh schema bootstrap."""
 
 from importlib import import_module
 import re
@@ -18,7 +18,7 @@ from tests.test_agent_access_migration import RecordingExecutor
 
 def test_instance_migration_and_bootstrap_use_identical_additive_ddl(monkeypatch):
     migration = import_module(
-        "crate.db.migrations.versions.124_agent_instance_operations"
+        "crate.db.migrations.versions.125_agent_instance_operations"
     )
     migrated, section, bootstrap = (RecordingExecutor() for _ in range(3))
     monkeypatch.setattr(migration, "op", migrated)
@@ -26,7 +26,7 @@ def test_instance_migration_and_bootstrap_use_identical_additive_ddl(monkeypatch
     create_agent_operations_v115_schema(section)
     create_schema(bootstrap)
 
-    assert (migration.revision, migration.down_revision) == ("124", "123")
+    assert (migration.revision, migration.down_revision) == ("125", "124")
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
     ddl = " ".join(section.statements)
@@ -104,7 +104,7 @@ def test_instance_rollback_removes_dependents_before_restoring_previous_contract
     monkeypatch,
 ):
     migration = import_module(
-        "crate.db.migrations.versions.124_agent_instance_operations"
+        "crate.db.migrations.versions.125_agent_instance_operations"
     )
     recorded = RecordingExecutor()
     monkeypatch.setattr(migration, "op", recorded)
@@ -175,7 +175,7 @@ def test_instance_real_rollback_preserves_library_work_and_credentials_then_reup
     from crate.db.engine import get_engine
 
     migration = import_module(
-        "crate.db.migrations.versions.124_agent_instance_operations"
+        "crate.db.migrations.versions.125_agent_instance_operations"
     )
     principal_id = "10000000-0000-0000-0000-000000000001"
     credential_id = "20000000-0000-0000-0000-000000000001"

@@ -5,8 +5,8 @@ from crate.db.schema_sections.ai_configuration_v121 import (
     create_ai_default_model_v121_schema,
 )
 
-revision = "130"
-down_revision = "129"
+revision = "131"
+down_revision = "130"
 branch_labels = None
 depends_on = None
 

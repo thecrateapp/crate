@@ -4,8 +4,8 @@ from alembic import op
 
 from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
 
-revision = "126"
-down_revision = "125"
+revision = "127"
+down_revision = "126"
 branch_labels = None
 depends_on = None
 

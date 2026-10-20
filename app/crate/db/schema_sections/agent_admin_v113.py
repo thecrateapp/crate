@@ -1,4 +1,4 @@
-"""Human policy and exact plan approval metadata for revision 122 (section id v113)."""
+"""Human policy and exact plan approval metadata for revision 123 (section id v113)."""
 
 
 def create_agent_admin_v113_schema(cur, *, include_index=True):

@@ -6,8 +6,8 @@ from crate.db.schema_sections.show_extraction_v119 import (
     PREVIOUS_OPERATIONS,
 )
 
-revision = "128"
-down_revision = "127"
+revision = "129"
+down_revision = "128"
 branch_labels = None
 depends_on = None
 

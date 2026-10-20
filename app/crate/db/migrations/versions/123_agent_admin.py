@@ -3,8 +3,8 @@
 from alembic import op
 from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
 
-revision = "122"
-down_revision = "121"
+revision = "123"
+down_revision = "122"
 branch_labels = None
 depends_on = None
 
