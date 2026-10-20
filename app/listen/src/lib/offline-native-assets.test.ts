@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const decodeImageMock = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/offline-artwork-image", () => ({
+  validateOfflineArtworkImage: decodeImageMock,
+}));
+
 const {
   apiMock,
   statMock,
@@ -65,6 +70,7 @@ vi.mock("@/lib/offline-native", () => ({
 import {
   assertNativeTrackIntegrity,
   cacheNativeTrackAsset,
+  cacheNativeArtworkAsset,
   estimateNativeOfflineBytes,
   getNativeOfflineAssetsNeedingRefresh,
   hasCachedNativeTrackAssets,
@@ -366,4 +372,55 @@ describe("assertNativeTrackIntegrity", () => {
     });
     expect(updateAssetIndexMock).not.toHaveBeenCalled();
   });
+});
+
+it("stores artwork through the native staged pipeline without Android audio delivery resolution", async () => {
+  vi.clearAllMocks();
+  const index: Record<string, unknown> = {};
+  ensureAssetIndexMock.mockImplementation(async () => index);
+  updateAssetIndexMock.mockImplementation(async (_profile, mutate) =>
+    Object.assign(index, await mutate(index)),
+  );
+  statMock.mockResolvedValue({ size: 100, uri: "file:///cover.webp" });
+  downloadFileMock.mockResolvedValue({});
+  renameFileMock.mockResolvedValue(undefined);
+  await cacheNativeArtworkAsset("profile", {
+    key: "artwork:album:7",
+    path: "/api/albums/7/cover",
+  });
+  expect(apiMock).not.toHaveBeenCalled();
+  expect(downloadFileMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      url: "https://api.example.test/api/albums/7/cover?size=640&format=webp",
+    }),
+  );
+  expect(index["artwork:album:7"]).toMatchObject({
+    state: "ready",
+    deliveryPolicy: "artwork",
+    playbackUrl: "capacitor://file:///cover.webp",
+  });
+});
+
+it("rejects a native HTML/corrupt image before publishing it and permits a later healthy retry", async () => {
+  vi.clearAllMocks();
+  const index: Record<string, unknown> = {};
+  ensureAssetIndexMock.mockImplementation(async () => index);
+  updateAssetIndexMock.mockImplementation(async (_profile, mutate) =>
+    Object.assign(index, await mutate(index)),
+  );
+  statMock.mockResolvedValue({ size: 100, uri: "file:///cover.webp" });
+  decodeImageMock.mockRejectedValueOnce(new Error("Not a decodable image"));
+  await expect(
+    cacheNativeArtworkAsset("profile", {
+      key: "artwork:album:7",
+      path: "/api/albums/7/cover",
+    }),
+  ).rejects.toThrow("Not a decodable image");
+  expect(index["artwork:album:7"]).toBeUndefined();
+  expect(deleteFileMock).toHaveBeenCalled();
+  await cacheNativeArtworkAsset("profile", {
+    key: "artwork:album:7",
+    path: "/api/albums/7/cover",
+  });
+  expect(index["artwork:album:7"]).toMatchObject({ state: "ready" });
 });

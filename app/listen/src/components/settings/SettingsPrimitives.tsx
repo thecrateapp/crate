@@ -81,13 +81,16 @@ export function Section({
   title,
   description,
   children,
+  ruled = true,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  ruled?: boolean;
 }) {
   return (
     <InstrumentPanel
+      ruled={ruled}
       as="section"
       headingLevel={2}
       label={{ children: title, tone: "accent" }}

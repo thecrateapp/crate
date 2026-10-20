@@ -112,7 +112,41 @@ for (const host of ["storybook", "standalone"] as const)
         "text-transform",
         "uppercase",
       );
-      const tile = bandcamp.locator('[data-slot="entity-card"]').first();
+      const purchases = bandcamp.getByRole("region", {
+        name: "Owned purchases",
+        exact: true,
+      });
+      const radar = bandcamp.getByRole("region", {
+        name: "Bandcamp Radar",
+        exact: true,
+      });
+      expect(
+        await bandcamp
+          .getByRole("region")
+          .evaluateAll((nodes) =>
+            nodes.map((node) => node.getAttribute("aria-label")),
+          ),
+      ).toEqual(["Owned purchases", "Bandcamp Radar", "Wishlist"]);
+      await expect(purchases.locator('[data-slot="entity-card"]')).toHaveCount(
+        4,
+      );
+      await expect(purchases.locator('[data-slot="entity-row"]')).toHaveCount(
+        0,
+      );
+      await expect(radar.locator('[data-slot="entity-row"]')).toHaveCount(4);
+      await expect(radar.locator('[data-slot="entity-card"]')).toHaveCount(0);
+      const radarOpen = radar.getByRole("button", {
+        name: "Open on Bandcamp: Night Music",
+        exact: true,
+      });
+      await radarOpen.click();
+      await expect(page.getByLabel("Bandcamp fixture event")).toHaveText(
+        "Open on Bandcamp requested locally",
+      );
+      await expect(radar.getByRole("button", { name: /^Import:/ })).toHaveCount(
+        0,
+      );
+      const tile = purchases.locator('[data-slot="entity-card"]').first();
       expect(
         await tile.evaluate((root) =>
           Math.abs(

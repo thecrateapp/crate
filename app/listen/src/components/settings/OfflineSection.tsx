@@ -1,15 +1,19 @@
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 import { useOffline } from "@/contexts/OfflineContext";
 import { formatBytes } from "@/lib/utils";
 import { usesNativeFilesystem } from "@/lib/platform";
+import { OfflineDownloadsView } from "./OfflineDownloadsView";
 import { OfflineSettingsView } from "./OfflineSettingsView";
 
-export function OfflineSection() {
+export function OfflineSection({ ruled }: { ruled?: boolean } = {}) {
   const { t } = useTranslation();
   const {
     supported: offlineSupported,
+    readOnly,
+    items,
     syncing: offlineSyncing,
     summary: offlineSummary,
     syncAll,
@@ -39,7 +43,23 @@ export function OfflineSection() {
 
   return (
     <OfflineSettingsView
+      ruled={ruled}
       supported={offlineSupported}
+      readOnly={readOnly}
+      downloads={
+        <OfflineDownloadsView
+          items={items}
+          renderImage={(image) => (
+            <ArtworkSurface
+              source={image.src}
+              alt={image.alt}
+              className={image.className}
+              fallback={image.fallback}
+              imageProps={{ onError: image.onError }}
+            />
+          )}
+        />
+      }
       syncing={offlineSyncing}
       summary={offlineSummary}
       storageQuota={storageQuota}

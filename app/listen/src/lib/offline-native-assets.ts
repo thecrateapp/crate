@@ -1,3 +1,4 @@
+import { validateOfflineArtworkImage } from "./offline-artwork-image";
 import { Capacitor } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 
@@ -28,6 +29,11 @@ import {
   updateOfflineNativeAssetIndex,
 } from "./offline-storage";
 import type { OfflineTrackIdentityInput } from "./offline-track-identity";
+
+import {
+  offlineArtworkRequestPath,
+  type OfflineArtworkRef,
+} from "./offline-artwork-identity";
 
 const ANDROID_OFFLINE_DELIVERY_POLICY = "balanced";
 const FILESYSTEM_NOT_FOUND_CODE = "OS-PLUG-FILE-0008";
@@ -348,10 +354,39 @@ async function resolveNativeOfflineDownloadTarget(
   };
 }
 
-export async function cacheNativeTrackAsset(
+export function cacheNativeTrackAsset(
   profileKey: string,
   track: OfflineManifestTrack,
   signal?: AbortSignal,
+): Promise<void> {
+  return cacheNativeAsset(profileKey, track, signal, false);
+}
+
+export function cacheNativeArtworkAsset(
+  profileKey: string,
+  ref: OfflineArtworkRef,
+  signal?: AbortSignal,
+): Promise<void> {
+  return cacheNativeAsset(
+    profileKey,
+    {
+      entity_uid: ref.key,
+      title: ref.key,
+      artist: "",
+      format: "webp",
+      stream_url: offlineArtworkRequestPath(ref),
+      download_url: offlineArtworkRequestPath(ref),
+    },
+    signal,
+    true,
+  );
+}
+
+async function cacheNativeAsset(
+  profileKey: string,
+  track: OfflineManifestTrack,
+  signal: AbortSignal | undefined,
+  artwork: boolean,
 ): Promise<void> {
   if (!isOfflineNativeRuntime) return;
   throwIfOfflineTransferAborted(signal);
@@ -368,12 +403,20 @@ export async function cacheNativeTrackAsset(
   } else if (
     existing?.path &&
     existing.originFingerprint === offlineSourceFingerprint(track) &&
-    existing.deliveryPolicy === requestedDeliveryPolicy()
+    existing.deliveryPolicy ===
+      (artwork ? "artwork" : requestedDeliveryPolicy())
   ) {
     return;
   }
 
-  const downloadTarget = await resolveNativeOfflineDownloadTarget(track);
+  const downloadTarget = artwork
+    ? {
+        streamUrl: track.stream_url,
+        extension: "webp",
+        expectedBytes: null,
+        effectivePolicy: "artwork",
+      }
+    : await resolveNativeOfflineDownloadTarget(track);
   throwIfOfflineTransferAborted(signal);
   const dirPath = `offline-media/${profileKey}`;
   const version = nextOfflineAssetVersion();
@@ -421,6 +464,13 @@ export async function cacheNativeTrackAsset(
       downloadTarget.expectedBytes,
     );
     throwIfOfflineTransferAborted(signal);
+    if (artwork && staged.size > 2 * 1024 * 1024)
+      throw new Error("Offline artwork is too large");
+    if (artwork)
+      await validateOfflineArtworkImage(
+        Capacitor.convertFileSrc(staged.uri),
+        signal,
+      );
     if (isIosNative) await excludeNativeOfflineAssetFromBackup(stagePath);
     throwIfOfflineTransferAborted(signal);
 

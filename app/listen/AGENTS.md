@@ -219,8 +219,9 @@ ShareSheetView composes AppModal/EntityRow/MediaCover with actual MonoLabel acti
 ShareSheet retains native/canvas/font/capability/cancellation/storage authority; busy sharing
 blocks dismissal and duplicate actions. BandcampPageView uses the actual EntityCard for tiles: upper-left artwork menu, full-width
 identity and canonical album spacing without a bordered row beneath the cover. Import/Open live
-in that menu; tapping the card opens Bandcamp through the app adapter. Collection rows reuse
-EntityRow with56px managed artwork and direct actions. Original guards/FLAC payloads and menus remain. Failed uncached reads offer retry; cached content remains usable.
+in that menu; tapping the card opens Bandcamp through the app adapter. Purchases lead the larger region as an EntityCard grid; Radar follows as EntityRow items with56px
+managed artwork and direct actions, including Open on Bandcamp. Keep import permission guards.
+The same order applies on narrow screens; Wishlist retains its grid. Original guards/FLAC payloads and menus remain. Failed uncached reads offer retry; cached content remains usable.
 
 UploadView owns the real drop target: decorative CrateLogo, centered canonical picker Button,
 hidden native Input, grouped8px caption spacing and format hint. Dropping stages files only;
@@ -256,3 +257,37 @@ Upload receipts/toasts and withdrawal notices use end-user copy without task IDs
 show file counts; withdrawal identifies the album and does not claim the background operation
 has already completed. Failed withdrawal keeps its confirmation open with a friendly error.
 All seven catalogs cover the messages; internal task IDs remain in response types only.
+
+## Offline surfaces — 1BD
+
+OfflineLibraryView preserves verified-only playback and the small clock leaves. Saved duration
+and quality reach the actual TrackRowContent/QualityBadge; missing fields stay empty, names
+retain case, and media fallbacks remain48px. Offline cover sidecars are stored once per album/manifest cover in the same profile as audio;
+CrateImage resolves local artwork before remote/responsive sources, and queue records retain
+canonical paths rather than object URLs. Original audio is not rewritten. Old downloads backfill
+on online sync/resume; unavailable artwork keeps the fallback without invalidating audio.
+OfflineSection owns context, quota and sync/clear authority. OfflineDownloadsView shows existing
+snapshot states through localized StatusDot, actual EntityRow/MonoLabel and count-based
+ProgressHairline. Unknown totals remain indeterminate; Total size means the manifest size, not
+bytes transferred. Unsupported/readOnly/busy/empty gates disable management. No fictitious
+per-item cancel/retry actions or raw filesystem errors. English Listen/Offline and Reviews/1BD/
+Offline reuse the exact scene as review-1bd-offline.html; no scene API/audio/storage writes.
+
+Offline artwork uses the existing Cache Storage on web and staged/verified native asset pipeline
+under offline-media (including iOS backup exclusion and Tauri identity-scoped cancellation).
+Images are640px and bounded to2MiB; both web and native decode the staged image before publication.
+Reject invalid/HTML payloads; evict an already persisted corrupt image so a later sync can repair it.
+Artwork notifications target only their profile/asset; no-op pruning and unrelated cover writes
+must not revoke mounted leases. Profile changes/clear invalidate leases; unmount revokes object URLs. Shared covers
+survive until the last offline reference is removed. Settings/library pure views receive the
+actual managed renderer from their adapter; review fixtures use local deterministic images.
+
+### Settings leading rule amendment —1BD
+
+Settings Section forwards InstrumentPanel's existing optional `ruled` prop (default true).
+Settings composes its first visible section with `ruled={false}` under each tab; internal
+section dividers remain. When Connect is release-gated off, OpenSubsonic becomes the unruled
+first section. Do not hide these rules with CSS selectors or change InstrumentPanel's default.
+The Storybook/standalone Settings scene uses the same props and preserves separators inside
+Account and Connections. Browser checks measure the border in all five tabs and both Connect
+feature states at375/1200px.

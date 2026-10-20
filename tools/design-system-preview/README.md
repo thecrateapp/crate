@@ -668,3 +668,35 @@ Upload receipts/toasts and withdrawal notices use end-user copy without task IDs
 show file counts; withdrawal identifies the album and does not claim the background operation
 has already completed. Failed withdrawal keeps its confirmation open with a friendly error.
 All seven catalogs cover the messages; internal task IDs remain in response types only.
+
+## Offline surfaces — 1BD
+
+OfflineLibraryView preserves verified-only playback and the small clock leaves. Saved duration
+and quality reach the actual TrackRowContent/QualityBadge; missing fields stay empty, names
+retain case, and media fallbacks remain48px. Offline cover sidecars share the audio profile cache and native asset index. Canonical cover
+paths survive reload; CrateImage resolves local leases before remote responsive sources.
+Embedding images into the original audio remains a separate export contract.
+OfflineSection owns context, quota and sync/clear authority. OfflineDownloadsView shows existing
+snapshot states through localized StatusDot, actual EntityRow/MonoLabel and count-based
+ProgressHairline. Unknown totals remain indeterminate; Total size means the manifest size, not
+bytes transferred. Unsupported/readOnly/busy/empty gates disable management. No fictitious
+per-item cancel/retry actions or raw filesystem errors. English Listen/Offline and Reviews/1BD/
+Offline reuse the exact scene as review-1bd-offline.html; no scene API/audio/storage writes.
+
+Offline artwork amendment: the same1BD scene now includes real MediaCover images and missing-art
+fallbacks. Runtime tests separately verify profile-scoped persistence, reload and CrateImage with
+network disabled; the review scene itself still performs no API/storage/audio operations.
+Artwork is decoded before publication on web/native; persisted corruption is evicted for repair
+on the next sync. Notifications invalidate only the affected profile/asset, not unrelated leases.
+Meter readings stay on one line. Its own container query stacks the caption below20rem so
+localized captions, rails and readings remain aligned at narrow widths, without caller CSS fixes.
+
+### Settings leading rule amendment —1BD
+
+Settings Section forwards InstrumentPanel's existing optional `ruled` prop (default true).
+Settings composes its first visible section with `ruled={false}` under each tab; internal
+section dividers remain. When Connect is release-gated off, OpenSubsonic becomes the unruled
+first section. Do not hide these rules with CSS selectors or change InstrumentPanel's default.
+The Storybook/standalone Settings scene uses the same props and preserves separators inside
+Account and Connections. Browser checks measure the border in all five tabs and both Connect
+feature states at375/1200px.

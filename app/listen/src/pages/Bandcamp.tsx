@@ -106,7 +106,7 @@ export function Bandcamp() {
         radar: radar.data?.total ?? 0,
       }}
       radar={
-        <ItemGrid
+        <ItemList
           items={radarItems}
           busyAction={busyAction}
           onImport={importItem}
@@ -114,7 +114,7 @@ export function Bandcamp() {
         />
       }
       owned={
-        <ItemList
+        <ItemGrid
           items={recentOwned}
           busyAction={busyAction}
           onImport={importItem}

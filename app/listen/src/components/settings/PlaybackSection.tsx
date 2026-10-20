@@ -24,7 +24,7 @@ import {
   PlaybackSettingsView,
   type PlaybackSettingsValue,
 } from "./PlaybackSettingsView";
-export function PlaybackSection() {
+export function PlaybackSection({ ruled }: { ruled?: boolean } = {}) {
   const mobilePlaybackRuntime = isMobilePlaybackRuntime();
   const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
   const [value, setValue] = useState<PlaybackSettingsValue>(() => ({
@@ -60,6 +60,7 @@ export function PlaybackSection() {
   };
   return (
     <PlaybackSettingsView
+      ruled={ruled}
       value={value}
       onChange={change}
       mobilePlaybackRuntime={mobilePlaybackRuntime}

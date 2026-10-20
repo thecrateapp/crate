@@ -1,3 +1,4 @@
+import { offlineTrackArtworkPath } from "@/lib/offline-artwork-identity";
 import type { Track } from "@/contexts/player-types";
 import type { OfflineItemRecord, OfflineManifestTrack } from "@/lib/offline";
 import { getOfflineTrackAssetKey } from "@/lib/offline";
@@ -28,6 +29,7 @@ export function toOfflinePlayerTrack(track: OfflineManifestTrack): Track {
     artistSlug: track.artist_slug || undefined,
     album: track.album || undefined,
     albumId: track.album_id ?? undefined,
+    albumCover: offlineTrackArtworkPath(track),
     albumSlug: track.album_slug || undefined,
     duration: track.duration ?? undefined,
     format: track.format || undefined,

@@ -184,6 +184,7 @@ function Scene() {
           preferences: (
             <>
               <InterfacePreferencesControls
+                ruled={false}
                 preferences={preferences}
                 onChange={(patch) => {
                   setPreferences((current) => ({ ...current, ...patch }));
@@ -218,6 +219,7 @@ function Scene() {
           playback: (
             <>
               <PlaybackSettingsView
+                ruled={false}
                 value={playback}
                 mobilePlaybackRuntime={runtime !== "desktop"}
                 androidNativePlayerEnabled={runtime === "android"}
@@ -254,6 +256,7 @@ function Scene() {
           account: (
             <>
               <AccountSettingsView
+                ruled={false}
                 profile={
                   <AccountProfileForm
                     name={
@@ -336,6 +339,7 @@ function Scene() {
             <>
               {feature ? (
                 <ConnectDevicesView
+                  ruled={false}
                   devices={
                     ["ready", "cached error"].includes(read)
                       ? devices.map((device) => ({
@@ -367,6 +371,7 @@ function Scene() {
                 </MonoLabel>
               )}
               <SettingsConnectionsFixture
+                ruled={feature}
                 busy={pending}
                 long={long}
                 onEvent={setEvent}
@@ -378,6 +383,7 @@ function Scene() {
           ),
           offline: (
             <OfflineSettingsView
+              ruled={false}
               supported
               syncing={false}
               summary={{

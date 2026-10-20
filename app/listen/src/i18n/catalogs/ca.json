@@ -1968,5 +1968,20 @@
   "settings.openSubsonic.keyValue": "Clau generada",
   "settings.bandcamp.countsError": "Els totals de la col·lecció no estan disponibles. El teu compte continua connectat.",
   "settings.scrobbling.toasts.cancelFailed": "No s’ha pogut cancel·lar la connexió. Torna-ho a provar.",
-  "album.remoteImport.downloadingUnknown": "S’està baixant…"
+  "album.remoteImport.downloadingUnknown": "S’està baixant…",
+  "settings.offline.downloadsTitle": "Baixades en aquest dispositiu",
+  "settings.offline.downloadsEmpty": "Aquí apareixerà la música desada per escoltar sense connexió.",
+  "settings.offline.trackProgress": "{ready} / {total} pistes disponibles",
+  "settings.offline.readOnly": "Torna a iniciar sessió per gestionar les baixades.",
+  "settings.offline.totalSize": "Mida total {size}",
+  "settings.offline.kind.album": "Àlbum",
+  "settings.offline.kind.track": "Pista",
+  "settings.offline.kind.playlist": "Llista",
+  "settings.offline.kind.crate": "Col·lecció Crate",
+  "settings.offline.state.idle": "Sense baixar",
+  "settings.offline.state.queued": "Esperant la baixada",
+  "settings.offline.state.downloading": "Baixant",
+  "settings.offline.state.syncing": "Actualitzant la música desada",
+  "settings.offline.state.ready": "Disponible sense connexió",
+  "settings.offline.state.error": "Necessita atenció"
 }

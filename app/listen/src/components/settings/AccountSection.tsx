@@ -26,7 +26,7 @@ interface AuthPublicConfig {
   invite_only?: boolean;
 }
 
-export function AccountSection() {
+export function AccountSection({ ruled }: { ruled?: boolean } = {}) {
   const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const [name, setName] = useState(user?.name || "");
@@ -241,6 +241,7 @@ export function AccountSection() {
 
   return (
     <AccountSettingsView
+      ruled={ruled}
       profile={
         <AccountProfileForm
           name={name}

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
@@ -65,5 +65,60 @@ describe("Bandcamp", () => {
         "No conectado. Abre Ajustes para conectar Bandcamp primero.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("leads with purchase album cards and keeps Radar rows actionable", () => {
+    const purchase = {
+      id: 10,
+      album_title: "Purchased Album",
+      artist_name: "Purchase Artist",
+      item_url: "https://example.bandcamp.com/album/purchased",
+      owned: true,
+      downloadable: true,
+    };
+    const radar = {
+      id: 11,
+      album_title: "Radar Album",
+      artist_name: "Radar Artist",
+      item_url: "https://example.bandcamp.com/album/radar",
+      owned: false,
+    };
+    for (const data of [
+      { connected: true, status: "connected" },
+      { items: [purchase], total: 1 },
+      { items: [], total: 0 },
+      { items: [radar], total: 1 },
+    ]) {
+      vi.mocked(useApi).mockReturnValueOnce({
+        data,
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      } as ReturnType<typeof useApi>);
+    }
+    renderWithListenProviders(<Bandcamp />, { locale: "en" });
+    const purchases = screen.getByRole("region", { name: "Owned purchases" });
+    const suggestions = screen.getByRole("region", { name: "Bandcamp Radar" });
+    expect(
+      purchases.compareDocumentPosition(suggestions) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(purchases.querySelector('[data-slot="entity-card"]')).not.toBeNull();
+    expect(purchases.querySelector('[data-slot="entity-row"]')).toBeNull();
+    expect(
+      within(purchases).getByRole("button", { name: "More actions" }),
+    ).toBeVisible();
+    expect(
+      suggestions.querySelector('[data-slot="entity-row"]'),
+    ).not.toBeNull();
+    expect(suggestions.querySelector('[data-slot="entity-card"]')).toBeNull();
+    expect(
+      within(suggestions).getByRole("button", {
+        name: "Open on Bandcamp: Radar Album",
+      }),
+    ).toBeVisible();
+    expect(
+      within(suggestions).queryByRole("button", { name: /Import:/ }),
+    ).toBeNull();
   });
 });

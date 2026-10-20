@@ -14,6 +14,7 @@ export interface ConnectDeviceViewItem {
   active: boolean;
 }
 export function ConnectDevicesView({
+  ruled,
   devices,
   loading,
   error,
@@ -24,6 +25,7 @@ export function ConnectDevicesView({
   onRetry,
   onRevoke,
 }: {
+  ruled?: boolean;
   devices: ConnectDeviceViewItem[];
   loading: boolean;
   error: boolean;
@@ -37,6 +39,7 @@ export function ConnectDevicesView({
   const { t } = useTranslation();
   return (
     <Section
+      ruled={ruled}
       title={t("settings.connectDevices.title")}
       description={t("settings.connectDevices.description")}
     >

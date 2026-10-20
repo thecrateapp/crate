@@ -2788,11 +2788,32 @@ button.genre-pill:hover,
 }
 
 .crate-meter {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 5ch;
-  align-items: center;
-  gap: 1rem;
+  container-type: inline-size;
+  container-name: crate-meter;
   min-width: 0;
+}
+
+.crate-meter-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  min-width: 0;
+}
+
+.crate-meter-layout > :first-child {
+  grid-column: 1 / -1;
+}
+
+@container crate-meter (min-width: 20rem) {
+  .crate-meter-layout {
+    grid-template-columns: auto minmax(4rem, 1fr) max-content;
+    gap: 1rem;
+  }
+
+  .crate-meter-layout > :first-child {
+    grid-column: auto;
+  }
 }
 
 .crate-toaster[data-sonner-toaster] {
@@ -2955,13 +2976,15 @@ button.genre-pill:hover,
   vertical-align: baseline;
 }
 
-.crate-meter > :first-child {
+.crate-meter-layout > :first-child {
   max-width: 24ch;
   overflow-wrap: anywhere;
 }
 
 .crate-meter-value {
-  overflow-wrap: anywhere;
+  min-width: 5ch;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .crate-meter-fill {

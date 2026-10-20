@@ -78,12 +78,12 @@ function isVisibleDevice(
   return seenAt !== null && Date.now() - seenAt <= RECENT_DEVICE_WINDOW_MS;
 }
 
-export function ConnectDevicesSection() {
+export function ConnectDevicesSection({ ruled }: { ruled?: boolean } = {}) {
   if (!CRATE_CONNECT_FEATURE_ENABLED) return null;
-  return <ConnectDevicesSectionContent />;
+  return <ConnectDevicesSectionContent ruled={ruled} />;
 }
 
-function ConnectDevicesSectionContent() {
+function ConnectDevicesSectionContent({ ruled }: { ruled?: boolean }) {
   const panelActive = useSettingsPanelActive();
   const { t } = useTranslation();
   const currentDeviceId = useMemo(() => getListenDeviceId(), []);
@@ -185,6 +185,7 @@ function ConnectDevicesSectionContent() {
   return (
     <>
       <ConnectDevicesView
+        ruled={ruled}
         devices={devices.map((device) => ({
           id: device.device_id,
           label: deviceLabel(device),

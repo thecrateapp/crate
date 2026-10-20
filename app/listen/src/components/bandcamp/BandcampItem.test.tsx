@@ -77,3 +77,29 @@ it("uses the shared row and managed MediaCover while preserving import and conte
   fireEvent.click(await screen.findByRole("menuitem", { name: "Import" }));
   expect(onImport).toHaveBeenCalledTimes(2);
 });
+
+it("opens a Radar album on Bandcamp from its row without offering an unowned import", () => {
+  const onImport = vi.fn();
+  const item = {
+    id: 9,
+    album_title: "Radar Album",
+    item_url: "https://example.bandcamp.com/album/radar",
+    owned: false,
+  };
+  renderWithListenProviders(
+    <BandcampItem
+      item={item}
+      variant="row"
+      busyAction={null}
+      onImport={onImport}
+    />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Open on Bandcamp: Radar Album" }),
+  );
+  expect(openExternal).toHaveBeenCalledExactlyOnceWith(item.item_url);
+  expect(
+    screen.queryByRole("button", { name: /Import:/ }),
+  ).not.toBeInTheDocument();
+  expect(onImport).not.toHaveBeenCalled();
+});

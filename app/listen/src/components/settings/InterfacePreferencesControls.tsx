@@ -12,10 +12,12 @@ interface PreferenceLabels {
 }
 
 export function InterfacePreferencesControls({
+  ruled,
   preferences,
   onChange,
   labels,
 }: {
+  ruled?: boolean;
   preferences: UiPreferences;
   onChange: (patch: PreferencePatch) => void;
   labels: PreferenceLabels;
@@ -35,7 +37,11 @@ export function InterfacePreferencesControls({
   ] as const;
 
   return (
-    <Section title={labels.title} description={labels.description}>
+    <Section
+      ruled={ruled}
+      title={labels.title}
+      description={labels.description}
+    >
       <div className="grid min-w-0 gap-5 @md:grid-cols-2 @2xl:grid-cols-3">
         {fields.map((field) => (
           <SelectRow

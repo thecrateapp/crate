@@ -558,3 +558,77 @@ Diego aprueba Compartir/importaciones y todas sus enmiendas (Contributions en gr
 de origen) y autoriza commit/push. Siguiente lote anunciado:1BD Offline, biblioteca sin conexión,
 gestión de descargas/almacenamiento y estados de disponibilidad. Se conservan los protocolos y
 gates de plataforma, Storybook/preview pequeño con vistas reales y parada antes del nuevo commit.
+
+Compartir/importaciones publicado en515bbb3b. Siguiente corte1BD Offline en revisión local:
+OfflineLibraryView conserva pistas verificadas y hojas de reloj, añade duración/calidad propias
+de pista a TrackRowContent y mantiene fallback48px sin fuentes de portada local inventadas.
+OfflineSection conserva cuota/almacenamiento y callbacks; OfflineDownloadsView presenta estados,
+recuentos y tamaño total del manifiesto con primitivas reales, sin progreso ficticio de bytes
+ni cancel/retry individuales que el contexto no expone. MonoLabel técnico, identidad con case
+original y gates readOnly/unsupported/busy/empty. Storybook en inglés y review-1bd-offline.html
+usan las mismas vistas reales. La incrustación/extracción de portada y QA nativa siguen aparte.
+Este nuevo corte se detiene sin commit hasta revisión de Diego; tres instancias activas.
+
+Validación final de Offline:81tests Listen/12archivos,54Desktop/9 y4casos browser en ambos
+hosts a375/1200px verdes; tipos, lint, siete catálogos y tres builds correctos. Bundle inicial
+203156/307200bytes gzip, avisos existentes de chunks grandes conservados. Una revisión fresca
+halló que el cero provisional de tamaño podía mostrarse como0B: se elevó a importante por
+confundir dato desconocido con confirmado y se resolvió en una pasada2RED→GREEN, manteniendo
+el cero verdadero de un manifiesto recibido. Sin hallazgos diferidos ni segunda revisión.
+Captura1bd-offline-review.png; tres servicios activos, HEAD/origin515bbb3b e índice vacío.
+Se detiene para revisión de Diego sin commit/push del nuevo corte. Sin QA nativa real ni
+cambios de caché/extracción de portada o mutaciones en producción.
+
+Diego amplía1BD Offline: incluir las portadas en la descarga y mostrarlas sin conexión. Se añaden
+sidecars640px por álbum y portada de manifiesto, compartidos por pista y aislados por perfil.
+Web conserva imágenes en su Cache Storage; Capacitor/Tauri reutilizan la descarga nativa staged,
+verificación, exclusión de backup y cancelación. Los originales no se reescriben. CrateImage
+prefiere una lease local (sin srcset remoto), los tracks mantienen ruta canónica al persistir y
+las vistas reales de biblioteca/Settings comparten MediaCover48px. Descargas antiguas completan
+portadas en sync online; ausencia de imagen no invalida audio. Clear/retirada elimina imágenes
+sin referencias. Storybook y preview actualizados; prueba con recarga y red totalmente cortada.
+
+Enmienda de alineación: Storage no rompe su valor en dos líneas; se corrige la receta compartida
+Meter (columna de lectura max-content, mínima5ch) y se completa su entrada, docs y casos en el
+catálogo. Dos consumidores reales conservados: Listen Offline/Stats y Admin SystemHealth. Sin
+reparaciones CSS en callers ni cambios en el mockup histórico. Sigue sin commit para revisión.
+
+
+Cierre local de las enmiendas1BD Offline/Bandcamp: la revisión fresca de portadas detectó cuatro
+hallazgos importantes, resueltos en una única pasada TDD: rutas relativas en webviews nativas,
+decodificación previa/evicción de imágenes corruptas, invalidación por perfil/asset y Meter a704px
+con traducción larga. Meter apila su caption bajo20rem de ancho disponible; lectura de una línea
+y rail visible, sin parches en callers. No segunda revisión ni certificación de dispositivos.
+
+Diego intercambia protagonismo/formato en Bandcamp: Purchases primero y en región mayor con
+MediaGrid/EntityCard; Radar en filas EntityRow con Open on Bandcamp y permisos/acciones reales.
+La aclaración posterior conserva las acciones: no son filas inertes. Wishlist mantiene su grid.
+Storybook y preview pequeño comparten las vistas reales y fixtures coherentes con permisos.
+
+Validación relevante final:183Listen,54Desktop,31shared,11Admin y13casos browser distintos verdes;
+cinco typechecks, lint33archivosListen, i18n0/0, catálogo59/93/120 y tres builds/bundle correctos.
+JSinicial205131/307200bytes gzip, avisos existentes de chunks grandes. Capturas finales:
+1bd-offline-artwork-alignment-final.png y1bd-bandcamp-purchases-radar.png. Se mantienen las tres
+instancias; HEAD/origin515bbb3b, índice vacío. Parada para revisión sin commit/push. QA física de
+iOS/Android/Tauri sigue explícitamente pendiente; no mutaciones ni importaciones en producción.
+
+
+Enmienda final Settings1BD: Section expone `ruled`, ya existente en InstrumentPanel. La primera
+sección visible de cada pestaña recibe false y las líneas internas se conservan; Connections
+respeta el gate de Connect y empieza en OpenSubsonic sin línea cuando no está habilitado.
+Sin nuevo fundamento ni CSS de reparación. Storybook y preview reutilizan esas props.
+Regresión7RED→31GREEN; navegador4/4verde en ambos hosts375/1200, cinco pestañas y ambos estados
+del gate Connect. Captura real1bd-settings-leading-rule.png; sin commit/push, tres servicios.
+
+Verificación final de la regla Settings:119tests Listen/19archivos y54Desktop/9 verdes; tipos
+Listen/Desktop/Storybook, lint17archivos, catálogo y tres builds/bundle correctos. Inspección real
+confirma border0px en Offline y portada local visible. HEAD/origin515bbb3b, índice vacío.
+
+
+Diego aprueba el cierre1BD Offline y sus enmiendas (portadas, Bandcamp y regla opcional de
+Settings) y autoriza commit/push. Siguiente lote anunciado antes de empezar:1BE Stats y Crate
+Digging, composición de métricas/listas/lecturas/estados y narrativa editorial con vistas reales.
+Se conservan periodos, alcance propio/global/usuario, privacidad, datos horarios y acciones.
+Lyrics/Info/output/targets/Tauri quedan para siguientes lotes internos1BE; sin nuevos instrumentos
+H3 ni cambios de protocolo. Storybook y preview pequeño, tres servicios activos y parada para
+revisión antes del próximo commit.

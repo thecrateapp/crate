@@ -1,3 +1,5 @@
+import { notifyOfflineArtworkChanged } from "./offline-artwork-events";
+
 import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 
@@ -187,6 +189,7 @@ export function getActiveOfflineProfileKey(): string | null {
 
 export function setActiveOfflineProfileKey(profileKey: string | null): void {
   writeOfflineStoreItem(OFFLINE_ACTIVE_PROFILE_KEY, profileKey);
+  notifyOfflineArtworkChanged();
 }
 
 function getOfflineNativeAssetStorageKey(profileKey: string): string {

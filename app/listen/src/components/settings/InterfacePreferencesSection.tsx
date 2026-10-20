@@ -7,7 +7,9 @@ import {
 } from "@crate/ui/lib/interface-preferences";
 import { InterfacePreferencesControls } from "./InterfacePreferencesControls";
 export { InterfacePreferencesControls } from "./InterfacePreferencesControls";
-export function InterfacePreferencesSection() {
+export function InterfacePreferencesSection({
+  ruled,
+}: { ruled?: boolean } = {}) {
   const { t } = useTranslation();
   const preferences = useSyncExternalStore(
     subscribeUiPreferences,
@@ -19,6 +21,7 @@ export function InterfacePreferencesSection() {
   return (
     <div>
       <InterfacePreferencesControls
+        ruled={ruled}
         preferences={preferences}
         onChange={(patch) => setSaveError(!setUiPreferences(patch))}
         labels={{

@@ -5919,6 +5919,14 @@
     "sourceHash": "sha256:7469e54bf358177087172f261678e6638bb49625668b58c517cbb8ce909859bf",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.offline.downloadsEmpty": {
+    "sourceHash": "sha256:f97246e28f6e2f8ec731fa69ec705900c36d98ba1e2c0cab6724dd0efef39d58",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.downloadsTitle": {
+    "sourceHash": "sha256:48d869c9a800ad39a2e8b5e6634af44176d9ef890614796c7f1ed81a04c39176",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
   "settings.offline.footprint": {
     "sourceHash": "sha256:8a7bfae5df75a63e20a0eadae3d984e99903dd7889a716cae099ea86a899dea8",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5926,6 +5934,22 @@
   "settings.offline.items": {
     "sourceHash": "sha256:201f2a4a629e358268d40eef5ffd746108e3903a5847908b6ff8ff886eb05829",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.offline.kind.album": {
+    "sourceHash": "sha256:64d6724e4e9af8cedf2fe9dca140b20e9da64d8596a4efb825858cfd52ace418",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.kind.crate": {
+    "sourceHash": "sha256:aac52cb9e3cb70b393de42210861cfe49dca644fe5ce53a7ad96ed151276e341",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.kind.playlist": {
+    "sourceHash": "sha256:ac56ba40e30f4a3b41148443d263484a95862fa4db8eebb7f4b4b7fe7337ca0a",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.kind.track": {
+    "sourceHash": "sha256:aee484aed6d9d97171ebcef6a2b083a5871cc89d303de135175f85b2125ba68e",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
   },
   "settings.offline.localMirrorDescription": {
     "sourceHash": "sha256:65ef33b27c158fcf567db31ed9f387c1223baadf0bce854eb675b376a9a0f6ac",
@@ -5939,6 +5963,10 @@
     "sourceHash": "sha256:4a78d0f14fe4766b5a45481f4e8e77a8d81b6798797a4403d3818f71d225aac8",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.offline.readOnly": {
+    "sourceHash": "sha256:374d091171e766e36c402d3da57ad972f2a1a8b300ae68ea218212f7bb5b08e7",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
   "settings.offline.readyItems": {
     "sourceHash": "sha256:48e692a214ab100854cab43c563a7258d8fd1b682310c89e36fc129abf7caaf0",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5946,6 +5974,30 @@
   "settings.offline.removeCopies": {
     "sourceHash": "sha256:5de2473a02fa490a933d9cda829429f2a2229742334eb5c0654141d78250b1de",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.offline.state.downloading": {
+    "sourceHash": "sha256:44fb84175220b2b2d086502f7da9d23f54548b3062a578ec5ef21fb7c9d1198b",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.state.error": {
+    "sourceHash": "sha256:2ce228166cda89319dfcc37abf49c5f0fa6c58a08d257101d10b9671812369d6",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.state.idle": {
+    "sourceHash": "sha256:ed74fc5565a27d650252687282476a081fd7059a9aa17d4f84b2420f1ab45bae",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.state.queued": {
+    "sourceHash": "sha256:6dab97436899781934eb66e327743d8047bdf18338120443216dfacd959aa3dd",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.state.ready": {
+    "sourceHash": "sha256:56c93f8363f8c626c658cced3ff6edc42e59658e3de9e26621d43faff8af2d2e",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.state.syncing": {
+    "sourceHash": "sha256:204c2fc5f78392337acb0ae61dab6d6f4efa980cfa3a431764302f9f5a373e90",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
   },
   "settings.offline.storage": {
     "sourceHash": "sha256:fee0c978fc60cb86d5e27f06969db7e23d134a1038df810b892c0b92bff55bc0",
@@ -5978,6 +6030,14 @@
   "settings.offline.toasts.syncFailed": {
     "sourceHash": "sha256:18d0c22172d92ca08ba76ed234ae52b9a64e5a528ec016820f58707f6d614568",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.offline.totalSize": {
+    "sourceHash": "sha256:5cd181d4f33f0d02af7c5fc7527290a4bb676e7f000da4472c9b07050856a3a7",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
+  },
+  "settings.offline.trackProgress": {
+    "sourceHash": "sha256:955af28ef4f1cb9aae78ad6d1668084aefbbe2d6566ccf31061f17c0719bded2",
+    "reviewedAt": "2026-10-20T19:25:44.692Z"
   },
   "settings.offline.unavailable": {
     "sourceHash": "sha256:3c00fe1c60f95aa0abc2e2a3712f6bac63d3138294fb44f6d63ebb935f4b0e31",

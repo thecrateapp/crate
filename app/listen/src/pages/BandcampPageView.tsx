@@ -117,8 +117,8 @@ export function BandcampPageView({
             ))}
           </div>
           <div className="grid min-w-0 gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-            <BandcampSection kind="radar">{radar}</BandcampSection>
             <BandcampSection kind="owned">{owned}</BandcampSection>
+            <BandcampSection kind="radar">{radar}</BandcampSection>
           </div>
           <BandcampSection kind="wishlist">{wishlist}</BandcampSection>
         </>

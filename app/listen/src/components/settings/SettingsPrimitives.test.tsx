@@ -10,6 +10,24 @@ import {
 } from "@/components/settings/SettingsPrimitives";
 
 describe("settings primitives", () => {
+  it("can omit a section's own rule while retaining its heading and description", () => {
+    render(
+      <Section
+        title="Offline mirror"
+        description="Saved on this device"
+        ruled={false}
+      >
+        Saved music
+      </Section>,
+    );
+    const section = screen.getByRole("region", { name: "Offline mirror" });
+    expect(section).not.toHaveClass("border-t");
+    expect(section).toHaveAccessibleDescription("Saved on this device");
+    expect(
+      within(section).getByRole("heading", { level: 2 }),
+    ).toHaveTextContent("Offline mirror");
+  });
+
   it("renders a section heading and description around its content", () => {
     render(
       <Section title="Playback" description="Tune your listening experience.">

@@ -4,11 +4,13 @@ import { Section } from "./SettingsPrimitives";
 
 /** Account regions shared by the production controller and isolated review. */
 export function AccountSettingsView({
+  ruled,
   profile,
   listening,
   providers,
   security,
 }: {
+  ruled?: boolean;
   profile: ReactNode;
   listening: ReactNode;
   providers: ReactNode;
@@ -17,7 +19,9 @@ export function AccountSettingsView({
   const { t } = useTranslation();
   return (
     <>
-      <Section title={t("settings.account.profileTitle")}>{profile}</Section>
+      <Section ruled={ruled} title={t("settings.account.profileTitle")}>
+        {profile}
+      </Section>
       <Section title={t("settings.account.listeningTitle")}>
         {listening}
       </Section>

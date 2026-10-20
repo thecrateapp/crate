@@ -1968,5 +1968,20 @@
   "settings.openSubsonic.keyValue": "Generierter Schlüssel",
   "settings.bandcamp.countsError": "Die Sammlungssummen sind nicht verfügbar. Dein Konto ist weiterhin verbunden.",
   "settings.scrobbling.toasts.cancelFailed": "Die Verbindung konnte nicht abgebrochen werden. Versuche es erneut.",
-  "album.remoteImport.downloadingUnknown": "Wird heruntergeladen…"
+  "album.remoteImport.downloadingUnknown": "Wird heruntergeladen…",
+  "settings.offline.downloadsTitle": "Downloads auf diesem Gerät",
+  "settings.offline.downloadsEmpty": "Hier erscheint Musik, die du zum Offline-Hören speicherst.",
+  "settings.offline.trackProgress": "{ready} / {total} Titel verfügbar",
+  "settings.offline.readOnly": "Melde dich erneut an, um deine Downloads zu verwalten.",
+  "settings.offline.totalSize": "Gesamtgröße {size}",
+  "settings.offline.kind.album": "Musikalbum",
+  "settings.offline.kind.track": "Titel",
+  "settings.offline.kind.playlist": "Wiedergabeliste",
+  "settings.offline.kind.crate": "Crate-Sammlung",
+  "settings.offline.state.idle": "Nicht heruntergeladen",
+  "settings.offline.state.queued": "Wartet auf den Download",
+  "settings.offline.state.downloading": "Wird heruntergeladen",
+  "settings.offline.state.syncing": "Gespeicherte Musik wird aktualisiert",
+  "settings.offline.state.ready": "Offline verfügbar",
+  "settings.offline.state.error": "Bitte prüfen"
 }

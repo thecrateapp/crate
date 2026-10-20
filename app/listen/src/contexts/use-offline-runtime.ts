@@ -45,6 +45,8 @@ import {
 import { useOfflineManifestSync } from "@/contexts/use-offline-manifest-sync";
 import { useOfflineSynchronization } from "@/contexts/use-offline-synchronization";
 
+import { pruneOfflineArtwork } from "@/lib/offline-artwork";
+
 const EMPTY_SNAPSHOT: OfflineSnapshot = { items: {} };
 const EMPTY_SUMMARY: OfflineSummary = {
   itemCount: 0,
@@ -62,7 +64,7 @@ function aggregateTrackState(
   const assetKey = getOfflineTrackAssetKey(ref);
   const trackId =
     typeof ref === "object" && ref
-      ? ref.libraryTrackId ?? ref.trackId ?? null
+      ? (ref.libraryTrackId ?? ref.trackId ?? null)
       : null;
   if (!assetKey && trackId == null) return "idle";
   const matches = items.filter((item) =>
@@ -96,7 +98,7 @@ function findTrackOfflineItem(
   const assetKey = getOfflineTrackAssetKey(ref);
   const trackId =
     typeof ref === "object" && ref
-      ? ref.libraryTrackId ?? ref.trackId ?? null
+      ? (ref.libraryTrackId ?? ref.trackId ?? null)
       : null;
   if (!assetKey && trackId == null) return null;
   return (
@@ -245,6 +247,7 @@ export function useOfflineRuntime(
           }, [])
           .map((track) => deleteCachedTrackAsset(profileKey, track)),
       );
+      await pruneOfflineArtwork(profileKey, Object.values(nextSnapshot.items));
     },
     [commitSnapshot, profileKey, supported],
   );

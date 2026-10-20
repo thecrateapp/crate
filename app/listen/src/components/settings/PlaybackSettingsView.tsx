@@ -37,11 +37,13 @@ const PLAYBACK_DELIVERY_OPTIONS: {
 ];
 
 export function PlaybackSettingsView({
+  ruled,
   value,
   mobilePlaybackRuntime,
   androidNativePlayerEnabled,
   onChange,
 }: {
+  ruled?: boolean;
   value: PlaybackSettingsValue;
   mobilePlaybackRuntime: boolean;
   androidNativePlayerEnabled: boolean;
@@ -59,6 +61,7 @@ export function PlaybackSettingsView({
   } = value;
   return (
     <Section
+      ruled={ruled}
       title={t("settings.playback.title")}
       description={t("settings.playback.subtitle")}
     >

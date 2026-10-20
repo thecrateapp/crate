@@ -1968,5 +1968,20 @@
   "settings.openSubsonic.keyValue": "Sortutako gakoa",
   "settings.bandcamp.countsError": "Bildumaren guztizkoak ez daude erabilgarri. Zure kontuak konektatuta jarraitzen du.",
   "settings.scrobbling.toasts.cancelFailed": "Ezin izan da konexioa ezeztatu. Saiatu berriro.",
-  "album.remoteImport.downloadingUnknown": "Deskargatzen…"
+  "album.remoteImport.downloadingUnknown": "Deskargatzen…",
+  "settings.offline.downloadsTitle": "Gailu honetako deskargak",
+  "settings.offline.downloadsEmpty": "Lineaz kanpo entzuteko gordetako musika hemen agertuko da.",
+  "settings.offline.trackProgress": "{ready} / {total} kanta erabilgarri",
+  "settings.offline.readOnly": "Hasi saioa berriro deskargak kudeatzeko.",
+  "settings.offline.totalSize": "Guztizko tamaina {size}",
+  "settings.offline.kind.album": "Albuma",
+  "settings.offline.kind.track": "Kanta",
+  "settings.offline.kind.playlist": "Erreprodukzio-zerrenda",
+  "settings.offline.kind.crate": "Crate bilduma",
+  "settings.offline.state.idle": "Deskargatu gabe",
+  "settings.offline.state.queued": "Deskargaren zain",
+  "settings.offline.state.downloading": "Deskargatzen",
+  "settings.offline.state.syncing": "Gordetako musika eguneratzen",
+  "settings.offline.state.ready": "Lineaz kanpo erabilgarri",
+  "settings.offline.state.error": "Arreta behar du"
 }

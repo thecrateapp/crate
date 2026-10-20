@@ -18,7 +18,9 @@ type ConfirmedAction = "rotate" | "revoke";
 type Notice = "created" | "copied" | "hidden";
 type RequestError = "copy" | "operation";
 
-export function OpenSubsonicCredentialsSection() {
+export function OpenSubsonicCredentialsSection({
+  ruled,
+}: { ruled?: boolean } = {}) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -115,6 +117,7 @@ export function OpenSubsonicCredentialsSection() {
 
   return (
     <OpenSubsonicSettingsView
+      ruled={ruled}
       configured={configured}
       loading={loading}
       loadError={loadError}

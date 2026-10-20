@@ -1,8 +1,9 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OfflineSection } from "@/components/settings/OfflineSection";
+import type { OfflineItemRecord } from "@/lib/offline";
 import type { OfflineContextValue } from "@/contexts/offline-context";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -198,4 +199,106 @@ describe("OfflineSection meters", () => {
       expect(screen.getByRole("meter", { name: "Tracks" })).toBeInTheDocument();
     },
   );
+});
+
+const download = (
+  overrides: Partial<OfflineItemRecord> = {},
+): OfflineItemRecord => ({
+  key: "album:1",
+  kind: "album",
+  entityId: "1",
+  title: "Mixed Case Album",
+  state: "downloading",
+  trackCount: 10,
+  readyTrackCount: 6,
+  totalBytes: 1024,
+  tracks: [],
+  ...overrides,
+});
+it("shows real download states and track-based progress without exposing internal errors", () => {
+  renderOffline({
+    items: [
+      download(),
+      download({
+        key: "playlist:2",
+        kind: "playlist",
+        entityId: "2",
+        title: "A Playlist",
+        state: "error",
+        errorMessage: "Internal filesystem secret /tmp/cache-123",
+      }),
+    ],
+  });
+  const list = screen.getByRole("group", { name: "Downloads on this device" });
+  const progress = within(list).getByRole("progressbar", {
+    name: "Mixed Case Album",
+  });
+  expect(progress).toHaveAttribute("aria-valuenow", "60");
+  expect(progress).toHaveAttribute("aria-valuetext", "6 / 10 tracks available");
+  expect(within(list).getByText("Needs attention")).toBeVisible();
+  expect(screen.queryByText(/cache-123/)).not.toBeInTheDocument();
+});
+it("keeps an unknown download total indeterminate and does not invent zero percent", () => {
+  renderOffline({
+    items: [download({ trackCount: 0, readyTrackCount: 0, state: "queued" })],
+  });
+  const progress = screen.getByRole("progressbar", {
+    name: "Mixed Case Album",
+  });
+  expect(progress).not.toHaveAttribute("aria-valuenow");
+  expect(progress).not.toHaveAttribute("aria-valuetext");
+  expect(screen.getByText("Waiting to download")).toBeVisible();
+});
+it("keeps offline-identity management read-only even if stale writable callbacks are supplied", async () => {
+  const syncAll = vi.fn(async () => {}),
+    clearActiveProfile = vi.fn(async () => {});
+  renderOffline({ readOnly: true, syncAll, clearActiveProfile });
+  const sync = screen.getByRole("button", { name: "Sync offline copy now" });
+  const clear = screen.getByRole("button", { name: "Remove offline copies" });
+  expect(sync).toBeDisabled();
+  expect(clear).toBeDisabled();
+  await userEvent.click(clear);
+  await userEvent.click(sync);
+  expect(syncAll).not.toHaveBeenCalled();
+  expect(clearActiveProfile).not.toHaveBeenCalled();
+});
+it.each(["queued", "error"] as const)(
+  "does not present a provisional %s record's zero-byte sentinel as a known file size",
+  (state) => {
+    renderOffline({
+      items: [
+        download({
+          state,
+          totalBytes: 0,
+          trackCount: 0,
+          readyTrackCount: 0,
+          contentVersion: null,
+        }),
+      ],
+    });
+    const downloads = screen.getByRole("group", {
+      name: "Downloads on this device",
+    });
+    expect(
+      within(downloads).queryByText("Total size 0 B"),
+    ).not.toBeInTheDocument();
+  },
+);
+it("retains an actual zero size confirmed by a received manifest", () => {
+  renderOffline({
+    items: [
+      download({
+        state: "ready",
+        totalBytes: 0,
+        trackCount: 0,
+        readyTrackCount: 0,
+        contentVersion: "empty-v1",
+      }),
+    ],
+  });
+  expect(
+    within(
+      screen.getByRole("group", { name: "Downloads on this device" }),
+    ).getByText("Total size 0 B"),
+  ).toBeVisible();
 });

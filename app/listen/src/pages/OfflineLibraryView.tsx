@@ -13,13 +13,18 @@ import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
 import { SectionHeader } from "@crate/ui/domain/lists/SectionHeader";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { TrackList } from "@crate/ui/domain/tracks/TrackList";
-import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import {
+  MediaCover,
+  type MediaCoverProps,
+} from "@crate/ui/domain/media/MediaCover";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { Button } from "@crate/ui/shadcn/button";
 import { TrackRowView } from "../components/cards/TrackRowView";
 import { TrackRowContent } from "../components/cards/TrackRowContent";
 import { TrackRowPlaybackControl } from "../components/cards/TrackRowPlaybackControl";
 import { SpectrumPlayButton } from "../components/player/SpectrumPlayButton";
+import { getQualityBadge } from "../components/player/bar/player-bar-utils";
+import { formatDuration } from "../lib/utils";
 
 export interface OfflineGroupView {
   key: string;
@@ -28,7 +33,12 @@ export interface OfflineGroupView {
     id: number | string;
     title: string;
     artist: string;
+    albumCover?: string;
     duration?: number;
+    format?: string;
+    bitrate?: number | null;
+    sampleRate?: number | null;
+    bitDepth?: number | null;
   }[];
 }
 export function OfflineLibraryView({
@@ -44,6 +54,7 @@ export function OfflineLibraryView({
   progress,
   activeGlyph,
   reconnect,
+  renderImage,
 }: {
   groups: OfflineGroupView[];
   currentTrack?: { id: number | string; title: string; artist: string } | null;
@@ -57,6 +68,7 @@ export function OfflineLibraryView({
   progress: ReactNode;
   activeGlyph?: ReactNode;
   reconnect?: ReactNode;
+  renderImage?: MediaCoverProps["renderImage"];
 }) {
   const { t } = useTranslation();
   return (
@@ -118,6 +130,17 @@ export function OfflineLibraryView({
                       title={track.title}
                       meta={track.artist}
                       actions={null}
+                      quality={getQualityBadge({
+                        ...track,
+                        id: String(track.id),
+                      })}
+                      duration={
+                        track.duration != null &&
+                        Number.isFinite(track.duration) &&
+                        track.duration > 0
+                          ? formatDuration(track.duration)
+                          : undefined
+                      }
                       leading={
                         <TrackRowPlaybackControl
                           disabled={false}
@@ -132,7 +155,12 @@ export function OfflineLibraryView({
                                 })
                           }
                           artwork={
-                            <MediaCover alt={track.title} className="size-12" />
+                            <MediaCover
+                              src={track.albumCover}
+                              renderImage={renderImage}
+                              alt={track.title}
+                              className="size-12"
+                            />
                           }
                           activeGlyph={activeGlyph}
                           onClick={(event) => {
@@ -160,7 +188,7 @@ export function OfflineLibraryView({
             <p className="truncate font-display text-base font-bold">
               {currentTrack?.title || t("offline.access.title")}
             </p>
-            <p className="font-mono text-xs text-text-muted">
+            <p className="text-sm text-text-muted">
               {currentTrack?.artist || t("offline.access.status")}
             </p>
           </div>

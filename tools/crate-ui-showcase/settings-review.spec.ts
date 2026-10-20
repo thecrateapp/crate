@@ -29,6 +29,36 @@ for (const host of ["storybook", "standalone"] as const)
       const tabs = page.getByRole("tablist", { name: "Settings", exact: true });
       await expect(tabs.getByRole("tab")).toHaveCount(5);
       await expect(page.getByRole("tabpanel")).toHaveCount(1);
+      for (const name of [
+        "Preferences",
+        "Playback",
+        "Account",
+        "Connections",
+        "Offline",
+      ]) {
+        await tabs.getByRole("tab", { name, exact: true }).click();
+        const sections = page
+          .getByRole("tabpanel")
+          .locator('[data-slot="instrument-panel"]');
+        await expect(sections.first()).toHaveCSS("border-top-width", "0px");
+        for (const section of (await sections.all()).slice(1)) {
+          await expect(section).toHaveCSS("border-top-width", "1px");
+        }
+      }
+      await page
+        .getByRole("checkbox", { name: "Connect feature", exact: true })
+        .uncheck();
+      await tabs.getByRole("tab", { name: "Connections", exact: true }).click();
+      await expect(
+        page
+          .getByRole("tabpanel")
+          .locator('[data-slot="instrument-panel"]')
+          .first(),
+      ).toHaveCSS("border-top-width", "0px");
+      await page
+        .getByRole("checkbox", { name: "Connect feature", exact: true })
+        .check();
+      await tabs.getByRole("tab", { name: "Preferences", exact: true }).click();
       await tabs.getByRole("tab", { name: "Preferences", exact: true }).focus();
       await page.keyboard.press("End");
       await expect(

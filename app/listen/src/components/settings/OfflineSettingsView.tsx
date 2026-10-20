@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useTranslation } from "react-i18next";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
@@ -8,7 +10,10 @@ import { Button } from "@crate/ui/shadcn/button";
 
 import { Section } from "./SettingsPrimitives";
 interface OfflineSettingsViewProps {
+  ruled?: boolean;
   supported: boolean;
+  readOnly?: boolean;
+  downloads?: ReactNode;
   syncing: boolean;
   summary: {
     itemCount: number;
@@ -25,7 +30,10 @@ interface OfflineSettingsViewProps {
   onClear: () => void;
 }
 export function OfflineSettingsView({
+  ruled,
   supported: offlineSupported,
+  readOnly = false,
+  downloads,
   syncing: offlineSyncing,
   summary: offlineSummary,
   storageQuota,
@@ -37,6 +45,7 @@ export function OfflineSettingsView({
   const { t } = useTranslation();
   return (
     <Section
+      ruled={ruled}
       title={t("settings.offline.title")}
       description={t("settings.offline.subtitle")}
     >
@@ -47,7 +56,7 @@ export function OfflineSettingsView({
             label={t("settings.offline.items")}
             size="md"
           />
-          <p className="mt-1 text-xs text-text-muted">
+          <MonoLabel className="mt-2">
             {t("settings.offline.readyItems", {
               count: offlineSummary.readyItemCount,
             })}
@@ -56,7 +65,7 @@ export function OfflineSettingsView({
                   count: offlineSummary.errorItemCount,
                 })}`
               : ""}
-          </p>
+          </MonoLabel>
         </div>
         <div>
           <Meter
@@ -65,9 +74,9 @@ export function OfflineSettingsView({
             max={offlineSummary.trackCount}
             valueText={`${offlineSummary.readyTrackCount}/${offlineSummary.trackCount}`}
           />
-          <p className="mt-1 text-xs text-text-muted">
+          <MonoLabel className="mt-2">
             {t("settings.offline.mirrored")}
-          </p>
+          </MonoLabel>
         </div>
         <div>
           {storageQuota != null ? (
@@ -86,17 +95,20 @@ export function OfflineSettingsView({
               size="sm"
             />
           )}
-          <p className="mt-1 text-xs text-text-muted">
+          <MonoLabel className="mt-2">
             {t("settings.offline.footprint")}
-          </p>
+          </MonoLabel>
         </div>
       </div>
+
+      {downloads}
 
       <div className="flex flex-wrap gap-3">
         <Button
           variant="secondary"
           disabled={
             !offlineSupported ||
+            readOnly ||
             offlineSyncing ||
             offlineSummary.itemCount === 0
           }
@@ -112,6 +124,7 @@ export function OfflineSettingsView({
           variant="danger-soft"
           disabled={
             !offlineSupported ||
+            readOnly ||
             offlineSyncing ||
             offlineSummary.itemCount === 0
           }
@@ -125,9 +138,11 @@ export function OfflineSettingsView({
       <p className="flex items-start gap-3 text-caption text-text-muted">
         <StatusDot tone={offlineSupported ? "off" : "warn"} />
         <span>
-          {offlineSupported
-            ? t("settings.offline.localMirrorDescription")
-            : t("settings.offline.unavailable")}
+          {!offlineSupported
+            ? t("settings.offline.unavailable")
+            : readOnly
+              ? t("settings.offline.readOnly")
+              : t("settings.offline.localMirrorDescription")}
         </span>
       </p>
     </Section>

@@ -1,3 +1,5 @@
+import { useOfflineArtwork } from "@/hooks/use-offline-artwork";
+
 import { useEffect, useMemo } from "react";
 import type { ImgHTMLAttributes } from "react";
 
@@ -41,7 +43,7 @@ export function CrateImage({
   const ticketVersion = useMediaAccessVersion();
   const resumeVersion = useMediaAccessResumeVersion();
   const rawSource = source ?? src ?? null;
-  const artwork = useMemo<ArtworkSource>(() => {
+  const remoteArtwork = useMemo<ArtworkSource>(() => {
     if (typeof rawSource !== "string") {
       if (rawSource) return rawSource;
       return artworkFromUrl(null, {
@@ -58,6 +60,33 @@ export function CrateImage({
       sizes,
     });
   }, [rawSource, retryPolicy, sizes, srcSet]);
+  const local = useOfflineArtwork(remoteArtwork.src);
+  const artwork = useMemo<ArtworkSource>(() => {
+    if (local.src)
+      return {
+        ...remoteArtwork,
+        logicalKey: `${remoteArtwork.logicalKey}:offline:${local.profileKey}`,
+        src: local.src,
+        srcSet: undefined,
+        sizes: undefined,
+        retryPolicy: "none",
+      };
+    if (local.pending || local.offline)
+      return {
+        ...remoteArtwork,
+        logicalKey: `${remoteArtwork.logicalKey}:offline:${local.profileKey}`,
+        src: null,
+        srcSet: undefined,
+        retryPolicy: "none",
+      };
+    return remoteArtwork;
+  }, [
+    remoteArtwork,
+    local.src,
+    local.pending,
+    local.offline,
+    local.profileKey,
+  ]);
   const isTicketedArtwork = requiresMediaAccessTicket(artwork.src);
   const preservesReadyArtwork =
     artwork.retryPolicy === "credentials" || isTicketedArtwork;
@@ -78,7 +107,7 @@ export function CrateImage({
     preservesReadyArtwork,
     resumeVersion,
     loading,
-    onError,
+    onError: local.src ? () => local.invalidate() : onError,
     onLoad,
   });
 

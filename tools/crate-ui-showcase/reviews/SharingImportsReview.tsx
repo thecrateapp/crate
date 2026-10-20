@@ -261,12 +261,14 @@ export function SharingExample() {
 function FixtureBandcampItem({
   variant,
   imported,
+  canImport,
   onAction,
   long,
   sampleIndex = 0,
 }: {
   variant: "row" | "tile";
   imported?: boolean;
+  canImport: boolean;
   onAction: (text: string) => void;
   long: boolean;
   sampleIndex?: number;
@@ -286,7 +288,7 @@ function FixtureBandcampItem({
     getActions: () =>
       buildBandcampActions(
         {
-          canImport: !imported,
+          canImport,
           itemUrl: "https://example.bandcamp.com/album/night-music",
           onImport: () => onAction("Import requested locally"),
           onOpen: () => onAction("Open on Bandcamp requested locally"),
@@ -321,7 +323,7 @@ function FixtureBandcampItem({
         variant === "row" ? (
           <BandcampItemActionsView
             title={title}
-            canImport={!imported}
+            canImport={canImport}
             importing={false}
             importDisabled={false}
             hasUrl
@@ -344,14 +346,15 @@ export function BandcampExample() {
   const [state, setState] = useState("ready"),
     [event, setEvent] = useState("No Bandcamp action yet");
   const empty = state === "empty";
-  const item = (variant: "row" | "tile", imported = false, sampleIndex = 0) =>
+  const item = (kind: "owned" | "radar" | "wishlist", sampleIndex = 0) =>
     empty ? (
       <EmptyState message="No items in this collection" />
     ) : (
       <FixtureBandcampItem
-        key={`${variant}-${sampleIndex}`}
-        variant={variant}
-        imported={imported}
+        key={`${kind}-${sampleIndex}`}
+        variant={kind === "radar" ? "row" : "tile"}
+        imported={kind === "owned" && sampleIndex === 3}
+        canImport={kind === "owned" && sampleIndex !== 3}
         onAction={setEvent}
         long={state === "long"}
         sampleIndex={sampleIndex}
@@ -377,18 +380,24 @@ export function BandcampExample() {
             radar: empty ? 0 : 8,
           }}
           radar={
+            <div className="space-y-3">
+              {empty
+                ? item("radar")
+                : [0, 1, 2, 3].map((index) => item("radar", index))}
+            </div>
+          }
+          owned={
             <MediaGrid density="wide">
               {empty
-                ? item("tile")
-                : [0, 1, 2, 3].map((index) => item("tile", false, index))}
+                ? item("owned")
+                : [0, 1, 2, 3].map((index) => item("owned", index))}
             </MediaGrid>
           }
-          owned={item("row", true)}
           wishlist={
             <MediaGrid density="wide">
               {empty
-                ? item("tile")
-                : [0, 1, 2, 3].map((index) => item("tile", false, index))}
+                ? item("wishlist")
+                : [0, 1, 2, 3].map((index) => item("wishlist", index))}
             </MediaGrid>
           }
           onSync={() => setEvent("Sync requested locally")}

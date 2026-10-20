@@ -22,7 +22,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "1BA. AlbumHeroFrame/AlbumActionsView, ArtistLibraryFrames, ReleaseCountdown, RemoteImportView, AuthFrame/CredentialsForm/ServerSetupView/AuthCallbackView and OfflineLibraryView are actual app-local views. The approved mockup is the reference; shared forms, headers, states and track visuals own their contracts. Native artwork measurements, auth transport, secure session persistence, API permissions, verified offline asset readiness and player engines remain in Listen controllers. Fixtures neither call the API nor write preferences. Native and live write QA remain separate.",
+          "1BA. AlbumHeroFrame/AlbumActionsView, ArtistLibraryFrames, ReleaseCountdown, RemoteImportView, AuthFrame/CredentialsForm/ServerSetupView/AuthCallbackView and OfflineLibraryView are actual app-local views. The approved mockup is the reference; shared forms, headers, states and track visuals own their contracts. Native artwork measurements, auth transport, secure session persistence, API permissions, verified offline asset readiness and player engines remain in Listen controllers. Fixtures neither call the API nor write preferences. Native and live write QA remain separate. The1BD Offline family now covers the complete offline library/management presentation; this earlier specimen also receives canonical per-track quality/duration when its fixture supplies those fields.",
       },
     },
   },

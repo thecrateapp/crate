@@ -89,6 +89,23 @@ function RouteProbe({
 }
 
 describe("Settings", () => {
+  it.each(["preferences", "playback", "account", "connections", "offline"])(
+    "omits only the leading section rule under the %s tab",
+    async (tab) => {
+      renderWithListenProviders(<Settings />, {
+        locale: "en",
+        route: `/settings?tab=${tab}`,
+      });
+      await act(async () => {});
+      const panel = screen.getByRole("tabpanel");
+      const sections = panel.querySelectorAll('[data-slot="instrument-panel"]');
+      expect(sections.length).toBeGreaterThan(0);
+      expect(sections[0]).not.toHaveClass("border-t");
+      for (const section of Array.from(sections).slice(1))
+        expect(section).toHaveClass("border-t");
+    },
+  );
+
   beforeEach(() => {
     localStorage.clear();
     vi.mocked(api).mockClear();
@@ -154,11 +171,8 @@ describe("Settings", () => {
 
     const playback = screen.getByRole("region", { name: "Playback" });
     expect(playback.tagName).toBe("SECTION");
-    expect(playback).toHaveClass(
-      "border-t",
-      "border-border-quiet",
-      "@container",
-    );
+    expect(playback).toHaveClass("@container");
+    expect(playback).not.toHaveClass("border-t");
     expect(
       within(playback).getByRole("heading", { level: 2, name: "Playback" }),
     ).toBeInTheDocument();

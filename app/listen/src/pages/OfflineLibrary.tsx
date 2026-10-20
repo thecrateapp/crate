@@ -1,3 +1,4 @@
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import {
   usePlayerActions,
   usePlayerProgress,
@@ -65,6 +66,15 @@ export function OfflineLibrary() {
   const groups = buildOfflineLibraryGroups(items);
   return (
     <OfflineLibraryView
+      renderImage={(image) => (
+        <ArtworkSurface
+          source={image.src}
+          alt={image.alt}
+          className={image.className}
+          fallback={image.fallback}
+          imageProps={{ onError: image.onError }}
+        />
+      )}
       groups={groups.map((group) => ({
         key: `${group.item.kind}:${group.item.entityId}`,
         title: group.item.title,

@@ -1968,5 +1968,20 @@
   "settings.openSubsonic.keyValue": "Clé générée",
   "settings.bandcamp.countsError": "Les totaux de la collection sont indisponibles. Votre compte reste connecté.",
   "settings.scrobbling.toasts.cancelFailed": "Impossible d’annuler la connexion. Réessayez.",
-  "album.remoteImport.downloadingUnknown": "Téléchargement…"
+  "album.remoteImport.downloadingUnknown": "Téléchargement…",
+  "settings.offline.downloadsTitle": "Téléchargements sur cet appareil",
+  "settings.offline.downloadsEmpty": "La musique enregistrée pour une écoute hors ligne apparaîtra ici.",
+  "settings.offline.trackProgress": "{ready} / {total} titres disponibles",
+  "settings.offline.readOnly": "Reconnecte-toi pour gérer tes téléchargements.",
+  "settings.offline.totalSize": "Taille totale {size}",
+  "settings.offline.kind.album": "Album musical",
+  "settings.offline.kind.track": "Titre",
+  "settings.offline.kind.playlist": "Liste de lecture",
+  "settings.offline.kind.crate": "Collection Crate",
+  "settings.offline.state.idle": "Non téléchargé",
+  "settings.offline.state.queued": "En attente du téléchargement",
+  "settings.offline.state.downloading": "Téléchargement en cours",
+  "settings.offline.state.syncing": "Mise à jour de la musique enregistrée",
+  "settings.offline.state.ready": "Disponible hors ligne",
+  "settings.offline.state.error": "À vérifier"
 }

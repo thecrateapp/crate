@@ -104,6 +104,7 @@ export function SettingsLocationFixture({
   );
 }
 export function SettingsConnectionsFixture({
+  ruled,
   countsUnavailable = false,
   read = "ready",
   busy = false,
@@ -111,7 +112,7 @@ export function SettingsConnectionsFixture({
   linked = true,
   long = false,
   onEvent,
-}: SettingsFixtureProps) {
+}: SettingsFixtureProps & { ruled?: boolean }) {
   const [configured, setConfigured] = useState(true),
     [secret, setSecret] = useState<string | null>(null),
     [notice, setNotice] = useState<CredentialNotice | null>(null),
@@ -127,6 +128,7 @@ export function SettingsConnectionsFixture({
   return (
     <>
       <OpenSubsonicSettingsView
+        ruled={ruled}
         configured={configured}
         loading={read === "loading"}
         loadError={read === "error"}

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { SettingsPageView, SETTINGS_TABS } from "./SettingsPageView";
+import { CRATE_CONNECT_FEATURE_ENABLED } from "@/lib/crate-connect";
 import { useTabParam } from "@/hooks/use-tab-param";
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 
@@ -27,28 +28,30 @@ export function Settings() {
       panels={{
         preferences: (
           <>
-            <InterfacePreferencesSection />
+            <InterfacePreferencesSection ruled={false} />
             <LanguageSection i18n={i18n} />
             <ShowsLocationSection />
           </>
         ),
         playback: (
           <>
-            <PlaybackSection />
+            <PlaybackSection ruled={false} />
             <SleepTimerSection />
           </>
         ),
-        account: <AccountSection />,
+        account: <AccountSection ruled={false} />,
         connections: (
           <>
-            <ConnectDevicesSection />
-            <OpenSubsonicCredentialsSection />
+            <ConnectDevicesSection ruled={false} />
+            <OpenSubsonicCredentialsSection
+              ruled={CRATE_CONNECT_FEATURE_ENABLED}
+            />
             <ScrobbleSection />
             <BandcampSection />
             <ServersSection />
           </>
         ),
-        offline: <OfflineSection />,
+        offline: <OfflineSection ruled={false} />,
       }}
     />
   );

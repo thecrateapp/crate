@@ -10,6 +10,7 @@ export type CredentialAction = "rotate" | "revoke";
 export type CredentialNotice = "created" | "copied" | "hidden";
 export type CredentialError = "copy" | "operation";
 export function OpenSubsonicSettingsView({
+  ruled,
   configured,
   loading,
   loadError,
@@ -27,6 +28,7 @@ export function OpenSubsonicSettingsView({
   onConfirm,
   onConfirmOpenChange,
 }: {
+  ruled?: boolean;
   configured: boolean | null;
   loading: boolean;
   loadError: boolean;
@@ -47,6 +49,7 @@ export function OpenSubsonicSettingsView({
   const { t } = useTranslation();
   return (
     <Section
+      ruled={ruled}
       title={t("settings.openSubsonic.title")}
       description={t("settings.openSubsonic.description")}
     >

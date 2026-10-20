@@ -187,3 +187,40 @@ describe("useOfflineSynchronization background abort", () => {
     expect(syncManifestIntoItem).not.toHaveBeenCalled();
   });
 });
+
+it("backfills legacy ready downloads once when online without scheduling work in read-only mode", async () => {
+  isOfflineBusyMock.mockReturnValue(false);
+  const snapshot = {
+    items: {
+      "album:1": {
+        key: "album:1",
+        kind: "album" as const,
+        entityId: "1",
+        title: "Saved",
+        state: "ready" as const,
+        trackCount: 1,
+        readyTrackCount: 1,
+        tracks: [],
+      },
+    },
+  };
+  const sync = vi.fn(async () => {});
+  const options = {
+    enqueue: <T>(fn: () => Promise<T>) => fn(),
+    profileKey: "legacy",
+    snapshot,
+    snapshotRef: { current: snapshot },
+    supported: true,
+    syncManifestIntoItem: sync,
+    transferAbortRef: { current: null },
+  };
+  const { rerender } = renderHook(
+    ({ enabled }) => useOfflineSynchronization({ ...options, enabled }),
+    { initialProps: { enabled: false } },
+  );
+  expect(sync).not.toHaveBeenCalled();
+  await act(async () => rerender({ enabled: true }));
+  expect(sync).toHaveBeenCalledTimes(1);
+  await act(async () => rerender({ enabled: true }));
+  expect(sync).toHaveBeenCalledTimes(1);
+});

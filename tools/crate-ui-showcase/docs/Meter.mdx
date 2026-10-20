@@ -1,0 +1,34 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Meter.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">Meter</DocHeading>
+
+<EntryDetails
+  id="primitives-meter"
+  review="Offline alignment amendment · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- A readonly quantity against a known positive range, used in Listen and Admin.
+- The caption uses MonoLabel; the formatted reading is a single, complete line. Its column
+  grows with units and separators instead of wrapping inside a fixed five-character width.
+  The track consumes the remaining width. Below320px available width, the component places its
+  caption above the track and reading; equivalent adjacent meters share that composition,
+  including longer localized captions. In the horizontal layout the rail retains at least64px.
+- A known zero is distinct from missing data. Missing or invalid ranges expose a named group
+  instead of a false meter or percentage. Supply localized label/value text from the app.
+- Keep native range semantics, bounded fill, optional warning/limit and callback/object refs.
+  No caller typography, width or geometry repairs.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Storage} />
+<Canvas of={Stories.MissingAndZero} />
+<Canvas of={Stories.NarrowLocalized} />
+<Controls />
+
+The presentation and browser checks cover375px,704px (existing Basque translations) and1200px. Full native/device QA remains separate.

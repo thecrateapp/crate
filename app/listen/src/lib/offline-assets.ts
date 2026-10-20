@@ -1,3 +1,4 @@
+import { notifyOfflineArtworkChanged } from "./offline-artwork-events";
 import { apiFetch, apiUrl } from "@/lib/api";
 import { isIosBrowser } from "@/lib/capacitor-runtime";
 import { isOfflineNativeRuntime } from "@/lib/offline-runtime";
@@ -180,9 +181,11 @@ export async function deleteCachedTrackAsset(
 export async function clearOfflineAssets(profileKey: string): Promise<void> {
   if (isOfflineNativeRuntime) {
     await clearNativeOfflineAssets(profileKey);
+    notifyOfflineArtworkChanged(profileKey);
     return;
   }
   await caches.delete(getOfflineCacheName(profileKey));
+  notifyOfflineArtworkChanged(profileKey);
 }
 
 export function getOfflineNativePlaybackUrl(
@@ -194,3 +197,9 @@ export function getOfflineNativePlaybackUrl(
 }
 
 export type { OfflineItemState };
+
+export {
+  cacheOfflineArtwork,
+  readOfflineArtwork,
+  pruneOfflineArtwork,
+} from "./offline-artwork";

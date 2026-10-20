@@ -1,5 +1,11 @@
 import { useCallback, type MutableRefObject } from "react";
 
+import {
+  cacheOfflineArtwork,
+  pruneOfflineArtwork,
+} from "@/lib/offline-artwork";
+import { offlineArtworkRefs } from "@/lib/offline-artwork-identity";
+
 import { api } from "@/lib/api";
 import type {
   OfflineItemKind,
@@ -69,6 +75,8 @@ export function useOfflineManifestSync({
         errorMessage: null,
         readyAssetKeys: existing?.readyAssetKeys || [],
         tracks: existing?.tracks || [],
+        artwork: existing?.artwork,
+        artworkVersion: existing?.artworkVersion,
       };
       commitSnapshot({
         items: {
@@ -121,6 +129,7 @@ export function useOfflineManifestSync({
         updatedAt: existing?.updatedAt || null,
         totalBytes: manifest.total_bytes ?? 0,
         tracks: manifestTracks,
+        artwork: manifest.artwork,
         readyAssetKeys,
         errorMessage: manifestTracks.length
           ? null
@@ -203,6 +212,17 @@ export function useOfflineManifestSync({
           { concurrency: 2, signal: transferController.signal },
         );
         if (runResult.cancelled) return;
+        try {
+          await cacheOfflineArtwork(
+            profileKey,
+            offlineArtworkRefs([midItem]),
+            transferController.signal,
+          );
+        } catch (error) {
+          if (transferController.signal.aborted) return;
+          throw error;
+        }
+        if (transferController.signal.aborted) return;
       } finally {
         if (transferAbortRef.current === transferController) {
           transferAbortRef.current = null;
@@ -222,8 +242,9 @@ export function useOfflineManifestSync({
             : existing?.contentVersion || null,
         updatedAt:
           readyCount === manifestTracks.length && failureCount === 0
-            ? manifest.updated_at ?? null
+            ? (manifest.updated_at ?? null)
             : existing?.updatedAt || null,
+        artworkVersion: 1,
         lastSyncedAt: new Date().toISOString(),
         totalBytes: manifest.total_bytes ?? 0,
         errorMessage:
@@ -265,6 +286,7 @@ export function useOfflineManifestSync({
           }, []),
         );
       }
+      await pruneOfflineArtwork(profileKey, Object.values(nextSnapshot.items));
     },
     [commitSnapshot, profileKey, snapshotRef, supported, transferAbortRef],
   );

@@ -67,35 +67,37 @@ export function Meter({
       aria-valuenow={hasRange ? boundedValue : undefined}
       aria-valuetext={hasRange ? valueText : undefined}
     >
-      <MonoLabel as="span" id={labelId} className="min-w-0">
-        {label}
-        {warning ? <span className="block">over · max {max}</span> : null}
-      </MonoLabel>
-      <span
-        className="crate-meter-track relative min-w-0 bg-border-quiet"
-        data-thickness={thickness}
-      >
-        {hasRange ? (
-          <span
-            ref={attachFill}
-            aria-hidden="true"
-            className={`crate-meter-fill absolute inset-0 origin-left ${warning ? "bg-state-warning" : "bg-accent-action-hi"}`}
-          />
-        ) : null}
-        {hasRange && limit != null && Number.isFinite(limit) ? (
-          <span
-            ref={limitRef}
-            aria-hidden="true"
-            className="crate-meter-limit absolute -top-1 -bottom-1 w-px bg-text-primary"
-          />
-        ) : null}
-      </span>
-      <span
-        id={readingId}
-        className={`crate-meter-value font-mono text-label tabular-nums text-right ${warning ? "text-state-warning" : "text-text-primary"}`}
-      >
-        {reading}
-      </span>
+      <div className="crate-meter-layout">
+        <MonoLabel as="span" id={labelId} className="min-w-0">
+          {label}
+          {warning ? <span className="block">over · max {max}</span> : null}
+        </MonoLabel>
+        <span
+          className="crate-meter-track relative min-w-0 bg-border-quiet"
+          data-thickness={thickness}
+        >
+          {hasRange ? (
+            <span
+              ref={attachFill}
+              aria-hidden="true"
+              className={`crate-meter-fill absolute inset-0 origin-left ${warning ? "bg-state-warning" : "bg-accent-action-hi"}`}
+            />
+          ) : null}
+          {hasRange && limit != null && Number.isFinite(limit) ? (
+            <span
+              ref={limitRef}
+              aria-hidden="true"
+              className="crate-meter-limit absolute -top-1 -bottom-1 w-px bg-text-primary"
+            />
+          ) : null}
+        </span>
+        <span
+          id={readingId}
+          className={`crate-meter-value font-mono text-label tabular-nums text-right ${warning ? "text-state-warning" : "text-text-primary"}`}
+        >
+          {reading}
+        </span>
+      </div>
     </div>
   );
 }

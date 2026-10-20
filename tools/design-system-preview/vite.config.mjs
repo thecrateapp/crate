@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1bdOffline: fileURLToPath(
+          new URL("review-1bd-offline.html", import.meta.url),
+        ),
         review1bdSharingImports: fileURLToPath(
           new URL("review-1bd-sharing-imports.html", import.meta.url),
         ),

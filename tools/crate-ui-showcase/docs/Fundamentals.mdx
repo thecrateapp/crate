@@ -144,3 +144,7 @@ options containing an actual MonoLabel share this feedback and keep a transparen
 background. Their resting state colors, target sizes and focus outline remain unchanged.
 The menu rule is scoped to actual MonoLabel options; body-text menu items keep their separate
 interaction recipe. Disabled options retain their resting feedback.
+
+Meter reserves its full formatted reading on one line (minimum5ch), with a flexible track; units and separators never wrap and displace adjacent instrument captions. See Components/Data Display/Meter.
+
+Meter owns its narrow layout: below320px available width, captions move above the rail and single-line reading. This keeps localized neighboring instruments aligned without caller overrides.

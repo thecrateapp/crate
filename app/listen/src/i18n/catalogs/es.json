@@ -1968,5 +1968,20 @@
   "settings.openSubsonic.keyValue": "Clave generada",
   "settings.bandcamp.countsError": "Los totales de la colección no están disponibles. Tu cuenta sigue conectada.",
   "settings.scrobbling.toasts.cancelFailed": "No se ha podido cancelar la conexión. Inténtalo de nuevo.",
-  "album.remoteImport.downloadingUnknown": "Descargando…"
+  "album.remoteImport.downloadingUnknown": "Descargando…",
+  "settings.offline.downloadsTitle": "Descargas en este dispositivo",
+  "settings.offline.downloadsEmpty": "Aquí aparecerá la música guardada para escuchar sin conexión.",
+  "settings.offline.trackProgress": "{ready} / {total} pistas disponibles",
+  "settings.offline.readOnly": "Vuelve a iniciar sesión para gestionar tus descargas.",
+  "settings.offline.totalSize": "Tamaño total {size}",
+  "settings.offline.kind.album": "Álbum",
+  "settings.offline.kind.track": "Pista",
+  "settings.offline.kind.playlist": "Lista",
+  "settings.offline.kind.crate": "Colección Crate",
+  "settings.offline.state.idle": "Sin descargar",
+  "settings.offline.state.queued": "Esperando descarga",
+  "settings.offline.state.downloading": "Descargando",
+  "settings.offline.state.syncing": "Actualizando la música guardada",
+  "settings.offline.state.ready": "Disponible sin conexión",
+  "settings.offline.state.error": "Necesita atención"
 }

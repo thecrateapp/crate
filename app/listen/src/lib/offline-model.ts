@@ -58,6 +58,8 @@ export interface OfflineItemRecord {
   errorMessage?: string | null;
   readyAssetKeys?: string[];
   readyStorageIds?: string[];
+  artwork?: OfflineManifest["artwork"];
+  artworkVersion?: number;
   tracks: OfflineManifestTrack[];
 }
 
