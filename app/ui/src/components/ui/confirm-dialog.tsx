@@ -30,8 +30,9 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      {/* No surface override: `bg-card` is not a generated utility, so it
-          only removed the base surface and left the dialog see-through. */}
+      {/* No surface override: the base modal surface is the one Dialog, Sheet
+          and AppModal use. `bg-card` is more transparent (78% on glass), so
+          over a Sheet the content behind would show through. */}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

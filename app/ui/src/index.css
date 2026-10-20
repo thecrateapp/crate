@@ -3,6 +3,23 @@
 @import "tailwindcss";
 @source "../../shared/ui";
 
+/* Surface colors as admin utilities (bg-card, bg-secondary, border-border...).
+   @crate/ui/tokens/surfaces.css sets these variables per [data-surface] but
+   does not register them with Tailwind, so without this block the classes
+   generate no CSS. `reference` registers the names without emitting a :root
+   declaration and without inlining: bg-card compiles to
+   var(--color-card, <glass value>), so it keeps following [data-surface].
+   Register only what app/ui/src uses; src/surface-tokens.test.ts enforces
+   that. Listen does not register them, so these classes stay empty there. */
+@theme reference {
+  --color-card: var(--crate-token-surface-card-glass);
+  --color-secondary: var(--crate-token-surface-secondary-glass);
+  --color-muted: var(--crate-token-surface-muted-glass);
+  --color-accent: var(--crate-token-surface-accent-glass);
+  --color-border: var(--crate-token-surface-border-glass);
+  --color-input: var(--crate-token-surface-input-glass);
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* Admin: glass surface variant by default */

@@ -24,7 +24,7 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
 - Auth is cookie-based (`/api/auth/me`, `/api/auth/heartbeat` with `app_id: "admin-web"`, `/api/auth/logout`). No bearer tokens, no localStorage tokens. Gate UI by capability via `useAuth().hasCapability(...)` / `hasAnyCapability(...)`, not by role name.
 - Every route must be gated: `CapabilityRoute anyOf={[...]}` in `App.tsx`, and the matching `navItems` entry in `Sidebar.tsx` must declare the same `capabilities`.
 - Pages are named exports (`export function Tasks()`); `App.tsx` maps them with `lazy(() => import(...).then(m => ({ default: m.X })))`.
-- Surface is glass (`index.html`). Do not set `data-surface="solid"` on admin subtrees and do not hardcode card backgrounds; use token classes (`bg-card`, `border-border`, `text-foreground`).
+- Surface is glass (`index.html`). Do not set `data-surface="solid"` on admin subtrees and do not hardcode card backgrounds; use token classes (`bg-card`, `border-border`, `text-foreground`). The surface colors the admin uses (`card`, `secondary`, `muted`, `accent`, `border`, `input`) are registered in `src/index.css` with `@theme reference`, so they generate in the admin build and still follow `[data-surface]`. To use another one (`bg-popover`, `text-card-foreground`, ...), register it there first; `src/surface-tokens.test.ts` fails otherwise.
 - Charts: Nivo only (`@nivo/*` already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`). recharts is not installed in app/ui; do not add it.
 - Icons: `lucide-react` is the admin convention. Toasts: `toast` from `sonner`.
 - No emojis in UI text.

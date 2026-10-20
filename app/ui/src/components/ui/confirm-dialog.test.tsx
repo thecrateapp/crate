@@ -6,10 +6,13 @@ import userEvent from "@testing-library/user-event";
 import { ConfirmDialog } from "./confirm-dialog";
 
 const TOKENS = resolve(process.cwd(), "../shared/ui/tokens");
-const tokenCss = readdirSync(TOKENS)
-  .filter((name) => name.endsWith(".css"))
-  .map((name) => readFileSync(resolve(TOKENS, name), "utf8"))
-  .join("\n");
+const tokenCss = [
+  ...readdirSync(TOKENS)
+    .filter((name) => name.endsWith(".css"))
+    .map((name) => readFileSync(resolve(TOKENS, name), "utf8")),
+  // The admin entry registers the surface colors it uses (bg-card, ...).
+  readFileSync(resolve(process.cwd(), "src/index.css"), "utf8"),
+].join("\n");
 const themeCss = [...tokenCss.matchAll(/@theme[^{]*\{([^}]*)\}/g)]
   .map((match) => match[1])
   .join("\n");
@@ -88,6 +91,6 @@ describe("ConfirmDialog", () => {
     );
     expect(backgrounds).toEqual(["bg-modal-surface"]);
     expect(backgrounds.every(definesBackground)).toBe(true);
-    expect(definesBackground("bg-card")).toBe(false);
+    expect(definesBackground("bg-not-a-surface")).toBe(false);
   });
 });
