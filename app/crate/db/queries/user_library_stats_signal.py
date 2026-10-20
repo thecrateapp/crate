@@ -642,10 +642,27 @@ def _heatmap(session, user_id: int | None, period: StatsPeriod) -> dict:
             key=lambda cell: cells[cell[0]][cell[1]],
         )
         peak = {"weekday": weekday, "hour": hour}
+    listener_count = None
+    if user_id is None:
+        listener_count = int(
+            session.execute(
+                text(
+                    f"""
+                    SELECT COUNT(DISTINCT user_id)
+                    FROM user_hourly_listening
+                    WHERE {period_day_filter(period)}
+                    """
+                ),
+                period_params(period),
+            ).scalar_one()
+            or 0
+        )
     return {
         "cells": cells,
         "peak": peak,
         "night_share": round(night / total, 4) if total else 0,
+        "night_hours": list(_NIGHT_HOURS),
+        "listener_count": listener_count,
     }
 
 
@@ -701,6 +718,38 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
         .mappings()
         .first()
     )
+    newest = (
+        session.execute(
+            text(
+                f"""
+                SELECT alb.name AS album, alb.artist, alb.id AS album_id,
+                       alb.slug AS album_slug,
+                       CAST(SUBSTRING(alb.year FROM '^[0-9]{{4}}') AS integer) AS year
+                FROM user_track_daily td
+                JOIN library_tracks lt ON lt.id = td.track_id
+                JOIN library_albums alb ON alb.id = lt.album_id
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND {period_day_filter(period, "td.day")}
+                  AND alb.year ~ '^[0-9]{{4}}'
+                GROUP BY alb.id
+                ORDER BY year DESC, SUM(td.minutes_listened) DESC, alb.name
+                LIMIT 1
+                """
+            ),
+            {"user_id": user_id, **period_params(period)},
+        )
+        .mappings()
+        .first()
+    )
+    last_day = (
+        min(period.end - timedelta(days=1), period.today)
+        if period.end
+        else period.today
+    )
+    share_this_year = round(
+        sum(float(row.minutes or 0) for row in rows if row.year == last_day.year)
+        / total,
+        4,
+    )
     top_albums = {
         int(row["decade"]): {key: row[key] for key in row.keys() if key != "decade"}
         for row in session.execute(
@@ -738,6 +787,8 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
             for decade, minutes in sorted(decades.items())
         ],
         "oldest_album": dict(oldest) if oldest else None,
+        "newest_album": dict(newest) if newest else None,
+        "share_this_year": share_this_year,
     }
 
 

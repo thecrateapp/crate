@@ -118,6 +118,27 @@ def test_unknown_windows_are_rejected(pg_db):
         get_user_stats_dashboard(1, window="year:1900")
 
 
+def test_music_age_reports_newest_and_current_year_share(history):
+    music_age = _dashboard("year:2024")["music_age"]
+
+    assert music_age["newest_album"]["year"] == 2024
+    assert music_age["newest_album"]["album_id"] and music_age["newest_album"]["album"]
+    assert music_age["oldest_album"]["year"] <= music_age["newest_album"]["year"]
+    assert 0 < music_age["share_this_year"] <= 1
+
+    rolling = _dashboard("365d")["music_age"]
+    assert rolling["newest_album"]["year"] == 2024
+    # No release in the library is from the period's last year (2026).
+    assert rolling["share_this_year"] == 0
+
+
+def test_heatmap_exposes_night_hours(history):
+    heatmap = _dashboard("365d")["heatmap"]
+
+    assert heatmap["night_hours"] == [22, 23, 0, 1, 2, 3, 4, 5]
+    assert heatmap["listener_count"] is None
+
+
 def test_artist_rank_needs_enough_listeners(pg_db):
     from sqlalchemy import text
 

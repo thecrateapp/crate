@@ -324,6 +324,8 @@ export interface StatsHeatmap {
   cells: number[][];
   peak?: { weekday: number; hour: number } | null;
   night_share: number;
+  night_hours?: number[];
+  listener_count?: number | null;
 }
 
 export interface StatsDecadeAlbum {
@@ -351,13 +353,9 @@ export interface StatsMusicAge {
     share: number;
     top_album?: StatsDecadeAlbum | null;
   }[];
-  oldest_album?: {
-    album: string;
-    artist?: string | null;
-    album_id?: number | null;
-    album_slug?: string | null;
-    year: number;
-  } | null;
+  oldest_album?: StatsDecadeAlbum | null;
+  newest_album?: StatsDecadeAlbum | null;
+  share_this_year?: number | null;
 }
 
 export interface StatsGenreTrend {

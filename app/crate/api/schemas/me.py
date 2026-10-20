@@ -763,6 +763,8 @@ class StatsHeatmapResponse(BaseModel):
     cells: list[list[float]] = Field(default_factory=list)
     peak: StatsHeatmapPeakResponse | None = None
     night_share: float = 0
+    night_hours: list[int] = Field(default_factory=list)
+    listener_count: int | None = None
 
 
 class StatsYearAlbumResponse(BaseModel):
@@ -783,6 +785,8 @@ class StatsMusicAgeResponse(BaseModel):
     median_year: int
     decades: list[StatsDecadeShareResponse] = Field(default_factory=list)
     oldest_album: StatsYearAlbumResponse | None = None
+    newest_album: StatsYearAlbumResponse | None = None
+    share_this_year: float | None = None
 
 
 class StatsGenreTrendResponse(BaseModel):

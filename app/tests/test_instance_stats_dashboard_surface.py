@@ -128,3 +128,43 @@ def test_instance_top_items_flag_first_plays_in_period(pg_db):
         + ancient["top_albums"]["items"]
     )
     assert items and all(item["is_new"] is False for item in items)
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_instance_heatmap_counts_listeners(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.repositories.user_library_aggregate_runner import (
+        recompute_user_listening_aggregates,
+    )
+    from crate.db.tx import transaction_scope
+    from tests.stats_history import seed_listening_history
+
+    end_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    seed_listening_history(events=120, days=20, end_at=end_at)
+    recompute_user_listening_aggregates(1)
+    with transaction_scope() as session:
+        for user_id in (201, 202):
+            session.execute(
+                text(
+                    "INSERT INTO users (id, email, name, role, password_hash, created_at) "
+                    "VALUES (:id, :email, :email, 'user', 'x', NOW()) "
+                    "ON CONFLICT (id) DO NOTHING"
+                ),
+                {"id": user_id, "email": f"l{user_id}@example.com"},
+            )
+        session.execute(
+            text(
+                "INSERT INTO user_hourly_listening (user_id, day, hour, minutes_listened) "
+                "VALUES (201, CURRENT_DATE - 1, 23, 5), (201, CURRENT_DATE - 2, 9, 3), "
+                "(202, CURRENT_DATE - 200, 10, 4)"
+            )
+        )
+
+    payload = surface.build_instance_stats_dashboard(
+        window="30d", month=None, **surface._DEFAULT_LIMITS
+    )
+
+    # User 1 (seeded history) and user 201; user 202 is outside the window.
+    assert payload["heatmap"]["listener_count"] == 2
+    assert payload["heatmap"]["night_hours"] == [22, 23, 0, 1, 2, 3, 4, 5]
