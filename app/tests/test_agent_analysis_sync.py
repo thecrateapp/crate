@@ -136,6 +136,36 @@ def _store(
         )
 
 
+def _analysis_with_mix_profile() -> dict:
+    return {
+        "bpm": 120.0,
+        "key": "A",
+        "scale": "minor",
+        "energy": 0.7,
+        "mood": None,
+        "mix_profile": {
+            "schemaVersion": 1,
+            "analyzer": "crate-rust",
+            "analyzerVersion": "smart-mix-v1",
+            "durationMs": 180_000,
+            "quality": "full",
+            "bpm": 120.0,
+            "bpmConfidence": 0.95,
+            "tempoStability": 0.97,
+            "beatAnchorMs": 500,
+            "downbeatAnchorMs": 500,
+            "timeSignature": 4,
+            "beatGridMs": [500, 1_000, 1_500],
+            "key": "A",
+            "scale": "minor",
+            "camelot": "8A",
+            "keyConfidence": 0.9,
+            "introCueMs": 500,
+            "outroCueMs": 175_000,
+        },
+    }
+
+
 def _requeue(track_id: int, pipeline: str) -> None:
     from crate.db.jobs.analysis_popularity import requeue_tracks
 
@@ -170,6 +200,43 @@ class TestAnalysisGenerationFences:
         assert _processing(track["id"], pipeline)["pipeline_signature"] is None
         assert _payload(track["id"], pipeline)["shadow_value"] is None
         assert _payload(track["id"], pipeline)["state"] == "pending"
+
+    def test_stale_claim_in_mixed_batch_does_not_publish_smart_mix_profile(
+        self, pg_db, tmp_path
+    ):
+        from crate.db.jobs.analysis_claims import claim_tracks
+        from crate.db.jobs.analysis_storage import store_analysis_results
+        from crate.db.repositories.smart_mix import get_track_mix_profile
+
+        tracks = [
+            _seed_track(pg_db, f"smart-mix-fence-{name}", library_path=str(tmp_path))
+            for name in ("current", "stale")
+        ]
+        for track in tracks:
+            path = Path(track["path"])
+            path.parent.mkdir(parents=True)
+            path.write_bytes(f"source {track['id']}".encode())
+        claims = {
+            int(claim["id"]): claim
+            for claim in claim_tracks("analysis_state", limit=len(tracks))
+        }
+        current, stale = tracks
+        assert set(claims) == {current["id"], stale["id"]}
+        _requeue(stale["id"], "analysis")
+
+        store_analysis_results(
+            [
+                (track["id"], track["path"], _analysis_with_mix_profile())
+                for track in tracks
+            ],
+            claims=claims,
+        )
+
+        profile = get_track_mix_profile(current["id"])
+        assert profile is not None and profile.analyzer == "crate-rust"
+        assert _payload(current["id"], "analysis")["shadow_value"] == 120.0
+        assert get_track_mix_profile(stale["id"]) is None
+        assert _payload(stale["id"], "analysis")["shadow_value"] is None
 
     @pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
     def test_old_claim_cannot_fail_a_new_generation(self, pg_db, pipeline):
