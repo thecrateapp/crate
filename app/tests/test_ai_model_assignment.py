@@ -225,13 +225,17 @@ def test_snapshot_reads_the_default_connection_once(pg_db, monkeypatch):
     def capture(conn, cursor, statement, parameters, context, executemany):
         statements.append(statement)
 
+    monkeypatch.delenv("CRATE_ENABLE_PATH_LLM_REFINEMENT", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     engine = get_engine()
     event.listen(engine, "before_cursor_execute", capture)
     try:
         result = service.snapshot()
     finally:
         event.remove(engine, "before_cursor_execute", capture)
-    assert len(statements) == 6
+    # Before setup, two more point reads: the Music Paths refinement switch and
+    # the Ollama opt-in setting that decide its legacy_enabled flag.
+    assert len(statements) == 8
     Snapshot.model_validate(result)
 
 
@@ -1012,3 +1016,143 @@ def test_version_fingerprint_is_stable_and_matches_stored_versions(pg_db):
         assert stored["fingerprint"] == store.version_fingerprint(
             ollama["id"], "qwen3:8b", config
         )
+
+
+def refine_once(monkeypatch):
+    """Run Music Paths refinement once; return the provider calls it attempted."""
+    from crate import music_paths_refinement as refinement
+    from tests.test_paths_llm_refinement import _track
+
+    calls = []
+    monkeypatch.setattr(
+        refinement,
+        "execute_structured",
+        lambda *args, **kwargs: calls.append(args) or pytest.fail("provider call"),
+    )
+    tracks = [
+        _track(i, title=str(i), artist=f"Artist {i}", genre_slug="rock")
+        for i in (1, 2, 3)
+    ]
+    result = refinement.refine_music_path_with_llm(
+        origin_label="Origin",
+        dest_label="Destination",
+        origin_type="genre",
+        dest_type="genre",
+        tracks=tracks,
+        candidates_by_genre={
+            "rock": [_track(4, title="Better", artist="Other", genre_slug="rock")]
+        },
+    )
+    assert result == tracks
+    return calls
+
+
+def legacy_enabled(snapshot):
+    return {a["action_id"]: a["legacy_enabled"] for a in snapshot["legacy_actions"]}
+
+
+def test_first_use_keeps_music_paths_refinement_off_when_settings_turned_it_off(
+    pg_db, monkeypatch
+):
+    from crate.db.cache_settings import set_setting
+
+    gemini_environment(monkeypatch, legacy_model="gemini/gemini-3.8-flash")
+    set_setting("paths_llm_refinement_enabled", "false")
+    reviewed = service.snapshot()
+    switches = legacy_enabled(reviewed)
+    assert switches.pop("music_paths.refine") is False
+    assert set(switches.values()) == {True}
+
+    preview = assign("env:gemini", "gemini-3.8-flash", LEVEL_HIGH, dry_run=True)
+
+    enabled = {o["action_id"]: o["enabled"] for o in preview["outcomes"]}
+    assert enabled.pop("music_paths.refine") is False
+    assert set(enabled.values()) == {True}
+    ModelAssignmentResult.model_validate(preview)
+
+    assign("env:gemini", "gemini-3.8-flash", LEVEL_HIGH)
+
+    assert store.get_binding("music_paths.refine")["enabled"] is False
+    assert all(
+        b["enabled"]
+        for b in store.list_bindings()
+        if b["action_id"] != "music_paths.refine"
+    )
+    assert refine_once(monkeypatch) == []
+
+
+def test_legacy_activation_keeps_music_paths_refinement_off(pg_db, monkeypatch):
+    from crate.db.cache_settings import set_setting
+
+    gemini_environment(monkeypatch)
+    set_setting("paths_llm_refinement_enabled", "false")
+
+    activate_legacy()
+
+    assert store.get_binding("music_paths.refine")["enabled"] is False
+    assert store.get_binding("genres.eq.propose")["enabled"] is True
+    assert refine_once(monkeypatch) == []
+
+
+def test_ollama_refinement_needs_the_explicit_opt_in_at_first_use(pg_db, monkeypatch):
+    from crate.llm import provider
+
+    monkeypatch.setattr(
+        provider,
+        "get_config",
+        lambda: {
+            "model": "ollama/qwen3:8b",
+            "provider": "ollama",
+            "ollama_url": "http://ollama:11434",
+        },
+    )
+    monkeypatch.delenv("CRATE_ENABLE_PATH_LLM_REFINEMENT", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    ollama = ollama_text()
+
+    def seeded():
+        outcomes = outcomes_by_action(assign(ollama["id"], "qwen3:8b", dry_run=True))
+        return (
+            legacy_enabled(service.snapshot())["music_paths.refine"],
+            outcomes["music_paths.refine"]["enabled"],
+        )
+
+    assert seeded() == (False, False)
+    monkeypatch.setenv("CRATE_ENABLE_PATH_LLM_REFINEMENT", "1")
+    assert seeded() == (True, True)
+
+
+def test_apply_model_assignment_rejects_a_legacy_step_once_active(pg_db, monkeypatch):
+    gemini_environment(monkeypatch)
+    activate_legacy()
+    current = service.snapshot()
+    before = write_counts()
+
+    with pytest.raises(AIConfigurationError) as error:
+        store.apply_model_assignment(
+            [
+                {
+                    "action_id": "shows.extract.vision",
+                    "op": "legacy",
+                    "enabled": True,
+                    "expected_binding_revision": store.get_binding(
+                        "shows.extract.vision"
+                    )["revision"],
+                    "legacy_context": service._legacy_contexts()[
+                        "shows.extract.vision"
+                    ],
+                }
+            ],
+            default_model=None,
+            expected_revision=current["revision"],
+            expected_review_fingerprint=current["review_fingerprint"],
+            review_fingerprint=lambda data: service._review_fingerprint(
+                service._legacy_contexts(), data
+            ),
+            validate_legacy=service._validate_legacy_or_normal,
+            validate_bindings=service._validate_bindings,
+            actor_id=None,
+        )
+
+    assert error.value.code == "AI_CONFIGURATION_INVALID"
+    assert write_counts() == before

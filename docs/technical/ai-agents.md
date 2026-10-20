@@ -136,13 +136,20 @@ per-image token bound (`AI_ACTION_NEEDS_IMAGE`, `AI_IMAGE_BOUND_UNKNOWN`); outpu
 input tokens are clamped to the model's own limits and the action's maxima, and an
 action left with fewer than 4096 usable input tokens is incompatible
 (`AI_CONTEXT_TOO_SMALL`); image detail prefers `ultra_high` for
-`shows.extract.vision`, then `high`, then `default`; a requested reasoning token
-budget is clamped to the model's thinking-budget range, falling back to the provider
-default when it cannot be honored. An action without a derivable profile keeps its
+`shows.extract.vision`, then `high`, then `default`. A requested reasoning token
+budget outside the model's thinking-budget range is rejected
+(`AI_PROFILE_INCOMPATIBLE`); within it, the budget is clamped to each action's output
+allowance and falls back to the provider default when that leaves it below the
+model's minimum. An action without a derivable profile keeps its
 current binding when the configuration is already active, or its validated legacy
 snapshot otherwise; only when neither can be kept does the whole assignment fail
 closed with `AI_SETUP_BLOCKED`, and activation itself stays all-or-nothing across
-the other ten actions.
+the other ten actions. Activating keeps each inherited on/off state: Music Paths
+refinement stays off when the Settings switch is off, or when it runs on Ollama
+without the explicit opt-in (`CRATE_ENABLE_PATH_LLM_REFINEMENT=1`, an
+`ollama/` `LLM_PROVIDER` or a stored model setting). The snapshot reports this as
+`legacy_actions[].legacy_enabled`, and each assignment outcome carries the
+feature's resulting `enabled` state.
 
 A profile is **owned** by an action only when it is referenced by exactly one
 binding and labelled for that action. Assigning a model reuses or appends to an
@@ -202,7 +209,9 @@ are readable only through their owned domain routes.
 Profiles may lower these maxima; they cannot raise them. Input profiles are bounded
 by the model context and 131072 tokens. Vision admission requires a conservative
 image bound or a sufficient complete model-context reservation; unknown image bounds
-fail closed. Show image composition remains capped at 20 megapixels, 200 proposals
+fail closed. Binding an enabled image action to such a profile is rejected up front
+with `AI_IMAGE_BOUND_UNKNOWN` (422), and catalog models and snapshot profile versions
+report `image_token_bound` so the UI offers only admissible models and profiles. Show image composition remains capped at 20 megapixels, 200 proposals
 and 50 selected shows. Each assisted extraction makes one model call. Local OCR and
 manual entry stay available independently, and extraction never publishes a show.
 

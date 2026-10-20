@@ -522,11 +522,15 @@ def configuration_snapshot(*, bounded=False, session=None) -> dict:
                 ).mappings()
             ],
             "bindings": list_bindings(session=s),
+            # Each version carries its catalog entry (or NULL) so readers can tell
+            # image admission without loading every connection's full catalog.
             "versions": [
                 _json(r)
                 for r in s.execute(
                     text(
-                        "SELECT * FROM ai_profile_versions ORDER BY created_at DESC,profile_id,version DESC LIMIT 1001"
+                        "SELECT v.*,(SELECT m FROM ai_provider_connections c,jsonb_array_elements(c.model_catalog) m "
+                        "WHERE c.id=v.connection_id AND m->>'model_id'=v.model_id LIMIT 1) AS catalog_model "
+                        "FROM ai_profile_versions v ORDER BY v.created_at DESC,v.profile_id,v.version DESC LIMIT 1001"
                     )
                 ).mappings()
             ],
@@ -651,7 +655,9 @@ __all__ += [
 ]
 
 
-def _capture_legacy_binding(s, action_id, context, validate, actor_id) -> dict:
+def _capture_legacy_binding(
+    s, action_id, context, validate, actor_id, enabled=True
+) -> dict:
     """Snapshot one inherited action as a version-1 profile; return its new binding."""
     provider = context["provider"]
     conn = ensure_environment_connection(provider, context["endpoint"], session=s)
@@ -678,7 +684,7 @@ def _capture_legacy_binding(s, action_id, context, validate, actor_id) -> dict:
         "action_id": action_id,
         "profile_id": profile["id"],
         "profile_version": 1,
-        "enabled": True,
+        "enabled": enabled,
         "revision": 0,
     }
 
@@ -691,9 +697,13 @@ def activate_legacy_configuration(
     expected_review_fingerprint,
     review_fingerprint,
     *,
+    legacy_enabled: Mapping[str, bool] | None = None,
     session=None,
 ):
-    """Internal-only exact legacy snapshots; editable API never accepts this config."""
+    """Internal-only exact legacy snapshots; editable API never accepts this config.
+
+    ``legacy_enabled`` seeds each captured binding's switch (default: on).
+    """
     with optional_scope(session) as s:
         with s.begin_nested():
             s.execute(
@@ -713,7 +723,12 @@ def activate_legacy_configuration(
                 binding = existing.get(action_id)
                 if binding is None:
                     binding = _capture_legacy_binding(
-                        s, action_id, context, validate, actor_id
+                        s,
+                        action_id,
+                        context,
+                        validate,
+                        actor_id,
+                        enabled=(legacy_enabled or {}).get(action_id, True),
                     )
                 changes.append(
                     {k: v for k, v in binding.items() if k != "revision"}
@@ -784,6 +799,11 @@ def apply_model_assignment(
             ):
                 _conflict()
             active = data["state"]["active"]
+            if active and any(step["op"] == "legacy" for step in steps):
+                # Legacy snapshots are captured only by the activating write.
+                raise AIConfigurationError(
+                    "AI_CONFIGURATION_INVALID", "Configuration is already active"
+                )
             changes = []
             for step in steps:
                 op, action_id = step["op"], step["action_id"]
@@ -816,7 +836,12 @@ def apply_model_assignment(
                     )["version"]
                 elif op == "legacy":
                     captured = _capture_legacy_binding(
-                        s, action_id, step["legacy_context"], validate_legacy, actor_id
+                        s,
+                        action_id,
+                        step["legacy_context"],
+                        validate_legacy,
+                        actor_id,
+                        enabled=step["enabled"],
                     )
                     profile_id = captured["profile_id"]
                     version = captured["profile_version"]

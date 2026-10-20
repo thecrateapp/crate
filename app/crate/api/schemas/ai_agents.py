@@ -138,8 +138,13 @@ class Connection(ConnectionMetadata):
     model_catalog: list[ModelCapabilities] = Field(max_length=500)
 
 
+class CatalogModel(ModelCapabilities):
+    # Per-image token reservation; None means image features cannot be admitted.
+    image_token_bound: int | None = None
+
+
 class ModelsResponse(ClosedModel):
-    models: list[ModelCapabilities] = Field(max_length=500)
+    models: list[CatalogModel] = Field(max_length=500)
     status: Literal["pending", "ready", "error"]
     updated_at: Stamp | None
     error_code: Code | None
@@ -153,6 +158,7 @@ class ProfileVersion(ClosedModel):
     config: ProfileConfig | LegacyProfileConfig
     fingerprint: Fingerprint
     created_at: Stamp
+    image_token_bound: int | None = None
 
 
 class Profile(ClosedModel):
@@ -192,6 +198,7 @@ class LegacyActionPreview(ClosedModel):
     endpoint: Annotated[str, Field(max_length=2048)] | None
     legacy_options: LegacyOptions
     effective_timeout_seconds: Annotated[int, Field(ge=1, le=300)] | None
+    legacy_enabled: bool = True
 
 
 class DefaultModelFeature(ClosedModel):
@@ -242,6 +249,7 @@ class AssignmentOutcome(ClosedModel):
     adjustments: list[Literal["reasoning", "image_detail"]] = Field(
         default_factory=list, max_length=2
     )
+    enabled: bool | None = None  # the feature's switch after applying; None if blocked
 
 
 class ModelAssignmentResult(ClosedModel):

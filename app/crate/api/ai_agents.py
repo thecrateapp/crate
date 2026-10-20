@@ -40,13 +40,26 @@ router = APIRouter(
 )
 
 
+# Codes naming a missing resource. Other *_UNKNOWN codes (image bound, legacy
+# limits) describe an invalid configuration and stay 422.
+_NOT_FOUND = frozenset(
+    {
+        "AI_ACTION_UNKNOWN",
+        "AI_CONNECTION_UNKNOWN",
+        "AI_INVOCATION_UNKNOWN",
+        "AI_JOB_UNKNOWN",
+        "AI_PROFILE_UNKNOWN",
+    }
+)
+
+
 def _invoke(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except AIConfigurationError as error:
         status = (
             404
-            if error.code.endswith("UNKNOWN")
+            if error.code in _NOT_FOUND
             else 409
             if error.code.endswith(("CONFLICT", "STALE"))
             else 422

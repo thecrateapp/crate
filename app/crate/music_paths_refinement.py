@@ -92,12 +92,20 @@ def refine_music_path_with_llm(
         return tracks
 
 
+def legacy_refinement_enabled(provider: str) -> bool:
+    """Whether refinement runs on server settings: the Settings switch, plus Ollama's opt-in.
+
+    AI models setup seeds the Music Paths binding from this, so first use keeps it.
+    """
+    if get_setting(_REFINEMENT_ENABLED_SETTING, "true") != "true":
+        return False
+    return provider != "ollama" or _ollama_refinement_is_explicitly_enabled()
+
+
 def _legacy_refinement_enabled(context: dict) -> bool:
     if context["mode"] != "legacy":
         return True
-    if get_setting(_REFINEMENT_ENABLED_SETTING, "true") != "true":
-        return False
-    return context["provider"] != "ollama" or _ollama_refinement_is_explicitly_enabled()
+    return legacy_refinement_enabled(context["provider"])
 
 
 def _revalidate_refinement(call: dict) -> None:

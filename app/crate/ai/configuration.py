@@ -298,6 +298,9 @@ def snapshot():
         )
     versions = {}
     for version in data["versions"]:
+        version["image_token_bound"] = _catalog_image_bound(
+            version.pop("catalog_model", None)
+        )
         versions.setdefault(version["profile_id"], []).append(version)
     return {
         "revision": data["state"]["revision"],
@@ -319,6 +322,9 @@ def snapshot():
             }
             | {
                 "supported": context["provider"] in _PROVIDERS,
+                "legacy_enabled": _legacy_enabled(
+                    context["action_id"], context["provider"]
+                ),
                 "effective_timeout_seconds": context["legacy_options"][
                     "timeout_seconds"
                 ]
@@ -397,7 +403,10 @@ def connection_models(id):
         else store.get_connection(_env_id(id[4:]))
     )
     return {
-        "models": row["model_catalog"] if row else [],
+        "models": [
+            {**model, "image_token_bound": _catalog_image_bound(model)}
+            for model in (row["model_catalog"] if row else [])
+        ],
         "status": row["catalog_status"] if row else "pending",
         "updated_at": row["catalog_updated_at"] if row else None,
         "error_code": row["catalog_error_code"] if row else None,
@@ -458,6 +467,48 @@ def create_profile_version(id, data, expected_version, actor_id):
     return store.create_profile_version(id, values, expected_version, actor_id)
 
 
+def _catalog_image_bound(model):
+    """Per-image token bound of a catalog entry; None when unknown or unreadable."""
+    try:
+        return image_token_bound(ModelCapabilities.model_validate(model))
+    except (ValueError, TypeError):
+        return None
+
+
+def _require_image_admission(connection, version, action_id):
+    """Mirror runtime admission (runtime.execute_structured): an enabled image action
+    needs a known per-image bound, or a profile whose input allowance reserves the
+    model's full context. Legacy snapshots keep their inherited admission."""
+    config = version.get("config") or {}
+    if (
+        get_action(action_id).input != "image"
+        or config.get("kind") == "legacy_snapshot"
+    ):
+        return
+    model = next(
+        m for m in connection["model_catalog"] if m["model_id"] == version["model_id"]
+    )
+    capabilities = ModelCapabilities.model_validate(model)
+    if image_token_bound(capabilities) is not None:
+        return
+    native_context = capabilities.context_window
+    if (
+        native_context is None
+        or native_context > ProfileConfig.model_validate(config).max_input_tokens
+    ):
+        _fail(
+            "AI_IMAGE_BOUND_UNKNOWN",
+            "Image token bounds are unavailable for this model",
+        )
+
+
+def _validate_binding(connection, version, action_id, *, enabled=True):
+    _validate_legacy_or_normal(connection, version, action_id)
+    # A disabled action is refused before admission, so it may stay bound.
+    if enabled:
+        _require_image_admission(connection, version, action_id)
+
+
 def _validate_bindings(data, changes):
     versions = {(v["profile_id"], v["version"]): v for v in data["versions"]}
     connections = {c["id"]: c for c in data["connections"]}
@@ -466,8 +517,11 @@ def _validate_bindings(data, changes):
         version = versions.get((change["profile_id"], change["profile_version"]))
         if version is None:
             _fail("AI_PROFILE_UNKNOWN", "Profile version does not exist")
-        _validate_legacy_or_normal(
-            connections[version["connection_id"]], version, change["action_id"]
+        _validate_binding(
+            connections[version["connection_id"]],
+            version,
+            change["action_id"],
+            enabled=change.get("enabled", True),
         )
 
 
@@ -476,6 +530,20 @@ def apply_bindings(changes, actor_id):
 
     values = BindingBatch.model_validate({"changes": changes}).model_dump()["changes"]
     return store.apply_validated_bindings(values, actor_id, _validate_bindings)
+
+
+def _legacy_enabled(action_id, provider):
+    """Whether an inherited action runs on server settings.
+
+    Only Music Paths refinement has its own switch (Settings, plus Ollama's opt-in);
+    setup seeds its binding from it instead of silently turning it on.
+    """
+    if action_id != "music_paths.refine":
+        return True
+    # Lazy: the refinement consumer imports this module through crate.ai.consumers.
+    from crate.music_paths_refinement import legacy_refinement_enabled
+
+    return legacy_refinement_enabled(provider)
 
 
 def _legacy_contexts(config=None):
@@ -523,6 +591,10 @@ def activate(expected_revision, actor_id, expected_review_fingerprint):
         _validate_legacy_or_normal,
         expected_review_fingerprint,
         review_fingerprint,
+        legacy_enabled={
+            action_id: _legacy_enabled(action_id, context["provider"])
+            for action_id, context in contexts.items()
+        },
     )
     return {k: result[k] for k in ("active", "revision", "activated_at")}
 
@@ -565,12 +637,13 @@ def _assignment_model(connection, model_id, reasoning):
     return capabilities
 
 
-def _outcome(action_id, outcome, reason=None, adjustments=()):
+def _outcome(action_id, outcome, reason=None, adjustments=(), enabled=None):
     return {
         "action_id": action_id,
         "outcome": outcome,
         "reason": reason,
         "adjustments": list(adjustments),
+        "enabled": enabled,
     }
 
 
@@ -605,7 +678,14 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
         )
         step = {
             "action_id": action_id,
-            "enabled": binding["enabled"] if binding else True,
+            # An unbound action is activated now: it keeps its server-settings switch.
+            "enabled": binding["enabled"]
+            if binding
+            else (
+                True
+                if active
+                else _legacy_enabled(action_id, contexts[action_id]["provider"])
+            ),
             "expected_binding_revision": binding["revision"] if binding else 0,
         }
         if entry.config is not None:
@@ -645,17 +725,29 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
                     "expected_version": owned["current_version"],
                 }
             steps.append(step)
-            outcomes.append(_outcome(action_id, outcome, None, entry.adjustments))
+            outcomes.append(
+                _outcome(action_id, outcome, None, entry.adjustments, step["enabled"])
+            )
             continue
         if active:
-            outcomes.append(_outcome(action_id, "kept_current", entry.reason))
+            outcomes.append(
+                _outcome(
+                    action_id,
+                    "kept_current",
+                    entry.reason,
+                    enabled=binding["enabled"] if binding else None,
+                )
+            )
             continue
         try:
             if binding is not None:
                 if bound is None:
                     _fail("AI_PROFILE_UNKNOWN", "Profile version does not exist")
-                _validate_legacy_or_normal(
-                    connections[bound["connection_id"]], bound, action_id
+                _validate_binding(
+                    connections[bound["connection_id"]],
+                    bound,
+                    action_id,
+                    enabled=binding["enabled"],
                 )
                 outcome = "kept_current"
                 step |= {
@@ -680,7 +772,9 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
             outcomes.append(_outcome(action_id, "blocked", error.code))
             continue
         steps.append(step)
-        outcomes.append(_outcome(action_id, outcome, entry.reason))
+        outcomes.append(
+            _outcome(action_id, outcome, entry.reason, enabled=step["enabled"])
+        )
     return outcomes, steps
 
 

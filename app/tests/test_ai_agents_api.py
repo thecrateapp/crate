@@ -403,6 +403,8 @@ def test_snapshot_bounds_collections_without_n_plus_one(pg_db, monkeypatch):
     def capture(conn, cursor, statement, parameters, context, executemany):
         statements.append(statement)
 
+    monkeypatch.delenv("CRATE_ENABLE_PATH_LLM_REFINEMENT", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
     engine = get_engine()
     event.listen(engine, "before_cursor_execute", capture)
     try:
@@ -414,7 +416,9 @@ def test_snapshot_bounds_collections_without_n_plus_one(pg_db, monkeypatch):
     assert (
         len(result["connections"]) == 1003
     )  # plus three bounded virtual environment entries
-    assert len(statements) == 5
+    # Five batch reads, plus the Music Paths refinement switch and Ollama
+    # opt-in settings that only matter before setup.
+    assert len(statements) == 7
     Snapshot.model_validate(result)
 
 
@@ -580,6 +584,7 @@ def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeyp
         },
         None,
     )
+    # Ollama has no per-image token bound, so image features can only be bound off.
     service.apply_bindings(
         [
             {
@@ -587,9 +592,9 @@ def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeyp
                 "profile_id": bounded["id"],
                 "profile_version": 1,
                 "expected_revision": 0,
-                "enabled": True,
+                "enabled": action.input != "image",
             }
-            for action_id in ACTIONS
+            for action_id, action in ACTIONS.items()
         ],
         None,
     )
@@ -828,3 +833,154 @@ def test_model_assignment_requires_a_manage_session(test_app, monkeypatch):
             path, headers={"Authorization": "Bearer machine"}, json=body
         )
         assert response.status_code == 401
+
+
+def test_bindings_reject_image_features_without_an_image_bound(
+    test_app, pg_db, monkeypatch
+):
+    from crate.ai import configuration as service
+    from tests.test_ai_model_assignment import gemini_environment
+
+    manage_session(monkeypatch)
+    env = gemini_environment(monkeypatch)
+
+    def profile(model_id):
+        return service.create_profile(
+            {
+                "label": model_id,
+                "connection_id": env["id"],
+                "model_id": model_id,
+                "config": {},
+            },
+            None,
+        )
+
+    def bind(action_id, profile_id):
+        return test_app.post(
+            "/api/admin/ai/bindings",
+            json={
+                "changes": [
+                    {
+                        "action_id": action_id,
+                        "profile_id": profile_id,
+                        "profile_version": 1,
+                        "expected_revision": 0,
+                    }
+                ]
+            },
+        )
+
+    unbounded = profile("gemini-2.5-flash")
+    rejected = bind("shows.extract.vision", unbounded["id"])
+    assert rejected.status_code == 422
+    assert rejected.headers["x-crate-error"] == "AI_IMAGE_BOUND_UNKNOWN"
+    assert store.list_bindings() == []
+
+    assert bind("genres.eq.propose", unbounded["id"]).status_code == 200
+    accepted = bind("shows.extract.vision", profile("gemini-3.8-flash")["id"])
+    assert accepted.status_code == 200, accepted.text
+    assert {b["action_id"] for b in store.list_bindings()} == {
+        "genres.eq.propose",
+        "shows.extract.vision",
+    }
+
+
+def test_catalog_and_snapshot_expose_the_image_token_bound(
+    test_app, pg_db, monkeypatch
+):
+    from crate.ai import configuration as service
+    from tests.test_ai_model_assignment import gemini_environment
+
+    manage_session(monkeypatch)
+    env = gemini_environment(monkeypatch)
+    for model_id in ("gemini-3.8-flash", "gemini-2.5-flash"):
+        service.create_profile(
+            {
+                "label": model_id,
+                "connection_id": env["id"],
+                "model_id": model_id,
+                "config": {},
+            },
+            None,
+        )
+
+    response = test_app.get("/api/admin/ai/connections/env:gemini/models")
+    assert response.status_code == 200, response.text
+    bounds = {m["model_id"]: m["image_token_bound"] for m in response.json()["models"]}
+    assert bounds == {"gemini-3.8-flash": 4096, "gemini-2.5-flash": None}
+    assert (
+        "image_token_bound" not in store.get_connection(env["id"])["model_catalog"][0]
+    )
+
+    snapshot = test_app.get("/api/admin/ai/snapshot")
+    assert snapshot.status_code == 200, snapshot.text
+    versions = {
+        version["model_id"]: version["image_token_bound"]
+        for profile in snapshot.json()["profiles"]
+        for version in profile["versions"]
+    }
+    assert versions == {"gemini-3.8-flash": 4096, "gemini-2.5-flash": None}
+
+
+def test_invoke_maps_only_missing_resources_to_404():
+    from crate.api import ai_agents as api
+    from fastapi import HTTPException
+
+    def status(code):
+        def fail():
+            raise AIConfigurationError(code, "message")
+
+        with pytest.raises(HTTPException) as error:
+            api._invoke(fail)
+        assert error.value.headers["X-Crate-Error"] == code
+        return error.value.status_code
+
+    for code in (
+        "AI_ACTION_UNKNOWN",
+        "AI_CONNECTION_UNKNOWN",
+        "AI_INVOCATION_UNKNOWN",
+        "AI_JOB_UNKNOWN",
+        "AI_PROFILE_UNKNOWN",
+    ):
+        assert status(code) == 404, code
+    for code in (
+        "AI_IMAGE_BOUND_UNKNOWN",
+        "AI_LEGACY_LIMITS_UNKNOWN",
+        "AI_SETUP_BLOCKED",
+    ):
+        assert status(code) == 422, code
+    for code in ("AI_CONFIGURATION_CONFLICT", "AI_CONTEXT_STALE"):
+        assert status(code) == 409, code
+
+
+def test_image_features_can_stay_bound_off_without_an_image_bound(pg_db, monkeypatch):
+    from crate.ai import configuration as service
+    from tests.test_ai_model_assignment import gemini_environment
+
+    env = gemini_environment(monkeypatch)
+    unbounded = service.create_profile(
+        {
+            "label": "Text Gemini",
+            "connection_id": env["id"],
+            "model_id": "gemini-2.5-flash",
+            "config": {},
+        },
+        None,
+    )
+    change = {
+        "action_id": "shows.extract.vision",
+        "profile_id": unbounded["id"],
+        "profile_version": 1,
+        "enabled": False,
+        "expected_revision": 0,
+    }
+
+    (bound,) = service.apply_bindings([change], None)
+
+    assert bound["enabled"] is False
+    with pytest.raises(AIConfigurationError) as error:
+        service.apply_bindings(
+            [change | {"enabled": True, "expected_revision": bound["revision"]}], None
+        )
+    assert error.value.code == "AI_IMAGE_BOUND_UNKNOWN"
+    assert store.get_binding("shows.extract.vision")["enabled"] is False
