@@ -37,7 +37,7 @@ _PREWARMED_WINDOWS = ("30d", "90d", "365d", "all_time")
 _DEFAULT_LIMITS = {
     "tracks_limit": 12,
     "artists_limit": 10,
-    "albums_limit": 12,
+    "albums_limit": 14,
     "genres_limit": 10,
     "replay_limit": 36,
 }
@@ -55,7 +55,7 @@ def instance_stats_subject_key(
 ) -> str:
     period = f"month:{month}" if month else window
     return (
-        f"instance:{period}:{tracks_limit}:{artists_limit}:{albums_limit}:"
+        f"v3:instance:{period}:{tracks_limit}:{artists_limit}:{albums_limit}:"
         f"{genres_limit}:{replay_limit}"
     )
 
@@ -128,7 +128,7 @@ def get_instance_stats_dashboard(
     month: str | None = None,
     tracks_limit: int = 12,
     artists_limit: int = 10,
-    albums_limit: int = 12,
+    albums_limit: int = 14,
     genres_limit: int = 10,
     replay_limit: int = 36,
 ) -> dict[str, Any]:
@@ -165,7 +165,7 @@ def refresh_instance_stats_dashboard_snapshot(
     month: str | None = None,
     tracks_limit: int = 12,
     artists_limit: int = 10,
-    albums_limit: int = 12,
+    albums_limit: int = 14,
     genres_limit: int = 10,
     replay_limit: int = 36,
 ) -> dict[str, Any]:

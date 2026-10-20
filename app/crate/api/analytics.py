@@ -108,7 +108,7 @@ def api_instance_listening_stats_dashboard(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     tracks_limit: int = Query(12, ge=1, le=50),
     artists_limit: int = Query(10, ge=1, le=50),
-    albums_limit: int = Query(10, ge=1, le=50),
+    albums_limit: int = Query(14, ge=1, le=50),
     genres_limit: int = Query(10, ge=1, le=50),
     replay_limit: int = Query(36, ge=1, le=100),
 ):

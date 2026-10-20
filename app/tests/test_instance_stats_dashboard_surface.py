@@ -30,7 +30,16 @@ def test_cold_instance_dashboard_queues_a_build_instead_of_aggregating(monkeypat
     assert payload["snapshot"]["scope"] == "stats:dashboard:instance"
     assert payload["subject"] == {"kind": "instance", "display_name": "Crate"}
     assert queued[0][0] == "refresh_instance_stats_dashboard_snapshot"
-    assert queued[0][2] == "stats-dashboard-instance:instance:90d:12:10:12:10:36"
+    assert queued[0][2] == "stats-dashboard-instance:v3:instance:90d:12:10:14:10:36"
+
+
+def test_instance_key_is_versioned_and_limits_match_listen():
+    key = surface.instance_stats_subject_key(
+        window="30d", month=None, **surface._DEFAULT_LIMITS
+    )
+
+    assert key == "v3:instance:30d:12:10:14:10:36"
+    assert surface._DEFAULT_LIMITS["albums_limit"] == 14
 
 
 def test_instance_refresh_scheduling_is_debounced(monkeypatch):

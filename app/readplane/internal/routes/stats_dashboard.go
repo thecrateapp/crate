@@ -74,7 +74,7 @@ func statsDashboardSubjectKey(userID int64, query url.Values) (string, error) {
 	}
 
 	return fmt.Sprintf(
-		"v2:user:%d:%s:%s:%d:%d:%d:%d:%d",
+		"v3:user:%d:%s:%s:%d:%d:%d:%d:%d",
 		userID,
 		period,
 		monthKey,

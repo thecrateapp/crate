@@ -186,7 +186,7 @@ def _handle_refresh_user_stats_dashboard_snapshot(
         month=params.get("month"),
         tracks_limit=int(params.get("tracks_limit") or 12),
         artists_limit=int(params.get("artists_limit") or 10),
-        albums_limit=int(params.get("albums_limit") or 12),
+        albums_limit=int(params.get("albums_limit") or 14),
         genres_limit=int(params.get("genres_limit") or 10),
         replay_limit=int(params.get("replay_limit") or 36),
     )
@@ -209,7 +209,7 @@ def _handle_refresh_instance_stats_dashboard_snapshot(
         month=params.get("month"),
         tracks_limit=int(params.get("tracks_limit") or 12),
         artists_limit=int(params.get("artists_limit") or 10),
-        albums_limit=int(params.get("albums_limit") or 12),
+        albums_limit=int(params.get("albums_limit") or 14),
         genres_limit=int(params.get("genres_limit") or 10),
         replay_limit=int(params.get("replay_limit") or 36),
     )

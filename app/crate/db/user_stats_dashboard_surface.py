@@ -45,7 +45,7 @@ from crate.db.ui_snapshot_shared import decorate_snapshot
 from crate.db.ui_snapshot_writes import upsert_ui_snapshot
 
 _MAX_AGE_SECONDS = 300
-_SUBJECT_KEY_VERSION = "v2"
+_SUBJECT_KEY_VERSION = "v3"
 _STALE_MAX_AGE_SECONDS = 86_400
 _DEFAULT_LIMITS = {
     "tracks_limit": 12,
