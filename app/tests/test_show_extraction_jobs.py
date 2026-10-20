@@ -346,6 +346,32 @@ def test_pending_readiness_probe_never_blocks_the_editors_next_extraction(
     )
 
 
+def test_readiness_probe_is_accepted_while_a_real_extraction_is_outstanding(
+    show_world,
+):
+    # The other half of the two-way exemption: the probe the import view
+    # starts on its own neither waits for nor is refused by the editor's one
+    # outstanding job, and replays by key like any accepted job.
+    actor = show_world["principal"]
+    real = accept_show_extraction(
+        actor, {"mode": "parse", "raw_text": "2027-03-02"}, "real-outstanding"
+    )
+
+    probe = accept_show_extraction(actor, {"mode": "probe"}, "readiness-during-real")
+
+    assert probe["job_id"] != real["job_id"]
+    assert (
+        accept_show_extraction(actor, {"mode": "probe"}, "readiness-during-real")[
+            "job_id"
+        ]
+        == probe["job_id"]
+    )
+    with pytest.raises(DiagnosticError, match="active maintenance job"):
+        accept_show_extraction(
+            actor, {"mode": "parse", "raw_text": "2027-03-04"}, "second-real"
+        )
+
+
 def test_pending_readiness_probe_never_blocks_a_plan_review(show_world):
     from tests.test_show_import_plans import prepare
 
