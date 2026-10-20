@@ -29,12 +29,29 @@ function keyLine(connection: Connection): string {
 
 function ModelsLine({ connection }: { connection: Connection }) {
   if (connection.model_count === 0) return <p>Models not loaded</p>;
+  const count = `${formatCount(connection.model_count)} models`;
+  if (!connection.catalog_updated_at) return <p>{count}</p>;
   return (
     <p>
-      {formatCount(connection.model_count)} models · updated{" "}
-      <RelativeTime value={connection.catalog_updated_at} />
+      {count} · updated <RelativeTime value={connection.catalog_updated_at} />
     </p>
   );
+}
+
+// The connection limits the API accepts.
+const LIMITS = {
+  daily_calls: 100000,
+  daily_tokens: 1000000000,
+  max_concurrent: 8,
+};
+
+/** An empty number input holds NaN; render it as an empty field. */
+function numberValue(value: number): number | "" {
+  return Number.isFinite(value) ? value : "";
+}
+
+function withinLimit(value: number, max: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= max;
 }
 
 function KeyForm({
@@ -54,12 +71,13 @@ function KeyForm({
         `/connections/${encodeURIComponent(connection.id)}/credential`,
         { api_key: value, expected_revision: connection.revision },
       );
-      refresh();
     } catch (error) {
       reportFailure(error);
     } finally {
       setBusy(false);
       setKey("");
+      // Also after a failure: a conflict leaves the revision stale.
+      refresh();
     }
   }
 
@@ -95,15 +113,18 @@ function KeyForm({
   );
 }
 
-function SettingsSection({
+/**
+ * Keyed on the connection revision by its parent: a newer revision (someone
+ * else's change, or our own save) restarts the form from the saved values, so
+ * saving never sends stale fields back.
+ */
+function LimitsForm({
   connection,
   refresh,
 }: {
   connection: Connection;
   refresh: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const contentId = useId();
   const [busy, setBusy] = useState(false);
   const [label, setLabel] = useState(connection.label);
   const [endpoint, setEndpoint] = useState(connection.endpoint ?? "");
@@ -111,17 +132,23 @@ function SettingsSection({
   const [dailyCalls, setDailyCalls] = useState(connection.daily_calls);
   const [dailyTokens, setDailyTokens] = useState(connection.daily_tokens);
   const [maxConcurrent, setMaxConcurrent] = useState(connection.max_concurrent);
-  const [modelId, setModelId] = useState("");
+  const isOllama = connection.provider === "ollama";
+  const valid =
+    withinLimit(dailyCalls, LIMITS.daily_calls) &&
+    withinLimit(dailyTokens, LIMITS.daily_tokens) &&
+    withinLimit(maxConcurrent, LIMITS.max_concurrent);
 
   async function saveSettings(event: FormEvent) {
     event.preventDefault();
+    if (!valid) return;
     setBusy(true);
     try {
       await writeAI(
         `/connections/${encodeURIComponent(connection.id)}`,
         {
           label,
-          endpoint: connection.provider === "ollama" ? endpoint || null : null,
+          // Hosted providers keep whatever endpoint the API holds.
+          ...(isOllama ? { endpoint: endpoint || null } : {}),
           enabled,
           daily_calls: dailyCalls,
           daily_tokens: dailyTokens,
@@ -130,13 +157,98 @@ function SettingsSection({
         },
         "PATCH",
       );
-      refresh();
     } catch (error) {
       reportFailure(error);
     } finally {
       setBusy(false);
+      refresh();
     }
   }
+
+  return (
+    <form
+      onSubmit={(event) => void saveSettings(event)}
+      className="flex flex-wrap gap-3"
+    >
+      <label className="space-y-1 text-sm text-white/70">
+        Name
+        <Input
+          required
+          maxLength={200}
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+        />
+      </label>
+      {isOllama ? (
+        <label className="space-y-1 text-sm text-white/70">
+          Endpoint
+          <Input
+            type="url"
+            required
+            value={endpoint}
+            onChange={(event) => setEndpoint(event.target.value)}
+          />
+        </label>
+      ) : null}
+      <label className="space-y-1 text-sm text-white/70">
+        Daily calls
+        <Input
+          type="number"
+          min={1}
+          max={LIMITS.daily_calls}
+          required
+          value={numberValue(dailyCalls)}
+          onChange={(event) => setDailyCalls(event.target.valueAsNumber)}
+        />
+      </label>
+      <label className="space-y-1 text-sm text-white/70">
+        Daily tokens
+        <Input
+          type="number"
+          min={1}
+          max={LIMITS.daily_tokens}
+          required
+          value={numberValue(dailyTokens)}
+          onChange={(event) => setDailyTokens(event.target.valueAsNumber)}
+        />
+      </label>
+      <label className="space-y-1 text-sm text-white/70">
+        At a time
+        <Input
+          type="number"
+          min={1}
+          max={LIMITS.max_concurrent}
+          required
+          value={numberValue(maxConcurrent)}
+          onChange={(event) => setMaxConcurrent(event.target.valueAsNumber)}
+        />
+      </label>
+      <label className="flex items-center gap-2 self-end pb-1 text-sm text-white/70">
+        <Switch
+          aria-label="Connection enabled"
+          checked={enabled}
+          onCheckedChange={setEnabled}
+        />
+        Enabled
+      </label>
+      <Button type="submit" disabled={busy || !valid}>
+        Save settings
+      </Button>
+    </form>
+  );
+}
+
+const MODEL_ID_PATTERN = "[A-Za-z0-9][A-Za-z0-9._:/-]*";
+
+function ManualModelForm({
+  connection,
+  refresh,
+}: {
+  connection: Connection;
+  refresh: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [modelId, setModelId] = useState("");
 
   async function addModel(event: FormEvent) {
     event.preventDefault();
@@ -151,20 +263,53 @@ function SettingsSection({
         },
       );
       setModelId("");
-      refresh();
     } catch (error) {
-      reportFailure(error);
+      reportFailure(error, "That model ID isn't valid.");
     } finally {
       setBusy(false);
+      refresh();
     }
   }
+
+  return (
+    <form
+      onSubmit={(event) => void addModel(event)}
+      className="flex flex-wrap items-end gap-2"
+    >
+      <label className="space-y-1 text-sm text-white/70">
+        Model ID
+        <Input
+          aria-label="Model ID"
+          required
+          maxLength={200}
+          pattern={MODEL_ID_PATTERN}
+          value={modelId}
+          onChange={(event) => setModelId(event.target.value)}
+        />
+      </label>
+      <Button type="submit" disabled={busy || !modelId}>
+        Add model
+      </Button>
+    </form>
+  );
+}
+
+function SettingsSection({
+  connection,
+  refresh,
+}: {
+  connection: Connection;
+  refresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const contentId = useId();
 
   return (
     <div>
       <button
         type="button"
         aria-expanded={open}
-        aria-controls={contentId}
+        aria-controls={open ? contentId : undefined}
         onClick={() => setOpen((value) => !value)}
         className="inline-flex items-center gap-1 text-sm text-white/70 hover:text-white"
       >
@@ -177,95 +322,12 @@ function SettingsSection({
       </button>
       {open ? (
         <div id={contentId} className="mt-3 space-y-4">
-          <form
-            onSubmit={(event) => void saveSettings(event)}
-            className="flex flex-wrap gap-3"
-          >
-            <label className="space-y-1 text-sm text-white/70">
-              Name
-              <Input
-                required
-                maxLength={200}
-                value={label}
-                onChange={(event) => setLabel(event.target.value)}
-              />
-            </label>
-            {connection.provider === "ollama" ? (
-              <label className="space-y-1 text-sm text-white/70">
-                Endpoint
-                <Input
-                  type="url"
-                  required
-                  value={endpoint}
-                  onChange={(event) => setEndpoint(event.target.value)}
-                />
-              </label>
-            ) : null}
-            <label className="space-y-1 text-sm text-white/70">
-              Daily calls
-              <Input
-                type="number"
-                min={1}
-                max={100000}
-                required
-                value={dailyCalls}
-                onChange={(event) => setDailyCalls(event.target.valueAsNumber)}
-              />
-            </label>
-            <label className="space-y-1 text-sm text-white/70">
-              Daily tokens
-              <Input
-                type="number"
-                min={1}
-                max={1000000000}
-                required
-                value={dailyTokens}
-                onChange={(event) => setDailyTokens(event.target.valueAsNumber)}
-              />
-            </label>
-            <label className="space-y-1 text-sm text-white/70">
-              At a time
-              <Input
-                type="number"
-                min={1}
-                max={8}
-                required
-                value={maxConcurrent}
-                onChange={(event) =>
-                  setMaxConcurrent(event.target.valueAsNumber)
-                }
-              />
-            </label>
-            <label className="flex items-center gap-2 self-end pb-1 text-sm text-white/70">
-              <Switch
-                aria-label="Connection enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
-              />
-              Enabled
-            </label>
-            <Button type="submit" disabled={busy}>
-              Save settings
-            </Button>
-          </form>
-          <form
-            onSubmit={(event) => void addModel(event)}
-            className="flex flex-wrap items-end gap-2"
-          >
-            <label className="space-y-1 text-sm text-white/70">
-              Model ID
-              <Input
-                aria-label="Model ID"
-                required
-                maxLength={200}
-                value={modelId}
-                onChange={(event) => setModelId(event.target.value)}
-              />
-            </label>
-            <Button type="submit" disabled={busy || !modelId}>
-              Add model
-            </Button>
-          </form>
+          <LimitsForm
+            key={connection.revision}
+            connection={connection}
+            refresh={refresh}
+          />
+          <ManualModelForm connection={connection} refresh={refresh} />
           <p className="text-xs text-white/45">
             Added models stay pending until Crate can confirm what they support.
           </p>
@@ -288,7 +350,12 @@ export function ProviderCard({
   const status = providerStatus(connection);
   const name = connectionName(connection);
 
-  const [job, setJob] = useState<Enqueued | null>(null);
+  // The latest refresh this card started. A finished one stays on screen so
+  // its outcome remains readable until the next refresh.
+  const [refreshJob, setRefreshJob] = useState<{
+    job: Enqueued;
+    finished: boolean;
+  } | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
 
   async function refreshModels() {
@@ -298,9 +365,17 @@ export function ProviderCard({
         `/connections/${encodeURIComponent(connection.id)}/refresh`,
         { expected_revision: connection.revision },
       );
-      setJob((current) => (result.task_id ? result : (current ?? result)));
+      setRefreshJob((current) =>
+        // A deduplicated acceptance names no job: keep following ours while it
+        // runs; otherwise another refresh is running elsewhere.
+        !result.task_id && current && !current.finished
+          ? current
+          : { job: result, finished: false },
+      );
     } catch (error) {
       reportFailure(error);
+      // A conflict leaves the revision stale; read the current one.
+      refresh();
     } finally {
       setRefreshBusy(false);
     }
@@ -341,10 +416,12 @@ export function ProviderCard({
             Refresh models
           </Button>
           <JobProgress
-            job={job}
+            job={refreshJob?.job ?? null}
             kind="refresh"
             onComplete={() => {
-              setJob(null);
+              setRefreshJob((current) =>
+                current ? { ...current, finished: true } : current,
+              );
               refresh();
             }}
           />

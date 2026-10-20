@@ -402,10 +402,32 @@ describe("aiErrorText", () => {
       "AI_ENVIRONMENT_READ_ONLY",
       "Keys from the server environment can't be changed here.",
     ],
+    ["AI_ENDPOINT_INVALID", "This address isn't a valid model server URL."],
+    ["AI_PROVIDER_UNSUPPORTED", "This provider isn't supported."],
   ];
 
   it.each(cases)("maps %s", (code, expected) => {
     expect(aiErrorText({ code })).toBe(expected);
+  });
+
+  it("uses the caller's text for a rejected request without a code", () => {
+    const invalid = { status: 422 };
+    expect(aiErrorText(invalid, "That model ID isn't valid.")).toBe(
+      "That model ID isn't valid.",
+    );
+    expect(aiErrorText(invalid)).toBe(
+      "AI settings could not be saved. Reload and try again.",
+    );
+    // A coded error keeps its own text.
+    expect(
+      aiErrorText(
+        { status: 422, code: "AI_MODEL_UNVALIDATED" },
+        "That model ID isn't valid.",
+      ),
+    ).toBe("Refresh this connection's models first.");
+    expect(aiErrorText({ status: 409 }, "That model ID isn't valid.")).toBe(
+      "AI settings could not be saved. Reload and try again.",
+    );
   });
 
   it("falls back for errors without a known code, by duck typing only", () => {

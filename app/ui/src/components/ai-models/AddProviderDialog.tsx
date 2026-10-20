@@ -57,6 +57,13 @@ export function AddProviderDialog({
 
   const { hidden } = splitConnections(snapshot);
 
+  function close() {
+    setProvider("gemini");
+    setName("");
+    setAddress("");
+    onOpenChange(false);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -66,9 +73,7 @@ export function AddProviderDialog({
         provider,
         endpoint: provider === "ollama" ? address : null,
       });
-      setName("");
-      setAddress("");
-      onOpenChange(false);
+      close();
       refresh();
     } catch (error) {
       reportFailure(error);
@@ -78,7 +83,15 @@ export function AddProviderDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Closing mid-request would hide its outcome; a closed form starts over.
+        if (busy) return;
+        if (next) onOpenChange(true);
+        else close();
+      }}
+    >
       <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Add provider</DialogTitle>

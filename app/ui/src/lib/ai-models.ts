@@ -401,19 +401,29 @@ const AI_ERROR_TEXT: Record<string, string> = {
     "Saving keys needs CRATE_CREDENTIAL_KEY on the server.",
   AI_ENVIRONMENT_READ_ONLY:
     "Keys from the server environment can't be changed here.",
+  AI_ENDPOINT_INVALID: "This address isn't a valid model server URL.",
+  AI_PROVIDER_UNSUPPORTED: "This provider isn't supported.",
 };
 
 const DEFAULT_AI_ERROR_TEXT =
   "AI settings could not be saved. Reload and try again.";
 
-export function aiErrorText(error: unknown): string {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? (error as { code?: unknown }).code
-      : undefined;
+/**
+ * Readable copy for a failed AI write. `invalidRequestText` names what the
+ * form sent, for a 422 the API rejects without a code (request validation).
+ */
+export function aiErrorText(
+  error: unknown,
+  invalidRequestText?: string,
+): string {
+  const { code, status } =
+    typeof error === "object" && error !== null
+      ? (error as { code?: unknown; status?: unknown })
+      : { code: undefined, status: undefined };
   if (typeof code === "string") {
     return AI_ERROR_TEXT[code] ?? DEFAULT_AI_ERROR_TEXT;
   }
+  if (status === 422 && invalidRequestText) return invalidRequestText;
   return DEFAULT_AI_ERROR_TEXT;
 }
 

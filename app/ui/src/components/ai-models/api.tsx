@@ -17,8 +17,8 @@ export async function writeAI<T>(
   return api<T>(`${AI_ROOT}${path}`, method, body);
 }
 
-export function reportFailure(error: unknown) {
-  toast.error(aiErrorText(error));
+export function reportFailure(error: unknown, invalidRequestText?: string) {
+  toast.error(aiErrorText(error, invalidRequestText));
 }
 
 type JobKind = "refresh" | "test";
