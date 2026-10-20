@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import "./show-ticket.css";
 import { useTranslation } from "react-i18next";
@@ -6,7 +7,6 @@ import {
   CalendarPlus,
   CRATE_ICON_SIZE,
   ExternalLink,
-  Loader2,
   MapPin,
   Play,
   X,
@@ -17,7 +17,12 @@ import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
-import { Button } from "@crate/ui/shadcn/button";
+import {
+  ActionButton,
+  ActionGroup,
+  ActionLink,
+} from "@crate/ui/primitives/ActionGroup";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { cn } from "@crate/ui/lib/cn";
 
 import {
@@ -25,9 +30,6 @@ import {
   showDirectionsUrl,
 } from "./UpcomingShowCardModel";
 import type { ExpandedViewProps } from "./UpcomingShowCardViewTypes";
-
-const TICKET_ACTION_CLASS_NAME =
-  "h-9 gap-1.5 border border-border-quiet px-3 font-mono text-label font-normal uppercase tracking-caps text-text-muted hover:border-border-interactive hover:bg-transparent hover:text-text-primary has-[>svg]:px-3";
 
 type Setlist = NonNullable<ExpandedViewProps["item"]["probable_setlist"]>;
 
@@ -40,6 +42,7 @@ function TicketHeader({
   attending,
   onClose,
   showClose,
+  menuAction,
 }: {
   item: ExpandedViewProps["item"];
   artistHref: string;
@@ -49,6 +52,7 @@ function TicketHeader({
   attending: boolean;
   onClose: () => void;
   showClose: boolean;
+  menuAction?: ReactNode;
 }) {
   const { t } = useTranslation();
   const support = (item.lineup || []).slice(1);
@@ -64,18 +68,21 @@ function TicketHeader({
 
   return (
     <header className="relative px-5 pt-5 pb-6 sm:px-7 sm:pt-7">
-      {showClose ? (
-        <IconButton
-          size="sm"
-          onClick={onClose}
-          label={t("radar.show.closeDetails")}
-          className="absolute top-2.5 right-2.5 z-10 size-7 rounded-lg text-text-muted hover:text-text-primary"
-        >
-          <X size={CRATE_ICON_SIZE.xs} className="size-3.5" />
-        </IconButton>
-      ) : null}
+      <div className="absolute top-2 right-2 z-10">
+        <ActionGroup label={t("actions.menu.more")}>
+          {menuAction}
+          {showClose && (
+            <ActionButton
+              onClick={onClose}
+              label={t("radar.show.closeDetails")}
+            >
+              <X size={CRATE_ICON_SIZE.md} />
+            </ActionButton>
+          )}
+        </ActionGroup>
+      </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pr-20">
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pr-24">
         <MonoLabel accent={timeRemaining} meta={[dateLabel, timeLabel]} />
         {attending ? <StatusDot label={t("radar.show.attending")} /> : null}
       </div>
@@ -121,31 +128,39 @@ function TicketSetlist({ setlist }: { setlist: Setlist }) {
   const rowKeys = setlistRowKeys(setlist);
 
   return (
-    <section>
-      <MonoLabel
-        as="h3"
-        accent={t("artist.setlist.title")}
-        meta={[t("artist.setlist.songCount", { count: setlist.length })]}
-      />
-      <HairlineList className="mt-3" label={t("artist.setlist.title")}>
-        {setlist.map((song, index) => (
-          <HairlineRow
-            key={rowKeys[index]}
-            className="setlist-ticket-row"
-            index={index + 1}
-            trailing={
-              typeof song.frequency === "number" ? (
-                <span className="font-mono text-label text-text-subtle tabular-nums">
-                  {Math.round(song.frequency * 100)}%
-                </span>
-              ) : null
-            }
-          >
-            {song.title}
-          </HairlineRow>
-        ))}
-      </HairlineList>
-    </section>
+    <FormField
+      kind="group"
+      label={
+        <MonoLabel
+          as="h3"
+          accent={t("artist.setlist.title")}
+          meta={[t("artist.setlist.songCount", { count: setlist.length })]}
+        />
+      }
+    >
+      {(group) => (
+        <div {...group} role="group">
+          <HairlineList label={t("artist.setlist.title")}>
+            {setlist.map((song, index) => (
+              <HairlineRow
+                key={rowKeys[index]}
+                className="setlist-ticket-row"
+                index={index + 1}
+                trailing={
+                  typeof song.frequency === "number" ? (
+                    <MonoLabel as="span">
+                      {Math.round(song.frequency * 100)}%
+                    </MonoLabel>
+                  ) : null
+                }
+              >
+                {song.title}
+              </HairlineRow>
+            ))}
+          </HairlineList>
+        </div>
+      )}
+    </FormField>
   );
 }
 
@@ -194,60 +209,42 @@ function TicketActions({
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="ghost"
+      <ActionGroup label={t("actions.menu.more")}>
+        <ActionButton
+          label={attending ? t("radar.show.going") : t("radar.show.attend")}
           aria-pressed={attending}
-          onClick={(e) => {
-            e.stopPropagation();
+          disabled={!item.id}
+          loading={savingAttendance}
+          onClick={(event) => {
+            event.stopPropagation();
             void onToggleAttendance();
           }}
-          disabled={!item.id || savingAttendance}
-          className={cn(
-            TICKET_ACTION_CLASS_NAME,
-            attending &&
-              "border-accent-action-hi text-accent-action-hi hover:border-accent-action-hi hover:text-accent-action-hi",
-          )}
         >
-          {savingAttendance ? (
-            <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
-          ) : attending ? (
-            <CalendarCheck size={CRATE_ICON_SIZE.xs} />
+          {attending ? (
+            <CalendarCheck size={CRATE_ICON_SIZE.md} />
           ) : (
-            <CalendarPlus size={CRATE_ICON_SIZE.xs} />
+            <CalendarPlus size={CRATE_ICON_SIZE.md} />
           )}
-          {attending ? t("radar.show.going") : t("radar.show.attend")}
-        </Button>
-        {directionsUrl ? (
-          <Button variant="ghost" asChild className={TICKET_ACTION_CLASS_NAME}>
-            <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
-              <MapPin size={CRATE_ICON_SIZE.xs} />
-              {t("radar.show.directions")}
-            </a>
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          asChild
-          className={cn(
-            TICKET_ACTION_CLASS_NAME,
-            "border-accent-action-hi/40 text-accent-action-hi hover:border-accent-action-hi hover:text-accent-action-hi",
-          )}
-        >
-          <a
-            href={item.url || "#"}
+        </ActionButton>
+        {directionsUrl && (
+          <ActionLink
+            label={t("radar.show.directions")}
+            href={directionsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => {
-              if (!item.url) e.preventDefault();
-            }}
           >
-            <ExternalLink size={CRATE_ICON_SIZE.xs} />
-            {t("radar.show.getTickets")}
-            {item.status === "onsale" && <StatusDot className="ml-0.5" />}
-          </a>
-        </Button>
-      </div>
+            <MapPin size={CRATE_ICON_SIZE.md} />
+          </ActionLink>
+        )}
+        <ActionLink
+          label={t("radar.show.getTickets")}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <ExternalLink size={CRATE_ICON_SIZE.md} />
+        </ActionLink>
+      </ActionGroup>
     </div>
   );
 }
@@ -262,6 +259,7 @@ export function UpcomingShowExpandedView({
   onPlaySetlist,
   onClose,
   showClose = true,
+  menuAction,
 }: ExpandedViewProps) {
   const { t, i18n } = useTranslation();
   const date = item.date ? new Date(item.date + "T12:00:00") : null;
@@ -289,6 +287,7 @@ export function UpcomingShowExpandedView({
           attending={attending}
           onClose={onClose}
           showClose={showClose}
+          menuAction={menuAction}
         />
       </div>
       <TicketPerforation />

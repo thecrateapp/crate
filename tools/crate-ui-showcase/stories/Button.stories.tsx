@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MoreHorizontal } from "@crate/ui/icons";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 const meta = {
   id: "components-button",
@@ -57,5 +59,27 @@ export const DisabledLink: Story = {
     <Button asChild disabled>
       <a href="#destination">Unavailable playlist</a>
     </Button>
+  ),
+};
+
+export const IconHover: Story = {
+  render: () => (
+    <div className="flex flex-wrap gap-6">
+      {(["ghost", "outline", "secondary"] as const).map((variant) => (
+        <FormField key={variant} kind="group" label={`${variant} icon hover`}>
+          {(group) => (
+            <div {...group} role="group">
+              <Button
+                variant={variant}
+                size="icon-lg"
+                aria-label={`${variant} actions`}
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </Button>
+            </div>
+          )}
+        </FormField>
+      ))}
+    </div>
   ),
 };

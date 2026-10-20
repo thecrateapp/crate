@@ -1,5 +1,3 @@
-import type { TFunction } from "i18next";
-
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
   albumPagePath,
@@ -7,33 +5,17 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 
-import {
-  canOpenUpcomingRelease,
-  upcomingCountdown,
-  type UpcomingItem,
-} from "./upcoming-model";
+import { canOpenUpcomingRelease, type UpcomingItem } from "./upcoming-model";
 
 export interface UpcomingEventRowModel {
   albumPath: string | null;
   artistPath: string;
-  badgeLabel: string;
-  countdown: ReturnType<typeof upcomingCountdown>;
   coverUrl: string | undefined;
-  dateLabel: string;
 }
 
 export function buildUpcomingEventRowModel(
   item: UpcomingItem,
-  language: string,
-  t: TFunction,
 ): UpcomingEventRowModel {
-  const dateObj = item.date ? new Date(`${item.date}T12:00:00`) : null;
-  const dateLabel = dateObj
-    ? dateObj.toLocaleDateString(language, {
-        month: "short",
-        day: "numeric",
-      })
-    : "";
   const coverUrl =
     resolveMaybeApiAssetUrl(item.cover_url) ||
     artistPhotoApiUrl(
@@ -69,11 +51,6 @@ export function buildUpcomingEventRowModel(
       artistSlug: item.artist_slug,
       artistName: item.artist,
     }),
-    badgeLabel: item.is_upcoming
-      ? t("radar.release.preRelease")
-      : t("radar.release.released"),
-    countdown: upcomingCountdown(item.date, item.time),
     coverUrl,
-    dateLabel,
   };
 }

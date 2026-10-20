@@ -10,11 +10,15 @@ import { DocHeading } from "../components/DocHeading";
 
 Text actions, explicit confirmation and semantic native links. Existing seven visual variants retain the mockup recipe: Poppins 500, default 14px, rectangular 4px corners or an explicit pill. Fine heights xs24/sm32/default40/lg44; coarse targets reserve at least44px in layout. Icon sizes remain compatibility options; named ActionButton is preferred for conventional item/header actions. Native form type, ref and enabled router child handlers are preserved. Disabled/loading links stay named links, leave Tab order and block pointer/keyboard navigation and both child/caller handlers. Loading buttons show one decorative spinner, stay named and block repeat execution.
 
+Neutral icon-only sizes (ghost, outline and secondary) keep their background unchanged on hover and highlight the foreground with high accent. Conventional ActionButton/ActionLink inherit this rule. Text-button hover and specialized filled playback controls retain their own roles. No caller hover-fill overrides.
+
 The approved persistent mockup and Diego’s confirmed adjustments are the reference. Shared components own their geometry, states and typography. Stories add layout only.
 
 <DocHeading as="h2">Real components</DocHeading>
 
 <Canvas of={Stories.Base} />
+
+<Canvas of={Stories.IconHover} />
 
 <Canvas of={Stories.Disabled} />
 

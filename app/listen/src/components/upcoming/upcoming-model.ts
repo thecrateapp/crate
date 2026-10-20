@@ -63,15 +63,6 @@ export function artistShowToUpcomingItem(show: ArtistShowEvent): UpcomingItem {
   };
 }
 
-export function itemKey(item: UpcomingItem, index: number): string {
-  return (
-    item.event_key ||
-    `${item.type}-${item.artist}-${item.release_id ?? item.venue ?? index}-${
-      item.date
-    }-${item.time ?? ""}`
-  );
-}
-
 export function canOpenUpcomingRelease(item: UpcomingItem) {
   if (item.type !== "release") return false;
   if (item.album_id != null) return true;
@@ -83,45 +74,6 @@ export function upcomingReleaseBadgeLabel(item: UpcomingItem) {
   return item.is_upcoming ? "Pre-release" : "Released";
 }
 
-export function upcomingCountdown(
-  date: string,
-  time?: string,
-  now: Date = new Date(),
-): { value: number; unit: "days" | "hours" } | null {
-  if (!date) return null;
-  const target = new Date(`${date}T${time || "23:59:59"}`);
-  if (Number.isNaN(target.getTime())) return null;
+export { upcomingCountdown } from "./upcoming-timing-model";
 
-  const millisecondsRemaining = target.getTime() - now.getTime();
-  if (millisecondsRemaining <= 0) return null;
-
-  const hoursRemaining = Math.max(
-    1,
-    Math.ceil(millisecondsRemaining / (60 * 60 * 1000)),
-  );
-  if (hoursRemaining < 48) {
-    return { value: hoursRemaining, unit: "hours" };
-  }
-  return { value: Math.ceil(hoursRemaining / 24), unit: "days" };
-}
-
-export function groupByMonth(
-  items: UpcomingItem[],
-): [string, UpcomingItem[]][] {
-  const groups = new Map<string, UpcomingItem[]>();
-  for (const item of items) {
-    const month = (item.date || "").slice(0, 7) || "Unknown";
-    const existing = groups.get(month) || [];
-    existing.push(item);
-    groups.set(month, existing);
-  }
-  return [...groups.entries()];
-}
-
-export function formatMonthLabel(month: string) {
-  if (month === "Unknown") return "Unknown Date";
-  return new Date(`${month}-15T12:00:00`).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-}
+export { itemKey, groupByMonth, formatMonthLabel } from "./upcoming-list-model";

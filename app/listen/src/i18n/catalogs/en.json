@@ -847,6 +847,7 @@
   "radar.filters.all": "All",
   "radar.filters.shows": "Shows",
   "radar.filters.releases": "Releases",
+  "radar.unavailable": "Radar is unavailable",
   "radar.searchPlaceholder": "Filter by artist, venue, city...",
   "radar.empty.genreTitle": "No genre shows near your show location",
   "radar.empty.genreBody": "Crate will show upcoming shows here when this genre has nearby artists on your Radar.",

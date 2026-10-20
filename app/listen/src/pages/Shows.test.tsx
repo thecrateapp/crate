@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -194,7 +194,11 @@ describe("Shows page", () => {
     expect(
       screen.queryByRole("link", { name: "Source" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/days to go/i)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("link", { name: "Open Future LP" })).getByText(
+        /days to go/i,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("uses genre shows when Radar is opened from a genre page", () => {
@@ -235,5 +239,77 @@ describe("Shows page", () => {
     expect(
       screen.queryByText("Follow some artists to unlock Radar"),
     ).not.toBeInTheDocument();
+  });
+
+  it("offers retry for a failed read instead of claiming the user follows nobody", () => {
+    const retry = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "offline",
+      refetch: retry,
+    });
+    renderWithListenProviders(<Shows />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Radar is unavailable");
+    expect(
+      screen.queryByText("Follow some artists to unlock Radar"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("retains cached events while a background refresh fails", () => {
+    mockUseApi.mockReturnValue({
+      data: UPCOMING_RESPONSE,
+      loading: true,
+      error: "offline",
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<Shows />);
+    expect(
+      screen.getByRole("link", { name: "Open Future LP" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("loading-state")).not.toBeInTheDocument();
+  });
+
+  it("shows an authoritative genre not-found state even with stale events", () => {
+    mockUseApi.mockReturnValue({
+      data: GENRE_DETAIL_RESPONSE,
+      loading: false,
+      error: "missing",
+      status: 404,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<Shows />, {
+      route: "/upcoming?genre=missing",
+      path: "/upcoming",
+    });
+    expect(screen.getByText("Genre not found")).toBeInTheDocument();
+    expect(screen.queryByText("Converge")).not.toBeInTheDocument();
+  });
+
+  it("names the search field and uses the authoritative attendance summary", () => {
+    mockUseApi.mockReturnValue({
+      data: {
+        ...UPCOMING_RESPONSE,
+        summary: { ...UPCOMING_RESPONSE.summary, attending_count: 0 },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<Shows />);
+    expect(screen.getByLabelText("Search")).toHaveAttribute("type", "search");
+    const summary = screen.getByRole("list", { name: "Radar summary" });
+    expect(
+      within(summary).getByText("Attending").closest("li"),
+    ).toHaveTextContent("0");
+    fireEvent.change(screen.getByLabelText("Search"), {
+      target: { value: "no matching artist" },
+    });
+    expect(
+      screen.getByText("Nothing matches your filters"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Next show")).not.toBeInTheDocument();
   });
 });

@@ -847,6 +847,7 @@
   "radar.filters.all": "Todo",
   "radar.filters.shows": "Conciertos",
   "radar.filters.releases": "Lanzamientos",
+  "radar.unavailable": "Radar no está disponible",
   "radar.searchPlaceholder": "Filtra por artista, sala o ciudad...",
   "radar.empty.genreTitle": "No hay conciertos de este género cerca de tu ubicación",
   "radar.empty.genreBody": "Crate mostrará aquí próximos conciertos cuando este género tenga artistas cercanos en tu Radar.",

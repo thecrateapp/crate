@@ -357,6 +357,35 @@ card geometry, solid show preparation Card and actual setlist modal/HairlineRow 
 shared components have real Listen and Admin consumers; artist page/show-prep/controllers stay
 Listen-local. Upcoming show cards/instruments, Radio and Paths remain separate next batches.
 
+### 1BC · Upcoming and shows (third cut)
+
+`Listen/Upcoming and shows` and `Reviews/1BC/Upcoming and shows` use the same production views
+as `review-1bc-upcoming-shows.html`. The historical mockup stays unchanged.
+
+| Listen-local composition                    | Actual adoption and contract                                                                                                                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ShowsPageView                               | Radar personal/genre reads, real summary values including zero, canonical filters/search, featured/coming-up/recent sections and loading/error/retry/empty/cached states.                |
+| UpcomingEventRowView / UpcomingEventArtwork | Compact show and release identity, existing 88px media role through MediaCover, solid object surface and independent native navigation/toggle/action regions.                            |
+| UpcomingDateStamp                           | Same local month / 24px display day / weekday in both row kinds; MonoLabel captions, semantic full date, no fabricated or impossible date.                                               |
+| UpcomingReleaseRowView                      | Real release navigation and informative state/countdown below identity; unavailable album access remains absent. Existing menu builder and managed artwork stay in ReleaseRow.           |
+| UpcomingShowCardView                        | Row/preview/feature ticket reused by Radar and Artist; responsive content measurement, canonical 44px actions, unchanged ticket/perforation/type scale and specialized setlist playback. |
+| UpcomingMonthGroupView                      | Actual month caption/separator and 8px gap before the first event. Month language follows the consumer locale.                                                                           |
+
+These domain compositions have no Admin consumer and therefore remain in Listen, using existing
+shared foundations. No shared catalogue status/hash or baseline changes are needed for this cut.
+The fixture covers filter/search/expansion/menu/attendance/featured transitions, pending controls,
+long content, image fallbacks, zero/missing profile values and all read states. Its callbacks are
+local and never call the API, audio or persisted preferences.
+
+Radar's legacy payload supplies genre names without percentages. Actual expanded tickets lazily
+read the existing artist resource via useApi's cache only when needed; closed rows and complete
+profiles skip the read. Matching identities and genre names/slugs preserve source/zero values;
+failed or unavailable reads retain names without invented percentages. Artist's existing rich
+profile continues to skip that read. This fixes the reported Fontaines D.C. Radar case.
+
+Order is chronological across shows and releases; stable event IDs retain expansion/attendance
+when a search changes list positions. Radio, Paths and new map/setlist instruments remain pending.
+
 `Listen/Artist`, `Reviews/1BC/Artist` and `review-1bc-artist.html` share the actual pure production
 views. Managed image/menu/enrichment/API/player authority stays in adapters. Grid specimens
 inject EntityCard, the existing base used by managed cards; they do not invent an app data flow.
@@ -365,13 +394,13 @@ full-width paragraphs, dates, genres with percentages including 0%, local callba
 
 Diego's confirmed secondary-caption standard now applies throughout the current code:
 
-| Owner | Current adoption |
-| --- | --- |
-| HeroActionBar | Generated Radio/Setlist/Download/Edit/etc. secondary captions and More, across Artist/Album/Crate/Playlist/CuratedPlaylist/HomePlaylist/Genre and any other consumer |
-| ArtistHeroActionsView | Injected Follow/Following and Share; keeps the original action order |
-| AlbumActionsView | Add/Added and Share captions |
-| Crate actions | Follow/pending caption |
-| BandcampSecondaryAction | Both actionable and owned secondary presentations; normal Bandcamp text button keeps its role |
+| Owner                   | Current adoption                                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HeroActionBar           | Generated Radio/Setlist/Download/Edit/etc. secondary captions and More, across Artist/Album/Crate/Playlist/CuratedPlaylist/HomePlaylist/Genre and any other consumer |
+| ArtistHeroActionsView   | Injected Follow/Following and Share; keeps the original action order                                                                                                 |
+| AlbumActionsView        | Add/Added and Share captions                                                                                                                                         |
+| Crate actions           | Follow/pending caption                                                                                                                                               |
+| BandcampSecondaryAction | Both actionable and owned secondary presentations; normal Bandcamp text button keeps its role                                                                        |
 
 The scan covered JSX vertical action patterns and shared hero recipe consumers in Listen,
 Admin and shared UI. No separate matching vertical secondary-action family was found in Admin;
@@ -392,3 +421,10 @@ review's artwork injection regression is fixed RED→GREEN, including photoConte
 Fixture backgrounds are decoded images; cache versioning remains in the app adapter.
 Evidence: `.artifacts/review/1bc-artist-*`, screenshot `1bc-artist-review.png`. Three services
 remain active; this Artist cut stops without commit for Diego.
+
+The real page integration also verifies successful attendance mutations refetch the authoritative
+Radar snapshot, updating its summary and featured selection in both directions. Genre reads
+opt into reporting cached HTTP failures so an authoritative404 hides stale events and counts;
+transient failures keep cached content. The default behavior of useApi stays unchanged for
+other callers. Genre profiles skip initial revalidation on reopen while normal invalidation
+and explicit refresh remain available.

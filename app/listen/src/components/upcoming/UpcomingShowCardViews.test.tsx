@@ -45,7 +45,28 @@ describe("UpcomingShowExpandedView", () => {
   it("summarizes distance to show date", () => {
     expect(
       formatShowTimeRemaining(showItem, new Date("2026-06-13T10:00:00")),
-    ).toBe("20 days to go");
+    ).toBe("21 days to go");
+  });
+
+  it.each(["", "invalid", "2026-02-31"])(
+    "omits unknown or impossible countdowns (%s)",
+    (date) => {
+      expect(
+        formatShowTimeRemaining(
+          { ...showItem, date },
+          new Date("2026-06-13T10:00:00"),
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it("uses days rather than switching long countdowns to months", () => {
+    expect(
+      formatShowTimeRemaining(
+        { ...showItem, date: "2026-09-01" },
+        new Date("2026-06-13T10:00:00"),
+      ),
+    ).toBe("81 days to go");
   });
 
   it("builds directions links from coordinates", () => {

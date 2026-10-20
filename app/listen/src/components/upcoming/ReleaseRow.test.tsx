@@ -26,12 +26,10 @@ describe("ReleaseRow", () => {
     renderWithListenProviders(<ReleaseRow item={release} />);
 
     const link = screen.getByRole("link", { name: /No Heroes/ });
-    expect(link.closest("article")).toHaveClass(
-      "upcoming-event-row-atmosphere",
-    );
+    expect(link.closest("article")).toHaveClass("bg-surface-object");
     expect(link).toHaveAttribute("href", expect.stringContaining("no-heroes"));
     expect(screen.getByText("Converge · Album")).toBeInTheDocument();
-    expect(screen.getByText("Pre-release")).toBeInTheDocument();
+    expect(screen.queryByText("Pre-release")).not.toBeInTheDocument();
   });
 
   it("offers album and artist navigation from the more button", () => {

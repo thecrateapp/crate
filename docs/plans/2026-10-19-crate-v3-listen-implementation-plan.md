@@ -374,3 +374,22 @@ Diego aprueba el segundo corte1BC y autoriza commit/push de Artist y del estánd
 secundarias validado. Continuar con Upcoming y shows, usando la referencia aprobada y sus
 enmiendas, actualizando Storybook y manteniendo5186/6006/5174 activos. El nuevo corte se
 detiene para revisión antes de commit/push; Radio y Paths permanecen pendientes.
+
+## 1BC Artist publicado; Upcoming y shows local para revisión
+
+Artist publicado en `5f511815`. El tercer corte aplica
+[el plan de Upcoming y shows](2026-10-20-crate-v3-upcoming-shows.md): vistas reales de Radar,
+lectura personal/género, filtros canónicos, orden cronológico, marco/fecha/imagen común de
+show y release y acciones del ticket. Se conserva la composición expandida aprobada.
+
+La incidencia de Fontaines D.C. venía del payload de Radar con nombres sin porcentajes; el
+ticket abierto recupera el perfil real con la lectura existente y caché, sin consultas de
+perfiles en filas cerradas. Se verifican100/88/76 en Listen conectado a producción.
+La revisión final detectó y corrigió autoridad404 con caché y refresco de asistencia: los
+tests de integración usan el hook y la página reales, con transporte local simulado.
+
+Storybook y `review-1bc-upcoming-shows.html` comparten las vistas de producción. Validación
+focalizada final86tests Listen/17archivos,52Desktop,31i18n,25políticas y4checks de navegador
+en375/1200px y ambos hosts. Tipado, lint, tres builds, bundle y catálogo correctos. Las tres
+instancias siguen activas; tercer corte sin commit/push hasta revisión. Radio/Paths y nuevos
+instrumentos siguen pendientes; este lote no certifica toda H2 ni plataformas nativas.

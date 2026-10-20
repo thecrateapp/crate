@@ -1482,9 +1482,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/button.tsx": "8a722ba61aa337cc5844b827ee8a1ae8c4d791c7d3407ecf5f8bfe3263ddae1a",
-        "tools/crate-ui-showcase/stories/Button.stories.tsx": "8f50483aa06972f5d8d8993b11211be2f33d995d6fe119a3f5b3c021eae94c29",
-        "tools/crate-ui-showcase/docs/Button.mdx": "52118123d05f433824dbf4bce854c0a83022983908ce530a91c6286a646c2ae4"
+        "app/shared/ui/shadcn/button.tsx": "dad9389e725307fb426e6e7f7755528b08c9aef93c60d209ccdeaf5ff3298536",
+        "tools/crate-ui-showcase/stories/Button.stories.tsx": "ee5f574a9acb915b8cf05153c7e4e3ea526464f359b6393fe5411f828b20a5ac",
+        "tools/crate-ui-showcase/docs/Button.mdx": "e4f105ace9ed8b844e09586c39ae0488ada755e92866f575d70bfe155fa37c1c"
       },
       "category": "Actions"
     },
@@ -1833,8 +1833,8 @@
       ],
       "fingerprints": {
         "app/shared/ui/primitives/ActionGroup.tsx": "62395485d44f98b5cf8d018beedf7052d5264e3a280eb68cea2de4e6857a5a6a",
-        "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "1c8615a53f43982003eb847fb384a3e4c072bfd6b22dc13af9d4f843097832e3",
-        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "4f4f6cd34ed0d38fe30818d711528f1d26dde5733e03bae333063bb9e8caf7ce"
+        "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "329c10c619dc296a64b5a77812d6b89eda7405273acedefd9cfeed263498eb9c",
+        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "a078358e786975ac544268ef6eac25a910e640316e3d9db0ecef9a78fc891261"
       },
       "name": "ActionGroup",
       "purpose": "ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps.",

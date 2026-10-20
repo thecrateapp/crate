@@ -163,3 +163,29 @@ describe("Button extensions", () => {
     expect(screen.getByRole("button")).toHaveClass("disabled:opacity-50");
   });
 });
+
+describe("icon-only hover", () => {
+  it.each([
+    ["ghost", "icon"],
+    ["ghost", "icon-xs"],
+    ["ghost", "icon-sm"],
+    ["ghost", "icon-lg"],
+    ["outline", "icon-lg"],
+    ["secondary", "icon-lg"],
+  ] as const)(
+    "highlights the foreground without changing the background for %s %s",
+    (variant, size) => {
+      render(
+        <Button variant={variant} size={size} aria-label="More actions" />,
+      );
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:text-accent-action-hi");
+      expect(button.className).not.toMatch(/(?:^|\s)(?:dark:)?hover:bg-/);
+    },
+  );
+
+  it("retains the ordinary text button hover", () => {
+    render(<Button variant="ghost">More actions</Button>);
+    expect(screen.getByRole("button")).toHaveClass("hover:bg-surface-control");
+  });
+});

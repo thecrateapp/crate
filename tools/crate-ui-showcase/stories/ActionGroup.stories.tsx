@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Card, CardHeader, CardTitle, CardAction } from "@crate/ui/shadcn/card";
 import { Copy, Eye, Save } from "@crate/ui/icons";
 import {
   ActionButton,
@@ -54,5 +55,32 @@ export const UnavailableLink: Story = {
         <Eye aria-hidden="true" />
       </ActionLink>
     </ActionGroup>
+  ),
+};
+
+export const ContainerEdge: Story = {
+  render: () => (
+    <Card>
+      <CardHeader>
+        <CardTitle as="h2">Playlist actions</CardTitle>
+        <CardAction>
+          <ActionGroup label="Playlist actions">
+            <ActionButton label="Duplicate Costa de noche" tooltip="Duplicate">
+              <Copy aria-hidden="true" />
+            </ActionButton>
+            <ActionLink
+              label="Preview Costa de noche"
+              tooltip="Preview"
+              href="#preview"
+            >
+              <Eye aria-hidden="true" />
+            </ActionLink>
+            <ActionButton label="Save Costa de noche" tooltip="Save">
+              <Save aria-hidden="true" />
+            </ActionButton>
+          </ActionGroup>
+        </CardAction>
+      </CardHeader>
+    </Card>
   ),
 };

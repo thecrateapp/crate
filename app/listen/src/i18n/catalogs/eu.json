@@ -825,6 +825,7 @@
   "radar.filters.all": "Dena",
   "radar.filters.shows": "Kontzertuak",
   "radar.filters.releases": "Argitalpenak",
+  "radar.unavailable": "Radar ez dago erabilgarri",
   "radar.searchPlaceholder": "Iragazi artista, areto edo hiriaren arabera...",
   "radar.empty.genreTitle": "Ez dago genero honetako kontzerturik zure kokapenetik gertu",
   "radar.empty.genreBody": "Cratek hemen erakutsiko ditu datozen kontzertuak genero honek zure Radar inguruan artistak dituenean.",

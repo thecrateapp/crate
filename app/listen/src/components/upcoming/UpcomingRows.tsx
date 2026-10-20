@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { UpcomingMonthGroupView } from "./UpcomingMonthGroupView";
 
@@ -27,18 +28,23 @@ export function UpcomingMonthGroup({
   items,
   expandedId,
   onToggleExpand,
+  onAttendanceChange,
 }: {
   month: string;
   items: UpcomingItem[];
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
+  onAttendanceChange?: (attending: boolean) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [attendanceOverrides, setAttendanceOverrides] = useState<
     Record<string, boolean>
   >({});
 
   return (
-    <UpcomingMonthGroupView label={formatMonthLabel(month)}>
+    <UpcomingMonthGroupView
+      label={formatMonthLabel(month, i18n.language, t("common.unknown"))}
+    >
       {items.map((item, index) => {
         const key = itemKey(item, index);
         const itemWithOverrides =
@@ -54,6 +60,10 @@ export function UpcomingMonthGroup({
               expanded={expandedId === key}
               onToggle={() => onToggleExpand(expandedId === key ? null : key)}
               onAttendanceChange={(attending) => {
+                if (onAttendanceChange) {
+                  onAttendanceChange(attending);
+                  return;
+                }
                 setAttendanceOverrides((current) => ({
                   ...current,
                   [key]: attending,

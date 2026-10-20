@@ -43,6 +43,8 @@ interface UseApiOptions {
   safetyNetMs?: number;
   revalidateIfCached?: "immediate" | "idle" | "never";
   idleRevalidateMs?: number;
+  /** Let a caller distinguish authoritative failures from a usable stale payload. */
+  reportCachedErrors?: boolean;
 }
 
 type IdleWindow = Window & {
@@ -93,6 +95,7 @@ export function useApi<T>(
     safetyNetMs = 0,
     revalidateIfCached = "immediate",
     idleRevalidateMs = 8_000,
+    reportCachedErrors = false,
   } = options;
   const [initialState] = useState<{ data: T | null; loading: boolean }>(() => {
     const initialData = url ? cacheGet<T>(url) : null;
@@ -181,8 +184,14 @@ export function useApi<T>(
           if (!cancelled && !controller.signal.aborted) {
             const canServeCachedData =
               method === "GET" && cacheGet<T>(requestUrl) !== null;
-            setError(canServeCachedData ? null : e.message);
-            setStatus(canServeCachedData ? null : e.status ?? null);
+            setError(
+              canServeCachedData && !reportCachedErrors ? null : e.message,
+            );
+            setStatus(
+              canServeCachedData && !reportCachedErrors
+                ? null
+                : (e.status ?? null),
+            );
           }
         })
         .finally(() => {
@@ -207,7 +216,14 @@ export function useApi<T>(
       cancelWarmingRetry?.();
       controller.abort();
     };
-  }, [url, method, trigger, revalidateIfCached, idleRevalidateMs]);
+  }, [
+    url,
+    method,
+    trigger,
+    revalidateIfCached,
+    idleRevalidateMs,
+    reportCachedErrors,
+  ]);
 
   // Listen to SSE invalidation events — refetch when ANY matching scope fires.
   // The old code only refetched if cacheGet returned null, which let stale

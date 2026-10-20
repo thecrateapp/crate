@@ -148,3 +148,6 @@ h3.showcase-doc-heading {
 @source "../../app/listen/src/components/explore/ExploreBrowseViews.tsx";
 @source "../../app/listen/src/components/explore/GenreTileView.tsx";
 @source "../../app/listen/src/components/explore/GenreHeroView.tsx";
+
+@source "../../app/listen/src/components/upcoming";
+@source "../../app/listen/src/pages/ShowsPageView.tsx";

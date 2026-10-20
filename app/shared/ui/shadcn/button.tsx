@@ -17,11 +17,11 @@ const buttonVariants = cva(
         "danger-soft":
           "rounded-md border border-state-danger/25 bg-state-danger/10 text-state-danger-text hover:border-state-danger/40 hover:bg-state-danger/15 focus-visible:border-border-focus",
         outline:
-          "rounded-md border border-border-subtle bg-surface-control text-text-primary shadow-control-inset hover:bg-surface-control-hover hover:text-text-primary focus-visible:border-border-focus",
+          "rounded-md border border-border-subtle bg-surface-control text-text-primary shadow-control-inset focus-visible:border-border-focus",
         secondary:
-          "rounded-md bg-surface-control text-text-primary hover:bg-surface-control-hover focus-visible:border-border-focus",
+          "rounded-md bg-surface-control text-text-primary focus-visible:border-border-focus",
         ghost:
-          "rounded-md text-text-secondary hover:bg-surface-control hover:text-text-primary dark:hover:bg-surface-control-hover focus-visible:border-border-focus",
+          "rounded-md text-text-secondary focus-visible:border-border-focus",
         link: "text-accent-action underline-offset-4 hover:underline focus-visible:border-border-focus",
       },
       size: {
@@ -40,6 +40,24 @@ const buttonVariants = cva(
         pill: "rounded-full",
       },
     },
+    compoundVariants: [
+      {
+        variant: ["ghost", "outline", "secondary"],
+        size: ["icon", "icon-xs", "icon-sm", "icon-lg"],
+        className: "hover:text-accent-action-hi",
+      },
+      {
+        variant: "ghost",
+        size: ["default", "xs", "sm", "lg"],
+        className:
+          "hover:bg-surface-control hover:text-text-primary dark:hover:bg-surface-control-hover",
+      },
+      {
+        variant: ["outline", "secondary"],
+        size: ["default", "xs", "sm", "lg"],
+        className: "hover:bg-surface-control-hover hover:text-text-primary",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

@@ -1,4 +1,3 @@
-import type { TFunction } from "i18next";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,8 +5,6 @@ import {
   type UpcomingEventRowModel,
 } from "./upcoming-event-row-model";
 import type { UpcomingItem } from "./upcoming-model";
-
-const translate = ((key: string) => key) as TFunction;
 
 const release: UpcomingItem = {
   type: "release",
@@ -26,18 +23,11 @@ const release: UpcomingItem = {
 };
 
 describe("buildUpcomingEventRowModel", () => {
-  it("derives release navigation, label and countdown presentation", () => {
-    const model: UpcomingEventRowModel = buildUpcomingEventRowModel(
-      release,
-      "en-US",
-      translate,
-    );
+  it("derives release and artist navigation", () => {
+    const model: UpcomingEventRowModel = buildUpcomingEventRowModel(release);
 
     expect(model.albumPath).toContain("no-heroes");
     expect(model.artistPath).toContain("converge");
-    expect(model.badgeLabel).toBe("radar.release.preRelease");
-    expect(model.dateLabel).toContain("Jan");
-    expect(model.countdown).toMatchObject({ unit: "days" });
   });
 
   it("does not expose release actions for a show", () => {
@@ -50,7 +40,7 @@ describe("buildUpcomingEventRowModel", () => {
       album_slug: undefined,
     };
 
-    const model = buildUpcomingEventRowModel(show, "en-US", translate);
+    const model = buildUpcomingEventRowModel(show);
 
     expect(model.albumPath).toBeNull();
     expect(model.artistPath).toContain("converge");

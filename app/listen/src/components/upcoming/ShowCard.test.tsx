@@ -5,6 +5,16 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { ShowCard } from "./ShowCard";
 import type { UpcomingItem } from "./upcoming-model";
+import { useApi } from "@/hooks/use-api";
+
+vi.mock("@/hooks/use-api", () => ({
+  useApi: vi.fn(() => ({
+    data: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
 
 const item: UpcomingItem = {
   id: 42,
@@ -98,6 +108,65 @@ describe("ShowCard ticket", () => {
 });
 
 describe("ShowCard row", () => {
+  it("loads actual genre percentages only for an open ticket, preserving zero and source", () => {
+    const profile = [
+      { name: "hardcore", slug: "hardcore", percent: 0, source: "enrichment" },
+    ];
+    vi.mocked(useApi).mockReturnValue({
+      data: { id: 7, name: "Converge", genre_profile: profile },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const { unmount } = renderWithListenProviders(
+      <ShowCard item={item} expanded={false} />,
+    );
+    expect(useApi).toHaveBeenLastCalledWith(null, "GET", undefined, {
+      revalidateIfCached: "never",
+    });
+    unmount();
+    renderWithListenProviders(<ShowCard item={item} expanded />);
+    expect(useApi).toHaveBeenLastCalledWith(
+      "/api/artist-slugs/converge",
+      "GET",
+      undefined,
+      { revalidateIfCached: "never" },
+    );
+    expect(screen.getByTitle("hardcore · 0% · enrichment")).toBeInTheDocument();
+  });
+
+  it("does not fetch or replace a percentage-bearing show profile", () => {
+    renderWithListenProviders(
+      <ShowCard
+        item={{
+          ...item,
+          genre_profile: [{ name: "hardcore", percent: 83, source: "manual" }],
+        }}
+        expanded
+      />,
+    );
+    expect(useApi).toHaveBeenLastCalledWith(null, "GET", undefined, {
+      revalidateIfCached: "never",
+    });
+    expect(screen.getByTitle("hardcore · 83% · manual")).toBeInTheDocument();
+  });
+
+  it("never assigns a cached profile belonging to a different artist", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        id: 99,
+        name: "Another artist",
+        genre_profile: [{ name: "hardcore", percent: 99 }],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<ShowCard item={item} expanded />);
+    expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+    expect(screen.queryByText("99%")).not.toBeInTheDocument();
+  });
+
   it("renders an article with an inner toggle button instead of a button root", () => {
     const onToggle = vi.fn();
     renderWithListenProviders(

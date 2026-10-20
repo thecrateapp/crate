@@ -244,3 +244,11 @@ regular mono, canonical caption size), inheriting the action's active/disabled c
 in HeroActionBar, including More and injected Follow/Add/Share/Bandcamp captions; never repair
 it in a page stylesheet. Primary Play/Shuffle and conventional Button text retain their existing
 roles. Navigation labels and icon-only tooltips are different roles, not secondary captions.
+
+## Icon-only hover — 1BC amendment
+
+Conventional neutral icon-only Button sizes (ghost/outline/secondary), including ActionButton
+and ActionLink, keep their background unchanged on hover and highlight only the foreground in
+high accent. Do not add hover background fills in consumers. Compact IconButton and compatibility
+actions already use foreground/glow; specialized playback ring/aura and solid artwork controls
+retain their established roles.

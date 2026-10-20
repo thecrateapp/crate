@@ -1,4 +1,8 @@
-import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  RefObject,
+  ReactNode,
+} from "react";
 
 import type { UpcomingItem } from "./upcoming-types";
 
@@ -10,6 +14,7 @@ export interface ActionMenuSlot {
 }
 
 export interface CollapsedViewProps {
+  artwork: ReactNode;
   item: UpcomingItem;
   attending: boolean;
   savingAttendance: boolean;
@@ -28,4 +33,5 @@ export interface ExpandedViewProps {
   onPlaySetlist: () => void;
   onClose: () => void;
   showClose?: boolean;
+  menuAction?: ReactNode;
 }
