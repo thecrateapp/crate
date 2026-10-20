@@ -17,7 +17,10 @@ import {
   AppPopoverDivider,
 } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
+import {
+  canUseHoverPointer,
+  useHoverCapability,
+} from "@crate/ui/lib/use-hover-capability";
 import { cn } from "@crate/ui/lib/cn";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
@@ -43,7 +46,13 @@ export type {
 
 export function detectTouchDominant(): boolean {
   if (typeof window === "undefined") return false;
-  if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) {
+  // Touch capacity is not the primary input: desktop Chrome can expose touch
+  // points while its primary pointer is a mouse/trackpad with hover.
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.maxTouchPoints > 0 &&
+    !canUseHoverPointer()
+  ) {
     return true;
   }
   if (typeof window.matchMedia === "function") {

@@ -1,14 +1,12 @@
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Radio, Route } from "@crate/ui/icons";
-import { SectionHeader } from "@crate/ui/domain/lists";
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+
+import { EmptyState } from "@crate/ui/domain/states";
 import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
 import { notify } from "@crate/ui/lib/notify";
 
 import {
   DecadeDetailView,
-  ExplorePill,
   GenreDetailView,
   PlaylistCategoryView,
 } from "@/components/explore/ExploreViews";
@@ -28,11 +26,23 @@ import { api } from "@/lib/api";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useTransparentHeader } from "@/components/layout/transparent-header";
 
+import {
+  BrowseReadState,
+  ExploreDecades,
+} from "@/components/explore/ExploreBrowseViews";
+import {
+  exploreSelectionLocation,
+  type ExploreSelection,
+} from "@/components/explore/explore-navigation";
+
 export function Explore() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const open = (key?: ExploreSelection, value?: string) =>
+    navigate(exploreSelectionLocation(location, key, value));
   const genreSlug = searchParams.get("genre");
   useTransparentHeader(searchParams.has("genre"));
   const playlistCategory = searchParams.get("playlistCategory");
@@ -40,6 +50,7 @@ export function Explore() {
   const {
     data: explorePage,
     loading,
+    error,
     refetch,
   } = useApi<ExplorePageData>("/api/browse/explore-page");
   const filters = explorePage?.filters;
@@ -76,31 +87,25 @@ export function Explore() {
 
   const decadeParam = searchParams.get("decade");
   if (genreSlug) {
-    return (
-      <GenreDetailView slug={genreSlug} onBack={() => setSearchParams({})} />
-    );
+    return <GenreDetailView slug={genreSlug} onBack={() => open()} />;
   }
   if (decadeParam) {
-    return (
-      <DecadeDetailView
-        decade={decadeParam}
-        onBack={() => setSearchParams({})}
-      />
-    );
+    return <DecadeDetailView decade={decadeParam} onBack={() => open()} />;
   }
   if (playlistCategory) {
     return (
-      <PlaylistCategoryView
-        category={playlistCategory}
-        onBack={() => setSearchParams({})}
-      />
+      <PlaylistCategoryView category={playlistCategory} onBack={() => open()} />
     );
   }
   return (
     <div className="space-y-6">
       <PageHeader size="md" title={t("explore.title")} />
       <div className="space-y-6">
-        {loading ? <LoadingState label={t("common.loadingShort")} /> : null}
+        <BrowseReadState
+          loading={loading && !explorePage}
+          error={error}
+          onRetry={refetch}
+        />
 
         {filters ? (
           <>
@@ -108,13 +113,11 @@ export function Explore() {
               <ExploreFeatureCard
                 title={t("explore.features.radio.title")}
                 subtitle={t("explore.features.radio.subtitle")}
-                icon={Radio}
                 onClick={() => navigate("/radio")}
               />
               <ExploreFeatureCard
                 title={t("explore.features.paths.title")}
                 subtitle={t("explore.features.paths.subtitle")}
-                icon={Route}
                 onClick={() => navigate("/paths")}
               />
             </div>
@@ -126,31 +129,13 @@ export function Explore() {
 
             <GenreExplorer
               genres={filters.genres}
-              onOpen={(genre) =>
-                setSearchParams({
-                  genre: genre.toLowerCase().replace(/\s+/g, "-"),
-                })
-              }
+              onOpen={(genre) => open("genre", genre)}
             />
 
-            {filters.decades.length > 0 && (
-              <div className="space-y-4">
-                <SectionHeader
-                  title={t("explore.timeTunnels.title")}
-                  subtitle={t("explore.timeTunnels.subtitle")}
-                />
-                <div className="flex flex-wrap gap-2">
-                  {filters.decades.map((decade) => (
-                    <ExplorePill
-                      key={decade}
-                      label={decade}
-                      count={0}
-                      onClick={() => setSearchParams({ decade })}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+            <ExploreDecades
+              decades={filters.decades}
+              onOpen={(decade) => open("decade", decade)}
+            />
 
             <MoodBrowseSection moods={moods} />
 
@@ -165,7 +150,7 @@ export function Explore() {
               />
             ) : null}
           </>
-        ) : loading ? null : (
+        ) : loading || error ? null : (
           <EmptyState variant="inline" message={t("explore.noFilters")} />
         )}
       </div>

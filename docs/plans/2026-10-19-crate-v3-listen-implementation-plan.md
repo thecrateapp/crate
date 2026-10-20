@@ -336,3 +336,19 @@ selección, reapertura y collage. La evidencia focalizada queda en el README de 
 el plan de detalles. Próximo checkpoint:1BC, dividido en lotes revisables según H2; primer
 lote Explore y browse de género/década/categoría. Storybook y las tres instancias continúan;
 parar cada lote nuevo para revisión antes de commit.
+
+## 1BB publicado;1BC Explore/browse local para revisión
+
+Segundo1BB aprobado/publicado `728af01c`, incluyendo detalles/editores/colaboración y búsqueda
+CatalogSearch con portadas preservadas. Primer lote1BC cubre R02 Explore, género, década y
+categoría: superficies sólidas, roles tipográficos, controles canónicos y navegación/lectura.
+[Plan y límites](2026-10-20-crate-v3-explore-browse.md). Storybook y la revisión pequeña
+`review-1bc-explore.html` usan las vistas reales; tres instancias activas. Se detiene sin commit
+para Diego. Artist, eventos, Radio y Paths siguen en los próximos lotes1BC; no se certifica H2.
+
+## 1BC Explore/browse y menús aprobados — publicación autorizada
+
+Diego aprueba el primer lote1BC y la corrección de menús contextuales de Chrome. Autoriza
+commit/push y continuar con el siguiente corte: páginas de artista. Se conserva la evidencia
+de los tests focalizados y de ambos hosts en Storybook. Eventos, Radio y Paths siguen después.
+Cada corte nuevo se detiene para revisión sin commit; las tres instancias permanecen activas.

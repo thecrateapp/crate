@@ -288,3 +288,62 @@ the local selected row and collage. The unsaved draft was canceled; no productio
 was changed. Evidence: `.artifacts/review/1bb-search-*`, including
 `1bb-search-real-covers.png`. All three preview services remain active; the second 1BB batch
 and this amendment remain uncommitted for review.
+
+### 1BC Explore and browse — first batch
+
+The complete second1BB collection/editor/search batch was approved and published as `728af01c`.
+`Listen/Explore and browse`, `Reviews/1BC/Explore and browse` and `review-1bc-explore.html`
+reuse ExploreBrowseReview and the actual Listen-local ExploreFeatureCard, ExploreDecades,
+ExploreMoodChoices, GenreTileView, GenreHeroView, BrowseDetailFrame and BrowseReadState.
+No new shared component/foundation variant or catalogue hash is required for these adapters.
+
+| Surface            | Production adoption                                                                                                                                                                | Review and consumer contract                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explore landing    | Feature destinations use solid Card; decade navigation uses FilterChip action; moods use Button/MonoLabel                                                                          | Local navigation/play request and pending completion, zero mood counts; actual controllers retain transports and playback                            |
+| Genre room/related | One GenreTileView composes Card, EntityPrimaryAction and MonoLabel; GenreTile retains managed fallback, long press and action menu                                                 | Actual presentation with/missing artwork, relation context, long names and separate action; actual menu/fallback consumer tests remain authoritative |
+| Genre detail       | GenreHeroView keeps PageHero background, original gradient and approved offset; genre counts use MonoLabel                                                                         | Actual hero/actions with local callbacks, zero counts, unchanged image authority; existing artist/album/show card grids are retained                 |
+| Decade/category    | BrowseDetailFrame composes PageHeader/BackLink/MonoLabel; real pages keep their ArtistCard/PlaylistCard grids                                                                      | Read states/zero counts/identity casing and Back; no simulated data fetches                                                                          |
+| Route/read state   | Exclusive browse selections preserve unrelated query values/hash; initial failures retry rather than masquerading as empty/not-found; cached content survives revalidation failure | Route-level tests and shared fixture callbacks, genuine404 remains distinct                                                                          |
+
+This batch covers R02 only. Artist, upcoming/show/release, Radio/Paths and future wheel/maps stay
+in their later1BC/H3 batches. The historical mockup is unchanged; no API/audio/preference writes
+come from fixture actions. Three preview services remain active. This new1BC batch stops for
+review before commit. Focused validation evidence is recorded in `.artifacts/review/1bc-*`.
+
+Final1BC review adds the actual `useGenreTileArtwork` lifecycle to the scene: invalid local
+image, next candidate, exhausted fallback and refreshed candidate. Production and review reuse
+the same hook. The independent review's layering defect is corrected in GenreTileView itself:
+background image/scrim stay below text inside the isolated solid Card; whole-tile navigation and
+independent menu remain intact. Not-found Back now keeps the same URL context contract.
+
+Validation: 53 scoped Listen tests/8files,31Desktop tests/3files,28shared policy tests/3files;
+4browser cases at375/1200px × both hosts. Listen/Desktop/Storybook types, changed lint,3builds,
+bundle202372Bgzip/24assets under307200 and unchanged catalogue pass. Live Explore/punk genre
+inspected readonly with real data. No actual playback/writes/native/AT or new canonical snapshots
+claimed. Evidence screenshot: `.artifacts/review/1bc-explore-review.png`. Stop1BC first batch
+for Diego.
+
+### 1BC amendment — desktop menus in Chrome
+
+Runtime diagnosis captured the reported desktop browser at2560px with a fine hover pointer,
+no coarse pointer, no native runtime, but `maxTouchPoints=10`. The previous detector treated
+capacity as touch dominance and forced the action sheet. ContextMenu now respects the canonical
+fine-pointer/hover capability before classifying reported touch points. Its controller and
+renderer share the same detector. Narrow/coarse/mobile/Capacitor policy and positioning remain.
+Temporary Vite-only diagnostics were removed and the served HTML/config verified clean.
+
+The existing ContextMenu entry is now documented at `Components/Actions/ContextMenu`, including
+native keyboard/submenu/focus, media header, disabled/destructive actions and desktop/sheet
+contracts. This completes its pending entry before modifying the shared source; it does not
+invent an Admin consumer (Admin's current MusicContextMenu uses the separate shadcn family).
+`Reviews/1BC/Context menus` and `review-1bc-menus.html` share the actual controlled component,
+useItemActionMenu and target/controller, without API/audio writes or scene CSS repairs.
+
+Regression evidence: two genuine RED rendering/controller assertions for the observed10-point
+fine-pointer environment become GREEN. Shared menu pack74/6files, Listen consumers26/4files
+and showcase/preview policy23/2files pass. Eight browser cases cover normal desktop, the exact
+reported-touch desktop, phone and coarse tablet in both hosts; they exercise positioning,
+disabled actions, submenu keyboard/action, Escape/focus restore and no API/overflow/errors.
+Listen/Desktop/Admin/shared/Storybook types, changed shared lint, builds and bundle pass.
+Initial Listen JS202350Bgzip/24assets stays below307200; catalogue54documented/93entries/120sources.
+Logs: `.artifacts/review/1bc-menu-*`; screenshot `1bc-desktop-menu.png`. New1BC remains uncommitted.

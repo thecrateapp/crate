@@ -67,3 +67,7 @@ body {
 @source "../../app/listen/src/components/search/CatalogSearchView.tsx";
 @source "../../app/listen/src/components/playlists/PlaylistTrackSearchView.tsx";
 @source "../../app/listen/src/components/playlists/PlaylistComposerTrackListView.tsx";
+
+@source "../../app/listen/src/components/explore/ExploreBrowseViews.tsx";
+@source "../../app/listen/src/components/explore/GenreTileView.tsx";
+@source "../../app/listen/src/components/explore/GenreHeroView.tsx";

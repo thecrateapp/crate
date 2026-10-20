@@ -45,17 +45,17 @@ function buildGenreDetailSummary(
   const hasAlbumMemberships = data.albums.some((album) => album.membership);
   const artistCount = hasArtistMemberships
     ? primaryArtists.length
-    : data.artist_count ?? primaryArtists.length;
+    : (data.artist_count ?? primaryArtists.length);
   const albumCount = hasAlbumMemberships
     ? primaryAlbums.length
-    : data.album_count ?? primaryAlbums.length;
+    : (data.album_count ?? primaryAlbums.length);
   const directAlbumTrackCount = primaryAlbums.reduce(
     (total, album) => total + (album.track_count || 0),
     0,
   );
   const trackCount = hasAlbumMemberships
     ? directAlbumTrackCount
-    : data.track_count ?? directAlbumTrackCount;
+    : (data.track_count ?? directAlbumTrackCount);
 
   return {
     description,
@@ -74,7 +74,7 @@ function buildGenreDetailSummary(
 export function useGenreDetailModel(slug: string) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const { data, loading } = useApi<GenreDetail>(
+  const { data, loading, error, status, refetch } = useApi<GenreDetail>(
     `/api/catalog/genres/${slug}`,
     "GET",
     undefined,
@@ -141,6 +141,9 @@ export function useGenreDetailModel(slug: string) {
   return {
     data,
     loading,
+    error,
+    status,
+    refetch,
     isDesktop,
     primaryArtists,
     primaryAlbums,

@@ -1,0 +1,19 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ContextMenu.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ContextMenu</DocHeading>
+<EntryDetails id="domain-actions-contextmenu" review="1BC · Desktop detection regression review" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Controlled action menu with shared media/user headers, separators, disabled/danger actions and disclosures. Callers retain action authority, localized labels and authenticated image adapters. The controller owns trigger/pointer anchoring, viewport clamping, outside dismissal and scroll handling. Native menu navigation supports arrows, Home/End, Escape and nested disclosure navigation; closing restores the invoking focus.
+
+Wide web windows with a fine primary pointer and hover use the anchored desktop menu. A reported touchscreen capacity alone does not override those primary input capabilities: Chrome can report touch points on an ordinary desktop. Coarse/touch-first input, narrow layouts and Capacitor keep the mobile action sheet, including its drag dismissal. Keyboard access remains available in both presentations. This correction does not change the global layout breakpoint, pointer target sizes or native runtime policy.
+
+Fixed solid overlay chrome, canonical AppMenuButton typography/focus and StatusDot remain shared. Desktop menus portal above content; mobile sheets own backdrop, scroll lock, safe area and focus containment. The approved mockup and later confirmed adjustments remain the visual reference. Geometry, touch and desktop modes are exercised in both review hosts. Device/AT certification remains a separate phase.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.LongContent} />
+<Controls of={Stories.Base} />

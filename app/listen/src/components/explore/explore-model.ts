@@ -1,3 +1,4 @@
+import type { MoodPreset } from "./explore-browse-types";
 import { api } from "@/lib/api";
 import type { Track } from "@/contexts/PlayerContext";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
@@ -83,10 +84,7 @@ export interface SystemPlaylist {
   is_smart: boolean;
 }
 
-export interface MoodPreset {
-  name: string;
-  track_count: number;
-}
+export type { MoodPreset } from "./explore-browse-types";
 
 export interface ExplorePageData {
   filters: BrowseFilters;

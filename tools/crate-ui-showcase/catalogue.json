@@ -423,18 +423,20 @@
     {
       "id": "domain-actions-contextmenu",
       "name": "ContextMenu",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Controlled desktop context menu and touch action sheet with shared headers, keyboard navigation and input-capability detection.",
+      "coverage": "documented",
+      "adoption": "Listen entity/track/action menus; existing shared module, Admin domain-menu adoption pending. Native/AT phase QA pending.",
+      "storyId": "components-contextmenu",
+      "story": "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ContextMenu.mdx",
       "sources": [
         "app/shared/ui/domain/actions/ContextMenu.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/actions/ContextMenu.tsx": "97b3d1510528c76e02195538e19bbd104170c997c0b8188c1ca7b5de4e6d57f3"
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "70201977a27fb5e6f02d1cd8d978a5748f08f04e46d380648ad71edbb2e5acbb",
+        "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "fc2c292abca6f7bdcd50f17f9a939fc5772b44b8d48d0b1d737dd808d0306ee9",
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "76ea46d77a4b59c0d8ae114b4f390c919d75338a941806fd48d38738feab436a"
       },
       "category": "Actions"
     },
