@@ -14,6 +14,9 @@ from crate.db.jobs.analysis_storage import (
     record_smart_mix_failure,
 )
 from crate.db.jobs.smart_mix_backfill import claim_smart_mix_backfill_batch
+from crate.db.repositories.library_processing_state import (
+    ensure_track_processing_rows,
+)
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
@@ -344,6 +347,9 @@ def _track(tmp_path: Path, name: str) -> tuple[Path, int]:
                 "track_uid": str(uuid.uuid4()),
             },
         ).scalar_one()
+        # Library upserts always create the analysis/bliss processing rows; the
+        # generation fence only accepts claim-less writes for those rows.
+        ensure_track_processing_rows(session, int(track_id))
     return path, int(track_id)
 
 
@@ -380,3 +386,39 @@ def test_embedded_profile_with_a_stale_captured_source_is_discarded(
     )
 
     assert get_track_mix_profile(track_id) is None
+
+
+def test_embedded_profile_with_a_current_captured_source_is_published(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    from crate.db.jobs.analysis_storage import (
+        smart_mix_source_revision,
+        store_analysis_result,
+    )
+
+    path, track_id = _track(tmp_path, "embedded-current")
+    captured = smart_mix_source_revision(path)
+
+    store_analysis_result(
+        track_id,
+        str(path),
+        {
+            "bpm": 120.0,
+            "key": "A",
+            "scale": "minor",
+            "energy": 0.7,
+            "mood": None,
+            "smart_mix_source_revision": captured,
+            "mix_profile": {
+                "analyzer": "crate-rust",
+                "analyzerVersion": ANALYZER_VERSION,
+                "durationMs": 180_000,
+                "quality": "full",
+            },
+        },
+    )
+
+    profile = get_track_mix_profile(track_id)
+    assert profile is not None
+    assert profile.analyzer == "crate-rust"
