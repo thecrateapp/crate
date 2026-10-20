@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1bdSettings: fileURLToPath(
+          new URL("review-1bd-settings.html", import.meta.url),
+        ),
         radioPathsReview: fileURLToPath(
           new URL("review-1bc-radio-paths.html", import.meta.url),
         ),

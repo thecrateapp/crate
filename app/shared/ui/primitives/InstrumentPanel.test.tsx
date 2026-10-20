@@ -19,6 +19,29 @@ describe("InstrumentPanel", () => {
     expect(panel).toHaveAccessibleDescription("Library source");
     expect(within(panel).queryByRole("heading")).toBeNull();
   });
+  it("forwards the heading tone without recoloring descriptions or metadata", () => {
+    render(
+      <InstrumentPanel
+        as="section"
+        headingLevel={2}
+        label={{ children: "Interface", tone: "accent" }}
+        description="Device preferences"
+        meta="Updated today"
+      >
+        <p>Values</p>
+      </InstrumentPanel>,
+    );
+    expect(screen.getByRole("heading", { name: "Interface" })).toHaveClass(
+      "text-accent-action-hi",
+    );
+    expect(screen.getByText("Updated today").closest(".font-mono")).toHaveClass(
+      "text-text-subtle",
+    );
+    expect(
+      screen.getByRole("region", { name: "Interface" }),
+    ).toHaveAccessibleDescription("Device preferences");
+  });
+
   it("keeps actions, descriptions and measurements outside its status announcement", async () => {
     const { rerender } = render(
       <InstrumentPanel

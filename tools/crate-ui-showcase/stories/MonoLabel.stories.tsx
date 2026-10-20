@@ -10,6 +10,7 @@ const meta = {
       control: "select",
       options: ["p", "span", "div", "h2", "h3", "dt", "figcaption", "legend"],
     },
+    tone: { control: "radio", options: ["subtle", "accent"] },
     size: { control: "radio", options: ["label", "eyebrow"] },
     className: { table: { disable: true } },
   },
@@ -62,6 +63,20 @@ export const ContextualMetrics: Story = {
       <MonoLabel>2 albums · 0 tracks</MonoLabel>
       <MonoLabel>12 tracks · 52m</MonoLabel>
       <MonoLabel>93% match</MonoLabel>
+    </div>
+  ),
+};
+
+export const Accent: Story = {
+  args: { children: "Interface", as: "h2", tone: "accent" },
+};
+export const SectionTones: Story = {
+  render: () => (
+    <div className="showcase-stack">
+      <MonoLabel as="h2" tone="accent">
+        Playback
+      </MonoLabel>
+      <MonoLabel>Stream quality</MonoLabel>
     </div>
   ),
 };

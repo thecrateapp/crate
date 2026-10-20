@@ -19,10 +19,16 @@ for (const host of ["storybook", "standalone"] as const)
       const journey = page.locator('[data-slot="path-cover-journey"]');
       await expect(journey).toBeVisible({ timeout: 30000 });
       await expect(journey.getByText("3 of 20")).toBeVisible();
-      await journey
-        .getByRole("button", { name: "Next step", exact: true })
-        .click();
-      await expect(journey.getByText("4 of 20")).toBeVisible();
+      await expect(
+        journey.getByRole("button", { name: "Next step", exact: true }),
+      ).toHaveCount(0);
+      // Keyboard browsing moves focus only; the stage keeps the queue's step.
+      await journey.locator(".path-step-thumb[data-focused]").focus();
+      await page.keyboard.press("ArrowRight");
+      await expect(
+        journey.getByRole("button", { name: /Play step 4:/ }),
+      ).toBeFocused();
+      await expect(journey.getByText("3 of 20")).toBeVisible();
       await expect(page.getByLabel("Radio Paths fixture event")).toHaveText(
         "No action yet",
       );
@@ -38,7 +44,7 @@ for (const host of ["storybook", "standalone"] as const)
         name: "Simulate next track",
         exact: true,
       });
-      const cover = journey.locator(".path-cover-step[data-focused]");
+      const cover = journey.locator(".path-step-thumb[data-focused]");
       await cover.focus();
       await page.keyboard.press("Home");
       await page.keyboard.press("ArrowLeft");
@@ -58,25 +64,32 @@ for (const host of ["storybook", "standalone"] as const)
       const first = journey.getByRole("button", { name: /Play step 1:/ });
       await first.focus();
       await page.keyboard.press("End");
-      await expect(journey.getByText("50 of 50")).toBeVisible();
+      await expect(
+        journey.getByRole("button", { name: /Play step 50:/ }),
+      ).toBeFocused();
+      await expect(journey.getByText("1 of 50")).toBeVisible();
       await page.keyboard.press("Enter");
       await expect(page.getByLabel("Radio Paths fixture event")).toHaveText(
         "Play from step 50",
       );
-      expect(
-        await journey.locator(".path-cover-step").count(),
-      ).toBeLessThanOrEqual(7);
-      for (const cover of await journey
-        .locator(".path-cover-step:visible")
+      await expect(journey.getByText("50 of 50")).toBeVisible();
+      await expect(journey.locator(".path-step-thumb")).toHaveCount(50);
+      for (const thumb of await journey
+        .locator(".path-step-thumb .crate-media-cover")
         .all()) {
-        const box = await cover.boundingBox();
+        const box = await thumb.boundingBox();
         expect(box!.width).toBeGreaterThanOrEqual(48);
         expect(box!.height).toBeGreaterThanOrEqual(48);
       }
+      // The transition overlay only exists while a step change is in flight.
+      const frame = journey.locator(".path-cover-frame");
+      await expect(frame).not.toHaveAttribute("data-transitioning", {
+        timeout: 6000,
+      });
       await expect
         .poll(() =>
           journey
-            .locator(".path-cover-stage")
+            .locator('[data-slot="path-cover-stage"]')
             .evaluate(
               (node) =>
                 node
@@ -86,23 +99,20 @@ for (const host of ["storybook", "standalone"] as const)
             ),
         )
         .toBe(0);
-      const selected = journey.locator(".path-cover-step[data-focused]");
-      const transform = await selected.evaluate(
-        (node) => getComputedStyle(node).transform,
-      );
       await page
         .getByRole("button", { name: "Pause simulation", exact: true })
         .click();
       await expect(journey.getByText("50 of 50")).toBeVisible();
-      await expect(selected).toHaveCSS("transform", transform);
+      await expect(frame).not.toHaveAttribute("data-transitioning");
       await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(journey).toHaveAttribute("data-motion", "off");
-      await journey
-        .getByRole("button", { name: "Previous step", exact: true })
-        .click();
-      await expect(journey.locator(".path-cover-step[data-focused]")).toHaveCSS(
-        "transition-duration",
-        "0s",
+      await journey.getByRole("button", { name: /Play step 49:/ }).click();
+      await expect(journey.getByText("49 of 50")).toBeVisible();
+      await expect(frame).not.toHaveAttribute("data-transitioning");
+      await expect(journey.locator(".path-cover-canvas")).toHaveCount(0);
+      await expect(journey.locator(".path-cover-art")).toHaveCSS(
+        "animation-name",
+        "none",
       );
       await page.emulateMedia({ reducedMotion: "no-preference" });
       await page.getByRole("tab", { name: "Paths", exact: true }).click();

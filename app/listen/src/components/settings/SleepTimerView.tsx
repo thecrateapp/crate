@@ -1,3 +1,4 @@
+import { useSettingsOverlay } from "./settings-panel-activity";
 import { FormField } from "@crate/ui/primitives/FormField";
 import {
   Select,
@@ -26,11 +27,17 @@ export function SleepTimerView({
   cancelLabel: string;
   onCancel: () => void;
 }) {
+  const [open, setOpen] = useSettingsOverlay();
   return (
     <div className="grid gap-4">
       <FormField label={label}>
         {(field) => (
-          <Select value={value} onValueChange={onChange}>
+          <Select
+            open={open}
+            onOpenChange={setOpen}
+            value={value}
+            onValueChange={onChange}
+          >
             <SelectTrigger {...field}>
               <SelectValue placeholder={label} />
             </SelectTrigger>

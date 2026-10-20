@@ -5471,6 +5471,10 @@
     "sourceHash": "sha256:c8d311e449b556cb52de6028665257d838c28054f02d0f2feb97d056ee579b13",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.account.listeningTitle": {
+    "sourceHash": "sha256:c62e33b01cdb01dc160b1d4d7e13902102ee5467d28f2d7a4ef25db0d6507c46",
+    "reviewedAt": "2026-10-20T12:08:48.693Z"
+  },
   "settings.account.newPassword": {
     "sourceHash": "sha256:2eb5036748dead71834e29761a7f2e38b88a3b02859579fd643ca21a2958a567",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5478,6 +5482,10 @@
   "settings.account.notLinked": {
     "sourceHash": "sha256:0b3f3c623cad834e92efc16e8d6341598b329a004db263282921e2a80d444763",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.profileTitle": {
+    "sourceHash": "sha256:8d02b7b814650e9624e4f5f2373281f3ead6156fd54a2a1ca69191355b20204b",
+    "reviewedAt": "2026-10-20T12:08:48.693Z"
   },
   "settings.account.pulseListed": {
     "sourceHash": "sha256:8ab224d44cacf9d5f005fb80fd174903852404b1b3116f076221ad8d2b99078c",
@@ -5490,6 +5498,10 @@
   "settings.account.saveProfile": {
     "sourceHash": "sha256:13e9b87f59fa72cb70f553567b40b5ad755698935b6aba4cadb4251c1dcdab75",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.account.securityTitle": {
+    "sourceHash": "sha256:e9a8fd5f6f971813f312fbe4f188798dbe88a21f1db731c21c150956c8737d71",
+    "reviewedAt": "2026-10-20T12:08:48.693Z"
   },
   "settings.account.timezone": {
     "sourceHash": "sha256:bb0a38239f448a3416c29712e9e5b8da96277496002f22cdd7961c0d5d2bd6bc",
@@ -6366,6 +6378,26 @@
   "settings.subtitle": {
     "sourceHash": "sha256:1824124024b5669348b6553ab9539667b6a033d734c49bb8c2b45cacfadbf8a5",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.tabs.account": {
+    "sourceHash": "sha256:ccbe528516c5a0b1757434a3f50bcd7a162d1983d5855849659f887bab7493e8",
+    "reviewedAt": "2026-10-20T11:55:57.965Z"
+  },
+  "settings.tabs.connections": {
+    "sourceHash": "sha256:f296d739ba9f615fb03207376525c54172b8164f949d3cafee19f9f594c9d9c7",
+    "reviewedAt": "2026-10-20T11:55:57.965Z"
+  },
+  "settings.tabs.offline": {
+    "sourceHash": "sha256:51c7b21e061183a6c16420c4a8d236abc921143af10fb29d200b0531126146b7",
+    "reviewedAt": "2026-10-20T11:55:57.965Z"
+  },
+  "settings.tabs.playback": {
+    "sourceHash": "sha256:f267506ad5a3b965028bd11456d358e119d6d125d2d2ef63d07e0f1feb7a0058",
+    "reviewedAt": "2026-10-20T11:55:57.965Z"
+  },
+  "settings.tabs.preferences": {
+    "sourceHash": "sha256:d0f2312f46ae74529e182dbb4bafe0a3eacbfa7b3cb285bd77d045196e35cb68",
+    "reviewedAt": "2026-10-20T11:55:57.965Z"
   },
   "settings.title": {
     "sourceHash": "sha256:650289c1707cbd4ed70eff3f559fe0672d37e3e10c9d774cdb1d17fba6d78001",

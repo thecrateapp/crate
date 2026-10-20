@@ -433,10 +433,59 @@ and explicit refresh remain available.
 
 `Listen/Radio and Paths`, `Reviews/1BC/Radio and Paths` and
 `review-1bc-radio-paths.html` share actual Listen-local page/seed/station/endpoint/detail and
-coverflow views. Shared foundations are reused without internal scene repairs. Search now
+cover journey views. Shared foundations are reused without internal scene repairs. Search now
 supports the genre domain alongside artist/album/track; each caller still limits its kinds.
-The final visual choice is Diego's original coverflow: automatic advancement on actual track
-changes, independent manual inspection, keyboard access, bounded artwork window and static
-hidden/reduced-motion presentation. The spatial experiment was removed. Complete track rows,
-real IDs, radio debounce/start, path create/save/regenerate/delete and managed artwork remain.
-Fixture callbacks are local; no API/audio/preferences are changed. This cut stops before commit.
+Diego's final Paths amendment replaces the coverflow with one large cover and a pixelate-blur
+transition, plus a keyboard-accessible 48 px thumbnail strip. A track change or explicit play
+moves the stage; keyboard inspection alone does not play or move it. The WebGL2 renderer loads
+lazily and only animates during transitions; hidden/reduced motion swaps instantly and failed
+textures/unsupported WebGL use the HTML/CSS fallback. Managed artwork, a bounded bitmap cache,
+complete track rows, real IDs, radio debounce/start and path create/save/regenerate/delete remain.
+Fixture callbacks are local; no API/audio/preferences are changed. See the approved
+Paths cover transition design. Settings and this Paths amendment are approved for a joint commit.
+
+## Listen Settings — first 1BD cut
+
+`listen-settings` inventories the real Listen-local field/page/Interface/Language/Playback,
+account profile/password/linked accounts and Connect devices views. Review scene
+`reviews-1bd-settings--complete` and `review-1bd-settings.html` reuse those components directly.
+Five canonical Settings tabs cover Preferences, Playback, Account, Connections and Offline, in the same order and composition as production. Fixtures isolate runtime capabilities,
+disabled actions, long values, read/loading/error/empty/cached states and feature-off omission.
+All callbacks stay local: no preference persistence, credentials, audio or API writes. The
+production adapters retain those boundaries, and device revoke still requires confirmation.
+MonoLabel adds subtle/accent tones and InstrumentPanel forwards label.tone; both existing shared entries are updated and refreshed. Settings section captions opt into accent while field labels remain subtle. Interface fields use a container-based1/2/3-column grid.
+Other Settings integrations and social/import/sharing remain subsequent 1BD cuts.
+
+Settings Select options expose explanations before selection, including accessible descriptions,
+while the trigger keeps a concise fixed-width value. Current-language/last-seen prose and device
+platform values preserve case; only captions use MonoLabel. Shared default-tone regression checks
+include a real Admin InstrumentPanel consumer.
+
+The approved 1BD navigation amendment groups Interface/Language/show location in Preferences,
+player/sleep timer in Playback, profile/access/quick links in Account, Connect/external services/
+native servers in Connections, and downloads/storage in Offline. Production uses `?tab=` with
+back/forward and unknown-value fallback; inactive panels remain mounted and hidden to preserve
+form drafts and operation ownership. The existing Tabs strip scrolls horizontally on mobile;
+selected URL/history tabs are revealed without a vertical page jump. No new shared foundation
+or local tab skin. The isolated scene reuses the real page frame and OfflineSettingsView; location,
+external integrations and quick links awaiting visual reconciliation are explicitly annotated,
+not duplicated controls. Offline storage/quota/actions remain in the production adapter.
+
+Account now separates Profile, Listening preferences, Connected accounts and Security using the
+actual AccountSettingsView in production and both hosts. Email is the first readonly Input
+(copyable, not disabled); ordinary fields use two columns where they fit, and Bio spans the row.
+ConnectedAccounts uses existing OAuth brand glyphs, compact EntityRow, StatusDot and nearby ghost
+Button actions inside a bounded list. Provider API IDs, busy state and link/unlink ownership stay
+unchanged. `reviews-1bd-settings--account` and `review-1bd-settings.html?tab=account` open this view.
+
+SettingsPanelActivity is Listen-local lifecycle context, not a new shared foundation: inactive
+panels keep drafts/controllers but close Select/sleep menus and credential/device confirmations.
+The tab strip also reveals the selection after container/orientation changes. Browser history
+with an open credential confirmation and dropdown has dedicated regression coverage. No live
+production settings or credentials are changed by review callbacks.
+
+Diego's final Account amendment removes the Listening timezone field and the manual device-zone
+button from production and both review hosts. The unused field/view/test are removed. Existing
+app-shell TimezoneAutodetect retains its initial detection/persistence behavior; Settings no
+longer exposes an automatic value as an editable preference. Pulse remains under Listening
+preferences. The automatic timezone tests and Account-absence regression cover this boundary.

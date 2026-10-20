@@ -1,63 +1,187 @@
-/* Listen-local coverflow; transforms change only when inspecting or changing track. */
+/* Listen-local path journey: one cover on stage plus the step strip. Motion only during a transition. */
+@property --path-cover-glow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
 .path-cover-journey {
   container-type: inline-size;
 }
 .path-cover-stage {
-  --path-spacing: clamp(82px, 15cqw, 150px);
   position: relative;
-  height: clamp(240px, 32cqw, 360px);
-  perspective: 1000px;
+  display: grid;
+  place-items: center;
+  padding-block: 24px 20px;
   isolation: isolate;
-  overflow: hidden;
+  transition: --path-cover-glow 3s ease;
 }
-.path-cover-step {
+.path-cover-stage::before {
+  content: "";
   position: absolute;
-  left: 50%;
-  top: 30%;
-  width: clamp(96px, 18cqw, 176px);
+  inset: 0 10%;
+  background: radial-gradient(
+    closest-side,
+    var(--path-cover-glow),
+    transparent
+  );
+  opacity: 0.38;
+  pointer-events: none;
+}
+.path-cover-frame {
+  position: relative;
+  width: clamp(200px, 56cqw, 400px);
   aspect-ratio: 1;
-  border-radius: var(--radius-md);
+  overflow: hidden;
   border: 1px solid var(--border-quiet);
+  border-radius: var(--radius-md);
   background: var(--surface-control);
-  transform: translateX(calc(-50% + var(--path-offset) * var(--path-spacing)))
-    translateY(calc(var(--path-distance) * 14px))
-    rotateY(calc(var(--path-offset) * -12deg)) scale(var(--path-scale));
-  opacity: calc(1 - var(--path-distance) * 0.16);
+}
+.path-cover-art {
+  animation: path-cover-fade-in 240ms var(--ease-out-expo, ease-out);
+}
+.path-cover-overlay {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+.path-cover-frame[data-transitioning] .path-cover-overlay {
+  visibility: visible;
+}
+.path-cover-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@keyframes path-cover-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.path-step-route {
+  --path-step-pitch: 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-quiet);
+}
+.path-step-origin,
+.path-step-destination {
+  overflow-wrap: anywhere;
+}
+.path-step-destination {
+  text-align: end;
+}
+.path-step-scroller {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.path-step-track {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  width: max-content;
+  padding: 4px 4px 12px;
+}
+/* Route hairline from the first step; the accent part reaches the playing step. */
+.path-step-track::before,
+.path-step-track::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  bottom: 4px;
+  height: 1px;
+}
+.path-step-track::before {
+  width: calc((var(--path-step-count) - 1) * var(--path-step-pitch));
+  background: var(--border-quiet);
+}
+.path-step-track::after {
+  width: calc(var(--path-step-progress) * var(--path-step-pitch));
+  background: var(--accent-action-hi);
+  transition: width 600ms var(--ease-out-expo, ease-out);
+}
+.path-step-thumb {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 48px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.path-step-thumb .crate-media-cover {
+  border: 1px solid var(--border-quiet);
   transition:
-    transform 600ms var(--ease-snap, ease-out),
-    opacity 400ms ease-out,
+    opacity 300ms ease-out,
     border-color 300ms ease-out;
 }
-.path-cover-step[data-focused] {
+.path-step-thumb[data-past] .crate-media-cover {
+  opacity: 0.55;
+}
+.path-step-thumb[data-focused] .crate-media-cover,
+.path-step-thumb:hover .crate-media-cover {
+  border-color: var(--accent-action-hi);
   opacity: 1;
 }
-.path-cover-step[data-current],
-.path-cover-step:hover {
-  border-color: var(--accent-action-hi);
+.path-step-thumb:focus-visible {
+  outline: 2px solid var(--accent-action-hi);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
 }
-.path-cover-journey[data-motion="off"] .path-cover-step {
+@container (min-width: 760px) {
+  .path-step-route {
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) minmax(0, 12rem);
+  }
+  .path-step-origin {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .path-step-scroller {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .path-step-destination {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+[data-crate-effects="off"] .path-cover-stage::before {
+  display: none;
+}
+.path-cover-journey[data-motion="off"] .path-cover-stage,
+.path-cover-journey[data-motion="off"] .path-step-track::after,
+.path-cover-journey[data-motion="off"] .path-step-thumb .crate-media-cover {
   transition: none;
 }
-@container (max-width:500px) {
-  .path-cover-stage {
-    --path-spacing: 82px;
-  }
-  .path-cover-step[data-distance="2"],
-  .path-cover-step[data-distance="3"] {
-    visibility: hidden;
-    pointer-events: none;
-  }
+.path-cover-journey[data-motion="off"] .path-cover-art {
+  animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .path-cover-step {
+  .path-cover-stage,
+  .path-step-track::after,
+  .path-step-thumb .crate-media-cover {
     transition: none;
+  }
+  .path-cover-art {
+    animation: none;
   }
 }
 @media (forced-colors: active) {
-  .path-cover-step {
+  .path-step-thumb .crate-media-cover {
     border-color: ButtonText;
   }
-  .path-cover-step[data-current] {
+  .path-step-thumb[data-focused] .crate-media-cover {
     outline: 2px solid Highlight;
   }
 }

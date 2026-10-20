@@ -73,6 +73,7 @@ function renderWithI18n(ui: ReactElement) {
 
 describe("ConnectDevicesSection", () => {
   beforeEach(() => {
+    apiMock.mockReset();
     vi.spyOn(Date, "now").mockReturnValue(
       new Date("2026-05-25T10:01:00.000Z").getTime(),
     );
@@ -131,6 +132,27 @@ describe("ConnectDevicesSection", () => {
         name: "Revoke Crate on Mobile Chrome (Android)",
       }),
     ).toBeDisabled();
+  });
+
+  it("distinguishes a failed list from empty and retries the actual read", async () => {
+    apiMock
+      .mockReset()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ devices: [] });
+    renderWithI18n(<ConnectDevicesSection />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Failed to load Crate Connect devices",
+    );
+    expect(
+      screen.queryByText("No active Crate Connect devices right now."),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByText("No active Crate Connect devices right now."),
+    ).toBeVisible();
+    expect(
+      apiMock.mock.calls.filter(([url]) => url === "/api/me/devices"),
+    ).toHaveLength(2);
   });
 
   it("revokes a non-current device", async () => {

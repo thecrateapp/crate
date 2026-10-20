@@ -15,56 +15,48 @@ const steps = Array.from({ length: 50 }, (_, index) => ({
   title: `Track ${index + 1}`,
   artist: "Coast",
 }));
+const stepButton = (step: number) =>
+  screen.getByRole("button", {
+    name: `Play step ${step}: Track ${step} by Coast`,
+  });
 afterEach(() => {
   delete document.documentElement.dataset.crateMotion;
 });
-describe("path coverflow", () => {
-  it("follows changed tracks, but keeps manual inspection on play/pause changes", () => {
-    const play = vi.fn();
-    const { rerender, container } = renderJourney(
+describe("path cover journey", () => {
+  it("follows actual track changes and ignores play/pause", () => {
+    const view = (active: number, playing: boolean) => (
       <PathCoverJourneyView
         steps={steps}
         origin="A"
         destination="B"
-        activeStep={2}
-        currentTrackKey="track-3"
-        playing
-        onPlay={play}
-      />,
+        activeStep={active}
+        currentTrackKey={`track-${active + 1}`}
+        playing={playing}
+        onPlay={vi.fn()}
+      />
     );
-    fireEvent.click(screen.getByRole("button", { name: "Next step" }));
-    expect(screen.getByText("4 of 50")).toBeInTheDocument();
-    expect(play).not.toHaveBeenCalled();
-    rerender(
-      <PathCoverJourneyView
-        steps={steps}
-        origin="A"
-        destination="B"
-        activeStep={2}
-        currentTrackKey="track-3"
-        playing={false}
-        onPlay={play}
-      />,
-    );
-    expect(screen.getByText("4 of 50")).toBeInTheDocument();
-    rerender(
-      <PathCoverJourneyView
-        steps={steps}
-        origin="A"
-        destination="B"
-        activeStep={10}
-        currentTrackKey="track-11"
-        playing
-        onPlay={play}
-      />,
-    );
+    const { rerender, container } = renderJourney(view(2, true));
+    expect(screen.getByText("3 of 50")).toBeInTheDocument();
+    rerender(view(2, false));
+    expect(screen.getByText("3 of 50")).toBeInTheDocument();
+    rerender(view(10, true));
     expect(screen.getByText("11 of 50")).toBeInTheDocument();
-    expect(container.querySelectorAll(".path-cover-step")).toHaveLength(7);
-    expect(
-      screen.getByRole("button", { name: "Play step 11: Track 11 by Coast" }),
-    ).toHaveAttribute("aria-current", "step");
+    expect(container.querySelectorAll(".path-step-thumb")).toHaveLength(50);
+    expect(stepButton(11)).toHaveAttribute("aria-current", "step");
   });
-  it("inspects the complete path with keyboard without playing, then Enter plays the actual step", async () => {
+  it("has no step buttons that would move the stage without the queue", () => {
+    renderJourney(
+      <PathCoverJourneyView
+        steps={steps}
+        origin="A"
+        destination="B"
+        onPlay={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Next step" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous step" })).toBeNull();
+  });
+  it("moves keyboard focus through the strip without changing the stage, then Enter plays", async () => {
     const user = userEvent.setup(),
       play = vi.fn();
     renderJourney(
@@ -77,18 +69,22 @@ describe("path coverflow", () => {
         onPlay={play}
       />,
     );
-    screen
-      .getByRole("button", { name: "Play step 1: Track 1 by Coast" })
-      .focus();
+    stepButton(1).focus();
     await user.keyboard("{End}");
-    expect(screen.getByText("50 of 50")).toBeInTheDocument();
+    expect(stepButton(50)).toHaveFocus();
+    expect(stepButton(50)).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("1 of 50")).toBeInTheDocument();
+    await user.keyboard("{ArrowLeft}");
+    expect(stepButton(49)).toHaveFocus();
     expect(play).not.toHaveBeenCalled();
     await user.keyboard("{Enter}");
-    expect(play).toHaveBeenCalledWith(49);
+    expect(play).toHaveBeenCalledWith(48);
+    expect(screen.getByText("49 of 50")).toBeInTheDocument();
     await user.keyboard("{Home}");
-    expect(screen.getByText("1 of 50")).toBeInTheDocument();
+    expect(stepButton(1)).toHaveFocus();
+    expect(screen.getByText("49 of 50")).toBeInTheDocument();
   });
-  it("does not arm a focus request at a keyboard boundary or steal external focus", async () => {
+  it("does not steal external focus after keyboard boundaries", async () => {
     const user = userEvent.setup();
     const view = (active: number) => (
       <>
@@ -104,17 +100,16 @@ describe("path coverflow", () => {
       </>
     );
     const { rerender } = renderJourney(view(2));
-    screen
-      .getByRole("button", { name: "Play step 3: Track 3 by Coast" })
-      .focus();
+    stepButton(3).focus();
     await user.keyboard("{Home}{ArrowLeft}");
+    expect(stepButton(1)).toHaveFocus();
     const other = screen.getByRole("button", { name: "Other control" });
     other.focus();
     rerender(view(3));
     expect(screen.getByText("4 of 50")).toBeInTheDocument();
     expect(other).toHaveFocus();
   });
-  it("moves focus with a changed current track only when focus is inside the coverflow", async () => {
+  it("moves focus with a changed current track only when focus is inside the step strip", async () => {
     const user = userEvent.setup(),
       play = vi.fn();
     const view = (active: number) => (
@@ -128,17 +123,14 @@ describe("path coverflow", () => {
       />
     );
     const { rerender } = renderJourney(view(2));
-    screen
-      .getByRole("button", { name: "Play step 3: Track 3 by Coast" })
-      .focus();
+    stepButton(3).focus();
     rerender(view(30));
-    expect(
-      screen.getByRole("button", { name: "Play step 31: Track 31 by Coast" }),
-    ).toHaveFocus();
+    expect(stepButton(31)).toHaveFocus();
     await user.keyboard("{Enter}");
     expect(play).toHaveBeenCalledWith(30);
   });
-  it("preserves inspection across list refreshes and follows same-position track replacements", () => {
+  it("keeps the chosen step across list refreshes and follows same-position track replacements", () => {
+    const play = vi.fn();
     const view = (list: typeof steps, key: string) => (
       <PathCoverJourneyView
         steps={list}
@@ -146,11 +138,12 @@ describe("path coverflow", () => {
         destination="B"
         activeStep={0}
         currentTrackKey={key}
-        onPlay={vi.fn()}
+        onPlay={play}
       />
     );
     const { rerender } = renderJourney(view(steps.slice(0, 5), "first-track"));
-    fireEvent.click(screen.getByRole("button", { name: "Next step" }));
+    fireEvent.click(stepButton(2));
+    expect(play).toHaveBeenCalledWith(1);
     rerender(view(steps.slice(0, 6), "first-track"));
     expect(screen.getByText("2 of 6")).toBeInTheDocument();
     rerender(
@@ -189,6 +182,38 @@ describe("path coverflow", () => {
     );
     expect(screen.getByText("5 of 50")).toBeInTheDocument();
   });
+  it("shows the chosen cover on stage and the travelled route up to the playing step", () => {
+    const covered = steps.slice(0, 6).map((step) => ({
+      ...step,
+      coverUrl: `/covers/${step.index}.jpg`,
+    }));
+    const play = vi.fn();
+    const { container } = renderJourney(
+      <PathCoverJourneyView
+        steps={covered}
+        origin="Ambient"
+        destination="Techno"
+        activeStep={3}
+        currentTrackKey="track-4"
+        onPlay={play}
+      />,
+    );
+    const stageImage = () =>
+      container.querySelector('[data-slot="path-cover-stage"] img');
+    expect(stageImage()).toHaveAttribute("src", "/covers/3.jpg");
+    fireEvent.click(stepButton(5));
+    expect(play).toHaveBeenCalledWith(4);
+    expect(stageImage()).toHaveAttribute("src", "/covers/4.jpg");
+    const track = container.querySelector<HTMLElement>(".path-step-track")!;
+    expect(track).toHaveAttribute("role", "group");
+    expect(track.style.getPropertyValue("--path-step-progress")).toBe("3");
+    const thumbs = container.querySelectorAll(".path-step-thumb");
+    expect(thumbs[2]).toHaveAttribute("data-past");
+    expect(thumbs[3]).not.toHaveAttribute("data-past");
+    expect(thumbs[4]).toHaveAttribute("data-focused");
+    expect(screen.getByText("Ambient")).toBeInTheDocument();
+    expect(screen.getByText("Techno")).toBeInTheDocument();
+  });
   it("keeps missing covers and empty/single paths usable", () => {
     const { rerender } = renderJourney(
       <PathCoverJourneyView
@@ -207,11 +232,7 @@ describe("path coverflow", () => {
         onPlay={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: "Next step" })).toBeDisabled();
-    expect(
-      within(
-        screen.getByRole("button", { name: "Play step 1: Track 1 by Coast" }),
-      ).queryByRole("img"),
-    ).toBeNull();
+    expect(stepButton(1)).toHaveAttribute("tabindex", "0");
+    expect(within(stepButton(1)).queryByRole("img")).toBeNull();
   });
 });

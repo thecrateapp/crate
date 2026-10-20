@@ -15,6 +15,7 @@ type MonoLabelElement =
 interface MonoLabelProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   as?: MonoLabelElement;
   size?: "label" | "eyebrow";
+  tone?: "subtle" | "accent";
   accent?: ReactNode;
   meta?: readonly (string | null | undefined | false)[];
   children?: ReactNode;
@@ -24,6 +25,7 @@ interface MonoLabelProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
 export function MonoLabel({
   as: Element = "p",
   size = "label",
+  tone = "subtle",
   accent,
   meta,
   children,
@@ -36,7 +38,8 @@ export function MonoLabel({
     <Element
       {...props}
       className={cn(
-        "m-0 font-mono font-normal text-text-subtle tabular-nums",
+        "m-0 font-mono font-normal tabular-nums",
+        tone === "accent" ? "text-accent-action-hi" : "text-text-subtle",
         size === "eyebrow"
           ? "text-eyebrow tracking-kicker"
           : "text-label tracking-caps",

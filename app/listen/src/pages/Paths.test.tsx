@@ -130,7 +130,7 @@ describe("Music paths pages", () => {
     ).toBeInTheDocument();
   });
 
-  it("replaces the linear detail strip with actual covers and inspection that does not play", () => {
+  it("replaces the linear detail strip with actual covers; keyboard browsing does not play", () => {
     const playAll = vi.fn();
     const { container } = renderWithListenProviders(<PathDetail />, {
       route: "/paths/77",
@@ -140,7 +140,13 @@ describe("Music paths pages", () => {
     expect(
       container.querySelector('[data-slot="path-cover-journey"]'),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Next step" }));
+    expect(screen.queryByRole("button", { name: "Next step" })).toBeNull();
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: "Play step 1: Track One by Artist One",
+      }),
+      { key: "ArrowRight" },
+    );
     expect(playAll).not.toHaveBeenCalled();
     fireEvent.click(
       screen.getByRole("button", {

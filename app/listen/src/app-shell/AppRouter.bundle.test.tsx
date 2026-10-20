@@ -63,6 +63,18 @@ describe("AppRouter mobile bundle boundary", () => {
     expect(mainSource).not.toContain("refreshMediaAccessTickets");
   });
 
+  it("loads the Paths cover transition renderer only on first use", () => {
+    const stageSource = readFileSync(
+      path.join(process.cwd(), "src/components/paths/PathCoverStage.tsx"),
+      "utf8",
+    );
+    expect(stageSource).toContain('import("./path-cover-transition-renderer")');
+    // Only a type import may name the renderer statically.
+    expect(stageSource).not.toMatch(
+      /^import\s+\{[^}]*\}\s+from\s+"\.\/path-cover-transition-renderer"/m,
+    );
+  });
+
   it("keeps Solar icons behind feature entry points", () => {
     const iconDirectory = path.join(process.cwd(), "../shared/ui/icons");
     const featureEntries = [

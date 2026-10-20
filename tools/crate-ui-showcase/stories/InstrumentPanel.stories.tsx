@@ -87,3 +87,17 @@ export const FragmentActions: Story = {
     ),
   },
 };
+
+export const AccentHeading: Story = {
+  args: {
+    as: "section",
+    headingLevel: 2,
+    summary: undefined,
+    label: { children: "Interface", tone: "accent" },
+    description: "Motion, effects and content density on this device.",
+    meta: "Device preferences",
+    children: (
+      <p>The heading uses accent; metadata and prose retain their own roles.</p>
+    ),
+  },
+};

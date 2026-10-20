@@ -1,5 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { PageHeader } from "@crate/ui/domain/navigation";
+import { SettingsPageView, SETTINGS_TABS } from "./SettingsPageView";
+import { useTabParam } from "@/hooks/use-tab-param";
+import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
@@ -15,28 +17,45 @@ import { ServersSection } from "@/components/settings/ServersSection";
 import { InterfacePreferencesSection } from "@/components/settings/InterfacePreferencesSection";
 
 export function Settings() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
+
+  const [tab, setTab] = useTabParam(SETTINGS_TABS, "preferences");
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        className="settings-header"
-        title={t("settings.title")}
-        subtitle={t("settings.subtitle")}
-      />
-
-      <InterfacePreferencesSection />
-      <LanguageSection i18n={i18n} />
-      <PlaybackSection />
-      <OfflineSection />
-      <ServersSection />
-      <ShowsLocationSection />
-      <SleepTimerSection />
-      <AccountSection />
-      <OpenSubsonicCredentialsSection />
-      <ScrobbleSection />
-      <BandcampSection />
-      <LinksSection />
-    </div>
+    <SettingsPageView
+      value={tab}
+      onValueChange={setTab}
+      panels={{
+        preferences: (
+          <>
+            <InterfacePreferencesSection />
+            <LanguageSection i18n={i18n} />
+            <ShowsLocationSection />
+          </>
+        ),
+        playback: (
+          <>
+            <PlaybackSection />
+            <SleepTimerSection />
+          </>
+        ),
+        account: (
+          <>
+            <AccountSection />
+            <LinksSection />
+          </>
+        ),
+        connections: (
+          <>
+            <ConnectDevicesSection />
+            <OpenSubsonicCredentialsSection />
+            <ScrobbleSection />
+            <BandcampSection />
+            <ServersSection />
+          </>
+        ),
+        offline: <OfflineSection />,
+      }}
+    />
   );
 }

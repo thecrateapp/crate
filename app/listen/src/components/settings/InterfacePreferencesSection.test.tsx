@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,25 +32,21 @@ afterEach(() => {
 });
 
 describe("InterfacePreferencesSection", () => {
-  it("offers only the three functional preferences through shared filter chips", () => {
+  it("offers only the three functional preferences through canonical Select fields", () => {
     renderWithListenProviders(<InterfacePreferencesSection />, {
       locale: "en",
     });
 
-    expect(screen.getAllByRole("radiogroup")).toHaveLength(3);
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("combobox")).toHaveLength(3);
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
     for (const [label, selected] of [
       ["Content density", "Comfortable"],
       ["Motion", "System"],
       ["Effects", "Subtle"],
-    ]) {
-      expect(
-        within(screen.getByRole("radiogroup", { name: label })).getByRole(
-          "radio",
-          { name: selected },
-        ),
-      ).toBeChecked();
-    }
+    ] as const)
+      expect(screen.getByRole("combobox", { name: label })).toHaveTextContent(
+        selected,
+      );
     expect(document.querySelectorAll("select")).toHaveLength(0);
     expect(
       screen.queryByRole("button", { name: /apply/i }),
@@ -63,15 +59,11 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
     const setItem = vi.spyOn(localStorage, "setItem");
-    const density = screen.getByRole("radiogroup", { name: "Content density" });
-    within(density).getByRole("radio", { name: "Comfortable" }).focus();
-    await user.keyboard("{End}");
+    const density = screen.getByRole("combobox", { name: "Content density" });
+    density.focus();
+    await user.keyboard("{Enter}{End}{Enter}");
 
-    await waitFor(() =>
-      expect(
-        within(density).getByRole("radio", { name: "Compact" }),
-      ).toBeChecked(),
-    );
+    await waitFor(() => expect(density).toHaveTextContent("Compact"));
     expect(document.documentElement.dataset.crateDensity).toBe("compact");
     expect(getUiPreferences()).toEqual({
       version: 1,
@@ -94,10 +86,12 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
 
-    await user.click(screen.getByRole("radio", { name: "Reduce motion" }));
+    await user.click(screen.getByRole("combobox", { name: "Motion" }));
+    await user.click(screen.getByRole("option", { name: "Reduce motion" }));
     expect(document.documentElement.dataset.crateMotion).toBe("reduced");
 
-    await user.click(screen.getByRole("radio", { name: "Off" }));
+    await user.click(screen.getByRole("combobox", { name: "Effects" }));
+    await user.click(screen.getByRole("option", { name: "Off" }));
 
     expect(document.documentElement.dataset.crateEffects).toBe("off");
     expect(getUiPreferences()).toEqual({
@@ -131,17 +125,21 @@ describe("InterfacePreferencesSection", () => {
       locale: "en",
     });
 
-    await user.click(screen.getByRole("radio", { name: "Reduce motion" }));
+    await user.click(screen.getByRole("combobox", { name: "Motion" }));
+    await user.click(screen.getByRole("option", { name: "Reduce motion" }));
 
     const error = await screen.findByRole("alert");
     expect(error).not.toHaveTextContent("settings.interface.saveError");
     expect(error).not.toBeEmptyDOMElement();
     expect(localStorage.getItem(legacyKey)).toBe(legacy);
     expect(getUiPreferences().motion).toBe("reduced");
-    expect(screen.getByRole("radio", { name: "Reduce motion" })).toBeChecked();
+    expect(screen.getByRole("combobox", { name: "Motion" })).toHaveTextContent(
+      "Reduce motion",
+    );
 
     save.mockRestore();
-    await user.click(screen.getByRole("radio", { name: "Off" }));
+    await user.click(screen.getByRole("combobox", { name: "Effects" }));
+    await user.click(screen.getByRole("option", { name: "Off" }));
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(

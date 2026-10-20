@@ -11,6 +11,7 @@ import {
 import { notify } from "@crate/ui/lib/notify";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { Button } from "@crate/ui/shadcn/button";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { usesConfigurableServer } from "@/lib/platform";
 import { revokeServerSession } from "@/lib/api";
@@ -73,9 +74,9 @@ export function ServersSection() {
     <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
       <div className="mb-1 flex items-center gap-2">
         <Server size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
-        <h2 className="text-sm font-semibold text-text-primary">
+        <MonoLabel as="h2" tone="accent">
           {t("settings.servers.title")}
-        </h2>
+        </MonoLabel>
       </div>
       <p className="mb-4 text-[0.75rem] text-text-muted">
         {t("settings.servers.description")}

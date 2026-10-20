@@ -411,3 +411,43 @@ Settings, cuenta, interfaz, reproducción y conexiones. Mantener los controlador
 capability gates y acciones existentes; normalizar con componentes reales y revisión aislada
 en5186/Storybook. Social, imports y compartir continúan en los siguientes lotes1BD. Las tres
 instancias siguen activas y el nuevo corte se detiene para revisión antes de commit.
+
+## Radio y Paths publicado; primer corte1BD Ajustes en revisión local
+
+Radio/Paths publicado en `0e3640e7`. El primer corte1BD aplica [el plan de Ajustes](2026-10-20-crate-v3-settings.md):
+preferencias/interfaz/idioma/reproducción, perfil y cuentas vinculadas, zona horaria y dispositivos
+Connect tras Playback. Select/FormField reales, confirmaciones y autoridad nativa/API conservadas.
+Diego añade MonoLabel tone=accent para títulos de sección y la cuadrícula responsive de Motion,
+Effects y Content density. Sus dos fichas shared se actualizan; los labels de campo siguen sutiles
+y los valores/prosa conservan su caso. Las explicaciones de Select se leen antes de seleccionar.
+
+La revisión pequeña `review-1bd-settings.html` y `reviews-1bd-settings--complete` comparten vistas
+reales con callbacks locales. Bandcamp, scrobbling, credenciales externas, ubicación/offline y
+los flujos de servidores, social/imports/share siguen en otros lotes1BD; no se certifica H2 ni
+los instrumentos H3. Tres instancias activas; primer corte1BD sin commit hasta revisión de Diego.
+
+### Enmienda aprobada1BD — navegación por cinco pestañas
+
+Diego aprueba Preferences, Playback, Account, Connections y Offline para este mismo corte.
+Se reutilizan Tabs, `?tab=` y vistas reales; formularios/peticiones conservan su montaje al cambiar
+mediante paneles ocultos. La barra móvil usa scroll horizontal y revela la selección. Connect pasa
+a Connections y el temporizador a Playback; perfil/enlaces a Account, ubicación a Preferences.
+La misma estructura se revisa en Storybook y preview aislado. La extracción OfflineSettingsView
+solo separa presentación y callbacks locales de la autoridad de cuota/almacenamiento. Integraciones
+pendientes mantienen sus flujos; sigue sin commit hasta revisión de Diego.
+
+### Account aceptado; bloqueo explícito de commit
+
+Account separa Profile/Listening preferences/Connected accounts/Security, Email primero en Input
+readonly y campos responsive. Los proveedores usan logos existentes, EntityRow compacto, StatusDot
+y acciones ghost próximas; APIs, IDs y autoridad OAuth no cambian. Diego acepta el aspecto y pide
+no hacer commit/push hasta nueva instrucción. Claude trabajará Paths y retirará el coverflow: este
+corte no debe modificar ni incluir ese trabajo. Las tres instancias siguen activas.
+
+### Commit conjunto autorizado —1BD Settings y transición de Paths
+
+Diego confirma que Claude ha terminado Paths y autoriza el commit de todo el lote. Incluye
+Settings con cinco pestañas, Account normalizado y timezone automático fuera de ajustes, más
+la transición pixelate-blur de portadas que sustituye el coverflow. Storybook/preview usan las
+vistas reales y la documentación de Paths refleja la decisión posterior. El bloqueo previo
+de commit queda revocado para este lote. No se ha solicitado despliegue ni nueva migración.

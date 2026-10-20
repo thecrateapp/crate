@@ -1,11 +1,18 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocation, useNavigate, type NavigateFunction } from "react-router";
+import { useEffect } from "react";
 
 import { Settings } from "@/pages/Settings";
-import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+import { api } from "@/lib/api";
+import {
+  renderWithListenProviders,
+  createMockAuthUser,
+} from "@/test/render-with-listen-providers";
 
-const { androidNativePlayerState } = vi.hoisted(() => ({
+const { androidNativePlayerState, credentialState } = vi.hoisted(() => ({
+  credentialState: { configured: false },
   androidNativePlayerState: { enabled: false },
 }));
 
@@ -26,6 +33,17 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     api: vi.fn(async (url: string, method?: string, body?: unknown) => {
+      if (url === "/api/me/location") {
+        return {
+          city: "Madrid",
+          country: "Spain",
+          country_code: "ES",
+          latitude: 40.4,
+          longitude: -3.7,
+          show_radius_km: 60,
+          show_location_mode: "fixed",
+        };
+      }
       if (url === "/api/bandcamp/me/status") {
         return {
           connected: false,
@@ -38,24 +56,51 @@ vi.mock("@/lib/api", async (importOriginal) => {
         return { remote_scrobbling_enabled: false };
       }
       if (url === "/api/auth/subsonic-token") {
-        return { configured: false };
+        return { configured: credentialState.configured };
       }
       return {};
     }),
   };
 });
 
+function RouteProbe({
+  onNavigate,
+}: {
+  onNavigate?: (navigate: NavigateFunction) => void;
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => onNavigate?.(navigate), [onNavigate, navigate]);
+  return (
+    <>
+      <output aria-label="Current route">
+        {location.pathname}
+        {location.search}
+        {location.hash}
+      </output>
+      <button type="button" onClick={() => void navigate(-1)}>
+        Previous tab
+      </button>
+      <button type="button" onClick={() => void navigate(1)}>
+        Next tab
+      </button>
+    </>
+  );
+}
+
 describe("Settings", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.mocked(api).mockClear();
     androidNativePlayerState.enabled = false;
+    credentialState.configured = false;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: 1024,
     });
   });
 
-  it("localizes the settings page chrome", () => {
+  it("localizes the settings page chrome", async () => {
     const { container } = renderWithListenProviders(<Settings />, {
       locale: "es",
     });
@@ -63,19 +108,30 @@ describe("Settings", () => {
     expect(
       screen.getByRole("heading", { name: "Ajustes" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Reproducción")).toBeInTheDocument();
-    expect(screen.getByText("Temporizador")).toBeInTheDocument();
-    expect(screen.getByText("Idioma de la app")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Español/i })).toBeInTheDocument();
-    expect(screen.getByText("1 h")).toBeInTheDocument();
-    expect(screen.getByText("Al terminar la pista")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Idioma de la app" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Idioma de la app" }),
+    ).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Reproducción" }));
+    expect(screen.getByRole("heading", { name: "Temporizador" })).toBeVisible();
+    await user.click(screen.getByRole("combobox", { name: "Temporizador" }));
+    expect(screen.getByRole("option", { name: "1 h" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Al terminar la pista" }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("tab", { name: "Cuenta" }));
+    expect(screen.getByPlaceholderText("tu-handle")).toBeVisible();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
-    expect(screen.getByText("OpenSubsonic")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Conexiones" }));
+    expect(screen.getByText("OpenSubsonic")).toBeVisible();
     expect(container.querySelector(".settings-header")).toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Reproducción" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("region", { name: "Reproducción" }),
+    ).not.toBeInTheDocument();
   });
 
   it("exposes functional interface preferences without a theme selector", () => {
@@ -91,7 +147,10 @@ describe("Settings", () => {
   });
 
   it("keeps the real playback controls inside a named instrument section", () => {
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=playback",
+    });
 
     const playback = screen.getByRole("region", { name: "Playback" });
     expect(playback.tagName).toBe("SECTION");
@@ -109,9 +168,220 @@ describe("Settings", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      within(playback).getByRole("radio", { name: /Auto \(recommended\)/i }),
-    ).toHaveAttribute("aria-checked", "true");
+      within(playback).getByRole("combobox", { name: "Stream quality" }),
+    ).toHaveTextContent("Auto (recommended)");
     expect(within(playback).getByText("Crossfade")).toBeInTheDocument();
+  });
+
+  it("groups the actual sections into five panels with only the selected panel exposed", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings",
+    });
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Preferences",
+      "Playback",
+      "Account",
+      "Connections",
+      "Offline",
+    ]);
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Interface" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Shows" })).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Playback" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Playback" }));
+    expect(screen.getByRole("region", { name: "Playback" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: /^Sleep timer$/i }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
+    expect(screen.getByRole("heading", { name: "OpenSubsonic" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Scrobbling" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Bandcamp" })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Account" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Offline" }));
+    expect(
+      screen.getByRole("heading", { name: "Offline mirror" }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+  });
+
+  it("separates profile, listening preferences and security within Account", async () => {
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=account",
+    });
+    const profile = screen.getByRole("region", { name: "Profile" });
+    const listening = screen.getByRole("region", {
+      name: "Listening preferences",
+    });
+    const security = screen.getByRole("region", { name: "Security" });
+    const email = within(profile).getByRole("textbox", { name: "Email" });
+    expect(email).toHaveAttribute("readonly");
+    expect(within(profile).getAllByRole("textbox")[0]).toBe(email);
+    expect(
+      within(listening).getByRole("switch", { name: "Show me in Crate Pulse" }),
+    ).toBeVisible();
+    expect(
+      within(security).getByRole("button", { name: "Change password" }),
+    ).toBeVisible();
+  });
+
+  it("keeps the automatically detected timezone out of Account settings", () => {
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=account",
+      auth: { user: createMockAuthUser({ timezone: "America/New_York" }) },
+    });
+    expect(screen.queryByText("Listening timezone")).not.toBeInTheDocument();
+    expect(screen.queryByText("America/New_York")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Use Europe/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "Show me in Crate Pulse" }),
+    ).toBeVisible();
+  });
+
+  it("keeps profile and password drafts when switching panels without saving", async () => {
+    const user = userEvent.setup();
+    const { api } = await import("@/lib/api");
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=account",
+    });
+    const name = screen.getByRole("textbox", { name: "Display name" });
+    await user.clear(name);
+    await user.type(name, "Draft Mixed Case Name");
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+    await user.type(
+      screen.getByLabelText("Current password", { exact: true }),
+      "draft only",
+    );
+    await user.click(screen.getByRole("tab", { name: "Playback" }));
+    expect(
+      screen.queryByRole("textbox", { name: "Display name" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Account" }));
+    expect(screen.getByRole("textbox", { name: "Display name" })).toHaveValue(
+      "Draft Mixed Case Name",
+    );
+    expect(
+      screen.getByLabelText("Current password", { exact: true }),
+    ).toHaveValue("draft only");
+    expect(
+      vi
+        .mocked(api)
+        .mock.calls.filter(([, method]) => method && method !== "GET"),
+    ).toEqual([]);
+  });
+
+  it("reads deep links and follows back/forward while preserving other query and hash", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <>
+        <Settings />
+        <RouteProbe />
+      </>,
+      { locale: "en", route: "/settings?tab=account&source=library#profile" },
+    );
+    expect(screen.getByRole("tab", { name: "Account" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
+    expect(screen.getByLabelText("Current route")).toHaveTextContent(
+      "/settings?tab=connections&source=library#profile",
+    );
+    await user.click(screen.getByRole("button", { name: "Previous tab" }));
+    expect(screen.getByRole("tab", { name: "Account" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: "Next tab" }));
+    expect(screen.getByRole("tab", { name: "Connections" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("dismisses a hidden Connections confirmation on browser history without revoking credentials", async () => {
+    credentialState.configured = true;
+    const user = userEvent.setup();
+    let navigate: NavigateFunction;
+    renderWithListenProviders(
+      <>
+        <Settings />
+        <RouteProbe
+          onNavigate={(value) => {
+            navigate = value;
+          }}
+        />
+      </>,
+      { locale: "en", route: "/settings?tab=account" },
+    );
+    await user.click(screen.getByRole("tab", { name: "Connections" }));
+    await user.click(await screen.findByRole("button", { name: "Revoke key" }));
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+    await act(() => navigate(-1));
+    expect(screen.getByRole("tab", { name: "Account" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await act(() => navigate(1));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(
+      vi.mocked(api).mock.calls.filter(([, method]) => method === "DELETE"),
+    ).toEqual([]);
+  });
+
+  it("dismisses hidden Select menus on history while retaining preference values", async () => {
+    const user = userEvent.setup();
+    let navigate: NavigateFunction;
+    renderWithListenProviders(
+      <>
+        <Settings />
+        <RouteProbe
+          onNavigate={(value) => {
+            navigate = value;
+          }}
+        />
+      </>,
+      { locale: "en", route: "/settings?tab=account" },
+    );
+    await user.click(screen.getByRole("tab", { name: "Playback" }));
+    await user.click(screen.getByRole("combobox", { name: "Stream quality" }));
+    expect(screen.getByRole("listbox")).toBeVisible();
+    await act(() => navigate(-1));
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    await act(() => navigate(1));
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Stream quality" }),
+    ).toHaveTextContent("Auto (recommended)");
+  });
+
+  it("falls back to Preferences for unknown tabs without rewriting the URL", () => {
+    renderWithListenProviders(
+      <>
+        <Settings />
+        <RouteProbe />
+      </>,
+      { locale: "en", route: "/settings?tab=unknown&source=library" },
+    );
+    expect(screen.getByRole("tab", { name: "Preferences" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByLabelText("Current route")).toHaveTextContent(
+      "/settings?tab=unknown&source=library",
+    );
   });
 
   it("changes and stores the selected Listen language", async () => {
@@ -119,9 +389,12 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    expect(screen.getByText("App language")).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "App language" }),
+    ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: /Español/i }));
+    await user.click(screen.getByRole("combobox", { name: "App language" }));
+    await user.click(screen.getByRole("option", { name: /Español/i }));
 
     expect(localStorage.getItem("crate-listen-locale")).toBe("es");
     expect(
@@ -131,17 +404,24 @@ describe("Settings", () => {
 
   it("lets the user opt into automatic stream quality", async () => {
     const user = userEvent.setup();
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=playback",
+    });
 
-    const auto = screen.getByRole("radio", { name: /Auto \(recommended\)/i });
-    expect(auto).toHaveAttribute("aria-checked", "true");
+    const auto = screen.getByRole("combobox", { name: "Stream quality" });
+    expect(auto).toHaveTextContent("Auto (recommended)");
 
-    await user.click(screen.getByRole("radio", { name: /^Original/i }));
+    await user.click(auto);
+    await user.click(screen.getByRole("option", { name: /^Original/i }));
     expect(localStorage.getItem("listen-player-delivery-policy")).toBe(
       "original",
     );
 
     await user.click(auto);
+    await user.click(
+      screen.getByRole("option", { name: /Auto \(recommended\)/i }),
+    );
     expect(localStorage.getItem("listen-player-delivery-policy")).toBe("auto");
   });
 
@@ -151,7 +431,10 @@ describe("Settings", () => {
       value: 390,
     });
 
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=playback",
+    });
 
     expect(screen.queryByText("Crossfade")).not.toBeInTheDocument();
     expect(screen.queryByText("Smart transitions")).not.toBeInTheDocument();
@@ -168,7 +451,10 @@ describe("Settings", () => {
     androidNativePlayerState.enabled = true;
     const user = userEvent.setup();
 
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=playback",
+    });
 
     const toggle = screen.getByRole("switch", { name: "Equalizer" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
@@ -179,7 +465,10 @@ describe("Settings", () => {
   });
 
   it("keeps crossfade controls on desktop", () => {
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=playback",
+    });
 
     expect(screen.getByText("Crossfade")).toBeInTheDocument();
     expect(screen.getByText("Smart transitions")).toBeInTheDocument();
@@ -189,7 +478,10 @@ describe("Settings", () => {
     const user = userEvent.setup();
     const { api } = await import("@/lib/api");
 
-    renderWithListenProviders(<Settings />, { locale: "en" });
+    renderWithListenProviders(<Settings />, {
+      locale: "en",
+      route: "/settings?tab=connections",
+    });
 
     const toggle = await screen.findByRole("switch", {
       name: "Scrobble remote plays",

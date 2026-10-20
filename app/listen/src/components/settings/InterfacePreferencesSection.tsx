@@ -1,76 +1,12 @@
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-
 import {
   getUiPreferences,
   setUiPreferences,
   subscribeUiPreferences,
-  type UiPreferences,
 } from "@crate/ui/lib/interface-preferences";
-import { Section } from "./SettingsPrimitives";
-
-type PreferencePatch = Partial<Omit<UiPreferences, "version">>;
-
-interface PreferenceLabels {
-  title: string;
-  description: string;
-  motionLabel: string;
-  effectsLabel: string;
-  densityLabel: string;
-  values: Record<string, string>;
-}
-
-export function InterfacePreferencesControls({
-  preferences,
-  onChange,
-  labels,
-}: {
-  preferences: UiPreferences;
-  onChange: (patch: PreferencePatch) => void;
-  labels: PreferenceLabels;
-}) {
-  const fields = [
-    { key: "motion", label: labels.motionLabel, values: ["system", "reduced"] },
-    {
-      key: "effects",
-      label: labels.effectsLabel,
-      values: ["off", "subtle", "expressive"],
-    },
-    {
-      key: "density",
-      label: labels.densityLabel,
-      values: ["comfortable", "compact"],
-    },
-  ] as const;
-
-  return (
-    <Section title={labels.title} description={labels.description}>
-      {fields.map((field) => (
-        <div
-          key={field.key}
-          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
-        >
-          <MonoLabel as="span">{field.label}</MonoLabel>
-          <SegmentedControl
-            as="radio"
-            label={field.label}
-            value={preferences[field.key]}
-            onValueChange={(value) =>
-              onChange({ [field.key]: value } as PreferencePatch)
-            }
-            items={field.values.map((value) => ({
-              value,
-              label: labels.values[value],
-            }))}
-          />
-        </div>
-      ))}
-    </Section>
-  );
-}
-
+import { InterfacePreferencesControls } from "./InterfacePreferencesControls";
+export { InterfacePreferencesControls } from "./InterfacePreferencesControls";
 export function InterfacePreferencesSection() {
   const { t } = useTranslation();
   const preferences = useSyncExternalStore(

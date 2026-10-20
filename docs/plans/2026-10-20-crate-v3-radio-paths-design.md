@@ -5,8 +5,9 @@
 Upcoming was approved and published as668a9a8a. The next cut covers Radio and Paths with the
 approved mockup/component system as reference. Diego asked for better visual presentation,
 clarified that new product workflows were not the goal, and finally preferred the original
-coverflow over a spatial-camera experiment. The final cut implements that coverflow, which
-advances automatically only on actual track changes. The spatial experiment is removed.
+coverflow over a spatial-camera experiment; the spatial experiment is removed. The coverflow was
+then replaced by the [Paths cover transition](2026-10-20-crate-v3-paths-cover-transition-design.md),
+which also advances automatically only on actual track changes.
 
 Existing search/start/session/create/play/regenerate/delete behavior remains. No preview/save
 split, waypoint editor, planner mode, new endpoint or backend dependency is introduced.
@@ -34,24 +35,20 @@ Missing reads show loading/error/retry; a verified empty collection has its own 
 
 PathDetail uses the same BackLink/PageHeader/ActionGroup recipe, preserves deletion confirmation,
 regeneration, full TrackRow list, queue/source and managed artwork. The old linear strip is replaced
-by a Listen-local PathCoverJourneyView presenting the approved coverflow:
+by a Listen-local PathCoverJourneyView. Its coverflow was later retired in favour of one large
+cover with a pixelate-blur transition and a step strip: see
+[Paths cover transition](2026-10-20-crate-v3-paths-cover-transition-design.md), which also removed
+the previous/next inspection buttons (they moved the cover without moving the queue). The
+interaction contract is now:
 
-- Current/inspected cover at the front; neighbours recede on each side. This is ordered sequence,
-  not a sound-space or energy projection.
-- Mount at most7 cover buttons. Visible covers remain at least48px; on narrow screens farther
-  neighbours are hidden. Missing artwork uses the real MediaCover fallback.
-- Actual current-track changes move the coverflow. Play/pause or unchanged track state never
-  advances it. No automatic tour, persistent animation, RAF loop or progress subscription.
-- Previous/next and arrow/Home/End inspect any step without playing. Click/Enter plays from that
-  exact index. Current track and inspected focus are separate. The complete track list remains
-  the accessible alternative.
+- Actual current-track changes advance the journey. Play/pause or unchanged track state never
+  advances it. No automatic tour, persistent animation or progress subscription.
+- Arrow/Home/End move keyboard focus through the steps without playing or changing the cover.
+  Click/Enter plays from that exact index. The complete track list remains the accessible
+  alternative.
 - Transitions stop for hidden/reduced motion. Empty/single-track paths retain valid controls.
-
-Use HTML/CSS transforms. This is a maintenance/design choice, not a claim that CSS always beats
-WebGL. It preserves authenticated artwork and native controls without adding textures/context-loss
-handling or a runtime library. Future full PathRouteMap/RadioSessionMap still needs H3/backend
-contracts. See [MDN animation guidance](https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Animation_performance_and_frame_rate)
-and [WebGL best practices](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices).
+  Missing artwork uses the real MediaCover fallback. Future full PathRouteMap/RadioSessionMap
+  still needs H3/backend contracts.
 
 ## Ownership and review
 

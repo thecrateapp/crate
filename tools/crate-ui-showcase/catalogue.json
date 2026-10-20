@@ -86,9 +86,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/MonoLabel.tsx": "1ff67ba85f1955f2312d797a6680339e8b56b3e8d9fc947cd4a86865dbfa2f62",
-        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "983c6ab60008f318207426145aff5340527e22a0e3024e26b4a5b5b44e7811d0",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "20fb7082f8ee1765cdbdb7cff4513e97ad9b6e386466dc7145542c21fa26ec1f"
+        "app/shared/ui/primitives/MonoLabel.tsx": "2b06496369fccb303cc1bcf75b170f0671233bd18300a4a2441fc67058b1eedf",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "d25dac3633c76eec17a45a56b568d4b3cabbfcf2e4c96935ade0558b26f717d5",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "cd7c938e63fb8e1d5ec2e01b8548b6dd44eb4bc2739bf944ee1a6aa9380eba6d"
       },
       "category": "Data Display"
     },
@@ -1218,9 +1218,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/InstrumentPanel.tsx": "459f188ffdf025119300c84d876bae3ceecae484b6d3a43e9cd6ab46a651cee4",
-        "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx": "f6ee516ae87fb2521ac4f47c2b16f6b048d6e4e951da77798267e1ea492b3c34",
-        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "b1dce8fdf95c09916a33945e3bad1b3b637874349ea06721ccdb2d14850c0654"
+        "app/shared/ui/primitives/InstrumentPanel.tsx": "005183206ff20fdceea32d5399203fe2901ea96d1bc4148a24b701cfbf9e5e09",
+        "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx": "36a17d80daaa2948fe2fed7838ef9cafeecf57c0db15d06d96bbb69a839105be",
+        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "3d4771612c655b4a397e6124f679c4bf82ff35b1578207dfe6c1ec5d1d37f1c2"
       },
       "category": "Layout"
     },

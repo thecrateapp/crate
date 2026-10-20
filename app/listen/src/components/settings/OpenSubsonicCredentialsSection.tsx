@@ -1,3 +1,4 @@
+import { useSettingsOverlay } from "./settings-panel-activity";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,7 +33,7 @@ export function OpenSubsonicCredentialsSection() {
   const [error, setError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const copyInProgress = useRef(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useSettingsOverlay();
   const [confirmingAction, setConfirmingAction] =
     useState<ConfirmedAction>("rotate");
 

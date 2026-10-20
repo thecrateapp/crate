@@ -83,3 +83,6 @@ body {
 @source "../../app/listen/src/pages/PathsPageView.tsx";
 @source "../../app/listen/src/pages/PathEndpointPanelView.tsx";
 @source "../../app/listen/src/pages/PathDetailHeaderView.tsx";
+
+@source "../../app/listen/src/components/settings";
+@source "../../app/listen/src/pages/SettingsPageView.tsx";

@@ -1,14 +1,13 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 export interface InstrumentPanelProps {
-  label: {
-    accent?: ReactNode;
-    meta?: readonly (string | null | false | undefined)[];
-    children?: ReactNode;
-  };
+  label: Pick<
+    ComponentProps<typeof MonoLabel>,
+    "accent" | "meta" | "children" | "tone"
+  >;
   meta?: ReactNode;
   status?: ReactNode;
   description?: ReactNode;

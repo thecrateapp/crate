@@ -1,20 +1,9 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { useSettingsPanelActive } from "./settings-panel-activity";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import {
-  CRATE_ICON_SIZE,
-  Loader2,
-  LogOut,
-  MonitorSpeaker,
-  Check,
-  Activity,
-  Clock,
-} from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-
-import { Switch } from "@crate/ui/primitives/Switch";
-import { Button } from "@crate/ui/shadcn/button";
+import { ConnectDevicesView } from "./ConnectDevicesView";
 
 import { api } from "@/lib/api";
 import {
@@ -95,11 +84,14 @@ export function ConnectDevicesSection() {
 }
 
 function ConnectDevicesSectionContent() {
+  const panelActive = useSettingsPanelActive();
   const { t } = useTranslation();
   const currentDeviceId = useMemo(() => getListenDeviceId(), []);
   const connectEnabled = useCrateConnectEnabled();
   const [devices, setDevices] = useState<ConnectDevice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [readAttempt, setReadAttempt] = useState(0);
   const [forgettingDeviceId, setForgettingDeviceId] = useState<string | null>(
     null,
   );
@@ -107,6 +99,9 @@ function ConnectDevicesSectionContent() {
   const [pendingRevoke, setPendingRevoke] = useState<ConnectDevice | null>(
     null,
   );
+  useEffect(() => {
+    if (!panelActive) setPendingRevoke(null);
+  }, [panelActive]);
   const devicesRequestIdRef = useRef(0);
   const showLoadError = useEffectEvent(() => {
     notify.error(t("settings.connectDevices.toasts.loadFailed"));
@@ -116,6 +111,7 @@ function ConnectDevicesSectionContent() {
     const controller = new AbortController();
     const requestId = ++devicesRequestIdRef.current;
     setLoading(true);
+    setLoadError(false);
     api<ConnectDeviceListResponse>("/api/me/devices", "GET", undefined, {
       signal: controller.signal,
     })
@@ -132,6 +128,7 @@ function ConnectDevicesSectionContent() {
         if (requestId !== devicesRequestIdRef.current) return;
         if (error instanceof DOMException && error.name === "AbortError")
           return;
+        setLoadError(true);
         showLoadError();
       })
       .finally(() => {
@@ -145,7 +142,7 @@ function ConnectDevicesSectionContent() {
     return () => {
       controller.abort();
     };
-  }, [currentDeviceId]);
+  }, [currentDeviceId, readAttempt]);
 
   async function revokeDevice(device: ConnectDevice) {
     setForgettingDeviceId(device.device_id);
@@ -186,100 +183,35 @@ function ConnectDevicesSectionContent() {
   }
 
   return (
-    <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="text-sm font-medium text-text-primary">
-            {t("settings.connectDevices.title")}
-          </div>
-          <p className="mt-1 text-xs text-text-muted">
-            {t("settings.connectDevices.description")}
-          </p>
-        </div>
-        <Switch
-          aria-label={t("settings.connectDevices.title")}
-          checked={connectEnabled}
-          disabled={updatingPreference}
-          onCheckedChange={() => void handleToggleConnect()}
-          className="disabled:cursor-wait disabled:opacity-70"
-        />
-      </div>
-
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-text-muted">
-          <Loader2 size={CRATE_ICON_SIZE.xs} className="animate-spin" />
-          {t("settings.connectDevices.loading")}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {devices.map((device) => {
-            const isCurrent = device.device_id === currentDeviceId;
-            const lastSeen =
-              device.last_seen_at || device.updated_at || device.created_at;
-            const label = deviceLabel(device);
-            const meta = deviceMeta(device);
-            const busy = forgettingDeviceId === device.device_id;
-            return (
-              <div
-                key={device.device_id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-border-quiet p-3 "
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="inline-flex items-center gap-2 text-sm font-medium text-text-primary">
-                      <MonitorSpeaker
-                        size={CRATE_ICON_SIZE.xs}
-                        className="text-text-muted"
-                      />
-                      <span className="truncate">{label}</span>
-                    </div>
-                    {isCurrent ? (
-                      <InfoBadge icon={Check}>{t("common.current")}</InfoBadge>
-                    ) : null}
-                    <InfoBadge
-                      icon={device.active ? Activity : Clock}
-                      tone={device.active ? "success" : "neutral"}
-                    >
-                      {device.active ? t("common.active") : t("common.recent")}
-                    </InfoBadge>
-                  </div>
-                  <div className="mt-1 text-xs text-text-muted">
-                    {t("settings.connectDevices.lastSeen", {
-                      value: formatSeenAt(lastSeen, t("common.recently")),
-                    })}
-                  </div>
-                  {meta ? (
-                    <div className="mt-1 text-xs text-text-primary/40">
-                      {meta}
-                    </div>
-                  ) : null}
-                </div>
-                <Button
-                  variant="danger-soft"
-                  aria-label={t("settings.connectDevices.revokeNamed", {
-                    name: label,
-                  })}
-                  disabled={isCurrent}
-                  loading={busy}
-                  onClick={() => setPendingRevoke(device)}
-                  className="h-auto gap-2 rounded-lg border-state-danger/20 px-3 py-2 text-xs [&_svg:not([class*='size-'])]:size-3.5 has-[>svg]:px-3"
-                >
-                  {busy ? null : <LogOut size={CRATE_ICON_SIZE.xs} />}
-                  {t("settings.connectDevices.revoke")}
-                </Button>
-              </div>
-            );
-          })}
-          {devices.length === 0 ? (
-            <div className="text-sm text-text-muted">
-              {t("settings.connectDevices.empty")}
-            </div>
-          ) : null}
-        </div>
-      )}
+    <>
+      <ConnectDevicesView
+        devices={devices.map((device) => ({
+          id: device.device_id,
+          label: deviceLabel(device),
+          meta: deviceMeta(device),
+          lastSeen: formatSeenAt(
+            device.last_seen_at || device.updated_at || device.created_at,
+            t("common.recently"),
+          ),
+          current: device.device_id === currentDeviceId,
+          active: device.active,
+        }))}
+        loading={loading}
+        error={loadError}
+        enabled={connectEnabled}
+        updating={updatingPreference}
+        forgettingId={forgettingDeviceId}
+        onToggle={() => void handleToggleConnect()}
+        onRetry={() => setReadAttempt((value) => value + 1)}
+        onRevoke={(id) =>
+          setPendingRevoke(
+            devices.find((device) => device.device_id === id) ?? null,
+          )
+        }
+      />
       <ConfirmDialog
         eyebrow={t("actions.confirmation.eyebrow")}
-        open={pendingRevoke !== null}
+        open={panelActive && pendingRevoke !== null}
         onOpenChange={(open) => {
           if (!open) setPendingRevoke(null);
         }}
@@ -301,6 +233,6 @@ function ConnectDevicesSectionContent() {
         ariaLabel={t("settings.connectDevices.revokeConfirmTitle")}
         backdropLabel={t("common.close")}
       />
-    </div>
+    </>
   );
 }

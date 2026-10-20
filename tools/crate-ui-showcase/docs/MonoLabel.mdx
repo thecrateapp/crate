@@ -7,19 +7,27 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h1">MonoLabel</DocHeading>
 
-<EntryDetails id="mono-label" review="Visual review approved by Diego · 1AR" />
+<EntryDetails
+  id="mono-label"
+  review="Base approved · 1AR; accent tone in 1BD review"
+/>
 
 <DocHeading as="h2">Contract</DocHeading>
 
 - Always uppercase, in both sizes and every layout. This includes the captions beside Checkbox, Switch and RadioGroup options; inline placement never creates a separate label style.
 - The component applies CSS text-transform; callers pass natural text. The original children and metadata strings are not uppercased in JavaScript. The component's uppercase utility wins over a caller's normal-case, lowercase or capitalize utility.
 - Use for contextual counts such as plays, albums, tracks, duration and match percentages, including ArtistCard subtitles and PlaylistCard metadata. Titles, artist names and prose retain their case; large highlighted metrics use StatNumber. Do not uppercase every generic EntityCard subtitle.
+- `tone=subtle|accent` changes only the foreground color. Settings section headings use accent; ordinary field captions retain subtle. This is separate from `accent`, which highlights an inline keyword before metadata. Typography, case, wrapping and semantics stay the same.
 - `size=label|eyebrow`, a semantic `as`, `accent` and `meta`. Consumers must preserve its font, weight and case.
 - Wrapping is supported. Scene wrappers constrain width without correcting component internals.
 
 <DocHeading as="h2">Real component</DocHeading>
 
 <Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Accent} />
+
+<Canvas of={Stories.SectionTones} />
 
 <Canvas of={Stories.UppercaseContract} />
 

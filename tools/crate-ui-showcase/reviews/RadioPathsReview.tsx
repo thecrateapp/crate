@@ -16,6 +16,7 @@ import { PathsPageView } from "../../../app/listen/src/pages/PathsPageView";
 import { PathEndpointPanelView } from "../../../app/listen/src/pages/PathEndpointPanelView";
 import { PathDetailHeaderView } from "../../../app/listen/src/pages/PathDetailHeaderView";
 import { PathCoverJourneyView } from "../../../app/listen/src/components/paths/PathCoverJourneyView";
+import { createCoverLoader } from "../../../app/listen/src/components/paths/path-cover-textures";
 import { TrackRowView } from "../../../app/listen/src/components/cards/TrackRowView";
 import { TrackRowContent } from "../../../app/listen/src/components/cards/TrackRowContent";
 import type { SearchResult } from "../../../app/listen/src/pages/paths-model";
@@ -42,6 +43,8 @@ import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { Music2, Play } from "@crate/ui/icons";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { IMAGE_SAMPLES } from "../fixtures/image-identity";
+// Fixture artwork is local data URIs: no API, tickets or credentials.
+const loadFixtureCover = createCoverLoader((url) => url, "omit");
 const i18n = i18next.createInstance();
 void i18n
   .use(new ICU())
@@ -363,6 +366,7 @@ function Scene() {
                 steps[active] ? `fixture-track-${active}` : undefined
               }
               playing={playing}
+              loadCover={loadFixtureCover}
               onPlay={(index) => {
                 setActive(index);
                 setPlaying(true);

@@ -20,6 +20,29 @@ describe("MonoLabel", () => {
       },
     );
   });
+  it("offers an accent tone without changing type, case, semantics or value text", () => {
+    render(
+      <MonoLabel as="h2" tone="accent">
+        Interface
+      </MonoLabel>,
+    );
+    const heading = screen.getByRole("heading", {
+      name: "Interface",
+      level: 2,
+    });
+    expect(heading).toHaveClass(
+      "text-accent-action-hi",
+      "uppercase",
+      "font-mono",
+      "font-normal",
+      "text-label",
+      "tracking-caps",
+    );
+    expect(heading).not.toHaveClass("text-text-subtle");
+    expect(heading).toHaveTextContent("Interface");
+    expect(heading).not.toHaveAttribute("tone");
+  });
+
   it("renders the accent key word before the metadata", () => {
     render(
       <MonoLabel accent="Upcoming show" meta={["Ticketmaster", "Last.fm"]} />,

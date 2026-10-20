@@ -1,31 +1,21 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ComponentProps,
-} from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ArrowRight, Music2 } from "@crate/ui/icons";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardAction,
-} from "@crate/ui/shadcn/card";
-import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { Card, CardHeader, CardContent } from "@crate/ui/shadcn/card";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { EmptyState } from "@crate/ui/domain/states";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
-import {
-  pathCoverWindow,
-  type PathCoverStep,
-} from "./path-cover-journey-model";
+import type { PathCoverStep } from "./path-cover-journey-model";
+import type { CoverLoader } from "./path-cover-textures";
+import { PathCoverStage } from "./PathCoverStage";
+import { PathStepStrip } from "./PathStepStrip";
 import "./path-cover-journey.css";
 
-/** Sequence composition, not a projection of sound/energy. No frame loop or progress subscription. */
+/**
+ * One cover on stage with a pixelate-blur transition between steps. The stage follows the
+ * playing track or the step just chosen to play; no progress subscription.
+ */
 export function PathCoverJourneyView({
   steps,
   origin,
@@ -34,6 +24,7 @@ export function PathCoverJourneyView({
   currentTrackKey,
   playing = false,
   onPlay,
+  loadCover,
   renderImage,
 }: {
   steps: PathCoverStep[];
@@ -43,41 +34,22 @@ export function PathCoverJourneyView({
   currentTrackKey?: string;
   playing?: boolean;
   onPlay: (index: number) => void;
+  /** Decodes covers for the WebGL transition; without it covers fade in. */
+  loadCover?: CoverLoader;
   renderImage?: ComponentProps<typeof MediaCover>["renderImage"];
 }) {
   const { t } = useTranslation();
   const motion = useMotionAllowed();
-  const [inspected, setInspected] = useState(Math.max(0, activeStep));
-  const focus = Math.min(Math.max(0, inspected), Math.max(0, steps.length - 1));
-  const stage = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState(Math.max(0, activeStep));
+  const focus = Math.min(Math.max(0, stage), Math.max(0, steps.length - 1));
   const previousTrackKey = useRef(currentTrackKey);
-  const focusButton = useRef<HTMLButtonElement>(null);
-  const restoreFocus = useRef(false);
   useEffect(() => {
-    // List refreshes and play/pause must not reset manual inspection.
+    // List refreshes and play/pause keep the stage; an actual track change moves it.
     if (previousTrackKey.current === currentTrackKey) return;
     previousTrackKey.current = currentTrackKey;
-    if (activeStep >= 0 && activeStep < steps.length) {
-      restoreFocus.current =
-        Boolean(stage.current?.contains(document.activeElement)) &&
-        activeStep !== focus;
-      setInspected(activeStep);
-    }
+    if (activeStep >= 0 && activeStep < steps.length) setStage(activeStep);
   }, [currentTrackKey]);
-  useEffect(() => {
-    if (restoreFocus.current) {
-      focusButton.current?.focus({ preventScroll: true });
-      restoreFocus.current = false;
-    }
-  }, [focus]);
   const current = steps[focus];
-  const indices = pathCoverWindow(steps.length, focus);
-  const inspect = (index: number, keyboard = false) => {
-    const next = Math.min(steps.length - 1, Math.max(0, index));
-    // A boundary key must never leave a pending focus request.
-    restoreFocus.current = keyboard && next !== focus;
-    setInspected(next);
-  };
   return (
     <Card
       data-slot="path-cover-journey"
@@ -89,92 +61,16 @@ export function PathCoverJourneyView({
           accent={t("paths.title")}
           meta={[t("common.trackCountLabel", { count: steps.length })]}
         />
-        <CardAction>
-          <ActionGroup label={t("paths.title")}>
-            <ActionButton
-              label={t("paths.journey.previous")}
-              onClick={() => inspect(focus - 1)}
-              disabled={focus === 0 || !steps.length}
-            >
-              <ArrowLeft aria-hidden="true" />
-            </ActionButton>
-            <ActionButton
-              label={t("paths.journey.next")}
-              onClick={() => inspect(focus + 1)}
-              disabled={focus >= steps.length - 1}
-            >
-              <ArrowRight aria-hidden="true" />
-            </ActionButton>
-          </ActionGroup>
-        </CardAction>
       </CardHeader>
       <CardContent>
         {current ? (
           <>
-            <div
-              ref={stage}
-              className="path-cover-stage"
-              role="group"
-              aria-label={t("paths.title")}
-              onKeyDown={(event) => {
-                const index =
-                  event.key === "ArrowLeft"
-                    ? focus - 1
-                    : event.key === "ArrowRight"
-                      ? focus + 1
-                      : event.key === "Home"
-                        ? 0
-                        : event.key === "End"
-                          ? steps.length - 1
-                          : null;
-                if (index == null) return;
-                event.preventDefault();
-                inspect(index, true);
-              }}
-            >
-              {indices.map((index) => {
-                const step = steps[index]!;
-                const offset = index - focus;
-                return (
-                  <button
-                    key={`${step.index}:${step.title}:${step.artist}`}
-                    type="button"
-                    className="path-cover-step"
-                    data-distance={Math.abs(offset)}
-                    data-focused={index === focus || undefined}
-                    data-current={index === activeStep || undefined}
-                    ref={index === focus ? focusButton : undefined}
-                    tabIndex={index === focus ? 0 : -1}
-                    aria-current={index === activeStep ? "step" : undefined}
-                    aria-label={t("paths.journey.stepAction", {
-                      step: index + 1,
-                      title: step.title,
-                      artist: step.artist,
-                    })}
-                    style={
-                      {
-                        "--path-offset": offset,
-                        "--path-distance": Math.abs(offset),
-                        "--path-scale": 1 - Math.abs(offset) * 0.13,
-                        zIndex: 10 - Math.abs(offset),
-                      } as CSSProperties
-                    }
-                    onClick={() => {
-                      inspect(index);
-                      onPlay(index);
-                    }}
-                  >
-                    <MediaCover
-                      src={step.coverUrl}
-                      alt=""
-                      fallbackIcon={Music2}
-                      className="size-full"
-                      renderImage={renderImage}
-                    />
-                  </button>
-                );
-              })}
-            </div>
+            <PathCoverStage
+              steps={steps}
+              focus={focus}
+              loadCover={loadCover}
+              renderImage={renderImage}
+            />
             <div
               className="grid min-w-0 gap-2 text-center"
               aria-live="polite"
@@ -198,10 +94,19 @@ export function PathCoverJourneyView({
                 </div>
               )}
             </div>
-            <div className="mt-6 flex min-w-0 flex-wrap justify-between gap-3 border-t border-border-quiet pt-4">
-              <MonoLabel>{origin}</MonoLabel>
-              <MonoLabel>{destination}</MonoLabel>
-            </div>
+            <PathStepStrip
+              steps={steps}
+              focus={focus}
+              activeStep={activeStep}
+              origin={origin}
+              destination={destination}
+              motion={motion}
+              renderImage={renderImage}
+              onSelect={(index) => {
+                setStage(index);
+                onPlay(index);
+              }}
+            />
           </>
         ) : (
           <EmptyState message={t("paths.journey.empty")} />
