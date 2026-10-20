@@ -84,3 +84,8 @@ def test_instance_snapshot_aggregates_every_listener(pg_db):
     assert payload["heatmap"]["peak"] is not None
     assert payload["artist_of_period"]["listener_top_percent"] is None
     assert history.event_count == 120
+    previous = payload["overview"]["previous"]
+    assert {"start", "end", "minutes_listened", "play_count", "active_days"} <= set(
+        previous
+    )
+    assert "overview_previous" not in payload

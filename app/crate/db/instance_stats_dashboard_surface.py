@@ -105,7 +105,12 @@ def build_instance_stats_dashboard(
     }
     with read_scope() as session:
         period = resolve_stats_period("UTC", window=window, month=month)
-        payload.update(get_stats_signal(session, None, period))
+        signal = get_stats_signal(session, None, period)
+        payload["overview"] = {
+            **payload["overview"],
+            "previous": signal.pop("overview_previous"),
+        }
+        payload.update(signal)
         payload["top_listeners"] = get_top_listeners(session, period)
     return payload
 

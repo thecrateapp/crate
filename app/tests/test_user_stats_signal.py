@@ -172,3 +172,46 @@ def _seed_artist_listeners(*, listeners: list[int], artist: str) -> None:
                 ),
                 {"u": 100 + index, "artist": artist, "plays": plays},
             )
+
+
+def test_overview_previous_totals_match_daily_rows(history):
+    from sqlalchemy import text
+
+    from crate.db.queries.user_stats_periods import (
+        previous_window,
+        resolve_stats_period,
+    )
+    from crate.db.tx import read_scope
+
+    payload = _dashboard("30d")
+    previous = payload["overview"]["previous"]
+    period = resolve_stats_period("UTC", window="30d")
+    start, end = previous_window(period)
+    assert (previous["start"], previous["end"]) == (start.isoformat(), end.isoformat())
+
+    with read_scope() as session:
+        row = session.execute(
+            text(
+                "SELECT COALESCE(SUM(minutes_listened), 0) AS minutes,"
+                " COALESCE(SUM(play_count), 0) AS plays,"
+                " COUNT(DISTINCT day) AS days FROM user_daily_listening"
+                " WHERE user_id = 1 AND day BETWEEN :s AND :e"
+            ),
+            {"s": start, "e": end},
+        ).one()
+        artists = session.execute(
+            text(
+                "SELECT COUNT(DISTINCT artist) FROM user_track_daily"
+                " WHERE user_id = 1 AND artist != '' AND day BETWEEN :s AND :e"
+            ),
+            {"s": start, "e": end},
+        ).scalar_one()
+    assert row.plays > 0
+    assert previous["play_count"] == row.plays
+    assert previous["minutes_listened"] == pytest.approx(row.minutes)
+    assert previous["active_days"] == row.days
+    assert previous["artist_count"] == artists
+
+
+def test_overview_previous_is_absent_for_all_time(history):
+    assert _dashboard("all_time")["overview"]["previous"] is None

@@ -20,6 +20,7 @@ from crate.db.queries.user_stats_periods import (
     StatsPeriod,
     period_day_filter,
     period_params,
+    previous_window,
 )
 
 METRICS_VERSION = "listening-v1"
@@ -805,6 +806,46 @@ def _computed_until(session, user_id: int | None) -> str | None:
     return _iso(value)
 
 
+def _overview_previous(
+    session, user_id: int | None, period: StatsPeriod
+) -> dict | None:
+    window = previous_window(period)
+    if window is None:
+        return None
+    start, end = window
+    row = session.execute(
+        text(
+            """
+            WITH daily AS (
+                SELECT COALESCE(SUM(minutes_listened), 0) AS minutes,
+                       COALESCE(SUM(play_count), 0) AS plays,
+                       COUNT(DISTINCT day) AS active_days
+                FROM user_daily_listening
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
+                  AND day >= :start AND day <= :last
+            ),
+            artists AS (
+                SELECT COUNT(DISTINCT artist) AS artist_count
+                FROM user_track_daily
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
+                  AND artist != '' AND day >= :start AND day <= :last
+            )
+            SELECT d.minutes, d.plays, d.active_days, a.artist_count
+            FROM daily d CROSS JOIN artists a
+            """
+        ),
+        {"user_id": user_id, "start": start, "last": end},
+    ).one()
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "minutes_listened": float(row.minutes or 0),
+        "play_count": int(row.plays or 0),
+        "active_days": int(row.active_days or 0),
+        "artist_count": int(row.artist_count or 0),
+    }
+
+
 def get_stats_signal(session, user_id: int | None, period: StatsPeriod) -> dict:
     """Signal sections for one user, or for the whole instance when ``user_id`` is None."""
     return {
@@ -812,6 +853,7 @@ def get_stats_signal(session, user_id: int | None, period: StatsPeriod) -> dict:
         "provisional": period.provisional,
         "computed_until": _computed_until(session, user_id),
         "metrics_version": METRICS_VERSION,
+        "overview_previous": _overview_previous(session, user_id, period),
         "tape": _tape(session, user_id, period),
         "highlights": None
         if user_id is None

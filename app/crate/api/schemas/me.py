@@ -416,6 +416,15 @@ class StatsOverviewTopArtistResponse(BaseModel):
     artist_slug: str | None = None
 
 
+class StatsOverviewPreviousResponse(BaseModel):
+    start: date_type | str
+    end: date_type | str
+    minutes_listened: float
+    play_count: int
+    active_days: int
+    artist_count: int
+
+
 class StatsOverviewResponse(BaseModel):
     window: str
     play_count: int
@@ -425,6 +434,7 @@ class StatsOverviewResponse(BaseModel):
     active_days: int
     skip_rate: float | int
     top_artist: StatsOverviewTopArtistResponse | None = None
+    previous: StatsOverviewPreviousResponse | None = None
 
 
 class TrendPointResponse(BaseModel):

@@ -152,7 +152,9 @@ def _with_signal(
         period = resolve_stats_period(
             user_stats_timezone(user_id, session=session), window=window, month=month
         )
-        payload.update(get_stats_signal(session, user_id, period))
+        signal = get_stats_signal(session, user_id, period)
+    payload.setdefault("overview", {})["previous"] = signal.pop("overview_previous")
+    payload.update(signal)
     return payload
 
 

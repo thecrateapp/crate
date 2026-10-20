@@ -3,6 +3,15 @@ export type StatsYearWindow = `year:${number}`;
 export type StatsSelection = StatsWindow | StatsYearWindow;
 export type StatsPeriodKey = StatsSelection | `month:${string}`;
 
+export interface StatsOverviewPrevious {
+  start: string;
+  end: string;
+  minutes_listened: number;
+  play_count: number;
+  active_days: number;
+  artist_count: number;
+}
+
 export interface StatsOverview {
   window: StatsPeriodKey;
   play_count: number;
@@ -19,6 +28,7 @@ export interface StatsOverview {
     play_count: number;
     minutes_listened: number;
   } | null;
+  previous?: StatsOverviewPrevious | null;
 }
 
 export interface StatsTrendPoint {
