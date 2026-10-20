@@ -1721,3 +1721,13 @@ def test_openapi_types_playlist_and_crate_collaboration_routes(test_app):
         data["paths"]["/api/playlists/{playlist_id}/leave"]["post"]["security"] == auth
     )
     assert data["paths"]["/api/crates/{crate_id}/members"]["post"]["security"] == auth
+
+
+def test_openapi_declares_stats_dashboard_snapshot_block(test_app):
+    schemas = test_app.get("/openapi.json").json()["components"]["schemas"]
+    snapshot = schemas["StatsDashboardResponse"]["properties"]["snapshot"]
+
+    assert "StatsSnapshotMetaResponse" in str(snapshot)
+    assert {"version", "pending", "stale", "built_at"} <= set(
+        schemas["StatsSnapshotMetaResponse"]["properties"]
+    )

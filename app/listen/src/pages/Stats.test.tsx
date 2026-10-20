@@ -134,6 +134,20 @@ describe("Stats page", () => {
     expect(screen.getByTestId("empty-state")).toBeVisible();
   });
 
+  it("shows the building state, not the empty state, for a pending cold snapshot", () => {
+    mockApis({
+      ...baseDashboard(),
+      overview: { ...baseDashboard().overview, play_count: 0 },
+      snapshot: { pending: true, version: 0 },
+    });
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.queryByTestId("empty-state")).toBeNull();
+  });
+
   it("retains a cached dashboard during a failed refresh", () => {
     mockUseApi.mockImplementation(() => ({
       data: signalDashboard(),

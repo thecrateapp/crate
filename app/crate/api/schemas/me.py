@@ -788,6 +788,18 @@ class StatsTopListenerResponse(BaseModel):
     active_days: int
 
 
+class StatsSnapshotMetaResponse(BaseModel):
+    scope: str | None = None
+    subject_key: str | None = None
+    version: int | None = None
+    built_at: str | None = None
+    source_seq: int | None = None
+    stale_after: str | None = None
+    stale: bool = False
+    pending: bool = False
+    generation_ms: int | None = None
+
+
 class StatsDashboardResponse(BaseModel):
     window: str
     subject: StatsSubjectResponse | None = None
@@ -811,6 +823,7 @@ class StatsDashboardResponse(BaseModel):
     music_age: StatsMusicAgeResponse | None = None
     genre_trend: list[StatsGenreTrendResponse] = Field(default_factory=list)
     top_listeners: list[StatsTopListenerResponse] = Field(default_factory=list)
+    snapshot: StatsSnapshotMetaResponse | None = None
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):

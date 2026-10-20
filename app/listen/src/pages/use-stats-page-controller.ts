@@ -195,7 +195,8 @@ export function useStatsPageController(): StatsPageController {
     dashboardError,
     retryDashboard: refetchDashboard,
     discoveries: story?.discoveries ?? EMPTY_DISCOVERIES,
-    hasStats: Boolean(overview?.play_count),
+    hasStats:
+      Boolean(overview?.play_count) || dashboard?.snapshot?.pending === true,
     isGlobalStats,
     isUserStats,
     kicker: buildKicker(isGlobalStats, isUserStats, subjectName, t),
