@@ -58,14 +58,14 @@ const DETAIL_FIELDS: TextFieldSpec[] = [
   { key: "country_code", maxLength: 2 },
   { key: "country", maxLength: 240 },
   { key: "region", maxLength: 240 },
-  { key: "timezone", maxLength: 240, placeholder: "Europe/Madrid" },
+  { key: "timezone", maxLength: 64, placeholder: "Europe/Madrid" },
   { key: "doors_time", type: "time" },
   { key: "tickets_url", type: "url", maxLength: 2048 },
   { key: "url", type: "url", maxLength: 2048 },
   { key: "image_url", type: "url", maxLength: 2048 },
   { key: "price_range", maxLength: 240 },
   { key: "address_line1", maxLength: 240 },
-  { key: "postal_code", maxLength: 240 },
+  { key: "postal_code", maxLength: 32 },
 ];
 
 const REQUIRED = new Set<string>([
@@ -250,6 +250,11 @@ export function ShowCandidateFields({
           size="sm"
           aria-expanded={expanded}
           aria-controls={detailsId}
+          aria-label={
+            index === null
+              ? undefined
+              : `${expanded ? "Fewer" : "More"} details for show ${index + 1}`
+          }
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? (

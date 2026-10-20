@@ -173,6 +173,17 @@ describe("fillTargets", () => {
     });
   });
 
+  it("falls back to every unsaved row when only saved rows are selected", () => {
+    const draft: ShowDraftState = {
+      candidates: [a, b, savedC],
+      selected: ["c"],
+    };
+    expect(fillTargets(draft, new Set(["c"]))).toEqual({
+      ids: ["a", "b"],
+      scope: "unsaved",
+    });
+  });
+
   it("targets only the selected unsaved rows, scope selected, otherwise", () => {
     const draft: ShowDraftState = {
       candidates: [a, b, savedC],

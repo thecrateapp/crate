@@ -228,11 +228,11 @@ export function ShowCandidateList({
                     )
                   }
                 />
-                <h4 className="text-sm font-medium">
+                <h3 className="text-sm font-medium">
                   {dateLabel
                     ? `Show ${number} · ${dateLabel}`
                     : `Show ${number}`}
-                </h4>
+                </h3>
                 <div className="ml-auto flex items-center gap-2">
                   {result ? (
                     <StatusBadge tone={result.tone}>{result.label}</StatusBadge>

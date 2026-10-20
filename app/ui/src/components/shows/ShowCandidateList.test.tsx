@@ -307,11 +307,26 @@ it("uses design-system controls only", async () => {
       onFill={vi.fn()}
     />,
   );
-  const toggle = screen.getAllByRole("button", { name: "More details" })[0]!;
+  const toggle = screen.getByRole("button", {
+    name: "More details for show 1",
+  });
+  expect(toggle).toHaveTextContent(/^More details$/);
   expect(toggle).toHaveAttribute("aria-expanded", "false");
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(toggle).toHaveTextContent("Fewer details");
+  expect(toggle).toHaveAccessibleName("Fewer details for show 1");
+  expect(
+    screen.getByRole("button", { name: "More details for show 2" }),
+  ).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByLabelText("Timezone for show 1")).toHaveAttribute(
+    "maxlength",
+    "64",
+  );
+  expect(screen.getByLabelText("Postal code for show 1")).toHaveAttribute(
+    "maxlength",
+    "32",
+  );
   expect(
     document.getElementById(toggle.getAttribute("aria-controls")!),
   ).toBeVisible();
@@ -337,4 +352,33 @@ it("uses design-system controls only", async () => {
       'select, details, pre, input[type="checkbox"]:not([aria-hidden]), input[type="radio"]:not([aria-hidden])',
     ),
   ).toBeNull();
+});
+
+it("heads each row at level 3, under the panel's level-2 title", () => {
+  renderList({
+    draft: { candidates: [complete("a"), complete("b")], selected: [] },
+  });
+  expect(
+    screen.getByRole("heading", { level: 3, name: /^Show 1 · / }),
+  ).toBeVisible();
+  expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+});
+
+it("keeps the single show's details toggle named without a row number", async () => {
+  const user = userEvent.setup();
+  render(
+    <ShowCandidateFields
+      candidate={complete("a")}
+      index={null}
+      locked={false}
+      showMissing={false}
+      onChange={vi.fn()}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "More details" }));
+  expect(screen.getByLabelText("Timezone")).toHaveAttribute("maxlength", "64");
+  expect(screen.getByLabelText("Postal code")).toHaveAttribute(
+    "maxlength",
+    "32",
+  );
 });

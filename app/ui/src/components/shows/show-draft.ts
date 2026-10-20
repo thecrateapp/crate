@@ -103,13 +103,10 @@ export function fillTargets(
   const unsavedIds = draft.candidates
     .filter((candidate) => !saved.has(candidate.item_id))
     .map((candidate) => candidate.item_id);
-  if (draft.selected.length > 0) {
-    const selected = new Set(draft.selected);
-    return {
-      ids: unsavedIds.filter((id) => selected.has(id)),
-      scope: "selected",
-    };
-  }
+  // A selection made only of saved rows fills nothing, so it doesn't count.
+  const selected = new Set(draft.selected);
+  const selectedIds = unsavedIds.filter((id) => selected.has(id));
+  if (selectedIds.length > 0) return { ids: selectedIds, scope: "selected" };
   return { ids: unsavedIds, scope: "unsaved" };
 }
 
