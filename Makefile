@@ -808,7 +808,9 @@ deploy-image-rollback: ## Roll back only application images/config (requires CON
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)
 	@echo "$(YELLOW)Syncing files...$(NC)"
-	@scp docker-compose.yaml docker-compose.project.yaml .env $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
+	@# The ui, listen and cast-receiver images build from the repo root and
+	@# install from the root lockfile, so the server needs both manifests.
+	@scp docker-compose.yaml docker-compose.project.yaml .env package.json package-lock.json $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
 	@$(SSH) "mkdir -p $(SERVER_PATH)/deploy/traefik"
 	@scp deploy/traefik/federation-readplane.yml $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/deploy/traefik/
 	@rsync -az --delete \
@@ -832,7 +834,9 @@ deploy-build: ## Deploy by building on the server (GHCR fallback)
 
 .PHONY: deploy-sync
 deploy-sync: ## Sync files to the server without restarting services
-	@scp docker-compose.yaml docker-compose.project.yaml .env $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
+	@# The ui, listen and cast-receiver images build from the repo root and
+	@# install from the root lockfile, so the server needs both manifests.
+	@scp docker-compose.yaml docker-compose.project.yaml .env package.json package-lock.json $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/
 	@$(SSH) "mkdir -p $(SERVER_PATH)/deploy/traefik"
 	@scp deploy/traefik/federation-readplane.yml $(SERVER_USER)@$(SERVER_HOST):$(SERVER_PATH)/deploy/traefik/
 	@rsync -az --delete \
