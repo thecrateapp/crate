@@ -8,7 +8,13 @@ from queue import Queue
 import pytest
 from sqlalchemy import text
 
-from tests.test_agent_analysis_sync import _payload, _processing, _requeue, _seed_track
+from tests.test_agent_analysis_sync import (
+    _analysis_with_mix_profile,
+    _payload,
+    _processing,
+    _requeue,
+    _seed_track,
+)
 from tests.test_agent_library_operations import _assert_backend_waits_for
 
 
@@ -240,3 +246,24 @@ def test_batch_preserves_valid_neighbors_when_one_source_changes(
     assert _payload(valid["id"], pipeline)["shadow_value"] == (
         99.0 if pipeline == "analysis" else [99.0] * 20
     )
+
+
+def test_claimed_source_change_prevents_smart_mix_publication(pg_db, tmp_path):
+    """An accepted claim whose physical source changed before storage must not
+    publish the embedded Smart Mix profile either, not just the legacy fields."""
+    from crate.db.jobs import analysis_storage as storage
+    from crate.db.repositories.smart_mix import get_track_mix_profile
+
+    track, claim, signature = _claimed(pg_db, tmp_path, "analysis")
+    _change_source(Path(track["path"]), "replaced")
+
+    storage.store_analysis_result(
+        track["id"],
+        track["path"],
+        _analysis_with_mix_profile(),
+        claim=claim,
+        signature=signature,
+    )
+
+    _assert_rejected(track, "analysis")
+    assert get_track_mix_profile(track["id"]) is None
