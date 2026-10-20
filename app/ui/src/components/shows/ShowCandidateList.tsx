@@ -239,7 +239,8 @@ export function ShowCandidateList({
                   ) : missing > 0 ? (
                     <StatusBadge tone="warning">{`${missing} missing`}</StatusBadge>
                   ) : null}
-                  {canRemove && !isSaved ? (
+                  {/* Imported rows stay; only rows typed here can go. */}
+                  {canRemove && !isSaved && !candidate.source_draft_id ? (
                     <Button
                       type="button"
                       variant="ghost"

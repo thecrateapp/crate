@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@crate/ui/shadcn/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { AddShowDialog } from "./AddShowDialog";
+import { AddShowSheet } from "./AddShowSheet";
 
 export function AddShowButton({ onSaved }: { onSaved: () => void }) {
   const { hasCapability } = useAuth();
@@ -14,7 +14,7 @@ export function AddShowButton({ onSaved }: { onSaved: () => void }) {
         <Plus size={14} className="mr-1" />
         Add show
       </Button>
-      <AddShowDialog open={open} onOpenChange={setOpen} onSaved={onSaved} />
+      <AddShowSheet open={open} onOpenChange={setOpen} onSaved={onSaved} />
     </>
   );
 }

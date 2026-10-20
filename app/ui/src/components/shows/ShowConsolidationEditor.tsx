@@ -85,6 +85,8 @@ export function ShowConsolidationEditor({
     loader.current = abort;
     setLoading(true);
     setError("");
+    // Reloading replaces the rows, so a reviewed merge stops applying now.
+    onValueChange({ ...value, rows: [], keep: null, merge: [] });
     try {
       const result = await api<{ items: ConsolidationRow[] }>(
         `/api/show-imports/shows?${ids.map((id) => `ids=${id}`).join("&")}`,

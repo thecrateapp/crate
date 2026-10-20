@@ -249,6 +249,25 @@ it("removes only unsaved shows while several remain", async () => {
   expect(onRemove).toHaveBeenCalledWith("b");
 });
 
+it("never offers to remove an imported show", () => {
+  renderList({
+    draft: {
+      candidates: [
+        { item_id: "a", date: "2027-03-02", source_draft_id: "draft-1" },
+        { item_id: "b", date: "2027-03-04", source_draft_id: "draft-1" },
+        { item_id: "c", date: "2027-03-06" },
+      ],
+      selected: [],
+    },
+    onRemove: vi.fn(),
+  });
+  expect(screen.queryByRole("button", { name: "Remove show 1" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Remove show 2" })).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "Remove show 3" }),
+  ).toBeInTheDocument();
+});
+
 it("shows source, evidence and model without raw references", () => {
   renderList({
     draft: {

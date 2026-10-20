@@ -128,6 +128,24 @@ describe("MergeShowsSheet", () => {
     },
   );
 
+  it("withdraws the reviewed merge as soon as the shows are loaded again", async () => {
+    renderWithAdminProviders(
+      <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
+    );
+    const user = await reviewMerge();
+    vi.mocked(api).mockImplementation(async (...args) =>
+      args[0].includes("/shows?") ? new Promise(() => {}) : routes(...args),
+    );
+    await user.click(screen.getByRole("button", { name: "Load shows" }));
+    expect(
+      screen.queryByRole("button", { name: "Merge shows" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("The selection changed. Review again before merging."),
+    ).toBeInTheDocument();
+    expect(posts("/apply")).toHaveLength(0);
+  });
+
   it("explains that a merge needs approval and links to it", async () => {
     renderWithAdminProviders(
       <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
