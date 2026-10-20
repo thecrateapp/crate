@@ -27,6 +27,8 @@ export type { ModelChoice } from "./types";
 
 type ChangeHandler = (next: ModelChoice, model: Model | null) => void;
 
+const CATALOG_ERROR = "Couldn't load this connection's models.";
+
 const NO_PROVIDER =
   "No provider is ready. Add a key or refresh models in Providers below.";
 
@@ -45,11 +47,13 @@ function CatalogSelects({
   feature?: Action;
   disabled?: boolean;
 }) {
-  const { data } = useApi<ModelsResponse>(
+  const { data, error } = useApi<ModelsResponse>(
     connection
       ? `${AI_ROOT}/connections/${encodeURIComponent(connection.id)}/models`
       : null,
   );
+  // useApi errors carry the raw response body; never render them.
+  const failed = connection !== null && data === null && error !== null;
   const models =
     connection && data ? eligibleModels(data.models, connection, feature) : [];
   const model = models.find((m) => m.model_id === value.modelId) ?? null;
@@ -104,7 +108,7 @@ function CatalogSelects({
         searchable={modelOptions.length > 8}
         value={model ? model.model_id : ""}
         options={modelOptions}
-        disabled={disabled || !connection}
+        disabled={disabled || !connection || failed}
         onChange={(modelId) => {
           if (modelId === value.modelId) return;
           onChange(
@@ -124,6 +128,11 @@ function CatalogSelects({
           onChange({ ...value, reasoning: reasoningFromValue(next) }, model)
         }
       />
+      {failed ? (
+        <p role="alert" className="basis-full text-sm text-amber-100/80">
+          {CATALOG_ERROR}
+        </p>
+      ) : null}
     </>
   );
 }

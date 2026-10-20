@@ -17,13 +17,18 @@ import { AdminSelect } from "@/components/ui";
 import {
   findConnection,
   imageDetailLabel,
+  isConflictError,
   isUsableConnection,
+  numberInputValue,
   PROVIDER_DEFAULT_REASONING,
 } from "@/lib/ai-models";
 
 import { reportFailure, writeAI } from "./api";
 import { ModelPicker, type ModelChoice } from "./ModelPicker";
 import type { Config, Model, Profile, Snapshot, Version } from "./types";
+
+const CONFLICT_TEXT =
+  "AI settings changed while you were editing. Review and try again.";
 
 // The same ceilings the API enforces for every profile.
 const MAX_TIMEOUT_SECONDS = 90;
@@ -145,17 +150,27 @@ export function ProfileForm({
   refresh,
 }: {
   snapshot: Snapshot;
-  /** The profile to add a version to, or null for a new profile. */
+  /** The profile to add a version to, as in the latest snapshot; null for a new profile. */
   profile: Profile | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   refresh: () => void;
 }) {
   const checkboxId = useId();
-  // The version being replaced is fixed when the form opens: a newer snapshot
-  // must not move expected_version and hide a concurrent change.
   const [profile] = useState(givenProfile);
   const [initial] = useState(() => initialState(snapshot, profile));
+  // The version being replaced is fixed when the form opens, so a newer
+  // snapshot cannot silently move expected_version over a concurrent change.
+  // Only after a conflict does the form adopt the refreshed current version.
+  const [expectedVersion, setExpectedVersion] = useState(
+    profile?.current_version ?? 0,
+  );
+  const [conflictedAt, setConflictedAt] = useState<Snapshot | null>(null);
+  const [conflicted, setConflicted] = useState(false);
+  if (conflictedAt && snapshot !== conflictedAt) {
+    setConflictedAt(null);
+    if (givenProfile) setExpectedVersion(givenProfile.current_version);
+  }
   const [name, setName] = useState("");
   const [choice, setChoice] = useState<ModelChoice>(initial.choice);
   const [model, setModel] = useState<Model | null>(null);
@@ -182,6 +197,7 @@ export function ProfileForm({
     model.model_id === choice.modelId &&
     limitsValid &&
     reviewed &&
+    conflictedAt === null &&
     (profile !== null || name.trim() !== "");
 
   function changeChoice(next: ModelChoice, nextModel: Model | null) {
@@ -207,11 +223,12 @@ export function ProfileForm({
       config: { reasoning: choice.reasoning, ...limits },
     };
     setBusy(true);
+    setConflicted(false);
     try {
       if (profile) {
         await writeAI(`/profiles/${encodeURIComponent(profile.id)}/versions`, {
           ...body,
-          expected_version: profile.current_version,
+          expected_version: expectedVersion,
         });
         toast.success(`New version of ${profile.label} saved`);
       } else {
@@ -220,7 +237,15 @@ export function ProfileForm({
       }
       onOpenChange(false);
     } catch (error) {
-      reportFailure(error);
+      if (isConflictError(error)) {
+        // Keep what was entered; wait for the refreshed profile, then ask for
+        // a fresh review before saving over the newer version.
+        setConflicted(true);
+        setConflictedAt(snapshot);
+        setReviewed(false);
+      } else {
+        reportFailure(error);
+      }
     } finally {
       setBusy(false);
       refresh();
@@ -288,7 +313,7 @@ export function ProfileForm({
                 required
                 min={1}
                 max={MAX_TIMEOUT_SECONDS}
-                value={limits.timeout_seconds}
+                value={numberInputValue(limits.timeout_seconds)}
                 onChange={(event) =>
                   setLimit("timeout_seconds", event.target.valueAsNumber)
                 }
@@ -301,7 +326,7 @@ export function ProfileForm({
                 required
                 min={1}
                 max={outputMax}
-                value={limits.max_output_tokens}
+                value={numberInputValue(limits.max_output_tokens)}
                 onChange={(event) =>
                   setLimit("max_output_tokens", event.target.valueAsNumber)
                 }
@@ -314,13 +339,19 @@ export function ProfileForm({
                 required
                 min={1}
                 max={inputMax}
-                value={limits.max_input_tokens}
+                value={numberInputValue(limits.max_input_tokens)}
                 onChange={(event) =>
                   setLimit("max_input_tokens", event.target.valueAsNumber)
                 }
               />
             </label>
           </div>
+
+          {conflicted ? (
+            <p role="alert" className="text-sm text-amber-100">
+              {CONFLICT_TEXT}
+            </p>
+          ) : null}
 
           {model && !limitsValid ? (
             <p className="text-sm text-amber-100">

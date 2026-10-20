@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   connectionName,
   formatCount,
+  numberInputValue,
   providerLabel,
   providerStatus,
 } from "@/lib/ai-models";
@@ -44,11 +45,6 @@ const LIMITS = {
   daily_tokens: 1000000000,
   max_concurrent: 8,
 };
-
-/** An empty number input holds NaN; render it as an empty field. */
-function numberValue(value: number): number | "" {
-  return Number.isFinite(value) ? value : "";
-}
 
 function withinLimit(value: number, max: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= max;
@@ -197,7 +193,7 @@ function LimitsForm({
           min={1}
           max={LIMITS.daily_calls}
           required
-          value={numberValue(dailyCalls)}
+          value={numberInputValue(dailyCalls)}
           onChange={(event) => setDailyCalls(event.target.valueAsNumber)}
         />
       </label>
@@ -208,7 +204,7 @@ function LimitsForm({
           min={1}
           max={LIMITS.daily_tokens}
           required
-          value={numberValue(dailyTokens)}
+          value={numberInputValue(dailyTokens)}
           onChange={(event) => setDailyTokens(event.target.valueAsNumber)}
         />
       </label>
@@ -219,7 +215,7 @@ function LimitsForm({
           min={1}
           max={LIMITS.max_concurrent}
           required
-          value={numberValue(maxConcurrent)}
+          value={numberInputValue(maxConcurrent)}
           onChange={(event) => setMaxConcurrent(event.target.valueAsNumber)}
         />
       </label>

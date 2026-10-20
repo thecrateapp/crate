@@ -68,12 +68,6 @@ export function InvocationSheet({
     invocation.reported_model !== invocation.model_id
       ? invocation.reported_model
       : null;
-  const cost =
-    invocation.estimated_cost != null && invocation.usage_known
-      ? `About ${invocation.estimated_cost.toLocaleString("en", {
-          maximumFractionDigits: 4,
-        })}`
-      : "Unknown";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -128,7 +122,8 @@ export function InvocationSheet({
               <Field label="Usage">
                 {invocation.usage_known ? "Known" : "Not reported"}
               </Field>
-              <Field label="Cost">{cost}</Field>
+              {/* Costs carry no currency yet, so none is shown. */}
+              <Field label="Cost">Unknown</Field>
             </dl>
           </section>
 

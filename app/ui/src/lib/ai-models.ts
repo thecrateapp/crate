@@ -427,6 +427,22 @@ export function aiErrorText(
   return DEFAULT_AI_ERROR_TEXT;
 }
 
+/** A write lost a compare-and-set race: refetch before trying again. */
+export function isConflictError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, status } = error as { code?: unknown; status?: unknown };
+  return (
+    status === 409 ||
+    code === "AI_CONFIGURATION_CONFLICT" ||
+    code === "AI_CONTEXT_STALE"
+  );
+}
+
+/** A cleared number input reads as NaN; render it as an empty field. */
+export function numberInputValue(value: number): number | "" {
+  return Number.isFinite(value) ? value : "";
+}
+
 // Codes a single model call can end with. Configuration codes fall back to
 // the reason and settings copy; anything else reads as a plain failure, never
 // as the save-oriented default of aiErrorText.

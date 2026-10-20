@@ -227,9 +227,3 @@ export interface Usage {
   };
   daily: DailyUsage[];
 }
-export function describeConfig(config: Config | LegacyConfig): string {
-  if ("kind" in config)
-    return `Inherited native defaults · timeout ${config.legacy_options.timeout_seconds ?? "provider default"} · output ${config.legacy_options.max_tokens ?? "provider default"} · ${config.legacy_options.image_detail}`;
-  const r = config.reasoning;
-  return `${r.mode}${r.level ? `: ${r.level}` : r.budget_tokens !== null ? `: ${r.budget_tokens} tokens` : ""} · ${config.image_detail} · ${config.timeout_seconds}s · output ${config.max_output_tokens}`;
-}

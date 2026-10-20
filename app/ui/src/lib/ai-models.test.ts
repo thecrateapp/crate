@@ -39,6 +39,8 @@ import {
   initialFeatureChoice,
   invocationErrorText,
   invocationStatusView,
+  isConflictError,
+  numberInputValue,
   isUsableConnection,
   outcomeGroups,
   providerLabel,
@@ -440,6 +442,32 @@ describe("aiErrorText", () => {
     expect(aiErrorText(undefined)).toBe(
       "AI settings could not be saved. Reload and try again.",
     );
+  });
+});
+
+describe("numberInputValue", () => {
+  it("renders a cleared number input as empty instead of NaN", () => {
+    expect(numberInputValue(Number.NaN)).toBe("");
+    expect(numberInputValue(Number.POSITIVE_INFINITY)).toBe("");
+    expect(numberInputValue(0)).toBe(0);
+    expect(numberInputValue(4096)).toBe(4096);
+  });
+});
+
+describe("isConflictError", () => {
+  it("recognises conflicts by status or code", () => {
+    expect(isConflictError({ status: 409 })).toBe(true);
+    expect(isConflictError({ code: "AI_CONFIGURATION_CONFLICT" })).toBe(true);
+    expect(isConflictError({ status: 409, code: "AI_CONTEXT_STALE" })).toBe(
+      true,
+    );
+  });
+
+  it("rejects other failures", () => {
+    expect(isConflictError({ status: 422 })).toBe(false);
+    expect(isConflictError({ code: "AI_MODEL_UNVALIDATED" })).toBe(false);
+    expect(isConflictError(new Error("response lost"))).toBe(false);
+    expect(isConflictError(undefined)).toBe(false);
   });
 });
 

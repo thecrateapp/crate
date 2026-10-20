@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 
-import { formatCount } from "@/lib/ai-models";
+import { formatCount, isConflictError } from "@/lib/ai-models";
 
 import { JobProgress, reportFailure, writeAI } from "./api";
 import type { Enqueued, Version } from "./types";
@@ -37,10 +37,13 @@ export function BillableTestDialog({
   version,
   open,
   onOpenChange,
+  refresh,
 }: {
   version: Version;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Re-reads the snapshot after the profile changed under this test. */
+  refresh: () => void;
 }) {
   const checkboxId = useId();
   const [attempt, setAttempt] = useState(newAttempt);
@@ -71,6 +74,12 @@ export function BillableTestDialog({
       setAttempt((current) => ({ ...current, job }));
     } catch (error) {
       reportFailure(error);
+      if (isConflictError(error)) {
+        // The profile changed since it was shown (AI_CONTEXT_STALE): this
+        // exact version can no longer be tested. Re-read it and start over.
+        refresh();
+        onOpenChange(false);
+      }
     } finally {
       setBusy(false);
     }

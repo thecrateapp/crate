@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AuthContext, type AuthContextValue } from "@/contexts/AuthContext";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 import {
@@ -83,6 +85,47 @@ function renderPanel(
   return { ...view, refresh };
 }
 
+function rerenderPanel(
+  view: ReturnType<typeof renderPanel>,
+  snapshot: Snapshot,
+) {
+  view.rerender(
+    <MemoryRouter>
+      <AuthContext.Provider value={view.authValue as AuthContextValue}>
+        <AdvancedPanel snapshot={snapshot} refresh={view.refresh} />
+      </AuthContext.Provider>
+    </MemoryRouter>,
+  );
+}
+
+const CONFLICT_COPY =
+  "AI settings changed while you were editing. Review and try again.";
+
+function conflict(code = "AI_CONFIGURATION_CONFLICT") {
+  return Object.assign(new Error('{"detail":"conflict"}'), {
+    status: 409,
+    code,
+  });
+}
+
+/** Poster after another admin saved version 2. */
+function withPosterVersion2(snapshot: Snapshot): Snapshot {
+  const next = structuredClone(snapshot);
+  const poster = next.profiles.find((item) => item.id === PROFILE_ID)!;
+  const first = poster.versions[0]!;
+  poster.current_version = 2;
+  poster.versions = [
+    {
+      ...first,
+      version: 2,
+      fingerprint: "e".repeat(64),
+      created_at: hoursAgo(0.5),
+    },
+    first,
+  ];
+  return next;
+}
+
 async function expand(user: UserEvent) {
   await user.click(
     screen.getByRole("button", { name: "Show advanced settings" }),
@@ -125,12 +168,20 @@ describe("AdvancedPanel", () => {
       name: "Show advanced settings",
     });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).not.toHaveAttribute("aria-controls");
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
 
     await user.click(toggle);
     expect(
       screen.getByRole("button", { name: "Hide advanced settings" }),
     ).toHaveAttribute("aria-expanded", "true");
+    const region = document.getElementById(
+      toggle.getAttribute("aria-controls") ?? "",
+    );
+    expect(region).not.toBeNull();
+    expect(
+      within(region!).getByRole("article", { name: "Poster" }),
+    ).toBeVisible();
 
     const poster = profile("Poster");
     expect(
@@ -403,6 +454,9 @@ describe("AdvancedPanel", () => {
 
     const output = within(dialog).getByLabelText("Output tokens");
     await user.clear(output);
+    expect(output).toHaveValue(null);
+    expect(output).not.toHaveAttribute("value", "NaN");
+    expect(save).toBeDisabled();
     await user.type(output, "20000");
     expect(
       within(dialog).getByText(
@@ -491,5 +545,80 @@ describe("AdvancedPanel", () => {
     expect(
       screen.queryByRole("button", { name: "New profile" }),
     ).not.toBeInTheDocument();
+  });
+  it("retries a conflicting version against the refreshed profile and keeps the form", async () => {
+    apiMock
+      .mockReset()
+      .mockRejectedValueOnce(conflict())
+      .mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    const snapshot = migratedSnapshot();
+    const view = renderPanel(snapshot);
+    await expand(user);
+
+    await user.click(
+      within(profile("Poster")).getByRole("button", { name: "New version" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "New version of Poster",
+    });
+    await choose(user, dialog, "Model", "Budget");
+    const reviewed = within(dialog).getByRole("checkbox", {
+      name: "I reviewed this model's options and limits",
+    });
+    await user.click(reviewed);
+    const save = within(dialog).getByRole("button", {
+      name: "Save new version",
+    });
+    await user.click(save);
+
+    await waitFor(() => expect(view.refresh).toHaveBeenCalledTimes(1));
+    expect(apiMock.mock.calls[0]?.[2]).toMatchObject({ expected_version: 1 });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(CONFLICT_COPY);
+    // Wait for the refreshed profile before saving again.
+    expect(save).toBeDisabled();
+
+    rerenderPanel(view, withPosterVersion2(snapshot));
+    expect(
+      within(dialog).getByRole("button", { name: "Model" }),
+    ).toHaveTextContent("Budget");
+    expect(reviewed).not.toBeChecked();
+    await user.click(reviewed);
+    await user.click(save);
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    expect(apiMock.mock.calls[1]).toEqual([
+      `/api/admin/ai/profiles/${PROFILE_ID}/versions`,
+      "POST",
+      expect.objectContaining({ expected_version: 2, model_id: "budget" }),
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("closes a stale billable test and refreshes the profile", async () => {
+    apiMock.mockReset().mockRejectedValue(conflict("AI_CONTEXT_STALE"));
+    const user = userEvent.setup();
+    const { refresh } = renderPanel(migratedSnapshot());
+    await expand(user);
+
+    await user.click(screen.getByRole("button", { name: "Test Poster" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Run a billable test?",
+    });
+    await user.click(
+      within(dialog).getByRole("checkbox", {
+        name: "I understand this call may be billed",
+      }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Run test" }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    expect(toast.error).toHaveBeenCalledWith(CONFLICT_COPY);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(apiMock).toHaveBeenCalledTimes(1);
   });
 });

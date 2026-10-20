@@ -64,7 +64,7 @@ const refine: Invocation = {
   usage_known: true,
   error_code: null,
   duration_ms: 3500,
-  estimated_cost: null,
+  estimated_cost: 0.0123,
   created_at: minutesAgo(5),
 };
 
@@ -197,7 +197,8 @@ describe("ActivityPanel", () => {
     const field = (label: string) =>
       within(sheet).getByText(label, { selector: "dt" }).closest("div");
 
-    expect(field("Cost")).toHaveTextContent("Unknown");
+    // Costs carry no currency, so none is ever shown.
+    expect(field("Cost")).toHaveTextContent(/^CostUnknown$/);
     expect(field("Model")).toHaveTextContent("gemini-3.8-flash");
     expect(
       within(sheet).getByText("Reported as gemini-3.8-flash-001"),

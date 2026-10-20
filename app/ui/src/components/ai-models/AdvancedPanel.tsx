@@ -45,7 +45,7 @@ function EarlierVersions({ versions }: { versions: Version[] }) {
       <button
         type="button"
         aria-expanded={open}
-        aria-controls={contentId}
+        aria-controls={open ? contentId : undefined}
         onClick={() => setOpen((value) => !value)}
         className="inline-flex items-center gap-1 text-white/70 hover:text-white"
       >
@@ -182,6 +182,12 @@ export function AdvancedPanel({
   } | null>(null);
 
   const count = snapshot.profiles.length;
+  // The form reads the profile from the latest snapshot so that, after a
+  // conflict, it can adopt the refreshed current version.
+  const formProfile = form?.profile
+    ? (snapshot.profiles.find((item) => item.id === form.profile?.id) ??
+      form.profile)
+    : null;
 
   function openForm(profile: Profile | null) {
     setForm((current) => ({
@@ -200,7 +206,7 @@ export function AdvancedPanel({
         <Button
           variant="outline"
           aria-expanded={expanded}
-          aria-controls={contentId}
+          aria-controls={expanded ? contentId : undefined}
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "Hide advanced settings" : "Show advanced settings"}
@@ -241,13 +247,14 @@ export function AdvancedPanel({
           onOpenChange={(open) =>
             setTest((current) => (current ? { ...current, open } : current))
           }
+          refresh={refresh}
         />
       ) : null}
       {form ? (
         <ProfileForm
           key={form.opened}
           snapshot={snapshot}
-          profile={form.profile}
+          profile={formProfile}
           open={form.open}
           onOpenChange={(open) =>
             setForm((current) => (current ? { ...current, open } : current))
