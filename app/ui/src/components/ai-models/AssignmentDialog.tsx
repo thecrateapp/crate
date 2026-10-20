@@ -60,7 +60,7 @@ function OutcomeGroup({ title, items }: { title: string; items: GroupItem[] }) {
 }
 
 function limitsText(connection: Connection): string {
-  return `Connection limits start to apply. ${connectionName(connection)}: ${formatCount(
+  return `${connectionName(connection)}: ${formatCount(
     connection.max_concurrent,
   )} at a time · ${formatCount(connection.daily_calls)} calls and ${formatCount(
     connection.daily_tokens,
@@ -70,7 +70,7 @@ function limitsText(connection: Connection): string {
 export function AssignmentDialog({
   open,
   modelId,
-  connection,
+  connections,
   result,
   actions,
   busy,
@@ -79,7 +79,8 @@ export function AssignmentDialog({
 }: {
   open: boolean;
   modelId: string;
-  connection: Connection | null;
+  /** Every connection whose limits start to apply if this activates. */
+  connections: Connection[];
   result: ModelAssignmentResult | null;
   actions: Action[];
   busy: boolean;
@@ -104,6 +105,7 @@ export function AssignmentDialog({
       }));
   const reason = (outcome: AssignmentOutcome) =>
     outcome.reason ? reasonText(outcome.reason) : null;
+  const staysOff = outcomes.filter((outcome) => outcome.enabled === false);
 
   return (
     <Dialog
@@ -117,9 +119,16 @@ export function AssignmentDialog({
           <DialogTitle>Use {modelId} for all features?</DialogTitle>
         </DialogHeader>
 
-        {result?.activation && connection ? (
+        {result?.activation && connections.length > 0 ? (
           <div className="space-y-1 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100">
-            <p>{limitsText(connection)}</p>
+            <p>Connection limits start to apply.</p>
+            <ul role="list" className="space-y-1">
+              {connections.map((connection) => (
+                <li key={connection.persistent_id ?? connection.id}>
+                  {limitsText(connection)}
+                </li>
+              ))}
+            </ul>
             <p>
               Each call reserves its full token allowance until the provider
               reports usage.
@@ -146,6 +155,15 @@ export function AssignmentDialog({
             title={`Can't be set up (${groups.blocked})`}
             items={itemsFor(["blocked"], reason)}
           />
+          {staysOff.length > 0 ? (
+            <div className="space-y-1 text-sm text-muted-foreground">
+              {staysOff.map((outcome) => (
+                <p key={outcome.action_id}>
+                  {labelOf(outcome.action_id)} stays off.
+                </p>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter>

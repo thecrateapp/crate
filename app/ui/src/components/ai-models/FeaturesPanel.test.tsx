@@ -230,6 +230,79 @@ describe("FeaturesPanel", () => {
     ).toBeVisible();
   });
 
+  it("shows a feature turned off in server settings as off before setup", () => {
+    const snapshot = aiSnapshot();
+    snapshot.legacy_actions = snapshot.legacy_actions.map((action) =>
+      action.action_id === "music_paths.refine"
+        ? { ...action, legacy_enabled: false }
+        : action,
+    );
+    renderPanel(snapshot);
+
+    const paths = screen.getByRole("switch", { name: "Refine Music Path" });
+    expect(paths).not.toBeChecked();
+    expect(paths).toBeDisabled();
+    expect(
+      screen.getByRole("switch", { name: "Propose genre EQ" }),
+    ).toBeChecked();
+  });
+
+  it("hides models and profiles without a known image bound from image features", async () => {
+    const unbounded = {
+      ...catalog.models[0]!,
+      model_id: "gemini-2.5-flash",
+      label: "Gemini 2.5 Flash",
+      image_token_bound: null,
+    };
+    useApiMock.mockImplementation((url: string | null) => ({
+      data: url?.endsWith("/models")
+        ? { ...catalog, models: [...catalog.models, unbounded] }
+        : null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    const snapshot = migratedSnapshot();
+    const poster = snapshot.profiles[0]!;
+    snapshot.profiles.push({
+      ...poster,
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      label: "Text Gemini",
+      versions: [
+        {
+          ...poster.versions[0]!,
+          profile_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+          model_id: "gemini-2.5-flash",
+          image_token_bound: null,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPanel(snapshot);
+
+    const sheet = await openSheet(user, "Extract shows from image");
+    await user.click(within(sheet).getByRole("button", { name: "Model" }));
+    expect(
+      await screen.findByRole("button", { name: "Gemini 3.8 Flash" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Gemini 2.5 Flash" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Gemini 3.8 Flash" }));
+    await user.click(
+      within(sheet).getByRole("radio", { name: "Use a saved profile" }),
+    );
+    await user.click(
+      within(sheet).getByRole("button", { name: "Saved profile" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: /^Poster · / }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: /^Text Gemini/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("disables feature controls for read-only operators", () => {
     renderPanel(migratedSnapshot(), {
       capabilities: ["ai.config.read", "ai.usage.read"],

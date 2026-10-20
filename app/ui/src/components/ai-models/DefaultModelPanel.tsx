@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   assignmentSummary,
   initialDefaultChoice,
+  limitedConnections,
   reasonText,
   reasoningLabel,
 } from "@/lib/ai-models";
@@ -36,7 +37,7 @@ interface AssignmentBody {
 interface Review {
   body: AssignmentBody;
   result: ModelAssignmentResult;
-  connection: Connection;
+  connections: Connection[];
   actions: Action[];
 }
 
@@ -113,11 +114,13 @@ export function DefaultModelPanel({
       expected_revision: snapshot.revision,
       expected_review_fingerprint: snapshot.review_fingerprint,
     };
+    // Review whenever applying may replace a model a feature uses now: before
+    // setup, without a usable default, or when some feature has its own model.
+    const current = snapshot.default_model;
     const needsReview =
       !snapshot.migrated ||
-      (snapshot.default_model?.features ?? []).some(
-        (feature) => feature.status === "override",
-      );
+      !current?.available ||
+      current.features.some((feature) => feature.status === "override");
     setBusy(true);
     try {
       if (needsReview) {
@@ -125,7 +128,16 @@ export function DefaultModelPanel({
           ...body,
           dry_run: true,
         });
-        setReview({ body, result, connection, actions: snapshot.actions });
+        setReview({
+          body,
+          result,
+          connections: limitedConnections(
+            snapshot,
+            connection,
+            result.outcomes,
+          ),
+          actions: snapshot.actions,
+        });
         setDialogOpen(true);
       } else {
         const result = await writeAI<ModelAssignmentResult>("/default-model", {
@@ -193,7 +205,7 @@ export function DefaultModelPanel({
         <AssignmentDialog
           open={dialogOpen}
           modelId={review.body.model_id}
-          connection={review.connection}
+          connections={review.connections}
           result={review.result}
           actions={review.actions}
           busy={busy}

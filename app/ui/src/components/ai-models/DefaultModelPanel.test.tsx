@@ -68,8 +68,9 @@ function outcome(
   kind: AssignmentOutcome["outcome"],
   reason: string | null = null,
   adjustments: AssignmentOutcome["adjustments"] = [],
+  enabled: boolean | null = true,
 ): AssignmentOutcome {
-  return { action_id, outcome: kind, reason, adjustments };
+  return { action_id, outcome: kind, reason, adjustments, enabled };
 }
 
 function result(
@@ -177,8 +178,11 @@ describe("DefaultModelPanel", () => {
       within(dialog).getByText("Use gemini-3.8-flash for all features?"),
     ).toBeVisible();
     expect(
+      within(dialog).getByText("Connection limits start to apply."),
+    ).toBeVisible();
+    expect(
       within(dialog).getByText(
-        "Connection limits start to apply. Gemini from server: 2 at a time · 1,000 calls and 1,000,000 tokens per day.",
+        "Gemini from server: 2 at a time · 1,000 calls and 1,000,000 tokens per day.",
       ),
     ).toBeVisible();
     expect(
@@ -498,6 +502,96 @@ describe("DefaultModelPanel", () => {
     expect(
       screen.getByRole("button", { name: "Use for all features" }),
     ).toBeDisabled();
+  });
+
+  it("reviews first when setup has no usable default model", async () => {
+    const withoutDefault = migratedSnapshot();
+    withoutDefault.default_model = null;
+    const unavailable = migratedSnapshot();
+    unavailable.default_model = {
+      ...unavailable.default_model!,
+      available: false,
+      error_code: "AI_MODEL_UNVALIDATED",
+      features: [],
+    };
+    for (const snapshot of [withoutDefault, unavailable]) {
+      apiMock
+        .mockReset()
+        .mockResolvedValueOnce(result(firstUseOutcomes, { activation: false }));
+      const user = userEvent.setup();
+      const { unmount } = renderWithAdminProviders(
+        <DefaultModelPanel snapshot={snapshot} refresh={vi.fn()} />,
+      );
+
+      if (!snapshot.default_model) {
+        await choose(user, "Connection", "Studio");
+        await choose(user, "Model", "Gemini 3.8 Flash");
+      }
+      await user.click(
+        screen.getByRole("button", { name: "Use for all features" }),
+      );
+
+      const dialog = await screen.findByRole("dialog");
+      expect(apiMock).toHaveBeenCalledTimes(1);
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/ai/default-model",
+        "POST",
+        expect.objectContaining({ dry_run: true }),
+      );
+      expect(
+        within(dialog).getByText("Will use gemini-3.8-flash (3)"),
+      ).toBeVisible();
+      unmount();
+    }
+  });
+
+  it("lists the limits of every connection that setup puts under limits", async () => {
+    apiMock.mockResolvedValueOnce(result(firstUseOutcomes));
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={aiSnapshot()} refresh={vi.fn()} />,
+    );
+
+    await choose(user, "Connection", "Studio");
+    await choose(user, "Model", "Gemini 3.8 Flash");
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const limits = within(dialog)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent)
+      .filter((text) => text?.includes("per day"));
+    expect(limits).toEqual([
+      "Studio: 2 at a time · 100 calls and 1,000,000 tokens per day.",
+      "Gemini from server: 2 at a time · 100 calls and 1,000,000 tokens per day.",
+    ]);
+  });
+
+  it("says which features stay off after setup", async () => {
+    apiMock.mockResolvedValueOnce(
+      result([
+        outcome("shows.extract.vision", "kept_legacy", "AI_ACTION_NEEDS_IMAGE"),
+        outcome("shows.extract.text", "applied"),
+        outcome("genres.eq.propose", "applied"),
+        outcome("music_paths.refine", "applied", null, [], false),
+      ]),
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={aiSnapshot()} refresh={vi.fn()} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText("Refine Music Path stays off."),
+    ).toBeVisible();
+    expect(within(dialog).queryByText(/Propose genre EQ stays off/)).toBeNull();
   });
 
   it("hides the controls from read-only operators", () => {

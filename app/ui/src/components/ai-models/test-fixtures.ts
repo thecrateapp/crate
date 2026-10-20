@@ -179,6 +179,7 @@ const PROFILE: Profile = {
       },
       fingerprint: "a".repeat(64),
       created_at: hoursAgo(2),
+      image_token_bound: 4096,
     },
   ],
 };
@@ -200,6 +201,7 @@ function legacyAction(
       max_tokens: maxTokens,
       image_detail: "default",
     },
+    legacy_enabled: true,
   };
 }
 
@@ -298,6 +300,7 @@ export const catalog: ModelsResponse = {
       max_output_tokens: 16000,
       context_window: 1000000,
       image_details: ["default", "high"],
+      image_token_bound: 4096,
     },
     {
       provider: "gemini",
@@ -315,6 +318,7 @@ export const catalog: ModelsResponse = {
       max_output_tokens: 4000,
       context_window: 32000,
       image_details: ["default"],
+      image_token_bound: null,
     },
   ],
   status: "ready",

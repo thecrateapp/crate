@@ -14,6 +14,8 @@ export interface Model {
   max_output_tokens: number | null;
   context_window: number | null;
   image_details: string[];
+  /** Per-image token reservation; null when image features can't be admitted. */
+  image_token_bound?: number | null;
 }
 export interface ReasoningConfig {
   mode: "provider_default" | "enabled" | "disabled" | "level" | "budget";
@@ -50,6 +52,8 @@ export interface Version {
   config: Config | LegacyConfig;
   fingerprint: string;
   created_at: string;
+  /** The catalog model's per-image token reservation, when known. */
+  image_token_bound?: number | null;
 }
 export interface Profile {
   id: string;
@@ -134,6 +138,8 @@ export interface Snapshot {
     legacy_model: string;
     effective_timeout_seconds: number | null;
     legacy_options: LegacyConfig["legacy_options"];
+    /** Whether the feature runs on server settings (Music Paths has its own switch). */
+    legacy_enabled?: boolean;
   }[];
 }
 export interface ModelsResponse {
@@ -164,6 +170,8 @@ export interface AssignmentOutcome {
   outcome: "applied" | "unchanged" | "kept_legacy" | "kept_current" | "blocked";
   reason: string | null;
   adjustments: ("reasoning" | "image_detail")[];
+  /** The feature's switch once applied; null when it can't be set up. */
+  enabled?: boolean | null;
 }
 export interface ModelAssignmentResult {
   dry_run: boolean;

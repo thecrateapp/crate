@@ -157,6 +157,14 @@ export function reasoningFromValue(value: string): ReasoningConfig {
   return PROVIDER_DEFAULT_REASONING;
 }
 
+/**
+ * Whether image features can run on a model or profile version: the server
+ * admits an image only when its per-image token bound is known.
+ */
+function admitsImages(entry: { image_token_bound?: number | null }): boolean {
+  return entry.image_token_bound != null;
+}
+
 /** Catalog models a connection can run for Crate, optionally for one feature. */
 export function eligibleModels(
   models: Model[],
@@ -168,7 +176,8 @@ export function eligibleModels(
       model.validated &&
       model.structured_output &&
       model.provider === connection.provider &&
-      (feature?.input !== "image" || model.input_modalities.includes("image")),
+      (feature?.input !== "image" ||
+        (model.input_modalities.includes("image") && admitsImages(model))),
   );
 }
 
@@ -261,13 +270,19 @@ export function savedProfileOptions(
   snapshot: Snapshot,
   actionId: string,
 ): SavedProfileOption[] {
+  const image =
+    snapshot.actions.find((action) => action.id === actionId)?.input ===
+    "image";
   const options: SavedProfileOption[] = [];
   for (const profile of snapshot.profiles) {
     const version = profile.versions.find(
       (candidate) => candidate.version === profile.current_version,
     );
     if (!version) continue;
-    if ("kind" in version.config && version.config.action_id !== actionId) {
+    if ("kind" in version.config) {
+      // A kept server-settings snapshot only ever runs its own feature.
+      if (version.config.action_id !== actionId) continue;
+    } else if (image && !admitsImages(version)) {
       continue;
     }
     options.push({ profile, version });
@@ -403,6 +418,8 @@ const AI_ERROR_TEXT: Record<string, string> = {
     "Keys from the server environment can't be changed here.",
   AI_ENDPOINT_INVALID: "This address isn't a valid model server URL.",
   AI_PROVIDER_UNSUPPORTED: "This provider isn't supported.",
+  AI_IMAGE_BOUND_UNKNOWN:
+    "This model's image limits are unknown, so it can't run image features.",
 };
 
 const DEFAULT_AI_ERROR_TEXT =
@@ -474,7 +491,10 @@ function findVersion(
 }
 
 export function summaryModel(snapshot: Snapshot): string {
-  if (snapshot.default_model) return snapshot.default_model.model_id;
+  const current = snapshot.default_model;
+  if (current?.available && current.model_id !== "unknown") {
+    return current.model_id;
+  }
   const counts = new Map<string, number>();
   for (const binding of snapshot.bindings) {
     if (!binding.enabled) continue;
@@ -503,7 +523,9 @@ export function activeFeatureCount(snapshot: Snapshot): number {
   if (snapshot.migrated) {
     return snapshot.bindings.filter((binding) => binding.enabled).length;
   }
-  return snapshot.legacy_actions.filter((action) => action.supported).length;
+  return snapshot.legacy_actions.filter(
+    (action) => action.supported && action.legacy_enabled !== false,
+  ).length;
 }
 
 export interface FeatureModelView {
@@ -555,6 +577,60 @@ export function featureModelView(
   return { label: "Override", tone: "neutral", model };
 }
 
+/**
+ * Connections whose limits start to apply when an assignment activates: the
+ * chosen one, plus each connection that keeps serving a feature (the server
+ * provider behind kept settings, or a feature's current binding).
+ */
+export function limitedConnections(
+  snapshot: Snapshot,
+  chosen: Connection,
+  outcomes: AssignmentOutcome[],
+): Connection[] {
+  const found: Connection[] = [];
+  const add = (connection: Connection | undefined) => {
+    if (!connection) return;
+    const key = connection.persistent_id ?? connection.id;
+    if (found.some((seen) => (seen.persistent_id ?? seen.id) === key)) return;
+    found.push(connection);
+  };
+  if (
+    outcomes.some(
+      (outcome) =>
+        outcome.outcome === "applied" || outcome.outcome === "unchanged",
+    )
+  ) {
+    add(chosen);
+  }
+  for (const outcome of outcomes) {
+    if (outcome.outcome === "kept_legacy") {
+      const legacy = snapshot.legacy_actions.find(
+        (action) => action.action_id === outcome.action_id,
+      );
+      add(
+        legacy
+          ? snapshot.connections.find(
+              (connection) =>
+                connection.source === "environment" &&
+                connection.provider === legacy.provider,
+            )
+          : undefined,
+      );
+    } else if (outcome.outcome === "kept_current") {
+      const binding = snapshot.bindings.find(
+        (candidate) => candidate.action_id === outcome.action_id,
+      );
+      const version = binding
+        ? findVersion(snapshot, binding.profile_id, binding.profile_version)
+        : undefined;
+      add(
+        version ? findConnection(snapshot, version.connection_id) : undefined,
+      );
+    }
+  }
+  return found;
+}
+
 export interface UsageTodayTotals {
   calls: number;
   tokens: number;
@@ -585,9 +661,7 @@ export function dailyTokenBudget(snapshot: Snapshot): number | null {
       binding.profile_version,
     );
     if (!version) continue;
-    const connection = snapshot.connections.find(
-      (candidate) => candidate.id === version.connection_id,
-    );
+    const connection = findConnection(snapshot, version.connection_id);
     if (!connection) continue;
     const key = connection.persistent_id ?? connection.id;
     if (seen.has(key)) continue;

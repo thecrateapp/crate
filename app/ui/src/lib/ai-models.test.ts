@@ -42,6 +42,7 @@ import {
   isConflictError,
   numberInputValue,
   isUsableConnection,
+  limitedConnections,
   outcomeGroups,
   providerLabel,
   PROVIDER_DEFAULT_REASONING,
@@ -973,5 +974,136 @@ describe("assignmentSummary", () => {
     expect(assignmentSummary("m", [outcome("applied")])).toBe(
       "m now runs 1 feature.",
     );
+  });
+});
+
+describe("final review fixes", () => {
+  function withProfile(
+    snapshot: Snapshot,
+    id: string,
+    overrides: Partial<Snapshot["profiles"][number]["versions"][number]>,
+  ): Snapshot {
+    const base = snapshot.profiles[0]!;
+    snapshot.profiles.push({
+      ...base,
+      id,
+      label: id,
+      versions: [{ ...base.versions[0]!, profile_id: id, ...overrides }],
+    });
+    return snapshot;
+  }
+
+  it("budgets an environment connection bound through its persistent id", () => {
+    const snapshot = withProfile(migratedSnapshot(), "env-profile", {
+      connection_id: ENV_GEMINI_PERSISTENT_ID,
+    });
+    snapshot.connections = snapshot.connections.map((connection) =>
+      connection.id === "env:gemini"
+        ? { ...connection, daily_tokens: 250000 }
+        : connection,
+    );
+    snapshot.bindings = snapshot.bindings.map((binding) =>
+      binding.action_id === "genres.eq.propose"
+        ? { ...binding, profile_id: "env-profile" }
+        : binding,
+    );
+
+    expect(dailyTokenBudget(snapshot)).toBe(1250000);
+  });
+
+  it("summarises the bound models when the default is unavailable or unreadable", () => {
+    for (const overrides of [
+      { model_id: "stale-model", available: false },
+      { model_id: "unknown", available: false },
+    ]) {
+      const snapshot = migratedSnapshot();
+      snapshot.default_model = { ...snapshot.default_model!, ...overrides };
+      expect(summaryModel(snapshot)).toBe("gemini-3.8-flash");
+      snapshot.bindings = [];
+      snapshot.legacy_actions = [
+        { ...snapshot.legacy_actions[0]!, model_id: "server-model" },
+      ];
+      expect(summaryModel(snapshot)).toBe("server-model");
+    }
+  });
+
+  it("does not count a feature turned off in server settings before setup", () => {
+    const snapshot = aiSnapshot();
+    snapshot.legacy_actions = snapshot.legacy_actions.map((action) =>
+      action.action_id === "music_paths.refine"
+        ? { ...action, legacy_enabled: false }
+        : action,
+    );
+
+    expect(activeFeatureCount(snapshot)).toBe(3);
+  });
+
+  it("offers image features only models with a known image bound", () => {
+    const connection = aiSnapshot().connections[0]!;
+    const unbounded: Model = {
+      ...catalog.models[0]!,
+      model_id: "gemini-2.5-flash",
+      image_token_bound: null,
+    };
+    const models = [...catalog.models, unbounded];
+    const vision = { ...action("shows.extract.vision"), input: "image" };
+
+    expect(
+      eligibleModels(models, connection, vision).map((m) => m.model_id),
+    ).toEqual(["gemini-3.8-flash"]);
+    expect(
+      eligibleModels(models, connection, action("genres.eq.propose")).map(
+        (m) => m.model_id,
+      ),
+    ).toEqual(["gemini-3.8-flash", "budget", "gemini-2.5-flash"]);
+  });
+
+  it("offers image features only profiles with a known image bound", () => {
+    const snapshot = withProfile(migratedSnapshot(), "Text only", {
+      model_id: "gemini-2.5-flash",
+      image_token_bound: null,
+    });
+
+    expect(
+      savedProfileOptions(snapshot, "shows.extract.vision").map(
+        (option) => option.profile.label,
+      ),
+    ).toEqual(["Poster"]);
+    expect(
+      savedProfileOptions(snapshot, "genres.eq.propose").map(
+        (option) => option.profile.label,
+      ),
+    ).toEqual(["Poster", "Text only"]);
+  });
+
+  it("lists every connection that setup puts under limits, once", () => {
+    const snapshot = aiSnapshot();
+    const studio = snapshot.connections[0]!;
+    const outcome = (
+      action_id: string,
+      kind: AssignmentOutcome["outcome"],
+    ): AssignmentOutcome => ({
+      action_id,
+      outcome: kind,
+      reason: null,
+      adjustments: [],
+    });
+
+    expect(
+      limitedConnections(snapshot, studio, [
+        outcome("shows.extract.vision", "kept_legacy"),
+        outcome("shows.extract.text", "applied"),
+        outcome("genres.eq.propose", "applied"),
+        outcome("music_paths.refine", "kept_legacy"),
+      ]).map((connection) => connection.id),
+    ).toEqual([STUDIO_ID, "env:gemini"]);
+
+    const environment = findConnection(snapshot, "env:gemini")!;
+    expect(
+      limitedConnections(snapshot, environment, [
+        outcome("shows.extract.vision", "kept_legacy"),
+        outcome("shows.extract.text", "applied"),
+      ]).map((connection) => connection.id),
+    ).toEqual(["env:gemini"]);
   });
 });

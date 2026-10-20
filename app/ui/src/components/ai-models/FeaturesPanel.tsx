@@ -82,7 +82,13 @@ function FeatureRow({
     (candidate) => candidate.action_id === action.id,
   );
   const view = featureModelView(snapshot, action.id);
-  const checked = snapshot.migrated ? (binding?.enabled ?? false) : true;
+  // Before setup a feature follows server settings, where Music Paths
+  // refinement has its own switch; setup keeps that state.
+  const checked = snapshot.migrated
+    ? (binding?.enabled ?? false)
+    : snapshot.legacy_actions.find(
+        (candidate) => candidate.action_id === action.id,
+      )?.legacy_enabled !== false;
   const canWrite = canManage && snapshot.migrated;
 
   return (
