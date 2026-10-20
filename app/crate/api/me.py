@@ -92,6 +92,7 @@ from crate.api.schemas.me import (
     ShowReminderCreateResponse,
     ShowReminderRequest,
     StatsDashboardResponse,
+    StatsRangeResponse,
     StatsOverviewResponse,
     StatsTrendsResponse,
     SyncStatusResponse,
@@ -116,6 +117,11 @@ from crate.db.home import (
     get_home_playlist,
 )
 from crate.db.home_section_surface import get_cached_home_section
+from crate.db.queries.user_library_stats_range import (
+    get_user_stats_range,
+    user_stats_today,
+    validate_stats_range,
+)
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
@@ -1112,6 +1118,26 @@ def stats_dashboard(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/stats/range",
+    response_model=StatsRangeResponse,
+    responses=_ME_RESPONSES,
+    summary="Listening summary for a date range",
+)
+def stats_range(
+    request: Request,
+    start: date = Query(...),
+    end: date = Query(...),
+    limit: int = Query(3, ge=1, le=20),
+):
+    user = _require_auth(request)
+    try:
+        validate_stats_range(start, end, today=user_stats_today(user["id"]))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return get_user_stats_range(user["id"], start, end, limit=limit)
 
 
 @router.get(

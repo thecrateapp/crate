@@ -7,14 +7,21 @@ returned rows only.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
 from crate.db.queries.user_library_stats_signal import _TRACK_REF_JOINS
+from crate.db.queries.user_stats_periods import user_stats_timezone
 from crate.db.tx import read_scope
 
-__all__ = ["MAX_RANGE_DAYS", "get_user_stats_range", "validate_stats_range"]
+__all__ = [
+    "MAX_RANGE_DAYS",
+    "get_user_stats_range",
+    "user_stats_today",
+    "validate_stats_range",
+]
 
 MAX_RANGE_DAYS = 400
 _DISCOVERY_LIMIT = 10
@@ -149,6 +156,12 @@ def validate_stats_range(start: date, end: date, *, today: date) -> None:
         raise ValueError("end must not be in the future")
     if (end - start).days > MAX_RANGE_DAYS:
         raise ValueError(f"range must not exceed {MAX_RANGE_DAYS} days")
+
+
+def user_stats_today(user_id: int, *, session=None) -> date:
+    """Today's date in the listener's stats timezone."""
+    tz = user_stats_timezone(user_id, session=session)
+    return datetime.now(ZoneInfo(tz)).date()
 
 
 def get_user_stats_range(

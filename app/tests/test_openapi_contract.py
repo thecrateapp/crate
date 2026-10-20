@@ -1731,3 +1731,13 @@ def test_openapi_declares_stats_dashboard_snapshot_block(test_app):
     assert {"version", "pending", "stale", "built_at"} <= set(
         schemas["StatsSnapshotMetaResponse"]["properties"]
     )
+
+
+def test_openapi_types_stats_range_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    for path in ("/api/me/stats/range", "/api/users/{username}/stats/range"):
+        operation = data["paths"][path]["get"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("/StatsRangeResponse")

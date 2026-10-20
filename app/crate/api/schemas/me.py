@@ -800,6 +800,42 @@ class StatsSnapshotMetaResponse(BaseModel):
     generation_ms: int | None = None
 
 
+class StatsRangeArtistResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    minutes: float
+    plays: int
+    share: float
+
+
+class StatsRangeAlbumResponse(StatsAlbumRefResponse):
+    minutes: float
+
+
+class StatsRangeTrackResponse(StatsTrackRefResponse):
+    plays: int
+    minutes: float
+
+
+class StatsRangeDiscoveryResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    first_day: str
+    minutes: float
+
+
+class StatsRangeResponse(BaseModel):
+    start: str
+    end: str
+    available: bool = True
+    top_artists: list[StatsRangeArtistResponse] = Field(default_factory=list)
+    top_albums: list[StatsRangeAlbumResponse] = Field(default_factory=list)
+    top_tracks: list[StatsRangeTrackResponse] = Field(default_factory=list)
+    discoveries: list[StatsRangeDiscoveryResponse] = Field(default_factory=list)
+
+
 class StatsDashboardResponse(BaseModel):
     window: str
     subject: StatsSubjectResponse | None = None
