@@ -166,6 +166,19 @@ it("still opens an empty merge editor from the toolbar", async () => {
   ).toHaveLength(0);
 });
 
+it("opens the manual show editor from the toolbar, for show curators only", async () => {
+  const { unmount } = renderWithAdminProviders(<Upcoming />);
+  await userEvent.click(screen.getByRole("button", { name: "Add show" }));
+  expect(screen.getByRole("dialog", { name: "Add show" })).toBeInTheDocument();
+  unmount();
+  renderWithAdminProviders(<Upcoming />, {
+    auth: { hasCapability: () => false, isAdmin: false },
+  });
+  expect(
+    screen.queryByRole("button", { name: "Add show" }),
+  ).not.toBeInTheDocument();
+});
+
 it("offers the detail merge only to show curators", async () => {
   renderWithAdminProviders(<Upcoming />, {
     route: "/upcoming?show_id=7",
