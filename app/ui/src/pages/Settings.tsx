@@ -1423,7 +1423,7 @@ function EnrichmentSection({
         <PanelCard
           icon={Bot}
           title="Legacy LLM Refinement"
-          description="The legacy toggle controls inherited refinement. Configured action bindings are managed in AI Agents."
+          description="The legacy toggle controls inherited refinement. Configured action bindings are managed in AI models."
         >
           <p className="text-sm">
             {pathAI?.status === "configured"
@@ -1433,8 +1433,8 @@ function EnrichmentSection({
                 : pathAI?.status === "legacy"
                   ? "Legacy routing: the toggle below controls inherited refinement."
                   : "Action routing has not been checked yet."}{" "}
-            <Link className="text-primary underline" to="/ai-agents">
-              AI Agents
+            <Link className="text-primary underline" to="/ai">
+              AI models
             </Link>
           </p>
           <FieldRow

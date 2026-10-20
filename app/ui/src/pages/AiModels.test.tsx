@@ -18,6 +18,7 @@ const { apiMock, useApiMock } = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@nivo/bar", () => ({ ResponsiveBar: () => null }));
 
 import { AiModels } from "./AiModels";
 
@@ -98,6 +99,26 @@ describe("AiModels", () => {
       }),
     ).toBe(false);
     expect(screen.queryByText("Calls today")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Activity" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Advanced" })).toBeVisible();
+  });
+
+  it("shows Advanced collapsed and Activity with ai.usage.read", () => {
+    mockUseApi(migratedSnapshot(), usageFixture(NOW), activityFixture);
+    renderWithAdminProviders(<AiModels />);
+
+    expect(screen.getByRole("heading", { name: "Advanced" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Show advanced settings" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeVisible();
+    expect(
+      within(screen.getByRole("table")).getByRole("row", {
+        name: /Extract shows from image/,
+      }),
+    ).toBeVisible();
   });
 
   it("shows a loading state while the snapshot is in flight", () => {

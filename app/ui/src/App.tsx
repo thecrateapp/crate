@@ -89,9 +89,6 @@ const LegacyPlanRedirect = lazy(() =>
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
 );
-const AiAgents = lazy(() =>
-  import("@/pages/AiAgents").then((m) => ({ default: m.AiAgents })),
-);
 const AiModels = lazy(() =>
   import("@/pages/AiModels").then((m) => ({ default: m.AiModels })),
 );
@@ -495,13 +492,13 @@ export default function App() {
                     </RequireCapabilities>
                   }
                 />
+                {/* TEST_GAP: App's route table needs the full provider stack
+                    (BrowserRouter, AuthProvider, the ops SSE stream), so this
+                    one-line redirect is not unit-tested, like the redirects
+                    above. /ai itself is gated by ai.config.read. */}
                 <Route
                   path="ai-agents"
-                  element={
-                    <RequireCapabilities anyOf={["ai.config.read"]}>
-                      <AiAgents />
-                    </RequireCapabilities>
-                  }
+                  element={<Navigate to="/ai" replace />}
                 />
                 <Route
                   path="ai"

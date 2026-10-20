@@ -37,6 +37,7 @@ import {
   imageDetailLabel,
   initialDefaultChoice,
   initialFeatureChoice,
+  invocationErrorText,
   invocationStatusView,
   isUsableConnection,
   outcomeGroups,
@@ -417,6 +418,32 @@ describe("aiErrorText", () => {
     expect(aiErrorText(undefined)).toBe(
       "AI settings could not be saved. Reload and try again.",
     );
+  });
+});
+
+describe("invocationErrorText", () => {
+  const cases: [string, string][] = [
+    ["AI_PROVIDER_TIMEOUT", "The provider didn't answer in time"],
+    ["AI_PROVIDER_FAILED", "The provider couldn't complete the request"],
+    [
+      "AI_RESPONSE_INVALID",
+      "The model's answer didn't match the expected format",
+    ],
+    ["AI_INPUT_TOO_LARGE", "The input was larger than the profile allows"],
+    ["AI_PROBE_FAILED", "The test request failed"],
+    ["AI_CONTEXT_TOO_SMALL", "The model's context window is too small"],
+    [
+      "AI_CREDENTIAL_STORAGE",
+      "Saving keys needs CRATE_CREDENTIAL_KEY on the server.",
+    ],
+  ];
+
+  it.each(cases)("explains %s", (code, expected) => {
+    expect(invocationErrorText(code)).toBe(expected);
+  });
+
+  it("never falls back to save-oriented copy for unknown codes", () => {
+    expect(invocationErrorText("AI_SOMETHING_ELSE")).toBe("The call failed");
   });
 });
 

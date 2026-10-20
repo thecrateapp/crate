@@ -3,6 +3,8 @@ import { Activity, AlertTriangle, Coins, Sparkles } from "lucide-react";
 import { OpsPageHero, OpsStatTile } from "@/components/admin/ops-surfaces";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ErrorState } from "@/components/ui/error-state";
+import { ActivityPanel } from "@/components/ai-models/ActivityPanel";
+import { AdvancedPanel } from "@/components/ai-models/AdvancedPanel";
 import { AI_ROOT } from "@/components/ai-models/api";
 import { DefaultModelPanel } from "@/components/ai-models/DefaultModelPanel";
 import { FeaturesPanel } from "@/components/ai-models/FeaturesPanel";
@@ -116,10 +118,12 @@ export function AiModels() {
             refresh={refetch}
           />
           <ProvidersPanel snapshot={snapshot} refresh={refetch} />
+          <AdvancedPanel snapshot={snapshot} refresh={refetch} />
+          {canReadUsage ? (
+            <ActivityPanel snapshot={snapshot} usage={usage} />
+          ) : null}
         </>
       ) : null}
-
-      {/* The Advanced and Activity panels are added in Task 7. */}
     </div>
   );
 }

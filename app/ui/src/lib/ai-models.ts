@@ -417,6 +417,26 @@ export function aiErrorText(error: unknown): string {
   return DEFAULT_AI_ERROR_TEXT;
 }
 
+// Codes a single model call can end with. Configuration codes fall back to
+// the reason and settings copy; anything else reads as a plain failure, never
+// as the save-oriented default of aiErrorText.
+const INVOCATION_ERROR_TEXT: Record<string, string> = {
+  AI_PROVIDER_TIMEOUT: "The provider didn't answer in time",
+  AI_PROVIDER_FAILED: "The provider couldn't complete the request",
+  AI_RESPONSE_INVALID: "The model's answer didn't match the expected format",
+  AI_INPUT_TOO_LARGE: "The input was larger than the profile allows",
+  AI_PROBE_FAILED: "The test request failed",
+};
+
+export function invocationErrorText(code: string): string {
+  return (
+    INVOCATION_ERROR_TEXT[code] ??
+    REASON_TEXT[code] ??
+    AI_ERROR_TEXT[code] ??
+    "The call failed"
+  );
+}
+
 function findVersion(
   snapshot: Snapshot,
   profileId: string,

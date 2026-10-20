@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { AdminSelect, type AdminSelectOption } from "@/components/ui";
 import { useApi } from "@/hooks/use-api";
@@ -34,12 +34,14 @@ function CatalogSelects({
   connection,
   value,
   onChange,
+  onModelResolved,
   feature,
   disabled,
 }: {
   connection: Connection | null;
   value: ModelChoice;
   onChange: ChangeHandler;
+  onModelResolved?: (model: Model | null) => void;
   feature?: Action;
   disabled?: boolean;
 }) {
@@ -62,6 +64,18 @@ function CatalogSelects({
       );
     }
   }, [loaded, value.modelId, model]);
+
+  // Callers often pass an inline callback; keep it out of the effect below.
+  const onModelResolvedRef = useRef(onModelResolved);
+  useEffect(() => {
+    onModelResolvedRef.current = onModelResolved;
+  });
+
+  // Report the catalog entry of the chosen model once the catalog is loaded,
+  // including a model that was preselected rather than picked.
+  useEffect(() => {
+    if (loaded) onModelResolvedRef.current?.(model);
+  }, [loaded, model]);
 
   const modelOptions: AdminSelectOption[] = models.map((m) => ({
     value: m.model_id,
@@ -118,12 +132,15 @@ export function ModelPicker({
   snapshot,
   value,
   onChange,
+  onModelResolved,
   feature,
   disabled,
 }: {
   snapshot: Snapshot;
   value: ModelChoice;
   onChange: ChangeHandler;
+  /** Receives the catalog entry of the chosen model whenever it resolves. */
+  onModelResolved?: (model: Model | null) => void;
   feature?: Action;
   disabled?: boolean;
 }) {
@@ -179,6 +196,7 @@ export function ModelPicker({
         connection={connection}
         value={value}
         onChange={onChange}
+        onModelResolved={onModelResolved}
         feature={feature}
         disabled={disabled}
       />
