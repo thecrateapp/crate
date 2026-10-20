@@ -101,6 +101,13 @@ function footerButton(name: string) {
   return within(footer).getByRole("button", { name });
 }
 
+// The editor keeps its own region for its notes; the sheet's own region,
+// for the review and merge states, comes after it.
+function sheetStatus() {
+  const regions = screen.getAllByRole("status");
+  return regions[regions.length - 1]!;
+}
+
 function ReopenableSheet({
   onMerged,
   initialIds,
@@ -426,11 +433,11 @@ describe("MergeShowsSheet", () => {
     renderWithAdminProviders(
       <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
     );
-    const status = screen.getByRole("status");
+    const status = sheetStatus();
     expect(status).toBeEmptyDOMElement();
     const user = await reviewMerge();
     await user.click(screen.getByRole("radio", { name: "Keep show 8" }));
-    expect(screen.getByRole("status")).toBe(status);
+    expect(sheetStatus()).toBe(status);
     expect(status).toHaveTextContent(
       "The selection changed. Review again before merging.",
     );
@@ -439,7 +446,7 @@ describe("MergeShowsSheet", () => {
     await user.click(
       await screen.findByRole("button", { name: "Merge shows" }),
     );
-    expect(screen.getByRole("status")).toBe(status);
+    expect(sheetStatus()).toBe(status);
     expect(status).toHaveTextContent("Merging…");
   });
 });

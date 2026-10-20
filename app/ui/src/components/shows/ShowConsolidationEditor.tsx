@@ -198,7 +198,10 @@ export function ShowConsolidationEditor({
           2 to 10 show IDs separated by commas. Open a show on Upcoming and
           choose Merge duplicates to fill this in, or enter the show IDs.
         </p>
-        {notice ? <p className="text-sm">{notice}</p> : null}
+        {/* Always mounted, so a screen reader hears the note arrive. */}
+        <p role="status" className="text-sm empty:sr-only">
+          {notice}
+        </p>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-state-danger-text">

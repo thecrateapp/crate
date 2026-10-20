@@ -139,6 +139,44 @@ function tourApi(count: number) {
   });
 }
 
+const NO_NEW_TEXT =
+  "No new shows. The dates Crate read are already in the draft.";
+
+// Each run reads the same three shows under new item IDs, as the server does.
+function reimportApi() {
+  let run = 0;
+  const implementation = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation(async (...args) => {
+    const url = args[0];
+    if (url.endsWith("/availability")) return FRESH_AVAILABILITY;
+    if (url.endsWith("/drafts")) return { items: [] };
+    if (url.endsWith("/extractions")) {
+      run += 1;
+      return { job_id: `extract-${run}` };
+    }
+    if (url.includes("/jobs/extract-"))
+      return {
+        status: "completed",
+        result: {
+          execution: { status: "completed", draft_id: `draft-${run}` },
+          draft: {
+            raw_text: "tour",
+            coverage: "incomplete",
+            candidates: [2, 4, 6].map((day) => ({
+              item_id: `run-${run}-${day}`,
+              artist_name: "Band",
+              date: `2027-03-0${day}`,
+              venue: "Hall",
+              city: "City",
+            })),
+          },
+        },
+      };
+    return implementation(...args);
+  });
+  return () => run;
+}
+
 async function importTour(user: ReturnType<typeof userEvent.setup>) {
   await user.click(
     screen.getByRole("radio", { name: "Import from flyer, text or link" }),
@@ -1000,36 +1038,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
   });
 
   it("keeps a re-imported tour at one row per show", async () => {
-    let run = 0;
-    const implementation = vi.mocked(api).getMockImplementation()!;
-    vi.mocked(api).mockImplementation(async (...args) => {
-      const url = args[0];
-      if (url.endsWith("/availability")) return FRESH_AVAILABILITY;
-      if (url.endsWith("/drafts")) return { items: [] };
-      if (url.endsWith("/extractions")) {
-        run += 1;
-        return { job_id: `extract-${run}` };
-      }
-      if (url.includes("/jobs/extract-"))
-        return {
-          status: "completed",
-          result: {
-            execution: { status: "completed", draft_id: `draft-${run}` },
-            draft: {
-              raw_text: "tour",
-              coverage: "incomplete",
-              candidates: [2, 4, 6].map((day) => ({
-                item_id: `run-${run}-${day}`,
-                artist_name: "Band",
-                date: `2027-03-0${day}`,
-                venue: "Hall",
-                city: "City",
-              })),
-            },
-          },
-        };
-      return implementation(...args);
-    });
+    const runs = reimportApi();
     renderWithAdminProviders(
       <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
     );
@@ -1037,11 +1046,70 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
     await importTour(user);
     await screen.findByLabelText("Select show 3");
     await user.click(screen.getByRole("button", { name: "Find dates" }));
-    await waitFor(() => expect(run).toBe(2));
-    await screen.findByText(/Found 3 shows/);
+    await waitFor(() => expect(runs()).toBe(2));
+    await screen.findByText(NO_NEW_TEXT);
     expect(screen.getByLabelText("Select show 3")).toBeInTheDocument();
     expect(screen.queryByLabelText("Select show 4")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Pasted text")).toHaveValue("tour");
+  });
+
+  it("keeps a standing review when a re-import finds only shows already in the draft", async () => {
+    reimportApi();
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    await importTour(user);
+    expect(await screen.findByText(/Found 3 shows/)).toBeVisible();
+    await user.click(screen.getByLabelText("Select show 1"));
+    await user.click(screen.getByLabelText("Select show 2"));
+    await user.click(screen.getByRole("button", { name: "Review 2 shows" }));
+    await screen.findByRole("button", { name: "Save 2 shows" });
+    await user.click(screen.getByRole("button", { name: "Find dates" }));
+    expect(await screen.findByText(NO_NEW_TEXT)).toBeVisible();
+    expect(screen.queryByText(/Found 3 shows/)).toBeNull();
+    expect(posts("/extractions")).toHaveLength(2);
+    // Nothing changed, so the review stands and can be saved as it is.
+    expect(screen.getByRole("button", { name: "Save 2 shows" })).toBeEnabled();
+    expect(
+      screen.queryByText("The draft changed. Review again before saving."),
+    ).toBeNull();
+    expect(screen.getByLabelText("Select show 1")).toBeChecked();
+    expect(screen.getByLabelText("Select show 2")).toBeChecked();
+    expect(screen.getByLabelText("Select show 3")).not.toBeChecked();
+    expect(screen.queryByLabelText("Select show 4")).not.toBeInTheDocument();
+  });
+
+  it("keeps «Start over» off while an import's acceptance is uncertain", async () => {
+    tourApi(1);
+    const tour = vi.mocked(api).getMockImplementation()!;
+    let lost = true;
+    vi.mocked(api).mockImplementation(async (...args) => {
+      if (args[0].endsWith("/extractions") && lost) {
+        lost = false;
+        throw new TypeError("Failed to fetch");
+      }
+      return tour(...args);
+    });
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    await importTour(user);
+    const retry = await screen.findByRole("button", { name: "Retry import" });
+    // The source holds text, which alone would allow a fresh start.
+    expect(footerButton("Start over")).toBeDisabled();
+    await user.click(footerButton("Start over"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Pasted text")).toHaveValue("tour");
+    await user.click(retry);
+    expect(await screen.findByLabelText("Artist")).toHaveValue("Band");
+    const keys = posts("/extractions").map(
+      ([, , body]) => (body as { idempotency_key: string }).idempotency_key,
+    );
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+    expect(footerButton("Start over")).toBeEnabled();
   });
 
   it("asks to select shows when several rows have none selected", async () => {

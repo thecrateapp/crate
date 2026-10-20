@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { PenLine, Plus, RotateCcw, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
@@ -80,12 +80,23 @@ export function AddShowSheet({
   // Everything lives outside SheetContent, so closing the panel keeps the
   // draft, the pending review or save, and the readiness check.
   const [mode, setMode] = useState<Mode>("manual");
-  const [draft, setDraft] = useState<ShowDraftState>(newDraft);
+  const [draft, setDraftState] = useState<ShowDraftState>(newDraft);
+  // Mirrors `draft`, so an import that finishes later merges into the
+  // latest rows and can tell whether it added any.
+  const draftRef = useRef(draft);
   const [attempted, setAttempted] = useState(false);
   const [notice, setNotice] = useState("");
   // Loading an existing show ends in an edit, so nothing else may start.
   const [linking, setLinking] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+
+  function setDraft(
+    next: ShowDraftState | ((current: ShowDraftState) => ShowDraftState),
+  ) {
+    const value = typeof next === "function" ? next(draftRef.current) : next;
+    draftRef.current = value;
+    setDraftState(value);
+  }
 
   const flow = useShowPlan({
     open,
@@ -114,15 +125,20 @@ export function AddShowSheet({
   // Manual entry never activates the source: no availability, no probe.
   const source = useShowSource({
     active: allowed && open && mode === "import",
-    // A functional update, so an import that finishes later never drops
-    // edits made since it started.
+    // Merged into the latest rows, so an import that finishes later never
+    // drops edits made since it started.
     onDraft(imported: ShowDraft) {
       const published = Object.values(imported.publication ?? {});
       // An import that found nothing changes nothing, so a review stands.
       if (!imported.candidates.length && !published.length) return;
       const savedIds = savedItemIds(flow.outcomes);
-      setDraft((current) => mergeImportedDraft(current, imported, savedIds));
+      const current = draftRef.current;
+      const merged = mergeImportedDraft(current, imported, savedIds);
       flow.addOutcomes(published);
+      // Every show read is already in the draft: nothing changed, so a
+      // standing review stands too.
+      if (imported.candidates.length && merged === current) return false;
+      setDraft(merged);
       flow.invalidate();
     },
   });
@@ -226,8 +242,11 @@ export function AddShowSheet({
     source.images.length ||
     source.storedImages.length,
   );
+  // An import whose acceptance was lost keeps its key for «Retry import»;
+  // starting over would drop it and could pay for a second extraction.
   const canStartOver =
     !locked &&
+    !source.uncertain &&
     flow.phase !== "saved" &&
     (discarded > 0 || draft.candidates.length > 1 || sourceHasContent);
   const status =

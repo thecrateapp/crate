@@ -363,6 +363,56 @@ describe("mergeImportedDraft", () => {
     expect(again).toBe(first);
   });
 
+  // AddShowSheet reads «the import added nothing» from this identity, so a
+  // standing review of the selection survives the re-import.
+  it("returns the very draft, selection included, when it holds every imported show", () => {
+    const draft: ShowDraftState = {
+      candidates: [
+        candidate({
+          item_id: "kept-1",
+          artist_name: "Band",
+          date: "2027-03-02",
+          venue: "Hall",
+          city: "City",
+        }),
+        candidate({
+          item_id: "kept-2",
+          artist_name: "Band",
+          date: "2027-03-04",
+          venue: "Hall",
+          city: "City",
+          lineup: ["Support"],
+        }),
+      ],
+      selected: ["kept-2"],
+    };
+    const result = mergeImportedDraft(
+      draft,
+      imported({
+        draft_id: "again",
+        candidates: [
+          candidate({
+            item_id: "new-4",
+            artist_name: "band",
+            date: "2027-03-04",
+            venue: "Hall ",
+            city: "City",
+          }),
+          candidate({
+            item_id: "new-2",
+            artist_name: "Band",
+            date: "2027-03-02",
+            venue: "Hall",
+            city: "city",
+          }),
+        ],
+      }),
+    );
+    expect(result).toBe(draft);
+    expect(result.selected).toEqual(["kept-2"]);
+    expect(result.candidates[1]!.lineup).toEqual(["Support"]);
+  });
+
   it("compares trimmed, case-insensitive artist, date, time, venue and city", () => {
     const draft: ShowDraftState = {
       candidates: [

@@ -92,6 +92,8 @@ const TRUNCATED_TEXT =
   "Only the first 200 shows or 60,000 characters were read.";
 const NONE_FOUND_TEXT =
   "No shows found. Try another method or enter the show manually.";
+const NO_NEW_TEXT =
+  "No new shows. The dates Crate read are already in the draft.";
 const REOPENED_TEXT =
   "Import reopened. Saved shows stay linked; the rest are ready to review.";
 const UNFINISHED_TEXT =
@@ -122,10 +124,12 @@ function uniqueWarnings(warnings?: string[]): string[] {
   return [...new Set((warnings ?? []).filter((warning) => warning.trim()))];
 }
 
-function foundText(draft: ShowDraft): string {
+function foundText(draft: ShowDraft, added: boolean): string {
   const count = draft.candidates.length;
   if (count === 0) return NONE_FOUND_TEXT;
-  const found = `Found ${countLabel(count, "show")}. ${FOUND_TEXT}`;
+  const found = added
+    ? `Found ${countLabel(count, "show")}. ${FOUND_TEXT}`
+    : NO_NEW_TEXT;
   return draft.truncated ? `${found} ${TRUNCATED_TEXT}` : found;
 }
 
@@ -134,7 +138,8 @@ export function useShowSource({
   onDraft,
 }: {
   active: boolean;
-  onDraft: (draft: ShowDraft) => void;
+  /** Returns false when the draft already held every show the import read. */
+  onDraft: (draft: ShowDraft) => boolean | void;
 }): ShowSourceState {
   const [availability, setAvailability] = useState<ShowAvailability | null>(
     null,
@@ -371,9 +376,9 @@ export function useShowSource({
     // text Crate read stays in each row's evidence, so running the import
     // again never sends it back as if the editor had pasted it.
     if (draft?.candidates) {
-      onDraft({ ...draft, draft_id: execution?.draft_id });
+      const added = onDraft({ ...draft, draft_id: execution?.draft_id });
       setWarnings(uniqueWarnings(draft.warnings));
-      setStatus(foundText(draft));
+      setStatus(foundText(draft, added !== false));
     }
     if (job.status === "cancelled") {
       if (!draft?.candidates) setStatus(STOPPED_TEXT);

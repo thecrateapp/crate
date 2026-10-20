@@ -171,3 +171,36 @@ it("fills in a lone show without loading it and asks for the others", () => {
   ).toBeVisible();
   expect(api).not.toHaveBeenCalled();
 });
+
+it("writes the lone-show note into a status region that was already there", () => {
+  const observer = new MutationObserver(() => {});
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  render(<Harness onReview={vi.fn()} initialIds={[7]} />);
+  const records = observer.takeRecords();
+  observer.disconnect();
+  const status = screen.getByRole("status");
+  expect(status).toHaveTextContent(
+    "Add the IDs of the other shows to merge with this one.",
+  );
+  // The note changed the text of a region already in the page, which is
+  // what a screen reader announces; a region that mounts with its text
+  // stays silent.
+  expect(
+    records.some(
+      (record) =>
+        record.target === status || record.target.parentNode === status,
+    ),
+  ).toBe(true);
+});
+
+it("keeps the note's status region, empty, when there is nothing to say", async () => {
+  render(<Harness onReview={vi.fn()} initialIds={[7]} />);
+  const status = screen.getByRole("status");
+  await userEvent.setup().type(screen.getByLabelText("Show IDs"), ", 8");
+  expect(screen.getByRole("status")).toBe(status);
+  expect(status).toBeEmptyDOMElement();
+});
