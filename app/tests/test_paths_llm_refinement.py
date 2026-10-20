@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def pinned_legacy_refinement(monkeypatch):
+    from crate import music_paths_refinement as refinement
+    from tests.ai_consumer_fakes import pin_actions
+    from crate.ai import configuration
+
+    pin_actions(monkeypatch)
+    context = configuration.resolve_action("music_paths.refine")
+    monkeypatch.setattr(
+        refinement,
+        "resolve_call",
+        lambda *a, **k: {
+            "context": {**context, "mode": "legacy", "provider": "gemini"}
+        },
+    )
+    monkeypatch.setattr(refinement, "revalidate_call", lambda call: None)
+    monkeypatch.setattr(refinement, "get_setting", lambda key, default=None: default)
+    monkeypatch.setattr(refinement, "get_cache", lambda *a, **k: None)
+    monkeypatch.setattr(refinement, "set_cache", lambda *a, **k: None)
+
 
 def _track(
     track_id: int,
@@ -28,7 +51,7 @@ def _track(
 
 
 def test_llm_refinement_skips_when_no_llm_is_configured(monkeypatch):
-    from crate.db import paths_llm_refinement
+    from crate import music_paths_refinement as paths_llm_refinement
 
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
@@ -39,11 +62,13 @@ def test_llm_refinement_skips_when_no_llm_is_configured(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        paths_llm_refinement, "_llm_refinement_is_configured", lambda: False
+        paths_llm_refinement,
+        "resolve_call",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("unavailable")),
     )
     monkeypatch.setattr(
         paths_llm_refinement,
-        "ask_structured",
+        "execute_structured",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("LLM should not be called when refinement is unavailable")
         ),
@@ -56,14 +81,19 @@ def test_llm_refinement_skips_when_no_llm_is_configured(monkeypatch):
             origin_type="genre",
             dest_type="genre",
             tracks=tracks,
-            candidates_by_genre={"punk": tracks},
+            candidates_by_genre={
+                "punk": [
+                    *tracks,
+                    _track(4, title="Alternative", artist="Other", genre_slug="punk"),
+                ]
+            },
         )
         == tracks
     )
 
 
 def test_llm_refinement_skips_when_admin_setting_is_disabled(monkeypatch):
-    from crate.db import paths_llm_refinement
+    from crate import music_paths_refinement as paths_llm_refinement
 
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
@@ -82,15 +112,7 @@ def test_llm_refinement_skips_when_admin_setting_is_disabled(monkeypatch):
     )
     monkeypatch.setattr(
         paths_llm_refinement,
-        "get_config",
-        lambda: {"provider": "gemini", "model": "gemini/gemini-2.5-flash"},
-    )
-    monkeypatch.setattr(
-        paths_llm_refinement, "get_provider_api_key", lambda _provider: "key"
-    )
-    monkeypatch.setattr(
-        paths_llm_refinement,
-        "ask_structured",
+        "execute_structured",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("LLM should not be called when refinement is disabled")
         ),
@@ -103,14 +125,19 @@ def test_llm_refinement_skips_when_admin_setting_is_disabled(monkeypatch):
             origin_type="genre",
             dest_type="genre",
             tracks=tracks,
-            candidates_by_genre={"punk": tracks},
+            candidates_by_genre={
+                "punk": [
+                    *tracks,
+                    _track(4, title="Alternative", artist="Other", genre_slug="punk"),
+                ]
+            },
         )
         == tracks
     )
 
 
 def test_llm_refinement_skips_when_setting_store_is_unavailable(monkeypatch):
-    from crate.db import paths_llm_refinement
+    from crate import music_paths_refinement as paths_llm_refinement
 
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
@@ -127,7 +154,7 @@ def test_llm_refinement_skips_when_setting_store_is_unavailable(monkeypatch):
     )
     monkeypatch.setattr(
         paths_llm_refinement,
-        "ask_structured",
+        "execute_structured",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("LLM should not be called when settings are unavailable")
         ),
@@ -140,15 +167,20 @@ def test_llm_refinement_skips_when_setting_store_is_unavailable(monkeypatch):
             origin_type="genre",
             dest_type="genre",
             tracks=tracks,
-            candidates_by_genre={"punk": tracks},
+            candidates_by_genre={
+                "punk": [
+                    *tracks,
+                    _track(4, title="Alternative", artist="Other", genre_slug="punk"),
+                ]
+            },
         )
         == tracks
     )
 
 
 def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
-    from crate.db import paths_llm_refinement
-    from crate.db.paths_llm_refinement import (
+    from crate import music_paths_refinement as paths_llm_refinement
+    from crate.music_paths_refinement import (
         MusicPathLlmRefinementResponse,
         MusicPathReplacement,
     )
@@ -168,11 +200,11 @@ def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
     )
 
     monkeypatch.setattr(
-        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+        paths_llm_refinement, "_legacy_refinement_enabled", lambda context: True
     )
     monkeypatch.setattr(
         paths_llm_refinement,
-        "ask_structured",
+        "execute_structured",
         lambda *_args, **_kwargs: MusicPathLlmRefinementResponse(
             replacements=[
                 MusicPathReplacement(
@@ -199,8 +231,8 @@ def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
 
 
 def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
-    from crate.db import paths_llm_refinement
-    from crate.db.paths_llm_refinement import (
+    from crate import music_paths_refinement as paths_llm_refinement
+    from crate.music_paths_refinement import (
         MusicPathLlmRefinementResponse,
         MusicPathReplacement,
     )
@@ -222,7 +254,7 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
     calls = {"count": 0}
 
     monkeypatch.setattr(
-        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+        paths_llm_refinement, "_legacy_refinement_enabled", lambda context: True
     )
     monkeypatch.setattr(
         paths_llm_refinement, "get_cache", lambda key, **_kwargs: cache.get(key)
@@ -246,7 +278,7 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
             ],
         )
 
-    monkeypatch.setattr(paths_llm_refinement, "ask_structured", fake_ask)
+    monkeypatch.setattr(paths_llm_refinement, "execute_structured", fake_ask)
 
     for _ in range(2):
         refined = paths_llm_refinement.refine_music_path_with_llm(
@@ -263,8 +295,8 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
 
 
 def test_llm_refinement_ignores_anchor_and_missing_candidate_replacements(monkeypatch):
-    from crate.db import paths_llm_refinement
-    from crate.db.paths_llm_refinement import (
+    from crate import music_paths_refinement as paths_llm_refinement
+    from crate.music_paths_refinement import (
         MusicPathLlmRefinementResponse,
         MusicPathReplacement,
     )
@@ -278,11 +310,11 @@ def test_llm_refinement_ignores_anchor_and_missing_candidate_replacements(monkey
     ]
 
     monkeypatch.setattr(
-        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+        paths_llm_refinement, "_legacy_refinement_enabled", lambda context: True
     )
     monkeypatch.setattr(
         paths_llm_refinement,
-        "ask_structured",
+        "execute_structured",
         lambda *_args, **_kwargs: MusicPathLlmRefinementResponse(
             replacements=[
                 MusicPathReplacement(

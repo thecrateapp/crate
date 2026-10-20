@@ -142,19 +142,14 @@ def _build_quality_report(
 
 
 def listen_i18n_ai_is_configured() -> bool:
-    try:
-        from crate.llm import get_config, get_provider_api_key
+    from crate.ai.runtime import action_availability
 
-        config = get_config()
-    except Exception:
+    state = action_availability("i18n.listen.draft")
+    if not state["available"]:
         return False
-
-    provider = str(config.get("provider") or "").strip()
-    if not provider:
-        return False
-    if provider == "ollama":
+    if state["status"] == "legacy" and state["provider"] == "ollama":
         return _ollama_i18n_ai_is_explicitly_enabled()
-    return bool(get_provider_api_key(provider))
+    return True
 
 
 def _ollama_i18n_ai_is_explicitly_enabled() -> bool:
@@ -192,10 +187,27 @@ def _queue_translation_draft_if_needed(
             or request
         )
 
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
+
+    try:
+        accepted = accept_action("i18n.listen.draft")
+    except AIConfigurationError:
+        return (
+            update_translation_request_status(
+                app=app,
+                locale=locale,
+                source_version=source_version,
+                status="manual_required",
+            )
+            or request
+        )
+
     params: dict[str, Any] = {
         "app": app,
         "locale": locale,
         "source_version": source_version,
+        "ai_acceptance": accepted,
     }
     if keys:
         params["keys"] = keys

@@ -74,3 +74,36 @@ export function buildUpcomingCityOptions<T extends UpcomingFilterItem>(
       countB - countA || cityA.localeCompare(cityB),
   );
 }
+
+export interface UpcomingShowRef {
+  type: "release" | "show";
+  artist: string;
+  date: string;
+  show_id?: number;
+}
+
+/**
+ * A show and the other listed shows that look like the same performance:
+ * the same artist (trimmed, case-insensitive) on the same date. The show
+ * itself comes first; at most `limit` IDs, as the merge editor takes.
+ */
+export function sameShowIds<T extends UpcomingShowRef>(
+  items: T[],
+  show: T,
+  limit = 10,
+): number[] {
+  if (show.show_id === undefined) return [];
+  const artist = normalize(show.artist);
+  const ids = [show.show_id];
+  for (const item of items) {
+    if (
+      item.type === "show" &&
+      item.show_id !== undefined &&
+      !ids.includes(item.show_id) &&
+      item.date === show.date &&
+      normalize(item.artist) === artist
+    )
+      ids.push(item.show_id);
+  }
+  return ids.slice(0, limit);
+}

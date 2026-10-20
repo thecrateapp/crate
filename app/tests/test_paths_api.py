@@ -51,9 +51,9 @@ class TestCreatePath:
     def test_creates_path(self, test_app):
         result = _make_mock_path()
         with (
-            patch("crate.db.paths.resolve_endpoint_label", return_value="Tool"),
+            patch("crate.db.paths_compute.resolve_endpoint_label", return_value="Tool"),
             patch(
-                "crate.db.paths.create_music_path", return_value=result
+                "crate.music_paths.create_music_path", return_value=result
             ) as mock_create,
         ):
             resp = test_app.post("/api/paths", json=_make_path_payload())
@@ -63,6 +63,7 @@ class TestCreatePath:
         assert data["id"] == 1
         assert data["name"] == "Test Path"
         mock_create.assert_called_once()
+        assert mock_create.call_args.kwargs["user_id"] == 1
 
     def test_creates_path_with_waypoints(self, test_app):
         result = _make_mock_path()
@@ -73,9 +74,9 @@ class TestCreatePath:
             ]
         )
         with (
-            patch("crate.db.paths.resolve_endpoint_label", return_value="Tool"),
+            patch("crate.db.paths_compute.resolve_endpoint_label", return_value="Tool"),
             patch(
-                "crate.db.paths.create_music_path", return_value=result
+                "crate.music_paths.create_music_path", return_value=result
             ) as mock_create,
         ):
             resp = test_app.post("/api/paths", json=payload)
@@ -92,11 +93,11 @@ class TestCreatePath:
         del payload["name"]
         with (
             patch(
-                "crate.db.paths.resolve_endpoint_label",
+                "crate.db.paths_compute.resolve_endpoint_label",
                 side_effect=["Tool", "Post-Hardcore"],
             ),
             patch(
-                "crate.db.paths.create_music_path", return_value=result
+                "crate.music_paths.create_music_path", return_value=result
             ) as mock_create,
         ):
             resp = test_app.post("/api/paths", json=payload)
@@ -107,8 +108,8 @@ class TestCreatePath:
 
     def test_returns_422_when_computation_fails(self, test_app):
         with (
-            patch("crate.db.paths.resolve_endpoint_label", return_value="Tool"),
-            patch("crate.db.paths.create_music_path", return_value=None),
+            patch("crate.db.paths_compute.resolve_endpoint_label", return_value="Tool"),
+            patch("crate.music_paths.create_music_path", return_value=None),
         ):
             resp = test_app.post("/api/paths", json=_make_path_payload())
 
@@ -126,9 +127,9 @@ class TestCreatePath:
         result = _make_mock_path()
         payload = _make_path_payload(step_count=5)
         with (
-            patch("crate.db.paths.resolve_endpoint_label", return_value="Tool"),
+            patch("crate.db.paths_compute.resolve_endpoint_label", return_value="Tool"),
             patch(
-                "crate.db.paths.create_music_path", return_value=result
+                "crate.music_paths.create_music_path", return_value=result
             ) as mock_create,
         ):
             resp = test_app.post("/api/paths", json=payload)
@@ -137,9 +138,9 @@ class TestCreatePath:
 
         payload_max = _make_path_payload(step_count=100)
         with (
-            patch("crate.db.paths.resolve_endpoint_label", return_value="Tool"),
+            patch("crate.db.paths_compute.resolve_endpoint_label", return_value="Tool"),
             patch(
-                "crate.db.paths.create_music_path", return_value=result
+                "crate.music_paths.create_music_path", return_value=result
             ) as mock_create,
         ):
             resp = test_app.post("/api/paths", json=payload_max)
@@ -148,7 +149,7 @@ class TestCreatePath:
 
     def test_rejects_invalid_endpoint_type(self, test_app):
         payload = _make_path_payload(origin={"type": "invalid", "value": "x"})
-        with patch("crate.db.paths.create_music_path", return_value=None):
+        with patch("crate.music_paths.create_music_path", return_value=None):
             resp = test_app.post("/api/paths", json=payload)
         assert resp.status_code == 422
 
@@ -255,7 +256,7 @@ class TestRegeneratePath:
     def test_regenerates_path(self, test_app):
         result = _make_mock_path(id=3)
         with patch(
-            "crate.db.paths.regenerate_music_path", return_value=result
+            "crate.music_paths.regenerate_music_path", return_value=result
         ) as mock_regen:
             resp = test_app.post("/api/paths/3/regenerate")
 
@@ -265,7 +266,7 @@ class TestRegeneratePath:
         mock_regen.assert_called_once_with(3, 1)
 
     def test_regeneration_fails(self, test_app):
-        with patch("crate.db.paths.regenerate_music_path", return_value=None):
+        with patch("crate.music_paths.regenerate_music_path", return_value=None):
             resp = test_app.post("/api/paths/3/regenerate")
 
         assert resp.status_code == 404
@@ -295,7 +296,7 @@ class TestPreviewPath:
             "total_distance": 0.12,
         }
         with patch(
-            "crate.db.paths.preview_music_path", return_value=result
+            "crate.music_paths.preview_music_path", return_value=result
         ) as mock_preview:
             resp = test_app.post(
                 "/api/paths/preview",
@@ -311,11 +312,12 @@ class TestPreviewPath:
         assert len(data["tracks"]) == 1
         assert data["tracks"][0]["title"] == "Schism"
         mock_preview.assert_called_once()
+        assert mock_preview.call_args.kwargs["user_id"] == 1
 
     def test_preview_with_waypoints(self, test_app):
         result = {"tracks": [], "total_distance": 0}
         with patch(
-            "crate.db.paths.preview_music_path", return_value=result
+            "crate.music_paths.preview_music_path", return_value=result
         ) as mock_preview:
             resp = test_app.post(
                 "/api/paths/preview",
@@ -333,7 +335,7 @@ class TestPreviewPath:
         assert args["waypoints"][0] == {"type": "album", "value": "14"}
 
     def test_preview_computation_fails(self, test_app):
-        with patch("crate.db.paths.preview_music_path", return_value=None):
+        with patch("crate.music_paths.preview_music_path", return_value=None):
             resp = test_app.post(
                 "/api/paths/preview",
                 json={

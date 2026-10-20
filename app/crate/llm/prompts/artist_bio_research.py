@@ -196,6 +196,7 @@ def consolidate_artist_bio(
     artist_context: dict[str, object],
     sources: list[dict[str, object]],
     language: str = "English",
+    ai_call: dict | None = None,
 ) -> ArtistBioResearchResponse:
     from crate.llm import ask_structured
 
@@ -209,4 +210,7 @@ def consolidate_artist_bio(
             language=language,
         ),
         system=ARTIST_BIO_RESEARCH_SYSTEM_PROMPT,
+        action_id="artists.bio.research",
+        private_response=True,
+        **(ai_call or {}),
     )

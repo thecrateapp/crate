@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
+from crate.ai.consumers import item_call, revalidate_call
 from crate.db.queries.genres_graph_related import (
     get_genre_cooccurring_album_slugs,
     get_genre_cooccurring_artist_slugs,
@@ -104,7 +105,9 @@ def _rank_candidate_targets(
     return sorted(targets, key=score)
 
 
-def build_genre_taxonomy_node_proposal(slug: str) -> dict:
+def build_genre_taxonomy_node_proposal(
+    slug: str, *, ai_call: dict | None = None
+) -> dict:
     canonical_slug = _normalize_slug(slug)
     catalog = get_genre_catalog()
     node = catalog.get(canonical_slug)
@@ -182,8 +185,10 @@ def build_genre_taxonomy_node_proposal(slug: str) -> dict:
         artist_count=artist_count,
         album_count=album_count,
         candidate_targets=candidate_targets,
+        ai_call=ai_call,
     )
 
+    revalidate_call(ai_call)
     relation_proposals = []
     for suggestion in response.relations:
         relation_type = suggestion.relation_type
@@ -275,6 +280,7 @@ def build_genre_taxonomy_rebuild_proposal(
     aggressive: bool = True,
     progress_callback=None,
     event_callback=None,
+    ai_call: dict | None = None,
 ) -> dict:
     """Build a review-only taxonomy rebuild proposal.
 
@@ -366,7 +372,9 @@ def build_genre_taxonomy_rebuild_proposal(
         if event_callback:
             event_callback({"message": f"Building node proposal for {slug}"})
         try:
-            proposal = build_genre_taxonomy_node_proposal(slug)
+            proposal = build_genre_taxonomy_node_proposal(
+                slug, ai_call=item_call(ai_call, slug)
+            )
             if proposal.get("ok"):
                 node_proposals.append(proposal)
             else:

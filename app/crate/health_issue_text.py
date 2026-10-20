@@ -11,6 +11,12 @@ from typing import Any
 def health_issue_identity(
     check_type: str, details: dict[str, Any] | None, description: str = ""
 ) -> str:
+    if check_type == "has_photo_desync" and details:
+        details = {
+            key: value
+            for key, value in details.items()
+            if key not in {"artist_uid", "folder_name", "filesystem_fingerprint"}
+        }
     payload = (
         json.dumps(details, sort_keys=True, default=str) if details else description
     )

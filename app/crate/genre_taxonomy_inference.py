@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 import logging
 import re
 
+from crate.ai.consumers import item_call, revalidate_call
 from crate.db.genres import (
     get_genre_cooccurring_album_slugs,
     get_genre_cooccurring_artist_slugs,
@@ -368,6 +369,7 @@ def _infer_and_store_node_description(
     canonical_slug: str,
     *,
     seed_artists: list[str] | None = None,
+    ai_call: dict | None = None,
 ) -> dict:
     """Generate and persist a missing description for one taxonomy node.
 
@@ -410,6 +412,7 @@ def _infer_and_store_node_description(
             related_genres=related_names,
             aliases=list(node.get("aliases") or []),
             seed_artists=seed_artists or [],
+            ai_call=item_call(ai_call, canonical_slug),
         )
     except Exception as exc:
         log.warning(
@@ -428,6 +431,7 @@ def _infer_and_store_node_description(
     if not description:
         return {"slug": canonical_slug, "updated": False, "reason": "empty_response"}
 
+    revalidate_call(ai_call)
     updated = update_genre_node_description(
         canonical_slug,
         description,
@@ -449,6 +453,7 @@ def infer_genre_taxonomy_batch(
     include_external: bool = True,
     progress_callback=None,
     event_callback=None,
+    ai_call: dict | None = None,
 ) -> dict:
     unmapped = _list_unmapped_genres(limit=limit, focus_slug=focus_slug)
     total = len(unmapped)
@@ -473,7 +478,9 @@ def infer_genre_taxonomy_batch(
         )
 
     if total == 0 and focus_slug and focus_slug in get_genre_catalog():
-        description_result = _infer_and_store_node_description(focus_slug)
+        description_result = _infer_and_store_node_description(
+            focus_slug, ai_call=ai_call
+        )
         described_slugs.add(focus_slug)
         if description_result.get("updated"):
             descriptions_updated += 1
@@ -552,6 +559,7 @@ def infer_genre_taxonomy_batch(
                 description_result = _infer_and_store_node_description(
                     canonical_slug,
                     seed_artists=evidence.artists,
+                    ai_call=ai_call,
                 )
                 described_slugs.add(canonical_slug)
                 if description_result.get("updated"):

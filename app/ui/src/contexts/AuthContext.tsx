@@ -33,6 +33,7 @@ export interface RolePreset {
 }
 
 export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
+  "ai.config.read",
   "ops.health.view",
   "ops.logs.view",
   "ops.tasks.manage",
@@ -42,6 +43,8 @@ export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
   "audit.view",
   "users.view",
   "roles.view",
+  "agents.integrations.manage",
+  "agents.plans.review",
   "library.metadata.write",
   "library.analysis.manage",
   "library.track.remove",

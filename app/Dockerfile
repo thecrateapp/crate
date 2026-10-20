@@ -28,6 +28,7 @@ FROM base AS worker-core-deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libchromaprint-tools \
+    tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-api.txt requirements-worker-core.txt .

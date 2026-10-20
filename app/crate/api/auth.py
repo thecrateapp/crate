@@ -8,12 +8,14 @@ from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Literal, TypedDict, overload
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from uuid import UUID
 
 import jwt
 import requests
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import cookie_parser
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -1031,13 +1033,35 @@ def _callback_origin(return_to: str | None = None, *, app_id: str | None = None)
     return f"https://admin.{domain}"
 
 
+def _is_mcp_return_to(return_to: str) -> bool:
+    from crate.mcp.oauth_config import oauth_enabled, oauth_settings
+
+    if "#" in return_to or any(
+        ord(char) < 33 or ord(char) == 127 for char in return_to
+    ):
+        return False
+    try:
+        issuer = oauth_settings().issuer
+    except ValueError:
+        return False
+    paths = ["/oauth/connections"]
+    if oauth_enabled():
+        paths.append("/oauth/authorize")
+    return any(
+        return_to == issuer + path or return_to.startswith(issuer + path + "?")
+        for path in paths
+    )
+
+
 def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> str:
-    """Validate return_to against allowed origins. Returns safe URL or fallback."""
+    """Allow frontend origins and exact configured MCP human destinations."""
     if not return_to:
         return "/"
     if native_oauth_auth.is_native_callback_url(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
+        return return_to
+    if _is_mcp_return_to(return_to):
         return return_to
     if return_to.startswith(("http://", "https://")):
         parts = return_to.split("/", 3)
@@ -1491,6 +1515,43 @@ _AUTH_ADMIN_RESPONSES = merge_responses(
 # ── Middleware ───────────────────────────────────────────────────
 
 
+def _is_agent_resource(path: str) -> bool:
+    path = path.rstrip("/")
+    if path == "/mcp":
+        return True
+    if not path.startswith("/mcp/artifacts/"):
+        return False
+    identifier = path.removeprefix("/mcp/artifacts/")
+    try:
+        return str(UUID(identifier)) == identifier.lower()
+    except ValueError:
+        return False
+
+
+def _has_machine_credential(request: Request) -> bool:
+    credentials = request.headers.getlist("Authorization")
+    credentials.extend(
+        value
+        for name, value in request.query_params.multi_items()
+        if name in {"token", "media_ticket"}
+    )
+    cookie_names = {
+        COOKIE_NAME,
+        COOKIE_NAME_LISTEN,
+        COOKIE_NAME_LISTEN_REFRESH,
+        "crate_token",
+    }
+    # Inspect each value before normal cookie lookup collapses duplicate names.
+    for header in request.headers.getlist("Cookie"):
+        for cookie in header.split(";"):
+            credentials.extend(
+                value
+                for name, value in cookie_parser(cookie).items()
+                if name in cookie_names
+            )
+    return any("crate_mcp_" in value for value in credentials)
+
+
 class AuthMiddleware:
     """Resolve auth via Bearer header, query param, or cookie (in that order).
 
@@ -1576,6 +1637,9 @@ class AuthMiddleware:
         return self._access_token_user(resolve_access_token_by_id(token_id))
 
     async def resolve_user(self, request: Request) -> dict | None:
+        # Machine credentials never participate in the human fallback chain.
+        if _is_agent_resource(request.url.path) or _has_machine_credential(request):
+            return None
         user = None
 
         # 1. Bearer token auth (primary for all clients)
@@ -1674,6 +1738,14 @@ class AuthMiddleware:
             return
 
         request = Request(scope, receive=receive)
+        if not _is_agent_resource(request.url.path) and _has_machine_credential(
+            request
+        ):
+            response = JSONResponse(
+                {"error": "MCP_CREDENTIAL_WRONG_RESOURCE"}, status_code=401
+            )
+            await response(scope, receive, send)
+            return
         scope.setdefault("state", {})
         user = await self.resolve_user(request)
         if user and user.get("auth_type") == "access_token":
@@ -2779,7 +2851,7 @@ def oauth_callback(
     if safe_return.startswith("http"):
         redirect_url = _post_auth_redirect_url(safe_return, token)
         access_expires_at = _access_expires_at_from_token(token)
-        if access_expires_at:
+        if access_expires_at and not _is_mcp_return_to(safe_return):
             redirect_url = _append_query_param(
                 redirect_url, "access_expires_at", _iso_datetime(access_expires_at)
             )

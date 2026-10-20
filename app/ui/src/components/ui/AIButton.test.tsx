@@ -3,16 +3,16 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AIButton } from "./AIButton";
 
-const { useLLMStatusMock } = vi.hoisted(() => ({
-  useLLMStatusMock: vi.fn(),
+const { useActionLLMStatusMock } = vi.hoisted(() => ({
+  useActionLLMStatusMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
-  useLLMStatus: useLLMStatusMock,
+  useActionLLMStatus: useActionLLMStatusMock,
 }));
 
 beforeEach(() => {
-  useLLMStatusMock.mockReturnValue({
+  useActionLLMStatusMock.mockReturnValue({
     available: true,
     model: "test-model",
     provider: "test",
@@ -21,21 +21,21 @@ beforeEach(() => {
 
 describe("AIButton", () => {
   it("renders children", () => {
-    render(<AIButton>Generate</AIButton>);
+    render(<AIButton actionId="genres.eq.propose">Generate</AIButton>);
     expect(
       screen.getByRole("button", { name: /Generate/i }),
     ).toBeInTheDocument();
   });
 
   it("does not render when the LLM is unavailable", () => {
-    useLLMStatusMock.mockReturnValue({
+    useActionLLMStatusMock.mockReturnValue({
       available: false,
       model: "",
       provider: "",
       error: "LLM provider is not configured",
     });
 
-    render(<AIButton>Generate</AIButton>);
+    render(<AIButton actionId="genres.eq.propose">Generate</AIButton>);
 
     expect(
       screen.queryByRole("button", { name: /Generate/i }),
@@ -45,7 +45,7 @@ describe("AIButton", () => {
   it("keeps the standard admin button sizing", () => {
     render(
       <div className="h-20">
-        <AIButton>Research with AI</AIButton>
+        <AIButton actionId="genres.eq.propose">Research with AI</AIButton>
       </div>,
     );
 
@@ -57,25 +57,41 @@ describe("AIButton", () => {
   });
 
   it("shows spinner when loading", () => {
-    render(<AIButton loading>Generate</AIButton>);
+    render(
+      <AIButton actionId="genres.eq.propose" loading>
+        Generate
+      </AIButton>,
+    );
     expect(screen.getByRole("button").querySelector("svg")).toHaveClass(
       "animate-spin",
     );
   });
 
   it("is disabled when loading", () => {
-    render(<AIButton loading>Generate</AIButton>);
+    render(
+      <AIButton actionId="genres.eq.propose" loading>
+        Generate
+      </AIButton>,
+    );
     expect(screen.getByRole("button")).toBeDisabled();
   });
 
   it("is disabled when disabled prop is true", () => {
-    render(<AIButton disabled>Generate</AIButton>);
+    render(
+      <AIButton actionId="genres.eq.propose" disabled>
+        Generate
+      </AIButton>,
+    );
     expect(screen.getByRole("button")).toBeDisabled();
   });
 
   it("calls onClick when clicked", async () => {
     const handleClick = vi.fn();
-    render(<AIButton onClick={handleClick}>Generate</AIButton>);
+    render(
+      <AIButton actionId="genres.eq.propose" onClick={handleClick}>
+        Generate
+      </AIButton>,
+    );
     await userEvent.click(screen.getByRole("button"));
     expect(handleClick).toHaveBeenCalledTimes(1);
   });

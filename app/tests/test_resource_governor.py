@@ -1,5 +1,20 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def env_policy_without_database(monkeypatch):
+    @contextmanager
+    def legacy_env_scope():
+        yield None
+
+    monkeypatch.setattr(
+        "crate.resource_governor._runtime_policy_scope", legacy_env_scope
+    )
+
 
 def test_resource_governor_defers_governed_task_when_load_is_high(monkeypatch):
     from crate import resource_governor as governor

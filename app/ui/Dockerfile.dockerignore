@@ -1,16 +1,21 @@
-node_modules/
-dist/
-__pycache__/
-*.pyc
-.git/
-bin/
-crate/
-tests/
-scripts/
-config.yaml
-requirements.txt
-Dockerfile
-listen/node_modules/
-listen/dist/
-shared/ui/node_modules/
-shared/ui/dist/
+# The admin image builds with the repository root as context (CI and compose)
+# so it can install from the root package-lock.json. BuildKit uses this file
+# instead of a root .dockerignore. It is an allowlist: only the root manifest
+# and lockfile, app/ui and the shared code the admin imports are sent. data/,
+# media/, test-music/, .git/, .env and the other apps never leave the host.
+*
+!package.json
+!package-lock.json
+!app/ui/
+!app/shared/ui/
+!app/shared/web/
+!app/shared/fonts/
+
+# Installed and generated output, even inside the allowed folders.
+**/node_modules/
+**/dist/
+**/coverage/
+**/.vite/
+**/*.tsbuildinfo
+**/.env
+**/.env.*

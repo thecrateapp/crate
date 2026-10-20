@@ -1,4 +1,6 @@
 import manifest from "../../../docs/manifest.json";
+import mcpContractUrl from "../../../docs/technical/crate-mcp-v1.json?url";
+import mcpLoadEvidenceUrl from "../../../docs/technical/crate-mcp-phase7-load.json?url";
 
 import { slugify } from "@/lib/utils";
 
@@ -38,6 +40,10 @@ interface ManifestDoc {
 type MarkdownLoader = () => Promise<string>;
 
 const loaders: Record<string, MarkdownLoader> = {
+  "docs/technical/ai-agents.md": () =>
+    import("../../../docs/technical/ai-agents.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/smart-mix-design.md": () =>
     import("../../../docs/technical/smart-mix-design.md?raw").then(
       (module) => module.default,
@@ -77,35 +83,47 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/03-worker-tasks-and-background-services.md": () =>
-    import(
-      "../../../docs/technical/03-worker-tasks-and-background-services.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/03-worker-tasks-and-background-services.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/04-library-storage-sync-and-imports.md": () =>
-    import(
-      "../../../docs/technical/04-library-storage-sync-and-imports.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/04-library-storage-sync-and-imports.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/05-enrichment-acquisition-and-integrations.md": () =>
-    import(
-      "../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/06-audio-analysis-similarity-and-discovery.md": () =>
-    import(
-      "../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/07-auth-users-social-and-sessions.md": () =>
-    import(
-      "../../../docs/technical/07-auth-users-social-and-sessions.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/07-auth-users-social-and-sessions.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/08-frontends-admin-and-listen.md": () =>
     import("../../../docs/technical/08-frontends-admin-and-listen.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/09-playback-realtime-and-subsonic.md": () =>
-    import(
-      "../../../docs/technical/09-playback-realtime-and-subsonic.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/09-playback-realtime-and-subsonic.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/opensubsonic.md": () =>
     import("../../../docs/technical/opensubsonic.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/11-crate-mcp.md": () =>
+    import("../../../docs/technical/11-crate-mcp.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-mcp.md": () =>
+    import("../../../docs/technical/crate-mcp.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-mcp-distribution.md": () =>
+    import("../../../docs/technical/crate-mcp-distribution.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/tauri-desktop-support.md": () =>
@@ -121,9 +139,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/10-development-deployment-and-operations.md": () =>
-    import(
-      "../../../docs/technical/10-development-deployment-and-operations.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/10-development-deployment-and-operations.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/artist-hero-theming-rollout.md": () =>
     import("../../../docs/technical/artist-hero-theming-rollout.md?raw").then(
       (module) => module.default,
@@ -161,9 +179,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-production-acceptance.md": () =>
-    import(
-      "../../../docs/technical/federation-production-acceptance.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/federation-production-acceptance.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/federation-protocol.md": () =>
     import("../../../docs/technical/federation-protocol.md?raw").then(
       (module) => module.default,
@@ -173,17 +191,17 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-streaming-benchmark.md": () =>
-    import(
-      "../../../docs/technical/federation-streaming-benchmark.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/federation-streaming-benchmark.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/federation-threat-model.md": () =>
     import("../../../docs/technical/federation-threat-model.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/federation-upgrade-and-rollback.md": () =>
-    import(
-      "../../../docs/technical/federation-upgrade-and-rollback.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/federation-upgrade-and-rollback.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/operations.md": () =>
     import("../../../docs/technical/operations.md?raw").then(
       (module) => module.default,
@@ -193,9 +211,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/listen-design-system-visual-qa.md": () =>
-    import(
-      "../../../docs/technical/listen-design-system-visual-qa.md?raw"
-    ).then((module) => module.default),
+    import("../../../docs/technical/listen-design-system-visual-qa.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,
@@ -204,6 +222,11 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/storage-retention.md?raw").then(
       (module) => module.default,
     ),
+};
+
+const documentAssets: Record<string, string> = {
+  "docs/technical/crate-mcp-v1.json": mcpContractUrl,
+  "docs/technical/crate-mcp-phase7-load.json": mcpLoadEvidenceUrl,
 };
 
 export interface DocEntry extends ManifestDoc {
@@ -375,9 +398,12 @@ export function resolveDocHref(sourcePath: string, href: string): string {
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) return href;
 
   const [target, fragment] = href.split("#", 2);
-  if (!target?.endsWith(".md")) return href;
+  if (!target) return href;
 
   const targetPath = resolveSourcePath(sourcePath, target);
+  const asset = documentAssets[targetPath];
+  if (asset) return `${asset}${fragment ? `#${fragment}` : ""}`;
+  if (!target.endsWith(".md")) return href;
   const targetDoc = docs.find((doc) => doc.sourcePath === targetPath);
   if (!targetDoc) return href;
   return `${targetDoc.route}${fragment ? `#${fragment}` : ""}`;

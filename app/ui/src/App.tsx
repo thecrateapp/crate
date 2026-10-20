@@ -60,8 +60,37 @@ const Users = lazy(() =>
 const Roles = lazy(() =>
   import("@/pages/Roles").then((m) => ({ default: m.Roles })),
 );
+const AgentConnections = lazy(() =>
+  import("@/pages/agents/AgentConnections").then((m) => ({
+    default: m.AgentConnections,
+  })),
+);
+const AgentPlanDetail = lazy(() =>
+  import("@/pages/agents/AgentPlanDetail").then((m) => ({
+    default: m.AgentPlanDetail,
+  })),
+);
+const AgentApprovals = lazy(() =>
+  import("@/pages/agents/AgentApprovals").then((m) => ({
+    default: m.AgentApprovals,
+  })),
+);
+const Agents = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({ default: m.Agents })),
+);
+const AgentsIndex = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({ default: m.AgentsIndex })),
+);
+const LegacyPlanRedirect = lazy(() =>
+  import("@/pages/agents/Agents").then((m) => ({
+    default: m.LegacyPlanRedirect,
+  })),
+);
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
+);
+const AiModels = lazy(() =>
+  import("@/pages/AiModels").then((m) => ({ default: m.AiModels })),
 );
 const Settings = lazy(() =>
   import("@/pages/Settings").then((m) => ({ default: m.Settings })),
@@ -144,7 +173,12 @@ function AdminIndex() {
   if (hasCapability("ops.logs.view")) return <Navigate to="/logs" replace />;
   if (hasCapability("ops.health.view"))
     return <Navigate to="/system" replace />;
+  if (hasCapability("agents.integrations.manage"))
+    return <Navigate to="/agents/connections" replace />;
+  if (hasCapability("agents.plans.review"))
+    return <Navigate to="/agents/approvals" replace />;
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
+  if (hasCapability("ai.config.read")) return <Navigate to="/ai" replace />;
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
       <p className="text-lg font-semibold text-foreground">
@@ -178,6 +212,12 @@ const SETTINGS_MANAGE = ["settings.manage"] as const;
 const LIBRARY_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const USERS_VIEW = ["users.view"] as const;
 const ROLES_VIEW = ["roles.view"] as const;
+const AGENT_INTEGRATIONS = ["agents.integrations.manage"] as const;
+const AGENT_PLANS = ["agents.plans.review"] as const;
+const AGENTS_SECTION = [
+  "agents.plans.review",
+  "agents.integrations.manage",
+] as const;
 const ADMIN_ACCESS = ["admin.access"] as const;
 const RELEASE_CURATION = [
   "curation.releases.write",
@@ -218,6 +258,48 @@ export default function App() {
                 }
               >
                 <Route index element={<AdminIndex />} />
+                <Route
+                  path="agents"
+                  element={
+                    <RequireCapabilities anyOf={AGENTS_SECTION}>
+                      <Agents />
+                    </RequireCapabilities>
+                  }
+                >
+                  <Route index element={<AgentsIndex />} />
+                  <Route
+                    path="approvals"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_PLANS}>
+                        <AgentApprovals />
+                      </RequireCapabilities>
+                    }
+                  />
+                  <Route
+                    path="approvals/:planId"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_PLANS}>
+                        <AgentPlanDetail />
+                      </RequireCapabilities>
+                    }
+                  />
+                  <Route
+                    path="connections"
+                    element={
+                      <RequireCapabilities anyOf={AGENT_INTEGRATIONS}>
+                        <AgentConnections />
+                      </RequireCapabilities>
+                    }
+                  />
+                </Route>
+                <Route
+                  path="agent-plans/:planId?"
+                  element={<LegacyPlanRedirect />}
+                />
+                <Route
+                  path="agent-integrations"
+                  element={<Navigate to="/agents/connections" replace />}
+                />
                 <Route
                   path="browse"
                   element={
@@ -407,6 +489,22 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={ADMIN_ACCESS}>
                       <I18nReview />
+                    </RequireCapabilities>
+                  }
+                />
+                {/* TEST_GAP: App's route table needs the full provider stack
+                    (BrowserRouter, AuthProvider, the ops SSE stream), so this
+                    one-line redirect is not unit-tested, like the redirects
+                    above. /ai itself is gated by ai.config.read. */}
+                <Route
+                  path="ai-agents"
+                  element={<Navigate to="/ai" replace />}
+                />
+                <Route
+                  path="ai"
+                  element={
+                    <RequireCapabilities anyOf={["ai.config.read"]}>
+                      <AiModels />
                     </RequireCapabilities>
                   }
                 />

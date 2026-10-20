@@ -91,14 +91,37 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
 
     p = TaskProgress(phase="analytics", phase_count=2)
 
+    class CancellationObserved(Exception):
+        pass
+
     def _progress(data):
+        if is_cancelled(task_id):
+            raise CancellationObserved()
         p.done = data.get("artists_done", p.done)
         p.total = data.get("artists_total", p.total)
         p.item = data.get("artist", p.item)
         emit_progress(task_id, p)
 
     emit_progress(task_id, p, force=True)
-    data = compute_analytics(lib, exts, progress_callback=_progress, incremental=True)
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "cancelled", "effects": "not_started"},
+        }
+    try:
+        data = compute_analytics(
+            lib, exts, progress_callback=_progress, incremental=True
+        )
+    except CancellationObserved:
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
     set_cache("analytics", data, ttl=3600)
 
     p.phase = "stats"
@@ -110,6 +133,15 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
     artists = albums = tracks = total_size = 0
     formats: dict[str, int] = {}
     for artist_dir in lib.iterdir():
+        if is_cancelled(task_id):
+            return {
+                "status": "cancelled",
+                "execution": {
+                    "status": "partial",
+                    "analytics_cache_updated": True,
+                    "artists_scanned": artists,
+                },
+            }
         if not artist_dir.is_dir() or artist_dir.name.startswith("."):
             continue
         artists += 1
@@ -473,6 +505,8 @@ def _chunk_coordinator(
     )
 
     for index, chunk in enumerate(chunks):
+        if is_cancelled(task_id):
+            break
         create_task(
             chunk_task_type,
             {"artists": chunk, "chunk_index": index, "total_chunks": len(chunks)},
@@ -739,6 +773,14 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
+    from crate.ai.consumers import resume_action, revalidate_call
+
+    ai_call = resume_action(
+        "genres.description.generate",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     limit = max(
         1,
@@ -777,7 +819,9 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
         include_external=include_external,
         progress_callback=_tax_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     emit_task_event(
         task_id,
         "info",
@@ -795,6 +839,14 @@ def _handle_rebuild_genre_taxonomy_proposals(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
+    from crate.ai.consumers import resume_action, revalidate_call
+
+    ai_call = resume_action(
+        "genres.taxonomy.propose",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     alias_limit = max(
         1,
@@ -846,7 +898,9 @@ def _handle_rebuild_genre_taxonomy_proposals(
         aggressive=aggressive,
         progress_callback=_proposal_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     summary = result.get("summary") or {}
     emit_task_event(
         task_id,

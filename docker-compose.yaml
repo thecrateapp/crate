@@ -260,8 +260,23 @@ services:
     group_add:
       - "${DOCKER_GID:-988}"
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=api
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      - CRATE_MCP_ALLOWED_HOSTS=${CRATE_MCP_ALLOWED_HOSTS:-}
+      - CRATE_MCP_ALLOWED_ORIGINS=${CRATE_MCP_ALLOWED_ORIGINS:-}
+      - CRATE_MCP_ADMIN_ORIGINS=${CRATE_MCP_ADMIN_ORIGINS:-}
+      - CRATE_MCP_OPS_FRESH_SECONDS=${CRATE_MCP_OPS_FRESH_SECONDS:-60}
+      - CRATE_MCP_OPS_STALE_SECONDS=${CRATE_MCP_OPS_STALE_SECONDS:-300}
+      - CRATE_MCP_HEARTBEAT_FRESH_SECONDS=${CRATE_MCP_HEARTBEAT_FRESH_SECONDS:-60}
+      - CRATE_MCP_HEALTH_FRESH_SECONDS=${CRATE_MCP_HEALTH_FRESH_SECONDS:-86400}
+      - CRATE_MCP_HEALTH_STALE_SECONDS=${CRATE_MCP_HEALTH_STALE_SECONDS:-604800}
       - SENTRY_DSN=${SENTRY_API_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
       - SENTRY_RELEASE=${SENTRY_RELEASE:-}
@@ -506,8 +521,15 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -657,6 +679,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=projector
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
       - SENTRY_SERVICE=projector
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -708,8 +731,15 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
@@ -834,6 +864,8 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
       - SENTRY_SERVICE=worker-analysis
@@ -1025,8 +1057,8 @@ services:
     logging: *default-logging
     image: ${CRATE_UI_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: ui/Dockerfile
+      context: .
+      dockerfile: app/ui/Dockerfile
       args:
         VITE_CARTO_API_KEY: ${VITE_CARTO_API_KEY:-}
     container_name: crate-ui
@@ -1048,8 +1080,8 @@ services:
     logging: *default-logging
     image: ${CRATE_LISTEN_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: listen/Dockerfile
+      context: .
+      dockerfile: app/listen/Dockerfile
       args:
         VITE_CRATE_CONNECT_FEATURE_ENABLED: ${CRATE_CONNECT_FEATURE_ENABLED:-false}
         VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${LISTEN_APPEARANCE_SETTINGS_ENABLED:-false}
@@ -1080,8 +1112,8 @@ services:
     logging: *default-logging
     image: ${CRATE_CAST_RECEIVER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-cast-receiver:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: cast-receiver/Dockerfile
+      context: .
+      dockerfile: app/cast-receiver/Dockerfile
       args:
         VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}

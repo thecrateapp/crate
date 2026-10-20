@@ -41,6 +41,8 @@ def serialize_task_surface(task: dict[str, Any]) -> dict[str, Any]:
         "created_at": task.get("created_at"),
         "started_at": task.get("started_at"),
         "updated_at": task.get("updated_at"),
+        "cancellation_requested_at": task.get("cancellation_requested_at"),
+        "cancellation_acknowledged_at": task.get("cancellation_acknowledged_at"),
     }
 
 
@@ -86,6 +88,14 @@ def build_tasks_surface_payload(limit: int = 100) -> dict[str, Any]:
             "systems": {"postgres": True, "watcher": True},
         }
 
+    from crate.db.queries.agent_runtime_policy import read_runtime_policy_state
+
+    policy = read_runtime_policy_state()
+    live["admission_policy"] = {
+        "max_running": policy["policy"]["max_running"],
+        "configured_revision": policy["configured_revision"],
+        "effective_revision": policy["effective_revision"],
+    }
     history = [serialize_task_surface(task) for task in list_tasks(limit=limit)]
     return {"live": live, "history": history}
 

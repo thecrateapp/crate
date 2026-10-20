@@ -202,6 +202,11 @@ _TAG_METADATA = [
         "description": "First-run setup and bootstrap helpers.",
     },
     {
+        "name": "agents",
+        "x-displayName": "Agent Integrations",
+        "description": "Human administration of service and delegated access, activity and exact plan decisions.",
+    },
+    {
         "name": "admin",
         "x-displayName": "System Playlists",
         "description": "Administrator-only curated/system playlist surfaces.",
@@ -257,6 +262,7 @@ _TAG_GROUPS = [
             "stack",
             "setup",
             "admin",
+            "agents",
         ],
     },
     {"name": "Compatibility", "tags": ["subsonic"]},
@@ -377,6 +383,7 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/missing-search",
         "/api/insights",
         "/api/shows",
+        "/api/show-imports",
         "/api/upcoming",
         "/api/network",
         "/api/batch",

@@ -106,6 +106,8 @@ services:
       target: api
     container_name: crate-dev-api
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -118,6 +120,19 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      - CRATE_MCP_ALLOWED_HOSTS=${CRATE_MCP_ALLOWED_HOSTS:-}
+      - CRATE_MCP_ALLOWED_ORIGINS=${CRATE_MCP_ALLOWED_ORIGINS:-}
+      - CRATE_MCP_ADMIN_ORIGINS=${CRATE_MCP_ADMIN_ORIGINS:-}
+      - CRATE_MCP_OPS_FRESH_SECONDS=${CRATE_MCP_OPS_FRESH_SECONDS:-60}
+      - CRATE_MCP_OPS_STALE_SECONDS=${CRATE_MCP_OPS_STALE_SECONDS:-300}
+      - CRATE_MCP_HEARTBEAT_FRESH_SECONDS=${CRATE_MCP_HEARTBEAT_FRESH_SECONDS:-60}
+      - CRATE_MCP_HEALTH_FRESH_SECONDS=${CRATE_MCP_HEALTH_FRESH_SECONDS:-86400}
+      - CRATE_MCP_HEALTH_STALE_SECONDS=${CRATE_MCP_HEALTH_STALE_SECONDS:-604800}
       # The VDJ pilot is enabled only in the local development stack.
       - CRATE_VDJ_ENABLED=true
       - CRATE_SMART_MIX_ENABLED=true
@@ -207,6 +222,8 @@ services:
       target: worker-core
     container_name: crate-dev-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -219,6 +236,11 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       - SENTRY_SERVICE=worker-default
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
@@ -340,6 +362,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=projector
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
       - SENTRY_SERVICE=projector
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_PROJECTOR_POSTGRES_STATEMENT_TIMEOUT_MS:-30000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
@@ -382,6 +405,8 @@ services:
       target: worker-core
     container_name: crate-dev-maintenance-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -394,6 +419,11 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_MCP_ENABLED=${CRATE_MCP_ENABLED:-false}
+      - CRATE_MCP_ACTIONS_ENABLED=${CRATE_MCP_ACTIONS_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ENABLED=${CRATE_MCP_OAUTH_ENABLED:-false}
+      - CRATE_MCP_OAUTH_ISSUER=${CRATE_MCP_OAUTH_ISSUER:-}
+      - CRATE_MCP_OAUTH_ALLOW_LOCALHOST=${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       - SENTRY_SERVICE=worker-maintenance
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
@@ -488,6 +518,8 @@ services:
       target: worker-analysis
     container_name: crate-dev-analysis-worker
     environment:
+      - CRATE_CREDENTIAL_KEY=${CRATE_CREDENTIAL_KEY:-}
+      - CRATE_CREDENTIAL_PREVIOUS_KEYS=${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
@@ -658,8 +690,8 @@ services:
 
   cast-receiver:
     build:
-      context: ./app
-      dockerfile: cast-receiver/Dockerfile
+      context: .
+      dockerfile: app/cast-receiver/Dockerfile
       args:
         VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}

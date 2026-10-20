@@ -29,6 +29,7 @@ def create_playlist(
     curation_key: str | None = None,
     featured_rank: int | None = None,
     category: str | None = None,
+    auto_refresh_enabled: bool = True,
     *,
     session: Session | None = None,
 ) -> int:
@@ -58,7 +59,7 @@ def create_playlist(
             curation_key=curation_key,
             featured_rank=featured_rank,
             category=category,
-            auto_refresh_enabled=True,
+            auto_refresh_enabled=auto_refresh_enabled,
             track_count=0,
             total_duration=0,
             generation_status="idle",

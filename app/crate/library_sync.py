@@ -580,6 +580,11 @@ class LibrarySync:
                 )
             return result
 
+    def prepare_album_sync(self, album_dir: Path, artist_name: str) -> dict:
+        """Compile the normal scanner payload without changing the library index."""
+        with _artist_sync_lock(artist_name):
+            return self._sync_album_unlocked(album_dir, artist_name, prepare_only=True)
+
     def _sync_album_unlocked(
         self,
         album_dir: Path,
@@ -587,6 +592,7 @@ class LibrarySync:
         *,
         audio_files: list[Path] | None = None,
         tree_mtime: float | None = None,
+        prepare_only: bool = False,
     ) -> dict:
         artist_root = _album_artist_root(album_dir)
 
@@ -599,6 +605,8 @@ class LibrarySync:
         existing_album_id = get_album_id_by_path(str(album_dir))
 
         if not audio_files:
+            if prepare_only:
+                return {"skipped": "empty_audio_scan", "album_id": existing_album_id}
             indexed_track_count = (
                 get_album_track_count(existing_album_id) if existing_album_id else 0
             )
@@ -656,7 +664,7 @@ class LibrarySync:
 
             # Check if file is unchanged — reuse existing DB row
             existing = existing_tracks_by_path.get(fpath)
-            if existing and existing.get("updated_at"):
+            if not prepare_only and existing and existing.get("updated_at"):
                 try:
                     stored_dt = to_datetime(existing["updated_at"])
                     stored_ts = stored_dt.timestamp() if stored_dt else 0.0
@@ -894,6 +902,14 @@ class LibrarySync:
                 album_dir,
                 exc_info=True,
             )
+
+        if prepare_only:
+            return {
+                "artist_payload": artist_payload,
+                "album_payload": album_payload,
+                "track_payloads": track_data_list,
+                "has_cover": bool(has_cover),
+            }
 
         _, album_id, persisted_album_entity_uid, synced_paths = upsert_scanned_album(
             artist_payload=artist_payload,

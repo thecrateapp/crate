@@ -13,6 +13,10 @@ const workspaceLockfile = JSON.parse(
   packages: Record<string, { dependencies?: Record<string, string> }>;
 };
 const dockerfile = readFileSync(resolve(listenRoot, "Dockerfile"), "utf8");
+const dockerignore = readFileSync(
+  resolve(listenRoot, "Dockerfile.dockerignore"),
+  "utf8",
+);
 
 describe("Listen Docker workspace dependencies", () => {
   it("declares the shared Cast protocol package", () => {
@@ -24,20 +28,20 @@ describe("Listen Docker workspace dependencies", () => {
     ).toBe("*");
   });
 
-  it("filters local workspace packages before installing npm dependencies", () => {
-    const installFilter =
-      dockerfile.match(/RUN sed -i([\s\S]*?)&& npm install/)?.[1] ?? "";
-
-    expect(installFilter).toContain(
-      String.raw`-e '/"@crate\/cast-protocol"/d'`,
+  it("installs the local workspaces from the root lockfile", () => {
+    expect(dockerfile).toContain("COPY package.json package-lock.json ./");
+    expect(dockerfile).toContain(
+      "COPY app/shared/cast/package.json app/shared/cast/",
     );
-    expect(installFilter).toContain(String.raw`-e '/"@crate\/ui"/d'`);
+    expect(dockerfile).toContain(
+      "RUN npm ci --workspace=app/listen --workspace=app/shared/ui --workspace=app/shared/cast",
+    );
+    expect(dockerfile).not.toContain("--package-lock=false");
+    expect(dockerfile).not.toContain("sed -i");
   });
 
-  it("installs the local Cast package in the production image", () => {
-    expect(dockerfile).toContain("COPY shared/cast/ /app-shared/shared/cast/");
-    expect(dockerfile).toContain(
-      "ln -s /app-shared/shared/cast node_modules/@crate/cast-protocol",
-    );
+  it("sends the shared Cast protocol in the build context", () => {
+    expect(dockerignore).toMatch(/^!app\/shared\/cast\/$/m);
+    expect(dockerfile).toContain("COPY app/shared/ app/shared/");
   });
 });

@@ -1,5 +1,6 @@
-from crate.db.tx import read_scope
 from sqlalchemy import text
+
+from crate.db.tx import read_scope
 
 
 def get_artists_with_folder() -> list[dict]:
@@ -122,7 +123,9 @@ def get_artists_with_photo() -> list[dict]:
     with read_scope() as session:
         rows = (
             session.execute(
-                text("SELECT name, folder_name, has_photo FROM library_artists")
+                text(
+                    "SELECT entity_uid, name, folder_name, has_photo FROM library_artists"
+                )
             )
             .mappings()
             .all()

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-router", () => ({
@@ -11,7 +11,7 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
-  useLLMStatus: () => ({
+  useActionLLMStatus: () => ({
     available: true,
     model: "gemini-test",
     provider: "gemini",
@@ -32,6 +32,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { PlaylistEditor } from "./PlaylistEditor";
 
 const mockUseApi = vi.mocked(useApi);
@@ -85,6 +86,36 @@ const editorSurface = {
   history: [],
 };
 
+function mockRule(op: string, value: number | number[], field = "year") {
+  const surface = structuredClone(editorSurface);
+  const smartRules = {
+    ...surface.playlist.smart_rules,
+    rules: [{ field, op, value }],
+    max_per_artist: 3,
+    deduplicate_artist: true,
+  };
+  const yearSurface = {
+    ...surface,
+    playlist: { ...surface.playlist, smart_rules: smartRules },
+  };
+  mockUseApi.mockImplementation((url: string | null) => ({
+    data: url?.includes("/editor-snapshot") ? yearSurface : null,
+    error: null,
+    loading: false,
+    refetch: vi.fn(),
+  }));
+  vi.mocked(api).mockResolvedValue({
+    total_matching: 0,
+    tracks: [],
+    genre_distribution: {},
+    artist_distribution: {},
+    format_distribution: {},
+    duration_total_sec: 0,
+    avg_year: null,
+    year_range: null,
+  } as never);
+}
+
 describe("PlaylistEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,12 +153,158 @@ describe("PlaylistEditor", () => {
       screen.getByPlaceholderText("Search tracks matching this playlist..."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Refine tracklist with AI/i }),
+      screen.getByRole("button", { name: /Suggest refinements/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Add rule")).toBeInTheDocument();
     expect(screen.getByText("generated")).toBeInTheDocument();
     expect(
       screen.getByText(/Upload a clean image-only hero asset/i),
     ).toBeInTheDocument();
+  });
+
+  it("saves metadata without resubmitting unchanged legacy year rules", async () => {
+    mockRule("gte", 2000);
+    render(<PlaylistEditor />);
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(api).toHaveBeenCalled());
+    const call = vi.mocked(api).mock.calls[0];
+    if (!call) throw new Error("Metadata save did not issue a request");
+    const [url, method, body] = call;
+    expect(url).toBe("/api/admin/system-playlists/42");
+    expect(method).toBe("PUT");
+    expect(body).toMatchObject({
+      name: "Screamo Core",
+      auto_refresh_enabled: true,
+    });
+    expect(body).not.toHaveProperty("smart_rules");
+  });
+
+  it.each([
+    { op: "gte", value: 2000, expected: "2000" },
+    { op: "between", value: [2000, 2020], expected: ["2000", "2020"] },
+  ])(
+    "previews legacy $op years as text while preserving rule options",
+    async ({ op, value, expected }) => {
+      mockRule(op, value);
+      render(<PlaylistEditor />);
+      fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+      await waitFor(() =>
+        expect(api).toHaveBeenCalledWith(
+          "/api/admin/system-playlists/42/preview",
+          "POST",
+          {
+            smart_rules: {
+              match: "all",
+              limit: 50,
+              sort: "random",
+              rules: [{ field: "year", op, value: expected }],
+              max_per_artist: 3,
+              deduplicate_artist: true,
+            },
+          },
+        ),
+      );
+    },
+  );
+
+  it("saves edited year filters as four-digit text", async () => {
+    mockRule("gte", 2000);
+    render(<PlaylistEditor />);
+    fireEvent.change(screen.getByPlaceholderText("Value"), {
+      target: { value: "2030" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42",
+        "PUT",
+        expect.objectContaining({
+          smart_rules: expect.objectContaining({
+            rules: [{ field: "year", op: "gte", value: "2030" }],
+            max_per_artist: 3,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("keeps edited BPM filters numeric", async () => {
+    mockRule("gte", 120, "bpm");
+    render(<PlaylistEditor />);
+    fireEvent.change(screen.getByPlaceholderText("Value"), {
+      target: { value: "171.25" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42",
+        "PUT",
+        expect.objectContaining({
+          smart_rules: expect.objectContaining({
+            rules: [{ field: "bpm", op: "gte", value: 171.25 }],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("preserves textual year bounds when editing either range endpoint", async () => {
+    mockRule("between", [2000, 2020]);
+    render(<PlaylistEditor />);
+    fireEvent.change(screen.getByPlaceholderText("Minimum"), {
+      target: { value: "1990" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Maximum"), {
+      target: { value: "2030" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42/preview",
+        "POST",
+        expect.objectContaining({
+          smart_rules: expect.objectContaining({
+            rules: [{ field: "year", op: "between", value: ["1990", "2030"] }],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("applies only server-stored refinement action IDs", async () => {
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (url.endsWith("/refine")) {
+        return {
+          proposal_id: "proposal-1",
+          editorial_revision: 7,
+          summary: "One repeated track",
+          issues: [],
+          actions: [
+            {
+              id: "remove:1",
+              type: "remove_track",
+              label: "Remove duplicate",
+              reason: "Repeated",
+              position: 1,
+              track_id: 1,
+            },
+          ],
+        } as never;
+      }
+      return { ok: true, applied_count: 1 } as never;
+    });
+    render(<PlaylistEditor />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Suggest refinements/i }),
+    );
+    await screen.findByText("Editorial refinement proposal");
+    fireEvent.click(screen.getByRole("button", { name: /Apply safe fixes/i }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42/refine/apply",
+        "POST",
+        { proposal_id: "proposal-1", action_ids: ["remove:1"] },
+      ),
+    );
   });
 });

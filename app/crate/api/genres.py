@@ -235,6 +235,14 @@ def _get_or_create_task(task_type: str, params: dict, max_limit: int = 500) -> d
                 "status": existing[0]["status"],
                 "deduplicated": True,
             }
+    from crate.ai.consumers import accept_action
+
+    ai_action = {
+        "infer_genre_taxonomy": "genres.description.generate",
+        "rebuild_genre_taxonomy_proposals": "genres.taxonomy.propose",
+    }.get(task_type)
+    if ai_action:
+        params = {**params, "ai_acceptance": accept_action(ai_action)}
     task_id = create_task(task_type, params)
     return {"task_id": task_id, "status": "queued", "deduplicated": False}
 
@@ -330,11 +338,12 @@ def rebuild_taxonomy_proposal(
     request: Request,
     body: GenreTaxonomyRebuildProposalRequest | None = None,
 ):
-    _require_genre_curator(request)
+    actor = _require_genre_curator(request)
     body = body or GenreTaxonomyRebuildProposalRequest.model_validate({})
     return _get_or_create_task(
         "rebuild_genre_taxonomy_proposals",
         {
+            "actor_user_id": actor.get("id"),
             "alias_limit": body.alias_limit,
             "node_limit": body.node_limit,
             "include_external": body.include_external,
@@ -510,11 +519,16 @@ def infer_taxonomy_node_proposal(
     request: Request,
     slug: str,
 ):
-    _require_genre_curator(request)
+    actor = _require_genre_curator(request)
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:
         raise HTTPException(status_code=400, detail="Slug is required")
-    proposal = build_genre_taxonomy_node_proposal(canonical_slug)
+    from crate.ai.consumers import resolve_call
+
+    proposal = build_genre_taxonomy_node_proposal(
+        canonical_slug,
+        ai_call=resolve_call("genres.taxonomy.propose", actor_id=actor.get("id")),
+    )
     if not proposal.get("ok"):
         raise HTTPException(status_code=404, detail="Genre not found")
     return proposal
@@ -795,12 +809,13 @@ def reindex_genres(request: Request):
     summary="Queue genre taxonomy inference",
 )
 def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody | None = None):
-    _require_genre_curator(request)
+    actor = _require_genre_curator(request)
     body = body or InferTaxonomyBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
     return _get_or_create_task(
         "infer_genre_taxonomy",
         {
+            "actor_user_id": actor.get("id"),
             "limit": body.limit,
             "focus_slug": slug,
             "include_external": body.include_external,
@@ -931,7 +946,7 @@ def generate_genre_eq(
     apply: bool = Query(False, description="Auto-apply the generated preset"),
 ):
     """Use the configured LLM to generate a 10-band EQ preset for a genre."""
-    _require_genre_curator(request)
+    actor = _require_genre_curator(request)
 
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:
@@ -949,10 +964,14 @@ def generate_genre_eq(
     try:
         from crate.llm.prompts.eq_preset import generate_eq_preset
 
+        from crate.ai.consumers import resolve_call, revalidate_call
+
+        ai_call = resolve_call("genres.eq.propose", actor_id=actor.get("id"))
         result = generate_eq_preset(
             genre_name=canonical_slug.replace("-", " ").title(),
             description=description,
             parent_genres=[s.replace("-", " ").title() for s in parent_slugs[:3]],
+            ai_call=ai_call,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -960,6 +979,7 @@ def generate_genre_eq(
     gains = [max(-12.0, min(12.0, round(g, 1))) for g in result.gains]
 
     if apply:
+        revalidate_call(ai_call)
         set_genre_eq_gains(canonical_slug, gains, reasoning=result.reasoning)
         invalidate_runtime_taxonomy_cache(broadcast=True)
         _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")

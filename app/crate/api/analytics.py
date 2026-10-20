@@ -3,6 +3,9 @@ import re as _re
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.auth import _require_auth
+from crate.api.permissions import require_permission
+from crate.agent_diagnostics import DiagnosticError
+from crate.agent_quality import get_library_quality
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -16,12 +19,13 @@ from crate.api.schemas.analytics import (
     InsightsResponse,
     MissingAlbumsResponse,
     QualityReportResponse,
+    QualityRefreshRequest,
+    QualityRefreshResponse,
     StatsResponse,
     TimelineResponse,
 )
 from crate.api.schemas.me import StatsDashboardResponse
 from crate.missing import find_missing_albums
-from crate.quality import quality_report
 from crate.api._deps import (
     artist_name_from_entity_uid,
     artist_name_from_id,
@@ -52,6 +56,7 @@ from crate.db.queries.analytics import (
     get_insights_artist_depth,
 )
 from crate.db.queries.tasks import list_tasks
+from crate.db.repositories.tasks_mutations import create_task_dedup
 
 router = APIRouter(tags=["analytics"])
 
@@ -204,15 +209,46 @@ def api_timeline(request: Request):
 @router.get(
     "/api/quality",
     response_model=QualityReportResponse,
-    responses=AUTH_ERROR_RESPONSES,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {
+            409: error_response("The quality snapshot changed during pagination."),
+            422: error_response("The quality category or cursor is invalid."),
+        },
+    ),
     summary="Get the library quality report",
 )
-def api_quality(request: Request):
+def api_quality(
+    request: Request,
+    category: str | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    cursor: str | None = None,
+):
     _require_auth(request)
-    lib = library_path()
-    exts = extensions()
-    report = quality_report(lib, exts)
-    return report
+    try:
+        return get_library_quality(category=category, limit=limit, cursor=cursor)
+    except DiagnosticError as exc:
+        raise HTTPException(
+            status_code=409 if exc.code == "CURSOR_STALE" else 422,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/api/quality/refresh",
+    response_model=QualityRefreshResponse,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        {422: error_response("Explicit global scope is required.")},
+    ),
+    summary="Queue an explicit global library quality scan",
+)
+def api_quality_refresh(request: Request, body: QualityRefreshRequest):
+    require_permission(request, "library.repair.run")
+    task_id = create_task_dedup(
+        "quality_check", {"scope": body.scope}, dedup_key="quality:global"
+    )
+    return {"task_id": task_id, "deduplicated": task_id is None}
 
 
 def api_missing_albums(request: Request, artist: str):

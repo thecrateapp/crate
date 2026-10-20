@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -215,7 +215,11 @@ async def lifespan(app: FastAPI):
 
     event_loop_monitor_task = asyncio.create_task(monitor_event_loop_lag())
     try:
-        yield
+        async with AsyncExitStack() as stack:
+            mcp_manager = getattr(app.state, "mcp_manager", None)
+            if mcp_manager is not None:
+                await stack.enter_async_context(mcp_manager.run())
+            yield
     finally:
         stop_cache_invalidation_runtime()
         from crate.federation.client import close_shared_clients
@@ -250,6 +254,22 @@ def create_app() -> FastAPI:
         default_response_class=DateAwareJSONResponse,
     )
     app.openapi = lambda: custom_openapi(app)
+    if os.environ.get("CRATE_MCP_ENABLED", "false").lower() == "true":
+        from starlette.routing import Route
+
+        from crate.mcp.server import create_mcp_server
+
+        _, app.state.mcp_manager, mcp_app = create_mcp_server()
+        app.router.routes.append(Route("/mcp", endpoint=mcp_app))
+        from crate.mcp.artifacts import ArtifactDownload
+
+        app.router.routes.append(
+            Route(
+                "/mcp/artifacts/{artifact_id:uuid}",
+                endpoint=ArtifactDownload(),
+                methods=["GET"],
+            )
+        )
 
     from crate.subsonic.errors import OpenSubsonicError
     from crate.subsonic.protocol import render_response
@@ -359,6 +379,7 @@ def create_app() -> FastAPI:
                 "stack",
                 "setup",
                 "admin",
+                "agents",
                 "admin-auth",
             },
             title="Crate Admin & System API",
@@ -513,6 +534,9 @@ def create_app() -> FastAPI:
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
     app.include_router(setup_router)
+    from crate.api.mcp_oauth import router as mcp_oauth_router
+
+    app.include_router(mcp_oauth_router)
     app.include_router(auth_router)
     app.include_router(access_tokens_router)
     app.include_router(capabilities_router)
@@ -576,6 +600,16 @@ def create_app() -> FastAPI:
     app.include_router(admin_federation_router)
     app.include_router(admin_global_catalog_router)
     app.include_router(admin_metrics_router)
+    from crate.api.agent_integrations import router as agent_integrations_router
+    from crate.api.agent_plans import router as agent_plans_router
+    from crate.api.show_imports import router as show_imports_router
+
+    from crate.api.ai_agents import router as ai_agents_router
+
+    app.include_router(ai_agents_router)
+    app.include_router(agent_integrations_router)
+    app.include_router(agent_plans_router)
+    app.include_router(show_imports_router)
 
     # Static files
     base = Path(__file__).resolve().parent.parent

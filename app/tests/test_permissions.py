@@ -1218,6 +1218,9 @@ def test_hard_delete_quarantined_track_deletes_crate_trash_file(tmp_path, monkey
 
 
 def test_hard_delete_all_quarantined_tracks_deletes_audio_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.is_cancelled", lambda _task_id: False
+    )
     from crate.worker_handlers.management import (
         _handle_hard_delete_all_quarantined_tracks,
     )
@@ -2182,20 +2185,13 @@ def test_llm_status_allows_curator_without_admin_access(monkeypatch):
     from crate.api.admin_metrics import llm_status
 
     monkeypatch.setattr(
-        "crate.llm.get_config",
-        lambda: {
-            "provider": "gemini",
-            "model": "gemini/gemini-2.5-flash",
-            "ollama_url": "http://ollama:11434",
-        },
+        "crate.ai.runtime.action_availability",
+        lambda action: {"action_id": action, "available": True, "provider": "gemini"},
     )
-    monkeypatch.setattr("crate.llm.get_provider_key_names", lambda _provider: ["KEY"])
-    monkeypatch.setattr("crate.llm.get_provider_api_key", lambda _provider: "secret")
-
     response = llm_status(_request_for("curator"))  # type: ignore[arg-type]
-
-    assert response["available"] is True
-    assert response["provider"] == "gemini"
+    assert response["actions"]["genres.eq.propose"]["available"] is True
+    assert "artists.bio.research" not in response["actions"]
+    assert "i18n.listen.draft" not in response["actions"]
 
 
 def test_llm_status_rejects_regular_user():

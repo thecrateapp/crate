@@ -54,6 +54,10 @@ x-crate-env: &crate-env
   CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES: ${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
   CRATE_FEDERATION_IMPORT_LEASE_SECONDS: ${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
 
+x-ai-credential-env: &ai-credential-env
+  CRATE_CREDENTIAL_KEY: ${CRATE_CREDENTIAL_KEY:-}
+  CRATE_CREDENTIAL_PREVIOUS_KEYS: ${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
+
 x-crate-enrichment-env: &crate-enrichment-env
   LASTFM_APIKEY: ${LASTFM_APIKEY:-}
   LASTFM_API_SECRET: ${LASTFM_API_SECRET:-}
@@ -237,8 +241,21 @@ services:
     group_add:
       - "${DOCKER_GID:-988}"
     environment:
-      <<: [*crate-env, *crate-enrichment-env]
+      <<: [*crate-env, *crate-enrichment-env, *ai-credential-env]
       CRATE_RUNTIME: api
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      CRATE_MCP_ALLOWED_HOSTS: ${CRATE_MCP_ALLOWED_HOSTS:-}
+      CRATE_MCP_ALLOWED_ORIGINS: ${CRATE_MCP_ALLOWED_ORIGINS:-}
+      CRATE_MCP_ADMIN_ORIGINS: ${CRATE_MCP_ADMIN_ORIGINS:-}
+      CRATE_MCP_OPS_FRESH_SECONDS: ${CRATE_MCP_OPS_FRESH_SECONDS:-60}
+      CRATE_MCP_OPS_STALE_SECONDS: ${CRATE_MCP_OPS_STALE_SECONDS:-300}
+      CRATE_MCP_HEARTBEAT_FRESH_SECONDS: ${CRATE_MCP_HEARTBEAT_FRESH_SECONDS:-60}
+      CRATE_MCP_HEALTH_FRESH_SECONDS: ${CRATE_MCP_HEALTH_FRESH_SECONDS:-86400}
+      CRATE_MCP_HEALTH_STALE_SECONDS: ${CRATE_MCP_HEALTH_STALE_SECONDS:-604800}
       CRATE_SSE_REDIS_MAX_CONNECTIONS: ${CRATE_SSE_REDIS_MAX_CONNECTIONS:-128}
       CRATE_MEDIA_WORKER_URL: http://crate-media-worker:8687
       CRATE_MEDIA_WORKER_MAX_ACTIVE: ${CRATE_MEDIA_WORKER_MAX_ACTIVE:-1}
@@ -397,11 +414,17 @@ services:
       <<:
         [
           *crate-env,
+          *ai-credential-env,
           *crate-enrichment-env,
           *worker-resource-env,
           *worker-native-env,
         ]
       CRATE_RUNTIME: worker
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       CRATE_WORKER_PROCESSES: ${CRATE_WORKER_PROCESSES:-3}
       FAST_WORKER_PROCESSES: ${FAST_WORKER_PROCESSES:-2}
       MAINTENANCE_WORKER_PROCESSES: ${MAINTENANCE_WORKER_PROCESSES:-1}
@@ -476,6 +499,7 @@ services:
     environment:
       <<: *crate-env
       CRATE_RUNTIME: projector
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
       CRATE_PROJECTOR_INTERVAL_SECONDS: ${CRATE_PROJECTOR_INTERVAL_SECONDS:-5}
       CRATE_PROJECTOR_BATCH_LIMIT: ${CRATE_PROJECTOR_BATCH_LIMIT:-200}
       CRATE_LEGACY_POOL_MAXCONN: ${PROJECTOR_LEGACY_POOL_MAXCONN:-2}
@@ -509,11 +533,17 @@ services:
       <<:
         [
           *crate-env,
+          *ai-credential-env,
           *crate-enrichment-env,
           *worker-resource-env,
           *worker-native-env,
         ]
       CRATE_RUNTIME: worker
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
       CRATE_LEGACY_POOL_MAXCONN: ${MAINTENANCE_LEGACY_POOL_MAXCONN:-2}
       CRATE_SQLALCHEMY_POOL_SIZE: ${MAINTENANCE_SQLALCHEMY_POOL_SIZE:-1}
       CRATE_SQLALCHEMY_MAX_OVERFLOW: ${MAINTENANCE_SQLALCHEMY_MAX_OVERFLOW:-1}
@@ -554,7 +584,13 @@ services:
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      <<: [*crate-env, *worker-resource-env, *worker-native-env]
+      <<:
+        [
+          *crate-env,
+          *worker-resource-env,
+          *worker-native-env,
+          *ai-credential-env,
+        ]
       CRATE_RUNTIME: worker
       CRATE_LEGACY_POOL_MAXCONN: ${ANALYSIS_LEGACY_POOL_MAXCONN:-2}
       CRATE_SQLALCHEMY_POOL_SIZE: ${ANALYSIS_SQLALCHEMY_POOL_SIZE:-1}

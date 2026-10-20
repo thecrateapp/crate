@@ -1,6 +1,16 @@
+import pytest
+
+from tests.ai_consumer_fakes import pin_actions
+
+
 from uuid import UUID
 
 from crate.api.schemas.i18n import I18nQualityIssueResponse, I18nQualityReportResponse
+
+
+@pytest.fixture(autouse=True)
+def pinned_ai(monkeypatch):
+    pin_actions(monkeypatch)
 
 
 def _quality_report(*, issues: list[I18nQualityIssueResponse]):
@@ -95,6 +105,10 @@ def test_admin_can_queue_missing_and_stale_translation_draft(pg_db, test_app):
                 "app": "listen",
                 "locale": "es",
                 "source_version": "sha256:test",
+                "ai_acceptance": {
+                    "action_id": "i18n.listen.draft",
+                    "fingerprint": "accepted:i18n.listen.draft",
+                },
                 "keys": ["player.pause", "settings.playback.title"],
             },
         )
@@ -247,6 +261,10 @@ def test_draft_i18n_translation_handler_merges_subset_keys(pg_db, monkeypatch):
             "app": "listen",
             "locale": "es",
             "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
             "keys": ["player.pause"],
         },
         dispatch=False,
@@ -258,6 +276,10 @@ def test_draft_i18n_translation_handler_merges_subset_keys(pg_db, monkeypatch):
             "app": "listen",
             "locale": "es",
             "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
             "keys": ["player.pause"],
         },
         {},

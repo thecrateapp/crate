@@ -86,6 +86,15 @@ describe("GenreTaxonomyTree", () => {
     expect(screen.getByText("Full detail page")).toBeInTheDocument();
   });
 
+  it("keeps the detail panel sticky below the fixed app header", () => {
+    renderTree();
+    fireEvent.click(screen.getByText("Hardcore"));
+    const panel = screen.getByText("Full detail page").closest(".sticky");
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("top-[calc(var(--app-header-h,0px)+1.5rem)]");
+    expect(panel).not.toHaveClass("top-6");
+  });
+
   it("shows taxonomy and playlist actions for capable users", () => {
     renderTree({ canCurate: true, canCreatePlaylists: true });
 

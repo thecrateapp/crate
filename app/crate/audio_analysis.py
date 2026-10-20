@@ -283,6 +283,9 @@ def analyze_track(filepath: Union[str, Path]) -> dict:
             elif _BACKEND == "librosa":
                 supplement = _analyze_librosa(str(filepath))
             if supplement:
+                rust.setdefault("_components", []).extend(
+                    supplement.get("_components", [])
+                )
                 # Merge: keep Rust values for basic metrics, add Python values for advanced
                 for key in (
                     "danceability",
@@ -348,6 +351,9 @@ def analyze_batch(filepaths: list) -> list:
                     )
                     for idx, sup in zip(needs_supplement, supplements):
                         if sup:
+                            rust[idx].setdefault("_components", []).extend(
+                                sup.get("_components", [])
+                            )
                             for key in _ADVANCED_KEYS:
                                 if (
                                     rust[idx].get(key) is None
@@ -372,6 +378,7 @@ def _analyze_rust(filepath: str) -> dict | None:
         if not data or data.get("error"):
             return None
         return {
+            "_components": ["crate-cli"],
             "bpm": data.get("bpm"),
             "key": data.get("key"),
             "scale": data.get("scale"),
@@ -416,6 +423,7 @@ def _analyze_rust_batch(filepaths: list) -> list | None:
                 if t:
                     results.append(
                         {
+                            "_components": ["crate-cli"],
                             "bpm": t.get("bpm"),
                             "key": t.get("key"),
                             "scale": t.get("scale"),
@@ -576,6 +584,7 @@ def _batch_panns_inference(items: list):
 
 def _extract_signal_features(audio: np.ndarray, result: dict, filepath: str = ""):
     """Extract BPM, key, loudness, dynamic range from audio signal."""
+    result.setdefault("_components", []).append("essentia")
     standard = _essentia_standard()
     RhythmExtractor2013 = standard.RhythmExtractor2013
     KeyExtractor = standard.KeyExtractor
@@ -658,6 +667,7 @@ def _apply_hybrid_from_probs(
     audio_44k: np.ndarray, probs: np.ndarray, lb_to_ix: dict, result: dict
 ):
     """Compute hybrid features from PANNs probs + Essentia signal features."""
+    result.setdefault("_components", []).append("panns-cnn14")
     standard = _essentia_standard()
     Danceability = standard.Danceability
     Energy = standard.Energy
@@ -818,6 +828,7 @@ def _apply_hybrid_from_probs(
 
 
 def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
+    result.setdefault("_components", []).append("essentia-heuristics")
     standard = _essentia_standard()
     Danceability = standard.Danceability
     Energy = standard.Energy
@@ -1026,6 +1037,7 @@ def _analyze_librosa(filepath: str) -> dict:
     import librosa
 
     result = _empty_result()
+    result["_components"] = ["librosa", "librosa-heuristics"]
     try:
         if not Path(filepath).is_file():
             return result

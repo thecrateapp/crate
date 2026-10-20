@@ -6,8 +6,8 @@ import asyncio
 import os
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
@@ -421,42 +421,18 @@ def llm_status(request: Request):
         configured_web_search_providers,
         web_search_provider_label,
     )
-    from crate.llm import get_config, get_provider_api_key, get_provider_key_names
+    from crate.ai.actions import ACTIONS
+    from crate.ai.runtime import action_availability
 
-    config = get_config()
-
-    # Test connectivity
-    available = False
-    error = None
-    try:
-        if config["provider"] == "ollama":
-            import requests as req
-
-            resp = req.get(f"{config['ollama_url']}/api/tags", timeout=5)
-            available = resp.status_code == 200
-            models = (
-                [m["name"] for m in resp.json().get("models", [])] if available else []
-            )
-        else:
-            key_names = get_provider_key_names(config["provider"])
-            if key_names:
-                available = bool(get_provider_api_key(config["provider"]))
-                if not available:
-                    error = f"{' or '.join(key_names)} not set"
-            else:
-                available = False
-                error = f"Unsupported LLM provider: {config['provider']}"
-            models = []
-    except Exception as e:
-        error = str(e)
-        models = []
-
+    actions = {}
+    for action_id, action in ACTIONS.items():
+        try:
+            require_permission(request, action.permission)
+        except HTTPException:
+            continue
+        actions[action_id] = action_availability(action_id)
     return {
-        "available": available,
-        "model": config["model"],
-        "provider": config["provider"],
-        "models": models,
-        "error": error,
+        "actions": actions,
         "web_research": {
             "available": True,
             "provider": web_search_provider_label(),
@@ -570,46 +546,40 @@ async def admin_logs_stream(request: Request, limit: int = Query(100, ge=1, le=2
 )
 def admin_download_policy(request: Request):
     _require_ops_runtime(request)
-    from crate.db.cache_settings import get_setting
+    from crate.db.repositories.runtime_policy import read_runtime_policy_state
+    from crate.runtime_policy_contract import download_policy_status
     from crate.actors import (
-        _is_download_allowed,
         _count_active_users,
         _count_active_streams,
-        _is_in_time_window,
         get_suggested_download_limits,
     )
 
-    suggested = get_suggested_download_limits()
-    window_enabled = get_setting("download_window_enabled", "false") == "true"
-
+    state = read_runtime_policy_state()
     return {
-        "downloads_allowed_now": _is_download_allowed(),
-        "active_users": _count_active_users(),
-        "active_streams": _count_active_streams(),
-        "time_window": {
-            "enabled": window_enabled,
-            "in_window": _is_in_time_window() if window_enabled else True,
-            "start": get_setting("download_window_start", "02:00"),
-            "end": get_setting("download_window_end", "07:00"),
-        },
-        "user_limit": {
-            "enabled": int(get_setting("download_max_active_users", "0")) > 0,
-            "max": int(get_setting("download_max_active_users", "0")),
-        },
-        "stream_limit": {
-            "enabled": int(get_setting("download_max_active_streams", "0")) > 0,
-            "max": int(get_setting("download_max_active_streams", "0")),
-        },
-        "suggested": suggested,
+        **download_policy_status(
+            state["policy"],
+            active_users=_count_active_users(),
+            active_streams=_count_active_streams(),
+        ),
+        "suggested": get_suggested_download_limits(),
+        "configured_revision": state["configured_revision"],
+        "effective_revision": state["effective_revision"],
+        "adoption_status": state["adoption_status"],
     }
 
 
 class DownloadPolicyUpdate(BaseModel):
-    window_enabled: bool | None = None
-    window_start: str | None = None
-    window_end: str | None = None
-    max_active_users: int | None = None
-    max_active_streams: int | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    window_enabled: StrictBool | None = None
+    window_start: str | None = Field(
+        default=None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$"
+    )
+    window_end: str | None = Field(default=None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    window_timezone: str | None = None
+    max_active_users: StrictInt | None = Field(default=None, ge=0, le=10000)
+    max_active_streams: StrictInt | None = Field(default=None, ge=0, le=10000)
+    expected_revision: StrictInt | None = Field(default=None, ge=0)
 
 
 @router.put(
@@ -619,22 +589,45 @@ class DownloadPolicyUpdate(BaseModel):
 )
 def update_download_policy(request: Request, body: DownloadPolicyUpdate):
     _require_ops_runtime(request)
-    from crate.db.cache_settings import set_setting
+    from crate.db.repositories.runtime_policy import (
+        read_runtime_policy_state,
+        update_runtime_policy,
+    )
+    from crate.runtime_policy_contract import PolicyRevisionConflict
 
-    if body.window_enabled is not None:
-        set_setting(
-            "download_window_enabled", "true" if body.window_enabled else "false"
+    state = read_runtime_policy_state()
+    window = {
+        key: getattr(body, f"window_{key}")
+        for key in ("enabled", "start", "end", "timezone")
+        if getattr(body, f"window_{key}") is not None
+    }
+    downloads = {
+        key: getattr(body, key)
+        for key in ("max_active_users", "max_active_streams")
+        if getattr(body, key) is not None
+    }
+    patch = {
+        **({"download_window": window} if window else {}),
+        **({"downloads": downloads} if downloads else {}),
+    }
+    try:
+        state = update_runtime_policy(
+            patch,
+            expected_revision=state["configured_revision"]
+            if body.expected_revision is None
+            else body.expected_revision,
+            expected_policy_hash=state["policy_hash"],
         )
-    if body.window_start is not None:
-        set_setting("download_window_start", body.window_start.strip())
-    if body.window_end is not None:
-        set_setting("download_window_end", body.window_end.strip())
-    if body.max_active_users is not None:
-        set_setting("download_max_active_users", str(max(0, body.max_active_users)))
-    if body.max_active_streams is not None:
-        set_setting("download_max_active_streams", str(max(0, body.max_active_streams)))
-
-    return {"ok": True}
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    return {
+        "ok": True,
+        "configured_revision": state["configured_revision"],
+        "effective_revision": state["effective_revision"],
+        "adoption_status": state["adoption_status"],
+    }
 
 
 @router.get(

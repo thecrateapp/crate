@@ -1605,21 +1605,13 @@ class TestWorkerAPI:
             assert data["running"] == 1
             assert data["pending"] == 1
 
-    def test_worker_schedules(self, test_app):
-        mock_schedules = {
-            "library_sync": 1800,
-            "enrich_artists": 86400,
-        }
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=mock_schedules),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
-            resp = test_app.get("/api/worker/schedules")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert "library_sync" in data
-            assert data["library_sync"]["interval_seconds"] == 1800
-            assert data["library_sync"]["enabled"] is True
+    def test_worker_schedules(self, pg_db, test_app):
+        resp = test_app.get("/api/worker/schedules")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "library_pipeline" in data
+        assert data["library_pipeline"]["interval_seconds"] == 86400
+        assert data["library_pipeline"]["enabled"] is True
 
 
 class TestTasksAPI:
@@ -1716,11 +1708,21 @@ class TestTasksAPI:
         }
         with (
             patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
+            patch(
+                "crate.db.repositories.task_control.request_cancellation",
+                return_value={
+                    "status": "cancelled",
+                    "cancellation_requested": True,
+                    "request_state": "cancelled",
+                },
+            ) as mock_cancel,
+            patch("crate.api.tasks.cancel_media_worker_job") as mock_media_cancel,
         ):
             resp = test_app.post("/api/tasks/t1/cancel")
             assert resp.status_code == 200
-            mock_update.assert_called_once_with("t1", status="cancelled")
+            assert resp.json()["request_state"] == "cancelled"
+            assert mock_cancel.call_args.args == ("t1",)
+            mock_media_cancel.assert_called_once_with("t1")
 
 
 class TestPlaylistCurationAPI:
@@ -2361,142 +2363,86 @@ class TestHealthAPI:
         assert sorted(sum(created, [])) == list(range(60))
 
     def test_repair_preview_endpoint(self, test_app):
-        preview = {
-            "items": [
-                {
-                    "issue_id": 7,
-                    "item_key": "issue:7",
-                    "plan_item_id": "repair-plan:abc123",
-                    "check_type": "duplicate_albums",
-                    "severity": "medium",
-                    "description": "Duplicate album",
-                    "support": "automatic",
-                    "risk": "destructive",
-                    "scope": "hybrid",
-                    "requires_confirmation": True,
-                    "supports_batch": True,
-                    "supports_artist_scope": True,
-                    "supports_global_scope": False,
-                    "auto_fixable": True,
-                    "executable": True,
-                    "action": "delete_loose",
-                    "target": "Birds In Row/UGLY",
-                    "message": "Would delete loose duplicate album folder for Birds In Row/UGLY",
-                    "fs_write": True,
-                    "details": {"reason": "identical track list"},
-                    "issue": {
-                        "id": 7,
-                        "check": "duplicate_albums",
-                        "details": {"artist": "Birds In Row"},
-                    },
-                }
-            ],
-            "total": 1,
-            "executable": 1,
-            "manual_only": 0,
-            "plan_version": "repair-preview:123",
-            "generated_at": "2026-04-30T10:00:00+00:00",
-        }
-
-        with patch(
-            "crate.api.management._build_repair_preview", return_value=preview
-        ) as mock_preview:
-            resp = test_app.post(
-                "/api/manage/repair-preview", json={"issues": [{"id": 7}]}
-            )
-
+        with (
+            patch(
+                "crate.api.management.get_open_repair_issues", return_value=[{"id": 7}]
+            ),
+            patch(
+                "crate.api.management.create_task", return_value="prepare-repairs"
+            ) as enqueue,
+            patch("crate.api.management._build_repair_preview") as build_preview,
+        ):
+            resp = test_app.post("/api/manage/repair-preview", json={"issue_ids": [7]})
         assert resp.status_code == 200
-        assert resp.json()["items"][0]["check_type"] == "duplicate_albums"
-        assert resp.json()["items"][0]["risk"] == "destructive"
-        assert resp.json()["items"][0]["scope"] == "hybrid"
-        assert resp.json()["plan_version"] == "repair-preview:123"
-        mock_preview.assert_called_once_with([{"id": 7}], auto_only=False)
+        assert {
+            key: resp.json()[key]
+            for key in ("task_id", "preparation_task_id", "status")
+        } == {
+            "task_id": "prepare-repairs",
+            "preparation_task_id": "prepare-repairs",
+            "status": "pending",
+        }
+        assert resp.json()["items"] == []
+        assert resp.json()["document"] is None
+        enqueue.assert_called_once_with(
+            "prepare_library_repairs",
+            {"issue_ids": [7], "actor_user_id": 1, "artist": ""},
+        )
+        build_preview.assert_not_called()
 
     def test_repair_specific_issues_rejects_stale_plan_version(self, test_app):
-        preview = {
-            "items": [],
-            "total": 0,
-            "executable": 0,
-            "manual_only": 0,
-            "plan_version": "repair-preview:fresh",
-            "generated_at": "2026-04-30T10:00:00+00:00",
-        }
-
         with (
-            patch("crate.api.management._build_repair_preview", return_value=preview),
-            patch("crate.api.management.create_task") as mock_create_task,
+            patch(
+                "crate.api.management.accept_admin_repair_selection",
+                side_effect=ValueError("Repair plan is stale; refresh its preview"),
+            ) as accept,
+            patch("crate.api.management.create_task") as enqueue,
         ):
             resp = test_app.post(
                 "/api/manage/repair-issues",
                 json={
-                    "issues": [{"id": 7}],
+                    "preparation_task_id": "prepare-repairs",
                     "dry_run": False,
-                    "plan_version": "repair-preview:stale",
+                    "plan_version": "repair-contract:stale",
+                    "plan_item_ids": ["repair-contract:7"],
                 },
             )
-
         assert resp.status_code == 409
         assert "stale" in resp.json()["detail"].lower()
-        mock_create_task.assert_not_called()
+        accept.assert_called_once_with(
+            "prepare-repairs",
+            1,
+            plan_version="repair-contract:stale",
+            plan_item_ids=["repair-contract:7"],
+            confirm_risky=False,
+        )
+        enqueue.assert_not_called()
 
     def test_repair_specific_issues_requires_confirmation_for_risky_items(
         self, test_app
     ):
-        preview = {
-            "items": [
-                {
-                    "issue_id": 7,
-                    "item_key": "issue:7",
-                    "plan_item_id": "repair-plan:danger",
-                    "check_type": "duplicate_albums",
-                    "severity": "high",
-                    "description": "Duplicate album",
-                    "support": "automatic",
-                    "risk": "destructive",
-                    "scope": "hybrid",
-                    "requires_confirmation": True,
-                    "supports_batch": True,
-                    "supports_artist_scope": True,
-                    "supports_global_scope": False,
-                    "auto_fixable": True,
-                    "executable": True,
-                    "action": "delete_loose",
-                    "target": "Birds In Row/UGLY",
-                    "message": "Would delete loose duplicate album folder for Birds In Row/UGLY",
-                    "fs_write": True,
-                    "details": {"reason": "identical track list"},
-                    "issue": {
-                        "id": 7,
-                        "check": "duplicate_albums",
-                        "details": {"artist": "Birds In Row"},
-                    },
-                }
-            ],
-            "total": 1,
-            "executable": 1,
-            "manual_only": 0,
-            "plan_version": "repair-preview:danger",
-            "generated_at": "2026-04-30T10:00:00+00:00",
-        }
-
         with (
-            patch("crate.api.management._build_repair_preview", return_value=preview),
-            patch("crate.api.management.create_task") as mock_create_task,
+            patch(
+                "crate.api.management.accept_admin_repair_selection",
+                side_effect=ValueError(
+                    "Repair execution requires explicit confirmation for risky fixes"
+                ),
+            ),
+            patch("crate.api.management.create_task") as enqueue,
         ):
             resp = test_app.post(
                 "/api/manage/repair-issues",
                 json={
-                    "issues": [{"id": 7}],
+                    "preparation_task_id": "prepare-repairs",
                     "dry_run": False,
-                    "plan_version": "repair-preview:danger",
-                    "plan_item_ids": ["repair-plan:danger"],
+                    "plan_version": "repair-contract:danger",
+                    "plan_item_ids": ["repair-contract:7"],
                     "confirm_risky": False,
                 },
             )
-
         assert resp.status_code == 409
         assert "confirmation" in resp.json()["detail"].lower()
-        mock_create_task.assert_not_called()
+        enqueue.assert_not_called()
 
     def test_fix_artist_by_entity_uid_enqueues_task(self, test_app):
         with (

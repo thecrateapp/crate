@@ -17,6 +17,7 @@ from crate.api.schemas.settings import (
     LibrarySettingsUpdateRequest,
     PathsSettingsUpdateRequest,
     ProcessingSettingsUpdateRequest,
+    RuntimeSettingsUpdateResponse,
     ScheduleIntervalsRequest,
     SettingsResponse,
     SettingsUpdateResponse,
@@ -34,7 +35,14 @@ from crate.db.cache_store import (
     get_cache_stats,
 )
 from crate.db.repositories.library import get_library_stats, get_library_track_count
-from crate.scheduler import get_schedules, set_schedules
+from crate.scheduler import get_schedules
+from crate.db.repositories.runtime_policy import (
+    read_runtime_policy_state,
+    read_schedules_state,
+    update_admission_slots,
+    update_schedules as persist_schedules,
+)
+from crate.runtime_policy_contract import PolicyRevisionConflict
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -64,9 +72,15 @@ def _require_settings_manager(request: Request) -> dict:
 )
 def get_settings(request: Request):
     _require_settings_manager(request)
+    runtime = read_runtime_policy_state()
     return {
         "schedules": get_schedules(),
-        "worker": {"max_workers": int(get_setting("max_workers", "5"))},
+        "worker": {
+            "max_workers": runtime["policy"]["max_running"],
+            "configured_revision": runtime["configured_revision"],
+            "effective_revision": runtime["effective_revision"],
+            "slot_semantics": "admission_limits",
+        },
         "enrichment": json.loads(get_setting("enrichment_sources", DEFAULT_ENRICHMENT)),
         "cache_stats": get_cache_stats(),
         "db_stats": get_db_table_stats(),
@@ -187,37 +201,44 @@ def _get_about_info() -> dict:
 
 @router.put(
     "/schedules",
-    response_model=SettingsUpdateResponse,
+    response_model=RuntimeSettingsUpdateResponse,
     responses=_SETTINGS_RESPONSES,
     summary="Update scheduler intervals",
 )
 def update_schedules(request: Request, body: ScheduleIntervalsRequest):
     _require_settings_manager(request)
-    payload = body.root
-    for key, val in payload.items():
-        if not isinstance(val, int) or val < 0:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid interval for '{key}': must be int >= 0",
-            )
-    set_schedules(payload)
-    return {"ok": True}
+    state = read_schedules_state()
+    try:
+        updated = persist_schedules(
+            body.schedules,
+            expected_revision=body.expected_revision or state["revision"],
+        )
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    return {"ok": True, "configured_revision": updated["revision"]}
 
 
 @router.put(
     "/worker",
-    response_model=SettingsUpdateResponse,
+    response_model=RuntimeSettingsUpdateResponse,
     responses=_SETTINGS_RESPONSES,
     summary="Update worker concurrency settings",
 )
 def update_worker(request: Request, body: WorkerSettingsRequest):
     _require_settings_manager(request)
-    if body.max_workers < 1 or body.max_workers > 10:
-        raise HTTPException(
-            status_code=422, detail="max_workers must be between 1 and 10"
+    try:
+        state = update_admission_slots(
+            body.max_workers, expected_revision=body.expected_revision
         )
-    set_setting("max_workers", str(body.max_workers))
-    return {"ok": True}
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    return {
+        "ok": True,
+        "configured_revision": state["configured_revision"],
+        "effective_revision": state["effective_revision"],
+    }
 
 
 @router.put(

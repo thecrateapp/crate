@@ -12,6 +12,8 @@ import logging
 import time
 from pathlib import Path
 
+from crate.analysis_provenance import result_signature, source_identity
+
 from crate.db.jobs.analysis import (
     claim_tracks as _db_claim_tracks,
     get_analysis_status as _db_get_analysis_status,
@@ -61,12 +63,14 @@ def _claim_tracks(state_column: str, *, limit: int):
     return _db_claim_tracks(state_column, limit=limit)
 
 
-def _mark_failed(track_id: int, state_column: str):
-    _db_mark_failed(track_id, state_column)
+def _mark_failed(track_id: int, state_column: str, *, claim: dict | None = None):
+    _db_mark_failed(track_id, state_column, claim=claim)
 
 
-def _release_claims(track_ids: list[int], state_column: str):
-    return _db_release_claims(track_ids, state_column)
+def _release_claims(
+    track_ids: list[int], state_column: str, *, claims: dict[int, dict] | None = None
+):
+    return _db_release_claims(track_ids, state_column, claims=claims)
 
 
 def _reset_stale_claims(state_column: str):
@@ -79,12 +83,43 @@ def _get_pending_count(state_column: str) -> int:
     return _db_get_pending_count(state_column)
 
 
-def _store_analysis_results(results: list[tuple[int, str, dict]]):
-    _db_store_analysis_results(results)
+def _store_analysis_results(
+    results: list[tuple[int, str, dict]],
+    *,
+    claims: dict[int, dict],
+    signatures: dict[int, str],
+):
+    _db_store_analysis_results(results, claims=claims, signatures=signatures)
 
 
-def _store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]):
-    _db_store_bliss_vectors(vectors_by_track_id)
+def _store_bliss_vectors(
+    vectors_by_track_id: dict[int, list[float]],
+    *,
+    claims: dict[int, dict],
+    signatures: dict[int, str],
+):
+    _db_store_bliss_vectors(vectors_by_track_id, claims=claims, signatures=signatures)
+
+
+def _capture_sources(batch: list[dict], state_column: str) -> list[dict]:
+    valid = []
+    for track in batch:
+        try:
+            track["_source"] = source_identity(track["path"])
+            valid.append(track)
+        except (OSError, ValueError):
+            _mark_failed(track["id"], state_column, claim=track)
+    return valid
+
+
+def _source_unchanged(track: dict, state_column: str) -> bool:
+    try:
+        if source_identity(track["path"]) == track["_source"]:
+            return True
+    except (OSError, ValueError):
+        pass
+    _mark_failed(track["id"], state_column, claim=track)
+    return False
 
 
 # ── Audio Analysis Daemon ────────────────────────────────────────
@@ -124,10 +159,18 @@ def analysis_daemon(config: dict):
                 continue
 
             if _should_pause_for_load():
-                _release_claims([int(item["id"]) for item in batch], "analysis_state")
+                _release_claims(
+                    [int(item["id"]) for item in batch],
+                    "analysis_state",
+                    claims={int(item["id"]): item for item in batch},
+                )
                 time.sleep(LOAD_PAUSE)
                 continue
 
+            batch = _capture_sources(batch, "analysis_state")
+            if not batch:
+                continue
+            claims = {int(track["id"]): track for track in batch}
             successful_results: list[tuple[int, str, dict]] = []
             batch_failed = False
             source_revisions = {
@@ -151,7 +194,7 @@ def analysis_daemon(config: dict):
                         ]
                         successful_results.append((track_id, path, result))
                     else:
-                        _mark_failed(track_id, "analysis_state")
+                        _mark_failed(track_id, "analysis_state", claim=track)
                         log.warning("Analysis returned no BPM for: %s", path)
             except Exception:
                 batch_failed = True
@@ -173,10 +216,10 @@ def analysis_daemon(config: dict):
                             ]
                             successful_results.append((track_id, path, result))
                         else:
-                            _mark_failed(track_id, "analysis_state")
+                            _mark_failed(track_id, "analysis_state", claim=track)
                             log.warning("Analysis returned no BPM for: %s", path)
                     except Exception:
-                        _mark_failed(track_id, "analysis_state")
+                        _mark_failed(track_id, "analysis_state", claim=track)
                         consecutive_failures += 1
                         log.warning("Analysis failed for: %s", path, exc_info=True)
 
@@ -190,7 +233,23 @@ def analysis_daemon(config: dict):
                             consecutive_failures = 0
 
             if successful_results:
-                _store_analysis_results(successful_results)
+                successful_results = [
+                    (tid, path, result)
+                    for tid, path, result in successful_results
+                    if _source_unchanged(claims[int(tid)], "analysis_state")
+                ]
+                _store_analysis_results(
+                    successful_results,
+                    claims=claims,
+                    signatures={
+                        int(tid): result_signature(
+                            "analysis",
+                            claims[int(tid)]["_source"],
+                            result.get("_components", []),
+                        )
+                        for tid, _path, result in successful_results
+                    },
+                )
                 for track_id, path, result in successful_results:
                     log.debug(
                         "Analyzed: %s — BPM %.1f, key %s",
@@ -246,10 +305,18 @@ def bliss_daemon(config: dict):
                 continue
 
             if _should_pause_for_load():
-                _release_claims([int(item["id"]) for item in batch], "bliss_state")
+                _release_claims(
+                    [int(item["id"]) for item in batch],
+                    "bliss_state",
+                    claims={int(item["id"]): item for item in batch},
+                )
                 time.sleep(LOAD_PAUSE)
                 continue
 
+            batch = _capture_sources(batch, "bliss_state")
+            if not batch:
+                continue
+            claims = {int(track["id"]): track for track in batch}
             successful_vectors: dict[int, list[float]] = {}
 
             tracks_by_directory: dict[str, list[dict]] = {}
@@ -280,11 +347,11 @@ def bliss_daemon(config: dict):
                         if vector and len(vector) == 20:
                             successful_vectors[int(track_id)] = vector
                         else:
-                            _mark_failed(track_id, "bliss_state")
+                            _mark_failed(track_id, "bliss_state", claim=track)
                             log.warning("Bliss returned invalid vector for: %s", path)
 
                     except Exception:
-                        _mark_failed(track_id, "bliss_state")
+                        _mark_failed(track_id, "bliss_state", claim=track)
                         consecutive_failures += 1
                         log.warning("Bliss failed for: %s", path, exc_info=True)
 
@@ -298,7 +365,21 @@ def bliss_daemon(config: dict):
                             consecutive_failures = 0
 
             if successful_vectors:
-                _store_bliss_vectors(successful_vectors)
+                successful_vectors = {
+                    tid: vector
+                    for tid, vector in successful_vectors.items()
+                    if _source_unchanged(claims[int(tid)], "bliss_state")
+                }
+                _store_bliss_vectors(
+                    successful_vectors,
+                    claims=claims,
+                    signatures={
+                        int(tid): result_signature(
+                            "bliss", claims[int(tid)]["_source"], ["crate-cli"]
+                        )
+                        for tid in successful_vectors
+                    },
+                )
                 for track in batch:
                     if int(track["id"]) in successful_vectors:
                         log.debug(

@@ -12,6 +12,71 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes AI configuration with native controls and operational limits", async () => {
+    window.history.pushState(null, "", "/operations/ai-agents");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "AI agents configuration",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Credential storage and rotation" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Limits and metering" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "MCP integrations" })
+        .getAttribute("href"),
+    ).toBe("/architecture/agents-and-mcp");
+  });
+
+  it("publishes the MCP architecture guide with operational reading paths", async () => {
+    window.history.pushState(null, "", "/architecture/agents-and-mcp");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", { name: "Agents and MCP", level: 1 }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "connection and operations" })
+        .getAttribute("href"),
+    ).toBe("/operations/crate-mcp");
+    expect(
+      screen
+        .getByRole("link", { name: "contract and acceptance" })
+        .getAttribute("href"),
+    ).toBe("/operations/crate-mcp-distribution");
+  });
+
+  it("publishes the MCP distribution guide and links back to connection guidance", async () => {
+    window.history.pushState(null, "", "/operations/crate-mcp-distribution");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Crate MCP distribution and acceptance",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("link", {
+          name: "connection guide",
+        }) as HTMLAnchorElement
+      ).getAttribute("href"),
+    ).toBe("/operations/crate-mcp");
+    expect(
+      (
+        screen.getByRole("link", {
+          name: "distributable JSON contract",
+        }) as HTMLAnchorElement
+      ).getAttribute("href"),
+    ).toMatch(/^\//);
+  });
+
   it("renders the home page", () => {
     render(<App />);
 

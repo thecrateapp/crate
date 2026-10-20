@@ -633,9 +633,11 @@ def get_genre_upcoming_shows(
                             LIMIT 3
                         ) AS artist_genres
                     FROM shows s
-                    JOIN genre_artists pa ON pa.artist_name = s.artist_name
+                    JOIN LATERAL (SELECT g.* FROM genre_artists g WHERE g.artist_name=s.artist_name OR g.artist_name=ANY(s.lineup)
+                        ORDER BY g.membership_score DESC,g.artist_name LIMIT 1) pa ON TRUE
                     LEFT JOIN library_artists la ON la.name = s.artist_name
                     WHERE s.date >= CURRENT_DATE
+                      AND s.merged_into_id IS NULL
                       AND COALESCE(s.status, '') != 'cancelled'
                       AND s.latitude IS NOT NULL
                       AND s.longitude IS NOT NULL

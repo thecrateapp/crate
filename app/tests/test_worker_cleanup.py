@@ -33,6 +33,11 @@ def test_service_cleanup_prunes_expired_recommendation_exposures(monkeypatch):
         lambda max_age_days: calls.append(f"logs:{max_age_days}"),
     )
 
+    monkeypatch.setattr(
+        "crate.db.repositories.show_extraction_jobs.cleanup_expired_show_sources",
+        lambda: calls.append("show_sources"),
+    )
     worker._run_periodic_cleanup()
+    assert "show_sources" in calls
 
     assert "recommendation_exposures" in calls
