@@ -68,6 +68,10 @@ def test_repository_keeps_the_local_cue_tempo(pg_db) -> None:
         intro_beat_ms=7_811,
         outro_bpm=121.6,
         outro_beat_ms=165_037,
+        intro_tempo_stability=0.97,
+        outro_tempo_stability=0.91,
+        intro_downbeat_ms=2_000,
+        outro_downbeat_ms=164_037,
     )
 
     assert upsert_track_mix_profile(track_id, mix_profile) is True
@@ -76,6 +80,8 @@ def test_repository_keeps_the_local_cue_tempo(pg_db) -> None:
     assert stored is not None
     assert (stored.intro_bpm, stored.intro_beat_ms) == (121.0, 7_811)
     assert (stored.outro_bpm, stored.outro_beat_ms) == (121.6, 165_037)
+    assert (stored.intro_tempo_stability, stored.outro_tempo_stability) == (0.97, 0.91)
+    assert (stored.intro_downbeat_ms, stored.outro_downbeat_ms) == (2_000, 164_037)
 
 
 def test_legacy_profile_without_decoder_duration_is_marked_as_library(pg_db) -> None:

@@ -26,9 +26,15 @@ const MEASUREMENT_WINDOW_MS: u64 = 5_000;
 const DOWNBEAT_MIN_CONFIDENCE: f32 = 0.65;
 const FULL_SCAN_HEAD_SECONDS: u32 = 600;
 const FULL_SCAN_TAIL_SECONDS: u32 = 120;
-const LOCAL_TEMPO_BEATS: usize = 16;
+const LOCAL_TEMPO_BEATS: usize = 24;
 const LOCAL_TEMPO_MIN_BEATS: usize = 8;
 const LOCAL_TEMPO_OUTLIER_MS: f64 = 6.0;
+const LOCAL_OUTLIER_SIGMAS: f64 = 3.0;
+const LOCAL_DRIFT_LIMIT: f64 = 0.10;
+const LOCAL_JITTER_LIMIT: f32 = 0.20;
+const CUE_DOWNBEAT_BEATS: usize = 32;
+const LOCAL_MIX_WINDOW_MS: f64 = 12_000.0;
+const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -672,73 +678,191 @@ fn fit_beats(beats: &[(f64, f64)]) -> Option<BeatFit> {
     })
 }
 
-/// Tempo and a fitted beat position from the beats around a cue.
-///
-/// The planner phases the decks at the cues, so a tempo that drifts across
-/// the track must be measured where the mix happens instead of extrapolated
-/// from the global tempo and the downbeat anchor.
-fn local_tempo(beat_grid_ms: &[u64], cue_ms: Option<u64>) -> (Option<f32>, Option<u64>) {
-    let Some(cue_ms) = cue_ms else {
-        return (None, None);
-    };
-    if beat_grid_ms.len() < 4 {
-        return (None, None);
-    }
-    let nearest = beat_grid_ms
+#[derive(Debug, Clone, Copy)]
+struct LocalBeat {
+    bpm: f32,
+    beat_ms: Option<u64>,
+    stability: f32,
+}
+
+fn nearest_beat(beat_grid_ms: &[u64], cue_ms: u64) -> usize {
+    beat_grid_ms
         .iter()
         .enumerate()
         .min_by_key(|(_, position)| position.abs_diff(cue_ms))
-        .map_or(0, |(index, _)| index);
-    let count = LOCAL_TEMPO_BEATS.min(beat_grid_ms.len());
-    let start = nearest
-        .saturating_sub(count / 2)
-        .min(beat_grid_ms.len() - count);
+        .map_or(0, |(index, _)| index)
+}
+
+fn mix_window_beats(beat_grid_ms: &[u64]) -> usize {
+    let mut intervals: Vec<u64> = beat_grid_ms
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    intervals.sort_unstable();
+    let interval = intervals.get(intervals.len() / 2).copied().unwrap_or(0) as f64;
+    if interval <= 0.0 {
+        return LOCAL_TEMPO_BEATS;
+    }
+    LOCAL_TEMPO_BEATS.max((LOCAL_MIX_WINDOW_MS / interval).ceil() as usize)
+}
+
+fn window_start(len: usize, nearest: usize, count: usize) -> usize {
+    nearest.saturating_sub(count / 2).min(len - count)
+}
+
+/// Tempo, a fitted beat position and beat stability from the beats around a cue.
+///
+/// The planner phases the decks at the cues, so tempo and stability are measured
+/// over the longest mix the planner allows (12 s, never fewer than 24 beats) instead
+/// of across the whole track: a breakdown elsewhere must not hide a steady outro,
+/// and a messy outro must not pass because the rest of the track is steady. The
+/// window clamps at the track ends, so it runs forward from an intro cue and
+/// backward from an outro cue.
+///
+/// Tempo, the beat reference and tempo drift come from regressions over the refined
+/// beats, which average their per-beat attack noise: refined attacks on real
+/// recordings scatter by tens of milliseconds even when the pulse is steady. A
+/// drift of d across the window moves beats about d * beats * period / 8 off the
+/// fitted line, so the limit is far tighter than for a whole track: 2% drift, about
+/// 30 ms at 120 BPM over 24 beats, still reads as steady. Jitter comes from the
+/// tracker beats of the same window, which stay regular on steady music, after
+/// removing the half-frame alternation that frame quantization adds to any pulse.
+fn local_beat(
+    beat_grid_ms: &[u64],
+    beat_frames: &[usize],
+    sample_rate: u32,
+    cue_ms: Option<u64>,
+) -> Option<LocalBeat> {
+    let cue_ms = cue_ms?;
+    if beat_grid_ms.len() < 4 || beat_frames.len() != beat_grid_ms.len() {
+        return None;
+    }
+    let nearest = nearest_beat(beat_grid_ms, cue_ms);
+    let count = mix_window_beats(beat_grid_ms).min(beat_grid_ms.len());
+    let start = window_start(beat_grid_ms.len(), nearest, count);
     let mut beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
         .iter()
         .enumerate()
         .map(|(offset, time)| ((start + offset) as f64, *time as f64))
         .collect();
-    let Some(mut fit) = fit_beats(&beats) else {
-        return (None, None);
-    };
+    let mut fit = fit_beats(&beats)?;
     while beats.len() > LOCAL_TEMPO_MIN_BEATS {
-        let (worst, residual) = beats
+        let residuals: Vec<f64> = beats
             .iter()
+            .map(|(index, time)| (time - fit.time_at(*index)).abs())
+            .collect();
+        let mut ordered = residuals.clone();
+        ordered.sort_by(|left, right| left.total_cmp(right));
+        let sigma = 1.4826 * ordered[ordered.len() / 2];
+        let limit = LOCAL_TEMPO_OUTLIER_MS.max(LOCAL_OUTLIER_SIGMAS * sigma);
+        let (worst, residual) = residuals
+            .iter()
+            .copied()
             .enumerate()
-            .map(|(position, (index, time))| (position, (time - fit.time_at(*index)).abs()))
             .max_by(|left, right| left.1.total_cmp(&right.1))
             .unwrap_or((0, 0.0));
-        if residual <= LOCAL_TEMPO_OUTLIER_MS {
+        if residual <= limit {
             break;
         }
         beats.remove(worst);
-        match fit_beats(&beats) {
-            Some(refit) => fit = refit,
-            None => return (None, None),
-        }
+        fit = fit_beats(&beats)?;
     }
+    let half = beats.len() / 2;
+    let drift = match (fit_beats(&beats[..half]), fit_beats(&beats[half..])) {
+        (Some(first), Some(second)) => (first.period - second.period).abs() / fit.period,
+        _ => 1.0,
+    };
+    let half_frame_ratio = (0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate)) / fit.period;
+    let jitter = (interval_jitter(&frame_intervals_ms(
+        &beat_frames[start..start + count],
+        sample_rate,
+    ))
+    .unwrap_or(1.0)
+        - half_frame_ratio as f32)
+        .max(0.0);
+    let stability =
+        (1.0 - (drift / LOCAL_DRIFT_LIMIT) as f32 - jitter / LOCAL_JITTER_LIMIT).clamp(0.0, 1.0);
     let reference = fit.time_at(nearest as f64);
-    (
-        Some((60_000.0 / fit.period) as f32),
-        (reference >= 0.0).then(|| reference.round() as u64),
-    )
+    Some(LocalBeat {
+        bpm: (60_000.0 / fit.period) as f32,
+        beat_ms: (reference >= 0.0).then(|| reference.round() as u64),
+        stability,
+    })
 }
 
-fn tempo_features(
+/// The bar downbeat nearest a cue, phased only from the beats around that cue so a
+/// dropped beat or a section change elsewhere in the track cannot shift it.
+fn cue_downbeat_ms(
+    features: &beat_tracking::FrameFeatures,
     beat_frames: &[usize],
-    onsets: &[f32],
-    sample_rate: u32,
-) -> (Option<f32>, f32, f32) {
-    if beat_frames.len() < 4 {
-        return (None, 0.0, 0.0);
+    beat_grid_ms: &[u64],
+    cue_ms: Option<u64>,
+) -> Option<u64> {
+    let cue_ms = cue_ms?;
+    if beat_frames.len() != beat_grid_ms.len() || beat_grid_ms.is_empty() {
+        return None;
     }
-    let intervals: Vec<f32> = beat_frames
+    let nearest = nearest_beat(beat_grid_ms, cue_ms);
+    let count = CUE_DOWNBEAT_BEATS.min(beat_frames.len());
+    let start = window_start(beat_frames.len(), nearest, count);
+    let phase = beat_tracking::window_downbeat_phase(features, &beat_frames[start..start + count])?;
+    let first = start + phase;
+    let bars = ((nearest as f64 - first as f64) / 4.0).round().max(0.0) as usize;
+    let mut index = first + bars * 4;
+    while index >= beat_grid_ms.len() && index >= 4 {
+        index -= 4;
+    }
+    beat_grid_ms.get(index).copied()
+}
+
+struct TempoFeatures {
+    frame_bpm: Option<f32>,
+    stability: f32,
+    strength_ratio: f32,
+    coverage: f32,
+}
+
+impl TempoFeatures {
+    const EMPTY: Self = Self {
+        frame_bpm: None,
+        stability: 0.0,
+        strength_ratio: 0.0,
+        coverage: 0.0,
+    };
+
+    fn confidence(&self, stability: f32) -> f32 {
+        (0.5 * stability + 0.35 * self.strength_ratio + 0.15 * self.coverage).clamp(0.0, 1.0)
+    }
+}
+
+fn frame_intervals_ms(beat_frames: &[usize], sample_rate: u32) -> Vec<f32> {
+    beat_frames
         .windows(2)
         .map(|pair| (pair[1] - pair[0]) as f32 * HOP_SIZE as f32 * 1_000.0 / sample_rate as f32)
+        .collect()
+}
+
+fn interval_jitter(intervals: &[f32]) -> Option<f32> {
+    let median_interval = median(intervals);
+    if intervals.is_empty() || median_interval <= 0.0 {
+        return None;
+    }
+    let residuals: Vec<f32> = intervals
+        .iter()
+        .map(|interval| (interval - median_interval).abs())
         .collect();
-    let median_interval = median(&intervals);
+    Some(median(&residuals) / median_interval)
+}
+
+/// Steadiness of a run of beat intervals: penalises tempo drift between its first and
+/// last thirds and the median interval jitter.
+fn interval_stability(intervals: &[f32]) -> Option<f32> {
+    if intervals.len() < 3 {
+        return None;
+    }
+    let median_interval = median(intervals);
     if median_interval <= 0.0 {
-        return (None, 0.0, 0.0);
+        return None;
     }
     let third = (intervals.len() / 3).max(2).min(intervals.len());
     let early_interval = median(&intervals[..third]);
@@ -749,7 +873,17 @@ fn tempo_features(
         .map(|interval| (interval - median_interval).abs())
         .collect();
     let jitter_ratio = median(&residuals) / median_interval;
-    let stability = (1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20).clamp(0.0, 1.0);
+    Some((1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20).clamp(0.0, 1.0))
+}
+
+fn tempo_features(beat_frames: &[usize], onsets: &[f32], sample_rate: u32) -> TempoFeatures {
+    if beat_frames.len() < 4 {
+        return TempoFeatures::EMPTY;
+    }
+    let intervals = frame_intervals_ms(beat_frames, sample_rate);
+    let Some(stability) = interval_stability(&intervals) else {
+        return TempoFeatures::EMPTY;
+    };
 
     let beat_strength = beat_frames
         .iter()
@@ -759,10 +893,13 @@ fn tempo_features(
     let reference = percentile(onsets, 0.95) + f32::EPSILON;
     let strength_ratio = (beat_strength / reference).clamp(0.0, 1.0);
     let coverage = (beat_frames.len() as f32 / 16.0).clamp(0.0, 1.0);
-    let confidence = (0.5 * stability + 0.35 * strength_ratio + 0.15 * coverage).clamp(0.0, 1.0);
     let mean_interval = intervals.iter().sum::<f32>() / intervals.len() as f32;
-    let bpm = 60_000.0 / mean_interval;
-    (Some(bpm), confidence, stability)
+    TempoFeatures {
+        frame_bpm: Some(60_000.0 / mean_interval),
+        stability,
+        strength_ratio,
+        coverage,
+    }
 }
 
 fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
@@ -922,16 +1059,9 @@ pub fn analyze_smart_mix_segments(
     let onsets = &features.onsets;
     let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
     let beat_grid_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
-    let (frame_bpm, bpm_confidence, tempo_stability) =
-        tempo_features(&beat_frames, onsets, sample_rate);
-    let bpm = grid_bpm(&beat_grid_ms).or(frame_bpm);
-    let downbeat_anchor_ms = if bpm_confidence >= DOWNBEAT_MIN_CONFIDENCE {
-        beat_tracking::downbeat_phase(&features, &beat_frames)
-            .and_then(|phase| beat_grid_ms.get(phase).copied())
-    } else {
-        None
-    };
-    let time_signature = downbeat_anchor_ms.map(|_| 4);
+    let tempo = tempo_features(&beat_frames, onsets, sample_rate);
+    let tempo_stability = tempo.stability;
+    let bpm = grid_bpm(&beat_grid_ms).or(tempo.frame_bpm);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
     let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
@@ -956,12 +1086,31 @@ pub fn analyze_smart_mix_segments(
             sample_rate,
         ),
     };
-    let (intro_bpm, intro_beat_ms) = local_tempo(&beat_grid_ms, intro_cue_ms);
-    let (outro_bpm, outro_beat_ms) = if tail.is_none() {
-        local_tempo(&beat_grid_ms, outro_cue_ms)
+    let intro_local = local_beat(&beat_grid_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let outro_local = if tail.is_none() {
+        local_beat(&beat_grid_ms, &beat_frames, sample_rate, outro_cue_ms)
     } else {
-        (None, None)
+        None
     };
+    let cue_stability = intro_local
+        .zip(outro_local)
+        .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
+    let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
+    let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
+    let intro_downbeat_ms = downbeat_detectable
+        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, intro_cue_ms))
+        .flatten();
+    let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
+        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, outro_cue_ms))
+        .flatten();
+    let downbeat_anchor_ms = downbeat_detectable
+        .then(|| {
+            beat_tracking::downbeat_phase(&features, &beat_frames)
+                .and_then(|phase| beat_grid_ms.get(phase).copied())
+        })
+        .flatten()
+        .or(intro_downbeat_ms);
+    let time_signature = downbeat_anchor_ms.map(|_| 4);
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -969,16 +1118,18 @@ pub fn analyze_smart_mix_segments(
     let outro_lufs = loudness.zip(active_end_ms).and_then(|(summary, end_ms)| {
         summary.window_lufs(end_ms.saturating_sub(MEASUREMENT_WINDOW_MS), end_ms)
     });
-    let quality = if tail.is_none()
-        && beat_grid_ms.len() >= 12
-        && bpm_confidence >= 0.75
-        && tempo_stability >= 0.8
-        && downbeat_anchor_ms.is_some()
-    {
-        "full"
-    } else {
-        "partial"
-    };
+    let steady_cues = intro_local.zip(outro_local).is_some_and(|(intro, outro)| {
+        intro.beat_ms.is_some()
+            && outro.beat_ms.is_some()
+            && intro.stability >= FULL_PROFILE_MIN_STABILITY
+            && outro.stability >= FULL_PROFILE_MIN_STABILITY
+    });
+    let quality =
+        if tail.is_none() && beat_grid_ms.len() >= 12 && bpm_confidence >= 0.75 && steady_cues {
+            "full"
+        } else {
+            "partial"
+        };
 
     SmartMixProfileResult {
         schema_version: 1,
@@ -999,10 +1150,14 @@ pub fn analyze_smart_mix_segments(
         key_confidence: Some(key_confidence),
         intro_cue_ms,
         outro_cue_ms,
-        intro_bpm,
-        intro_beat_ms,
-        outro_bpm,
-        outro_beat_ms,
+        intro_bpm: intro_local.map(|local| local.bpm),
+        intro_beat_ms: intro_local.and_then(|local| local.beat_ms),
+        outro_bpm: outro_local.map(|local| local.bpm),
+        outro_beat_ms: outro_local.and_then(|local| local.beat_ms),
+        intro_tempo_stability: intro_local.map(|local| local.stability),
+        outro_tempo_stability: outro_local.map(|local| local.stability),
+        intro_downbeat_ms,
+        outro_downbeat_ms,
         intro_lufs: intro_lufs.map(|value| value as f32),
         outro_lufs: outro_lufs.map(|value| value as f32),
         true_peak_dbfs: loudness

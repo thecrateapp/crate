@@ -151,6 +151,139 @@ def test_degrades_unsafe_beatmatch_to_adaptive(
     assert plan.bass_handoff == "none"
 
 
+def _beat_only(track_uid: str, **overrides: object) -> TrackMixProfile:
+    values: dict[str, object] = {
+        "quality": MixProfileQuality.PARTIAL,
+        "downbeat_anchor_ms": None,
+        "time_signature": None,
+        "intro_bpm": 120.0,
+        "intro_beat_ms": 7_750,
+        "outro_bpm": 120.0,
+        "outro_beat_ms": 164_900,
+    }
+    values.update(overrides)
+    return _profile(track_uid, **values)
+
+
+def test_partial_profiles_without_a_downbeat_beatmatch_on_local_beats() -> None:
+    outgoing = _beat_only("outgoing")
+    incoming = _beat_only("incoming")
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.fallback_reason is None
+    beat_ms = 60_000 / 120.0
+    outgoing_phase = (plan.outgoing_cue_ms - 164_900) % beat_ms
+    incoming_phase = (plan.incoming_cue_ms - 7_750) % beat_ms
+    assert plan.beat_phase_offset_ms == round(
+        (outgoing_phase - incoming_phase) % beat_ms
+    )
+
+
+@pytest.mark.parametrize(
+    ("outgoing", "incoming", "reason"),
+    [
+        (
+            _beat_only("outgoing", outro_beat_ms=None),
+            _beat_only("incoming"),
+            TransitionFallbackReason.LOW_CONFIDENCE,
+        ),
+        (
+            _beat_only("outgoing"),
+            _beat_only("incoming", intro_bpm=None),
+            TransitionFallbackReason.LOW_CONFIDENCE,
+        ),
+        (
+            _beat_only("outgoing", tempo_stability=0.6),
+            _beat_only("incoming"),
+            TransitionFallbackReason.UNSTABLE_TEMPO,
+        ),
+        (
+            _beat_only("outgoing", bpm_confidence=0.5),
+            _beat_only("incoming"),
+            TransitionFallbackReason.LOW_CONFIDENCE,
+        ),
+        (
+            _beat_only("outgoing", quality=MixProfileQuality.LEGACY),
+            _beat_only("incoming"),
+            TransitionFallbackReason.LOW_CONFIDENCE,
+        ),
+    ],
+)
+def test_partial_profiles_still_need_reliable_beats_at_both_cues(
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    reason: TransitionFallbackReason,
+) -> None:
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is TransitionMode.ADAPTIVE
+    assert plan.fallback_reason is reason
+
+
+@pytest.mark.parametrize(
+    ("track_stability", "cue_stability", "mode"),
+    [
+        (0.40, 0.95, TransitionMode.BEATMATCH),
+        (0.95, 0.50, TransitionMode.ADAPTIVE),
+        (0.95, None, TransitionMode.BEATMATCH),
+    ],
+)
+def test_the_stability_at_the_mixed_cue_decides_beatmatch(
+    track_stability: float, cue_stability: float | None, mode: TransitionMode
+) -> None:
+    outgoing = _beat_only(
+        "outgoing", tempo_stability=track_stability, outro_tempo_stability=cue_stability
+    )
+    incoming = _beat_only(
+        "incoming", tempo_stability=track_stability, intro_tempo_stability=cue_stability
+    )
+
+    plan = plan_transition(outgoing, incoming, _context(source="radio"))
+
+    assert plan.mode is mode
+    if mode is TransitionMode.ADAPTIVE:
+        assert plan.fallback_reason is TransitionFallbackReason.UNSTABLE_TEMPO
+
+
+@pytest.mark.parametrize(
+    ("bpm", "preferred_ms", "mode"),
+    [
+        (120.0, 3_000, TransitionMode.ADAPTIVE),
+        (120.0, 4_000, TransitionMode.BEATMATCH),
+        (150.0, 3_500, TransitionMode.BEATMATCH),
+    ],
+)
+def test_beatmatch_needs_two_bars_of_overlap(
+    bpm: float, preferred_ms: int, mode: TransitionMode
+) -> None:
+    outgoing = _profile("outgoing", bpm=bpm)
+    incoming = _profile("incoming", bpm=bpm)
+
+    plan = plan_transition(
+        outgoing,
+        incoming,
+        _context(source="radio", preferred_duration_ms=preferred_ms),
+    )
+
+    assert plan.mode is mode
+    if mode is TransitionMode.ADAPTIVE:
+        assert plan.fallback_reason is TransitionFallbackReason.INSUFFICIENT_WINDOW
+        assert plan.incoming_tempo_ratio == 1.0
+        assert plan.bass_handoff == "none"
+
+
+def test_an_unknown_meter_does_not_block_beatmatch() -> None:
+    plan = plan_transition(
+        _profile("outgoing", time_signature=None),
+        _beat_only("incoming"),
+        _context(source="radio"),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+
+
 def test_missing_profile_uses_fixed_safe_fallback() -> None:
     plan = plan_transition(
         None,

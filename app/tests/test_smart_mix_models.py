@@ -163,6 +163,22 @@ def test_summary_exposes_the_local_cue_tempo() -> None:
     assert payload["outroBeatMs"] == 165_037
 
 
+def test_cue_beat_measurements_are_validated_and_exposed() -> None:
+    payload = profile(
+        intro_tempo_stability=1.3,
+        outro_tempo_stability=0.82,
+        intro_downbeat_ms=2_000,
+        outro_downbeat_ms=162_000,
+    ).to_summary_dict()
+
+    assert payload["introTempoStability"] == 1.0
+    assert payload["outroTempoStability"] == 0.82
+    assert payload["introDownbeatMs"] == 2_000
+    assert payload["outroDownbeatMs"] == 162_000
+    with pytest.raises((TypeError, ValueError)):
+        profile(outro_downbeat_ms=-1)
+
+
 def test_rust_payload_carries_the_local_cue_tempo() -> None:
     draft = mix_profile_draft_from_payload(
         {
@@ -173,11 +189,17 @@ def test_rust_payload_carries_the_local_cue_tempo() -> None:
             "introBeatMs": 7_811,
             "outroBpm": 121.6,
             "outroBeatMs": 145_930,
+            "introTempoStability": 0.97,
+            "outroTempoStability": 0.91,
+            "introDownbeatMs": 2_011,
+            "outroDownbeatMs": 144_000,
         }
     )
 
     assert (draft.intro_bpm, draft.intro_beat_ms) == (121.0, 7_811)
     assert (draft.outro_bpm, draft.outro_beat_ms) == (121.6, 145_930)
+    assert (draft.intro_tempo_stability, draft.outro_tempo_stability) == (0.97, 0.91)
+    assert (draft.intro_downbeat_ms, draft.outro_downbeat_ms) == (2_011, 144_000)
 
 
 @pytest.mark.parametrize(
