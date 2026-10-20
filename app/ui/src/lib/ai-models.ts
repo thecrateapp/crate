@@ -294,10 +294,30 @@ function featureCount(n: number): string {
   return `${formatCount(n)} ${n === 1 ? "feature" : "features"}`;
 }
 
-/** The toast description after «Use for all features». */
+function staysOffText(
+  outcomes: AssignmentOutcome[],
+  actions: Pick<Action, "id" | "label">[],
+): string {
+  const off = outcomes.filter(staysOffAfterApply);
+  if (off.length === 0) return "";
+  const labels = off.map(
+    (outcome) =>
+      actions.find((action) => action.id === outcome.action_id)?.label,
+  );
+  if (off.length === 1 && labels[0]) {
+    return ` ${labels[0]} stays off. Turn it on in Features.`;
+  }
+  if (off.length === 2 && labels[0] && labels[1]) {
+    return ` ${labels[0]} and ${labels[1]} stay off. Turn them on in Features.`;
+  }
+  return ` ${formatCount(off.length)} stay off. Turn them on in Features.`;
+}
+
+/** The toast description after «Use for all features»: only what will run. */
 export function assignmentSummary(
   modelId: string,
   outcomes: AssignmentOutcome[],
+  actions: Pick<Action, "id" | "label">[],
 ): string {
   const groups = outcomeGroups(outcomes);
   const kept =
@@ -306,7 +326,10 @@ export function assignmentSummary(
       : "";
   const turnedOff =
     groups.turnedOff > 0 ? ` ${formatCount(groups.turnedOff)} turned off.` : "";
-  return `${modelId} now runs ${featureCount(groups.uses)}.${kept}${turnedOff}`;
+  return `${modelId} now runs ${featureCount(groups.uses)}.${kept}${turnedOff}${staysOffText(
+    outcomes,
+    actions,
+  )}`;
 }
 
 export interface ReasoningPreset {
@@ -764,15 +787,38 @@ export function formatCount(n: number): string {
 
 export interface OutcomeGroups {
   uses: number;
+  staysOff: number;
   kept: number;
   turnedOff: number;
   blocked: number;
 }
 
+/**
+ * The feature takes the model but its switch stays off: setup never turns a
+ * feature on that is off now.
+ */
+export function staysOffAfterApply(outcome: AssignmentOutcome): boolean {
+  return (
+    (outcome.outcome === "applied" || outcome.outcome === "unchanged") &&
+    outcome.enabled === false
+  );
+}
+
 export function outcomeGroups(outcomes: AssignmentOutcome[]): OutcomeGroups {
-  const groups: OutcomeGroups = { uses: 0, kept: 0, turnedOff: 0, blocked: 0 };
+  const groups: OutcomeGroups = {
+    uses: 0,
+    staysOff: 0,
+    kept: 0,
+    turnedOff: 0,
+    blocked: 0,
+  };
   for (const outcome of outcomes) {
-    if (outcome.outcome === "applied" || outcome.outcome === "unchanged") {
+    if (staysOffAfterApply(outcome)) {
+      groups.staysOff += 1;
+    } else if (
+      outcome.outcome === "applied" ||
+      outcome.outcome === "unchanged"
+    ) {
       groups.uses += 1;
     } else if (
       outcome.outcome === "kept_legacy" ||

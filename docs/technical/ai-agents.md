@@ -147,12 +147,17 @@ snapshot otherwise. Before activation, an image action that can keep neither, an
 fails only the image checks, is turned off instead of blocking setup: its outcome is
 `turned_off`, with the model's reason (for example `AI_ACTION_NEEDS_IMAGE`) and
 `enabled: false`, and it is bound switched off to its own profile on the chosen
-model, derived with the same limits but validated against the model alone. A
-disabled binding is validated at profile level only (enabled connection, validated
-model, native options); an enabled one is always validated for its action, image
-input and image token bound included, so turning that feature on through
-`/bindings` or the Features switch is rejected with the action's code until it is
-given a model that reads images. The legacy activation path applies the same rule.
+model, derived with the same limits but validated against the model alone. When
+that replaces a binding the operator made before setup, the outcome also sets
+`replaces_current`. A disabled binding to a normal profile is validated at profile
+level only (enabled connection, validated model, native options); a disabled
+binding to a legacy snapshot is still validated for its action, so a snapshot stays
+restricted to its own feature. An enabled binding is always validated for its
+action, image input and image token bound included, so turning that feature on
+through `/bindings` or the Features switch is rejected with the action's code until
+it is given a model that reads images. The legacy activation path applies the same
+rule to every binding it writes, so an enabled image binding whose model can no
+longer run it fails activation with that code.
 Only an action left with no such fallback, such as one without enough context on
 the chosen model, still fails the whole assignment closed with `AI_SETUP_BLOCKED`,
 and activation itself stays all-or-nothing across the eleven actions. After
@@ -163,6 +168,15 @@ without the explicit opt-in (`CRATE_ENABLE_PATH_LLM_REFINEMENT=1`, an
 `ollama/` `LLM_PROVIDER` or a stored model setting). The snapshot reports this as
 `legacy_actions[].legacy_enabled`, and each assignment outcome carries the
 feature's resulting `enabled` state.
+
+Assigning a model never turns a feature on. A feature that is off keeps its switch
+off when a later default can run it: the model is applied to its own profile and the
+outcome is `applied` with `enabled: false`. The review lists such features under
+«Stay off», the confirmation counts only the features that will run, and the
+operator turns them on in Features, where the binding is validated in full. Only a
+dry run can tell, so when a feature is off and the chosen model is not the current
+default, the admin UI runs one first and shows the review if any such feature would
+take the model.
 
 A profile is **owned** by an action only when it is referenced by exactly one
 binding and labelled for that action. Assigning a model reuses or appends to an

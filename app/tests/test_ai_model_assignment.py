@@ -419,8 +419,10 @@ def test_text_only_first_use_turns_off_image_features_instead_of_blocking(
             "reason": "AI_ACTION_NEEDS_IMAGE",
             "adjustments": [],
             "enabled": False,
+            "replaces_current": False,
         }
     assert {outcomes[a]["outcome"] for a in TEXT_ACTIONS} == {"applied"}
+    assert {outcomes[a]["replaces_current"] for a in TEXT_ACTIONS} == {False}
     ModelAssignmentResult.model_validate(preview)
     assert write_counts() == before
 
@@ -624,6 +626,140 @@ def test_legacy_activation_keeps_an_image_feature_off_on_a_text_model(
     vision = store.get_binding("shows.extract.vision")
     assert (vision["profile_id"], vision["enabled"]) == (text["id"], False)
     assert bound_config("artwork.hero.analyze")["kind"] == "legacy_snapshot"
+
+
+def gemini_connection(*model_ids):
+    conn = service.create_connection({"label": "Gemini", "provider": "gemini"}, None)
+    catalog = [
+        model_capabilities("gemini", m).model_dump(mode="json") for m in model_ids
+    ]
+    return store.save_model_catalog(conn["id"], catalog, "ready", conn["revision"])
+
+
+def vision_on_a_text_only_refresh():
+    """Bound on while its model read images; a later refresh says it no longer does."""
+    conn = gemini_connection("gemini-3.8-flash")
+    reader = service.create_profile(
+        {
+            "label": "Poster reader",
+            "connection_id": conn["id"],
+            "model_id": "gemini-3.8-flash",
+            "config": {},
+        },
+        None,
+    )
+    bind("shows.extract.vision", reader["id"])
+    text_only = model_capabilities("gemini", "gemini-3.8-flash").model_dump(
+        mode="json"
+    ) | {"input_modalities": ["text"]}
+    store.save_model_catalog(conn["id"], [text_only], "ready", conn["revision"])
+
+
+def vision_on_an_unknown_image_bound():
+    """Bound on before bindings checked image admission: only an enabled-aware
+    validator rejects it, since the model reads images and the profile is valid."""
+    env = store.get_connection(service._env_id("gemini"))
+    unbounded = service.create_profile(
+        {
+            "label": "Poster reader",
+            "connection_id": env["id"],
+            "model_id": "gemini-2.5-flash",
+            "config": {},
+        },
+        None,
+    )
+    store.apply_bindings(
+        [
+            {
+                "action_id": "shows.extract.vision",
+                "profile_id": unbounded["id"],
+                "profile_version": 1,
+                "enabled": True,
+                "expected_revision": 0,
+            }
+        ],
+        None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("bound_on", "code"),
+    [
+        (vision_on_a_text_only_refresh, "AI_ACTION_NEEDS_IMAGE"),
+        (vision_on_an_unknown_image_bound, "AI_IMAGE_BOUND_UNKNOWN"),
+    ],
+)
+def test_legacy_activation_rejects_an_enabled_image_feature_its_model_cannot_run(
+    pg_db, monkeypatch, bound_on, code
+):
+    gemini_environment(monkeypatch)
+    bound_on()
+    before = write_counts()
+
+    with pytest.raises(AIConfigurationError) as error:
+        activate_legacy()
+
+    assert error.value.code == code
+    assert write_counts() == before
+    assert store.configuration_state()["active"] is False
+
+
+def test_a_turned_off_feature_stays_off_when_a_later_default_can_run_it(
+    pg_db, monkeypatch
+):
+    ollama_environment(monkeypatch)
+    assign("env:ollama", "qwen3:8b")
+    turned_off = {a: store.get_binding(a) for a in IMAGE_ACTIONS}
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key-for-assignment")
+    gemini = service.ensure_environment_connection("gemini")
+    store.save_model_catalog(
+        gemini["id"],
+        [model_capabilities("gemini", "gemini-3.8-flash").model_dump(mode="json")],
+        "ready",
+        gemini["revision"],
+    )
+
+    result = assign("env:gemini", "gemini-3.8-flash", LEVEL_HIGH)
+
+    assert result["activation"] is False
+    outcomes = outcomes_by_action(result)
+    for action_id in IMAGE_ACTIONS:
+        assert (outcomes[action_id]["outcome"], outcomes[action_id]["enabled"]) == (
+            "applied",
+            False,
+        )
+        binding = store.get_binding(action_id)
+        assert binding["enabled"] is False
+        assert binding["revision"] == turned_off[action_id]["revision"] + 1
+        # Appended to the feature's own profile, never a new one.
+        assert (binding["profile_id"], binding["profile_version"]) == (
+            turned_off[action_id]["profile_id"],
+            2,
+        )
+        assert bound_version(action_id)["model_id"] == "gemini-3.8-flash"
+    switches = {outcomes[a]["enabled"] for a in TEXT_ACTIONS}
+    assert switches == {True, False}  # Music Paths refinement keeps its opt-in.
+
+    vision = store.get_binding("shows.extract.vision")
+    (enabled,) = service.apply_bindings(
+        [
+            {
+                "action_id": "shows.extract.vision",
+                "profile_id": vision["profile_id"],
+                "profile_version": vision["profile_version"],
+                "enabled": True,
+                "expected_revision": vision["revision"],
+            }
+        ],
+        None,
+    )
+
+    assert enabled["enabled"] is True
+    context = service.resolve_action("shows.extract.vision")
+    assert (context["model_id"], context["image_token_bound"]) == (
+        "gemini-3.8-flash",
+        4096,
+    )
 
 
 def test_after_activation_incompatible_features_keep_their_binding(pg_db, monkeypatch):
@@ -1070,7 +1206,10 @@ def test_pre_activation_bound_incompatible_feature_turns_off_an_invalid_binding(
     assert outcomes["shows.extract.vision"]["outcome"] == "turned_off"
     assert outcomes["shows.extract.vision"]["reason"] == "AI_ACTION_NEEDS_IMAGE"
     assert outcomes["shows.extract.vision"]["enabled"] is False
+    # The operator's own binding is replaced, not just switched off.
+    assert outcomes["shows.extract.vision"]["replaces_current"] is True
     assert outcomes["artwork.hero.analyze"]["outcome"] == "kept_legacy"
+    assert outcomes["artwork.hero.analyze"]["replaces_current"] is False
 
     result = assign(ollama["id"], "qwen3:8b")
 

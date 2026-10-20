@@ -253,6 +253,8 @@ class AssignmentOutcome(ClosedModel):
     )
     # The feature's switch after applying: False when turned off, None if blocked.
     enabled: bool | None = None
+    # Turned off by rebinding an existing binding to the chosen model.
+    replaces_current: bool = False
 
 
 class ModelAssignmentResult(ClosedModel):

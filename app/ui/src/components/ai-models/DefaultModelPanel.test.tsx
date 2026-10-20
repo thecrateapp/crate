@@ -318,13 +318,16 @@ describe("DefaultModelPanel", () => {
 
   it("turns off image features the model can't run and still confirms", async () => {
     const turnedOff = [
-      outcome(
-        "shows.extract.vision",
-        "turned_off",
-        "AI_ACTION_NEEDS_IMAGE",
-        [],
-        false,
-      ),
+      {
+        ...outcome(
+          "shows.extract.vision",
+          "turned_off",
+          "AI_ACTION_NEEDS_IMAGE",
+          [],
+          false,
+        ),
+        replaces_current: true,
+      },
       outcome("shows.extract.text", "applied"),
       outcome("genres.eq.propose", "applied"),
       outcome("music_paths.refine", "applied", null, [], false),
@@ -347,7 +350,9 @@ describe("DefaultModelPanel", () => {
     });
     expect(within(group).getByText("Extract shows from image")).toBeVisible();
     expect(
-      within(group).getByText("Needs a model that reads images"),
+      within(group).getByText(
+        "Needs a model that reads images · Replaces its current model",
+      ),
     ).toBeVisible();
     expect(
       within(group).getByText(
@@ -356,11 +361,13 @@ describe("DefaultModelPanel", () => {
     ).toBeVisible();
     expect(within(dialog).queryByText(/Can't be set up/)).toBeNull();
     expect(
-      within(dialog).queryByText("Extract shows from image stays off."),
-    ).toBeNull();
-    expect(
-      within(dialog).getByText("Refine Music Path stays off."),
+      within(dialog).getByText("Will use gemini-3.8-flash (2)"),
     ).toBeVisible();
+    const staysOff = within(dialog).getByRole("region", {
+      name: "Stay off (1)",
+    });
+    expect(within(staysOff).getByText("Refine Music Path")).toBeVisible();
+    expect(within(staysOff).queryByText("Extract shows from image")).toBeNull();
     expect(dialog.textContent).not.toContain("AI_ACTION_NEEDS_IMAGE");
     const confirm = within(dialog).getByRole("button", {
       name: "Use for all features",
@@ -371,9 +378,113 @@ describe("DefaultModelPanel", () => {
 
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith("Default model updated", {
-        description: "gemini-3.8-flash now runs 3 features. 1 turned off.",
+        description:
+          "gemini-3.8-flash now runs 2 features. 1 turned off. Refine Music Path stays off. Turn it on in Features.",
       }),
     );
+  });
+
+  it("reviews first when a feature the new model can run stays off", async () => {
+    const outcomes = [
+      outcome("shows.extract.vision", "kept_current", "AI_ACTION_NEEDS_IMAGE"),
+      outcome("shows.extract.text", "applied", null, [], false),
+      outcome("genres.eq.propose", "applied"),
+      outcome("music_paths.refine", "applied"),
+    ];
+    apiMock
+      .mockResolvedValueOnce(result(outcomes, { activation: false }))
+      .mockResolvedValueOnce(
+        result(outcomes, { activation: false, dry_run: false }),
+      );
+    const refresh = vi.fn();
+    const user = userEvent.setup();
+    // No feature has its own model, but Extract shows from text is off.
+    renderWithAdminProviders(
+      <DefaultModelPanel
+        snapshot={withoutOverrides(migratedSnapshot())}
+        refresh={refresh}
+      />,
+    );
+
+    await choose(user, "Model", "Budget");
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/admin/ai/default-model",
+      "POST",
+      expect.objectContaining({ model_id: "budget", dry_run: true }),
+    );
+    expect(within(dialog).getByText("Will use budget (2)")).toBeVisible();
+    const staysOff = within(dialog).getByRole("region", {
+      name: "Stay off (1)",
+    });
+    expect(within(staysOff).getByText("Extract shows from text")).toBeVisible();
+    expect(
+      within(staysOff).getByText("Turn them on in Features after saving."),
+    ).toBeVisible();
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Use for all features" }),
+    );
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Default model updated", {
+        description:
+          "budget now runs 2 features. 1 kept their current model. Extract shows from text stays off. Turn it on in Features.",
+      }),
+    );
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/admin/ai/default-model",
+      "POST",
+      expect.objectContaining({ model_id: "budget", dry_run: false }),
+    );
+  });
+
+  it("applies after the check when no feature that is off would take the model", async () => {
+    const outcomes = [
+      outcome("shows.extract.vision", "kept_current", "AI_ACTION_NEEDS_IMAGE"),
+      outcome(
+        "shows.extract.text",
+        "kept_current",
+        "AI_CONTEXT_TOO_SMALL",
+        [],
+        false,
+      ),
+      outcome("genres.eq.propose", "applied"),
+      outcome("music_paths.refine", "applied"),
+    ];
+    apiMock
+      .mockResolvedValueOnce(result(outcomes, { activation: false }))
+      .mockResolvedValueOnce(
+        result(outcomes, { activation: false, dry_run: false }),
+      );
+    const refresh = vi.fn();
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel
+        snapshot={withoutOverrides(migratedSnapshot())}
+        refresh={refresh}
+      />,
+    );
+
+    await choose(user, "Model", "Budget");
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    expect(apiMock.mock.calls.map((call) => call[2].dry_run)).toEqual([
+      true,
+      false,
+    ]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith("Default model updated", {
+      description: "budget now runs 2 features. 2 kept their current model.",
+    });
   });
 
   it("applies directly after setup and reports kept features", async () => {
@@ -649,9 +760,52 @@ describe("DefaultModelPanel", () => {
 
     const dialog = await screen.findByRole("dialog");
     expect(
-      within(dialog).getByText("Refine Music Path stays off."),
+      within(dialog).getByText("Will use gemini-3.8-flash (2)"),
     ).toBeVisible();
-    expect(within(dialog).queryByText(/Propose genre EQ stays off/)).toBeNull();
+    const staysOff = within(dialog).getByRole("region", {
+      name: "Stay off (1)",
+    });
+    expect(within(staysOff).getByText("Refine Music Path")).toBeVisible();
+    expect(
+      within(staysOff).getByText("Turn them on in Features after saving."),
+    ).toBeVisible();
+    expect(within(staysOff).queryByText("Propose genre EQ")).toBeNull();
+  });
+
+  it("says when a kept feature stays off", async () => {
+    apiMock.mockResolvedValueOnce(
+      result([
+        outcome(
+          "shows.extract.vision",
+          "kept_current",
+          "AI_ACTION_NEEDS_IMAGE",
+          [],
+          false,
+        ),
+        outcome("shows.extract.text", "applied"),
+        outcome("genres.eq.propose", "applied"),
+        outcome("music_paths.refine", "applied"),
+      ]),
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={aiSnapshot()} refresh={vi.fn()} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const kept = within(dialog).getByRole("region", {
+      name: "Keep their current model (1)",
+    });
+    expect(
+      within(kept).getByText("Needs a model that reads images · Stays off"),
+    ).toBeVisible();
+    expect(
+      within(dialog).queryByRole("region", { name: /Stay off/ }),
+    ).toBeNull();
   });
 
   it("hides the controls from read-only operators", () => {

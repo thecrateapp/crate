@@ -727,10 +727,17 @@ describe("formatCount", () => {
 });
 
 describe("outcomeGroups", () => {
-  it("groups outcomes into uses, kept and blocked", () => {
+  it("groups outcomes into uses, stay off, kept, turned off and blocked", () => {
     const outcomes: AssignmentOutcome[] = [
       { action_id: "a", outcome: "applied", reason: null, adjustments: [] },
       { action_id: "b", outcome: "unchanged", reason: null, adjustments: [] },
+      {
+        action_id: "g",
+        outcome: "applied",
+        reason: null,
+        adjustments: [],
+        enabled: false,
+      },
       {
         action_id: "c",
         outcome: "kept_legacy",
@@ -759,6 +766,7 @@ describe("outcomeGroups", () => {
     ];
     expect(outcomeGroups(outcomes)).toEqual({
       uses: 2,
+      staysOff: 1,
       kept: 2,
       turnedOff: 1,
       blocked: 1,
@@ -965,36 +973,98 @@ describe("savedProfileOptions", () => {
 });
 
 describe("assignmentSummary", () => {
-  const outcome = (kind: AssignmentOutcome["outcome"]): AssignmentOutcome => ({
-    action_id: kind,
+  const actions = [
+    { id: "shows.extract.vision", label: "Extract shows from image" },
+    { id: "artwork.hero.analyze", label: "Analyze artist hero" },
+    { id: "genres.eq.propose", label: "Propose genre EQ" },
+  ];
+  const outcome = (
+    kind: AssignmentOutcome["outcome"],
+    action_id: string = kind,
+    enabled: boolean | null = true,
+  ): AssignmentOutcome => ({
+    action_id,
     outcome: kind,
     reason: null,
     adjustments: [],
+    enabled,
   });
 
   it("counts the features that run the model and those kept", () => {
     expect(
-      assignmentSummary("m", [
-        outcome("applied"),
-        outcome("unchanged"),
-        outcome("applied"),
-        outcome("kept_current"),
-      ]),
+      assignmentSummary(
+        "m",
+        [
+          outcome("applied"),
+          outcome("unchanged"),
+          outcome("applied"),
+          outcome("kept_current"),
+        ],
+        actions,
+      ),
     ).toBe("m now runs 3 features. 1 kept their current model.");
   });
 
   it("counts the features turned off", () => {
     expect(
-      assignmentSummary("m", [
-        outcome("applied"),
-        outcome("turned_off"),
-        outcome("turned_off"),
-      ]),
+      assignmentSummary(
+        "m",
+        [
+          outcome("applied"),
+          outcome("turned_off", "a", false),
+          outcome("turned_off", "b", false),
+        ],
+        actions,
+      ),
     ).toBe("m now runs 1 feature. 2 turned off.");
   });
 
+  it("counts only features that run and names the ones that stay off", () => {
+    expect(
+      assignmentSummary(
+        "m",
+        [
+          outcome("applied", "genres.eq.propose"),
+          outcome("applied", "shows.extract.vision", false),
+          outcome("applied", "artwork.hero.analyze", false),
+        ],
+        actions,
+      ),
+    ).toBe(
+      "m now runs 1 feature. Extract shows from image and Analyze artist hero stay off. Turn them on in Features.",
+    );
+    expect(
+      assignmentSummary(
+        "m",
+        [
+          outcome("applied", "genres.eq.propose"),
+          outcome("unchanged", "shows.extract.vision", false),
+          outcome("turned_off", "artwork.hero.analyze", false),
+        ],
+        actions,
+      ),
+    ).toBe(
+      "m now runs 1 feature. 1 turned off. Extract shows from image stays off. Turn it on in Features.",
+    );
+  });
+
+  it("counts the features that stay off when there are more than two", () => {
+    expect(
+      assignmentSummary(
+        "m",
+        [
+          outcome("applied", "genres.eq.propose"),
+          outcome("applied", "shows.extract.vision", false),
+          outcome("applied", "artwork.hero.analyze", false),
+          outcome("applied", "music_paths.refine", false),
+        ],
+        actions,
+      ),
+    ).toBe("m now runs 1 feature. 3 stay off. Turn them on in Features.");
+  });
+
   it("omits the kept sentence and uses the singular for one feature", () => {
-    expect(assignmentSummary("m", [outcome("applied")])).toBe(
+    expect(assignmentSummary("m", [outcome("applied")], actions)).toBe(
       "m now runs 1 feature.",
     );
   });

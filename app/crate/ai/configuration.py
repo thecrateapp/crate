@@ -646,13 +646,16 @@ def _assignment_model(connection, model_id, reasoning):
     return capabilities
 
 
-def _outcome(action_id, outcome, reason=None, adjustments=(), enabled=None):
+def _outcome(
+    action_id, outcome, reason=None, adjustments=(), enabled=None, replaces=False
+):
     return {
         "action_id": action_id,
         "outcome": outcome,
         "reason": reason,
         "adjustments": list(adjustments),
         "enabled": enabled,
+        "replaces_current": replaces,
     }
 
 
@@ -794,7 +797,16 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
             step["enabled"] = False
         steps.append(step)
         outcomes.append(
-            _outcome(action_id, outcome, entry.reason, enabled=step["enabled"])
+            _outcome(
+                action_id,
+                outcome,
+                entry.reason,
+                enabled=step["enabled"],
+                # An operator's own binding gives way to the switched-off profile.
+                replaces=outcome == "turned_off"
+                and binding is not None
+                and step["op"] != "keep",
+            )
         )
     return outcomes, steps
 

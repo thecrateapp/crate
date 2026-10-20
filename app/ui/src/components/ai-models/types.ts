@@ -178,6 +178,8 @@ export interface AssignmentOutcome {
   adjustments: ("reasoning" | "image_detail")[];
   /** The feature's switch once applied: false when turned off, null when it can't be set up. */
   enabled?: boolean | null;
+  /** Turned off by rebinding the feature's existing model. */
+  replaces_current?: boolean;
 }
 export interface ModelAssignmentResult {
   dry_run: boolean;

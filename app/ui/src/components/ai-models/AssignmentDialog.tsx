@@ -14,6 +14,7 @@ import {
   formatCount,
   outcomeGroups,
   reasonText,
+  staysOffAfterApply,
 } from "@/lib/ai-models";
 
 import type {
@@ -102,22 +103,22 @@ export function AssignmentDialog({
     actions.find((action) => action.id === actionId)?.label ??
     "Unknown feature";
   const itemsFor = (
-    kinds: AssignmentOutcome["outcome"][],
-    note: (outcome: AssignmentOutcome) => string | null,
+    include: (outcome: AssignmentOutcome) => boolean,
+    note: (outcome: AssignmentOutcome) => (string | null)[],
   ): GroupItem[] =>
-    outcomes
-      .filter((outcome) => kinds.includes(outcome.outcome))
-      .map((outcome) => ({
-        actionId: outcome.action_id,
-        label: labelOf(outcome.action_id),
-        note: note(outcome),
-      }));
+    outcomes.filter(include).map((outcome) => ({
+      actionId: outcome.action_id,
+      label: labelOf(outcome.action_id),
+      note: note(outcome).filter(Boolean).join(" · ") || null,
+    }));
+  const isOutcome =
+    (...kinds: AssignmentOutcome["outcome"][]) =>
+    (outcome: AssignmentOutcome) =>
+      kinds.includes(outcome.outcome);
   const reason = (outcome: AssignmentOutcome) =>
     outcome.reason ? reasonText(outcome.reason) : null;
-  // Turned-off features have their own group; these keep an existing switch off.
-  const staysOff = outcomes.filter(
-    (outcome) => outcome.enabled === false && outcome.outcome !== "turned_off",
-  );
+  const adjustments = (outcome: AssignmentOutcome) =>
+    outcome.adjustments.map((adjustment) => ADJUSTMENT_NOTES[adjustment]);
 
   return (
     <Dialog
@@ -151,36 +152,42 @@ export function AssignmentDialog({
         <div className="max-h-[50vh] space-y-4 overflow-y-auto">
           <OutcomeGroup
             title={`Will use ${modelId} (${groups.uses})`}
-            items={itemsFor(["applied", "unchanged"], (outcome) =>
-              outcome.adjustments.length > 0
-                ? outcome.adjustments
-                    .map((adjustment) => ADJUSTMENT_NOTES[adjustment])
-                    .join(" · ")
-                : null,
+            items={itemsFor(
+              (outcome) =>
+                isOutcome("applied", "unchanged")(outcome) &&
+                !staysOffAfterApply(outcome),
+              adjustments,
             )}
           />
           <OutcomeGroup
+            title={`Stay off (${groups.staysOff})`}
+            items={itemsFor(staysOffAfterApply, adjustments)}
+            hint="Turn them on in Features after saving."
+          />
+          <OutcomeGroup
             title={`Keep their current model (${groups.kept})`}
-            items={itemsFor(["kept_legacy", "kept_current"], reason)}
+            items={itemsFor(
+              isOutcome("kept_legacy", "kept_current"),
+              (outcome) => [
+                reason(outcome),
+                outcome.enabled === false ? "Stays off" : null,
+              ],
+            )}
           />
           <OutcomeGroup
             title={`Will be turned off (${groups.turnedOff})`}
-            items={itemsFor(["turned_off"], reason)}
+            items={itemsFor(isOutcome("turned_off"), (outcome) => [
+              reason(outcome),
+              outcome.replaces_current ? "Replaces its current model" : null,
+            ])}
             hint="You can turn them on later with a model that supports them."
           />
           <OutcomeGroup
             title={`Can't be set up (${groups.blocked})`}
-            items={itemsFor(["blocked"], reason)}
+            items={itemsFor(isOutcome("blocked"), (outcome) => [
+              reason(outcome),
+            ])}
           />
-          {staysOff.length > 0 ? (
-            <div className="space-y-1 text-sm text-muted-foreground">
-              {staysOff.map((outcome) => (
-                <p key={outcome.action_id}>
-                  {labelOf(outcome.action_id)} stays off.
-                </p>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <DialogFooter>

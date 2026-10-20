@@ -12,6 +12,7 @@ import {
   limitedConnections,
   reasonText,
   reasoningLabel,
+  reasoningValue,
 } from "@/lib/ai-models";
 
 import { reportFailure, writeAI } from "./api";
@@ -75,10 +76,32 @@ function statusLine(snapshot: Snapshot): { text: string; warning: boolean } {
   };
 }
 
-function announce(modelId: string, result: ModelAssignmentResult) {
+function announce(
+  modelId: string,
+  result: ModelAssignmentResult,
+  actions: Action[],
+) {
   toast.success("Default model updated", {
-    description: assignmentSummary(modelId, result.outcomes),
+    description: assignmentSummary(modelId, result.outcomes, actions),
   });
+}
+
+/** Re-applying the usable default only re-applies features that have their own model. */
+function isCurrentDefault(snapshot: Snapshot, body: AssignmentBody): boolean {
+  const current = snapshot.default_model;
+  return (
+    !!current?.available &&
+    current.connection_id === body.connection_id &&
+    current.model_id === body.model_id &&
+    reasoningValue(current.reasoning) === reasoningValue(body.reasoning)
+  );
+}
+
+/** A feature that is off now takes the model but stays off. */
+function staysOffOnApply(result: ModelAssignmentResult): boolean {
+  return result.outcomes.some(
+    (outcome) => outcome.outcome === "applied" && outcome.enabled === false,
+  );
 }
 
 export function DefaultModelPanel({
@@ -121,32 +144,39 @@ export function DefaultModelPanel({
       !snapshot.migrated ||
       !current?.available ||
       current.features.some((feature) => feature.status === "override");
+    // Applying never turns a feature on, so check first whether a feature
+    // that is off now would take this model; only a dry run can tell.
+    const checkSwitches =
+      snapshot.bindings.some((binding) => !binding.enabled) &&
+      !isCurrentDefault(snapshot, body);
     setBusy(true);
     try {
-      if (needsReview) {
+      if (needsReview || checkSwitches) {
         const result = await writeAI<ModelAssignmentResult>("/default-model", {
           ...body,
           dry_run: true,
         });
-        setReview({
-          body,
-          result,
-          connections: limitedConnections(
-            snapshot,
-            connection,
-            result.outcomes,
-          ),
-          actions: snapshot.actions,
-        });
-        setDialogOpen(true);
-      } else {
-        const result = await writeAI<ModelAssignmentResult>("/default-model", {
-          ...body,
-          dry_run: false,
-        });
-        announce(body.model_id, result);
-        refresh();
+        if (needsReview || staysOffOnApply(result)) {
+          setReview({
+            body,
+            result,
+            connections: limitedConnections(
+              snapshot,
+              connection,
+              result.outcomes,
+            ),
+            actions: snapshot.actions,
+          });
+          setDialogOpen(true);
+          return;
+        }
       }
+      const result = await writeAI<ModelAssignmentResult>("/default-model", {
+        ...body,
+        dry_run: false,
+      });
+      announce(body.model_id, result, snapshot.actions);
+      refresh();
     } catch (error) {
       reportFailure(error);
       refresh();
@@ -163,7 +193,7 @@ export function DefaultModelPanel({
         ...review.body,
         dry_run: false,
       });
-      announce(review.body.model_id, result);
+      announce(review.body.model_id, result, review.actions);
     } catch (error) {
       reportFailure(error);
     } finally {
