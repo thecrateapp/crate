@@ -179,6 +179,13 @@ def _load_session(session_id: str) -> dict | None:
     return json.loads(raw)
 
 
+def get_session_user_id(session_id: str) -> int | None:
+    session = _load_session(session_id)
+    if not session or session.get("user_id") is None:
+        return None
+    return int(session["user_id"])
+
+
 def _delete_session(session_id: str) -> bool:
     r = _redis()
     return r.delete(_session_key(session_id)) > 0

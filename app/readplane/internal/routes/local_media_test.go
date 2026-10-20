@@ -120,3 +120,41 @@ func TestServeLocalMediaFallsBackWhenDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, rec.Code)
 	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
 }
+
+func TestTrackStreamWithAccessTokenFallsBackToFastAPI(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Backend-Authorization", r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer backend.Close()
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	require.NoError(t, err)
+	server := &Server{
+		cfg:      config.Config{Version: "test", LocalMediaEnabled: true},
+		auth:     queryTokenAuthenticator{},
+		catalog:  catalog.NewStore(nil, 0),
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"by id", "/api/tracks/1/stream"},
+		{"by entity", "/api/tracks/by-entity/0b5d2c8e-6f1a-4d3b-9c7e-2a1f4e8d6b90/stream"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			request.Header.Set("Authorization", "Bearer crv_continuation")
+			response := httptest.NewRecorder()
+
+			server.Handler().ServeHTTP(response, request)
+
+			assert.Equal(t, http.StatusNoContent, response.Code)
+			assert.Equal(t, "fallback", response.Header().Get("X-Crate-Readplane"))
+			assert.Equal(t, "Bearer crv_continuation", response.Header().Get("X-Backend-Authorization"))
+		})
+	}
+}

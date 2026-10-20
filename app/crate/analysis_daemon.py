@@ -24,6 +24,7 @@ from crate.db.jobs.analysis import (
     store_analysis_results as _db_store_analysis_results,
     store_bliss_vectors as _db_store_bliss_vectors,
 )
+from crate.db.jobs.analysis_storage import smart_mix_source_revision
 
 log = logging.getLogger(__name__)
 
@@ -172,6 +173,10 @@ def analysis_daemon(config: dict):
             claims = {int(track["id"]): track for track in batch}
             successful_results: list[tuple[int, str, dict]] = []
             batch_failed = False
+            source_revisions = {
+                int(track["id"]): smart_mix_source_revision(track["path"])
+                for track in batch
+            }
 
             try:
                 batch_results = analyze_batch([track["path"] for track in batch])
@@ -184,6 +189,9 @@ def analysis_daemon(config: dict):
                     track_id = track["id"]
                     path = track["path"]
                     if result and result.get("bpm") is not None:
+                        result["smart_mix_source_revision"] = source_revisions[
+                            int(track_id)
+                        ]
                         successful_results.append((track_id, path, result))
                     else:
                         _mark_failed(track_id, "analysis_state", claim=track)
@@ -203,6 +211,9 @@ def analysis_daemon(config: dict):
                     try:
                         result = analyze_track(path)
                         if result and result.get("bpm") is not None:
+                            result["smart_mix_source_revision"] = source_revisions[
+                                int(track_id)
+                            ]
                             successful_results.append((track_id, path, result))
                         else:
                             _mark_failed(track_id, "analysis_state", claim=track)

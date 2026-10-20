@@ -34,7 +34,7 @@ def migration_context(connection, monkeypatch, migrations):
 
 
 def test_agent_migration_and_bootstrap_use_same_schema(monkeypatch):
-    migration = import_module("crate.db.migrations.versions.109_agent_access")
+    migration = import_module("crate.db.migrations.versions.118_agent_access")
     migrated, section, bootstrap = (
         RecordingExecutor(),
         RecordingExecutor(),
@@ -46,8 +46,8 @@ def test_agent_migration_and_bootstrap_use_same_schema(monkeypatch):
     create_schema(bootstrap)
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
-    assert migration.revision == "109"
-    assert migration.down_revision == "108"
+    assert migration.revision == "118"
+    assert migration.down_revision == "117"
 
 
 def test_agent_schema_real_downgrade_upgrade_and_idempotency(pg_db, monkeypatch):
@@ -56,13 +56,13 @@ def test_agent_schema_real_downgrade_upgrade_and_idempotency(pg_db, monkeypatch)
     migrations = [
         import_module(f"crate.db.migrations.versions.{name}")
         for name in (
-            "109_agent_access",
-            "110_agent_diagnostic_reads",
-            "111_agent_commands",
-            "112_mcp_oauth",
-            "113_agent_admin",
-            "114_agent_library_operations",
-            "115_agent_instance_operations",
+            "118_agent_access",
+            "119_agent_diagnostic_reads",
+            "120_agent_commands",
+            "121_mcp_oauth",
+            "122_agent_admin",
+            "123_agent_library_operations",
+            "124_agent_instance_operations",
         )
     ]
     migration = migrations[0]

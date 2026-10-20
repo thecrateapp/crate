@@ -21,7 +21,7 @@ sources:
   - app/crate/db/repositories/ai_configuration.py
   - app/crate/db/repositories/ai_usage.py
   - app/crate/db/repositories/show_extraction_jobs.py
-  - app/crate/db/migrations/versions/121_ai_default_model.py
+  - app/crate/db/migrations/versions/130_ai_default_model.py
   - app/crate/worker_handlers/ai_configuration.py
   - app/tests/test_ai_workflow.py
   - app/tests/test_ai_model_assignment.py

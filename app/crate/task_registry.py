@@ -179,6 +179,11 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "analyze_all": TaskTypeInfo("Full Audio Analysis", "analysis"),
     "analyze_album_full": TaskTypeInfo("Album Analysis", "analysis"),
     "compute_bliss": TaskTypeInfo("Bliss Similarity", "analysis"),
+    "compute_smart_mix_profile": TaskTypeInfo("Smart Mix Profile", "analysis"),
+    "backfill_smart_mix_profiles": TaskTypeInfo(
+        "Smart Mix Profile Backfill", "analysis"
+    ),
+    "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
     "materialize_artwork_variants": TaskTypeInfo("Artwork Variants", "artwork"),
     "backfill_artwork_variants": TaskTypeInfo("Artwork Variant Backfill", "artwork"),
     "cleanup_artwork_variants": TaskTypeInfo("Artwork Variant Cleanup", "artwork"),

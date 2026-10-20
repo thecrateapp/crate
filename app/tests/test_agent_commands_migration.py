@@ -19,7 +19,7 @@ from tests.test_agent_access_migration import (
 
 
 def test_commands_migration_matches_bootstrap_and_is_idempotent(pg_db, monkeypatch):
-    migration = import_module("crate.db.migrations.versions.111_agent_commands")
+    migration = import_module("crate.db.migrations.versions.120_agent_commands")
     migrated, section, bootstrap = (
         RecordingExecutor(),
         RecordingExecutor(),
@@ -31,7 +31,7 @@ def test_commands_migration_matches_bootstrap_and_is_idempotent(pg_db, monkeypat
     create_schema(bootstrap)
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
-    assert (migration.revision, migration.down_revision) == ("111", "110")
+    assert (migration.revision, migration.down_revision) == ("120", "119")
     with transaction_scope() as session:
         monkeypatch.setattr(migration, "op", SessionExecutor(session))
         migration.upgrade()
@@ -55,10 +55,10 @@ def test_commands_downgrade_preserves_identity_disables_removed_scopes_and_reupg
 ):
     from crate.db.engine import get_engine
 
-    migration = import_module("crate.db.migrations.versions.111_agent_commands")
-    oauth = import_module("crate.db.migrations.versions.112_mcp_oauth")
-    admin = import_module("crate.db.migrations.versions.113_agent_admin")
-    library = import_module("crate.db.migrations.versions.114_agent_library_operations")
+    migration = import_module("crate.db.migrations.versions.120_agent_commands")
+    oauth = import_module("crate.db.migrations.versions.121_mcp_oauth")
+    admin = import_module("crate.db.migrations.versions.122_agent_admin")
+    library = import_module("crate.db.migrations.versions.123_agent_library_operations")
     with transaction_scope() as session:
         session.execute(
             text("""

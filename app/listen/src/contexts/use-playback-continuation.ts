@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import { fetchInfiniteContinuation } from "@/lib/radio";
+import { nativeOwnsBackgroundRefill } from "./use-playback-radio-refill";
 import {
   collectUniqueTracks,
   getPlaySourceSignature,
@@ -53,6 +54,7 @@ export function usePlaybackContinuation({
       !!continuationSource?.radio?.seedId;
 
     if (!supportsContinuation || !continuationSource) return;
+    if (nativeOwnsBackgroundRefill()) return;
 
     const remainingUpcoming = queue.length - currentIndex - 1;
     if (remainingUpcoming > RADIO_REFILL_THRESHOLD) {

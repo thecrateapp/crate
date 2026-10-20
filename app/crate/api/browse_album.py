@@ -924,6 +924,17 @@ def _placeholder_cover(seed: str) -> Response:
     )
 
 
+def _missing_vdj_cover() -> Response:
+    """Return a cacheable miss without pretending it is an album image."""
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "public, max-age=60",
+            "X-Crate-Artwork": "missing",
+        },
+    )
+
+
 def _local_album_cover(album_dir: Path | None) -> Path | None:
     if album_dir is None or not album_dir.is_dir():
         return None
@@ -942,6 +953,7 @@ def api_cover(
     size: int | None = None,
     image_format: str | None = None,
     album_entity_uid: str | None = None,
+    missing_response: Response | None = None,
 ):
     del image_format
     lib = library_path()
@@ -950,9 +962,6 @@ def api_cover(
     # that shadows the real /Artist/YYYY/Album entry in the DB.
     if album_dir is None or not album_dir.is_dir():
         album_dir = find_album_dir(lib, artist, album)
-    if not album_dir:
-        return _placeholder_cover(album or artist)
-
     cover = _local_album_cover(album_dir)
     entity_uid = album_entity_uid
     if entity_uid is None:
@@ -963,11 +972,11 @@ def api_cover(
             ArtworkAsset("album-cover", entity_uid),
             requested_size=size,
             local_original=cover,
-            missing_response=_placeholder_cover(album or artist),
+            missing_response=missing_response or _placeholder_cover(album or artist),
         )
     if cover is not None:
         return deliver_original_artwork(cover)
-    return _placeholder_cover(album or artist)
+    return missing_response or _placeholder_cover(album or artist)
 
 
 @router.post(
@@ -1079,6 +1088,36 @@ def api_cover_by_id(
         size=size,
         image_format=image_format,
         album_entity_uid=str(album.get("entity_uid") or "") or None,
+    )
+
+
+@router.get(
+    "/api/vdj/albums/{album_id}/cover",
+    responses=_IMAGE_RESPONSES,
+    include_in_schema=False,
+    summary="Get album artwork for VirtualDJ",
+)
+def api_vdj_cover_by_id(
+    album_id: int,
+    size: int | None = Query(None, ge=32, le=1024),
+    image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+):
+    """Serve the same artwork source as Listen without an SVG placeholder."""
+    if album_id <= 0:
+        return _missing_vdj_cover()
+    album = get_library_album_by_id(album_id)
+    if not album:
+        return _missing_vdj_cover()
+    artist = get_library_artist(album["artist"])
+    album_dir = resolve_album_dir(library_path(), album, artist=artist)
+    return api_cover(
+        album["artist"],
+        album["name"],
+        album_dir=album_dir,
+        size=size,
+        image_format=image_format,
+        album_entity_uid=str(album.get("entity_uid") or "") or None,
+        missing_response=_missing_vdj_cover(),
     )
 
 

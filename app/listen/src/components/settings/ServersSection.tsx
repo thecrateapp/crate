@@ -22,6 +22,7 @@ import {
   setCurrentServerId,
   type ServerConfig,
 } from "@/lib/server-store";
+import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
 
 /**
  * Settings panel listing configured Crate servers. Only rendered in
@@ -47,7 +48,7 @@ export function ServersSection() {
     return () => window.removeEventListener(SERVER_STORE_EVENT, sync);
   }, []);
 
-  if (!usesConfigurableServer) return null;
+  if (!usesConfigurableServer || FIXED_SERVER_URL) return null;
 
   const handleSwitch = (server: ServerConfig) => {
     if (server.id === currentId) return;

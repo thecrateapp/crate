@@ -1,4 +1,4 @@
-"""Immutable additive default-model column for AI configuration (revision 121)."""
+"""Immutable additive default-model column for AI configuration (revision 130, section id v121)."""
 
 
 def create_ai_default_model_v121_schema(cur):

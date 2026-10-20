@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 from zoneinfo import available_timezones
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -240,6 +240,12 @@ class AuthRefreshResponse(BaseModel):
 
 class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
+    auth_type: Literal["access_token"] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    scopes: list[str] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     bio: str | None = None
     instagram_handle: str | None = None
     timezone: str | None = None

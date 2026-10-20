@@ -1,4 +1,4 @@
-"""Durable bounded agent commands; revision 111 bootstrap definition."""
+"""Durable bounded agent commands; revision 120 bootstrap definition (section id v111)."""
 
 from typing import Any
 

@@ -44,6 +44,14 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/ai-agents.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/smart-mix-design.md": () =>
+    import("../../../docs/technical/smart-mix-design.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/smart-mix-implementation-plan.md": () =>
+    import("../../../docs/technical/smart-mix-implementation-plan.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/README.md": () =>
     import("../../../docs/README.md?raw").then((module) => module.default),
   "docs/api.md": () =>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
 import { subscribeNativePlayerEvents } from "@/contexts/subscribe-native-player-events";
 import {
@@ -12,8 +13,10 @@ import type {
   EngineEventName,
   EnginePositionEvent,
   EngineState,
+  EngineTransitionEvent,
   NativeEventMetadata,
 } from "@/lib/playback-engine";
+import { resolveNativeCrossfadeTransition } from "@/lib/native-transition-visual";
 import {
   nativePlaybackErrorMessage,
   persistNativePlaybackDiagnostic,
@@ -174,6 +177,7 @@ type PlaybackStateOptions = {
 };
 
 export interface UseNativePlaybackEventBridgeParams {
+  adoptNativeAppendedTracks?: () => Promise<void>;
   applyNativePosition: (event: EnginePositionEvent) => void;
   applyNativeState: (
     state: EngineState,
@@ -187,7 +191,9 @@ export interface UseNativePlaybackEventBridgeParams {
   clearNativeBufferingWatchdog: () => void;
   commitIsBuffering: (isBuffering: boolean) => void;
   commitIsPlaying: (isPlaying: boolean) => void;
+  crossfadeTimerRef: MutableValueRef<number | null>;
   currentIndexRef: ValueRef<number>;
+  durationRef: ValueRef<number>;
   flushCurrentPlayEvent: (
     reason: "completed" | "skipped",
     track?: Track,
@@ -199,9 +205,11 @@ export interface UseNativePlaybackEventBridgeParams {
     nativeError: EngineEventMap["error"],
   ) => boolean;
   scheduleNativeBufferingWatchdog: () => void;
+  setCrossfadeTransition: (transition: CrossfadeTransition | null) => void;
 }
 
 export function useNativePlaybackEventBridge({
+  adoptNativeAppendedTracks,
   applyNativePosition,
   applyNativeState,
   applyNativeTrackChange,
@@ -210,13 +218,16 @@ export function useNativePlaybackEventBridge({
   clearNativeBufferingWatchdog,
   commitIsBuffering,
   commitIsPlaying,
+  crossfadeTimerRef,
   currentIndexRef,
+  durationRef,
   flushCurrentPlayEvent,
   isNativeEventStale,
   queueRef,
   recoverNativeBuffering,
   retryNativePlaybackAfterAuthError,
   scheduleNativeBufferingWatchdog,
+  setCrossfadeTransition,
 }: UseNativePlaybackEventBridgeParams) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -252,6 +263,38 @@ export function useNativePlaybackEventBridge({
           isNativeEventStale,
         )
       ) {
+        return;
+      }
+      if (eventName === "transitionStarted") {
+        const transition = resolveNativeCrossfadeTransition(
+          payload as EngineTransitionEvent,
+          queueRef.current,
+          performance.now(),
+          durationRef.current,
+        );
+        if (!transition) return;
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+        }
+        setCrossfadeTransition(transition);
+        crossfadeTimerRef.current = window.setTimeout(() => {
+          setCrossfadeTransition(null);
+          crossfadeTimerRef.current = null;
+        }, transition.durationMs);
+        return;
+      }
+      if (eventName === "transitionProgress") {
+        return;
+      }
+      if (
+        eventName === "transitionEnded" ||
+        eventName === "transitionCancelled"
+      ) {
+        if (crossfadeTimerRef.current != null) {
+          window.clearTimeout(crossfadeTimerRef.current);
+          crossfadeTimerRef.current = null;
+        }
+        setCrossfadeTransition(null);
         return;
       }
       if (eventName === "bufferingChanged") {
@@ -336,12 +379,15 @@ export function useNativePlaybackEventBridge({
       clearNativeBufferingWatchdog,
       commitIsBuffering,
       commitIsPlaying,
+      crossfadeTimerRef,
       currentIndexRef,
+      durationRef,
       flushCurrentPlayEvent,
       isNativeEventStale,
       queueRef,
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
+      setCrossfadeTransition,
     ],
   );
 
@@ -367,48 +413,96 @@ export function useNativePlaybackEventBridge({
     [applyNativeState],
   );
 
+  const onNativePosition = useEffectEvent(
+    (event: Parameters<typeof applyNativePosition>[0]) =>
+      applyNativePosition(event),
+  );
+  const onNativeState = useEffectEvent(
+    (event: Parameters<typeof applyNativeState>[0]) => applyNativeState(event),
+  );
+  const onNativeTrackChange = useEffectEvent(
+    (event: Parameters<typeof applyNativeTrackChange>[0]) =>
+      applyNativeTrackChange(event),
+  );
+  const onNativeEvent = useEffectEvent(
+    (...args: Parameters<typeof handleNativeEvent>) =>
+      handleNativeEvent(...args),
+  );
+  const onAdoptAppended = useEffectEvent(() => adoptNativeAppendedTracks?.());
+  const onReconcile = useEffectEvent(
+    (...args: Parameters<typeof reconcileNativePlayback>) =>
+      reconcileNativePlayback(...args),
+  );
+  const onRecoverBuffering = useEffectEvent(
+    (...args: Parameters<typeof recoverNativeBuffering>) =>
+      recoverNativeBuffering(...args),
+  );
+  const onClearBufferingWatchdog = useEffectEvent(() =>
+    clearNativeBufferingWatchdog(),
+  );
+
   useEffect(() => {
     if (!shouldUseAndroidNativePlayer()) return;
     let disposed = false;
     const resumeAuthorizationCoordinator =
-      createNativeResumeAuthorizationCoordinator(recoverNativeBuffering);
+      createNativeResumeAuthorizationCoordinator(
+        (...args: Parameters<typeof recoverNativeBuffering>) =>
+          onRecoverBuffering(...args),
+      );
     resumeAuthorizationCoordinatorRef.current = resumeAuthorizationCoordinator;
     const subscription = subscribeNativePlayerEvents(androidNativeEngine, {
       positionChanged: (event) => {
         if (disposed) return;
-        applyNativePosition(event);
+        onNativePosition(event);
       },
       playEventCheckpoint: (event) => {
         if (disposed) return;
-        applyNativePosition(event);
+        onNativePosition(event);
       },
       stateChanged: (event) => {
         if (disposed) return;
-        applyNativeState(event);
+        onNativeState(event);
       },
       trackChanged: (event) => {
         if (disposed) return;
-        applyNativeTrackChange(event);
+        onNativeTrackChange(event);
+        androidNativeEngine.planAhead(event.index);
+      },
+      transitionStarted: (event) => {
+        if (disposed) return;
+        onNativeEvent("transitionStarted", event);
+      },
+      transitionProgress: (event) => {
+        if (disposed) return;
+        onNativeEvent("transitionProgress", event);
+      },
+      transitionEnded: (event) => {
+        if (disposed) return;
+        onNativeEvent("transitionEnded", event);
+      },
+      transitionCancelled: (event) => {
+        if (disposed) return;
+        onNativeEvent("transitionCancelled", event);
       },
       bufferingChanged: (event) => {
         if (disposed) return;
-        handleNativeEvent("bufferingChanged", event);
+        onNativeEvent("bufferingChanged", event);
       },
       nearQueueEnd: (event) => {
         if (disposed) return;
-        handleNativeEvent("nearQueueEnd", event);
+        onNativeEvent("nearQueueEnd", event);
       },
       queueEnded: (event) => {
         if (disposed) return;
-        handleNativeEvent("queueEnded", event);
+        onNativeEvent("queueEnded", event);
       },
       resumeAuthorizationRequired: (event) => {
         if (disposed) return;
-        handleNativeEvent("resumeAuthorizationRequired", event);
+        onNativeEvent("resumeAuthorizationRequired", event);
       },
       error: (event) => {
         if (disposed) return;
-        handleNativeEvent("error", event);
+        onNativeEvent("error", event);
       },
     });
 
@@ -426,31 +520,38 @@ export function useNativePlaybackEventBridge({
           .then((events) => {
             if (disposed) return;
             for (const event of events) {
-              handleNativeEvent(event.event, event.payload);
+              onNativeEvent(event.event, event.payload);
             }
           })
           .catch(() => {});
       })
       .then(() => {
         if (disposed) return;
-        reconcileNativePlayback();
+        onReconcile();
       })
       .catch((error) => {
         console.error("[native-player] failed to attach listeners:", error);
       });
 
+    const adoptThenReconcile = () => {
+      void Promise.resolve(onAdoptAppended())
+        .catch((error) => {
+          console.warn("[native-player] appended tracks not adopted:", error);
+        })
+        .then(() => {
+          if (disposed) return;
+          onReconcile({
+            rotateIndexChange: true,
+            passiveLifecycle: true,
+          });
+        });
+    };
     const onNativeResume = () => {
-      reconcileNativePlayback({
-        rotateIndexChange: true,
-        passiveLifecycle: true,
-      });
+      adoptThenReconcile();
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        reconcileNativePlayback({
-          rotateIndexChange: true,
-          passiveLifecycle: true,
-        });
+        adoptThenReconcile();
       }
     };
     window.addEventListener("crate:app-resumed", onNativeResume);
@@ -467,16 +568,8 @@ export function useNativePlaybackEventBridge({
       }
       window.removeEventListener("crate:app-resumed", onNativeResume);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      clearNativeBufferingWatchdog();
+      onClearBufferingWatchdog();
       subscription.dispose();
     };
-  }, [
-    applyNativePosition,
-    applyNativeState,
-    applyNativeTrackChange,
-    clearNativeBufferingWatchdog,
-    handleNativeEvent,
-    reconcileNativePlayback,
-    recoverNativeBuffering,
-  ]);
+  }, []);
 }

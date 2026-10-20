@@ -11,9 +11,9 @@ def test_diagnostic_migration_round_trip_preserves_snapshots(pg_db, monkeypatch)
     from crate.db.engine import get_engine
     from crate.db.tx import transaction_scope
 
-    migration = import_module("crate.db.migrations.versions.110_agent_diagnostic_reads")
-    assert migration.revision == "110"
-    assert migration.down_revision == "109"
+    migration = import_module("crate.db.migrations.versions.119_agent_diagnostic_reads")
+    assert migration.revision == "119"
+    assert migration.down_revision == "118"
     with transaction_scope() as session:
         session.execute(
             text("""

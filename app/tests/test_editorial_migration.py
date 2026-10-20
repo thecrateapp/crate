@@ -9,7 +9,7 @@ from tests.test_agent_access_migration import RecordingExecutor
 
 
 def test_editorial_migration_matches_fresh_bootstrap(monkeypatch):
-    migration = import_module("crate.db.migrations.versions.116_editorial_playlists")
+    migration = import_module("crate.db.migrations.versions.125_editorial_playlists")
     migrated, section, bootstrap = (RecordingExecutor() for _ in range(3))
     migrated.get_context = lambda: type(
         "Context", (), {"autocommit_block": staticmethod(nullcontext)}
@@ -18,7 +18,7 @@ def test_editorial_migration_matches_fresh_bootstrap(monkeypatch):
     migration.upgrade()
     create_editorial_v116_schema(section)
     create_schema(bootstrap)
-    assert (migration.revision, migration.down_revision) == ("116", "115")
+    assert (migration.revision, migration.down_revision) == ("125", "124")
     assert migrated.statements[:-1] == section.statements[:-1]
     assert (
         migrated.statements[-1].replace(" CONCURRENTLY", "") == section.statements[-1]

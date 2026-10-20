@@ -2,10 +2,15 @@
 
 #[cfg(feature = "analysis")]
 pub mod analyze;
+#[cfg(feature = "analysis")]
+pub mod beat_tracking;
 #[cfg(feature = "bliss")]
 pub mod bliss;
 pub mod diff;
 pub mod fingerprint;
+#[cfg(feature = "analysis")]
+pub mod loudness;
+pub mod mix_profile;
 #[cfg(feature = "ml")]
 pub mod ml;
 pub mod quality;

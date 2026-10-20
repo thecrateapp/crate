@@ -13,7 +13,7 @@ from tests.test_mcp_oauth_integration import oauth_env as oauth_env  # noqa: PLC
 
 
 def test_oauth_migration_matches_bootstrap_and_is_idempotent(pg_db, monkeypatch):
-    migration = import_module("crate.db.migrations.versions.112_mcp_oauth")
+    migration = import_module("crate.db.migrations.versions.121_mcp_oauth")
     migrated, section, bootstrap = (
         RecordingExecutor(),
         RecordingExecutor(),
@@ -25,7 +25,7 @@ def test_oauth_migration_matches_bootstrap_and_is_idempotent(pg_db, monkeypatch)
     create_schema(bootstrap)
     assert migrated.statements == section.statements
     assert all(statement in bootstrap.statements for statement in section.statements)
-    assert (migration.revision, migration.down_revision) == ("112", "111")
+    assert (migration.revision, migration.down_revision) == ("121", "120")
     with transaction_scope() as session:
         monkeypatch.setattr(migration, "op", SessionExecutor(session))
         migration.upgrade()
@@ -51,7 +51,7 @@ def test_oauth_downgrade_revokes_and_preserves_delegated_identity_references(
     from crate.db.repositories.mcp_oauth import resolve_oauth_access_token
 
     principal = resolve_oauth_access_token(_tokens(oauth_env)["access_token"])[0]
-    migration = import_module("crate.db.migrations.versions.112_mcp_oauth")
+    migration = import_module("crate.db.migrations.versions.121_mcp_oauth")
     with transaction_scope() as session:
         monkeypatch.setattr(migration, "op", SessionExecutor(session))
         migration.downgrade()

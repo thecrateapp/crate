@@ -37,6 +37,11 @@ class TestAnalysisDaemonUnit:
         monkeypatch.setattr(analysis_daemon, "_should_pause_for_load", lambda: False)
         monkeypatch.setattr(
             analysis_daemon,
+            "smart_mix_source_revision",
+            lambda path: f"captured:{path}",
+        )
+        monkeypatch.setattr(
+            analysis_daemon,
             "_mark_failed",
             lambda track_id, state, **_kwargs: calls["failed"].append(
                 (track_id, state)
@@ -95,6 +100,7 @@ class TestAnalysisDaemonUnit:
                     "scale": "major",
                     "energy": 0.91,
                     "mood": {"happy": 0.8},
+                    "smart_mix_source_revision": "captured:/music/test.flac",
                 },
             )
         ]

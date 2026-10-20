@@ -16,6 +16,7 @@ from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
 )
 from crate.db.repositories.library_processing_state import ensure_track_processing_rows
+from crate.db.repositories.smart_mix import mark_track_mix_source_revision
 from crate.db.repositories.library_shared import (
     allocate_unique_slug,
     coerce_uuid_or_none,
@@ -208,6 +209,10 @@ def upsert_track(
                     key_value=requested_track_mbid,
                 )
             ensure_track_processing_rows(s, track_id)
+            if data.get("smart_mix_source_revision"):
+                mark_track_mix_source_revision(
+                    track_id, data["smart_mix_source_revision"], session=s
+                )
             enqueue_local_dirty_source("track", str(entity_uid), "upsert", session=s)
             return
         insert_stmt = pg_insert(LibraryTrack).values(
@@ -333,6 +338,10 @@ def upsert_track(
                 key_value=requested_track_mbid,
             )
         ensure_track_processing_rows(s, track_id)
+        if data.get("smart_mix_source_revision"):
+            mark_track_mix_source_revision(
+                track_id, data["smart_mix_source_revision"], session=s
+            )
         enqueue_local_dirty_source("track", str(entity_uid), "upsert", session=s)
 
 
