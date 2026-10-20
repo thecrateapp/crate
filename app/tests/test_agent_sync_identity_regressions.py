@@ -14,6 +14,7 @@ from tests.test_agent_analysis_sync import (
     _frozen_scan,
     _seed_track,
 )
+from tests.test_smart_mix_publication import _draft
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -295,3 +296,63 @@ def test_sync_rolls_back_earlier_album_writes_when_a_path_is_occupied_during_ins
         **foreign_before,
         "path": str(new_path),
     }
+
+
+def test_sync_preview_hides_smart_mix_source_revision_but_apply_payload_keeps_it(
+    pg_db, tmp_path, monkeypatch
+):
+    from crate.agent_sync import apply_operation, compile_operation
+    from crate.db.jobs.analysis_storage import (
+        SmartMixPublication,
+        capture_smart_mix_source,
+        publish_smart_mix_profile,
+    )
+    from crate.db.repositories.smart_mix import get_track_mix_profile
+    from crate.library_sync import LibrarySync
+
+    track, album, config, _initial = _ExactSyncFixtures()._prepare(
+        pg_db, tmp_path, monkeypatch, suffix="smart-mix-preview"
+    )
+    path = Path(track["path"])
+    outcome = publish_smart_mix_profile(
+        capture_smart_mix_source(track["id"], path), _draft()
+    )
+    assert outcome is SmartMixPublication.PUBLISHED
+
+    new_revision = "deadbeef" * 8
+
+    def _scan_with_revision(_self, directory, artist):
+        scan = _frozen_scan(directory, artist)
+        scan["track_payloads"][0]["smart_mix_source_revision"] = new_revision
+        return scan
+
+    monkeypatch.setattr(LibrarySync, "prepare_album_sync", _scan_with_revision)
+
+    plan = compile_operation(
+        "library_sync",
+        {"scope": "album", "entity_uid": album["entity_uid"]},
+        config,
+    )
+
+    changes = plan["document"]["changes"]
+    assert len(changes) == 1
+    change = changes[0]
+    assert change["action"] == "update_index"
+    assert "smart_mix_source_revision" not in change["after"]
+    assert not (change["before"] or {}).keys() & {"smart_mix_source_revision"}
+
+    track_payloads = plan["execution"]["albums"][0]["prepared"]["track_payloads"]
+    assert track_payloads[0]["smart_mix_source_revision"] == new_revision
+
+    result = apply_operation(
+        "library_sync",
+        plan["execution"],
+        config,
+        task_id="sync-smart-mix-preview",
+        authorize=_authorize,
+    )
+
+    assert result["execution"]["status"] == "completed"
+    # Applying the plan still carried smart_mix_source_revision through to the
+    # upsert, so the now-stale profile from the earlier source is no longer served.
+    assert get_track_mix_profile(track["id"]) is None

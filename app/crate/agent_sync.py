@@ -166,8 +166,20 @@ def compile_operation(operation: str, parameters: dict, config: dict) -> dict:
                 fields = {
                     k: v
                     for k, v in track.items()
+                    # Keep the frozen apply payload (``track``, part of
+                    # ``prepared["track_payloads"]``) intact so applying the plan
+                    # still marks stale Smart Mix profiles; only the preview
+                    # drops these: raw paths/fingerprints are redundant with
+                    # other preview fields, and smart_mix_source_revision is an
+                    # opaque sha256 that always reads null -> <sha256> and adds
+                    # ~130 bytes/track against the plan size limit.
                     if k
-                    not in {"path", "audio_fingerprint", "audio_fingerprint_source"}
+                    not in {
+                        "path",
+                        "audio_fingerprint",
+                        "audio_fingerprint_source",
+                        "smart_mix_source_revision",
+                    }
                 }
                 changes.append(
                     {
