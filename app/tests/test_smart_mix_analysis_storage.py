@@ -10,6 +10,9 @@ from crate.db.jobs.analysis_storage import (
     store_analysis_result,
     store_smart_mix_profile_result,
 )
+from crate.db.repositories.library_processing_state import (
+    ensure_track_processing_rows,
+)
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
@@ -250,6 +253,9 @@ def _create_track(path: Path, *, bpm: float | None = None) -> tuple[int, str]:
                 "bpm": bpm,
             },
         ).scalar_one()
+        # Library upserts always create the analysis/bliss processing rows; the
+        # generation fence only accepts claim-less writes for those rows.
+        ensure_track_processing_rows(session, int(track_id))
     return int(track_id), track_uid
 
 
