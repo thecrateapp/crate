@@ -205,3 +205,10 @@ ArtistCard contextual subtitles/counts, scalar metadata and PlaylistCard count s
 MonoLabel; the component forces uppercase. Titles, artist names, summaries and descriptions keep
 their case. Home history and replay metric captions use the same role. Do not globally uppercase
 EntityCard/EntityRow subtitles: they also carry identity and prose.
+
+## Secondary action captions — 1BC
+
+Hero secondary actions use actual MonoLabel as="span" with inherited color for the text below
+the glyph, including the injected Follow/Add/Share/Bandcamp slots on Album/Artist/Crate. Ordinary
+Button text and primary Play/Shuffle are unchanged. HeroActionBar owns generated captions/More;
+app adapters retain callbacks/media/menu/permission authority. Apply this to future equivalents.

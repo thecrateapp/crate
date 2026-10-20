@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronUp,
   Globe,
-  X,
 } from "@crate/ui/icons";
 import type { ReactNode } from "react";
 
@@ -20,6 +19,11 @@ import {
   ModalCloseButton,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { Button } from "@crate/ui/shadcn/button";
 import { cn } from "@crate/ui/lib/cn";
 import { formatCompact, formatSize } from "../../web/utils";
 
@@ -66,6 +70,7 @@ export interface ArtistBioProfileLabels {
   popularity: string;
   albums: string;
   tracks: string;
+  close: string;
 }
 
 export const DEFAULT_ARTIST_BIO_PROFILE_LABELS: ArtistBioProfileLabels = {
@@ -86,6 +91,7 @@ export const DEFAULT_ARTIST_BIO_PROFILE_LABELS: ArtistBioProfileLabels = {
   popularity: "popularity",
   albums: "albums",
   tracks: "tracks",
+  close: "Close",
 };
 
 export interface ArtistBioProfileProps {
@@ -252,50 +258,68 @@ function ArtistBioMemberTable({
   members: ArtistBioMember[];
 }) {
   return (
-    <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-meta">
-        {caption}
-      </h3>
-      <div className="overflow-x-auto rounded-lg border border-border-quiet-subtle">
-        <table
-          aria-label={caption}
-          className="w-full min-w-[28rem] text-left text-sm"
+    <FormField
+      kind="group"
+      label={
+        <span role="heading" aria-level={3}>
+          {caption}
+        </span>
+      }
+    >
+      {(group) => (
+        <div
+          {...group}
+          role="group"
+          className="overflow-x-auto rounded-lg border border-border-quiet-subtle"
         >
-          <thead className="bg-surface-quiet-subtle text-xs uppercase tracking-wider text-text-meta">
-            <tr>
-              <th className="px-3 py-2 font-medium">{labels.member}</th>
-              <th className="px-3 py-2 font-medium">{labels.role}</th>
-              <th className="px-3 py-2 font-medium">
-                {current ? labels.since : labels.from}
-              </th>
-              {!current ? (
-                <th className="px-3 py-2 font-medium">{labels.to}</th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-quiet-subtle">
-            {members.map((member) => (
-              <tr key={artistBioMemberKey(member)}>
-                <td className="px-3 py-2 font-medium text-text-hero">
-                  {member.name}
-                </td>
-                <td className="px-3 py-2 text-text-secondary">
-                  {member.roles?.join(", ") || "—"}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
-                  {formatMemberDate(member.begin, labels.unknown)}
-                </td>
+          <table
+            aria-label={caption}
+            className="w-full min-w-[28rem] text-left text-sm"
+          >
+            <thead className="bg-surface-quiet-subtle text-xs uppercase tracking-wider text-text-meta">
+              <tr>
+                <th className="px-3 py-2">
+                  <MonoLabel as="span">{labels.member}</MonoLabel>
+                </th>
+                <th className="px-3 py-2">
+                  <MonoLabel as="span">{labels.role}</MonoLabel>
+                </th>
+                <th className="px-3 py-2">
+                  <MonoLabel as="span">
+                    {current ? labels.since : labels.from}
+                  </MonoLabel>
+                </th>
                 {!current ? (
-                  <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
-                    {formatMemberDate(member.end, labels.unknown)}
-                  </td>
+                  <th className="px-3 py-2">
+                    <MonoLabel as="span">{labels.to}</MonoLabel>
+                  </th>
                 ) : null}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            </thead>
+            <tbody className="divide-y divide-border-quiet-subtle">
+              {members.map((member) => (
+                <tr key={artistBioMemberKey(member)}>
+                  <td className="px-3 py-2 font-medium text-text-hero">
+                    {member.name}
+                  </td>
+                  <td className="px-3 py-2 text-text-secondary">
+                    {member.roles?.join(", ") || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
+                    {formatMemberDate(member.begin, labels.unknown)}
+                  </td>
+                  {!current ? (
+                    <td className="whitespace-nowrap px-3 py-2 text-text-quiet">
+                      {formatMemberDate(member.end, labels.unknown)}
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </FormField>
   );
 }
 
@@ -312,23 +336,22 @@ function ArtistBioStats({
     ["scrobbles", stats.playcount, labels.scrobbles],
     ["followers", stats.spotifyFollowers, labels.followers],
     ["popularity", stats.spotifyPopularity, labels.popularity],
-  ].filter(([, value]) => typeof value === "number" && value > 0) as [
-    string,
-    number,
-    string,
-  ][];
+  ].filter(
+    ([, value]) =>
+      typeof value === "number" && Number.isFinite(value) && value >= 0,
+  ) as [string, number, string][];
 
   if (!items.length) return null;
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
       {items.map(([key, value, label]) => (
-        <div key={key}>
-          <div className="text-xl font-bold text-text-hero">
-            {key === "popularity" ? `${value}%` : formatCompact(value)}
-          </div>
-          <div className="text-xs text-text-meta">{label}</div>
-        </div>
+        <StatNumber
+          key={key}
+          value={key === "popularity" ? `${value}%` : formatCompact(value)}
+          label={<MonoLabel as="span">{label}</MonoLabel>}
+          size="sm"
+        />
       ))}
     </div>
   );
@@ -344,20 +367,14 @@ function ArtistBioLibraryStats({
   if (!stats) return null;
 
   return (
-    <div className="flex gap-6 text-xs text-text-quiet">
-      <span>
-        <strong className="text-text-secondary">{stats.albums}</strong>{" "}
-        {labels.albums}
-      </span>
-      <span>
-        <strong className="text-text-secondary">{stats.tracks}</strong>{" "}
-        {labels.tracks}
-      </span>
-      <span>
-        <strong className="text-text-secondary">
-          {formatSize(stats.sizeMb)}
-        </strong>
-      </span>
+    <div className="flex flex-wrap gap-6">
+      <MonoLabel as="span">
+        <strong>{stats.albums}</strong> {labels.albums}
+      </MonoLabel>
+      <MonoLabel as="span">
+        <strong>{stats.tracks}</strong> {labels.tracks}
+      </MonoLabel>
+      <MonoLabel as="span">{formatSize(stats.sizeMb)}</MonoLabel>
     </div>
   );
 }
@@ -374,21 +391,26 @@ function ArtistBioExternalLinks({
   return (
     <div className="flex flex-wrap gap-2">
       {links.map((link) => (
-        <a
+        <Button
+          asChild
+          variant="outline"
+          size="lg"
           key={`${link.type}-${link.url}`}
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          onClick={(event) => {
-            if (!onOpen) return;
-            event.preventDefault();
-            onOpen(link.url);
-          }}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border-quiet px-2.5 py-1 text-xs text-text-muted-strong transition-colors hover:border-border-interactive hover:bg-surface-quiet-subtle hover:text-text-secondary-strong"
         >
-          <Globe size={CRATE_ICON_SIZE.micro} />{" "}
-          {linkLabel(link.type, link.url)}
-        </a>
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            onClick={(event) => {
+              if (!onOpen) return;
+              event.preventDefault();
+              onOpen(link.url);
+            }}
+          >
+            <Globe size={CRATE_ICON_SIZE.micro} />{" "}
+            {linkLabel(link.type, link.url)}
+          </a>
+        </Button>
       ))}
     </div>
   );
@@ -421,28 +443,27 @@ export function ArtistBioProfile({
     <div className={cn("flex min-h-0 flex-col", className)}>
       <ModalHeader
         data-testid="artist-bio-header"
-        className="relative top-auto z-auto shrink-0 border-b-0 bg-transparent backdrop-blur-none"
+        className="relative top-auto z-auto shrink-0"
       >
         <div className="flex items-start justify-between gap-4 p-5 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="size-16 shrink-0 overflow-hidden rounded-xl bg-surface-quiet-subtle shadow-xl">
-              {photoContent ??
-                (photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt={artistName}
-                    className="size-full object-cover"
-                  />
-                ) : null)}
-            </div>
+            <MediaCover
+              src={photoUrl}
+              alt={photoContent ? "" : artistName}
+              fallback={photoContent}
+              className="size-16 shrink-0"
+              renderImage={photoContent ? () => photoContent : undefined}
+            />
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-text-primary sm:text-2xl">
+              <h2 className="truncate font-display text-xl font-bold text-text-primary sm:text-2xl">
                 {artistName}
               </h2>
               {meta.length > 0 ? (
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted">
                   {meta.map((item) => (
-                    <span key={item}>{item}</span>
+                    <MonoLabel as="span" key={item}>
+                      {item}
+                    </MonoLabel>
                   ))}
                 </div>
               ) : null}
@@ -455,13 +476,8 @@ export function ArtistBioProfile({
             </div>
           </div>
           {onClose ? (
-            <ModalCloseButton
-              onClick={onClose}
-              className="shrink-0 text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-strong"
-            />
-          ) : (
-            <X aria-hidden="true" className="invisible size-6 shrink-0" />
-          )}
+            <ModalCloseButton onClick={onClose} label={labels.close} />
+          ) : null}
         </div>
       </ModalHeader>
       <ModalBody
@@ -474,37 +490,42 @@ export function ArtistBioProfile({
       >
         <ArtistBioStats stats={stats} labels={labels} />
         {bio ? (
-          <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-text-meta">
-              {labels.biography}
-            </h3>
-            <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-body">
-              {splitBioParagraphs(
-                bioExpanded ? bio : truncateArtistBio(bio, 500),
-              ).map((paragraph) => (
-                <p key={paragraph}>
-                  <ArtistBioText text={paragraph} expanded />
-                </p>
-              ))}
-            </div>
-            {bio.length > 500 && onBioToggle ? (
-              <button
-                type="button"
-                onClick={onBioToggle}
-                className="link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs"
-              >
-                {bioExpanded ? (
-                  <>
-                    <ChevronUp size={CRATE_ICON_SIZE.micro} /> {labels.less}
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={CRATE_ICON_SIZE.micro} /> {labels.more}
-                  </>
-                )}
-              </button>
-            ) : null}
-          </div>
+          <FormField
+            kind="group"
+            label={
+              <span role="heading" aria-level={3}>
+                {labels.biography}
+              </span>
+            }
+          >
+            {(group) => (
+              <div {...group} role="group">
+                <div className="space-y-4 text-sm leading-7 text-text-secondary-strong sm:text-body">
+                  {splitBioParagraphs(
+                    bioExpanded ? bio : truncateArtistBio(bio, 500),
+                  ).map((paragraph, index) => (
+                    <p key={`${index}:${paragraph}`}>
+                      <ArtistBioText text={paragraph} expanded />
+                    </p>
+                  ))}
+                </div>
+                {bio.length > 500 && onBioToggle ? (
+                  <Button variant="link" onClick={onBioToggle}>
+                    {bioExpanded ? (
+                      <>
+                        <ChevronUp size={CRATE_ICON_SIZE.micro} /> {labels.less}
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={CRATE_ICON_SIZE.micro} />{" "}
+                        {labels.more}
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+              </div>
+            )}
+          </FormField>
         ) : null}
         <ArtistBioMembers members={members} labels={labels} />
         <ArtistBioLibraryStats stats={libraryStats} labels={labels} />

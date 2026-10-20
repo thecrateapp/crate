@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { OfflineItemState } from "../../lib/offline-model";
 import type { ReactNode, RefObject } from "react";
 import {
@@ -149,7 +150,9 @@ export function AlbumActionsView({
                 following={state.saved}
                 iconSize={CRATE_ICON_SIZE.lg}
               >
-                <span>{state.saved ? t("common.added") : t("common.add")}</span>
+                <MonoLabel as="span" className="text-inherit">
+                  {state.saved ? t("common.added") : t("common.add")}
+                </MonoLabel>
               </FollowHeartButton>
             ) : null}
             <button
@@ -159,7 +162,9 @@ export function AlbumActionsView({
               aria-label={t("common.share")}
             >
               <Share2 size={CRATE_ICON_SIZE.lg} />
-              <span>{t("common.share")}</span>
+              <MonoLabel as="span" className="text-inherit">
+                {t("common.share")}
+              </MonoLabel>
             </button>
             {supportAction}
           </>

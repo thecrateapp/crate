@@ -198,6 +198,10 @@ describe("ArtistHeroSection", () => {
     expect(
       within(secondary).getByRole("button", { name: "Follow" }),
     ).toHaveTextContent("Follow");
+    expect(within(secondary).getByText("Follow")).toHaveClass(
+      "font-mono",
+      "uppercase",
+    );
     expect(
       within(secondary).getByRole("button", { name: "Share" }),
     ).toHaveTextContent("Share");
@@ -452,5 +456,52 @@ describe("ArtistHeroSection", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Play top tracks" }),
     ).toBeInTheDocument();
+  });
+  it("shows real zero counts with contextual MonoLabel and uses the canonical text action", () => {
+    const onOpenBio = vi.fn();
+    renderWithI18n(
+      <MemoryRouter>
+        <ArtistHeroSection
+          artist={{
+            id: 7,
+            name: "Mixed Case Artist",
+            albums: [],
+            total_tracks: 0,
+            total_size_mb: 0,
+            primary_format: null,
+            genres: [],
+            issue_count: 0,
+          }}
+          artistInfo={{
+            bio: "Long biography with natural case. ".repeat(12),
+            tags: [],
+            similar: [],
+            listeners: 0,
+            playcount: 0,
+            image_url: null,
+            url: "",
+          }}
+          photoUrl=""
+          tags={[]}
+          following={false}
+          onPlay={vi.fn()}
+          onShuffle={vi.fn()}
+          onArtistRadio={vi.fn()}
+          onToggleFollow={vi.fn()}
+          onShare={vi.fn()}
+          onOpenBio={onOpenBio}
+        />
+      </MemoryRouter>,
+    );
+    for (const text of ["0 listeners", "0 tracks", "0 albums"]) {
+      expect(screen.getByText(text)).toHaveClass("font-mono", "uppercase");
+    }
+    expect(
+      screen.getByRole("heading", { name: "Mixed Case Artist" }),
+    ).not.toHaveClass("uppercase");
+    const more = screen.getByRole("button", { name: "Show more" });
+    expect(more).toHaveAttribute("data-slot", "button");
+    fireEvent.click(more);
+    expect(onOpenBio).toHaveBeenCalledOnce();
   });
 });

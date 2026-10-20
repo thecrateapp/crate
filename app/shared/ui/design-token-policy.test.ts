@@ -21,7 +21,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "domain/ArtistHeroPresentation.tsx": {
     "text-[52px]": 1,
     "text-[56px]": 1,
-    "tracking-[0.3em]": 1,
   },
   "domain/brand/CrateLoader.tsx": {
     [ORGANIC_BLOB_RADIUS]: 1,

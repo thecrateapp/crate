@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { CRATE_ICON_SIZE, Loader2, MoreHorizontal } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { cn } from "@crate/ui/lib/cn";
 
 import { ItemActionMenu } from "../actions/ItemActionMenu";
@@ -154,9 +155,12 @@ function HeroActionMenuControl({
       className={HERO_SECONDARY_ACTION_CLASS}
     >
       <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
-      <span className="max-w-full whitespace-normal wrap-anywhere">
+      <MonoLabel
+        as="span"
+        className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+      >
         {moreLabel}
-      </span>
+      </MonoLabel>
     </button>
   );
 
@@ -279,9 +283,12 @@ export function HeroActionBar({
               )}
             >
               {action.icon}
-              <span className="max-w-full whitespace-normal wrap-anywhere">
+              <MonoLabel
+                as="span"
+                className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+              >
                 {action.label}
-              </span>
+              </MonoLabel>
             </button>
           ))}
           {secondaryExtra}

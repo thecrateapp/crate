@@ -39,3 +39,24 @@ export function ArtistTopTracksFrame({
     </section>
   );
 }
+
+/** V2 community-card scale: two/three/four/five columns; discography has its own role above. */
+export function ArtistCommunityGroupFrame({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={title}>
+      <SectionHeader title={title} className="mb-4" />
+      <MediaGrid
+        density="comfortable"
+        className="md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+      >
+        {children}
+      </MediaGrid>
+    </section>
+  );
+}

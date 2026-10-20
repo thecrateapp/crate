@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   CrateAlbumListView,
   CrateAlbumListItem,
@@ -783,7 +784,9 @@ function CratePageActions({
             disabled={followPending}
             onClick={onFollow}
           >
-            <span>{followLabel}</span>
+            <MonoLabel as="span" className="text-inherit">
+              {followLabel}
+            </MonoLabel>
           </FollowHeartButton>
         ) : null
       }

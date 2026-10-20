@@ -46,6 +46,7 @@ export function ArtistBioModal({
       popularity: t("artist.bio.popularity"),
       albums: t("artist.bio.albums"),
       tracks: t("artist.bio.tracks"),
+      close: t("common.close"),
     }),
     [t],
   );
@@ -71,10 +72,10 @@ export function ArtistBioModal({
   const urls = mb?.urls
     ? Object.entries(mb.urls).map(([type, url]) => ({ type, url }))
     : [];
-  const listeners = artistInfo?.listeners ?? enrichment?.lastfm?.listeners ?? 0;
-  const playcount = artistInfo?.playcount ?? 0;
-  const spotifyFollowers = enrichment?.spotify?.followers ?? 0;
-  const spotifyPopularity = enrichment?.spotify?.popularity ?? 0;
+  const listeners = artistInfo?.listeners ?? enrichment?.lastfm?.listeners;
+  const playcount = artistInfo?.playcount;
+  const spotifyFollowers = enrichment?.spotify?.followers;
+  const spotifyPopularity = enrichment?.spotify?.popularity;
   const genreItems = getGenreItems(artist, tags);
 
   return (

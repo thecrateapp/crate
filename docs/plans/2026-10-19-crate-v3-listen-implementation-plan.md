@@ -352,3 +352,25 @@ Diego aprueba el primer lote1BC y la corrección de menús contextuales de Chrom
 commit/push y continuar con el siguiente corte: páginas de artista. Se conserva la evidencia
 de los tests focalizados y de ambos hosts en Storybook. Eventos, Radio y Paths siguen después.
 Cada corte nuevo se detiene para revisión sin commit; las tres instancias permanecen activas.
+
+## 1BC Explore publicado; Artist y estándar de acciones secundarias en revisión
+
+Primer corte1BC publicado `a89bac48`: Explore/browse y corrección de menús Chrome. El segundo
+corte cubre Artist según [su plan](2026-10-20-crate-v3-artist.md): hero y estados de lectura,
+biografía editorial, agrupación de secciones, preparación de show y modal de setlist. Conserva
+imágenes V2, fondo100px más abajo y degradado original. Cuatro familias compartidas Artist ya
+tienen entradas Storybook; los controladores y vistas de un solo dominio siguen en Listen.
+
+Diego confirma MonoLabel para TODO texto debajo de glifos de acciones secundarias. HeroActionBar
+y los añadidos Artist/Album/Crate/Bandcamp lo aplican, cubriendo también playlists y géneros.
+Play/Shuffle y Button convencionales mantienen sus roles. Inventario y contratos en Storybook;
+review pequeña `review-1bc-artist.html` y `reviews-1bc-artist--complete`. Este segundo corte se
+detiene sin commit; tres instancias activas. Eventos/Upcoming, Radio y Paths siguen pendientes
+en próximos cortes1BC; H2 no queda certificado por este lote.
+
+## 1BC Artist aprobado — publicación autorizada
+
+Diego aprueba el segundo corte1BC y autoriza commit/push de Artist y del estándar de acciones
+secundarias validado. Continuar con Upcoming y shows, usando la referencia aprobada y sus
+enmiendas, actualizando Storybook y manteniendo5186/6006/5174 activos. El nuevo corte se
+detiene para revisión antes de commit/push; Radio y Paths permanecen pendientes.

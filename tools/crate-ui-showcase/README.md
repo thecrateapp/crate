@@ -172,7 +172,7 @@ retain native artwork measurements, route helpers, auth, imports and verified of
 1BA review amendments: Listen/QualityBadge documents the actual soundwave/tier adapter used by
 hero, rows and player; TrackMetadata demonstrates reserved responsive columns and missing values.
 ShowGenres uses the real expanded show view and UpcomingMonthGroupView with its canonical8px
-caption-to-first-item gap. Supplied genre profiles retain percentages, including0%; names alone
+caption-to-first-item gap. Supplied genre profiles retain percentages, including 0%; names alone
 never acquire synthetic percentages. The expanded show composition is Diego's reference for the
 next Listen migrations. Production Top Tracks depth/rate requires the prepared backend change
 to be deployed; the live preview still reads the existing production API.
@@ -249,7 +249,7 @@ Home instruments, native/AT certification and real production writes are not cla
 Second-batch checks: initial consumer pack114/17files; final affected follow-up102/9files,
 including native DND7, public/authenticated crate pages, picker, create/edit and playlist hover.
 Shared57/6files, Listen policy31/7files and Desktop50/7files pass. Four browser cases pass at
-375/1200px × both hosts: real8px field gaps,40px Input/Select,44px actions,48px row artwork,
+375/1200px × both hosts: real 8 px field gaps,40px Input/Select,44px actions,48px row artwork,
 V2 coverflow304/400px, both hover families, native submit, picker/move/remove, owner restrictions,
 create/edit/pending/confirm/read states and no overflow/API requests. All5typechecks (Listen,
 Desktop, Admin, shared UI, Storybook), changed lint,3builds and catalogue pass. Initial Listen
@@ -347,3 +347,48 @@ disabled actions, submenu keyboard/action, Escape/focus restore and no API/overf
 Listen/Desktop/Admin/shared/Storybook types, changed shared lint, builds and bundle pass.
 Initial Listen JS202350Bgzip/24assets stays below307200; catalogue54documented/93entries/120sources.
 Logs: `.artifacts/review/1bc-menu-*`; screenshot `1bc-desktop-menu.png`. New1BC remains uncommitted.
+
+### 1BC Artist — second batch
+
+Base Explore/browse and Chrome menus published as `a89bac48`. Artist detail continues H2:
+ArtistHeroView + ArtistHeroActionsView, canonical read states with cached content preserved,
+ArtistBioProfile/Text/Frame/Presentation catalogue entries, original V2 discography/community
+card geometry, solid show preparation Card and actual setlist modal/HairlineRow readout. The
+shared components have real Listen and Admin consumers; artist page/show-prep/controllers stay
+Listen-local. Upcoming show cards/instruments, Radio and Paths remain separate next batches.
+
+`Listen/Artist`, `Reviews/1BC/Artist` and `review-1bc-artist.html` share the actual pure production
+views. Managed image/menu/enrichment/API/player authority stays in adapters. Grid specimens
+inject EntityCard, the existing base used by managed cards; they do not invent an app data flow.
+The historical mockup is unchanged. Profile examples cover missing data versus real 0, members,
+full-width paragraphs, dates, genres with percentages including 0%, local callbacks and dialogs.
+
+Diego's confirmed secondary-caption standard now applies throughout the current code:
+
+| Owner | Current adoption |
+| --- | --- |
+| HeroActionBar | Generated Radio/Setlist/Download/Edit/etc. secondary captions and More, across Artist/Album/Crate/Playlist/CuratedPlaylist/HomePlaylist/Genre and any other consumer |
+| ArtistHeroActionsView | Injected Follow/Following and Share; keeps the original action order |
+| AlbumActionsView | Add/Added and Share captions |
+| Crate actions | Follow/pending caption |
+| BandcampSecondaryAction | Both actionable and owned secondary presentations; normal Bandcamp text button keeps its role |
+
+The scan covered JSX vertical action patterns and shared hero recipe consumers in Listen,
+Admin and shared UI. No separate matching vertical secondary-action family was found in Admin;
+its conventional text buttons and icon-only tooltips keep their own roles. Navigation captions,
+file-drop instructions, metadata and primary Play/Shuffle are not secondary action captions.
+Use actual MonoLabel and inherit parent color. No Button foundation typography change.
+
+The final review adds independent injected artwork without a URL, actual More/Bandcamp action and
+owned specimens, and long-name interaction. BandcampSecondaryActionView is the production pure
+view; the transport and purchase/import authority remains in BandcampSupportButton. The artist
+scene imports the actual Listen viewport/safe-area metrics for mobile modal sizing.
+
+Validation at the Artist review stop: Listen101/15files, shared35/5, Admin38/3, Desktop28/3,
+policy27/3, browser4/4 (both hosts375/1200), plus13affected Artist consumer checks after the
+image-source fix. Types, changed Listen lint and three individual builds pass; initial JS
+202395gzip bytes remains below307200. Catalogue58documented/93entries/120sources. One fresh
+review's artwork injection regression is fixed RED→GREEN, including photoContent without URL.
+Fixture backgrounds are decoded images; cache versioning remains in the app adapter.
+Evidence: `.artifacts/review/1bc-artist-*`, screenshot `1bc-artist-review.png`. Three services
+remain active; this Artist cut stops without commit for Diego.

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { cn } from "../lib/cn";
 import type { ArtistHeroComposition } from "./ArtistHeroFrame";
 
@@ -31,13 +32,11 @@ export function ArtistHeroPresentation({
   const mobile = composition === "mobile";
   const copy = (
     <>
-      <p className="text-xs font-semibold uppercase leading-none tracking-[0.3em] text-accent-action sm:text-xs">
-        {kicker}
-      </p>
+      <MonoLabel className="text-accent-action">{kicker}</MonoLabel>
       <h1
         data-testid="hero-result-artist-name"
         className={cn(
-          "mt-1 max-w-[16ch] text-balance font-black leading-[0.96] tracking-display text-text-primary",
+          "mt-1 max-w-[16ch] text-balance font-display font-black leading-[0.96] tracking-display text-text-primary",
           mobile
             ? "text-4xl min-[390px]:text-5xl"
             : "text-[52px] lg:text-[56px]",

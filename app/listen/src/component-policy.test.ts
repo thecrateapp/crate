@@ -11,8 +11,8 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-// 1BC replaces four Explore raw controls with canonical actions and card primitives.
-const RAW_CONTROL_BUDGET = { button: 72, input: 6, textarea: 1 };
+// 1BC Artist replaces the remaining raw biography disclosure with canonical Button.
+const RAW_CONTROL_BUDGET = { button: 71, input: 6, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":

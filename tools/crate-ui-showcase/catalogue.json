@@ -351,72 +351,80 @@
     {
       "id": "domain-artistbioprofile",
       "name": "ArtistBioProfile",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Existing shared editorial profile for Listen biography and Admin research preview; injected labels, artwork, callbacks and data.",
+      "coverage": "documented",
+      "adoption": "Listen ArtistBioModal; Admin ArtistBioResearchDialog.",
+      "storyId": "components-artistbioprofile",
+      "story": "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx",
       "sources": [
         "app/shared/ui/domain/ArtistBioProfile.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistBioProfile.tsx": "303d3df6d17b8689473144fc29a54b80531fab0a9e4cb9d19a1fffaa82434e68"
+        "app/shared/ui/domain/ArtistBioProfile.tsx": "a6e9d930b31c5f78c53505a52121da1ef9236dba43c3c1f8c8635ebe96d1c7fe",
+        "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx": "e97c8600e156fa7b518985d52bbf44e0f52b78fcca834550ba8b442439a75340",
+        "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx": "05814d08a3ec6904fc533084fd4fbf0ce318b8bdcd4d15734771922a13a158df"
       },
       "category": "Data Display"
     },
     {
       "id": "domain-artistbiotext",
       "name": "ArtistBioText",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared biography text and safe external links, preserving punctuation and URL-aware truncation.",
+      "coverage": "documented",
+      "adoption": "Listen artist hero/profile; Admin artist About/Overview.",
+      "storyId": "components-artistbiotext",
+      "story": "tools/crate-ui-showcase/stories/ArtistBioText.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistBioText.mdx",
       "sources": [
         "app/shared/ui/domain/ArtistBioText.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistBioText.tsx": "9bb1a935c8ef9a7314f20bf40c85390a94a03b1821ec5c28c5ecda2d1e0d5ae0"
+        "app/shared/ui/domain/ArtistBioText.tsx": "9bb1a935c8ef9a7314f20bf40c85390a94a03b1821ec5c28c5ecda2d1e0d5ae0",
+        "tools/crate-ui-showcase/stories/ArtistBioText.stories.tsx": "69c80e05da87e3e39257ec92e94a72f649e9c81bd5fe650af39b872bc75b4de5",
+        "tools/crate-ui-showcase/docs/ArtistBioText.mdx": "4a4bd28678564006ae28c00866d380bceab108e89f5fd315ca1f5fab1f0866e0"
       },
       "category": "Data Display"
     },
     {
       "id": "domain-artistheroframe",
       "name": "ArtistHeroFrame",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared artwork/fade canvas with desktop/mobile bounds, not a page/data controller.",
+      "coverage": "documented",
+      "adoption": "Listen home/artist hero; Admin HeroCompositionCanvas.",
+      "storyId": "components-artistheroframe",
+      "story": "tools/crate-ui-showcase/stories/ArtistHeroFrame.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistHeroFrame.mdx",
       "sources": [
         "app/shared/ui/domain/ArtistHeroFrame.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistHeroFrame.tsx": "62ea5350816b48658f1455ebeb376640a97a6c38a909aeceac060bb351db4cc0"
+        "app/shared/ui/domain/ArtistHeroFrame.tsx": "62ea5350816b48658f1455ebeb376640a97a6c38a909aeceac060bb351db4cc0",
+        "tools/crate-ui-showcase/stories/ArtistHeroFrame.stories.tsx": "e19668b8242d840244bbe8f0f247fc63d7a0ea0c162416f3096446514b96c9a8",
+        "tools/crate-ui-showcase/docs/ArtistHeroFrame.mdx": "503c3c353f5f514a6f6ab16019204095e21f6227af508fed1b0f13931150c93e"
       },
       "category": "Layout"
     },
     {
       "id": "domain-artistheropresentation",
       "name": "ArtistHeroPresentation",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Editorial home hero copy/action layout over ArtistHeroFrame, with injected slots.",
+      "coverage": "documented",
+      "adoption": "Listen HomeCanonicalHero; Admin ArtistHeroArtworkEditor. Artist detail uses PageHero via ArtistHeroView.",
+      "storyId": "components-artistheropresentation",
+      "story": "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx",
       "sources": [
         "app/shared/ui/domain/ArtistHeroPresentation.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "ecd16dcc62a2187873784a6c6446904e5126fc1f30d87c2e17fbbffd7b0f5f87"
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "30d5df750f72522fb35b85621db41bb7acb32bdd29d5322c861b6ed6c9115fa8",
+        "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx": "9d3925e7cc7a6ea92ed2d26c469a3c935c5f9ce65047ed13bd56dcadb544b144",
+        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "cf00778e971aeeaa9b8f58383958b1ce97abf210d096eaaa3b99b5494bdc20e8"
       },
       "category": "Data Display"
     },
@@ -684,9 +692,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/HeroActionBar.tsx": "1e1cfefd9d685be06d8f50d84ddf8870c461cfef12b00611e2df9e50c5c3b4aa",
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "54037d4399e6f496b7bd52ec0472242d681108a637d43d975686b823d0516ae6",
         "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
-        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "f50095d0e2b8c7e3da8b5a79e54d212de04e3562bc855cc3dddb8481bcfed245"
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "616d6ba2b8a18f104f23320ffba6bc20c76295c66a42ef5c3fc55939ca14f7e3"
       },
       "category": "Actions"
     },

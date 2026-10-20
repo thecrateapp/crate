@@ -317,3 +317,17 @@ it("keeps zero-valued hero context visible alongside its heading", () => {
   render(<PageHero title="Pending imports" eyebrow={0} subtitle={0} />);
   expect(screen.getAllByText("0")).toHaveLength(2);
 });
+
+it("uses MonoLabel for secondary captions without changing primary action text", () => {
+  render(
+    <HeroActionBar
+      primaryActions={[{ key: "play", label: "Play" }]}
+      secondaryActions={[{ key: "share", label: "Share" }]}
+    />,
+  );
+  expect(screen.getByText("Share")).toHaveClass("font-mono", "uppercase");
+  expect(screen.getByRole("button", { name: "Play" })).not.toHaveClass(
+    "font-mono",
+    "uppercase",
+  );
+});

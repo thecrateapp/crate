@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 
@@ -46,11 +46,42 @@ describe("artist mobile modals", () => {
       .getByText("Probable Setlist")
       .closest("[data-app-modal-panel]");
     expect(panel).toHaveClass("crate-overlay-panel");
+    expect(
+      screen
+        .getByText("Smugglers & Scholars")
+        .closest('[data-slot="hairline-row"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByText("80%")).toHaveClass("font-mono", "uppercase");
     expect(panel).not.toHaveClass("listen-glass-panel");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
       "listen-mobile-bottom-chrome-height",
     );
+  });
+
+  it("keeps setlist export authority in the app adapter and closes after play", async () => {
+    apiMock.mockResolvedValue({});
+    const calls: string[] = [];
+    renderWithProviders(
+      <ArtistSetlistModal
+        artistName="Artist"
+        artistId={7}
+        open
+        onClose={() => calls.push("close")}
+        onPlay={() => calls.push("play")}
+        setlist={[{ title: "Song", frequency: 0.8, play_count: 12 }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/artists/7/setlist-playlist",
+      "POST",
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Export" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Play Setlist" }));
+    expect(calls).toEqual(["play", "close"]);
   });
 
   it("renders artist bio as a native bottom sheet instead of a floating panel", () => {
@@ -196,9 +227,9 @@ describe("artist mobile modals", () => {
     expect(screen.queryByRole("button", { name: /noise/i })).toBeNull();
     expect(hardcore).toHaveClass("rounded-full");
     expect(hardcore).not.toHaveClass("bg-white/8");
-    expect(header).toHaveClass("border-b-0", "bg-transparent");
+    expect(header).toHaveClass("bg-surface-popover");
     expect(header).not.toHaveClass("backdrop-blur-xl");
-    expect(close).toHaveClass("hover:text-accent-action");
+    expect(close).toHaveClass("hover:text-text-primary");
     expect(close.className).not.toContain("bg-white/5");
     expect(close.className).not.toContain("border-white/10");
   });

@@ -201,6 +201,7 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        artist1bc: resolve(import.meta.dirname, "review-1bc-artist.html"),
         menus1bc: fileURLToPath(
           new URL("review-1bc-menus.html", import.meta.url),
         ),

@@ -236,3 +236,11 @@ TabsList owns one decorative cyan indicator with spring-snappy450ms travel and o
 initial static placement, responsive/RTL/vertical alignment and OS/Crate reduced-motion fallback.
 Do not duplicate underline positioning or margins in consumers. Radix retains activation,
 keyboard, focus and panel semantics. See the three live contracts and Reviews/1AY/Shell.
+
+## Secondary action captions — 1BC
+
+Diego's confirmed standard: text below an action glyph uses actual MonoLabel (uppercase,
+regular mono, canonical caption size), inheriting the action's active/disabled color. Apply it
+in HeroActionBar, including More and injected Follow/Add/Share/Bandcamp captions; never repair
+it in a page stylesheet. Primary Play/Shuffle and conventional Button text retain their existing
+roles. Navigation labels and icon-only tooltips are different roles, not secondary captions.

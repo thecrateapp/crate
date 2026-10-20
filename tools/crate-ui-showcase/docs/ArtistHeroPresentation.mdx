@@ -1,0 +1,24 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ArtistHeroPresentation.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ArtistHeroPresentation</DocHeading>
+<EntryDetails
+  id="domain-artistheropresentation"
+  review="1BC · Artist reconciliation"
+/>
+
+Editorial home hero copy/action layout over ArtistHeroFrame, with injected slots.
+
+Listen HomeCanonicalHero; Admin ArtistHeroArtworkEditor. Artist detail uses PageHero via ArtistHeroView.
+
+The approved mockup and later confirmed decisions remain the reference. App adapters retain managed image recovery, authorization, routing, i18n, API and playback. Fixture callbacks are local. Captions use MonoLabel; names and prose preserve case. No new app contexts or synthetic data enter shared UI.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+The kicker uses actual MonoLabel. Editorial title scale and desktop/mobile copy placement remain unchanged. This is the Home/editor artwork composition; Artist detail retains PageHero and its approved100px background adjustment.
+
+The editorial artist title uses the display face; contextual copy uses MonoLabel. Existing desktop 52/56 px and mobile 36/48 px title scales remain unchanged.
