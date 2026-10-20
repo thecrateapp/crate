@@ -1,14 +1,14 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
 import {
   ArtistHeroFrame,
   artistHeroArtworkFitClassName,
 } from "@crate/ui/domain/ArtistHeroFrame";
 import { ArtistBioText } from "@crate/ui/domain/ArtistBioText";
 import { PageHero } from "@crate/ui/domain/hero";
+import { SectionActionButton } from "@crate/ui/domain/lists/SectionHeader";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { Button } from "@crate/ui/shadcn/button";
 import { formatCompact } from "../../lib/utils";
 
 export interface ArtistHeroImageProps {
@@ -125,10 +125,9 @@ export function ArtistHeroView({
             <ArtistBioText text={bio} />
           </p>
           {bio.length > 200 ? (
-            <Button variant="link" onClick={onOpenBio}>
+            <SectionActionButton onClick={onOpenBio}>
               {t("common.showMore")}
-              <ChevronDown size={CRATE_ICON_SIZE.micro} />
-            </Button>
+            </SectionActionButton>
           ) : null}
         </div>
       ) : null}

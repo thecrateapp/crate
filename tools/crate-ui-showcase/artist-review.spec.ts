@@ -22,6 +22,72 @@ for (const host of ["storybook", "standalone"] as const)
       const hero = page.getByRole("group", {
         name: "Artist hero · managed image adapter and actual secondary actions",
       });
+      const more = hero.getByRole("button", { name: "Show more", exact: true });
+      const moreCaption = more.getByText("Show more", { exact: true });
+      await expect(moreCaption).toHaveCSS("text-transform", "uppercase");
+      expect(
+        await moreCaption.evaluate(
+          (element) => getComputedStyle(element).fontFamily,
+        ),
+      ).toMatch(/Mono/i);
+      await expect(more.locator(".crate-status-dot")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+      await expect(more.locator("svg")).toHaveCount(0);
+      const biography = more.locator("..").locator("p").first();
+      expect((await moreCaption.boundingBox())!.x).toBeCloseTo(
+        (await biography.boundingBox())!.x,
+        1,
+      );
+      expect((await more.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await more.hover();
+      await expect(more).toHaveCSS("text-decoration-line", "none");
+      await expect(more).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await more.click();
+      const bioDialog = page.getByRole("dialog", {
+        name: "Nocturnal Ensemble biography",
+      });
+      await expect(bioDialog).toBeVisible();
+      const bioGroup = bioDialog.getByRole("group", {
+        name: "Biography",
+        exact: true,
+      });
+      const less = bioGroup.getByRole("button", { name: "Less", exact: true });
+      const lessCaption = less.getByText("Less", { exact: true });
+      await expect(lessCaption).toHaveCSS("text-transform", "uppercase");
+      await expect(lessCaption).toHaveCSS("font-family", /JetBrains Mono/);
+      await expect(less.locator(".crate-status-dot")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+      await expect(less.locator("svg")).toHaveCount(0);
+      // Read both edges in one frame: the modal entrance transforms the parent.
+      expect(
+        await bioGroup.evaluate(
+          (group) =>
+            group
+              .querySelector("button .crate-mono-label")!
+              .getBoundingClientRect().x -
+            group.querySelector("p")!.getBoundingClientRect().x,
+        ),
+      ).toBeCloseTo(0, 1);
+      await expect
+        .poll(async () => (await less.boundingBox())!.height)
+        .toBeGreaterThanOrEqual(43.99);
+      await less.click();
+      const expand = bioGroup.getByRole("button", {
+        name: "More",
+        exact: true,
+      });
+      await expect(expand).toBeVisible();
+      await expect(expand.locator(".crate-status-dot")).toHaveCount(1);
+      await expand.click();
+      await expect(less).toBeVisible();
+      await bioDialog
+        .getByRole("button", { name: "Close", exact: true })
+        .click();
+      await expect(more).toBeFocused();
       for (const text of ["Radio", "Setlist", "Follow", "Share"]) {
         const caption = hero.getByText(text, { exact: true });
         await expect(caption).toHaveCSS("text-transform", "uppercase");

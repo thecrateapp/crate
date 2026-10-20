@@ -59,6 +59,14 @@ export interface Track {
 
 export type RepeatMode = "off" | "one" | "all";
 
+export interface CrossfadeTransition {
+  outgoing: Track;
+  incoming: Track;
+  durationMs: number;
+  startedAt: number;
+  outgoingDurationSeconds: number;
+}
+
 type RadioSeedType =
   | "track"
   | "album"

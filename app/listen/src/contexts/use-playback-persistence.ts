@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from "react";
 import type { MutableRefObject } from "react";
 
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import { saveQueue } from "@/contexts/player-utils";
 
 const CHECKPOINT_INTERVAL_MS = 5000;
@@ -11,6 +11,7 @@ interface UsePlaybackPersistenceOptions {
   currentIndex: number;
   isPlaying: boolean;
   shuffle: boolean;
+  playSource: PlaySource | null;
   queueRef: MutableRefObject<Track[]>;
   currentIndexRef: MutableRefObject<number>;
   currentTimeRef: MutableRefObject<number>;
@@ -27,7 +28,7 @@ interface UsePlaybackPersistenceOptions {
 /**
  * Persists the player state to localStorage across three triggers:
  *
- *   1. Structural changes (queue / currentIndex / play-pause) — write
+ *   1. Structural changes (queue / currentIndex / play-pause / shuffle / source) — write
  *      immediately on the corresponding state update.
  *   2. Periodic checkpoint every 5s while a queue is loaded, so a tab
  *      crash doesn't lose more than a few seconds of resume position.
@@ -44,6 +45,7 @@ export function usePlaybackPersistence({
   currentIndex,
   isPlaying,
   shuffle,
+  playSource,
   queueRef,
   currentIndexRef,
   currentTimeRef,
@@ -54,16 +56,17 @@ export function usePlaybackPersistence({
   const persistNow = useEffectEvent((playing: boolean) => {
     saveQueue(queueRef.current, currentIndexRef.current, {
       currentTime: currentTimeRef.current,
+      playSource,
       wasPlaying: playing,
       shuffle: shuffleRef.current,
       unshuffledQueue: unshuffledQueueRef.current,
     });
   });
 
-  // Structural: immediate writes on queue / cursor / play-pause / shuffle changes.
+  // Structural: immediate writes on queue / cursor / play-pause / shuffle / source changes.
   useEffect(() => {
     persistNow(isPlaying);
-  }, [queue, currentIndex, isPlaying, shuffle]);
+  }, [queue, currentIndex, isPlaying, shuffle, playSource]);
 
   // Periodic checkpoint so a crash mid-playback doesn't erase resume
   // position. No-op when the queue is empty.

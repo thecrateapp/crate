@@ -490,7 +490,6 @@ app-shell TimezoneAutodetect retains its initial detection/persistence behavior;
 longer exposes an automatic value as an editable preference. Pulse remains under Listening
 preferences. The automatic timezone tests and Account-absence regression cover this boundary.
 
-
 ## Listen Settings — remaining 1BD compositions
 
 `listen-settings-integrations` inventories ShowsLocationView, OpenSubsonicSettingsView,
@@ -513,15 +512,45 @@ Server view props contain display descriptors only. Fixture actions do not read 
 preferences, credentials or audio. The automatic timezone is not reintroduced. Social, imports,
 sharing and the later1BE families remain outside this Settings cut. Stop for review before commit.
 
-
 The final review pass preserves verified Bandcamp identity/Disconnect when only totals fail;
 a separate totals retry cannot relink the account. Native cancellation and provider disconnect
 use the existing busy gate. Manual IP detection retains notifications. City suggestions ignore
 obsolete responses, respect focus/Escape dismissal and visibly identify the keyboard choice.
 Connected usernames preserve case outside StatusDot. These cases have adapter/view/browser tests.
 
-
 Diego’s Account amendment removes the redundant Quick links region from production and both
 review hosts. LinksSection, its unused LinksSettingsView and fixture are removed. The normal
 user-menu sign-out remains available; Account ends with Security. The server story retains its
 stable id and is now displayed as Servers. Account regression tests check the reduced composition.
+
+### Listen Community — 1BD
+
+`Listen/Community` and `Reviews/1BD/Community` document the actual directory, public profile,
+connections and desktop profile-card views. The same scene is available at
+`http://127.0.0.1:5186/review-1bd-community.html`. Search/identity and public library/network
+slots retain app controller authority; the fixture supplies only static imagery/data and local
+callbacks. Names/bios retain case; technical captions use MonoLabel. Read failure never means
+verified empty/zero, and directory search discards obsolete replies. Own-profile/busy follow,
+ready/loading/error, empty/zero, long content and both connection modes are reviewable.
+No shared foundation changes; catalogue fingerprints remain intact. Run `community-review.spec.ts`
+with one worker for both hosts at375/1200px,8px field gaps, control geometry and no API/storage
+side effects. Production follow, public collection access and authenticated artwork remain
+covered by Listen adapter tests; live QA stays read-only.
+
+### Approved action-label amendment — 1BD
+
+`Reviews/1BD/Action labels` and `review-1bd-action-labels.html` share one small scene using actual
+SectionHeader and ContextMenu components. Diego approved both changes: View All uses the same
+accent MonoLabel and glowing decorative dot in section buttons, profile links and search;
+context-menu action/disclosure options use uppercase MonoLabel while preserving state colors
+and media-name case. SectionHeader/SectionActionLabel own the caption/marker composition.
+Component entries, docs and targeted fingerprints are current. `action-labels.spec.ts` covers
+both hosts375/1200, touch targets, option wrapping/full-label titles, keyboard navigation and
+local-only callbacks; `context-menu-input.spec.ts` retains desktop/touch detection coverage.
+
+The same review includes enabled/disabled MonoLabel link feedback and the actual player-bar
+Playing from caption (source names retain their case/navigation). Listen/Player/SourceLabel
+documents its desktop visibility and session restoration. The existing Artist review and
+ArtistBioProfile entries cover Show more and More/Less through shared SectionActionButton:
+accent MonoLabel/dot,44px target and text alignment without an inset. Both expansion states
+remain functional; no fixture API/audio or preference writes.

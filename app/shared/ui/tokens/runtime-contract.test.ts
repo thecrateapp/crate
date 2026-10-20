@@ -51,6 +51,17 @@ describe("runtime token bridge", () => {
     expect(inset).toMatch(/text-decoration:\s*underline/);
   });
 
+  it("keeps shared link feedback free of beams and generated hover underlines", () => {
+    const recipes = readTokenFile("recipes.css");
+    expect(recipes).not.toMatch(/@keyframes\s+crateLinkBeam/);
+    expect(recipes).not.toMatch(
+      /\.link-(?:meta|accent)[^{,]*::(?:before|after)/,
+    );
+    expect(recipes).toMatch(
+      /\.link-accent:hover,\s*\.link-accent:focus-visible\s*\{[^}]*color:\s*var\(--accent-action-hi\)/s,
+    );
+  });
+
   it("derives fixed defaults in the identity layer", () => {
     const themes = readTokenFile("themes.css");
 

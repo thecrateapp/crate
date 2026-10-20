@@ -33,7 +33,7 @@ export function StatNumber({
   className,
 }: StatNumberProps) {
   const caption = label ? (
-    <span className="font-mono font-normal text-label uppercase tracking-label text-text-subtle">
+    <span className="font-mono font-normal text-label uppercase tracking-label text-text-subtle transition-colors in-[a:hover]:text-accent-action-hi in-[a:focus-visible]:text-accent-action-hi">
       {label}
     </span>
   ) : null;

@@ -14,10 +14,17 @@ import { DocHeading } from "../components/DocHeading";
 - Use for highlighted metrics, not every numeral in a table.
 - `sm/md/lg/xl`, units and labels above or below. The caller distinguishes missing data from zero.
 - No local font or weight overrides on the value. Full Admin adoption is still pending.
+- Inside a native link, the caption changes from subtle gray to high accent on hover or
+  keyboard focus. StatNumber owns this feedback for both label positions; readonly metrics
+  stay subtle and the numeral/unit keep their existing colors. No caller selectors are needed.
 
 <DocHeading as="h2">Real component</DocHeading>
 
 <Canvas of={Stories.Base} />
+
+<DocHeading as="h2">Linked and readonly metrics</DocHeading>
+
+<Canvas of={Stories.Linked} />
 
 <Controls />
 

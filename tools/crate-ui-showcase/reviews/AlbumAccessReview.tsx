@@ -458,7 +458,7 @@ export function ArtistEntryExamples() {
       </ArtistAlbumGroupFrame>
       <ArtistTopTracksFrame
         title="Sample artist · Top Tracks"
-        actionLabel="View all"
+        actionLabel="View All"
         onAction={() => setResult("Sample artist → all tracks.")}
       >
         <TrackList

@@ -451,3 +451,44 @@ Settings con cinco pestañas, Account normalizado y timezone automático fuera d
 la transición pixelate-blur de portadas que sustituye el coverflow. Storybook/preview usan las
 vistas reales y la documentación de Paths refleja la decisión posterior. El bloqueo previo
 de commit queda revocado para este lote. No se ha solicitado despliegue ni nueva migración.
+
+### Settings restantes publicado;1BD Comunidad en revisión
+
+Diego aprobó y autorizó la publicación de Settings restantes (incluida la retirada de Quick
+links). Publicado en `b78077aa`, junto con el commit previo pendiente `5337b239`.
+El siguiente corte anunciado antes de comenzar es [1BD Comunidad](2026-10-20-crate-v3-community.md):
+People/búsqueda, perfiles públicos, seguidores/seguidos y tarjetas de perfil. Vistas reales de
+Listen con fundamentos existentes, callbacks y medios gestionados en adaptadores; Storybook en
+inglés y `review-1bd-community.html` reutilizan la misma escena aislada. Fallos de lectura no se
+presentan como vacíos/cero; nombres/bios conservan case y metadatos usan MonoLabel. Seguimiento,
+perfiles propios, colecciones públicas y privacidad conservan la autoridad actual.
+
+En revisión local, sin nuevo commit:75 tests Listen,52 Desktop,23 shared y4 casos browser en
+ambos hosts a375/1200px; tipos de los tres consumidores, lint, i18n, builds y catálogo verdes.
+Revisión fresca y correcciones comprobadas completas. Tres instancias activas. Imports/share y
+los demás lotes1BD siguen después; no se certifica H2/H3 ni se ejecuta CI completa en este corte.
+
+Enmiendas de revisión de Comunidad: métricas sociales/escucha comparten grid2/3columnas;
+afinidad pasa al extremo derecho de PageHeader y al siguiente tier StatNumber(md). Los enlaces
+compartidos pierden beams y mantienen foco visible. StatNumber cambia su caption a accent al
+hover/foco de un enlace; lecturas sin enlace conservan gris. Contratos y ejemplos reales de
+Foundations/StatNumber actualizados con sus fingerprints. Verificación scoped:53shared,
+7Profile,4Admin y7browser verdes, tipos/lint/builds/catálogo correctos. Tres instancias activas;
+todo este corte sigue sin commit hasta aprobación de Diego.
+
+Diego aprueba los dos patrones de acciones de1BD: VIEW ALL en MonoLabel accent con un dot
+decorativo y glow en vez de flecha; opciones de ContextMenu en MonoLabel mayúscula. La misma
+SectionActionLabel compone secciones, perfiles y pie de búsqueda; copia única/localizada,
+estados y navegación conservados. Storybook y preview aislado `review-1bd-action-labels.html`
+actualizados con fuentes reales; regla registrada en shared/AGENTS.94Listen,92shared,7Admin,
+52Desktop y12browser verdes; tipos, lint, i18n, builds/catálogo correctos. Se mantienen las tres
+instancias. Esta aprobación visual no autoriza un nuevo commit; Comunidad sigue sin publicar.
+
+
+Última enmienda local1BD: enlaces MonoLabel y opciones de ContextMenu pasan a accent al hover/
+foco, sin fondo. SectionActionButton comparte VIEW ALL, Show more y More/Less con dot y sin
+sangría; conserva44px y callbacks. PlayerBar mantiene Playing from en MonoLabel y ahora guarda/
+restaura su origen junto a la cola, sin autoplay. Storybook, preview aislado de acciones y vista
+de artista actualizados.72Listen,101shared,10Admin,52Desktop y12browser relevantes verdes;
+tipos, lint, builds y catálogo correctos. Tres servicios activos; sigue pendiente de revisión,
+sin commit/push. Evidencia y límites en el plan de Comunidad.

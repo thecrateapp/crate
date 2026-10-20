@@ -124,3 +124,23 @@ the retired gradient/backdrop recipes have no remaining consumers. Text, timed l
 scroll behavior remain owned by Listen. The player header has no added Now Playing caption.
 EQ access follows runtime capability, independent of whether the effect is enabled; opening
 its existing panel must not enable the effect or change saved gains/preferences.
+
+## Link feedback — 1BD amendment
+
+Links in both apps use the shared `link-meta` / `link-accent` recipes. Hover changes foreground
+color; accent links use the high accent. Diego removed all animated link beams, their generated
+underline layers and their keyframes. Normal and reduced motion share the same feedback.
+Native keyboard focus stays visible; truncated `link-inset` anchors retain an inset outline
+and static underline on focus. This concerns link feedback; tab indicators and player transport
+keep their independent interaction contracts. See the live Foundations/Links story.
+
+Linked StatNumber captions use the same high-accent foreground on hover and keyboard focus,
+with no beam or background. This behavior belongs to StatNumber itself. The numeral and unit
+keep their roles, and readonly metric captions remain subtle gray. See StatNumber/Linked.
+
+The same foreground rule applies to enabled links containing MonoLabel: hover and visible
+keyboard focus use high accent. Informational/disabled labels keep their tone. Context-menu
+options containing an actual MonoLabel share this feedback and keep a transparent hover/focus
+background. Their resting state colors, target sizes and focus outline remain unchanged.
+The menu rule is scoped to actual MonoLabel options; body-text menu items keep their separate
+interaction recipe. Disabled options retain their resting feedback.

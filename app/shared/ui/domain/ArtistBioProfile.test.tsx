@@ -1,9 +1,38 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ArtistBioProfile, mergeArtistBioMembers } from "./ArtistBioProfile";
 
 describe("ArtistBioProfile", () => {
+  it.each([true, false])(
+    "uses the shared text-aligned dot action for biography expansion: %s",
+    (expanded) => {
+      const onToggle = vi.fn();
+      render(
+        <ArtistBioProfile
+          artistName="Artist"
+          bio={"Biography. ".repeat(80)}
+          bioExpanded={expanded}
+          onBioToggle={onToggle}
+        />,
+      );
+      const label = expanded ? "Less" : "More";
+      const action = screen.getByRole("button", { name: label, exact: true });
+      expect(action).toHaveClass("link-accent", "p-0", "min-h-11");
+      expect(within(action).getByText(label)).toHaveClass(
+        "crate-mono-label",
+        "uppercase",
+        "text-accent-action-hi",
+      );
+      expect(action.querySelector(".crate-status-dot")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+      expect(action.querySelector("svg")).toBeNull();
+      fireEvent.click(action);
+      expect(onToggle).toHaveBeenCalledOnce();
+    },
+  );
   it("renders the full multi-paragraph bio and grouped member tables", () => {
     render(
       <ArtistBioProfile

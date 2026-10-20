@@ -1,9 +1,19 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { UserAvatar } from "./UserAvatar";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
 import { clamp } from "@/lib/utils";
 import {
   ErrorCard,
@@ -65,6 +75,10 @@ export function ProfileHoverCard({
   openDelayMs = 180,
 }: ProfileHoverCardProps) {
   const isDesktop = useIsDesktop();
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const restoringFocusRef = useRef(false);
   const normalizedUsername = username?.trim().replace(/^@/, "") || "";
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const openTimerRef = useRef<number | null>(null);
@@ -136,6 +150,55 @@ export function ProfileHoverCard({
       });
   }, [card, isDesktop, normalizedUsername, open]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const anchor = triggerRef.current?.getBoundingClientRect();
+    const popup = popoverRef.current?.getBoundingClientRect();
+    if (!anchor || !popup) return;
+    const place = () =>
+      setPosition({
+        left: clamp(
+          anchor.left + anchor.width / 2 - popup.width / 2,
+          12,
+          Math.max(12, window.innerWidth - popup.width - 12),
+        ),
+        top: clamp(
+          anchor.bottom + 14 + popup.height > window.innerHeight
+            ? anchor.top - popup.height - 14
+            : anchor.bottom + 14,
+          12,
+          Math.max(12, window.innerHeight - popup.height - 12),
+        ),
+      });
+    place();
+    const close = () => setOpen(false);
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
+        close();
+        restoringFocusRef.current = true;
+        triggerRef.current?.querySelector<HTMLElement>("a,button")?.focus();
+        restoringFocusRef.current = false;
+      }
+    };
+    window.addEventListener("resize", close);
+    const outsideScroll = (event: Event) => {
+      if (
+        event.target instanceof Node &&
+        popoverRef.current?.contains(event.target)
+      )
+        return;
+      close();
+    };
+    window.addEventListener("scroll", outsideScroll, true);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", outsideScroll, true);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [open, loading, error, card]);
+
   function updatePosition() {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -160,7 +223,7 @@ export function ProfileHoverCard({
   }
 
   function scheduleOpen() {
-    if (!isDesktop || !normalizedUsername) return;
+    if (!isDesktop || !normalizedUsername || restoringFocusRef.current) return;
     cancelClose();
     if (openTimerRef.current) window.clearTimeout(openTimerRef.current);
     openTimerRef.current = window.setTimeout(() => {
@@ -178,11 +241,13 @@ export function ProfileHoverCard({
   }
 
   async function handleFollowToggle() {
-    if (!card) return;
+    if (!card || busy || card.id === user?.id) return;
+    const requestId = requestIdRef.current;
     setBusy(true);
     try {
       if (card.relationship_state.following) {
         await api(`/api/users/${card.id}/follow`, "DELETE");
+        if (requestId !== requestIdRef.current) return;
         const nextCard = {
           ...card,
           relationship_state: {
@@ -197,6 +262,7 @@ export function ProfileHoverCard({
         const response = await api<{
           relationship_state?: ProfileCardPayload["relationship_state"];
         }>(`/api/users/${card.id}/follow`, "POST");
+        if (requestId !== requestIdRef.current) return;
         const nextCard = {
           ...card,
           relationship_state: response.relationship_state || {
@@ -207,6 +273,8 @@ export function ProfileHoverCard({
         cacheProfileCard(normalizedUsername, nextCard);
         setCard(nextCard);
       }
+    } catch {
+      notify.error(t("actions.user.toasts.followFailed"));
     } finally {
       setBusy(false);
     }
@@ -233,19 +301,55 @@ export function ProfileHoverCard({
       {open
         ? createPortal(
             <AppPopover
+              ref={popoverRef}
+              role="dialog"
+              aria-label={
+                card?.display_name ||
+                card?.username ||
+                t("profileHover.defaultName")
+              }
+              onFocusCapture={cancelClose}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget))
+                  scheduleClose();
+              }}
               layer="popover"
-              className="profile-hover-popover fixed w-[360px] overflow-visible p-0"
-              style={{ left: position.left, top: position.top }}
+              className="fixed w-90 max-w-full overflow-y-auto p-0"
+              style={{
+                left: position.left,
+                top: position.top,
+                maxWidth: "calc(100vw - 24px)",
+                maxHeight: "calc(100dvh - 24px)",
+              }}
               onPointerEnter={cancelClose}
               onPointerLeave={scheduleClose}
             >
               {loading ? (
                 <LoadingCard />
               ) : error ? (
-                <ErrorCard />
+                <ErrorCard
+                  onRetry={() => {
+                    setOpen(false);
+                    scheduleOpen();
+                  }}
+                />
               ) : card ? (
                 <ProfileCardBody
                   card={card}
+                  avatar={
+                    <UserAvatar
+                      name={
+                        card.display_name ||
+                        card.username ||
+                        t("profileHover.defaultName")
+                      }
+                      avatar={card.avatar}
+                      userId={card.id}
+                      alt=""
+                      size="lg"
+                    />
+                  }
+                  isOwnProfile={card.id === user?.id}
                   busy={busy}
                   onFollowToggle={() => void handleFollowToggle()}
                 />

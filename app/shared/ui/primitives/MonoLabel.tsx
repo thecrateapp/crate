@@ -38,12 +38,13 @@ export function MonoLabel({
     <Element
       {...props}
       className={cn(
-        "m-0 font-mono font-normal tabular-nums",
+        "crate-mono-label m-0 font-mono font-normal tabular-nums",
         tone === "accent" ? "text-accent-action-hi" : "text-text-subtle",
         size === "eyebrow"
           ? "text-eyebrow tracking-kicker"
           : "text-label tracking-caps",
         className,
+        "transition-colors in-[:is(a[href],[role=link]):not([aria-disabled=true]):not([data-disabled]):hover]:text-accent-action-hi in-[:is(a[href],[role=link]):not([aria-disabled=true]):not([data-disabled]):focus-visible]:text-accent-action-hi",
         // Case belongs to the label role, not to a consumer variant.
         "uppercase",
       )}

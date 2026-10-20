@@ -15,8 +15,14 @@ export const ARTIST_BIO_FIXTURE =
     5,
   ) +
   "\n\nFind more at https://example.com/music. A second paragraph keeps its own rhythm.";
-export function ArtistBioExample({ sparse = false }: { sparse?: boolean }) {
-  const [expanded, setExpanded] = useState(true);
+export function ArtistBioExample({
+  sparse = false,
+  initialExpanded = true,
+}: {
+  sparse?: boolean;
+  initialExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(initialExpanded);
   const [event, setEvent] = useState("No profile action");
   return (
     <>

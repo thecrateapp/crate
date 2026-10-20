@@ -17,8 +17,14 @@ Listen ArtistBioModal; Admin ArtistBioResearchDialog.
 The approved mockup and later confirmed decisions remain the reference. App adapters retain managed image recovery, authorization, routing, i18n, API and playback. Fixture callbacks are local. Captions use MonoLabel; names and prose preserve case. No new app contexts or synthetic data enter shared UI.
 
 <Canvas of={Stories.Base} />
+<Canvas of={Stories.Collapsed} />
 <Controls of={Stories.Base} />
 
 The profile now composes MediaCover, FormField groups with real 8 px caption gaps, MonoLabel, StatNumber, Button and the unmodified modal close control. Full-width paragraphs remain uncapped. Missing external metrics are omitted; explicit 0 is retained. Member roles/period grouping and genre percentages/source are preserved. Close labels can be localized.
+
+Biography More/Less uses the same `SectionActionButton` as the artist hero's Show more and
+section View All actions: accent uppercase MonoLabel, decorative glowing dot, no horizontal
+inset and44px hit height. It aligns with the paragraphs above and retains the controlled
+expansion callback and injected labels. There is no disclosure arrow or hover background.
 
 Injected photoContent is authoritative even without a URL and keeps its own image semantics. MediaCover retains the native URL/initials fallback when no injected content is provided. The long-body modal scene imports the real Listen safe-area/viewport metrics; no preview selector repairs the component.

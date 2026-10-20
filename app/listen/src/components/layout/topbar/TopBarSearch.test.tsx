@@ -264,6 +264,20 @@ describe("TopBarSearch", () => {
       "crate-overlay-surface",
       "bg-surface-popover",
     );
+    const viewAll = screen.getByRole("button", {
+      name: 'View all results for "high"',
+    });
+    expect(screen.getByText("View All")).toHaveClass(
+      "font-mono",
+      "uppercase",
+      "text-accent-action-hi",
+    );
+    expect(viewAll.querySelector(".crate-status-dot")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    fireEvent.click(viewAll);
+    expect(navigateMock).toHaveBeenCalledWith("/search?q=high");
   });
 
   it("labels canonical results that are only available remotely", async () => {

@@ -86,3 +86,16 @@ body {
 
 @source "../../app/listen/src/components/settings";
 @source "../../app/listen/src/pages/SettingsPageView.tsx";
+
+@source "../../app/listen/src/components/social";
+@source "../../app/listen/src/pages/PeopleContent.tsx";
+@source "../../app/listen/src/pages/PeopleSummary.tsx";
+@source "../../app/listen/src/pages/PeopleSearch.tsx";
+@source "../../app/listen/src/pages/UserConnectionsView.tsx";
+@source "../../app/listen/src/pages/UserProfileView.tsx";
+@source "../../app/listen/src/pages/UserProfileHero.tsx";
+@source "../../app/listen/src/pages/UserProfileRelationships.tsx";
+@source "../../app/listen/src/pages/UserProfileTaste.tsx";
+@source "../../app/listen/src/pages/UserProfileMatch.tsx";
+@source "../../app/listen/src/pages/UserProfileLibraryView.tsx";
+@source "../../app/listen/src/pages/UserProfileNetworkView.tsx";

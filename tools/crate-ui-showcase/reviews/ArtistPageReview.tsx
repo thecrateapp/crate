@@ -210,7 +210,7 @@ function ArtistScene() {
               <div {...group} role="group">
                 <ArtistTopTracksFrame
                   title="Top Tracks"
-                  actionLabel="View all"
+                  actionLabel="View All"
                   onAction={() => setEvent("Open all artist tracks")}
                 >
                   <TrackList

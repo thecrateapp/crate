@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PlayerChromeRefinementsExample } from "../reviews/ArtistPlayerReview";
+import { PlayerSourceLabelExample } from "../reviews/ActionLabelsReview";
 import {
   PlayerTransportStory,
   PlayerPanelsStory,
@@ -35,4 +36,15 @@ export const DisplayModes: Story = {
 };
 export const ChromeRefinements: Story = {
   render: () => <PlayerChromeRefinementsExample />,
+};
+export const SourceLabel: Story = {
+  render: () => <PlayerSourceLabelExample />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The actual PlayerBarTrackCopy uses uppercase MonoLabel for Playing from; the source name keeps its original case and navigation. The desktop-only row retains its existing responsive visibility. Playback sessions persist the source alongside queue/cursor/shuffle and restore it without autoplay; legacy sessions without a saved source remain unknown.",
+      },
+    },
+  },
 };

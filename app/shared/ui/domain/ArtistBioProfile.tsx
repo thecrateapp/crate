@@ -1,9 +1,4 @@
-import {
-  CRATE_ICON_SIZE,
-  ChevronDown,
-  ChevronUp,
-  Globe,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Globe } from "@crate/ui/icons";
 import type { ReactNode } from "react";
 
 import {
@@ -23,6 +18,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { SectionActionButton } from "@crate/ui/domain/lists/SectionHeader";
 import { Button } from "@crate/ui/shadcn/button";
 import { cn } from "@crate/ui/lib/cn";
 import { formatCompact, formatSize } from "../../web/utils";
@@ -510,18 +506,9 @@ export function ArtistBioProfile({
                   ))}
                 </div>
                 {bio.length > 500 && onBioToggle ? (
-                  <Button variant="link" onClick={onBioToggle}>
-                    {bioExpanded ? (
-                      <>
-                        <ChevronUp size={CRATE_ICON_SIZE.micro} /> {labels.less}
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown size={CRATE_ICON_SIZE.micro} />{" "}
-                        {labels.more}
-                      </>
-                    )}
-                  </Button>
+                  <SectionActionButton onClick={onBioToggle}>
+                    {bioExpanded ? labels.less : labels.more}
+                  </SectionActionButton>
                 ) : null}
               </div>
             )}

@@ -61,14 +61,14 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "c75a33dc81dc62c992fe0c12023c351c13e5f8e86757c31a99a42f47c886acac",
+        "app/shared/ui/tokens/recipes.css": "9c464ca047c3fe580afd28f55146b9c235cc18ef51bbbd8522ab4482e34bb1f3",
         "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
-        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "5eb613a4385c8fbef8590f965558d0f1f8bff8456ff26306c194660aace14c86",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "b2f84a3a2fa5510065b1979b4c796716d71aac5bb6b63019b46e761b99706046"
+        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "113c81a2a8351a2336690cb9856d1d09c628108d5f20ff9478530d994cf934c5",
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "d4b50a1d329dac8760da86f2ae1e5776f3b2453c903b42716d9094a8ed7511ff"
       },
       "category": "Foundations"
     },
@@ -86,9 +86,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/MonoLabel.tsx": "2b06496369fccb303cc1bcf75b170f0671233bd18300a4a2441fc67058b1eedf",
-        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "d25dac3633c76eec17a45a56b568d4b3cabbfcf2e4c96935ade0558b26f717d5",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "cd7c938e63fb8e1d5ec2e01b8548b6dd44eb4bc2739bf944ee1a6aa9380eba6d"
+        "app/shared/ui/primitives/MonoLabel.tsx": "7edc65bb24d82d6eff7f2282752b84072fee3ed71b0be56f672f3dbaddc9ed8e",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "4761f4838b30b82659a0ee6e1e83b72ae95691d195f328a70ef8d10bfc1c34a2",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "861d05316397e445a58ece02dc18fbae56d46357046a3a915f18131a80010af0"
       },
       "category": "Data Display"
     },
@@ -126,9 +126,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/StatNumber.tsx": "56baeeb2bee3fe7741eba57ea533a04892fc1fddf5ab24fb432ea80f549a1e53",
-        "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "ac8008b434f2712c7eebafb760702b9dbaeff23c10589bcc478c38d8cbf61e36",
-        "tools/crate-ui-showcase/docs/StatNumber.mdx": "5ae03d8b518b9fae8d1b6c4e24e4684bdf13265add35f8879880a22490b300e4"
+        "app/shared/ui/primitives/StatNumber.tsx": "62d516e2398ac10bf46fac849456a7fb5f5d29b600d2c4bdb380653b00c3c6d2",
+        "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "67c16f820394562530aff6aed8e636ef4ea463df30c961b1de3a39b77a5e4ba7",
+        "tools/crate-ui-showcase/docs/StatNumber.mdx": "7632d9fac28d2a066151520e19fd9f03676a35ccf7245b7e5bd0181949867764"
       },
       "category": "Data Display"
     },
@@ -362,9 +362,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistBioProfile.tsx": "a6e9d930b31c5f78c53505a52121da1ef9236dba43c3c1f8c8635ebe96d1c7fe",
-        "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx": "e97c8600e156fa7b518985d52bbf44e0f52b78fcca834550ba8b442439a75340",
-        "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx": "05814d08a3ec6904fc533084fd4fbf0ce318b8bdcd4d15734771922a13a158df"
+        "app/shared/ui/domain/ArtistBioProfile.tsx": "3f7589e63acd4d1ad9e67aaed1d211de0cf6c108ebf6390e8107294d631d19e5",
+        "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx": "566cfde3d971f7b9b67a5dbb665cb5517dfc4c40f026861a57943567b06d1d49",
+        "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx": "533d1c28eae9cf7d46384350b7b85969b0703ed56f28616cfa49772cd8170665"
       },
       "category": "Data Display"
     },
@@ -442,9 +442,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/actions/ContextMenu.tsx": "70201977a27fb5e6f02d1cd8d978a5748f08f04e46d380648ad71edbb2e5acbb",
-        "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "fc2c292abca6f7bdcd50f17f9a939fc5772b44b8d48d0b1d737dd808d0306ee9",
-        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "76ea46d77a4b59c0d8ae114b4f390c919d75338a941806fd48d38738feab436a"
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "b1a16b08e49014afd75079aa0d17eadbc0c736fcec55bcd807d79b4356554893",
+        "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "070e1c69d1e0ff827748ef30f93c9a58d8546b8e5c0a4ee5ef6cb36997fd3379",
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "31eb634e7952648c29a9f20a6c9952c1eca42383945b6eff647dcdd6adb5120b"
       },
       "category": "Actions"
     },
@@ -790,9 +790,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/lists/SectionHeader.tsx": "903421ed6dd21b140560b5824288f1e05cee1d198cd9d5491d727e63903acb68",
-        "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx": "86199fb03beb6710bc2dd7097af0b9a0a06d097e4989a097449549381ec5d340",
-        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "bede11427716368ebfd28e228f4dde51635bbab76a744e4e83d01b73f9022627"
+        "app/shared/ui/domain/lists/SectionHeader.tsx": "a823275b7ece209edaa1c12c8f0d6d03662ee8596e765f9b4418318d6fbde62a",
+        "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx": "7286d1e658f150989ad476d877ec0801cb6273cecd9b5bfcd7197e9bfbce5425",
+        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "5834b3540d2b404273bb2c223560060f8c5afed04770df4ae4962d5c0d37ae22"
       },
       "category": "Layout"
     },

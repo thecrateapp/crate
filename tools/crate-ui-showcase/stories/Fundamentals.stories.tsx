@@ -183,3 +183,31 @@ export const Motion: Story = {
     </div>
   ),
 };
+
+export const Links: Story = {
+  render: () => (
+    <div className="showcase-stack">
+      <h2 className="showcase-heading">Link feedback</h2>
+      <p>
+        Links use foreground color and keyboard focus, without animated beams or
+        generated hover underlines.
+      </p>
+      <div className="showcase-line">
+        <a className="link-meta" href="#link-feedback-target">
+          Metadata link
+        </a>
+        <a className="link-accent" href="#link-feedback-target">
+          Accent link
+        </a>
+        <div className="w-48 truncate">
+          <a className="link-meta link-inset" href="#link-feedback-target">
+            Inset focus link inside clipped text
+          </a>
+        </div>
+      </div>
+      <p id="link-feedback-target">
+        Native link navigation and accessible names remain intact.
+      </p>
+    </div>
+  ),
+};

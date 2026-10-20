@@ -40,7 +40,9 @@ export function usePlayerRuntimeState() {
   const [crossfadeTransition, setCrossfadeTransition] =
     useState<CrossfadeTransition | null>(null);
   const [shuffle, setShuffleState] = useState(() => stored.shuffle);
-  const [playSource, setPlaySource] = useState<PlaySource | null>(null);
+  const [playSource, setPlaySource] = useState<PlaySource | null>(
+    stored.playSource,
+  );
   const [repeat, setRepeatState] = useState<RepeatMode>("off");
   const [smartCrossfadeEnabled, setSmartCrossfadeEnabled] = useState(
     getSmartCrossfadePreference,

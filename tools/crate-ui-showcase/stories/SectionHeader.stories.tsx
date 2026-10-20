@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SectionHeader } from "@crate/ui/domain/lists/SectionHeader";
+import {
+  SectionHeader,
+  SectionActionLabel,
+  SectionActionButton,
+} from "@crate/ui/domain/lists/SectionHeader";
+import { FormField } from "@crate/ui/primitives/FormField";
 const meta = {
   id: "components-sectionheader",
   title: "Components/Layout/SectionHeader",
@@ -9,7 +14,7 @@ const meta = {
     subtitle: "From your collection.",
     eyebrow: "Collection",
     count: 0,
-    actionLabel: "See all",
+    actionLabel: "View All",
     onAction: () => {},
   },
   argTypes: {
@@ -44,4 +49,33 @@ export const LongContent: Story = {
       </div>
     ),
   ],
+};
+export const NativeLink: Story = {
+  args: {
+    actionLabel: undefined,
+    onAction: undefined,
+    action: (
+      <a
+        className="link-accent inline-flex min-h-11 items-center"
+        href="#section-destination"
+      >
+        <SectionActionLabel>View All</SectionActionLabel>
+      </a>
+    ),
+  },
+};
+
+export const TextAlignedAction: Story = {
+  render: () => (
+    <FormField kind="group" label="Text-aligned contextual action">
+      {(props) => (
+        <div {...props} role="group">
+          <p className="text-sm text-text-muted">
+            A contextual action starts at the same edge as its preceding text.
+          </p>
+          <SectionActionButton>Show more</SectionActionButton>
+        </div>
+      )}
+    </FormField>
+  ),
 };

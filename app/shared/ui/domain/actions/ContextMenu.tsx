@@ -23,6 +23,7 @@ import {
 } from "@crate/ui/lib/use-hover-capability";
 import { cn } from "@crate/ui/lib/cn";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { MobileActionSheet } from "./MobileActionSheet";
 import type {
@@ -111,7 +112,9 @@ function ContextMenuItemLabel({ label }: { label: string }) {
   const labelRef = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
-    const element = labelRef.current;
+    const element = labelRef.current?.querySelector<HTMLElement>(
+      '[data-slot="context-menu-item-label"]',
+    );
     if (!element) return;
     syncClampedLabelTitle(element, label);
     if (typeof ResizeObserver === "undefined") return;
@@ -123,15 +126,17 @@ function ContextMenuItemLabel({ label }: { label: string }) {
   }, [label]);
 
   return (
-    <span
-      ref={labelRef}
-      data-slot="context-menu-item-label"
-      className="line-clamp-2 min-w-0 break-words"
-      onPointerEnter={(event) =>
-        syncClampedLabelTitle(event.currentTarget, label)
-      }
-    >
-      {label}
+    <span ref={labelRef} className="min-w-0">
+      <MonoLabel
+        as="span"
+        data-slot="context-menu-item-label"
+        className="line-clamp-2 min-w-0 break-words text-inherit"
+        onPointerEnter={(event) =>
+          syncClampedLabelTitle(event.currentTarget, label)
+        }
+      >
+        {label}
+      </MonoLabel>
     </span>
   );
 }

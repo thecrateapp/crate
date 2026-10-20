@@ -1917,52 +1917,9 @@ button.genre-pill:hover,
   .link-meta,
   .link-accent {
     position: relative;
-    clip-path: inset(0 0 -3px 0);
     cursor: pointer;
     text-decoration: none;
     transition: color var(--motion-duration-fast) ease;
-  }
-
-  .link-meta::before,
-  .link-accent::before {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 6%;
-    height: 2px;
-    border-radius: 9999px;
-    background: currentColor;
-    content: "";
-    filter: drop-shadow(0 0 3px currentColor);
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(0);
-    transition: opacity var(--motion-duration-fast) ease;
-  }
-
-  .link-meta::after,
-  .link-accent::after {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 40%;
-    height: 2px;
-    border-radius: 9999px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, currentColor 20%, transparent) 40%,
-      color-mix(in srgb, currentColor 70%, transparent) 78%,
-      currentColor 85%,
-      currentColor
-    );
-    content: "";
-    filter: drop-shadow(0 0 3px currentColor);
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(-85%) scaleX(-1);
-    transform-origin: 92.5% center;
-    transition: opacity var(--motion-duration-fast) ease;
   }
 
   .link-meta {
@@ -1978,10 +1935,14 @@ button.genre-pill:hover,
     color: var(--text-primary);
   }
 
+  .link-accent:hover,
+  .link-accent:focus-visible {
+    color: var(--accent-action-hi);
+  }
+
   .link-meta:focus-visible,
   .link-accent:focus-visible {
     border-radius: 2px;
-    clip-path: none;
   }
 
   .link-meta.link-inset:focus-visible,
@@ -1989,105 +1950,6 @@ button.genre-pill:hover,
     background: color-mix(in srgb, currentColor 14%, transparent);
     text-decoration: underline 2px currentColor;
     text-underline-offset: 2px;
-  }
-
-  .link-meta:hover::before,
-  .link-accent:hover::before {
-    animation: crateLinkBeamCore 2.4s infinite;
-    opacity: 1;
-  }
-
-  .link-meta:hover::after,
-  .link-accent:hover::after {
-    animation: crateLinkBeam 2.4s infinite;
-    opacity: 1;
-  }
-
-  .link-meta:focus-visible::before,
-  .link-meta:focus-visible::after,
-  .link-accent:focus-visible::before,
-  .link-accent:focus-visible::after {
-    display: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .link-meta:hover::before,
-    .link-accent:hover::before {
-      display: none;
-    }
-
-    .link-meta:hover::after,
-    .link-accent:hover::after {
-      width: 100%;
-      animation: none;
-      background: currentColor;
-      filter: none;
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  [data-crate-motion="reduced"] .link-meta:hover::before,
-  [data-crate-motion="reduced"] .link-accent:hover::before {
-    display: none;
-  }
-
-  [data-crate-motion="reduced"] .link-meta:hover::after,
-  [data-crate-motion="reduced"] .link-accent:hover::after {
-    width: 100%;
-    animation: none;
-    background: currentColor;
-    filter: none;
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes crateLinkBeam {
-  0% {
-    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
-    transform: translateX(-85%) scaleX(-1);
-  }
-  4% {
-    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-    transform: translateX(-85%) scaleX(1);
-  }
-  46% {
-    animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
-    transform: translateX(150%) scaleX(1);
-  }
-  54% {
-    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-    transform: translateX(150%) scaleX(-1);
-  }
-  96% {
-    transform: translateX(-85%) scaleX(-1);
-  }
-  100% {
-    transform: translateX(-85%) scaleX(-1);
-  }
-}
-
-@keyframes crateLinkBeamCore {
-  0% {
-    transform: translateX(0);
-  }
-  4% {
-    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-    transform: translateX(0);
-  }
-  46% {
-    transform: translateX(1566.67%);
-  }
-  54% {
-    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-    transform: translateX(1566.67%);
-  }
-  96% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(0);
   }
 }
 
@@ -3237,6 +3099,24 @@ button.genre-pill:hover,
 
 .crate-overlay-menu-item[data-state="checked"],
 .crate-overlay-menu-item[data-active="true"] {
+  color: var(--accent-action-hi);
+}
+
+/* MonoLabel actions signal hover/focus through foreground, without a fill. */
+.crate-overlay-menu-item:has(.crate-mono-label):not(:disabled):not(
+    [data-disabled]
+  ):is(:hover, :focus-visible, [data-highlighted], [data-state="open"]) {
+  background: transparent;
+}
+
+.crate-overlay-menu-item:has(.crate-mono-label):not(:disabled):not(
+    [data-disabled]
+  ):not([aria-disabled="true"]):is(
+    :hover,
+    :focus-visible,
+    [data-highlighted],
+    [data-state="open"]
+  ) {
   color: var(--accent-action-hi);
 }
 

@@ -1,4 +1,4 @@
-import type { RepeatMode, Track } from "@/contexts/player-types";
+import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { apiStreamUrl, getApiBase } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
@@ -36,6 +36,7 @@ export function getStoredVolume(): number {
 
 export interface StoredQueue {
   queue: Track[];
+  playSource: PlaySource | null;
   currentIndex: number;
   currentTime: number;
   wasPlaying: boolean;
@@ -69,6 +70,14 @@ export function getStoredQueue(): StoredQueue {
           : null;
         const storedQueue = {
           queue,
+          playSource:
+            parsed.playSource &&
+            typeof parsed.playSource.name === "string" &&
+            ["album", "crate", "playlist", "radio", "track", "queue"].includes(
+              parsed.playSource.type,
+            )
+              ? (parsed.playSource as PlaySource)
+              : null,
           currentIndex: parsed.currentIndex ?? 0,
           currentTime: parsed.currentTime ?? 0,
           wasPlaying: parsed.wasPlaying === true,
@@ -92,6 +101,7 @@ export function getStoredQueue(): StoredQueue {
   }
   return {
     queue: [],
+    playSource: null,
     currentIndex: 0,
     currentTime: 0,
     wasPlaying: false,
@@ -118,6 +128,7 @@ function normalizeStoredTrack(track: Track): Track {
 }
 
 export interface SaveQueueOptions {
+  playSource?: PlaySource | null;
   currentTime?: number;
   wasPlaying?: boolean;
   shuffle?: boolean;
@@ -138,6 +149,7 @@ export function saveQueue(
       STORAGE_KEY,
       JSON.stringify({
         queue: safeQueue,
+        playSource: safeQueue.length ? (options.playSource ?? null) : null,
         currentIndex,
         currentTime: options.currentTime ?? 0,
         wasPlaying: options.wasPlaying ?? false,
@@ -231,7 +243,7 @@ export function getOfflineStreamUrl(
 ): string | null {
   if (!track.entityUid && !track.path) return null;
   return getOfflineNativePlaybackUrl(
-    track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
+    track.entityUid ? { entityUid: track.entityUid } : (track.path ?? null),
     undefined,
     options,
   );

@@ -19,3 +19,9 @@ export interface UserSearchResult {
   bio: string | null;
   joined_at: string;
 }
+
+/** Only the public identity fields required by the directory view. */
+export interface PeopleViewer {
+  name: string | null;
+  username?: string | null;
+}

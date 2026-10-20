@@ -5,18 +5,16 @@ export {
 } from "./player-progress-context";
 import { createContext } from "react";
 
-import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type {
+  CrossfadeTransition,
+  PlaySource,
+  RepeatMode,
+  Track,
+} from "@/contexts/player-types";
+export type { CrossfadeTransition } from "./player-types";
 import type { PlayerQueueSnapshot } from "@/contexts/player-session";
 import type { ConnectedPlaybackInstance } from "@/hooks/use-crate-connect-ws";
 import type { RemotePlaybackState } from "@/lib/remote-playback-state";
-
-export interface CrossfadeTransition {
-  outgoing: Track;
-  incoming: Track;
-  durationMs: number;
-  startedAt: number;
-  outgoingDurationSeconds: number;
-}
 
 export interface PlayerStateValue {
   isPlaying: boolean;

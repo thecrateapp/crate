@@ -23,8 +23,6 @@ const BASE_SYSTEM_EXPORTS: Array<[RegExp, string]> = [
 const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
   "lib/media-layout":
     "Internal geometry shared by MediaGrid/MediaRail and their skeleton composites in both apps.",
-  "domain/entity/EntityPrimaryAction":
-    "Building block rendered inside EntityCard and EntityRow.",
   "domain/media":
     "Barrel over MediaCover and MediaEntity for entity components.",
   "domain/media/MediaEntity":

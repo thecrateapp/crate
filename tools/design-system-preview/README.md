@@ -364,7 +364,6 @@ and bundle gates, preview build, drift/layers and Listen i18n. Batches overlap e
 these are not additive full-suite totals. No full suites or new Linux recording ran in this cut.
 The main handover records remaining canonical/native QA and Admin's narrow bundle headroom.
 
-
 ## Text tabs / Checkpoint 1Q — local Linux review
 
 Open <http://127.0.0.1:5186/#pestanas>. Both samples use actual shared Radix Tabs and the
@@ -382,11 +381,9 @@ canonical baselines. Linux 1N–1P recording/comparison, native QA and phase-clo
 remain pending. Preserve all 33 canonical 1M PNGs and original manifest. Stop at Diego's review
 before 1b.4, commit or push; final scoped results are in the main handover.
 
-
 Diego approved 1Q on 2026-10-16 and authorised commit/push and continuation to 1b.4.
 This supersedes the local-only stop above. Keep this specimen and the preview active;
 stop for the next visual review at checkpoint 1R. Baselines/native/phase-close QA remain separate.
-
 
 ## Shared states / Checkpoint 1R — local review
 
@@ -409,7 +406,6 @@ actual card/row geometry, 8px field gaps, indicator delay/cancellation, reduced 
 or writes and the approved marker placement. Advisory `checkpoint-1r-{1440,390}.png` images
 are ignored local review material. Preserve all canonical 33 PNGs and the original 1M manifest.
 Stop at 1R for Diego's review; no commit/push or advance to 1b.5 is implied by marker approval.
-
 
 Diego approved complete 1R on 2026-10-16; published as `093dcb1f`. This supersedes the
 local-only stop above. The next stop is 1S, before another publication or 1b.6.
@@ -441,19 +437,16 @@ no overflow or API/storage writes. Advisory PNGs stay ignored beneath `.artifact
 Preserve all 33 canonical 1M PNGs and manifest. Final checks/budgets and unresolved pin/native QA are
 in the main handover. Stop at 1S for Diego; no 1S commit/push or 1b.6 is authorised yet.
 
-
 1S review follow-up: the seek head and beam now share the same motion timing. Two browser
 regressions sample their rendered positions throughout forward/backward seeks, pointer drag and
 live demonstration ticks at 1440/390 px; both head variants remain within 0.75 px of the beam end.
 Reduced motion removes movement transitions from both. Keep this correction local for 1S review.
-
 
 Latest 1S review correction supersedes the equal-timing fix above: natural uninterrupted dragging
 still separated the independently animated head and beam. `PlayerProgressBeam` now owns one moving
 edge in both real player consumers. The point is 4 px idle / 6 px engaged, the trail envelope 8 px,
 and the core stays 1–2 px. The two regressions now sample real rAF frames during continuous forward,
 reverse and repeated drags, seeks and live ticks without pausing or changing animation clocks.
-
 
 ## Admin status colour / Checkpoint 1T — local review
 
@@ -472,7 +465,6 @@ return/cancel/confirm, actual 8 px field gap, overflow and no API/storage writes
 are advisory ignored artifacts. Do not regenerate the 33 canonical 1M captures or dispatch full
 CI while iterating. Canonical Linux recording/comparison, real-data Admin geometry, native/AT QA
 and the unavailable `app/web@258bbaee` fidelity comparison remain pending.
-
 
 ## Skip navigation / Checkpoint 1U — local review
 
@@ -493,7 +485,6 @@ artifacts. The preview static build includes `index.html` and `skip-link-demo.ht
 cross-engine checks and canonical Linux CI capture/import/comparison remain pending; do not
 regenerate 1M baselines or dispatch full CI during iteration.
 
-
 ## Admin icon inventory / Checkpoint 1V — local review
 
 Diego approved 1U, published as `afed5a3c` on 2026-10-17. This supersedes its local-only stop above.
@@ -512,7 +503,6 @@ Focused serial tooling tests cover the scanner and report freshness;
 overflow, URL preservation and no API errors. Local PNGs remain advisory. Canonical 1M captures,
 CI/native/AT and pinned-site fidelity limits remain as documented. Keep all previous specimens,
 the two-entry static build and :5186 active. Stop at 1V before commit/push or migration.
-
 
 ## Admin navigation / Checkpoint 1W — local review
 
@@ -562,7 +552,6 @@ Keep :5186 alive and stop at 1X for Diego before commit/push or another migratio
 exit to the next page control and Escape returning to the field without Shell's blur shortcut
 stealing focus. Keep these regressions in both preview and actual Admin scoped browser runs.
 
-
 ## Checkpoint 1Y — reusable operational surfaces
 
 1X is approved/published as `b628a438`. Open <http://127.0.0.1:5186/#superficies-admin> for real
@@ -576,7 +565,6 @@ Run `admin-ops-checkpoint.spec.ts` and the affected `status-colour-checkpoint.sp
 `ops-surfaces.spec.ts` covers Tasks/SystemHealth at three widths; `instrument-panel.spec.ts`
 checks the affected panel spacing. These checks do not regenerate the canonical 1M PNGs/manifest.
 Keep the preview alive and stop at 1Y before commit/push or another migration group.
-
 
 ## Checkpoint 1Z — Logs and Stack
 
@@ -595,7 +583,6 @@ Run `admin-operations-checkpoint.spec.ts`, then affected `admin-controls-checkpo
 `admin-ops-checkpoint.spec.ts`, serial `--workers=1`. Scoped actual Admin coverage is
 `tests/admin-e2e/operations-icons.spec.ts`, using intercepted fixtures. Do not update canonical
 1M PNGs/manifest locally. Keep :5186 active and stop at 1Z before publication or another group.
-
 
 1Z summary-row follow-up: Logs/Stack header counts/statuses use uniform static CrateChip tags,
 with shared warning tone for incidents. They do not inherit interactive pill touch sizing. The
@@ -632,3 +619,18 @@ its recorded date and Chromaprint source; PCM fallback mode changes that result'
 Empty mode clears all three results. The actual worker/API projection is implemented alongside
 the optional Admin type; older snapshots display the empty fingerprint card. No raw hash is shown.
 The wider unified recent/readout work remains for later tasks; 1AA is still local for review.
+
+`review-1bd-community.html` reuses the actual Community scene from Storybook. Its four tabs cover
+People/search, public profiles, followers/following and desktop profile cards, including local
+read/error/retry, own/other, pending follow and empty/long content. No production requests or
+mutations. The historical mockup remains the reference and receives no new specimens.
+
+`review-1bd-action-labels.html` is the small standalone scene for Diego's approved View All
+caption/glowing-dot and uppercase context-menu options. It imports the same ActionLabelsReview
+as Storybook, with actual shared components and local callbacks. Normal/long options, disabled
+and danger states, disclosure navigation and touch sheets remain reviewable. No new samples
+were added to the historical mockup.
+
+Its current amendment also covers MonoLabel link foreground feedback and the actual desktop
+player-source caption. `review-1bc-artist.html` retains the focused real hero/biography scene:
+Show more and More/Less share SectionActionButton and align with their preceding text.

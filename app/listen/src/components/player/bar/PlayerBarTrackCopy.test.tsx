@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { PlayerBarTrackCopy } from "./PlayerBarTrackCopy";
@@ -22,6 +22,21 @@ function renderCopy(sourceLabel: string | null) {
 }
 
 describe("PlayerBarTrackCopy", () => {
+  it("uses MonoLabel for Playing from while the source name retains its original role", () => {
+    renderCopy("Night Drives");
+    const caption = screen.getByText("Playing from:");
+    expect(caption).toHaveClass(
+      "crate-mono-label",
+      "font-mono",
+      "font-normal",
+      "text-label",
+      "uppercase",
+      "shrink-0",
+    );
+    const name = screen.getByText("Night Drives");
+    expect(name).not.toHaveClass("uppercase", "font-mono");
+    expect(name).toHaveTextContent("Night Drives");
+  });
   it("keeps a fixed desktop width so the actions sit right after the title at a stable position", () => {
     const { container, unmount } = renderCopy(null);
     const withoutSource = (container.firstElementChild as HTMLElement)
@@ -45,6 +60,7 @@ describe("PlayerBarTrackCopy", () => {
   });
 
   it("truncates a linked play source inside the row instead of collapsing it", () => {
+    const onOpenSource = vi.fn();
     renderWithListenProviders(
       <PlayerBarTrackCopy
         displayTrack={{ id: "t1", title: "Song", artist: "Band" }}
@@ -59,7 +75,7 @@ describe("PlayerBarTrackCopy", () => {
         isDesktop
         onOpenAlbum={vi.fn()}
         onOpenArtist={vi.fn()}
-        onOpenSource={vi.fn()}
+        onOpenSource={onOpenSource}
       />,
       { locale: "en" },
     );
@@ -70,5 +86,7 @@ describe("PlayerBarTrackCopy", () => {
     expect(link).toHaveClass("link-meta", "link-inset", "min-w-0", "truncate");
     expect(link.parentElement).toHaveClass("flex");
     expect(screen.getByText("Playing from:")).toHaveClass("shrink-0");
+    fireEvent.click(link);
+    expect(onOpenSource).toHaveBeenCalledOnce();
   });
 });

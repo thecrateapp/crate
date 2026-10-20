@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 const meta = {
   id: "components-statnumber",
   title: "Components/Data Display/StatNumber",
@@ -40,6 +41,33 @@ export const MissingAndZero: Story = {
     <div className="showcase-line">
       <StatNumber value="—" label="Missing data" />
       <StatNumber value="0" label="Known zero" />
+    </div>
+  ),
+};
+export const Linked: Story = {
+  render: () => (
+    <div className="showcase-line">
+      <a
+        href="#stat-number-destination"
+        className="link-meta inline-flex min-h-11"
+      >
+        <StatNumber value="12" label="Followers" size="sm" />
+      </a>
+      <StatNumber value="3" label="Friends" size="sm" />
+      <a
+        href="#stat-number-destination"
+        className="link-meta inline-flex min-h-11"
+      >
+        <StatNumber
+          value="7"
+          label="Following"
+          size="sm"
+          labelPosition="above"
+        />
+      </a>
+      <MonoLabel id="stat-number-destination" tone="accent">
+        Linked metric destination
+      </MonoLabel>
     </div>
   ),
 };

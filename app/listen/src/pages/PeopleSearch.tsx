@@ -1,12 +1,11 @@
+import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
-import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
-
-import { UserRow } from "@/components/social/UserRow";
-import type { UserSearchResult } from "@/pages/people-types";
-
-const PEOPLE_SEARCH_INPUT_CLASS_NAME =
-  "h-7 rounded-none border-0 bg-transparent pl-9 shadow-none backdrop-blur-none md:text-base focus-visible:bg-transparent";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { EmptyState } from "@crate/ui/domain/lists";
+import { PeopleLoadingState } from "../components/social/PeopleLoadingState";
+import type { UserSearchResult } from "./people-types";
 
 export function PeopleSearch({
   onQueryChange,
@@ -14,55 +13,55 @@ export function PeopleSearch({
   results,
   searching,
   t,
+  error = false,
+  onRetry,
+  renderUser,
 }: {
   onQueryChange: (value: string) => void;
   query: string;
   results: UserSearchResult[];
   searching: boolean;
   t: TFunction;
+  error?: boolean;
+  onRetry?: () => void;
+  renderUser: (user: UserSearchResult) => ReactNode;
 }) {
-  const trimmedQuery = query.trim();
-
+  const trimmed = query.trim();
   return (
-    <section className="rounded-panel border border-border-quiet bg-text-primary/[0.03] p-5 sm:p-6">
-      <SearchInput
-        value={query}
-        onValueChange={onQueryChange}
-        label={t("people.search.placeholder")}
-        clearLabel={t("search.clear")}
-        placeholder={t("people.search.placeholder")}
-        containerClassName="border-b border-border-quiet py-3"
-        className={PEOPLE_SEARCH_INPUT_CLASS_NAME}
-      />
-
-      <div className="mt-4 space-y-3">
-        {trimmedQuery && searching ? (
-          <div className="flex items-center gap-2 text-sm text-text-muted">
-            <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
-            {t("people.search.loading")}
-          </div>
-        ) : null}
-
-        {!trimmedQuery ? (
-          <div className="border-y border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
-            {t("people.search.emptyPrompt")}
-          </div>
-        ) : null}
-
-        {trimmedQuery && !searching && results.length === 0 ? (
-          <div className="border-y border-dashed border-border-quiet px-4 py-8 text-center text-sm text-text-muted">
-            {t("people.search.noMatches", { query: trimmedQuery })}
-          </div>
-        ) : null}
-
-        {results.map((item) => (
-          <UserRow
-            key={item.id}
-            user={item}
-            className="border border-border-quiet bg-text-primary/[0.02]"
-          />
-        ))}
-      </div>
+    <section
+      aria-label={t("people.search.placeholder")}
+      className="grid min-w-0 gap-4 border-t border-border-quiet pt-6"
+    >
+      <FormField label={t("search.label")}>
+        <SearchInput
+          value={query}
+          onValueChange={onQueryChange}
+          label={t("people.search.placeholder")}
+          clearLabel={t("search.clear")}
+          placeholder={t("people.search.placeholder")}
+        />
+      </FormField>
+      {!trimmed ? (
+        <EmptyState message={t("people.search.emptyPrompt")} />
+      ) : searching ? (
+        <PeopleLoadingState label={t("people.search.loading")} />
+      ) : error ? (
+        <ErrorState
+          message={t("people.loadFailed")}
+          onRetry={onRetry}
+          retryLabel={t("common.retry")}
+        />
+      ) : results.length ? (
+        <div className="grid min-w-0 divide-y divide-border-quiet">
+          {results.map((user) => (
+            <div key={user.id}>{renderUser(user)}</div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          message={t("people.search.noMatches", { query: trimmed })}
+        />
+      )}
     </section>
   );
 }

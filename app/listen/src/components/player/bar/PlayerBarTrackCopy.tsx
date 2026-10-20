@@ -1,8 +1,12 @@
 import type { MouseEventHandler } from "react";
 import { useTranslation } from "react-i18next";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
-import type { CrossfadeTransition } from "@/contexts/player-context";
-import type { PlaySource, Track } from "@/contexts/player-types";
+import type {
+  CrossfadeTransition,
+  PlaySource,
+  Track,
+} from "../../../contexts/player-types";
 
 interface PlayerBarTrackCopyProps {
   displayTrack: Track;
@@ -107,7 +111,9 @@ export function PlayerBarTrackCopy({
             key={`src-${sourceLabel}`}
             className="animate-fade-in flex min-w-0 items-baseline gap-1 text-xs leading-tight text-text-muted"
           >
-            <span className="shrink-0">{t("player.playingFrom")}</span>
+            <MonoLabel as="span" className="shrink-0">
+              {t("player.playingFrom")}
+            </MonoLabel>
             {displayPlaySource?.href && sourceLabel !== "Discovery Radio" ? (
               <button
                 type="button"

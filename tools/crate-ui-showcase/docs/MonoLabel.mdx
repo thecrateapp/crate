@@ -20,6 +20,10 @@ import { DocHeading } from "../components/DocHeading";
 - `tone=subtle|accent` changes only the foreground color. Settings section headings use accent; ordinary field captions retain subtle. This is separate from `accent`, which highlights an inline keyword before metadata. Typography, case, wrapping and semantics stay the same.
 - `size=label|eyebrow`, a semantic `as`, `accent` and `meta`. Consumers must preserve its font, weight and case.
 - Wrapping is supported. Scene wrappers constrain width without correcting component internals.
+- Inside an enabled native link or link-role ancestor, the label changes to high accent on
+  hover and visible keyboard focus. This is automatic, without a caller color override.
+  Disabled links and standalone informational labels retain their resting tone. Context-menu
+  options use the same foreground feedback through the shared menu recipe, without hover fill.
 
 <DocHeading as="h2">Real component</DocHeading>
 
@@ -32,6 +36,8 @@ import { DocHeading } from "../components/DocHeading";
 <Canvas of={Stories.UppercaseContract} />
 
 <Canvas of={Stories.ContextualMetrics} />
+
+<Canvas of={Stories.Linked} />
 
 <Controls />
 

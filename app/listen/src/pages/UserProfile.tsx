@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useParams } from "react-router";
-import { ErrorState } from "@crate/ui/domain/states";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
-import { CrateLoader } from "@/components/ui/CrateLoader";
+import { UserProfileReadState } from "./UserProfileReadState";
 import { api } from "@/lib/api";
 
 import { UserProfileContent } from "./UserProfileSections";
@@ -16,14 +15,14 @@ export function UserProfile() {
   const { t, i18n } = useTranslation();
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
-  const { data, loading, refetch } = useApi<PublicProfile>(
+  const { data, loading, error, status, refetch } = useApi<PublicProfile>(
     username ? "/api/users/" + encodeURIComponent(username) + "/page" : null,
   );
   const [busy, setBusy] = useState(false);
   const isOwnProfile = Boolean(data && user?.id === data.id);
 
   async function handleFollowToggle() {
-    if (!data || isOwnProfile) return;
+    if (!data || isOwnProfile || busy) return;
     setBusy(true);
     try {
       if (data.relationship_state.following) {
@@ -51,21 +50,15 @@ export function UserProfile() {
     }
   }
 
-  if (loading) {
-    return <CrateLoader label={t("userProfile.loadingLabel")} />;
-  }
-
-  if (!data) {
+  if (!data)
     return (
-      <ErrorState
-        kind="notFound"
-        title={t("userProfile.notFound")}
-        backTo="/people"
-        backLabel={t("userProfile.backToPeople")}
-        className="py-16"
+      <UserProfileReadState
+        loading={loading}
+        error={!!error}
+        status={status}
+        onRetry={refetch}
       />
     );
-  }
 
   return (
     <UserProfileContent

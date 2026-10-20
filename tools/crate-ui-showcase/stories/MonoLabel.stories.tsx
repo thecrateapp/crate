@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { MonoLabelLinkExamples } from "../reviews/ActionLabelsReview";
 const meta = {
   id: "components-monolabel",
   title: "Components/Data Display/MonoLabel",
@@ -18,6 +19,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Base: Story = {};
+export const Linked: Story = { render: () => <MonoLabelLinkExamples /> };
 export const UppercaseContract: Story = {
   render: () => (
     <div className="showcase-stack">

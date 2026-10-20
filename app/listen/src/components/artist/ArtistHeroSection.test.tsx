@@ -500,7 +500,17 @@ describe("ArtistHeroSection", () => {
       screen.getByRole("heading", { name: "Mixed Case Artist" }),
     ).not.toHaveClass("uppercase");
     const more = screen.getByRole("button", { name: "Show more" });
-    expect(more).toHaveAttribute("data-slot", "button");
+    expect(more).toHaveClass("min-h-11", "p-0", "link-accent");
+    expect(within(more).getByText("Show more")).toHaveClass(
+      "crate-mono-label",
+      "uppercase",
+      "text-accent-action-hi",
+    );
+    expect(more.querySelector(".crate-status-dot")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(more.querySelector("svg")).toBeNull();
     fireEvent.click(more);
     expect(onOpenBio).toHaveBeenCalledOnce();
   });

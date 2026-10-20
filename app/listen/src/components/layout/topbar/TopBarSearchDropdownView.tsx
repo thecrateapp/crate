@@ -5,6 +5,7 @@ import { cn } from "@crate/ui/lib/cn";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { SectionActionLabel } from "@crate/ui/domain/lists/SectionHeader";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
@@ -202,8 +203,13 @@ export function TopBarSearchDropdownView<
         </div>
       ) : null}
       {trimmedQuery && !showSearchError ? (
-        <Button variant="ghost" className="w-full" onClick={onSeeAllResults}>
-          {t("search.seeAllResults", { query: trimmedQuery })}
+        <Button
+          variant="ghost"
+          className="w-full"
+          aria-label={t("search.seeAllResults", { query: trimmedQuery })}
+          onClick={onSeeAllResults}
+        >
+          <SectionActionLabel>{t("common.viewAll")}</SectionActionLabel>
         </Button>
       ) : null}
     </AppPopover>,

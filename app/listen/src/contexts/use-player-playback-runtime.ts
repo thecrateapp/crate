@@ -93,6 +93,7 @@ export function usePlayerPlaybackRuntime({
 
   usePlaybackPersistence({
     queue,
+    playSource,
     currentIndex,
     isPlaying,
     shuffle,

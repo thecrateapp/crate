@@ -76,6 +76,65 @@ describe("ContextMenu", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([true, false])(
+    "uses uppercase MonoLabel options in desktop=%s without changing header case",
+    (desktop) => {
+      isDesktop = desktop;
+      render(
+        <ContextMenu
+          header={header}
+          items={[
+            { key: "play", label: "Play now", onSelect: vi.fn() },
+            {
+              key: "active",
+              label: "Following artist",
+              active: true,
+              onSelect: vi.fn(),
+            },
+            {
+              key: "danger",
+              label: "Remove track",
+              danger: true,
+              onSelect: vi.fn(),
+            },
+            {
+              key: "list",
+              type: "disclosure",
+              label: "Add to playlist",
+              expanded: false,
+              onToggle: vi.fn(),
+              items: [],
+            },
+          ]}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          open
+          position={{ x: 12, y: 12 }}
+        />,
+      );
+      for (const name of [
+        "Play now",
+        "Following artist",
+        "Remove track",
+        "Add to playlist",
+      ]) {
+        expect(screen.getByText(name)).toHaveClass(
+          "font-mono",
+          "font-normal",
+          "uppercase",
+          "text-inherit",
+        );
+      }
+      expect(screen.getByText("El Cielo")).not.toHaveClass("uppercase");
+      expect(
+        screen.getByRole("menuitem", { name: "Following artist" }),
+      ).toHaveAttribute("data-active", "true");
+      expect(
+        screen.getByRole("menuitem", { name: "Remove track" }),
+      ).toHaveAttribute("data-danger", "true");
+    },
+  );
+
   it("renders the desktop menu with a media header", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

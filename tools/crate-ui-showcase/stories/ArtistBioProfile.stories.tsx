@@ -9,3 +9,6 @@ const meta = {
 export default meta;
 export const Base: StoryObj<typeof meta> = {};
 export const Sparse: StoryObj<typeof meta> = { args: { sparse: true } };
+export const Collapsed: StoryObj<typeof meta> = {
+  args: { initialExpanded: false },
+};

@@ -95,6 +95,44 @@ afterEach(() => {
 });
 
 describe("getStoredQueue / saveQueue round-trip", () => {
+  it.each(["album", "crate", "playlist", "radio", "track", "queue"] as const)(
+    "retains the %s playback origin across a persisted session",
+    (type) => {
+      const playSource: PlaySource = {
+        type,
+        name: "Night Drives",
+        id: "origin-1",
+        href: "/playlist/night-drives",
+      };
+      if (type === "radio")
+        playSource.radio = {
+          seedType: "discovery",
+          shapedSessionId: "session-1",
+        };
+      saveQueue([TRACK_A, TRACK_B], 1, { playSource, currentTime: 42 });
+      expect(getStoredQueue().playSource).toEqual(playSource);
+      expect(getStoredQueue().currentTime).toBe(42);
+    },
+  );
+
+  it.each([
+    undefined,
+    null,
+    "bad source",
+    { type: "other", name: "Unknown" },
+    { type: "album", name: 42 },
+  ])(
+    "restores legacy or invalid playback origins as null without dropping the queue: %j",
+    (playSource) => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ queue: [TRACK_A], currentIndex: 0, playSource }),
+      );
+      expect(getStoredQueue().playSource).toBeNull();
+      expect(getStoredQueue().queue).toEqual([TRACK_A]);
+    },
+  );
+
   it("returns empty defaults when nothing is persisted", () => {
     const stored = getStoredQueue();
     expect(stored.queue).toEqual([]);

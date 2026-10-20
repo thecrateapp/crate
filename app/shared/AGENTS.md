@@ -252,3 +252,26 @@ and ActionLink, keep their background unchanged on hover and highlight only the 
 high accent. Do not add hover background fills in consumers. Compact IconButton and compatibility
 actions already use foreground/glow; specialized playback ring/aura and solid artwork controls
 retain their established roles.
+
+## Section actions and context-menu options — 1BD approval
+
+Diego approved both patterns on2026-10-20. Section navigation uses the localized View All label
+(English source: View All), actual accent MonoLabel and a decorative accent StatusDot with the
+shared glow, replacing the arrow. SectionHeader/SectionActionLabel own this composition; injected
+profile links and the search footer reuse it. Preserve native navigation/callbacks, focus and44px
+hit height. The marker is static and unnamed; do not add link beams or per-caller label styles.
+
+SectionActionButton owns native callback actions with the same caption/dot and zero horizontal
+inset. Artist hero Show more and shared biography More/Less reuse it, aligned with their prose.
+Keep each action's localized contextual label and controlled callback; only collection navigation
+is named View All. No caller padding/typography repairs or hover underline/background.
+
+Domain ContextMenu action/disclosure/submenu options use actual uppercase MonoLabel at its
+canonical caption size. Labels inherit the menu's normal/active/danger/disabled foreground;
+media names/details retain their existing roles and case. Keep two-line clamping/full-label
+access, pointer targets, original localized accessible names and desktop/sheet navigation.
+
+MonoLabel inside an enabled native/ARIA link changes to high accent on hover/focus-visible;
+standalone and disabled captions keep their tone. ContextMenu owns the same foreground-only
+feedback for its MonoLabel options, including disclosure/submenu highlight/open states; no hover
+fill. Resting normal/danger/disabled colors and media-name case remain their existing roles.

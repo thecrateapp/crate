@@ -129,7 +129,7 @@ function HeadersScene() {
                 title="Recent albums"
                 count={0}
                 subtitle="Nothing is hidden when the count is zero."
-                actionLabel="See all albums"
+                actionLabel="View All"
                 onAction={() => setResult("Album list opened.")}
               />
               <SectionHeader

@@ -386,7 +386,7 @@ describe("HomeTasteHero", () => {
     );
   });
 
-  it("keeps the Featured Artist kicker tight to the artist name", () => {
+  it("uses the canonical MonoLabel kicker while keeping the artist name adjacent", () => {
     mockDesktopPointer();
 
     renderWithListenProviders(
@@ -399,7 +399,12 @@ describe("HomeTasteHero", () => {
       />,
     );
 
-    expect(screen.getByText("Featured Artist")).toHaveClass("leading-none");
+    expect(screen.getByText("Featured Artist")).toHaveClass(
+      "font-mono",
+      "font-normal",
+      "text-label",
+      "uppercase",
+    );
     expect(screen.getByRole("heading", { name: "Converge" })).toHaveClass(
       "mt-1",
     );
@@ -1291,7 +1296,7 @@ describe("UpcomingAlbumsSection", () => {
     );
 
     expect(screen.getByText("What's coming up")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "View all" }));
+    fireEvent.click(screen.getByRole("button", { name: "View All" }));
     expect(onViewAll).toHaveBeenCalledWith("upcoming-albums");
   });
 });

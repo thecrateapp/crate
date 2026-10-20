@@ -1,5 +1,4 @@
 import { UserAvatar } from "@/components/social/UserAvatar";
-import { cn } from "@/lib/utils";
 
 export function UserProfileAvatar({
   name,
@@ -18,7 +17,7 @@ export function UserProfileAvatar({
       avatar={avatar}
       userId={userId}
       size="xl"
-      className={cn("user-profile-avatar-placeholder", className)}
+      className={className}
     />
   );
 }

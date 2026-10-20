@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
-import { ArrowRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { cn } from "@crate/ui/lib/cn";
 
 export type SectionHeaderSize = "md" | "lg" | "display";
@@ -27,6 +27,41 @@ const TITLE_CLASS_NAME: Record<SectionHeaderSize, string> = {
   display: "text-3xl font-bold tracking-tight",
 };
 
+/** Shared caption for section navigation, including injected native links. */
+export function SectionActionLabel({ children }: { children: ReactNode }) {
+  return (
+    <MonoLabel
+      as="span"
+      tone="accent"
+      className="inline-flex items-center gap-2"
+    >
+      {children}
+      <StatusDot className="drop-shadow-accent-action" />
+    </MonoLabel>
+  );
+}
+
+/** Text-aligned section action with a full-height target and no horizontal inset. */
+export function SectionActionButton({
+  children,
+  className,
+  type = "button",
+  ...props
+}: ComponentProps<"button">) {
+  return (
+    <button
+      {...props}
+      type={type}
+      className={cn(
+        "link-accent inline-flex min-h-11 items-center p-0 disabled:pointer-events-none disabled:opacity-50",
+        className,
+      )}
+    >
+      <SectionActionLabel>{children}</SectionActionLabel>
+    </button>
+  );
+}
+
 export function SectionHeader({
   title,
   subtitle,
@@ -44,14 +79,9 @@ export function SectionHeader({
   const resolvedAction =
     action ??
     (actionLabel && onAction ? (
-      <button
-        type="button"
-        onClick={onAction}
-        className="link-accent inline-flex min-h-11 items-center gap-1 text-sm font-normal"
-      >
+      <SectionActionButton onClick={onAction}>
         {actionLabel}
-        <ArrowRight size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
-      </button>
+      </SectionActionButton>
     ) : null);
 
   return (
