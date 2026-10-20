@@ -21,6 +21,7 @@ from crate.db.queries.user_library_stats_signal import (
     get_stats_signal,
 )
 from crate.db.queries.instance_stats_listeners import get_top_listeners
+from crate.db.queries.user_stats_new_flags import mark_new_items
 from crate.db.queries.user_stats_periods import resolve_stats_period
 from crate.db.repositories.tasks import create_task_dedup
 from crate.db.tx import read_scope
@@ -112,6 +113,14 @@ def build_instance_stats_dashboard(
         }
         payload.update(signal)
         payload["top_listeners"] = get_top_listeners(session, period)
+        mark_new_items(
+            session,
+            None,
+            period,
+            tracks=payload["top_tracks"]["items"],
+            artists=payload["top_artists"]["items"],
+            albums=payload["top_albums"]["items"],
+        )
     return payload
 
 

@@ -89,3 +89,42 @@ def test_instance_snapshot_aggregates_every_listener(pg_db):
         previous
     )
     assert "overview_previous" not in payload
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_instance_top_items_flag_first_plays_in_period(pg_db):
+    from crate.db.jobs.instance_listening_rollups import (
+        rebuild_instance_entity_firsts,
+        rebuild_instance_listening_days,
+    )
+    from crate.db.repositories.user_library_aggregate_runner import (
+        recompute_user_listening_aggregates,
+    )
+    from crate.db.tx import transaction_scope
+    from tests.stats_history import seed_listening_history
+
+    end_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    seed_listening_history(events=120, days=20, end_at=end_at)
+    recompute_user_listening_aggregates(1)
+    with transaction_scope() as session:
+        rebuild_instance_listening_days(session, None)
+        rebuild_instance_entity_firsts(session, None)
+
+    def build(window: str) -> dict:
+        return surface.build_instance_stats_dashboard(
+            window=window, month=None, **surface._DEFAULT_LIMITS
+        )
+
+    recent = build("30d")
+    artists = recent["top_artists"]["items"]
+    assert artists and all(item["is_new"] is True for item in artists)
+    assert all(item["is_new"] is True for item in recent["top_tracks"]["items"])
+    assert all(item["is_new"] is True for item in recent["top_albums"]["items"])
+
+    ancient = build("all_time")
+    items = (
+        ancient["top_tracks"]["items"]
+        + ancient["top_artists"]["items"]
+        + ancient["top_albums"]["items"]
+    )
+    assert items and all(item["is_new"] is False for item in items)

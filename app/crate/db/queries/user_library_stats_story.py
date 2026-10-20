@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from calendar import month_name
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -16,6 +17,7 @@ from sqlalchemy import text
 
 from crate.db.queries.user_stats_periods import (
     StatsPeriod,
+    previous_window,
     period_day_filter,
     period_params,
     resolve_stats_period,
@@ -236,6 +238,20 @@ def _audio_profile_payload(session, user_id: int, period: StatsPeriod) -> dict:
         "valence": float(row["valence"] or 0) if row else 0,
         "bpm": round(float(row["bpm"]), 1) if row and row["bpm"] is not None else None,
     }
+
+
+def _previous_audio_profile_payload(
+    session, user_id: int, period: StatsPeriod
+) -> dict | None:
+    window = previous_window(period)
+    if window is None:
+        return None
+    first, last = window
+    # ``previous_window`` is inclusive; ``period_day_filter`` ends exclusively.
+    previous = replace(
+        period, start=first, end=last + timedelta(days=1), previous_start=None
+    )
+    return _audio_profile_payload(session, user_id, previous)
 
 
 def _json_payload(value: Any) -> list[dict]:
@@ -511,6 +527,9 @@ def get_stats_story(
             "comebacks": _comeback_rows(session, user_id, period, limit=5),
             "rhythm": _rhythm_payload(session, user_id, period),
             "audio_profile": _audio_profile_payload(session, user_id, period),
+            "audio_profile_previous": _previous_audio_profile_payload(
+                session, user_id, period
+            ),
             "monthly_snapshots": _monthly_snapshots(session, user_id, period.today),
         }
 

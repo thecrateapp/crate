@@ -215,3 +215,133 @@ def test_overview_previous_totals_match_daily_rows(history):
 
 def test_overview_previous_is_absent_for_all_time(history):
     assert _dashboard("all_time")["overview"]["previous"] is None
+
+
+def _play_new_track_yesterday() -> None:
+    from sqlalchemy import text
+
+    from crate.db.repositories.library_album_upserts import upsert_album
+    from crate.db.repositories.library_artist_upserts import upsert_artist
+    from crate.db.repositories.library_track_upserts import upsert_track
+    from crate.db.tx import transaction_scope
+
+    upsert_artist({"name": "Fresh Face"})
+    album_id = upsert_album(
+        {
+            "artist": "Fresh Face",
+            "name": "Fresh Record",
+            "path": "/music/Fresh Face/Fresh Record",
+            "year": "2026",
+            "genre": "Shoegaze",
+        }
+    )
+    upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Fresh Face",
+            "album": "Fresh Record",
+            "filename": "01.flac",
+            "title": "Fresh Song",
+            "track_number": 1,
+            "format": "flac",
+            "genre": "Shoegaze",
+            "year": "2026",
+            "duration": 200.0,
+            "path": "/music/Fresh Face/Fresh Record/01.flac",
+        }
+    )
+    ended = datetime.now(timezone.utc) - timedelta(hours=26)
+    with transaction_scope() as session:
+        track_id = session.execute(
+            text("SELECT id FROM library_tracks WHERE title = 'Fresh Song'")
+        ).scalar_one()
+        for index in range(40):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_play_events (
+                        user_id, client_event_id, track_id, track_entity_uid,
+                        track_path, title, artist, album, started_at, ended_at,
+                        played_seconds, track_duration_seconds, completion_ratio,
+                        was_skipped, was_completed, play_source_type, device_type,
+                        app_platform, created_at
+                    )
+                    SELECT 1, 'fresh-' || :i, lt.id, lt.entity_uid, lt.path,
+                           lt.title, lt.artist, lt.album,
+                           CAST(:ended AS timestamptz) - interval '200 seconds',
+                           CAST(:ended AS timestamptz), 200, 200, 1, false, true,
+                           'album', 'web', 'listen-web', CAST(:ended AS timestamptz)
+                    FROM library_tracks lt WHERE lt.id = :track_id
+                    """
+                ),
+                {"i": index, "ended": ended, "track_id": track_id},
+            )
+
+
+def test_top_items_flag_entities_first_heard_in_period(history):
+    _play_new_track_yesterday()
+    recompute_user_listening_aggregates(1)
+
+    payload = _dashboard("30d")
+
+    tracks = {item["title"]: item["is_new"] for item in payload["top_tracks"]["items"]}
+    artists = {
+        item["artist_name"]: item["is_new"] for item in payload["top_artists"]["items"]
+    }
+    albums = {item["album"]: item["is_new"] for item in payload["top_albums"]["items"]}
+    assert tracks["Fresh Song"] is True
+    assert artists["Fresh Face"] is True
+    assert albums["Fresh Record"] is True
+    older = [name for name in artists if name != "Fresh Face"]
+    assert older and not any(artists[name] for name in older)
+    assert not any(is_new for title, is_new in tracks.items() if title != "Fresh Song")
+
+    year = datetime.now(timezone.utc).year
+    year_items = _dashboard(f"year:{year}")["top_artists"]["items"]
+    assert year_items and all("is_new" in item for item in year_items)
+
+
+def test_all_time_marks_nothing_new(history):
+    _play_new_track_yesterday()
+    recompute_user_listening_aggregates(1)
+
+    payload = _dashboard("all_time")
+
+    items = (
+        payload["top_tracks"]["items"]
+        + payload["top_artists"]["items"]
+        + payload["top_albums"]["items"]
+    )
+    assert items and all(item["is_new"] is False for item in items)
+
+
+def test_audio_profile_previous_uses_previous_window(history):
+    from sqlalchemy import text
+
+    from crate.db.queries.user_stats_periods import (
+        previous_window,
+        resolve_stats_period,
+    )
+    from crate.db.tx import read_scope
+
+    payload = _dashboard("30d")
+    previous = payload["story"]["audio_profile_previous"]
+    period = resolve_stats_period("UTC", window="30d")
+    first, last = previous_window(period)
+    with read_scope() as session:
+        expected = session.execute(
+            text(
+                """
+                SELECT SUM(lt.energy * td.play_count) / SUM(td.play_count) AS energy
+                FROM user_track_daily td
+                JOIN library_tracks lt ON lt.id = td.track_id
+                WHERE td.user_id = 1 AND td.day BETWEEN :first AND :last
+                """
+            ),
+            {"first": first, "last": last},
+        ).scalar_one()
+    assert previous is not None
+    assert previous["energy"] == pytest.approx(float(expected))
+    assert set(previous) == set(payload["story"]["audio_profile"])
+
+    assert _dashboard("all_time")["story"]["audio_profile_previous"] is None

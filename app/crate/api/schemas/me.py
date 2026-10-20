@@ -478,6 +478,7 @@ class StatsTrackResponse(IdentityFieldsMixin):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsArtistResponse(BaseModel):
@@ -490,6 +491,7 @@ class StatsArtistResponse(BaseModel):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsAlbumResponse(BaseModel):
@@ -506,6 +508,7 @@ class StatsAlbumResponse(BaseModel):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsGenreResponse(BaseModel):
@@ -617,6 +620,7 @@ class StatsStoryResponse(BaseModel):
     comebacks: list[StatsStoryArtistSignalResponse] = Field(default_factory=list)
     rhythm: StatsRhythmResponse
     audio_profile: StatsAudioProfileResponse
+    audio_profile_previous: StatsAudioProfileResponse | None = None
     monthly_snapshots: list[StatsMonthlySnapshotResponse] = Field(default_factory=list)
 
 

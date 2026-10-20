@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 from calendar import month_name
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import _STATS_WINDOWS, normalize_stats_window
 from crate.db.queries.user_library_stats_month import month_bounds, month_period_key
+from crate.db.queries.user_stats_periods import previous_window, resolve_stats_period
 from crate.db.tx import read_scope
 
 
@@ -1373,6 +1374,20 @@ def _monthly_snapshots(months: int = 8) -> list[dict]:
     return snapshots
 
 
+def _previous_audio_profile(window: str, month: str | None) -> dict | None:
+    period = resolve_stats_period("UTC", window=window, month=month)
+    bounds = previous_window(period)
+    if bounds is None:
+        return None
+    first, last = bounds
+    return _audio_profile_payload(
+        current_start=datetime.combine(first, time.min, tzinfo=timezone.utc),
+        current_end=datetime.combine(
+            last + timedelta(days=1), time.min, tzinfo=timezone.utc
+        ),
+    )
+
+
 def get_global_stats_story(window: str = "30d", month: str | None = None) -> dict:
     if month:
         current_start, current_end = month_bounds(month)
@@ -1406,6 +1421,7 @@ def get_global_stats_story(window: str = "30d", month: str | None = None) -> dic
             current_start=current_start,
             current_end=current_end,
         ),
+        "audio_profile_previous": _previous_audio_profile(window, month),
         "monthly_snapshots": _monthly_snapshots(),
     }
 

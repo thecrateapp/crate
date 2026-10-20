@@ -31,6 +31,7 @@ from crate.db.queries.user_library_stats_signal import (
     METRICS_VERSION,
     get_stats_signal,
 )
+from crate.db.queries.user_stats_new_flags import mark_new_items
 from crate.db.queries.user_stats_periods import (
     resolve_stats_period,
     user_stats_timezone,
@@ -153,6 +154,14 @@ def _with_signal(
             user_stats_timezone(user_id, session=session), window=window, month=month
         )
         signal = get_stats_signal(session, user_id, period)
+        mark_new_items(
+            session,
+            user_id,
+            period,
+            tracks=payload["top_tracks"]["items"],
+            artists=payload["top_artists"]["items"],
+            albums=payload["top_albums"]["items"],
+        )
     payload.setdefault("overview", {})["previous"] = signal.pop("overview_previous")
     payload.update(signal)
     return payload

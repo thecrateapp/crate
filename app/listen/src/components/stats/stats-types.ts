@@ -68,6 +68,7 @@ export interface StatsTrack {
   play_count: number;
   complete_play_count: number;
   minutes_listened: number;
+  is_new?: boolean;
 }
 
 export interface StatsArtist {
@@ -78,6 +79,7 @@ export interface StatsArtist {
   play_count: number;
   complete_play_count: number;
   minutes_listened: number;
+  is_new?: boolean;
 }
 
 export interface StatsAlbum {
@@ -92,6 +94,7 @@ export interface StatsAlbum {
   play_count: number;
   complete_play_count: number;
   minutes_listened: number;
+  is_new?: boolean;
 }
 
 export interface StatsGenre {
@@ -188,6 +191,7 @@ export interface StatsStory {
   comebacks: StatsStoryArtistSignal[];
   rhythm: StatsRhythm;
   audio_profile: StatsAudioProfile;
+  audio_profile_previous?: StatsAudioProfile | null;
   monthly_snapshots: StatsMonthlySnapshot[];
 }
 
