@@ -476,6 +476,7 @@
   "upload.badge": "Importer de la musique",
   "upload.title": "Ajoute de la musique à ta bibliothèque",
   "upload.subtitle": "Importe des titres seuls ou des albums ZIP. Crate les ajoutera à la bibliothèque partagée, lancera l'enrichissement habituel et ajoutera automatiquement tes imports à ta collection.",
+  "upload.dropzone.chooseFiles": "Choisir des fichiers",
   "upload.dropzone.title": "Dépose les fichiers ici ou choisis des fichiers",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC ou ZIP",
   "upload.ready.title": "Prêt à importer",
@@ -488,9 +489,9 @@
   "upload.next.attributed": "Ton import t'est attribué, avec export et retrait dans Bibliothèque.",
   "upload.progress": "Import {done}/{total}",
   "upload.import": "Importer dans la bibliothèque",
-  "upload.status.queued": "Import en file",
-  "upload.status.processing": "La tâche `{taskId}` traite {count, plural, one {# fichier} other {# fichiers}}.",
-  "upload.toasts.queued": "Import en file. Crate importe ta musique en arrière-plan.",
+  "upload.status.queued": "Envoi reçu",
+  "upload.status.processing": "Nous ajoutons {count, plural, one {# fichier} other {# fichiers}} à ta bibliothèque. Tu peux continuer à naviguer.",
+  "upload.toasts.queued": "Envoi reçu. Nous ajoutons ta musique à la bibliothèque.",
   "upload.errors.tooLarge": "Le téléversement est trop volumineux pour une seule requête. Réessayez pour que Crate puisse le découper en fragments.",
   "upload.errors.queueWithMessage": "Impossible de mettre le téléversement en file: {message}",
   "upload.errors.queue": "Impossible de mettre le téléversement en file",
@@ -1393,7 +1394,7 @@
   "library.contributions.withdraw.title": "Retirer la contribution ?",
   "library.contributions.withdraw.description": "Cela retire ta contribution de {album}. Si aucun autre utilisateur n'a contribué cette copie, Crate supprimera définitivement les fichiers de l'album et les lignes de base de données via une tâche worker.",
   "library.contributions.withdraw.confirm": "Retirer la contribution",
-  "library.contributions.toasts.removalQueued": "Suppression mise en file ({taskId})",
+  "library.contributions.toasts.removalQueued": "Nous retirons ta contribution à {album}. Tu peux continuer à naviguer.",
   "library.contributions.toasts.removeFailed": "Impossible de retirer la contribution",
   "actions.artist.openNamed": "Ouvrir {name}",
   "actions.artist.followNamed": "Suivre {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Cookie de session",
   "settings.openSubsonic.keyValue": "Clé générée",
   "settings.bandcamp.countsError": "Les totaux de la collection sont indisponibles. Votre compte reste connecté.",
-  "settings.scrobbling.toasts.cancelFailed": "Impossible d’annuler la connexion. Réessayez."
+  "settings.scrobbling.toasts.cancelFailed": "Impossible d’annuler la connexion. Réessayez.",
+  "album.remoteImport.downloadingUnknown": "Téléchargement…"
 }

@@ -12,7 +12,6 @@ export const COLLECTION_SECTIONS = [
   "playlists",
   "albums",
   "liked",
-  "bandcamp",
   "contributions",
 ] as const;
 export type CollectionSection = (typeof COLLECTION_SECTIONS)[number];

@@ -523,6 +523,10 @@
     "sourceHash": "sha256:29b7d29ae695c9f52759014c88444a3d83ecc82145736f55388b8086c3769cc6",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "album.remoteImport.downloadingUnknown": {
+    "sourceHash": "sha256:2bbf71583d9de9db28816d2a21b06df6b033ef5cda7bad88ed926aef652b0283",
+    "reviewedAt": "2026-10-20T16:54:17.806Z"
+  },
   "album.remoteImport.failed": {
     "sourceHash": "sha256:b3376a8b10eb1e26236f9872549c12cb7992389e7b51c4ea4074b0adb23a1731",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -3068,8 +3072,8 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "library.contributions.toasts.removalQueued": {
-    "sourceHash": "sha256:535d8e104ef83617baab21877f57b524523518080fd184e9ad6fbc19ac6f3a5e",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:a13338441c35bfdd7082a1c4412934924da0103b565e51e125bd4226431c5be2",
+    "reviewedAt": "2026-10-20T18:47:55.992Z"
   },
   "library.contributions.toasts.removeFailed": {
     "sourceHash": "sha256:ae5d60757e772c6172391f3f34ac596126bcf9b5003cef5d30e467741ac22517",
@@ -7499,6 +7503,10 @@
     "sourceHash": "sha256:df99eb75c4945e1bacde1e5e554d56b7b7b4f52a96d6dcb9e245b5eda047536f",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "upload.dropzone.chooseFiles": {
+    "sourceHash": "sha256:667d1c3806b39fcce1e4ce7540cfd0cea801fa450c54f2d7593ca318bbae1ac3",
+    "reviewedAt": "2026-10-20T17:11:14.451Z"
+  },
   "upload.dropzone.formats": {
     "sourceHash": "sha256:66cc2e55d8e388a2b6a9dcbe9d43e981cd86f4a2363f45eb25005b237f253b76",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -7560,12 +7568,12 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "upload.status.processing": {
-    "sourceHash": "sha256:8acf480afc0fbd697614e29b528f680f93066038956d5ee01cd5764126fa13a8",
-    "reviewedAt": "2026-10-03T11:52:01.770Z"
+    "sourceHash": "sha256:667e58790396e91466db7c8d17b1fd86a62484b7ee283ceaf594f804af0cd237",
+    "reviewedAt": "2026-10-20T18:47:55.992Z"
   },
   "upload.status.queued": {
-    "sourceHash": "sha256:91a79b087901b111d28601d65cbe8398a8dca51860f60c0f77286b9b28ec3399",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:ccb0a6be22a87204425b1c795d53eb920333fcde1a3d8fac8e012d2ac225d72d",
+    "reviewedAt": "2026-10-20T18:47:55.992Z"
   },
   "upload.subtitle": {
     "sourceHash": "sha256:8651ef8ef978bf0fc0a35833b8d09fea327e4e1c1ecad91bfc01a8fcb7cd0c1a",
@@ -7576,8 +7584,8 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "upload.toasts.queued": {
-    "sourceHash": "sha256:818e6bef22a97b74a0c1a9312038a9fbf0adc652345127116b4a488318ec6246",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:15c910fa3595c7f7b3f79c4b2cdf7baf272db408daf9c4df51506f4990f42877",
+    "reviewedAt": "2026-10-20T18:47:55.992Z"
   },
   "userConnections.backToProfile": {
     "sourceHash": "sha256:260bfbe574fffd856904242e78f04e24291c9f97b10bee8d76cb7d0ea7f2fc03",

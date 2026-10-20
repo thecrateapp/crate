@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { EntityRow } from "@crate/ui/domain/entity/EntityRow";
+import { Send } from "@crate/ui/icons";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { MonoLabelLinkExamples } from "../reviews/ActionLabelsReview";
 const meta = {
@@ -71,6 +73,22 @@ export const ContextualMetrics: Story = {
 
 export const Accent: Story = {
   args: { children: "Interface", as: "h2", tone: "accent" },
+};
+export const EntityAction: Story = {
+  render: () => (
+    <EntityRow
+      title="Open collection"
+      titleContent={<MonoLabel as="span">Open collection</MonoLabel>}
+      subtitle="A native action row with a contextual caption"
+      leading={
+        <span className="flex size-12 items-center justify-center">
+          <Send aria-hidden="true" />
+        </span>
+      }
+      onOpen={() => {}}
+      menuButton="none"
+    />
+  ),
 };
 export const SectionTones: Story = {
   render: () => (

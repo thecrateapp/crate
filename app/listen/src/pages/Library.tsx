@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -12,7 +12,6 @@ import {
 import { useTabParam } from "@/hooks/use-tab-param";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
-import { LibraryBandcampTab } from "./LibraryBandcampTab";
 import {
   LibraryAlbumsTab,
   LibraryArtistsTab,
@@ -27,7 +26,6 @@ type Tab =
   | "artists"
   | "albums"
   | "liked"
-  | "bandcamp"
   | "crates"
   | "contributions";
 
@@ -45,7 +43,6 @@ const tabs: { key: Tab; labelKey: string }[] = [
   { key: "playlists", labelKey: "nav.collection.playlists" },
   { key: "albums", labelKey: "nav.collection.albums" },
   { key: "liked", labelKey: "library.tabs.liked" },
-  { key: "bandcamp", labelKey: "nav.collection.bandcamp" },
   { key: "contributions", labelKey: "nav.collection.contributions" },
 ];
 
@@ -54,12 +51,33 @@ const tabTitleKeys: Record<Tab, string> = {
   artists: "nav.collection.artists",
   albums: "nav.collection.albums",
   liked: "nav.collection.likedTracks",
-  bandcamp: "nav.collection.bandcamp",
   crates: "nav.collection.crates",
   contributions: "nav.collection.contributions",
 };
 
 export function Library() {
+  const location = useLocation();
+  const { section } = useParams<{ section?: string }>();
+  const query = new URLSearchParams(location.search);
+  if (section === "bandcamp" || (!section && query.get("tab") === "bandcamp")) {
+    query.delete("tab");
+    const search = query.toString();
+    return (
+      <Navigate
+        replace
+        to={{
+          pathname: "/bandcamp",
+          search: search ? `?${search}` : "",
+          hash: location.hash,
+        }}
+        state={location.state}
+      />
+    );
+  }
+  return <LibraryContent />;
+}
+
+function LibraryContent() {
   const { t } = useTranslation();
   const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
@@ -117,7 +135,6 @@ export function Library() {
         {tab === "artists" && <LibraryArtistsTab key={refreshKey} />}
         {tab === "albums" && <LibraryAlbumsTab key={refreshKey} />}
         {tab === "liked" && <LibraryLikedTab key={refreshKey} />}
-        {tab === "bandcamp" && <LibraryBandcampTab key={refreshKey} />}
         {tab === "crates" && (
           <Crates key={refreshKey} onCrateChange={refetchStats} />
         )}

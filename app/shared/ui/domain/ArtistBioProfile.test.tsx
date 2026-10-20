@@ -17,7 +17,7 @@ describe("ArtistBioProfile", () => {
         />,
       );
       const label = expanded ? "Less" : "More";
-      const action = screen.getByRole("button", { name: label, exact: true });
+      const action = screen.getByRole("button", { name: label });
       expect(action).toHaveClass("link-accent", "p-0", "min-h-11");
       expect(within(action).getByText(label)).toHaveClass(
         "crate-mono-label",

@@ -130,7 +130,7 @@ export function BandcampSettingsView({
           {status?.connected ? (
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline">
-                <Link to="/library?tab=bandcamp">
+                <Link to="/bandcamp">
                   {t("settings.bandcamp.viewPurchases")}
                 </Link>
               </Button>

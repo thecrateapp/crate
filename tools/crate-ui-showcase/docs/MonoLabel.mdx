@@ -39,6 +39,13 @@ import { DocHeading } from "../components/DocHeading";
 
 <Canvas of={Stories.Linked} />
 
+The same foreground feedback applies to an enabled native EntityRow primary action containing
+an actual MonoLabel. Canonical entity actions are unfilled; the caption becomes high accent on
+hover/keyboard focus without changing the row background. Disabled actions remain subdued.
+Ordinary Button labels and non-interactive metadata keep their roles.
+
+<Canvas of={Stories.EntityAction} />
+
 <Controls />
 
 Diego approved the visual reference at 1AQ. The enforced case contract is part of the local 1AR review. Consumer adoption and platform QA remain separate statuses.

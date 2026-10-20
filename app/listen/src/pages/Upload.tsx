@@ -1,51 +1,18 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import {
-  Archive,
-  CheckCircle2,
-  CRATE_ICON_SIZE,
-  Loader2,
-  Music,
-  Upload as UploadIcon,
-} from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { Button } from "@crate/ui/shadcn/button";
-import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 
 import { ApiError, api } from "@/lib/api";
-import { formatBytes } from "@/lib/utils";
 
-interface UploadResponse {
-  task_id: string;
-  upload_id: string;
-  file_count: number;
-  total_bytes: number;
-}
-
-interface ChunkedUploadInitResponse {
-  upload_id: string;
-  file_count: number;
-  chunk_size: number;
-}
-
-interface UploadProgress {
-  done: number;
-  total: number;
-}
-
-interface UploadMusicFilesOptions {
-  chunkedThresholdBytes?: number;
-  onProgress?: (progress: UploadProgress) => void;
-  onFileProgress?: (progress: FileUploadProgress) => void;
-}
-
-interface FileUploadProgress {
-  fileIndex: number;
-  loadedBytes: number;
-  totalBytes: number;
-}
+import type {
+  UploadResponse,
+  ChunkedUploadInitResponse,
+  UploadProgress,
+  UploadMusicFilesOptions,
+  FileUploadProgress,
+} from "./upload-types";
+import { UploadView } from "./UploadView";
 
 const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
 
@@ -160,10 +127,6 @@ export function Upload() {
     [files],
   );
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setFiles(Array.from(event.target.files || []));
-  }
-
   async function handleSubmit() {
     if (files.length === 0) return;
 
@@ -192,158 +155,16 @@ export function Upload() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div className="space-y-2">
-        <InfoBadge icon={UploadIcon}>{t("upload.badge")}</InfoBadge>
-        <h1 className="text-3xl font-bold text-text-primary">
-          {t("upload.title")}
-        </h1>
-        <p className="max-w-2xl text-sm leading-6 text-text-muted">
-          {t("upload.subtitle")}
-        </p>
-      </div>
-
-      <div className="rounded-panel border border-border-quiet bg-text-primary/[0.04] p-6">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-4">
-            <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-text-primary/15 bg-text-primary/[0.03] px-6 py-10 text-center transition-colors hover:border-accent-action/40 hover:bg-text-primary/[0.05]">
-              <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-accent-action/15 text-accent-action">
-                <UploadIcon size={CRATE_ICON_SIZE.xl} />
-              </div>
-              <div className="text-base font-semibold text-text-primary">
-                {t("upload.dropzone.title")}
-              </div>
-              <div className="mt-2 text-sm text-text-muted">
-                {t("upload.dropzone.formats")}
-              </div>
-              <input
-                type="file"
-                multiple
-                accept=".flac,.mp3,.m4a,.ogg,.opus,.wav,.aac,.alac,.zip,audio/*,.zip"
-                className="hidden"
-                disabled={submitting}
-                onChange={handleFileChange}
-              />
-            </label>
-
-            {files.length > 0 ? (
-              <div className="space-y-2 border-t border-border-quiet bg-surface-canvas/50 pt-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold text-text-primary">
-                      {t("upload.ready.title")}
-                    </div>
-                    <div className="text-xs text-text-muted">
-                      {t("upload.selectedFiles", {
-                        count: files.length,
-                        size: formatBytes(totalBytes),
-                      })}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => setFiles([])}
-                    className="link-meta text-xs"
-                  >
-                    {t("common.clear")}
-                  </button>
-                </div>
-                <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                  {files.map((file, index) => (
-                    <div
-                      key={`${file.name}-${file.size}-${file.lastModified}`}
-                      className="space-y-2 rounded-xl px-3 py-2 text-sm text-text-primary/75"
-                    >
-                      <div className="flex items-center gap-3">
-                        {file.name.toLowerCase().endsWith(".zip") ? (
-                          <Archive
-                            size={CRATE_ICON_SIZE.xs}
-                            className="shrink-0 text-accent-action"
-                          />
-                        ) : (
-                          <Music
-                            size={CRATE_ICON_SIZE.xs}
-                            className="shrink-0 text-accent-action"
-                          />
-                        )}
-                        <span className="min-w-0 flex-1 truncate">
-                          {file.name}
-                        </span>
-                        <span className="text-xs text-text-primary/40">
-                          {fileProgress[index]
-                            ? `${formatBytes(fileProgress[index].loadedBytes)} / ${formatBytes(file.size)}`
-                            : formatBytes(file.size)}
-                        </span>
-                      </div>
-                      {submitting ? (
-                        <ProgressHairline
-                          label={file.name}
-                          value={
-                            fileProgress[index] && file.size > 0
-                              ? fileProgress[index].loadedBytes / file.size
-                              : undefined
-                          }
-                          valueText={
-                            fileProgress[index]
-                              ? `${formatBytes(fileProgress[index].loadedBytes)} / ${formatBytes(file.size)}`
-                              : undefined
-                          }
-                        />
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-4 border-l border-border-quiet pl-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
-              {t("upload.next.title")}
-            </h2>
-            <ul className="space-y-3 text-sm leading-6 text-text-muted">
-              <li>{t("upload.next.import")}</li>
-              <li>{t("upload.next.enrichment")}</li>
-              <li>{t("upload.next.liked")}</li>
-              <li>{t("upload.next.saved")}</li>
-              <li>{t("upload.next.attributed")}</li>
-            </ul>
-            <Button
-              shape="pill"
-              onClick={handleSubmit}
-              disabled={submitting || files.length === 0}
-              className="h-auto w-full px-4 py-3 font-semibold shadow-none hover:bg-accent-action [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-4"
-            >
-              {submitting ? (
-                <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
-              ) : (
-                <UploadIcon size={CRATE_ICON_SIZE.sm} />
-              )}
-              {uploadProgress
-                ? t("upload.progress", {
-                    done: uploadProgress.done,
-                    total: uploadProgress.total,
-                  })
-                : t("upload.import")}
-            </Button>
-            {lastUpload ? (
-              <div className="border-l-2 border-state-success/40 bg-state-success/10 px-4 py-3 text-sm text-state-success-text">
-                <div className="flex items-center gap-2 font-medium">
-                  <CheckCircle2 size={CRATE_ICON_SIZE.sm} />
-                  {t("upload.status.queued")}
-                </div>
-                <div className="mt-1 text-xs text-state-success-text/80">
-                  {t("upload.status.processing", {
-                    taskId: lastUpload.task_id,
-                    count: lastUpload.file_count,
-                  })}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
+    <UploadView
+      files={files}
+      submitting={submitting}
+      lastUpload={lastUpload}
+      uploadProgress={uploadProgress}
+      fileProgress={fileProgress}
+      totalBytes={totalBytes}
+      onFilesChange={setFiles}
+      onClear={() => setFiles([])}
+      onSubmit={() => void handleSubmit()}
+    />
   );
 }

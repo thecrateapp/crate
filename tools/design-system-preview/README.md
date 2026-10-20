@@ -634,3 +634,37 @@ were added to the historical mockup.
 Its current amendment also covers MonoLabel link foreground feedback and the actual desktop
 player-source caption. `review-1bc-artist.html` retains the focused real hero/biography scene:
 Show more and More/Less share SectionActionButton and align with their preceding text.
+
+`review-1bd-sharing-imports.html` imports the exact SharingImportsReview used by Storybook.
+Five local tabs cover ShareSheet modes/style/busy/unavailable, Bandcamp reads/canonical album tiles/
+56px rows/menu, native file picking and actual drag/drop, confirmed/unknown upload progress,
+remote-import states/confirmation and contribution export/withdrawal. The Upload dropzone uses
+the actual decorative CrateLogo and canonical picker action. Nothing uploads or changes an
+account/library from the scene. Historical mockup unchanged; each host scans the actual view
+sources for their utility classes.
+
+Diego’s Upload amendment removes the entire What happens next section; do not reintroduce
+processing/enrichment/attribution instructions into this end-user view or its stories.
+
+### Contributions and Bandcamp navigation amendment
+
+Collection now has six sections: Artists, Crates, Playlists, Albums, Liked and Contributions.
+Bandcamp is removed from both sidebar children and Collection tabs; /bandcamp is the single
+canonical view, reachable through the existing Settings connection link while its future main
+navigation placement is undecided. Old /library?tab=bandcamp and /collection/bandcamp URLs
+replace-redirect to it, preserving unrelated query/hash/state. The obsolete LibraryBandcampTab
+controller/purchases composition is removed, so it cannot diverge into a second live screen.
+
+Contributions use LibraryContributionCard: actual EntityCard in the default MediaGrid, matching
+Albums. The adapter reuses AlbumCard artwork/model/playback helpers and the lazy AlbumCardMenu;
+Export and Remove contribution are specific menu entries, with withdrawal still confirmed.
+Source metadata stays below title/artist as actual uppercase MonoLabel, without a chip or border:
+Upload uses subtle gray with a 12px Solar upload icon; Bandcamp uses accent with its 12px brand
+mark. Icons are decorative and inherit the caption color. Missing local album IDs keep navigation, playback and
+export unavailable while allowing withdrawal. The current review uses the actual card view and
+pure contribution action builder with local callbacks; it never starts real playback.
+
+Upload receipts/toasts and withdrawal notices use end-user copy without task IDs. Receipts
+show file counts; withdrawal identifies the album and does not claim the background operation
+has already completed. Failed withdrawal keeps its confirmation open with a friendly error.
+All seven catalogs cover the messages; internal task IDs remain in response types only.

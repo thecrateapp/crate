@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
+const toastSuccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@crate/ui/lib/notify", () => ({
   notify: {
     error: toastErrorMock,
-    success: vi.fn(),
+    success: toastSuccessMock,
   },
 }));
 
@@ -107,6 +108,75 @@ describe("Upload", () => {
     vi.clearAllMocks();
   });
 
+  it("opens the native picker from a keyboard-reachable canonical action without exposing native file chrome", () => {
+    renderWithListenProviders(<Upload />, { locale: "en" });
+    const picker = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    expect(picker).toHaveAttribute("data-slot", "input");
+    expect(picker).toHaveAttribute("hidden");
+    expect(picker).toHaveAttribute("multiple");
+    const choose = screen.getByRole("button", { name: "Choose files" });
+    expect(choose).toHaveAttribute("data-slot", "button");
+    const nativePicker = vi.spyOn(picker, "click");
+    fireEvent.click(choose);
+    expect(nativePicker).toHaveBeenCalledOnce();
+    expect(screen.queryByText("What happens next")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/enrichment run in the background/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("stages dropped files without issuing a request until import is confirmed", () => {
+    renderWithListenProviders(<Upload />, { locale: "en" });
+    const zone = screen.getByRole("group", { name: "Upload music" });
+    fireEvent.drop(zone, {
+      dataTransfer: { files: [new File(["music"], "Evening.flac")] },
+    });
+    expect(screen.getByText("Evening.flac")).toBeVisible();
+    expect(vi.mocked(api)).not.toHaveBeenCalled();
+  });
+
+  it("shows an active drop target for files, preserves the queue on text drops and resets after dropping", () => {
+    renderWithListenProviders(<Upload />, { locale: "en" });
+    const zone = screen.getByRole("group", { name: "Upload music" });
+    expect(zone).toHaveAttribute("data-upload-dropzone");
+    expect(zone.querySelector("svg.crate-logo")).toHaveAttribute(
+      "data-crate-logo-effects",
+      "off",
+    );
+    expect(zone).toHaveClass("border-dashed", "min-h-64");
+    fireEvent.dragEnter(zone, { dataTransfer: { types: ["Files"] } });
+    expect(zone).toHaveAttribute("data-dragging", "true");
+    fireEvent.drop(zone, {
+      dataTransfer: { files: [new File(["music"], "Evening.flac")] },
+    });
+    expect(zone).toHaveAttribute("data-dragging", "false");
+    fireEvent.drop(zone, {
+      dataTransfer: { files: [], types: ["text/plain"] },
+    });
+    expect(screen.getByText("Evening.flac")).toBeVisible();
+    expect(vi.mocked(api)).not.toHaveBeenCalled();
+  });
+
+  it("does not replace files from a drop while an upload is in flight", async () => {
+    const request = deferred<unknown>();
+    vi.mocked(api).mockImplementationOnce(() => request.promise);
+    const { container } = renderWithListenProviders(<Upload />, {
+      locale: "en",
+    });
+    chooseFiles(container, [new File(["music"], "Original.flac")]);
+    fireEvent.click(screen.getByRole("button", { name: "Import to library" }));
+    fireEvent.drop(screen.getByRole("group", { name: "Upload music" }), {
+      dataTransfer: { files: [new File(["new"], "Replacement.flac")] },
+    });
+    expect(screen.getByText("Original.flac")).toBeVisible();
+    expect(screen.queryByText("Replacement.flac")).not.toBeInTheDocument();
+    await act(async () =>
+      request.resolve({ task_id: "task", file_count: 1, total_bytes: 5 }),
+    );
+  });
+
   it("localizes the upload page chrome", () => {
     renderWithListenProviders(<Upload />, { locale: "es" });
 
@@ -165,7 +235,7 @@ describe("Upload", () => {
       },
     });
 
-    expect(container.innerHTML).toContain("bg-surface-canvas/50");
+    expect(container.querySelector(".bg-surface-canvas")).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("gradient-bg-50");
   });
 });
@@ -405,4 +475,48 @@ describe("Upload file progress", () => {
     await act(async () => retryChunk.resolve({ ok: true }));
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
+});
+
+describe("Upload friendly receipt", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api).mockReset();
+  });
+  it.each([
+    [
+      "en",
+      "Upload received. We’re adding your music to the library.",
+      "2 files are being added to your library. You can keep browsing.",
+    ],
+    [
+      "es",
+      "Subida recibida. Estamos añadiendo tu música a la biblioteca.",
+      "Estamos añadiendo 2 archivos a tu biblioteca. Puedes seguir navegando.",
+    ],
+  ] as const)(
+    "confirms the upload and file count in %s without showing internal task IDs",
+    async (locale, toast, receipt) => {
+      vi.mocked(api).mockResolvedValueOnce({
+        task_id: "internal-task-837",
+        upload_id: "internal-upload-26",
+        file_count: 2,
+        total_bytes: 6,
+      });
+      const { container } = renderWithListenProviders(<Upload />, { locale });
+      chooseFiles(container, [
+        new File(["abc"], "First.flac"),
+        new File(["abc"], "Second.flac"),
+      ]);
+      fireEvent.click(
+        screen.getByRole("button", {
+          name:
+            locale === "es" ? "Importar a la biblioteca" : "Import to library",
+        }),
+      );
+      await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith(toast));
+      expect(screen.getByRole("status")).toHaveTextContent(receipt);
+      expect(container).not.toHaveTextContent("internal-task-837");
+      expect(container).not.toHaveTextContent("internal-upload-26");
+    },
+  );
 });

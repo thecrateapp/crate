@@ -24,8 +24,7 @@ export function SidebarNavigation({
       expandLabel={t("nav.sidebar.expand")}
       collectionActive={
         location.pathname === "/library" ||
-        location.pathname.startsWith("/collection") ||
-        location.pathname === "/bandcamp"
+        location.pathname.startsWith("/collection")
       }
     />
   );

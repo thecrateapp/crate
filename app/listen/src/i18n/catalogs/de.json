@@ -476,6 +476,7 @@
   "upload.badge": "Musik hochladen",
   "upload.title": "Musik zu deiner Bibliothek hinzufügen",
   "upload.subtitle": "Lade einzelne Titel oder ZIP-Alben hoch. Crate importiert sie in die gemeinsame Bibliothek, startet die übliche Anreicherung und fügt deine Uploads automatisch deiner Sammlung hinzu.",
+  "upload.dropzone.chooseFiles": "Dateien auswählen",
   "upload.dropzone.title": "Dateien hier ablegen oder auswählen",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC oder ZIP",
   "upload.ready.title": "Bereit zum Import",
@@ -488,9 +489,9 @@
   "upload.next.attributed": "Dein Upload wird dir zugeordnet, mit Export- und Rückzugsoptionen in der Bibliothek.",
   "upload.progress": "Upload {done}/{total}",
   "upload.import": "In Bibliothek importieren",
-  "upload.status.queued": "Upload eingereiht",
-  "upload.status.processing": "Task `{taskId}` verarbeitet {count, plural, one {# Datei} other {# Dateien}}.",
-  "upload.toasts.queued": "Upload eingereiht. Crate importiert deine Musik im Hintergrund.",
+  "upload.status.queued": "Upload erhalten",
+  "upload.status.processing": "{count, plural, one {# Datei wird} other {# Dateien werden}} zu deiner Bibliothek hinzugefügt. Du kannst weiter stöbern.",
+  "upload.toasts.queued": "Upload erhalten. Deine Musik wird zur Bibliothek hinzugefügt.",
   "upload.errors.tooLarge": "Der Upload ist zu groß für eine einzelne Anfrage. Versuche es erneut, damit Crate ihn in Blöcke aufteilen kann.",
   "upload.errors.queueWithMessage": "Upload konnte nicht eingereiht werden: {message}",
   "upload.errors.queue": "Upload konnte nicht eingereiht werden",
@@ -1393,7 +1394,7 @@
   "library.contributions.withdraw.title": "Beitrag entfernen?",
   "library.contributions.withdraw.description": "Dies entfernt deinen Beitrag von {album}. Wenn kein anderer Nutzer diese Kopie beigetragen hat, entfernt Crate die Albumdateien und Datenbankzeilen dauerhaft über eine Worker-Aufgabe.",
   "library.contributions.withdraw.confirm": "Beitrag entfernen",
-  "library.contributions.toasts.removalQueued": "Entfernung eingereiht ({taskId})",
+  "library.contributions.toasts.removalQueued": "Dein Beitrag zu {album} wird entfernt. Du kannst weiter stöbern.",
   "library.contributions.toasts.removeFailed": "Beitrag konnte nicht entfernt werden",
   "actions.artist.openNamed": "{name} öffnen",
   "actions.artist.followNamed": "{name} folgen",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Sitzungs-Cookie",
   "settings.openSubsonic.keyValue": "Generierter Schlüssel",
   "settings.bandcamp.countsError": "Die Sammlungssummen sind nicht verfügbar. Dein Konto ist weiterhin verbunden.",
-  "settings.scrobbling.toasts.cancelFailed": "Die Verbindung konnte nicht abgebrochen werden. Versuche es erneut."
+  "settings.scrobbling.toasts.cancelFailed": "Die Verbindung konnte nicht abgebrochen werden. Versuche es erneut.",
+  "album.remoteImport.downloadingUnknown": "Wird heruntergeladen…"
 }

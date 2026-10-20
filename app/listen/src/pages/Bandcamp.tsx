@@ -1,15 +1,10 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { useCallback, useMemo, useState } from "react";
+import { BandcampPageView } from "./BandcampPageView";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Heart, Loader2, Radar, RefreshCw } from "@crate/ui/icons";
-import type { LucideIcon } from "@crate/ui/icons";
-import type { ReactNode } from "react";
 import { notify } from "@crate/ui/lib/notify";
 
-import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { MediaGrid } from "@crate/ui/domain/lists";
 import { EmptyState } from "@crate/ui/domain/states";
-import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { BandcampItem as BandcampItemView } from "@/components/bandcamp/BandcampItem";
@@ -39,30 +34,6 @@ export function Bandcamp() {
     wishlist.refetch();
     radar.refetch();
   }, [collection, radar, status, wishlist]);
-
-  const stats = useMemo(
-    () => [
-      {
-        label: "owned",
-        labelText: t("bandcamp.stats.owned"),
-        value: collection.data?.total ?? 0,
-        icon: BandcampLogo,
-      },
-      {
-        label: "wishlist",
-        labelText: t("bandcamp.stats.wishlist"),
-        value: wishlist.data?.total ?? 0,
-        icon: Heart,
-      },
-      {
-        label: "radar",
-        labelText: t("bandcamp.stats.radar"),
-        value: radar.data?.total ?? 0,
-        icon: Radar,
-      },
-    ],
-    [collection.data, radar.data, t, wishlist.data],
-  );
 
   async function queueTask(path: string, busyKey: string, taskLabel: string) {
     setBusyAction(busyKey);
@@ -116,193 +87,64 @@ export function Bandcamp() {
     status.data?.username ||
     t("bandcamp.connection.accountFallback");
 
+  const reads = [status, collection, wishlist, radar];
+  const readState = reads.some((read) => read.error && !read.data)
+    ? "error"
+    : reads.some((read) => read.loading && !read.data)
+      ? "loading"
+      : "ready";
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-8 sm:py-6">
-      <section className="bandcamp-page-surface relative overflow-hidden rounded-panel border border-text-primary/8 p-6 md:p-8">
-        <div className="bandcamp-page-sheen pointer-events-none absolute inset-y-0 right-0 w-1/2" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <InfoBadge icon={BandcampLogo}>Bandcamp</InfoBadge>
-            <h1 className="mt-5 text-4xl font-black tracking-tight text-text-primary md:text-6xl">
-              {t("bandcamp.title")}
-            </h1>
-            <p className="mt-3 max-w-2xl text-base text-text-secondary md:text-lg">
-              {t("bandcamp.subtitle")}
-            </p>
-            <ConnectionLine
-              connected={connected}
-              loading={status.loading}
-              profileName={profileName}
-              error={status.data?.last_error}
-            />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              shape="pill"
-              disabled={!connected || busyAction !== null}
-              onClick={() =>
-                queueTask(
-                  "/api/bandcamp/me/sync",
-                  "sync",
-                  t("bandcamp.tasks.sync"),
-                )
-              }
-              className="h-11 px-5 font-black shadow-none hover:bg-accent-action/90 has-[>svg]:px-5"
-            >
-              {busyAction === "sync" ? (
-                <Loader2 className=" size-4 animate-spin" />
-              ) : (
-                <RefreshCw className=" size-4" />
-              )}
-              {t("bandcamp.actions.sync")}
-            </Button>
-            <Button
-              variant="ghost"
-              shape="pill"
-              disabled={!connected || busyAction !== null}
-              onClick={() =>
-                queueTask(
-                  "/api/bandcamp/me/radar/refresh",
-                  "radar",
-                  t("bandcamp.tasks.radar"),
-                )
-              }
-              className="h-11 border border-text-primary/12 bg-text-primary/5 px-5 font-black text-text-primary hover:bg-text-primary/10 hover:text-text-primary has-[>svg]:px-5"
-            >
-              <Radar className=" size-4" />
-              {t("bandcamp.actions.refreshRadar")}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} label={stat.labelText} />
-        ))}
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Rail
-          title={t("bandcamp.rails.radar.title")}
-          subtitle={t("bandcamp.rails.radar.subtitle")}
-        >
-          <ItemGrid
-            items={radarItems}
-            busyAction={busyAction}
-            onImport={importItem}
-            empty={t("bandcamp.empty.radar")}
-          />
-        </Rail>
-        <Rail
-          title={t("bandcamp.rails.owned.title")}
-          subtitle={t("bandcamp.rails.owned.subtitle")}
-        >
-          <ItemList
-            items={recentOwned}
-            busyAction={busyAction}
-            onImport={importItem}
-            empty={t("bandcamp.empty.owned")}
-          />
-        </Rail>
-      </section>
-
-      <Rail
-        title={t("bandcamp.rails.wishlist.title")}
-        subtitle={t("bandcamp.rails.wishlist.subtitle")}
-      >
+    <BandcampPageView
+      readState={readState}
+      connected={connected}
+      profileName={profileName}
+      connectionError={status.data?.last_error}
+      busyAction={busyAction}
+      totals={{
+        owned: collection.data?.total ?? 0,
+        wishlist: wishlist.data?.total ?? 0,
+        radar: radar.data?.total ?? 0,
+      }}
+      radar={
+        <ItemGrid
+          items={radarItems}
+          busyAction={busyAction}
+          onImport={importItem}
+          empty={t("bandcamp.empty.radar")}
+        />
+      }
+      owned={
+        <ItemList
+          items={recentOwned}
+          busyAction={busyAction}
+          onImport={importItem}
+          empty={t("bandcamp.empty.owned")}
+        />
+      }
+      wishlist={
         <ItemGrid
           items={wishlistItems}
           busyAction={busyAction}
           onImport={importItem}
           empty={t("bandcamp.empty.wishlist")}
         />
-      </Rail>
-    </div>
-  );
-}
-
-function ConnectionLine({
-  connected,
-  loading,
-  profileName,
-  error,
-}: {
-  connected: boolean;
-  loading: boolean;
-  profileName: string;
-  error?: string | null;
-}) {
-  const { t } = useTranslation();
-  if (loading && !connected) {
-    return (
-      <p className="mt-5 text-sm text-text-muted">
-        {t("bandcamp.connection.checking")}
-      </p>
-    );
-  }
-  if (!connected) {
-    return (
-      <p className="mt-5 text-sm text-state-warning-text">
-        {t("bandcamp.connection.notConnected")}
-      </p>
-    );
-  }
-  return (
-    <p className="mt-5 text-sm text-text-secondary">
-      {t("bandcamp.connection.connectedAs")}{" "}
-      <span className="font-bold text-text-primary">{profileName}</span>
-      {error ? (
-        <span className="text-state-danger-text">
-          {" · "}
-          {t("bandcamp.connection.lastError", { error })}
-        </span>
-      ) : null}
-    </p>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: LucideIcon | typeof BandcampLogo;
-}) {
-  return (
-    <div className="rounded-panel border border-text-primary/8 bg-text-primary/[0.035] p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-black uppercase tracking-overline-wide text-text-muted">
-          {label}
-        </span>
-        <Icon className=" size-4 text-accent-action" />
-      </div>
-      <div className="mt-5 text-4xl font-black text-text-primary">
-        {value.toLocaleString()}
-      </div>
-    </div>
-  );
-}
-
-function Rail({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-panel border border-text-primary/8 bg-surface-elevated/90 p-5">
-      <div className="mb-5">
-        <h2 className="text-2xl font-black text-text-primary">{title}</h2>
-        <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
-      </div>
-      {children}
-    </section>
+      }
+      onSync={() =>
+        void queueTask(
+          "/api/bandcamp/me/sync",
+          "sync",
+          t("bandcamp.tasks.sync"),
+        )
+      }
+      onRefreshRadar={() =>
+        void queueTask(
+          "/api/bandcamp/me/radar/refresh",
+          "radar",
+          t("bandcamp.tasks.radar"),
+        )
+      }
+      onRetry={refreshAll}
+    />
   );
 }
 

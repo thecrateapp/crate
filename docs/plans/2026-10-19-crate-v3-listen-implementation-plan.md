@@ -492,3 +492,69 @@ restaura su origen junto a la cola, sin autoplay. Storybook, preview aislado de 
 de artista actualizados.72Listen,101shared,10Admin,52Desktop y12browser relevantes verdes;
 tipos, lint, builds y catálogo correctos. Tres servicios activos; sigue pendiente de revisión,
 sin commit/push. Evidencia y límites en el plan de Comunidad.
+
+
+### Comunidad publicada;1BD Compartir e importaciones en revisión local
+
+Comunidad y sus enmiendas de acciones/biografía publicadas en `028da356`, origin/feat/crate_v3.
+Siguiente corte anunciado: [Compartir e importaciones](2026-10-20-crate-v3-sharing-imports.md).
+ShareSheet, Bandcamp, Upload y RemoteImport componen vistas reales con fundamentos compartidos;
+Contributions reutiliza su fila y confirmación. Se conservan autoridad nativa/API, protocolos
+de upload, permisos/FLAC, progreso confirmado, cancelación/idempotencia/SSE y export/withdraw.
+
+Diego detecta que el antiguo dropzone era cosmético y pide conservar una composición cuidada:
+Upload vuelve a ser un destino de drop visible, centrado, con logo Crate y botón compartido
+para elegir archivos; ya procesa drops, sin enviar hasta Import. El selector nativo queda
+oculto tras ese botón accesible. Texto/drops vacíos conservan la selección y durante una
+subida no se sustituye. No se convierte /upload en modal. Storybook en inglés y pequeño
+preview5186 comparten la escena de cinco pestañas; sin ampliar el mockup histórico.
+Este corte se detiene para revisión antes de un nuevo commit/push. Offline completa y1BE
+siguen después; no se certifican H2/H3 globales ni la QA nativa/canónica de la fase.
+
+Verificación del corte Compartir/importaciones:124Listen,78shared,18Admin,54Desktop y8browser
+relevantes verdes; workflow estático Desktop1verde. Cinco typechecks, lint modificado, i18n,
+catálogo y tres builds/bundle correctos; avisos existentes de chunks grandes conservados.
+Revisión fresca:1hallazgo importante, Windows Tauri interceptaba drops HTML; resuelto en una
+pasada con flags de host y regresión2RED→GREEN. No QA nativa real ni mutaciones en producción.
+Diego retira toda la sección What happens next por técnica; logo/dropzone y picker centrados
+en ambas vistas reales. HEAD/origin028da356, índice vacío, tres servicios activos; listo para
+revisión sin commit/push. Evidencia completa y límites en el plan de este corte.
+
+Enmiendas de revisión de Bandcamp y Contributions: los tiles reutilizan el EntityCard de álbum,
+con menú sobre la esquina superior izquierda de la portada y título/artista sin acciones que
+compriman su ancho. Contributions abre el álbum disponible y usa su AlbumCardMenu real y
+perezoso; conserva exportación y confirmación de retirada. Sin álbum local no ofrece enlaces
+ni reproducción rotos. Bandcamp sale del submenú y de las pestañas de Collection: queda una
+sola vista `/bandcamp`, con redirección de enlaces antiguos y acceso existente desde Settings.
+Su futura ubicación principal sigue pendiente de decisión.
+
+Storybook y preview pequeño comparten las vistas reales y acciones locales. Verificación final
+de estas enmiendas: 62 tests Listen, 54 Desktop y 11 casos de navegador verdes; tipos de
+Listen, Desktop y Storybook, lint de los 34 archivos Listen modificados, catálogo y tres builds
+correctos. Bundle inicial 203133 bytes gzip, dentro del presupuesto de 307200. Inspección real
+de Contributions y su menú sin ejecutar acciones en producción; captura guardada en
+`.artifacts/review/1bd-contributions-navigation.png`. Tres servicios activos; HEAD/origin
+`028da356`, índice vacío. Se mantiene la parada para revisión antes de commit/push.
+
+Nueva enmienda de Diego: Contributions pasa a MediaGrid/EntityCard con la misma densidad y
+composición que Albums. Reutiliza modelo, artwork gestionado, reproducción, guardado y menú de
+AlbumCard; Export/Remove contribution son opciones específicas, con confirmación explícita.
+Los álbumes aún no disponibles permiten retirar la aportación sin navegación/reproducción rotas.
+Storybook y preview pequeño comparten LibraryContributionCard y el builder real de acciones.
+Se retiran los IDs de tarea de los avisos de retirada y de la confirmación visible de Upload;
+mensajes amigables en los siete idiomas, con nombre del álbum o recuento de archivos y sin
+afirmar que el trabajo ya ha terminado. 101 tests Listen, 54 Desktop y 4 casos browser verdes;
+tipos, lint, locales, catálogo y builds correctos. Captura `1bd-contributions-grid.png`.
+Las tres instancias siguen activas; se mantiene la parada sin commit/push.
+
+Último ajuste visual de Contributions: el origen deja de ser InfoBadge y pasa a MonoLabel
+mayúscula, Upload en gris e icono Solar de12px y Bandcamp en accent con marca de12px, ambos
+decorativos. La vista real y Storybook usan el mismo componente.17 tests Listen,54 Desktop,
+tipos/lint/catálogo y los cuatro casos browser relevantes verdes (un fallo previo aislado de
+la escena de compartir pasó en su repetición focalizada, sin cambios de producto). Previews
+activos; sigue sin commit/push. Captura:1bd-contribution-source-labels.png.
+
+Diego aprueba Compartir/importaciones y todas sus enmiendas (Contributions en grid y MonoLabel
+de origen) y autoriza commit/push. Siguiente lote anunciado:1BD Offline, biblioteca sin conexión,
+gestión de descargas/almacenamiento y estados de disponibilidad. Se conservan los protocolos y
+gates de plataforma, Storybook/preview pequeño con vistas reales y parada antes del nuevo commit.

@@ -484,6 +484,7 @@
   "upload.badge": "Upload music",
   "upload.title": "Add music to your library",
   "upload.subtitle": "Upload individual tracks or zipped albums. Crate will import them into the shared library, run the usual enrichment pipeline, and add what you uploaded to your collection automatically.",
+  "upload.dropzone.chooseFiles": "Choose files",
   "upload.dropzone.title": "Drop files here or choose files",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP",
   "upload.ready.title": "Ready to import",
@@ -496,9 +497,9 @@
   "upload.next.attributed": "Your upload is attributed to you, with export and withdrawal controls in Library.",
   "upload.progress": "Uploading {done}/{total}",
   "upload.import": "Import to library",
-  "upload.status.queued": "Upload queued",
-  "upload.status.processing": "Task `{taskId}` is processing {count, plural, one {# file} other {# files}}.",
-  "upload.toasts.queued": "Upload queued. Crate is importing your music in the background.",
+  "upload.status.queued": "Upload received",
+  "upload.status.processing": "{count, plural, one {# file is being added} other {# files are being added}} to your library. You can keep browsing.",
+  "upload.toasts.queued": "Upload received. We’re adding your music to the library.",
   "upload.errors.tooLarge": "Upload is too large for a single request. Try again so Crate can split it into chunks.",
   "upload.errors.queueWithMessage": "Failed to queue upload: {message}",
   "upload.errors.queue": "Failed to queue upload",
@@ -1415,7 +1416,7 @@
   "library.contributions.withdraw.title": "Remove contribution?",
   "library.contributions.withdraw.description": "This withdraws your contribution of {album}. If no other user contributed this library copy, Crate will permanently remove the album files and database rows in a worker task.",
   "library.contributions.withdraw.confirm": "Remove contribution",
-  "library.contributions.toasts.removalQueued": "Removal queued ({taskId})",
+  "library.contributions.toasts.removalQueued": "Removing your contribution of {album}. You can keep browsing.",
   "library.contributions.toasts.removeFailed": "Failed to remove contribution",
   "actions.artist.openNamed": "Open {name}",
   "actions.artist.followNamed": "Follow {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Session cookie",
   "settings.openSubsonic.keyValue": "Generated key",
   "settings.bandcamp.countsError": "Collection totals are unavailable. Your account is still connected.",
-  "settings.scrobbling.toasts.cancelFailed": "Could not cancel the connection. Try again."
+  "settings.scrobbling.toasts.cancelFailed": "Could not cancel the connection. Try again.",
+  "album.remoteImport.downloadingUnknown": "Downloading…"
 }

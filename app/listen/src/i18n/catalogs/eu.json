@@ -476,6 +476,7 @@
   "upload.badge": "Igo musika",
   "upload.title": "Gehitu musika zure liburutegira",
   "upload.subtitle": "Igo abesti solteak edo ZIP albumak. Crate-k liburutegi partekatura inportatuko ditu, ohiko aberaste-prozesua exekutatuko du eta igotakoa automatikoki gehituko du zure bildumara.",
+  "upload.dropzone.chooseFiles": "Aukeratu fitxategiak",
   "upload.dropzone.title": "Arrastatu fitxategiak hona edo aukeratu fitxategiak",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC edo ZIP",
   "upload.ready.title": "Inportatzeko prest",
@@ -488,9 +489,9 @@
   "upload.next.attributed": "Igoera zuri egozten zaizu, Liburutegian esportatzeko eta kentzeko kontrolekin.",
   "upload.progress": "{done}/{total} igotzen",
   "upload.import": "Inportatu liburutegira",
-  "upload.status.queued": "Igoera ilaran",
-  "upload.status.processing": "`{taskId}` atazak {count, plural, one {# fitxategi} other {# fitxategi}} prozesatzen ditu.",
-  "upload.toasts.queued": "Igoera ilaran. Crate zure musika atzeko planoan inportatzen ari da.",
+  "upload.status.queued": "Igoera jasota",
+  "upload.status.processing": "Zure liburutegira {count, plural, one {fitxategi #} other {# fitxategi}} gehitzen ari gara. Nabigatzen jarrai dezakezu.",
+  "upload.toasts.queued": "Igoera jasota. Zure musika liburutegira gehitzen ari gara.",
   "upload.errors.tooLarge": "Igoera handiegia da eskaera bakarrerako. Saiatu berriro Cratek zatitan banatu dezan.",
   "upload.errors.queueWithMessage": "Ezin izan da igoera ilaran jarri: {message}",
   "upload.errors.queue": "Ezin izan da igoera ilaran jarri",
@@ -1393,7 +1394,7 @@
   "library.contributions.withdraw.title": "Ekarpena kendu?",
   "library.contributions.withdraw.description": "Honek {album} albumaren zure ekarpena kentzen du. Beste erabiltzaile batek kopia hau ekarri ez badu, Crate-k albumaren fitxategiak eta datu-baseko errenkadak behin betiko ezabatuko ditu worker ataza baten bidez.",
   "library.contributions.withdraw.confirm": "Kendu ekarpena",
-  "library.contributions.toasts.removalQueued": "Ezabaketa ilaran ({taskId})",
+  "library.contributions.toasts.removalQueued": "{album} albumari egin diozun ekarpena kentzen ari gara. Nabigatzen jarrai dezakezu.",
   "library.contributions.toasts.removeFailed": "Ezin izan da ekarpena kendu",
   "actions.artist.openNamed": "Ireki {name}",
   "actions.artist.followNamed": "Jarraitu {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Saioko cookiea",
   "settings.openSubsonic.keyValue": "Sortutako gakoa",
   "settings.bandcamp.countsError": "Bildumaren guztizkoak ez daude erabilgarri. Zure kontuak konektatuta jarraitzen du.",
-  "settings.scrobbling.toasts.cancelFailed": "Ezin izan da konexioa ezeztatu. Saiatu berriro."
+  "settings.scrobbling.toasts.cancelFailed": "Ezin izan da konexioa ezeztatu. Saiatu berriro.",
+  "album.remoteImport.downloadingUnknown": "Deskargatzen…"
 }

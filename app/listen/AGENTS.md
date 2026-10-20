@@ -212,3 +212,47 @@ Hero secondary actions use actual MonoLabel as="span" with inherited color for t
 the glyph, including the injected Follow/Add/Share/Bandcamp slots on Album/Artist/Crate. Ordinary
 Button text and primary Play/Shuffle are unchanged. HeroActionBar owns generated captions/More;
 app adapters retain callbacks/media/menu/permission authority. Apply this to future equivalents.
+
+## Sharing and imports — local1BD
+
+ShareSheetView composes AppModal/EntityRow/MediaCover with actual MonoLabel action captions.
+ShareSheet retains native/canvas/font/capability/cancellation/storage authority; busy sharing
+blocks dismissal and duplicate actions. BandcampPageView uses the actual EntityCard for tiles: upper-left artwork menu, full-width
+identity and canonical album spacing without a bordered row beneath the cover. Import/Open live
+in that menu; tapping the card opens Bandcamp through the app adapter. Collection rows reuse
+EntityRow with56px managed artwork and direct actions. Original guards/FLAC payloads and menus remain. Failed uncached reads offer retry; cached content remains usable.
+
+UploadView owns the real drop target: decorative CrateLogo, centered canonical picker Button,
+hidden native Input, grouped8px caption spacing and format hint. Dropping stages files only;
+explicit Import starts the existing multipart/chunked flow. Empty/text drops keep the queue,
+active uploads reject replacements, and confirmed bytes alone drive determinate progress.
+The page retains request/error/task authority. RemoteImportView uses caption/ProgressHairline/
+ConfirmDialog; unknown download progress is indeterminate, never a fabricated percentage.
+Contributions use the album-style EntityCard grid and specific contextual actions; withdrawal retains explicit confirmation.
+The small review/English stories import these actual views, not production adapters or copies.
+
+Diego’s Upload amendment removes the entire What happens next section; do not reintroduce
+processing/enrichment/attribution instructions into this end-user view or its stories.
+
+### Contributions and Bandcamp navigation amendment
+
+Collection now has six sections: Artists, Crates, Playlists, Albums, Liked and Contributions.
+Bandcamp is removed from both sidebar children and Collection tabs; /bandcamp is the single
+canonical view, reachable through the existing Settings connection link while its future main
+navigation placement is undecided. Old /library?tab=bandcamp and /collection/bandcamp URLs
+replace-redirect to it, preserving unrelated query/hash/state. The obsolete LibraryBandcampTab
+controller/purchases composition is removed, so it cannot diverge into a second live screen.
+
+Contributions use LibraryContributionCard: actual EntityCard in the default MediaGrid, matching
+Albums. The adapter reuses AlbumCard artwork/model/playback helpers and the lazy AlbumCardMenu;
+Export and Remove contribution are specific menu entries, with withdrawal still confirmed.
+Source metadata stays below title/artist as actual uppercase MonoLabel, without a chip or border:
+Upload uses subtle gray with a 12px Solar upload icon; Bandcamp uses accent with its 12px brand
+mark. Icons are decorative and inherit the caption color. Missing local album IDs keep navigation, playback and
+export unavailable while allowing withdrawal. The current review uses the actual card view and
+pure contribution action builder with local callbacks; it never starts real playback.
+
+Upload receipts/toasts and withdrawal notices use end-user copy without task IDs. Receipts
+show file counts; withdrawal identifies the album and does not claim the background operation
+has already completed. Failed withdrawal keeps its confirmation open with a friendly error.
+All seven catalogs cover the messages; internal task IDs remain in response types only.

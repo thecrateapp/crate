@@ -4,7 +4,6 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { LibraryBandcampHeader } from "./LibraryBandcampHeader";
 import { LibraryBandcampImported } from "./LibraryBandcampImported";
 import { LibraryContributionsTab } from "./LibraryContributionsTab";
-import { LibraryBandcampTab } from "./LibraryBandcampTab";
 import { LibraryPlaylistsTab } from "./LibraryPlaylistsTab";
 const apiState = vi.hoisted(() => ({
   error: null as Error | null,
@@ -78,7 +77,7 @@ it("uses icon actions and preserves disabled export and withdrawal identity", ()
   expect(onWithdraw).toHaveBeenCalledWith(contribution);
   expect(onExport).not.toHaveBeenCalled();
 });
-it.each([LibraryContributionsTab, LibraryBandcampTab, LibraryPlaylistsTab])(
+it.each([LibraryContributionsTab, LibraryPlaylistsTab])(
   "shows a retryable read error instead of an empty library",
   (Tab) => {
     apiState.error = new Error("Read failed");

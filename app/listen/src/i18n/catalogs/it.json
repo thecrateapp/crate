@@ -476,6 +476,7 @@
   "upload.badge": "Carica musica",
   "upload.title": "Aggiungi musica alla tua libreria",
   "upload.subtitle": "Carica brani singoli o album ZIP. Crate li importerà nella libreria condivisa, avvierà il solito arricchimento e aggiungerà automaticamente ciò che carichi alla tua collezione.",
+  "upload.dropzone.chooseFiles": "Scegli file",
   "upload.dropzone.title": "Trascina qui i file o scegli i file",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC o ZIP",
   "upload.ready.title": "Pronto per l'importazione",
@@ -488,9 +489,9 @@
   "upload.next.attributed": "Il caricamento viene attribuito a te, con controlli di esportazione e ritiro nella Libreria.",
   "upload.progress": "Caricamento {done}/{total}",
   "upload.import": "Importa nella libreria",
-  "upload.status.queued": "Caricamento in coda",
-  "upload.status.processing": "Il task `{taskId}` sta elaborando {count, plural, one {# file} other {# file}}.",
-  "upload.toasts.queued": "Caricamento in coda. Crate sta importando la tua musica in background.",
+  "upload.status.queued": "Caricamento ricevuto",
+  "upload.status.processing": "Stiamo aggiungendo {count, plural, one {# file} other {# file}} alla tua libreria. Puoi continuare a navigare.",
+  "upload.toasts.queued": "Caricamento ricevuto. Stiamo aggiungendo la tua musica alla libreria.",
   "upload.errors.tooLarge": "Il caricamento è troppo grande per una singola richiesta. Riprova così Crate può dividerlo in blocchi.",
   "upload.errors.queueWithMessage": "Impossibile accodare il caricamento: {message}",
   "upload.errors.queue": "Impossibile accodare il caricamento",
@@ -1393,7 +1394,7 @@
   "library.contributions.withdraw.title": "Rimuovere il contributo?",
   "library.contributions.withdraw.description": "Questo ritira il tuo contributo di {album}. Se nessun altro utente ha contribuito questa copia, Crate rimuoverà definitivamente i file dell'album e le righe del database tramite un'attività worker.",
   "library.contributions.withdraw.confirm": "Rimuovi contributo",
-  "library.contributions.toasts.removalQueued": "Rimozione in coda ({taskId})",
+  "library.contributions.toasts.removalQueued": "Stiamo rimuovendo il tuo contributo a {album}. Puoi continuare a navigare.",
   "library.contributions.toasts.removeFailed": "Impossibile rimuovere il contributo",
   "actions.artist.openNamed": "Apri {name}",
   "actions.artist.followNamed": "Segui {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Cookie di sessione",
   "settings.openSubsonic.keyValue": "Chiave generata",
   "settings.bandcamp.countsError": "I totali della raccolta non sono disponibili. Il tuo account è ancora collegato.",
-  "settings.scrobbling.toasts.cancelFailed": "Impossibile annullare la connessione. Riprova."
+  "settings.scrobbling.toasts.cancelFailed": "Impossibile annullare la connessione. Riprova.",
+  "album.remoteImport.downloadingUnknown": "Download in corso…"
 }

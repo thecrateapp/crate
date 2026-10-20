@@ -86,9 +86,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/MonoLabel.tsx": "7edc65bb24d82d6eff7f2282752b84072fee3ed71b0be56f672f3dbaddc9ed8e",
-        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "4761f4838b30b82659a0ee6e1e83b72ae95691d195f328a70ef8d10bfc1c34a2",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "861d05316397e445a58ece02dc18fbae56d46357046a3a915f18131a80010af0"
+        "app/shared/ui/primitives/MonoLabel.tsx": "ce043985f3e2687183f9f511e8833e3f104ba8df4cf0eeb90d8cf88859176248",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "1c28cb1dd0a869737446fddab0c99c4a7348f305680dbabe0f34de8ecd34615b",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "c7b13970dace0aca8de56f07b69571ab9444dce7fc6efeb695f68daaeb567c5f"
       },
       "category": "Data Display"
     },

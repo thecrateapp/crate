@@ -99,3 +99,8 @@ body {
 @source "../../app/listen/src/pages/UserProfileMatch.tsx";
 @source "../../app/listen/src/pages/UserProfileLibraryView.tsx";
 @source "../../app/listen/src/pages/UserProfileNetworkView.tsx";
+
+@source "../../app/listen/src/components/share/ShareSheetView.tsx";
+@source "../../app/listen/src/components/bandcamp";
+@source "../../app/listen/src/pages/BandcampPageView.tsx";
+@source "../../app/listen/src/pages/UploadView.tsx";

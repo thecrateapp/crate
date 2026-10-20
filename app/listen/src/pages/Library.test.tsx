@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { useLocation } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { RouteContent } from "@/components/layout/RouteContent";
 import type { ReactNode } from "react";
@@ -160,6 +160,52 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 describe("Library", () => {
+  it("keeps Contributions as a collection tab without a second Bandcamp tab", () => {
+    isDesktop = true;
+    renderLibrary();
+    expect(
+      screen.queryByRole("tab", { name: "Bandcamp" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Contributions" })).toBeVisible();
+  });
+  it.each([
+    ["/library?tab=bandcamp&node=peer#saved", "/bandcamp?node=peer#saved"],
+    ["/collection/bandcamp?node=peer#saved", "/bandcamp?node=peer#saved"],
+  ])(
+    "redirects the old collection destination %s to the single Bandcamp page",
+    async (route, expected) => {
+      function CurrentRoute() {
+        const location = useLocation();
+        return (
+          <output aria-label="Canonical route">
+            {location.pathname}
+            {location.search}
+            {location.hash}
+          </output>
+        );
+      }
+      renderWithListenProviders(
+        <>
+          <Routes>
+            <Route path="/library" element={<Library />} />
+            <Route path="/collection/:section" element={<Library />} />
+            <Route
+              path="/bandcamp"
+              element={<h1>Single Bandcamp destination</h1>}
+            />
+          </Routes>
+          <CurrentRoute />
+        </>,
+        { route },
+      );
+      await screen.findByRole("heading", {
+        name: "Single Bandcamp destination",
+      });
+      expect(screen.getByLabelText("Canonical route")).toHaveTextContent(
+        expected,
+      );
+    },
+  );
   it("retains keyboard tab focus after a path-section change settles in the Shell frame", async () => {
     isDesktop = true;
     function InShellFrame() {
@@ -359,7 +405,7 @@ describe("Library", () => {
     expect(screen.getByRole("option", { name: "Album" })).toBeInTheDocument();
   });
 
-  it("keeps Bandcamp and Contributions visible on desktop", () => {
+  it("keeps Contributions visible on desktop with Bandcamp outside Collection", () => {
     isDesktop = true;
 
     renderLibrary();
@@ -367,7 +413,9 @@ describe("Library", () => {
     expect(
       screen.getByRole("heading", { name: "Your Library" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Bandcamp/i })).toBeVisible();
+    expect(
+      screen.queryByRole("tab", { name: /Bandcamp/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Contributions/i })).toBeVisible();
   });
 
@@ -386,7 +434,6 @@ describe("Library", () => {
       "Playlists",
       "Albums",
       "Liked",
-      "Bandcamp",
       "Contributions",
     ]);
   });
@@ -411,9 +458,6 @@ describe("Library", () => {
     expect(
       screen.getByRole("tab", { name: "Playlists" }),
     ).toHaveAccessibleDescription("0");
-    expect(screen.getByRole("tab", { name: "Bandcamp" })).not.toHaveAttribute(
-      "aria-describedby",
-    );
     expect(
       screen.getByRole("tab", { name: "Contributions" }),
     ).not.toHaveAttribute("aria-describedby");

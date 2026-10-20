@@ -476,6 +476,7 @@
   "upload.badge": "Puja música",
   "upload.title": "Afegeix música a la teva biblioteca",
   "upload.subtitle": "Puja cançons soltes o àlbums ZIP. Crate els importarà a la biblioteca compartida, executarà l'enriquiment habitual i afegirà automàticament el que pugis a la teva col·lecció.",
+  "upload.dropzone.chooseFiles": "Tria fitxers",
   "upload.dropzone.title": "Arrossega fitxers aquí o tria fitxers",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC o ZIP",
   "upload.ready.title": "A punt per importar",
@@ -488,9 +489,9 @@
   "upload.next.attributed": "La pujada queda atribuïda a tu, amb controls d'exportació i retirada a Biblioteca.",
   "upload.progress": "Pujant {done}/{total}",
   "upload.import": "Importa a la biblioteca",
-  "upload.status.queued": "Pujada en cua",
-  "upload.status.processing": "La tasca `{taskId}` processa {count, plural, one {# fitxer} other {# fitxers}}.",
-  "upload.toasts.queued": "Pujada en cua. Crate està important la teva música en segon pla.",
+  "upload.status.queued": "Pujada rebuda",
+  "upload.status.processing": "Estem afegint {count, plural, one {# fitxer} other {# fitxers}} a la teva biblioteca. Pots continuar navegant.",
+  "upload.toasts.queued": "Pujada rebuda. Estem afegint la teva música a la biblioteca.",
   "upload.errors.tooLarge": "La pujada és massa gran per a una sola petició. Torna-ho a provar perquè Crate la pugui dividir en fragments.",
   "upload.errors.queueWithMessage": "No s’ha pogut posar la pujada a la cua: {message}",
   "upload.errors.queue": "No s’ha pogut posar la pujada a la cua",
@@ -1393,7 +1394,7 @@
   "library.contributions.withdraw.title": "Treure contribució?",
   "library.contributions.withdraw.description": "Això retira la teva contribució de {album}. Si cap altre usuari ha contribuït aquesta còpia, Crate eliminarà permanentment els fitxers de l'àlbum i les files de base de dades mitjançant una tasca worker.",
   "library.contributions.withdraw.confirm": "Treure contribució",
-  "library.contributions.toasts.removalQueued": "Eliminació en cua ({taskId})",
+  "library.contributions.toasts.removalQueued": "Estem retirant la teva aportació de {album}. Pots continuar navegant.",
   "library.contributions.toasts.removeFailed": "No s'ha pogut treure la contribució",
   "actions.artist.openNamed": "Obre {name}",
   "actions.artist.followNamed": "Segueix {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Galeta de sessió",
   "settings.openSubsonic.keyValue": "Clau generada",
   "settings.bandcamp.countsError": "Els totals de la col·lecció no estan disponibles. El teu compte continua connectat.",
-  "settings.scrobbling.toasts.cancelFailed": "No s’ha pogut cancel·lar la connexió. Torna-ho a provar."
+  "settings.scrobbling.toasts.cancelFailed": "No s’ha pogut cancel·lar la connexió. Torna-ho a provar.",
+  "album.remoteImport.downloadingUnknown": "S’està baixant…"
 }

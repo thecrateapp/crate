@@ -7,19 +7,22 @@ import {
   Loader2,
 } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import type { RemoteImportStatus } from "../../lib/remote-import-types";
 export type { RemoteImportStatus } from "../../lib/remote-import-types";
 
 function RemoteImportCompleted() {
   const { t } = useTranslation();
   return (
-    <p
+    <MonoLabel
       role="status"
-      className="inline-flex items-center gap-2 text-sm font-medium text-accent-action"
+      tone="accent"
+      className="inline-flex items-center gap-2"
     >
       <ArrowDownToLine size={CRATE_ICON_SIZE.sm} />
       {t("album.remoteImport.completed")}
-    </p>
+    </MonoLabel>
   );
 }
 
@@ -30,11 +33,11 @@ function RemoteImportApprovalStatus({
 }) {
   const { t } = useTranslation();
   return (
-    <p className="text-sm text-text-muted" role="status">
+    <MonoLabel role="status">
       {status === "approved"
         ? t("album.remoteImport.approved")
         : t("album.remoteImport.awaitingApproval")}
-    </p>
+    </MonoLabel>
   );
 }
 
@@ -46,16 +49,32 @@ function RemoteImportProgressStatus({
   progress: number | null;
 }) {
   const { t } = useTranslation();
+  const value =
+    status === "downloading" && progress !== null && Number.isFinite(progress)
+      ? Math.max(0, Math.min(100, progress))
+      : undefined;
+  const label =
+    status === "downloading"
+      ? value === undefined
+        ? t("album.remoteImport.downloadingUnknown")
+        : t("album.remoteImport.downloading", { progress: value })
+      : t(`album.remoteImport.${status}`);
   return (
-    <p
-      className="inline-flex items-center gap-2 text-sm text-text-muted"
-      role="status"
-    >
-      <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
-      {status === "downloading" && progress != null
-        ? t("album.remoteImport.downloading", { progress })
-        : t(`album.remoteImport.${status}`)}
-    </p>
+    <div role="status" className="grid min-w-0 gap-2">
+      <MonoLabel className="inline-flex items-center gap-2">
+        <Loader2
+          size={CRATE_ICON_SIZE.sm}
+          className="animate-spin"
+          aria-hidden="true"
+        />
+        {label}
+      </MonoLabel>
+      <ProgressHairline
+        label={label}
+        value={value === undefined ? undefined : value / 100}
+        valueText={label}
+      />
+    </div>
   );
 }
 
@@ -82,9 +101,9 @@ function RemoteImportTerminalStatus({
   const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
-      <span className="inline-flex items-center gap-2 text-text-muted">
+      <MonoLabel as="span" className="inline-flex items-center gap-2">
         <AlertCircle size={CRATE_ICON_SIZE.sm} /> {message}
-      </span>
+      </MonoLabel>
       <Button variant="ghost" onClick={onRetry}>
         {t("album.remoteImport.retry")}
       </Button>

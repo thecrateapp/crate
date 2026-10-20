@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1bdSharingImports: fileURLToPath(
+          new URL("review-1bd-sharing-imports.html", import.meta.url),
+        ),
         review1bdActionLabels: fileURLToPath(
           new URL("review-1bd-action-labels.html", import.meta.url),
         ),

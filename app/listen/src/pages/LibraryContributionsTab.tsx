@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
+import { MediaGrid } from "@crate/ui/domain/lists";
 import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { LibrarySection } from "@/components/library/LibrarySection";
-import { LibraryContributionRow } from "@/components/library/LibraryContributionRow";
-import { ContributionArtwork } from "@/components/library/ContributionArtwork";
+import { LibraryContributionItem } from "@/components/library/LibraryContributionItem";
 import { useApi } from "@/hooks/use-api";
 import { api, apiAssetUrl } from "@/lib/api";
-import { contributionSourceLabel } from "@/lib/contributions";
 import { openExternalUrl } from "@/lib/external-links";
 import type {
   BandcampTaskResponse,
@@ -51,22 +50,19 @@ export function LibraryContributionsTab() {
     if (!withdrawTarget) return;
     setWithdrawing(true);
     try {
-      const response = await api<BandcampTaskResponse>(
+      await api<BandcampTaskResponse>(
         `/api/me/contributions/${withdrawTarget.id}/withdraw`,
         "POST",
       );
       notify.success(
         t("library.contributions.toasts.removalQueued", {
-          taskId: response.task_id,
+          album: withdrawTarget.album_name,
         }),
       );
       setWithdrawTarget(null);
       refetchContributions();
-    } catch (error) {
-      notify.error(
-        (error as Error).message ||
-          t("library.contributions.toasts.removeFailed"),
-      );
+    } catch {
+      notify.error(t("library.contributions.toasts.removeFailed"));
     } finally {
       setWithdrawing(false);
     }
@@ -86,22 +82,16 @@ export function LibraryContributionsTab() {
           description={t("library.contributions.empty")}
         />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <MediaGrid aria-label={t("nav.collection.contributions")}>
           {contributions.map((contribution) => (
-            <LibraryContributionRow
+            <LibraryContributionItem
               key={contribution.id}
-              title={contribution.album_name}
-              artist={contribution.artist_name}
-              sourceLabel={contributionSourceLabel(contribution.source)}
-              artwork={<ContributionArtwork contribution={contribution} />}
-              exportLabel={t("common.export")}
-              withdrawLabel={t("library.contributions.withdraw.confirm")}
-              canExport={Boolean(contribution.album_id)}
+              contribution={contribution}
               onExport={() => exportContribution(contribution)}
               onWithdraw={() => setWithdrawTarget(contribution)}
             />
           ))}
-        </div>
+        </MediaGrid>
       )}
 
       <ContributionWithdrawDialog

@@ -5,13 +5,21 @@ import {
 } from "./listen-navigation-model";
 const t = (key: string) => key;
 describe("Listen navigation destinations", () => {
-  it("preserves all collection destinations and the separate desktop Bandcamp route", () => {
+  it("keeps Contributions in Collection and removes Bandcamp in desktop and mobile navigation", () => {
     const desktop = collectionNavigationItems(t, false, {
       pathname: "/library",
       search: "?tab=albums",
     });
-    expect(desktop).toHaveLength(7);
-    expect(desktop[5]!.to).toBe("/bandcamp");
+    expect(desktop).toHaveLength(6);
+    expect(desktop[5]!.to).toBe("/library?tab=contributions");
+    for (const mobile of [true, false]) {
+      expect(
+        collectionNavigationItems(t, mobile, {
+          pathname: "/bandcamp",
+          search: "",
+        }).some((item) => item.to.includes("bandcamp") || item.active),
+      ).toBe(false);
+    }
     expect(
       desktop.filter((item) => item.active).map((item) => item.to),
     ).toEqual(["/library?tab=albums"]);

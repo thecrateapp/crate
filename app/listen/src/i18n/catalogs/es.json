@@ -484,6 +484,7 @@
   "upload.badge": "Subir música",
   "upload.title": "Añade música a tu biblioteca",
   "upload.subtitle": "Sube canciones sueltas o álbumes en ZIP. Crate las importará a la biblioteca compartida, ejecutará el enriquecimiento habitual y añadirá automáticamente lo que subas a tu colección.",
+  "upload.dropzone.chooseFiles": "Elegir archivos",
   "upload.dropzone.title": "Arrastra archivos aquí o elige archivos",
   "upload.dropzone.formats": "FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC o ZIP",
   "upload.ready.title": "Listo para importar",
@@ -496,9 +497,9 @@
   "upload.next.attributed": "La subida queda atribuida a ti, con controles de exportación y retirada en Biblioteca.",
   "upload.progress": "Subiendo {done}/{total}",
   "upload.import": "Importar a la biblioteca",
-  "upload.status.queued": "Subida encolada",
-  "upload.status.processing": "La tarea `{taskId}` está procesando {count, plural, one {# archivo} other {# archivos}}.",
-  "upload.toasts.queued": "Subida encolada. Crate está importando tu música en segundo plano.",
+  "upload.status.queued": "Subida recibida",
+  "upload.status.processing": "Estamos añadiendo {count, plural, one {# archivo} other {# archivos}} a tu biblioteca. Puedes seguir navegando.",
+  "upload.toasts.queued": "Subida recibida. Estamos añadiendo tu música a la biblioteca.",
   "upload.errors.tooLarge": "La subida es demasiado grande para una sola petición. Inténtalo de nuevo para que Crate pueda dividirla en fragmentos.",
   "upload.errors.queueWithMessage": "No se pudo encolar la subida: {message}",
   "upload.errors.queue": "No se pudo encolar la subida",
@@ -1415,7 +1416,7 @@
   "library.contributions.withdraw.title": "¿Quitar contribución?",
   "library.contributions.withdraw.description": "Esto retira tu contribución de {album}. Si ningún otro usuario contribuyó esta copia, Crate eliminará permanentemente los archivos del álbum y las filas de base de datos mediante una tarea worker.",
   "library.contributions.withdraw.confirm": "Quitar contribución",
-  "library.contributions.toasts.removalQueued": "Eliminación encolada ({taskId})",
+  "library.contributions.toasts.removalQueued": "Estamos retirando tu aportación de {album}. Puedes seguir navegando.",
   "library.contributions.toasts.removeFailed": "No se pudo quitar la contribución",
   "actions.artist.openNamed": "Abrir {name}",
   "actions.artist.followNamed": "Seguir a {name}",
@@ -1966,5 +1967,6 @@
   "settings.bandcamp.cookieLabel": "Cookie de sesión",
   "settings.openSubsonic.keyValue": "Clave generada",
   "settings.bandcamp.countsError": "Los totales de la colección no están disponibles. Tu cuenta sigue conectada.",
-  "settings.scrobbling.toasts.cancelFailed": "No se ha podido cancelar la conexión. Inténtalo de nuevo."
+  "settings.scrobbling.toasts.cancelFailed": "No se ha podido cancelar la conexión. Inténtalo de nuevo.",
+  "album.remoteImport.downloadingUnknown": "Descargando…"
 }

@@ -45,6 +45,7 @@ export function MonoLabel({
           : "text-label tracking-caps",
         className,
         "transition-colors in-[:is(a[href],[role=link]):not([aria-disabled=true]):not([data-disabled]):hover]:text-accent-action-hi in-[:is(a[href],[role=link]):not([aria-disabled=true]):not([data-disabled]):focus-visible]:text-accent-action-hi",
+        "in-[button[data-slot=entity-primary]:not(:disabled):hover]:text-accent-action-hi in-[button[data-slot=entity-primary]:not(:disabled):focus-visible]:text-accent-action-hi",
         // Case belongs to the label role, not to a consumer variant.
         "uppercase",
       )}

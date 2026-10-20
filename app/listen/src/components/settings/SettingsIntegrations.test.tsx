@@ -148,6 +148,9 @@ describe("Settings integration views", () => {
       { locale: "en" },
     );
     expect(screen.getByText("Record Collector")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "View purchases" }),
+    ).toHaveAttribute("href", "/bandcamp");
     expect(screen.queryByLabelText("Session cookie")).toBeNull();
     expect(screen.getByText(/Collection 0/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Sync" }));

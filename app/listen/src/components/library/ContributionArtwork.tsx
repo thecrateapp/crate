@@ -7,8 +7,10 @@ import type { LibraryContribution } from "@/pages/library-model";
 
 export function ContributionArtwork({
   contribution,
+  layout = "row",
 }: {
   contribution: LibraryContribution;
+  layout?: "row" | "grid";
 }) {
   const src = contribution.album_id
     ? albumCoverApiUrl(
@@ -18,14 +20,14 @@ export function ContributionArtwork({
           artistName: contribution.artist_name,
           albumName: contribution.album_name,
         },
-        { size: 128 },
+        { size: layout === "grid" ? 320 : 128 },
       )
     : null;
   return (
     <MediaCover
       src={src}
       alt=""
-      className="size-14 shrink-0"
+      className={layout === "grid" ? "size-full" : "size-14 shrink-0"}
       fallback={
         contribution.source === "bandcamp" ? (
           <BandcampLogo size={CRATE_ICON_SIZE.lg} />

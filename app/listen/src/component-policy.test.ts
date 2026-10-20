@@ -11,8 +11,8 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-// 1BD Settings remaining views retire six more raw location/server/navigation controls.
-const RAW_CONTROL_BUDGET = { button: 56, input: 5, textarea: 1 };
+// 1BD sharing/imports retires the share row, upload clear button and native raw file copy.
+const RAW_CONTROL_BUDGET = { button: 54, input: 4, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":

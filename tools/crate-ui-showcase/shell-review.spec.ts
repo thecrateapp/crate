@@ -23,7 +23,13 @@ for (const host of hosts) {
     const nav = page.getByRole("complementary");
     await nav.getByRole("button", { name: "Collection", exact: true }).click();
     const links = nav.locator("li a");
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(6);
+    await expect(
+      nav.getByRole("link", { name: "Bandcamp", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      nav.getByRole("link", { name: "Contributions", exact: true }),
+    ).toBeVisible();
     const parentHeight = (await nav
       .getByRole("button", { name: "Collection", exact: true })
       .boundingBox())!.height;
@@ -126,7 +132,13 @@ for (const host of hosts) {
       exact: true,
     });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("link")).toHaveCount(7);
+    await expect(dialog.getByRole("link")).toHaveCount(6);
+    await expect(
+      dialog.getByRole("link", { name: "Bandcamp", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      dialog.getByRole("link", { name: "Contributions", exact: true }),
+    ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(collection).toBeFocused();

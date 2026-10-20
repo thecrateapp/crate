@@ -1,8 +1,7 @@
 import type { TFunction } from "i18next";
 import { Download, ExternalLink } from "@crate/ui/icons";
 
-import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
-import { action } from "@/components/actions/shared";
+import { action, type ItemActionMenuEntry } from "@crate/ui/domain/actions";
 
 export interface BandcampActionInput {
   canImport: boolean;

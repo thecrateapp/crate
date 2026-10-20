@@ -1,4 +1,3 @@
-import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import {
   Activity,
   CrateBox,
@@ -59,22 +58,15 @@ export function collectionNavigationItems(
     { section: "playlists", icon: ListMusic, key: "nav.collection.playlists" },
     { section: "albums", icon: Disc, key: "nav.collection.albums" },
     { section: "liked", icon: Heart, key: "nav.collection.likedTracks" },
-    { section: "bandcamp", icon: BandcampLogo, key: "nav.collection.bandcamp" },
     {
       section: "contributions",
       icon: Upload,
       key: "nav.collection.contributions",
     },
   ].map(({ section, icon: Icon, key }) => ({
-    to: mobile
-      ? `/collection/${section}`
-      : section === "bandcamp"
-        ? "/bandcamp"
-        : `/library?tab=${section}`,
+    to: mobile ? `/collection/${section}` : `/library?tab=${section}`,
     label: t(key),
     icon: <Icon size={CRATE_ICON_SIZE.xl} />,
-    active:
-      (inCollection && selected === section) ||
-      (section === "bandcamp" && location.pathname === "/bandcamp"),
+    active: inCollection && selected === section,
   }));
 }
