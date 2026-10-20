@@ -219,6 +219,52 @@ def test_every_derived_config_passes_profile_validation():
             assert d.config.max_input_tokens <= action.maxima.max_input_tokens
 
 
+def test_image_features_a_model_cannot_run_carry_a_profile_to_bind_them_off():
+    by_id = {d.action_id: d for d in derive_all(OLLAMA_TEXT, PROVIDER_DEFAULT)}
+
+    limits = {
+        action_id: (
+            config.timeout_seconds,
+            config.max_output_tokens,
+            config.max_input_tokens,
+            config.image_detail,
+        )
+        for action_id in IMAGE_ACTIONS
+        if (config := by_id[action_id].disabled_config) is not None
+    }
+    assert limits == {
+        "shows.extract.vision": (90, 16000, 24960, "default"),
+        "artwork.hero.analyze": (90, 4096, 36864, "default"),
+    }
+    for action_id in IMAGE_ACTIONS:
+        config = by_id[action_id].disabled_config
+        assert by_id[action_id].config is None
+        assert validate_profile(config, OLLAMA_TEXT) == config
+        with pytest.raises(AIConfigurationError) as excinfo:
+            validate_profile(config, OLLAMA_TEXT, action_id)
+        assert excinfo.value.code == "AI_ACTION_NEEDS_IMAGE"
+    assert all(
+        d.disabled_config is None for d in by_id.values() if d.config is not None
+    )
+
+    unbounded = {d.action_id: d for d in derive_all(GEMINI_25, PROVIDER_DEFAULT)}
+    for action_id in IMAGE_ACTIONS:
+        config = unbounded[action_id].disabled_config
+        assert unbounded[action_id].reason == "AI_IMAGE_BOUND_UNKNOWN"
+        assert validate_profile(config, GEMINI_25, action_id) == config
+
+    small = ModelCapabilities.model_validate(
+        OLLAMA_TEXT.model_dump() | {"context_window": 20000}
+    )
+    tight = {d.action_id: d for d in derive_all(small, PROVIDER_DEFAULT)}
+    # No room for 4096 input tokens beside 16000 output tokens.
+    assert tight["shows.extract.vision"].reason == "AI_ACTION_NEEDS_IMAGE"
+    assert tight["shows.extract.vision"].disabled_config is None
+    assert tight["artwork.hero.analyze"].disabled_config is not None
+    assert tight["shows.extract.text"].reason == "AI_CONTEXT_TOO_SMALL"
+    assert tight["shows.extract.text"].disabled_config is None
+
+
 def test_derive_action_config_matches_the_single_action_entry_from_derive_all():
     direct = derive_action_config(GEMINI_38, HIGH, "music_paths.refine")
     (via_all,) = derive_all(GEMINI_38, HIGH, ["music_paths.refine"])

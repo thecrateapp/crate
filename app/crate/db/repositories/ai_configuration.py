@@ -697,12 +697,16 @@ def activate_legacy_configuration(
     expected_review_fingerprint,
     review_fingerprint,
     *,
+    validate_binding: Callable[..., object],
     legacy_enabled: Mapping[str, bool] | None = None,
     session=None,
 ):
     """Internal-only exact legacy snapshots; editable API never accepts this config.
 
-    ``legacy_enabled`` seeds each captured binding's switch (default: on).
+    ``validate`` checks each inherited context before it is captured, and
+    ``validate_binding(connection, version, action_id, enabled=...)`` revalidates
+    every binding activation writes. ``legacy_enabled`` seeds each captured
+    binding's switch (default: on).
     """
     with optional_scope(session) as s:
         with s.begin_nested():
@@ -751,7 +755,9 @@ def activate_legacy_configuration(
                     for c in data["connections"]
                     if c["id"] == version["connection_id"]
                 )
-                validate(conn, version, change["action_id"])
+                validate_binding(
+                    conn, version, change["action_id"], enabled=change["enabled"]
+                )
             return activate_configuration(
                 changes, expected_revision, actor_id, session=s
             )

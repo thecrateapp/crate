@@ -407,6 +407,7 @@ describe("aiErrorText", () => {
     ],
     ["AI_ENDPOINT_INVALID", "This address isn't a valid model server URL."],
     ["AI_PROVIDER_UNSUPPORTED", "This provider isn't supported."],
+    ["AI_ACTION_NEEDS_IMAGE", "This feature needs a model that reads images."],
   ];
 
   it.each(cases)("maps %s", (code, expected) => {
@@ -748,8 +749,20 @@ describe("outcomeGroups", () => {
         reason: "AI_ACTION_DISABLED",
         adjustments: [],
       },
+      {
+        action_id: "f",
+        outcome: "turned_off",
+        reason: "AI_ACTION_NEEDS_IMAGE",
+        adjustments: [],
+        enabled: false,
+      },
     ];
-    expect(outcomeGroups(outcomes)).toEqual({ uses: 2, kept: 2, blocked: 1 });
+    expect(outcomeGroups(outcomes)).toEqual({
+      uses: 2,
+      kept: 2,
+      turnedOff: 1,
+      blocked: 1,
+    });
   });
 });
 
@@ -968,6 +981,16 @@ describe("assignmentSummary", () => {
         outcome("kept_current"),
       ]),
     ).toBe("m now runs 3 features. 1 kept their current model.");
+  });
+
+  it("counts the features turned off", () => {
+    expect(
+      assignmentSummary("m", [
+        outcome("applied"),
+        outcome("turned_off"),
+        outcome("turned_off"),
+      ]),
+    ).toBe("m now runs 1 feature. 2 turned off.");
   });
 
   it("omits the kept sentence and uses the singular for one feature", () => {

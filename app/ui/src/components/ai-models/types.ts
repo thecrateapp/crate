@@ -167,10 +167,16 @@ export interface Enqueued {
 }
 export interface AssignmentOutcome {
   action_id: string;
-  outcome: "applied" | "unchanged" | "kept_legacy" | "kept_current" | "blocked";
+  outcome:
+    | "applied"
+    | "unchanged"
+    | "kept_legacy"
+    | "kept_current"
+    | "turned_off"
+    | "blocked";
   reason: string | null;
   adjustments: ("reasoning" | "image_detail")[];
-  /** The feature's switch once applied; null when it can't be set up. */
+  /** The feature's switch once applied: false when turned off, null when it can't be set up. */
   enabled?: boolean | null;
 }
 export interface ModelAssignmentResult {

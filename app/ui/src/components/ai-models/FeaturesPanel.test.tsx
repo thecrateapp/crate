@@ -182,6 +182,63 @@ describe("FeaturesPanel", () => {
     );
   });
 
+  it("keeps a turned-off image feature off and explains why it can't turn on", async () => {
+    const snapshot = migratedSnapshot();
+    snapshot.bindings = snapshot.bindings.map((binding) =>
+      binding.action_id === "shows.extract.vision"
+        ? { ...binding, enabled: false }
+        : binding,
+    );
+    snapshot.default_model!.features = snapshot.default_model!.features.map(
+      (feature) =>
+        feature.action_id === "shows.extract.vision"
+          ? {
+              ...feature,
+              status: "incompatible" as const,
+              reason: "AI_ACTION_NEEDS_IMAGE",
+            }
+          : feature,
+    );
+    apiMock.mockRejectedValueOnce(
+      Object.assign(new Error('{"detail":"Action requires image input"}'), {
+        status: 422,
+        code: "AI_ACTION_NEEDS_IMAGE",
+      }),
+    );
+    const user = userEvent.setup();
+    const { refresh } = renderPanel(snapshot);
+
+    const toggle = screen.getByRole("switch", {
+      name: "Extract shows from image",
+    });
+    expect(toggle).not.toBeChecked();
+    expect(
+      within(row("Extract shows from image")).getByText(
+        "Needs a model that reads images",
+      ),
+    ).toBeVisible();
+    await user.click(toggle);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "This feature needs a model that reads images.",
+      ),
+    );
+    expect(apiMock).toHaveBeenCalledWith("/api/admin/ai/bindings", "POST", {
+      changes: [
+        expect.objectContaining({
+          action_id: "shows.extract.vision",
+          enabled: true,
+        }),
+      ],
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("switch", { name: "Extract shows from image" }),
+    ).not.toBeChecked();
+  });
+
   it("keeps routing unchanged when a binding change conflicts", async () => {
     apiMock.mockRejectedValueOnce(
       Object.assign(new Error('{"detail":"stale"}'), {

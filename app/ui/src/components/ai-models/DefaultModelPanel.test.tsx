@@ -316,6 +316,66 @@ describe("DefaultModelPanel", () => {
     expect(apiMock).toHaveBeenCalledTimes(1);
   });
 
+  it("turns off image features the model can't run and still confirms", async () => {
+    const turnedOff = [
+      outcome(
+        "shows.extract.vision",
+        "turned_off",
+        "AI_ACTION_NEEDS_IMAGE",
+        [],
+        false,
+      ),
+      outcome("shows.extract.text", "applied"),
+      outcome("genres.eq.propose", "applied"),
+      outcome("music_paths.refine", "applied", null, [], false),
+    ];
+    apiMock
+      .mockResolvedValueOnce(result(turnedOff))
+      .mockResolvedValueOnce(result(turnedOff, { dry_run: false }));
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={aiSnapshot()} refresh={vi.fn()} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const group = within(dialog).getByRole("region", {
+      name: "Will be turned off (1)",
+    });
+    expect(within(group).getByText("Extract shows from image")).toBeVisible();
+    expect(
+      within(group).getByText("Needs a model that reads images"),
+    ).toBeVisible();
+    expect(
+      within(group).getByText(
+        "You can turn them on later with a model that supports them.",
+      ),
+    ).toBeVisible();
+    expect(within(dialog).queryByText(/Can't be set up/)).toBeNull();
+    expect(
+      within(dialog).queryByText("Extract shows from image stays off."),
+    ).toBeNull();
+    expect(
+      within(dialog).getByText("Refine Music Path stays off."),
+    ).toBeVisible();
+    expect(dialog.textContent).not.toContain("AI_ACTION_NEEDS_IMAGE");
+    const confirm = within(dialog).getByRole("button", {
+      name: "Use for all features",
+    });
+    expect(confirm).toBeEnabled();
+
+    await user.click(confirm);
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Default model updated", {
+        description: "gemini-3.8-flash now runs 3 features. 1 turned off.",
+      }),
+    );
+  });
+
   it("applies directly after setup and reports kept features", async () => {
     apiMock.mockResolvedValueOnce(
       result(

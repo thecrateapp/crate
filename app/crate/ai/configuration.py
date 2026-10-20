@@ -503,8 +503,16 @@ def _require_image_admission(connection, version, action_id):
 
 
 def _validate_binding(connection, version, action_id, *, enabled=True):
+    """An enabled binding is validated for its action, image admission included.
+
+    The runtime refuses a disabled action before any model check, so a disabled
+    binding needs only a valid profile: an image feature can stay bound off to a
+    text model. Legacy snapshots stay restricted to their own action either way.
+    """
+    if not enabled and (version.get("config") or {}).get("kind") != "legacy_snapshot":
+        _validate_version(connection, version)
+        return
     _validate_legacy_or_normal(connection, version, action_id)
-    # A disabled action is refused before admission, so it may stay bound.
     if enabled:
         _require_image_admission(connection, version, action_id)
 
@@ -591,6 +599,7 @@ def activate(expected_revision, actor_id, expected_review_fingerprint):
         _validate_legacy_or_normal,
         expected_review_fingerprint,
         review_fingerprint,
+        validate_binding=_validate_binding,
         legacy_enabled={
             action_id: _legacy_enabled(action_id, context["provider"])
             for action_id, context in contexts.items()
@@ -667,6 +676,39 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
     profiles = {p["id"]: p for p in data["profiles"]}
     connections = {c["id"]: c for c in data["connections"]}
     references = Counter(b["profile_id"] for b in data["bindings"])
+
+    def model_step(action_id, binding, bound, profile_config):
+        """Step fields binding the action to this config on the chosen model, and
+        whether it is already bound to exactly that version."""
+        config = profile_config.model_dump(mode="json")
+        fingerprint = store.version_fingerprint(connection["id"], model_id, config)
+        if bound is not None and bound["fingerprint"] == fingerprint:
+            return True, {
+                "op": "keep",
+                "profile_id": bound["profile_id"],
+                "version": bound["version"],
+            }
+        target = {
+            "connection_id": connection["id"],
+            "model_id": model_id,
+            "config": config,
+        }
+        owned = _owned_profile(action_id, binding, profiles, references)
+        if owned is None:
+            return False, target | {"op": "create", "label": ACTIONS[action_id].label}
+        current = versions.get((owned["id"], owned["current_version"]))
+        if current is not None and current["fingerprint"] == fingerprint:
+            return False, {
+                "op": "reuse",
+                "profile_id": owned["id"],
+                "version": owned["current_version"],
+            }
+        return False, target | {
+            "op": "append",
+            "profile_id": owned["id"],
+            "expected_version": owned["current_version"],
+        }
+
     outcomes, steps = [], []
     for entry in derived:
         action_id = entry.action_id
@@ -689,44 +731,17 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
             "expected_binding_revision": binding["revision"] if binding else 0,
         }
         if entry.config is not None:
-            config = entry.config.model_dump(mode="json")
-            fingerprint = store.version_fingerprint(connection["id"], model_id, config)
-            target = {
-                "connection_id": connection["id"],
-                "model_id": model_id,
-                "config": config,
-            }
-            owned = _owned_profile(action_id, binding, profiles, references)
-            current = (
-                versions.get((owned["id"], owned["current_version"])) if owned else None
-            )
-            if bound is not None and bound["fingerprint"] == fingerprint:
-                outcome = "unchanged"
-                step |= {
-                    "op": "keep",
-                    "profile_id": bound["profile_id"],
-                    "version": bound["version"],
-                }
-            elif owned is None:
-                outcome = "applied"
-                step |= target | {"op": "create", "label": ACTIONS[action_id].label}
-            elif current is not None and current["fingerprint"] == fingerprint:
-                outcome = "applied"
-                step |= {
-                    "op": "reuse",
-                    "profile_id": owned["id"],
-                    "version": owned["current_version"],
-                }
-            else:
-                outcome = "applied"
-                step |= target | {
-                    "op": "append",
-                    "profile_id": owned["id"],
-                    "expected_version": owned["current_version"],
-                }
+            unchanged, fields = model_step(action_id, binding, bound, entry.config)
+            step |= fields
             steps.append(step)
             outcomes.append(
-                _outcome(action_id, outcome, None, entry.adjustments, step["enabled"])
+                _outcome(
+                    action_id,
+                    "unchanged" if unchanged else "applied",
+                    None,
+                    entry.adjustments,
+                    step["enabled"],
+                )
             )
             continue
         if active:
@@ -769,8 +784,14 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
                 outcome = "kept_legacy"
                 step |= {"op": "legacy", "legacy_context": context}
         except AIConfigurationError as error:
-            outcomes.append(_outcome(action_id, "blocked", error.code))
-            continue
+            if entry.disabled_config is None:
+                outcomes.append(_outcome(action_id, "blocked", error.code))
+                continue
+            # An image feature that can keep nothing is bound switched off to its
+            # own profile on the chosen model instead of blocking setup.
+            outcome = "turned_off"
+            step |= model_step(action_id, binding, bound, entry.disabled_config)[1]
+            step["enabled"] = False
         steps.append(step)
         outcomes.append(
             _outcome(action_id, outcome, entry.reason, enabled=step["enabled"])
@@ -782,7 +803,8 @@ def assign_model(data, actor_id, *, action_ids=None, make_default=True):
     """Use one validated model for every compatible target action in one reviewed write.
 
     Reads only the cached catalog: no provider or discovery request. Before activation
-    the same transaction activates, and incompatible actions keep their legacy snapshot.
+    the same transaction activates, and incompatible actions keep their legacy snapshot;
+    an image action that cannot keep it is turned off on the chosen model instead.
     """
     from crate.api.schemas.ai_agents import ModelAssignment
 

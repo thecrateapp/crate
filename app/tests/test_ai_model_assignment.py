@@ -7,8 +7,13 @@ import pytest
 
 from crate.ai import configuration as service
 from crate.ai.actions import ACTIONS
-from crate.ai.capabilities import model_capabilities
-from crate.ai.contracts import AIConfigurationError, ReasoningConfig
+from crate.ai.capabilities import model_capabilities, validate_profile
+from crate.ai.contracts import (
+    AIConfigurationError,
+    ModelCapabilities,
+    ProfileConfig,
+    ReasoningConfig,
+)
 from crate.ai.default_model import derive_action_config
 from crate.api.schemas.ai_agents import ModelAssignmentResult, Snapshot
 from crate.db.repositories import ai_configuration as store
@@ -38,11 +43,7 @@ def gemini_environment(
     return store.save_model_catalog(conn["id"], catalog, "ready", conn["revision"])
 
 
-def ollama_text(context=40960):
-    conn = service.create_connection(
-        {"label": "Local", "provider": "ollama", "endpoint": "http://ollama:11434"},
-        None,
-    )
+def qwen3_text(context=40960):
     metadata = {
         "capabilities": ["completion"],
         "model_info": {
@@ -50,8 +51,37 @@ def ollama_text(context=40960):
             "qwen3.context_length": context,
         },
     }
-    model = model_capabilities("ollama", "qwen3:8b", metadata).model_dump(mode="json")
+    return model_capabilities("ollama", "qwen3:8b", metadata).model_dump(mode="json")
+
+
+def ollama_text(context=40960):
+    conn = service.create_connection(
+        {"label": "Local", "provider": "ollama", "endpoint": "http://ollama:11434"},
+        None,
+    )
+    model = qwen3_text(context)
     return store.save_model_catalog(conn["id"], [model], "ready", conn["revision"])
+
+
+def ollama_environment(monkeypatch):
+    """Server settings on Ollama only, with its text-only catalog refreshed."""
+    from crate.llm import provider
+
+    monkeypatch.setattr(
+        provider,
+        "get_config",
+        lambda: {
+            "model": "ollama/qwen3:8b",
+            "provider": "ollama",
+            "ollama_url": "http://ollama:11434",
+        },
+    )
+    monkeypatch.delenv("CRATE_ENABLE_PATH_LLM_REFINEMENT", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    conn = service.ensure_environment_connection("ollama")
+    return store.save_model_catalog(
+        conn["id"], [qwen3_text()], "ready", conn["revision"]
+    )
 
 
 def assign(
@@ -347,22 +377,253 @@ def test_blocked_legacy_snapshot_rejects_without_writes(pg_db, monkeypatch):
         },
     )
     monkeypatch.setenv("GEMINI_API_KEY", "test-key-for-assignment")
-    ollama = ollama_text()
+    # 20000 tokens of context leave too little input beside 16000 output tokens,
+    # so these features have no profile on this model, not even a switched-off one.
+    ollama = ollama_text(context=20000)
+    blocked = {
+        a for a, action in ACTIONS.items() if action.maxima.max_output_tokens == 16000
+    }
+    assert "shows.extract.vision" in blocked and "shows.extract.text" in blocked
 
     preview = assign(ollama["id"], "qwen3:8b", dry_run=True)
 
     outcomes = outcomes_by_action(preview)
-    for action_id in IMAGE_ACTIONS:
+    for action_id in blocked:
         assert outcomes[action_id]["outcome"] == "blocked"
         assert outcomes[action_id]["reason"] == "AI_MODEL_UNVALIDATED"
-    for action_id in TEXT_ACTIONS:
+        assert outcomes[action_id]["enabled"] is None
+    assert outcomes["artwork.hero.analyze"]["outcome"] == "turned_off"
+    for action_id in set(TEXT_ACTIONS) - blocked:
         assert outcomes[action_id]["outcome"] == "applied"
     ModelAssignmentResult.model_validate(preview)
-    with pytest.raises(AIConfigurationError) as blocked:
+    with pytest.raises(AIConfigurationError) as setup:
         assign(ollama["id"], "qwen3:8b")
-    assert blocked.value.code == "AI_SETUP_BLOCKED"
+    assert setup.value.code == "AI_SETUP_BLOCKED"
     assert_nothing_written()
     assert [c["id"] for c in store.list_connections()] == [ollama["id"]]
+
+
+def test_text_only_first_use_turns_off_image_features_instead_of_blocking(
+    pg_db, monkeypatch
+):
+    env = ollama_environment(monkeypatch)
+    before = write_counts()
+
+    preview = assign("env:ollama", "qwen3:8b", dry_run=True)
+
+    outcomes = outcomes_by_action(preview)
+    for action_id in IMAGE_ACTIONS:
+        assert outcomes[action_id] == {
+            "action_id": action_id,
+            "outcome": "turned_off",
+            "reason": "AI_ACTION_NEEDS_IMAGE",
+            "adjustments": [],
+            "enabled": False,
+        }
+    assert {outcomes[a]["outcome"] for a in TEXT_ACTIONS} == {"applied"}
+    ModelAssignmentResult.model_validate(preview)
+    assert write_counts() == before
+
+    result = assign("env:ollama", "qwen3:8b")
+
+    assert result["activation"] is True
+    assert result["outcomes"] == preview["outcomes"]
+    assert store.configuration_state()["active"] is True
+    labels = {p["id"]: p["label"] for p in store.list_profiles()}
+    model = ModelCapabilities.model_validate(env["model_catalog"][0])
+    for action_id in IMAGE_ACTIONS:
+        binding = store.get_binding(action_id)
+        assert binding["enabled"] is False
+        assert labels[binding["profile_id"]] == ACTIONS[action_id].label
+        version = bound_version(action_id)
+        assert (version["connection_id"], version["model_id"]) == (
+            env["id"],
+            "qwen3:8b",
+        )
+        config = ProfileConfig.model_validate(version["config"])
+        assert validate_profile(config, model) == config
+        maxima = ACTIONS[action_id].maxima
+        assert config.timeout_seconds <= maxima.timeout_seconds
+        assert config.max_output_tokens <= maxima.max_output_tokens
+        assert config.max_input_tokens + config.max_output_tokens <= 40960
+        with pytest.raises(AIConfigurationError) as disabled:
+            service.resolve_action(action_id)
+        assert disabled.value.code == "AI_ACTION_DISABLED"
+    for action_id in TEXT_ACTIONS:
+        version = bound_version(action_id)
+        assert (version["connection_id"], version["model_id"]) == (
+            env["id"],
+            "qwen3:8b",
+        )
+
+    settled = write_counts()
+    again = outcomes_by_action(assign("env:ollama", "qwen3:8b"))
+    assert {again[a]["outcome"] for a in IMAGE_ACTIONS} == {"kept_current"}
+    assert {again[a]["enabled"] for a in IMAGE_ACTIONS} == {False}
+    assert {again[a]["outcome"] for a in TEXT_ACTIONS} == {"unchanged"}
+    assert write_counts() == settled
+
+
+def test_turned_off_image_feature_cannot_be_enabled_without_an_image_model(
+    pg_db, monkeypatch
+):
+    from crate.api import ai_agents as api
+    from fastapi import HTTPException
+
+    ollama_environment(monkeypatch)
+    assign("env:ollama", "qwen3:8b")
+    vision = store.get_binding("shows.extract.vision")
+    change = {
+        "action_id": "shows.extract.vision",
+        "profile_id": vision["profile_id"],
+        "profile_version": vision["profile_version"],
+        "enabled": True,
+        "expected_revision": vision["revision"],
+    }
+    before = write_counts()
+
+    with pytest.raises(HTTPException) as rejected:
+        api._invoke(service.apply_bindings, [change], None)
+
+    assert rejected.value.status_code == 422
+    assert rejected.value.headers["X-Crate-Error"] == "AI_ACTION_NEEDS_IMAGE"
+    assert write_counts() == before
+
+    gemini = service.create_connection({"label": "Gemini", "provider": "gemini"}, None)
+    gemini = store.save_model_catalog(
+        gemini["id"],
+        [model_capabilities("gemini", "gemini-3.8-flash").model_dump(mode="json")],
+        "ready",
+        gemini["revision"],
+    )
+    reader = service.create_profile(
+        {
+            "label": "Poster reader",
+            "connection_id": gemini["id"],
+            "model_id": "gemini-3.8-flash",
+            "config": {},
+        },
+        None,
+    )
+
+    (enabled,) = service.apply_bindings(
+        [change | {"profile_id": reader["id"], "profile_version": 1}], None
+    )
+
+    assert enabled["enabled"] is True
+    assert (enabled["profile_id"], enabled["profile_version"]) == (reader["id"], 1)
+
+
+def test_disabled_bindings_are_validated_at_profile_level(pg_db):
+    ollama = ollama_text()
+    # Valid for the model, but over Propose genre EQ's 45 s and without image input.
+    slow_text = service.create_profile(
+        {
+            "label": "Slow text",
+            "connection_id": ollama["id"],
+            "model_id": "qwen3:8b",
+            "config": {"timeout_seconds": 90},
+        },
+        None,
+    )
+    off = {
+        action_id: {
+            "action_id": action_id,
+            "profile_id": slow_text["id"],
+            "profile_version": 1,
+            "enabled": False,
+            "expected_revision": 0,
+        }
+        for action_id in ("shows.extract.vision", "genres.eq.propose")
+    }
+
+    service.apply_bindings(list(off.values()), None)
+
+    assert {b["action_id"]: b["enabled"] for b in store.list_bindings()} == {
+        "shows.extract.vision": False,
+        "genres.eq.propose": False,
+    }
+    for action_id, code in (
+        ("shows.extract.vision", "AI_ACTION_NEEDS_IMAGE"),
+        ("genres.eq.propose", "AI_PROFILE_INCOMPATIBLE"),
+    ):
+        revision = store.get_binding(action_id)["revision"]
+        with pytest.raises(AIConfigurationError) as error:
+            service.apply_bindings(
+                [off[action_id] | {"enabled": True, "expected_revision": revision}],
+                None,
+            )
+        assert error.value.code == code
+        assert store.get_binding(action_id)["revision"] == revision
+
+    store.update_connection(ollama["id"], {"enabled": False}, ollama["revision"], None)
+    revision = store.get_binding("genres.eq.propose")["revision"]
+    with pytest.raises(AIConfigurationError) as unavailable:
+        service.apply_bindings(
+            [off["genres.eq.propose"] | {"expected_revision": revision}], None
+        )
+    assert unavailable.value.code == "AI_CONNECTION_UNAVAILABLE"
+
+
+def test_a_disabled_binding_keeps_a_legacy_snapshot_to_its_own_feature(
+    pg_db, monkeypatch
+):
+    gemini_environment(monkeypatch)
+    activate_legacy()
+    vision = store.get_binding("shows.extract.vision")
+    eq = store.get_binding("genres.eq.propose")
+
+    with pytest.raises(AIConfigurationError) as error:
+        service.apply_bindings(
+            [
+                {
+                    "action_id": "genres.eq.propose",
+                    "profile_id": vision["profile_id"],
+                    "profile_version": vision["profile_version"],
+                    "enabled": False,
+                    "expected_revision": eq["revision"],
+                }
+            ],
+            None,
+        )
+
+    assert error.value.code == "AI_PROFILE_INCOMPATIBLE"
+    assert store.get_binding("genres.eq.propose") == eq
+
+
+def test_legacy_activation_keeps_an_image_feature_off_on_a_text_model(
+    pg_db, monkeypatch
+):
+    gemini_environment(monkeypatch)
+    ollama = ollama_text()
+    text = service.create_profile(
+        {
+            "label": "Text",
+            "connection_id": ollama["id"],
+            "model_id": "qwen3:8b",
+            "config": {},
+        },
+        None,
+    )
+    service.apply_bindings(
+        [
+            {
+                "action_id": "shows.extract.vision",
+                "profile_id": text["id"],
+                "profile_version": 1,
+                "enabled": False,
+                "expected_revision": 0,
+            }
+        ],
+        None,
+    )
+
+    activate_legacy()
+
+    assert store.configuration_state()["active"] is True
+    vision = store.get_binding("shows.extract.vision")
+    assert (vision["profile_id"], vision["enabled"]) == (text["id"], False)
+    assert bound_config("artwork.hero.analyze")["kind"] == "legacy_snapshot"
 
 
 def test_after_activation_incompatible_features_keep_their_binding(pg_db, monkeypatch):
@@ -774,7 +1035,7 @@ def test_pre_activation_bound_incompatible_feature_keeps_a_valid_binding(
     assert store.configuration_state()["active"] is True
 
 
-def test_pre_activation_bound_incompatible_feature_blocks_an_invalid_binding(
+def test_pre_activation_bound_incompatible_feature_turns_off_an_invalid_binding(
     pg_db, monkeypatch
 ):
     gemini_environment(monkeypatch)
@@ -801,21 +1062,34 @@ def test_pre_activation_bound_incompatible_feature_blocks_an_invalid_binding(
         operator["id"], {"enabled": False}, operator["revision"], None
     )
     ollama = ollama_text()
-    before = write_counts()
+    before = store.get_binding("shows.extract.vision")
 
     preview = assign(ollama["id"], "qwen3:8b", dry_run=True)
 
     outcomes = outcomes_by_action(preview)
-    assert outcomes["shows.extract.vision"]["outcome"] == "blocked"
-    assert outcomes["shows.extract.vision"]["reason"] == "AI_CONNECTION_UNAVAILABLE"
+    assert outcomes["shows.extract.vision"]["outcome"] == "turned_off"
+    assert outcomes["shows.extract.vision"]["reason"] == "AI_ACTION_NEEDS_IMAGE"
+    assert outcomes["shows.extract.vision"]["enabled"] is False
     assert outcomes["artwork.hero.analyze"]["outcome"] == "kept_legacy"
-    with pytest.raises(AIConfigurationError) as blocked:
-        assign(ollama["id"], "qwen3:8b")
-    assert blocked.value.code == "AI_SETUP_BLOCKED"
-    assert write_counts() == before
+
+    result = assign(ollama["id"], "qwen3:8b")
+
+    assert result["activation"] is True
+    after = store.get_binding("shows.extract.vision")
+    assert after["enabled"] is False
+    assert after["revision"] == before["revision"] + 1
+    assert after["profile_id"] != vision["id"]
+    profiles = {p["id"]: p for p in store.list_profiles()}
+    assert (
+        profiles[after["profile_id"]]["label"] == ACTIONS["shows.extract.vision"].label
+    )
+    assert bound_version("shows.extract.vision")["model_id"] == "qwen3:8b"
+    assert profiles[vision["id"]]["current_version"] == 1
 
 
-def test_unsupported_legacy_provider_blocks_unbound_image_features(pg_db, monkeypatch):
+def test_unsupported_legacy_provider_turns_off_unbound_image_features(
+    pg_db, monkeypatch
+):
     from crate.llm import provider
 
     monkeypatch.setattr(
@@ -833,13 +1107,17 @@ def test_unsupported_legacy_provider_blocks_unbound_image_features(pg_db, monkey
 
     outcomes = outcomes_by_action(preview)
     for action_id in IMAGE_ACTIONS:
-        assert outcomes[action_id]["outcome"] == "blocked"
-        assert outcomes[action_id]["reason"] == "AI_PROVIDER_UNSUPPORTED"
+        assert outcomes[action_id]["outcome"] == "turned_off"
+        assert outcomes[action_id]["reason"] == "AI_ACTION_NEEDS_IMAGE"
     assert {outcomes[a]["outcome"] for a in TEXT_ACTIONS} == {"applied"}
-    with pytest.raises(AIConfigurationError) as blocked:
-        assign(ollama["id"], "qwen3:8b")
-    assert blocked.value.code == "AI_SETUP_BLOCKED"
-    assert_nothing_written()
+
+    result = assign(ollama["id"], "qwen3:8b")
+
+    assert result["activation"] is True
+    for action_id in IMAGE_ACTIONS:
+        assert store.get_binding(action_id)["enabled"] is False
+        assert bound_version(action_id)["connection_id"] == ollama["id"]
+    assert [c["id"] for c in store.list_connections()] == [ollama["id"]]
 
 
 def test_apply_model_assignment_rejects_an_unknown_op_without_writes(pg_db):

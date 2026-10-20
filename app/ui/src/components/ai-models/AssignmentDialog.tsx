@@ -37,7 +37,15 @@ interface GroupItem {
   note: string | null;
 }
 
-function OutcomeGroup({ title, items }: { title: string; items: GroupItem[] }) {
+function OutcomeGroup({
+  title,
+  items,
+  hint,
+}: {
+  title: string;
+  items: GroupItem[];
+  hint?: string;
+}) {
   const headingId = useId();
   if (items.length === 0) return null;
   return (
@@ -55,6 +63,7 @@ function OutcomeGroup({ title, items }: { title: string; items: GroupItem[] }) {
           </li>
         ))}
       </ul>
+      {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
     </section>
   );
 }
@@ -105,7 +114,10 @@ export function AssignmentDialog({
       }));
   const reason = (outcome: AssignmentOutcome) =>
     outcome.reason ? reasonText(outcome.reason) : null;
-  const staysOff = outcomes.filter((outcome) => outcome.enabled === false);
+  // Turned-off features have their own group; these keep an existing switch off.
+  const staysOff = outcomes.filter(
+    (outcome) => outcome.enabled === false && outcome.outcome !== "turned_off",
+  );
 
   return (
     <Dialog
@@ -150,6 +162,11 @@ export function AssignmentDialog({
           <OutcomeGroup
             title={`Keep their current model (${groups.kept})`}
             items={itemsFor(["kept_legacy", "kept_current"], reason)}
+          />
+          <OutcomeGroup
+            title={`Will be turned off (${groups.turnedOff})`}
+            items={itemsFor(["turned_off"], reason)}
+            hint="You can turn them on later with a model that supports them."
           />
           <OutcomeGroup
             title={`Can't be set up (${groups.blocked})`}

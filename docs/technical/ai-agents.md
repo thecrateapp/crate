@@ -63,7 +63,8 @@ establish live readiness or a known version.
    Its first use computes every action's derived limits and activates the whole
    configuration in one reviewed transaction; an action whose derived limits are
    incompatible with that model keeps its existing binding, or its inherited legacy
-   snapshot, instead of blocking the other ten.
+   snapshot, instead of blocking the other ten. An image feature that can keep
+   neither is turned off, and the review lists it with the reason.
 4. On Features, give one feature its own model when it should diverge from the
    default. This creates or reuses a profile version scoped to that single feature
    and leaves every other feature's binding untouched.
@@ -142,9 +143,21 @@ budget outside the model's thinking-budget range is rejected
 allowance and falls back to the provider default when that leaves it below the
 model's minimum. An action without a derivable profile keeps its
 current binding when the configuration is already active, or its validated legacy
-snapshot otherwise; only when neither can be kept does the whole assignment fail
-closed with `AI_SETUP_BLOCKED`, and activation itself stays all-or-nothing across
-the other ten actions. Activating keeps each inherited on/off state: Music Paths
+snapshot otherwise. Before activation, an image action that can keep neither, and
+fails only the image checks, is turned off instead of blocking setup: its outcome is
+`turned_off`, with the model's reason (for example `AI_ACTION_NEEDS_IMAGE`) and
+`enabled: false`, and it is bound switched off to its own profile on the chosen
+model, derived with the same limits but validated against the model alone. A
+disabled binding is validated at profile level only (enabled connection, validated
+model, native options); an enabled one is always validated for its action, image
+input and image token bound included, so turning that feature on through
+`/bindings` or the Features switch is rejected with the action's code until it is
+given a model that reads images. The legacy activation path applies the same rule.
+Only an action left with no such fallback, such as one without enough context on
+the chosen model, still fails the whole assignment closed with `AI_SETUP_BLOCKED`,
+and activation itself stays all-or-nothing across the eleven actions. After
+activation nothing is turned off: incompatible features keep their current binding
+(`kept_current`). Activating keeps each inherited on/off state: Music Paths
 refinement stays off when the Settings switch is off, or when it runs on Ollama
 without the explicit opt-in (`CRATE_ENABLE_PATH_LLM_REFINEMENT=1`, an
 `ollama/` `LLM_PROVIDER` or a stored model setting). The snapshot reports this as
@@ -164,18 +177,18 @@ is a compare-and-swap keyed on actually differing from the current value. A stal
 `expected_revision` or `expected_review_fingerprint`, caught either in the pre-check
 or under the row lock, is rejected without any write.
 
-| Code                        | Status | When                                                                                |
-| --------------------------- | -----: | ----------------------------------------------------------------------------------- |
-| `AI_CONFIGURATION_CONFLICT` |    409 | the revision or review fingerprint differs, in the pre-check or under the lock      |
-| `AI_CONNECTION_UNKNOWN`     |    404 | the UUID connection does not exist                                                  |
-| `AI_ACTION_UNKNOWN`         |    404 | an unknown action on the single-feature route                                       |
-| `AI_CONNECTION_UNAVAILABLE` |    422 | the connection is disabled                                                          |
-| `AI_CREDENTIAL_REQUIRED`    |    422 | a cloud connection has no environment key or stored secret                          |
-| `AI_MODEL_UNVALIDATED`      |    422 | the model is absent or pending, or an environment provider was never refreshed      |
-| `AI_PROFILE_INCOMPATIBLE`   |    422 | the requested reasoning is not native to the model                                  |
-| `AI_MODEL_INCOMPATIBLE`     |    422 | the model can run none of the target actions                                        |
-| `AI_SETUP_BLOCKED`          |    422 | before activation, an action can keep neither the new model nor its legacy snapshot |
-| `AI_CONFIGURATION_INVALID`  |    422 | a single-feature assignment is attempted before activation                          |
+| Code                        | Status | When                                                                                                                |
+| --------------------------- | -----: | ------------------------------------------------------------------------------------------------------------------- |
+| `AI_CONFIGURATION_CONFLICT` |    409 | the revision or review fingerprint differs, in the pre-check or under the lock                                      |
+| `AI_CONNECTION_UNKNOWN`     |    404 | the UUID connection does not exist                                                                                  |
+| `AI_ACTION_UNKNOWN`         |    404 | an unknown action on the single-feature route                                                                       |
+| `AI_CONNECTION_UNAVAILABLE` |    422 | the connection is disabled                                                                                          |
+| `AI_CREDENTIAL_REQUIRED`    |    422 | a cloud connection has no environment key or stored secret                                                          |
+| `AI_MODEL_UNVALIDATED`      |    422 | the model is absent or pending, or an environment provider was never refreshed                                      |
+| `AI_PROFILE_INCOMPATIBLE`   |    422 | the requested reasoning is not native to the model                                                                  |
+| `AI_MODEL_INCOMPATIBLE`     |    422 | the model can run none of the target actions                                                                        |
+| `AI_SETUP_BLOCKED`          |    422 | before activation, an action can keep neither the new model nor its legacy snapshot, nor be turned off on the model |
+| `AI_CONFIGURATION_INVALID`  |    422 | a single-feature assignment is attempted before activation                                                          |
 
 After activation, connection admission limits apply. Legacy snapshots remain scoped
 to their original action and cannot be edited or reused as arbitrary profiles.
@@ -210,7 +223,8 @@ Profiles may lower these maxima; they cannot raise them. Input profiles are boun
 by the model context and 131072 tokens. Vision admission requires a conservative
 image bound or a sufficient complete model-context reservation; unknown image bounds
 fail closed. Binding an enabled image action to such a profile is rejected up front
-with `AI_IMAGE_BOUND_UNKNOWN` (422), and catalog models and snapshot profile versions
+with `AI_IMAGE_BOUND_UNKNOWN` (422), or with `AI_ACTION_NEEDS_IMAGE` (422) when its
+model does not read images, and catalog models and snapshot profile versions
 report `image_token_bound` so the UI offers only admissible models and profiles. Show image composition remains capped at 20 megapixels, 200 proposals
 and 50 selected shows. Each assisted extraction makes one model call. Local OCR and
 manual entry stay available independently, and extraction never publishes a show.

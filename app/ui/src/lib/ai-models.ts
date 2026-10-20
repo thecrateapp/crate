@@ -304,7 +304,9 @@ export function assignmentSummary(
     groups.kept > 0
       ? ` ${formatCount(groups.kept)} kept their current model.`
       : "";
-  return `${modelId} now runs ${featureCount(groups.uses)}.${kept}`;
+  const turnedOff =
+    groups.turnedOff > 0 ? ` ${formatCount(groups.turnedOff)} turned off.` : "";
+  return `${modelId} now runs ${featureCount(groups.uses)}.${kept}${turnedOff}`;
 }
 
 export interface ReasoningPreset {
@@ -420,6 +422,7 @@ const AI_ERROR_TEXT: Record<string, string> = {
   AI_PROVIDER_UNSUPPORTED: "This provider isn't supported.",
   AI_IMAGE_BOUND_UNKNOWN:
     "This model's image limits are unknown, so it can't run image features.",
+  AI_ACTION_NEEDS_IMAGE: "This feature needs a model that reads images.",
 };
 
 const DEFAULT_AI_ERROR_TEXT =
@@ -762,11 +765,12 @@ export function formatCount(n: number): string {
 export interface OutcomeGroups {
   uses: number;
   kept: number;
+  turnedOff: number;
   blocked: number;
 }
 
 export function outcomeGroups(outcomes: AssignmentOutcome[]): OutcomeGroups {
-  const groups: OutcomeGroups = { uses: 0, kept: 0, blocked: 0 };
+  const groups: OutcomeGroups = { uses: 0, kept: 0, turnedOff: 0, blocked: 0 };
   for (const outcome of outcomes) {
     if (outcome.outcome === "applied" || outcome.outcome === "unchanged") {
       groups.uses += 1;
@@ -775,6 +779,8 @@ export function outcomeGroups(outcomes: AssignmentOutcome[]): OutcomeGroups {
       outcome.outcome === "kept_current"
     ) {
       groups.kept += 1;
+    } else if (outcome.outcome === "turned_off") {
+      groups.turnedOff += 1;
     } else if (outcome.outcome === "blocked") {
       groups.blocked += 1;
     }

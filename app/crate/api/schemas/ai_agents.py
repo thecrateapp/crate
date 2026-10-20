@@ -244,12 +244,15 @@ class ModelAssignment(FeatureModelAssignment):
 
 class AssignmentOutcome(ClosedModel):
     action_id: ID
-    outcome: Literal["applied", "unchanged", "kept_legacy", "kept_current", "blocked"]
+    outcome: Literal[
+        "applied", "unchanged", "kept_legacy", "kept_current", "turned_off", "blocked"
+    ]
     reason: Code | None
     adjustments: list[Literal["reasoning", "image_detail"]] = Field(
         default_factory=list, max_length=2
     )
-    enabled: bool | None = None  # the feature's switch after applying; None if blocked
+    # The feature's switch after applying: False when turned off, None if blocked.
+    enabled: bool | None = None
 
 
 class ModelAssignmentResult(ClosedModel):

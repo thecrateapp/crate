@@ -146,8 +146,10 @@ def test_deepseek_uses_real_metadata_without_friendly_name_inference():
     text_only = model_capabilities(
         "deepseek", "deepseek-flash", deepseek_metadata(input_modalities=["text"])
     )
-    with pytest.raises(AIConfigurationError):
+    with pytest.raises(AIConfigurationError) as needs_image:
         validate_profile(ProfileConfig(), text_only, "shows.extract.vision")
+    assert needs_image.value.code == "AI_ACTION_NEEDS_IMAGE"
+    assert validate_profile(ProfileConfig(), text_only) == ProfileConfig()
     unknown = model_capabilities("gemini", "gemini-99-vision-ultra")
     assert not unknown.validated and unknown.input_modalities == []
     with pytest.raises(AIConfigurationError):

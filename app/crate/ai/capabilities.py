@@ -242,7 +242,9 @@ def validate_profile(
     if action_id is not None:
         action = get_action(action_id)
         if action.input == "image" and "image" not in model.input_modalities:
-            reject("Action requires image input")
+            raise AIConfigurationError(
+                "AI_ACTION_NEEDS_IMAGE", "Action requires image input"
+            )
         if (
             config.timeout_seconds > action.maxima.timeout_seconds
             or config.max_output_tokens > action.maxima.max_output_tokens

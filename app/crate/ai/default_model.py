@@ -3,7 +3,8 @@
 Pure derivation: no database access. A single model (plus a requested reasoning
 configuration) is projected onto every registered action, producing either a
 validated :class:`~crate.ai.contracts.ProfileConfig` or a closed incompatibility
-reason per action.
+reason per action. An image action that fails only the image checks also carries
+its limits validated against the model alone, to bind it switched off.
 """
 
 from collections.abc import Iterable
@@ -30,6 +31,9 @@ class DerivedConfig:
     config: ProfileConfig | None
     reason: str | None = None
     adjustments: tuple[Literal["reasoning", "image_detail"], ...] = ()
+    # Only when the image checks alone reject the model: the same derived limits,
+    # validated without the action, so first use can bind the action switched off.
+    disabled_config: ProfileConfig | None = None
 
 
 def require_supported_reasoning(
@@ -89,18 +93,36 @@ def _resolve_reasoning(
     return resolved, resolved != reasoning
 
 
+def _image_reason(model: ModelCapabilities, action_id: str) -> str | None:
+    if get_action(action_id).input != "image":
+        return None
+    if "image" not in model.input_modalities:
+        return "AI_ACTION_NEEDS_IMAGE"
+    if image_token_bound(model) is None:
+        return "AI_IMAGE_BOUND_UNKNOWN"
+    return None
+
+
 def derive_action_config(
     model: ModelCapabilities, reasoning: ReasoningConfig, action_id: str
 ) -> DerivedConfig:
+    reason = _image_reason(model, action_id)
+    if reason is not None:
+        base = _derive_limits(model, reasoning, action_id, for_action=False)
+        return DerivedConfig(action_id, None, reason, disabled_config=base.config)
+    return _derive_limits(model, reasoning, action_id, for_action=True)
+
+
+def _derive_limits(
+    model: ModelCapabilities,
+    reasoning: ReasoningConfig,
+    action_id: str,
+    *,
+    for_action: bool,
+) -> DerivedConfig:
+    """Clamp the action's maxima to the model; validate for the action or the model only."""
     action = get_action(action_id)
     is_image_action = action.input == "image"
-
-    if is_image_action:
-        if "image" not in model.input_modalities:
-            return DerivedConfig(action_id, None, "AI_ACTION_NEEDS_IMAGE")
-        if image_token_bound(model) is None:
-            return DerivedConfig(action_id, None, "AI_IMAGE_BOUND_UNKNOWN")
-
     timeout = action.maxima.timeout_seconds
 
     output = action.maxima.max_output_tokens
@@ -136,7 +158,7 @@ def derive_action_config(
         max_input_tokens=input_tokens,
     )
     try:
-        validate_profile(config, model, action_id)
+        validate_profile(config, model, action_id if for_action else None)
     except AIConfigurationError as error:
         return DerivedConfig(action_id, None, error.code)
     return DerivedConfig(action_id, config, None, tuple(adjustments))
