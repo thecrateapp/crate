@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -16,15 +16,14 @@ import {
   emptyConsolidationDraft,
 } from "./ShowConsolidationEditor";
 import {
+  UNCERTAIN_TEXT,
   issueText,
   mergePlanView,
+  showLinkPath,
   type MergeShowView,
 } from "./show-import-presentation";
-import type { ShowPlan } from "./show-import-types";
-import { useShowPlan } from "./use-show-plan";
-
-const UNCERTAIN_TEXT =
-  "We lost contact before this was confirmed. Retrying continues the same request.";
+import type { ShowConsolidationPlan } from "./show-import-types";
+import { useResetAfterClose, useShowPlan } from "./use-show-plan";
 
 function ShowSummary({ show }: { show: MergeShowView }) {
   return (
@@ -36,14 +35,12 @@ function ShowSummary({ show }: { show: MergeShowView }) {
   );
 }
 
-function MergeReview({ plan }: { plan: ShowPlan }) {
+function MergeReview({ plan }: { plan: ShowConsolidationPlan }) {
   const keepId = useId();
   const mergeId = useId();
   const view = mergePlanView(plan);
   const change = plan.changes.find((item) => item.item_id === "consolidation");
-  const revisions =
-    (change?.after as { revisions?: Record<string, number> } | undefined)
-      ?.revisions ?? {};
+  const revisions = change?.after.revisions ?? {};
   return (
     <section
       aria-label="Merge review"
@@ -110,14 +107,27 @@ export function MergeShowsSheet({
   open,
   onOpenChange,
   onMerged,
+  initialIds = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMerged: () => void;
+  /**
+   * Shows to load as soon as the panel opens, e.g. a show and its look-alikes
+   * from Upcoming. A new array starts a new merge; the same array reopens the
+   * merge as it was left.
+   */
+  initialIds?: readonly number[] | null;
 }) {
   const [selection, setSelection] = useState(emptyConsolidationDraft);
+  // The prefill already taken, so reopening the panel keeps the merge as it
+  // was left instead of loading the shows again.
+  const [usedPrefill, setUsedPrefill] = useState<readonly number[] | null>(
+    null,
+  );
   const flow = useShowPlan({
     open,
+    approvalAction: "merge",
     onApplied: () => {
       toast.success("Shows merged");
       onMerged();
@@ -130,18 +140,34 @@ export function MergeShowsSheet({
     setSelection(emptyConsolidationDraft());
   }
 
-  // However the panel closes after a merge, the next opening starts fresh.
-  const closed = useEffectEvent(() => {
-    if (flow.phase === "saved") reset();
-  });
+  useResetAfterClose(open, flow.phase === "saved", reset);
+  // Opened over a pending review or merge, the prefill is dropped: the
+  // pending request is never replaced.
   useEffect(() => {
-    if (!open) closed();
+    if (open && initialIds && flow.locked) setUsedPrefill(initialIds);
   }, [open]);
 
+  // A pending review or merge is never replaced by a prefill.
+  const prefill =
+    open && initialIds && initialIds !== usedPrefill && !flow.locked
+      ? initialIds
+      : null;
   const kept = flow.outcomes.find(
     (outcome) => outcome.item_id === "consolidation",
   );
   const saved = flow.phase === "saved";
+  const plan = flow.plan?.kind === "consolidation" ? flow.plan : null;
+  const status = saved
+    ? "Shows merged."
+    : flow.busy
+      ? flow.phase === "preparing"
+        ? "Checking the merge…"
+        : "Merging…"
+      : flow.phase === "uncertain"
+        ? UNCERTAIN_TEXT
+        : flow.changed
+          ? "The selection changed. Review again before merging."
+          : "";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -155,65 +181,53 @@ export function MergeShowsSheet({
         </SheetHeader>
         <div className="space-y-5 px-4 pb-4">
           {saved ? (
-            <div role="status" className="space-y-3 text-sm">
-              <p className="font-medium">Shows merged.</p>
-              <div className="flex flex-wrap items-center gap-3">
-                {kept?.show_id ? (
-                  <a
-                    href={`/shows?show_id=${kept.show_id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-foreground underline underline-offset-2"
-                  >
-                    Open the kept show
-                  </a>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={reset}
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {kept?.show_id ? (
+                <a
+                  href={showLinkPath(kept.show_id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground underline underline-offset-2"
                 >
-                  Merge more
-                </Button>
-              </div>
+                  Open the kept show
+                </a>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" onClick={reset}>
+                Merge more
+              </Button>
             </div>
           ) : (
             <>
               <ShowConsolidationEditor
                 value={selection}
                 disabled={flow.locked}
+                initialIds={prefill}
+                onPrefilled={() => setUsedPrefill(initialIds)}
                 onValueChange={(next) => {
                   setSelection(next);
                   flow.invalidate();
                 }}
                 onReview={(consolidation) => flow.prepare({ consolidation })}
               />
-              {flow.plan ? <MergeReview plan={flow.plan} /> : null}
-              {flow.changed && !flow.busy ? (
-                <p role="status" className="text-sm">
-                  The selection changed. Review again before merging.
-                </p>
-              ) : null}
-              {flow.busy ? (
-                <p role="status" className="text-sm">
-                  {flow.phase === "preparing"
-                    ? "Checking the merge…"
-                    : "Merging…"}
-                </p>
-              ) : null}
-              {flow.phase === "uncertain" ? (
-                <p role="status" className="text-sm">
-                  {UNCERTAIN_TEXT}
-                </p>
-              ) : null}
-              {flow.error ? (
-                <p role="alert" className="text-sm text-state-danger-text">
-                  {flow.error}
-                </p>
-              ) : null}
+              {plan ? <MergeReview plan={plan} /> : null}
             </>
           )}
+          {/* Always mounted, so a screen reader hears each change. */}
+          <p
+            role="status"
+            className={
+              saved
+                ? "text-sm font-medium empty:sr-only"
+                : "text-sm empty:sr-only"
+            }
+          >
+            {status}
+          </p>
+          {!saved && flow.error ? (
+            <p role="alert" className="text-sm text-state-danger-text">
+              {flow.error}
+            </p>
+          ) : null}
         </div>
         <SheetFooter className="sticky bottom-0 flex-row flex-wrap justify-end gap-2 border-t border-border-quiet bg-modal-surface/95 backdrop-blur">
           <Button

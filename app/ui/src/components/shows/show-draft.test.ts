@@ -6,6 +6,7 @@ import {
   addDate,
   fillDates,
   fillTargets,
+  hasShowContent,
   isBlankCandidate,
   mergeImportedDraft,
   missingFields,
@@ -14,6 +15,7 @@ import {
   reviewSelection,
   savedItemIds,
   selectAllValid,
+  unsavedWithContent,
   type ShowDraftState,
 } from "./show-draft";
 import {
@@ -335,5 +337,120 @@ describe("mergeImportedDraft", () => {
     expect(edited.candidates.find((c) => c.item_id === "resume-1")!.city).toBe(
       "Manual City",
     );
+  });
+
+  it("skips a re-imported show that is already an unsaved row", () => {
+    const tour = (prefix: string): ShowDraft =>
+      imported({
+        draft_id: `${prefix}-draft`,
+        candidates: [2, 4, 6].map((day) =>
+          candidate({
+            item_id: `${prefix}-${day}`,
+            artist_name: "Band",
+            date: `2027-03-0${day}`,
+            venue: "Hall",
+            city: "City",
+          }),
+        ),
+      });
+    const first = mergeImportedDraft(newDraft(), tour("first"));
+    const again = mergeImportedDraft(first, tour("second"));
+    expect(again.candidates.map((c) => c.item_id)).toEqual([
+      "first-2",
+      "first-4",
+      "first-6",
+    ]);
+    expect(again).toBe(first);
+  });
+
+  it("compares trimmed, case-insensitive artist, date, time, venue and city", () => {
+    const draft: ShowDraftState = {
+      candidates: [
+        candidate({
+          item_id: "typed",
+          artist_name: "Band",
+          date: "2027-03-02",
+          local_time: "21:00",
+          venue: "Hall",
+          city: "Madrid",
+        }),
+      ],
+      selected: ["typed"],
+    };
+    const result = mergeImportedDraft(
+      draft,
+      imported({
+        candidates: [
+          candidate({
+            item_id: "same",
+            artist_name: "  BAND ",
+            date: "2027-03-02",
+            local_time: "21:00",
+            venue: "hall",
+            city: "MADRID ",
+          }),
+          candidate({
+            item_id: "other-time",
+            artist_name: "Band",
+            date: "2027-03-02",
+            local_time: "22:00",
+            venue: "Hall",
+            city: "Madrid",
+          }),
+        ],
+      }),
+    );
+    expect(result.candidates.map((c) => c.item_id)).toEqual([
+      "typed",
+      "other-time",
+    ]);
+  });
+
+  it("adds a show again when the matching row is already saved", () => {
+    const saved = candidate({
+      item_id: "saved-row",
+      artist_name: "Band",
+      date: "2027-03-02",
+      venue: "Hall",
+      city: "City",
+    });
+    const draft: ShowDraftState = { candidates: [saved], selected: [] };
+    const result = mergeImportedDraft(
+      draft,
+      imported({
+        candidates: [{ ...saved, item_id: "again" }],
+      }),
+      new Set(["saved-row"]),
+    );
+    expect(result.candidates.map((c) => c.item_id)).toEqual([
+      "saved-row",
+      "again",
+    ]);
+  });
+});
+
+describe("hasShowContent and unsavedWithContent", () => {
+  it("counts every filled field but not the default status", () => {
+    expect(hasShowContent(emptyShow())).toBe(false);
+    expect(hasShowContent({ ...emptyShow(), status: "scheduled" })).toBe(false);
+    expect(hasShowContent({ ...emptyShow(), city: "  " })).toBe(false);
+    expect(hasShowContent({ ...emptyShow(), tickets_url: "https://x" })).toBe(
+      true,
+    );
+    expect(hasShowContent({ ...emptyShow(), lineup: ["A"] })).toBe(true);
+    expect(hasShowContent({ ...emptyShow(), latitude: 0 })).toBe(true);
+  });
+
+  it("lists only the unsaved rows that hold something", () => {
+    const filled = candidate({ item_id: "filled", date: "2027-03-02" });
+    const saved = candidate({ item_id: "saved", date: "2027-03-04" });
+    const blank = candidate({ item_id: "blank" });
+    const draft: ShowDraftState = {
+      candidates: [filled, saved, blank],
+      selected: [],
+    };
+    expect(
+      unsavedWithContent(draft, new Set(["saved"])).map((c) => c.item_id),
+    ).toEqual(["filled"]);
   });
 });

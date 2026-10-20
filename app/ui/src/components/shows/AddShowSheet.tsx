@@ -1,11 +1,5 @@
-import {
-  useEffect,
-  useEffectEvent,
-  useId,
-  useState,
-  type FormEvent,
-} from "react";
-import { PenLine, Plus, ScanText } from "lucide-react";
+import { useId, useState, type FormEvent } from "react";
+import { PenLine, Plus, RotateCcw, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { Button } from "@crate/ui/shadcn/button";
@@ -17,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@crate/ui/shadcn/sheet";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { ShowCandidateFields } from "./ShowCandidateFields";
@@ -35,17 +30,18 @@ import {
   removeDate,
   reviewSelection,
   savedItemIds,
+  unsavedWithContent,
   type SharedShowFields,
   type ShowDraftState,
 } from "./show-draft";
-import { countLabel } from "./show-import-presentation";
+import { UNCERTAIN_TEXT, countLabel } from "./show-import-presentation";
 import {
   showPayload,
   type ShowCandidate,
   type ShowDraft,
   type ShowOutcome,
 } from "./show-import-types";
-import { useShowPlan } from "./use-show-plan";
+import { useResetAfterClose, useShowPlan } from "./use-show-plan";
 import { useShowSource } from "./use-show-source";
 
 type Mode = "manual" | "import";
@@ -68,8 +64,6 @@ const TOO_MANY_TEXT =
 const MISSING_TEXT = "Fill in the highlighted fields to continue.";
 const EXISTING_FAILED_TEXT =
   "Couldn't load the existing show. Keep this draft and try again.";
-const UNCERTAIN_TEXT =
-  "We lost contact before this was confirmed. Retrying continues the same request.";
 
 export function AddShowSheet({
   open,
@@ -91,6 +85,7 @@ export function AddShowSheet({
   const [notice, setNotice] = useState("");
   // Loading an existing show ends in an edit, so nothing else may start.
   const [linking, setLinking] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   const flow = useShowPlan({
     open,
@@ -125,7 +120,8 @@ export function AddShowSheet({
       const published = Object.values(imported.publication ?? {});
       // An import that found nothing changes nothing, so a review stands.
       if (!imported.candidates.length && !published.length) return;
-      setDraft((current) => mergeImportedDraft(current, imported));
+      const savedIds = savedItemIds(flow.outcomes);
+      setDraft((current) => mergeImportedDraft(current, imported, savedIds));
       flow.addOutcomes(published);
       flow.invalidate();
     },
@@ -138,16 +134,10 @@ export function AddShowSheet({
     setDraft(newDraft());
     setAttempted(false);
     setNotice("");
+    setConfirmingDiscard(false);
   }
 
-  // However the panel closes after everything was saved (corner button,
-  // Escape, «Close»), the next opening starts fresh.
-  const closed = useEffectEvent(() => {
-    if (flow.phase === "saved") reset();
-  });
-  useEffect(() => {
-    if (!open) closed();
-  }, [open]);
+  useResetAfterClose(open, flow.phase === "saved", reset);
 
   const locked = flow.locked || source.busy || linking;
   const saved = savedItemIds(flow.outcomes);
@@ -226,6 +216,42 @@ export function AddShowSheet({
     saved.has(candidate.item_id),
   ).length;
   const planCount = flow.plan?.changes.length ?? 0;
+  const plan = flow.plan?.kind === "consolidation" ? null : flow.plan;
+  // Rows that hold something are only discarded after a yes; saved rows
+  // stay in Crate whatever happens to the draft.
+  const discarded = unsavedWithContent(draft, saved).length;
+  const sourceHasContent = Boolean(
+    source.text.trim() ||
+    source.url.trim() ||
+    source.images.length ||
+    source.storedImages.length,
+  );
+  const canStartOver =
+    !locked &&
+    flow.phase !== "saved" &&
+    (discarded > 0 || draft.candidates.length > 1 || sourceHasContent);
+  const status =
+    flow.phase === "saved"
+      ? savedCount === 1
+        ? "Show saved."
+        : `${countLabel(savedCount, "show")} saved.`
+      : flow.busy
+        ? flow.phase === "preparing"
+          ? "Checking the selection. Nothing is published yet."
+          : "Saving the reviewed selection…"
+        : flow.phase === "uncertain"
+          ? UNCERTAIN_TEXT
+          : flow.changed
+            ? "The draft changed. Review again before saving."
+            : "";
+  const nothingSelected =
+    rowsShown && draft.candidates.length > 1 && selection.length === 0;
+
+  function startOver() {
+    if (!canStartOver) return;
+    if (discarded > 0) setConfirmingDiscard(true);
+    else reset();
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -303,9 +329,9 @@ export function AddShowSheet({
               </Button>
             ) : null}
           </form>
-          {flow.plan ? (
+          {plan ? (
             <ShowPlanSummary
-              plan={flow.plan}
+              plan={plan}
               candidates={draft.candidates}
               disabled={locked}
               onUseExisting={(itemId, showId) =>
@@ -319,30 +345,17 @@ export function AddShowSheet({
               }
             />
           ) : null}
-          {flow.phase === "saved" ? (
-            <p role="status" className="text-sm font-medium">
-              {savedCount === 1
-                ? "Show saved."
-                : `${countLabel(savedCount, "show")} saved.`}
-            </p>
-          ) : null}
-          {flow.changed && !flow.busy ? (
-            <p role="status" className="text-sm">
-              The draft changed. Review again before saving.
-            </p>
-          ) : null}
-          {flow.busy ? (
-            <p role="status" className="text-sm">
-              {flow.phase === "preparing"
-                ? "Checking the selection. Nothing is published yet."
-                : "Saving the reviewed selection…"}
-            </p>
-          ) : null}
-          {flow.phase === "uncertain" ? (
-            <p role="status" className="text-sm">
-              {UNCERTAIN_TEXT}
-            </p>
-          ) : null}
+          {/* Always mounted, so a screen reader hears each change. */}
+          <p
+            role="status"
+            className={
+              flow.phase === "saved"
+                ? "text-sm font-medium empty:sr-only"
+                : "text-sm empty:sr-only"
+            }
+          >
+            {status}
+          </p>
           {notice ? (
             <p role="alert" className="text-sm text-state-danger-text">
               {notice}
@@ -355,6 +368,18 @@ export function AddShowSheet({
           ) : null}
         </div>
         <SheetFooter className="sticky bottom-0 flex-row flex-wrap justify-end gap-2 border-t border-border-quiet bg-modal-surface/95 backdrop-blur">
+          {flow.phase === "saved" ? null : (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mr-auto"
+              disabled={!canStartOver}
+              onClick={startOver}
+            >
+              <RotateCcw aria-hidden="true" />
+              Start over
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -374,9 +399,11 @@ export function AddShowSheet({
               variant={flow.plan?.executable ? "outline" : "default"}
               disabled={locked || !rowsShown || selection.length === 0}
             >
-              {selection.length > 1
-                ? `Review ${selection.length} shows`
-                : "Review show"}
+              {nothingSelected
+                ? "Select shows to review"
+                : selection.length > 1
+                  ? `Review ${selection.length} shows`
+                  : "Review show"}
             </Button>
           ) : null}
           {flow.phase === "reviewed" && flow.plan?.executable ? (
@@ -401,6 +428,15 @@ export function AddShowSheet({
             </>
           ) : null}
         </SheetFooter>
+        <ConfirmDialog
+          open={confirmingDiscard}
+          onOpenChange={setConfirmingDiscard}
+          title={`Discard ${countLabel(discarded, "unsaved show")}?`}
+          description="The draft and its source are cleared. Shows you already saved stay in Crate."
+          confirmLabel="Discard"
+          variant="destructive"
+          onConfirm={reset}
+        />
       </SheetContent>
     </Sheet>
   );

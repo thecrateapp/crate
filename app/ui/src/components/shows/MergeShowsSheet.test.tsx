@@ -101,12 +101,32 @@ function footerButton(name: string) {
   return within(footer).getByRole("button", { name });
 }
 
-function ReopenableSheet({ onMerged }: { onMerged: () => void }) {
+function ReopenableSheet({
+  onMerged,
+  initialIds,
+}: {
+  onMerged: () => void;
+  initialIds?: number[];
+}) {
   const [open, setOpen] = useState(true);
+  const [ids, setIds] = useState(initialIds);
   return (
     <>
       <button onClick={() => setOpen(true)}>Reopen merge panel</button>
-      <MergeShowsSheet open={open} onOpenChange={setOpen} onMerged={onMerged} />
+      <button
+        onClick={() => {
+          setIds(initialIds ? [...initialIds] : undefined);
+          setOpen(true);
+        }}
+      >
+        Merge these again
+      </button>
+      <MergeShowsSheet
+        open={open}
+        onOpenChange={setOpen}
+        onMerged={onMerged}
+        initialIds={ids}
+      />
     </>
   );
 }
@@ -218,7 +238,7 @@ describe("MergeShowsSheet", () => {
     await user.click(screen.getByRole("button", { name: "Merge shows" }));
     expect(await screen.findByText("Shows merged.")).toBeVisible();
     const link = screen.getByRole("link", { name: "Open the kept show" });
-    expect(link).toHaveAttribute("href", "/shows?show_id=7");
+    expect(link).toHaveAttribute("href", "/upcoming?show_id=7");
     expect(link).toHaveAttribute("target", "_blank");
     expect(merged).toHaveBeenCalledOnce();
     expect(toast.success).toHaveBeenCalledWith("Shows merged");
@@ -275,7 +295,7 @@ describe("MergeShowsSheet", () => {
     const user = await reviewMerge();
     await user.click(screen.getByRole("button", { name: "Merge shows" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This change needs approval first. Approve it in Agent approvals, then save again.",
+      "This merge needs approval first. Approve it in Agent approvals, then merge again.",
     );
     expect(
       screen.queryByRole("button", { name: "Retry merge" }),
@@ -307,5 +327,119 @@ describe("MergeShowsSheet", () => {
     expect(screen.queryByText("Shows merged.")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Show IDs")).toHaveValue("");
     expect(screen.getByLabelText("Show IDs")).not.toBeDisabled();
+  });
+
+  it("loads the shows it opens with and still needs the review", async () => {
+    renderWithAdminProviders(
+      <MergeShowsSheet
+        open
+        onOpenChange={vi.fn()}
+        onMerged={vi.fn()}
+        initialIds={[7, 8]}
+      />,
+    );
+    expect(screen.getByLabelText("Show IDs")).toHaveValue("7, 8");
+    expect(
+      await screen.findByRole("radio", { name: "Keep show 7" }),
+    ).toBeChecked();
+    expect(
+      vi.mocked(api).mock.calls.filter(([url]) => url.includes("/shows?")),
+    ).toHaveLength(1);
+    expect(posts("/plans")).toHaveLength(0);
+    expect(
+      screen.queryByRole("button", { name: "Merge shows" }),
+    ).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("checkbox", { name: "Merge show 8" }));
+    await user.click(screen.getByRole("button", { name: "Review merge" }));
+    await screen.findByRole("button", { name: "Merge shows" });
+    expect(posts("/apply")).toHaveLength(0);
+  });
+
+  it("keeps a reviewed merge when reopened, and loads again for a new request", async () => {
+    renderWithAdminProviders(
+      <ReopenableSheet onMerged={vi.fn()} initialIds={[7, 8]} />,
+    );
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Merge show 8" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Review merge" }));
+    await screen.findByRole("button", { name: "Merge shows" });
+    await user.click(footerButton("Close"));
+    await user.click(
+      screen.getByRole("button", { name: "Reopen merge panel" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Merge shows" }),
+    ).toBeVisible();
+    const loads = () =>
+      vi.mocked(api).mock.calls.filter(([url]) => url.includes("/shows?"));
+    expect(loads()).toHaveLength(1);
+    await user.click(footerButton("Close"));
+    await user.click(screen.getByRole("button", { name: "Merge these again" }));
+    await waitFor(() => expect(loads()).toHaveLength(2));
+    expect(
+      screen.queryByRole("button", { name: "Merge shows" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("checkbox", { name: "Merge show 8" }),
+    ).not.toBeChecked();
+  });
+
+  it("tells an editor who can't approve who has to", async () => {
+    vi.mocked(api).mockImplementation(async (...args) => {
+      if (args[0].endsWith("/apply"))
+        throw Object.assign(
+          new Error(JSON.stringify({ detail: "Approval required" })),
+          { status: 409, code: "APPROVAL_REQUIRED" },
+        );
+      return routes(...args);
+    });
+    renderWithAdminProviders(
+      <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
+      {
+        auth: {
+          hasCapability: (capability: string) =>
+            capability !== "agents.plans.review",
+        },
+      },
+    );
+    const user = await reviewMerge();
+    const review = screen.getByRole("region", { name: "Merge review" });
+    expect(within(review).getByRole("note")).toHaveTextContent(
+      "A merge always needs approval. Someone who can approve changes must approve it in Agent approvals. Then come back and merge.",
+    );
+    expect(within(review).queryByRole("link")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Merge shows" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This merge needs approval first. Someone who can approve changes must approve it in Agent approvals. Then come back and merge again.",
+    );
+  });
+
+  it("announces every state in one status region that is always there", async () => {
+    vi.mocked(api).mockImplementation(async (...args) =>
+      args[0].endsWith("/jobs/apply-1")
+        ? new Promise(() => {})
+        : routes(...args),
+    );
+    renderWithAdminProviders(
+      <MergeShowsSheet open onOpenChange={vi.fn()} onMerged={vi.fn()} />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    const user = await reviewMerge();
+    await user.click(screen.getByRole("radio", { name: "Keep show 8" }));
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent(
+      "The selection changed. Review again before merging.",
+    );
+    await user.click(screen.getByRole("checkbox", { name: "Merge show 7" }));
+    await user.click(screen.getByRole("button", { name: "Review merge" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Merge shows" }),
+    );
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("Merging…");
   });
 });

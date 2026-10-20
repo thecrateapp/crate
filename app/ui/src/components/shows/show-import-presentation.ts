@@ -8,24 +8,27 @@ import { humanizeKey } from "@/lib/humanize";
 import type { StatusTone } from "@/components/admin/StatusBadge";
 import { formatShowDateParts } from "@crate/ui/domain/shows/show-types";
 import type {
+  ConsolidationShow,
   ExtractionMethod,
   ModelMethod,
   ShowAvailability,
-  ShowCandidate,
+  ShowConsolidationPlan,
   ShowDraftRow,
+  ShowImportChange,
   ShowOutcome,
-  ShowPlan,
 } from "./show-import-types";
 
-const MODEL_METHODS = new Set<ModelMethod>([
-  "vision",
-  "text_llm",
-  "ocr_text_llm",
-]);
+/** The methods that send the source to an AI model. */
+export const MODEL_METHODS: ReadonlySet<ExtractionMethod> =
+  new Set<ModelMethod>(["vision", "text_llm", "ocr_text_llm"]);
 
-function isModelMethod(method: ExtractionMethod): method is ModelMethod {
-  return MODEL_METHODS.has(method as ModelMethod);
+export function isModelMethod(method: ExtractionMethod): method is ModelMethod {
+  return MODEL_METHODS.has(method);
 }
+
+/** Shown while an accepted review or save waits to be confirmed. */
+export const UNCERTAIN_TEXT =
+  "We lost contact before this was confirmed. Retrying continues the same request.";
 
 export function modelDisplayName(model?: string | null): string {
   if (!model) return "AI model";
@@ -181,13 +184,31 @@ export function pickMethod(
   return null;
 }
 
-export function aiSendNote(option: MethodOption): string | null {
+/** What else goes with the image: the model reads every text source too. */
+export interface SentAlong {
+  pastedText: boolean;
+  link: boolean;
+}
+
+function listed(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+export function aiSendNote(
+  option: MethodOption,
+  along: SentAlong = { pastedText: false, link: false },
+): string | null {
   const model = modelDisplayName(option.model);
+  const extras = [
+    along.pastedText ? "your pasted text" : null,
+    along.link ? "the linked page's text" : null,
+  ].filter((part): part is string => part !== null);
   switch (option.method) {
     case "vision":
-      return `Sends the image to ${model} once. This counts toward your AI usage.`;
+      return `Sends ${listed(["the image", ...extras])} to ${model} once. This counts toward your AI usage.`;
     case "ocr_text_llm":
-      return `Sends the text read from the image to ${model} once. The image stays on your server. This counts toward your AI usage.`;
+      return `Sends ${listed(["the text read from the image", ...extras])} to ${model} once. The image stays on your server. This counts toward your AI usage.`;
     case "text_llm":
       return `Sends the text or the linked page's text to ${model} once. This counts toward your AI usage.`;
     default:
@@ -210,11 +231,10 @@ export function readinessState(
   return availability.ocr.available ? "ready" : "unavailable";
 }
 
-export function readinessView(
-  state: ReadinessState,
-  reason?: string | null,
-): { label: string; tone: StatusTone } {
-  void reason;
+export function readinessView(state: ReadinessState): {
+  label: string;
+  tone: StatusTone;
+} {
   switch (state) {
     case "loading":
     case "checking":
@@ -236,6 +256,11 @@ export function ocrReasonText(reason?: string | null): string {
   if (reason === "OCR_LANGUAGES_OR_VERSION_UNAVAILABLE")
     return "The worker's OCR engine is not version 5 or lacks English and Spanish.";
   return "OCR is not available on the worker.";
+}
+
+/** Where a saved show opens: Upcoming, with that show's detail expanded. */
+export function showLinkPath(showId: number): string {
+  return `/upcoming?show_id=${encodeURIComponent(String(showId))}`;
 }
 
 export function sourceLabel(
@@ -352,6 +377,8 @@ export interface PlanChangeView {
   title: string;
   subtitle: string;
   isUpdate: boolean;
+  /** An update of a saved show that changes none of its fields. */
+  unchangedUpdate: boolean;
   fields: {
     key: string;
     label: string;
@@ -449,11 +476,7 @@ function technicalDetails(
 }
 
 export function planChangeView(
-  change: {
-    item_id: string;
-    before: Record<string, unknown>;
-    after: ShowCandidate & { source_manifest?: unknown };
-  },
+  change: ShowImportChange,
   rowLabel: string,
 ): PlanChangeView {
   const after = change.after as unknown as Record<string, unknown>;
@@ -479,7 +502,11 @@ export function planChangeView(
     fields = newFields(after);
     unchanged = 0;
   } else {
-    const keys = Object.keys(SHOW_FIELD_LABELS);
+    // A show matched by its details keeps its saved artist name; only an
+    // explicitly chosen show takes the artist typed here.
+    const keys = Object.keys(SHOW_FIELD_LABELS).filter(
+      (key) => key !== "artist_name" || Boolean(after.existing_show_id),
+    );
     const beforeSubset = pickFields(change.before, keys);
     const afterSubset = pickFields(after, keys);
     const diff = fieldDiff(beforeSubset, afterSubset) ?? [];
@@ -498,6 +525,7 @@ export function planChangeView(
     title,
     subtitle,
     isUpdate,
+    unchangedUpdate: isUpdate && fields.length === 0,
     fields,
     unchanged,
     evidence: (after.evidence as string | null | undefined) ?? null,
@@ -528,14 +556,54 @@ const SHOW_ERROR_TEXT: Record<string, string> = {
     "The AI model changed. Check the method and try again.",
   LLM_UNAVAILABLE:
     "That AI model isn't available right now. Choose another method.",
-  APPROVAL_REQUIRED:
-    "This change needs approval first. Approve it in Agent approvals, then save again.",
   PLAN_STALE: "A show changed after your review. Review again before saving.",
   TARGET_BUSY: "Another change is saving these shows. Try again in a moment.",
 };
 
-export function showErrorText(error: unknown, fallback: string): string {
+/** The server's one-outstanding-job refusal (`agent_requests._accept`). */
+const ACTIVE_JOB_DETAIL =
+  "This integration already has an active maintenance job";
+const ACTIVE_JOB_TEXT =
+  "Another import or save of yours is still running. Try again in a moment.";
+
+/** The word for the action that runs again once the plan is approved. */
+export type ApprovalAction = "save" | "merge";
+
+/**
+ * What to do about a plan that needs approval. Only an editor who can review
+ * plans is sent to Agent approvals; anyone else is told who has to.
+ */
+export function approvalNextStep(
+  action: ApprovalAction,
+  canApprove: boolean,
+  { again = false }: { again?: boolean } = {},
+): string {
+  const verb = again ? `${action} again` : action;
+  return canApprove
+    ? `Approve it in Agent approvals, then ${verb}.`
+    : `Someone who can approve changes must approve it in Agent approvals. Then come back and ${verb}.`;
+}
+
+export function showErrorText(
+  error: unknown,
+  fallback: string,
+  context: { action?: ApprovalAction; canApprove?: boolean } = {},
+): string {
   const code = (error as { code?: string } | null | undefined)?.code;
+  if (code === "APPROVAL_REQUIRED") {
+    const action = context.action ?? "save";
+    const subject = action === "merge" ? "This merge" : "This change";
+    return `${subject} needs approval first. ${approvalNextStep(
+      action,
+      context.canApprove ?? true,
+      { again: true },
+    )}`;
+  }
+  if (
+    code === "LIMIT_EXCEEDED" &&
+    apiErrorText(error, "") === ACTIVE_JOB_DETAIL
+  )
+    return ACTIVE_JOB_TEXT;
   if (code && SHOW_ERROR_TEXT[code]) return SHOW_ERROR_TEXT[code];
   return apiErrorText(error, fallback);
 }
@@ -545,17 +613,6 @@ export interface MergeShowView {
   title: string;
   detail: string;
   people: string;
-}
-
-export interface ConsolidationShow {
-  id: number;
-  artist_name?: string | null;
-  date?: string | null;
-  local_time?: string | null;
-  venue?: string | null;
-  city?: string | null;
-  attendance_count: number;
-  reminder_count: number;
 }
 
 export function mergeShowView(show: ConsolidationShow): MergeShowView {
@@ -572,17 +629,13 @@ export function mergeShowView(show: ConsolidationShow): MergeShowView {
   };
 }
 
-export function mergePlanView(plan: ShowPlan): {
+export function mergePlanView(plan: ShowConsolidationPlan): {
   keep: MergeShowView | null;
   merge: MergeShowView[];
 } {
   const change = plan.changes.find((c) => c.item_id === "consolidation");
   if (!change) return { keep: null, merge: [] };
-  const before = change.before as { shows?: ConsolidationShow[] };
-  const after = change.after as unknown as {
-    canonical_show_id?: number;
-    duplicate_show_ids?: number[];
-  };
+  const { before, after } = change;
   const shows = before.shows ?? [];
   const byId = new Map(shows.map((show) => [show.id, show]));
   const keepShow =

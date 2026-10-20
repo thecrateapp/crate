@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { reasonText } from "@/lib/ai-models";
 import {
+  MODEL_METHODS,
   SHOW_FIELD_LABELS,
   SHOW_STATUS_LABELS,
   aiSendNote,
+  approvalNextStep,
   countLabel,
   draftRowView,
+  isModelMethod,
   issueText,
   mergePlanView,
   mergeShowView,
@@ -20,10 +23,14 @@ import {
   readinessState,
   readinessView,
   showErrorText,
+  showLinkPath,
   sourceLabel,
   type MethodOption,
 } from "./show-import-presentation";
-import type { ShowAvailability, ShowPlan } from "./show-import-types";
+import type {
+  ShowAvailability,
+  ShowConsolidationPlan,
+} from "./show-import-types";
 
 const CONFIGURED_ACTION = {
   configured: true,
@@ -297,6 +304,66 @@ describe("aiSendNote", () => {
   it("is null for free methods", () => {
     expect(aiSendNote({ ...base, method: "ocr" })).toBeNull();
     expect(aiSendNote({ ...base, method: "parse" })).toBeNull();
+  });
+  it.each([
+    [
+      "vision",
+      { pastedText: true, link: false },
+      "Sends the image and your pasted text to gemini-3.8-flash once. This counts toward your AI usage.",
+    ],
+    [
+      "vision",
+      { pastedText: false, link: true },
+      "Sends the image and the linked page's text to gemini-3.8-flash once. This counts toward your AI usage.",
+    ],
+    [
+      "vision",
+      { pastedText: true, link: true },
+      "Sends the image, your pasted text and the linked page's text to gemini-3.8-flash once. This counts toward your AI usage.",
+    ],
+    [
+      "ocr_text_llm",
+      { pastedText: true, link: false },
+      "Sends the text read from the image and your pasted text to gemini-3.8-flash once. The image stays on your server. This counts toward your AI usage.",
+    ],
+    [
+      "ocr_text_llm",
+      { pastedText: false, link: true },
+      "Sends the text read from the image and the linked page's text to gemini-3.8-flash once. The image stays on your server. This counts toward your AI usage.",
+    ],
+    [
+      "ocr_text_llm",
+      { pastedText: true, link: true },
+      "Sends the text read from the image, your pasted text and the linked page's text to gemini-3.8-flash once. The image stays on your server. This counts toward your AI usage.",
+    ],
+    [
+      "vision",
+      { pastedText: false, link: false },
+      "Sends the image to gemini-3.8-flash once. This counts toward your AI usage.",
+    ],
+  ] as const)("tells %s what else it sends: %o", (method, along, text) => {
+    expect(aiSendNote({ ...base, method }, along)).toBe(text);
+  });
+});
+
+describe("isModelMethod", () => {
+  it("is true only for the methods that call a model", () => {
+    expect(
+      (["ocr", "ocr_text_llm", "vision", "parse", "text_llm"] as const).filter(
+        isModelMethod,
+      ),
+    ).toEqual(["ocr_text_llm", "vision", "text_llm"]);
+    expect([...MODEL_METHODS].sort()).toEqual([
+      "ocr_text_llm",
+      "text_llm",
+      "vision",
+    ]);
+  });
+});
+
+describe("showLinkPath", () => {
+  it("opens the show on Upcoming", () => {
+    expect(showLinkPath(7)).toBe("/upcoming?show_id=7");
   });
 });
 
@@ -597,8 +664,6 @@ describe("showErrorText", () => {
     const mapping: Record<string, string> = {
       LLM_UNAVAILABLE:
         "That AI model isn't available right now. Choose another method.",
-      APPROVAL_REQUIRED:
-        "This change needs approval first. Approve it in Agent approvals, then save again.",
       PLAN_STALE:
         "A show changed after your review. Review again before saving.",
       TARGET_BUSY:
@@ -612,6 +677,75 @@ describe("showErrorText", () => {
   it("falls back for unreadable detail shapes", () => {
     const error = new Error(JSON.stringify({ detail: [{ msg: "x" }] }));
     expect(showErrorText(error, "fallback")).toBe("fallback");
+  });
+  it.each([
+    [
+      "save",
+      true,
+      "This change needs approval first. Approve it in Agent approvals, then save again.",
+    ],
+    [
+      "merge",
+      true,
+      "This merge needs approval first. Approve it in Agent approvals, then merge again.",
+    ],
+    [
+      "save",
+      false,
+      "This change needs approval first. Someone who can approve changes must approve it in Agent approvals. Then come back and save again.",
+    ],
+    [
+      "merge",
+      false,
+      "This merge needs approval first. Someone who can approve changes must approve it in Agent approvals. Then come back and merge again.",
+    ],
+  ] as const)(
+    "names the %s action for approval, with approval rights: %s",
+    (action, canApprove, text) => {
+      const error = Object.assign(new Error("ignored"), {
+        status: 409,
+        code: "APPROVAL_REQUIRED",
+      });
+      expect(showErrorText(error, "fallback", { action, canApprove })).toBe(
+        text,
+      );
+    },
+  );
+  it("explains the editor's other running job in plain words", () => {
+    const busy = Object.assign(
+      new Error(
+        JSON.stringify({
+          detail: "This integration already has an active maintenance job",
+        }),
+      ),
+      { status: 429, code: "LIMIT_EXCEEDED" },
+    );
+    expect(showErrorText(busy, "fallback")).toBe(
+      "Another import or save of yours is still running. Try again in a moment.",
+    );
+    const allowance = Object.assign(
+      new Error(
+        JSON.stringify({
+          detail:
+            "Extraction is limited to ten jobs per editor in fifteen minutes",
+        }),
+      ),
+      { status: 429, code: "LIMIT_EXCEEDED" },
+    );
+    expect(showErrorText(allowance, "fallback")).toBe(
+      "Extraction is limited to ten jobs per editor in fifteen minutes",
+    );
+  });
+});
+
+describe("approvalNextStep", () => {
+  it("sends only an editor who can approve to Agent approvals", () => {
+    expect(approvalNextStep("merge", true)).toBe(
+      "Approve it in Agent approvals, then merge.",
+    );
+    expect(approvalNextStep("save", false)).toBe(
+      "Someone who can approve changes must approve it in Agent approvals. Then come back and save.",
+    );
   });
 });
 
@@ -671,19 +805,64 @@ describe("planChangeView", () => {
     };
     const view = planChangeView({ item_id: "a", before, after }, "Show 1");
     expect(view.isUpdate).toBe(true);
+    expect(view.unchangedUpdate).toBe(false);
     expect(view.fields.map((f) => [f.key, f.status])).toEqual([
       ["venue", "changed"],
       ["url", "added"],
     ]);
-    expect(view.unchanged).toBe(3);
+    expect(view.unchanged).toBe(2);
+  });
+
+  it("leaves out the artist of a show matched by its details", () => {
+    const before = {
+      artist_name: "External Band",
+      date: "2027-03-02",
+      venue: "Hall",
+      city: "Madrid",
+    };
+    const after = { ...before, item_id: "a", artist_name: "EXTERNAL BAND" };
+    const matched = planChangeView({ item_id: "a", before, after }, "Show 1");
+    expect(matched.fields.map((f) => f.key)).toEqual([]);
+    expect(matched.unchangedUpdate).toBe(true);
+
+    const chosen = planChangeView(
+      { item_id: "a", before, after: { ...after, existing_show_id: 42 } },
+      "Show 1",
+    );
+    expect(chosen.fields.map((f) => [f.key, f.before, f.value])).toEqual([
+      ["artist_name", "External Band", "EXTERNAL BAND"],
+    ]);
+    expect(chosen.unchangedUpdate).toBe(false);
+  });
+
+  it("marks an update that changes nothing", () => {
+    const before = {
+      artist_name: "Band",
+      date: "2027-03-02",
+      venue: "Hall",
+      city: "Madrid",
+    };
+    const view = planChangeView(
+      { item_id: "a", before, after: { ...before, item_id: "a" } },
+      "Show 1",
+    );
+    expect(view.isUpdate).toBe(true);
+    expect(view.unchangedUpdate).toBe(true);
+    expect(view.fields).toEqual([]);
+    const created = planChangeView(
+      { item_id: "a", before: {}, after: { ...before, item_id: "a" } },
+      "Show 1",
+    );
+    expect(created.unchangedUpdate).toBe(false);
   });
 });
 
 describe("mergePlanView", () => {
   it("builds the keep/merge view from the consolidation change", () => {
-    const plan: ShowPlan = {
+    const plan: ShowConsolidationPlan = {
       plan_id: "p1",
       plan_version: "v1",
+      kind: "consolidation",
       executable: true,
       changes: [
         {
@@ -692,6 +871,7 @@ describe("mergePlanView", () => {
             shows: [
               {
                 id: 7,
+                revision: 1,
                 artist_name: "Band",
                 date: "2027-03-02",
                 local_time: null,
@@ -702,6 +882,7 @@ describe("mergePlanView", () => {
               },
               {
                 id: 8,
+                revision: 1,
                 artist_name: "Band",
                 date: "2027-03-02",
                 local_time: null,
@@ -712,7 +893,11 @@ describe("mergePlanView", () => {
               },
             ],
           },
-          after: { canonical_show_id: 7, duplicate_show_ids: [8] } as never,
+          after: {
+            canonical_show_id: 7,
+            duplicate_show_ids: [8],
+            revisions: { "7": 1, "8": 1 },
+          },
         },
       ],
     };
@@ -739,6 +924,7 @@ describe("mergeShowView", () => {
     expect(
       mergeShowView({
         id: 8,
+        revision: 1,
         artist_name: "Band",
         date: "2027-03-02",
         local_time: "21:00",

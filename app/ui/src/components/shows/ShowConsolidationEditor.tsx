@@ -1,33 +1,15 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { RadioGroup, RadioGroupItem } from "@crate/ui/primitives/RadioGroup";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { api } from "@/lib/api";
 import { mergeShowView, showErrorText } from "./show-import-presentation";
-
-export interface ShowConsolidation {
-  canonical_show_id: number;
-  duplicate_show_ids: number[];
-  revisions: Record<string, number>;
-}
-
-export interface ConsolidationRow {
-  id: number;
-  revision: number;
-  artist_name: string;
-  date: string;
-  local_time?: string;
-  venue: string;
-  city: string;
-  merged_into_id?: number;
-  attendance_count: number;
-  reminder_count: number;
-}
+import type { ConsolidationShow, ShowConsolidation } from "./show-import-types";
 
 export interface ConsolidationDraft {
   ids: string;
-  rows: ConsolidationRow[];
+  rows: ConsolidationShow[];
   keep: number | null;
   merge: number[];
 }
@@ -40,6 +22,7 @@ const INVALID_IDS_TEXT = "Enter 2 to 10 different show IDs.";
 const GONE_TEXT =
   "Some of these shows were deleted or already merged. Check the IDs and load them again.";
 const LOAD_FAILED_TEXT = "Couldn't load these shows.";
+const ONE_SHOW_TEXT = "Add the IDs of the other shows to merge with this one.";
 
 function parseIds(value: string): number[] | null {
   const parts = value
@@ -57,38 +40,76 @@ export function ShowConsolidationEditor({
   value,
   onValueChange,
   disabled,
+  initialIds,
+  onPrefilled,
   onReview,
 }: {
   value: ConsolidationDraft;
   onValueChange: (next: ConsolidationDraft) => void;
   disabled: boolean;
+  /**
+   * Shows to fill in and load as soon as the editor opens, the same way
+   * «Load shows» does. Nothing is merged without the review.
+   */
+  initialIds?: readonly number[] | null;
+  /** Called once the initial shows were taken, so they aren't taken twice. */
+  onPrefilled?: () => void;
   onReview: (selection: ShowConsolidation) => void;
 }) {
   const idsId = useId();
   const hintId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const loader = useRef<AbortController | null>(null);
   const locked = disabled || loading;
   const merging = new Set(value.merge);
 
   useEffect(() => () => loader.current?.abort(), []);
 
-  async function load() {
+  // The editor mounts each time its panel opens, so this runs once per open.
+  const prefill = useEffectEvent(() => {
+    if (!initialIds?.length || disabled) return;
+    onPrefilled?.();
+    const text = initialIds.join(", ");
+    const ids = parseIds(text);
+    if (ids) {
+      void load(ids, text);
+      return;
+    }
+    onValueChange({ ids: text, rows: [], keep: null, merge: [] });
+    if (initialIds.length === 1) setNotice(ONE_SHOW_TEXT);
+  });
+  useEffect(() => {
+    prefill();
+  }, []);
+
+  function loadTyped() {
     const ids = parseIds(value.ids);
     if (!ids) {
       setError(INVALID_IDS_TEXT);
       return;
     }
+    void load(ids, value.ids);
+  }
+
+  async function load(ids: number[], text: string) {
     loader.current?.abort();
     const abort = new AbortController();
     loader.current = abort;
     setLoading(true);
     setError("");
+    setNotice("");
+    const cleared: ConsolidationDraft = {
+      ids: text,
+      rows: [],
+      keep: null,
+      merge: [],
+    };
     // Reloading replaces the rows, so a reviewed merge stops applying now.
-    onValueChange({ ...value, rows: [], keep: null, merge: [] });
+    onValueChange(cleared);
     try {
-      const result = await api<{ items: ConsolidationRow[] }>(
+      const result = await api<{ items: ConsolidationShow[] }>(
         `/api/show-imports/shows?${ids.map((id) => `ids=${id}`).join("&")}`,
         "GET",
         undefined,
@@ -101,14 +122,14 @@ export function ShowConsolidationEditor({
         rows.some((row) => row.merged_into_id)
       ) {
         setError(GONE_TEXT);
-        onValueChange({ ...value, rows: [], keep: null, merge: [] });
+        onValueChange(cleared);
         return;
       }
-      onValueChange({ ...value, rows, keep: rows[0]!.id, merge: [] });
+      onValueChange({ ...cleared, rows, keep: rows[0]!.id });
     } catch (failure) {
       if (abort.signal.aborted) return;
       setError(showErrorText(failure, LOAD_FAILED_TEXT));
-      onValueChange({ ...value, rows: [], keep: null, merge: [] });
+      onValueChange(cleared);
     } finally {
       if (loader.current === abort) {
         loader.current = null;
@@ -150,6 +171,7 @@ export function ShowConsolidationEditor({
             aria-describedby={hintId}
             onChange={(event) => {
               setError("");
+              setNotice("");
               onValueChange({
                 ids: event.target.value,
                 rows: [],
@@ -160,22 +182,23 @@ export function ShowConsolidationEditor({
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               event.preventDefault();
-              void load();
+              loadTyped();
             }}
           />
           <Button
             type="button"
             variant="outline"
             disabled={locked}
-            onClick={() => void load()}
+            onClick={loadTyped}
           >
             Load shows
           </Button>
         </div>
         <p id={hintId} className="text-xs text-muted-foreground">
-          2 to 10 show IDs separated by commas. A show&apos;s ID is the number
-          after show_id= in its link.
+          2 to 10 show IDs separated by commas. Open a show on Upcoming and
+          choose Merge duplicates to fill this in, or enter the show IDs.
         </p>
+        {notice ? <p className="text-sm">{notice}</p> : null}
       </div>
       {error ? (
         <p role="alert" className="text-sm text-state-danger-text">

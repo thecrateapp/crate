@@ -149,22 +149,97 @@ export function reviewSelection(
   );
 }
 
+// The fields that make two rows the same show to the editor.
+const IDENTITY_FIELDS = [
+  "artist_name",
+  "date",
+  "local_time",
+  "venue",
+  "city",
+] as const;
+
+function identityKey(candidate: ShowCandidate): string {
+  return IDENTITY_FIELDS.map((field) => {
+    const value = candidate[field];
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+  }).join("|");
+}
+
+// Every field an editor can fill in, besides the status they start with.
+const CONTENT_FIELDS = [
+  "artist_name",
+  "date",
+  "local_time",
+  "venue",
+  "city",
+  "region",
+  "country",
+  "country_code",
+  "address_line1",
+  "postal_code",
+  "timezone",
+  "doors_time",
+  "url",
+  "tickets_url",
+  "image_url",
+  "price_range",
+  "lineup",
+  "latitude",
+  "longitude",
+] as const satisfies readonly (keyof ShowCandidate)[];
+
+/** Whether discarding this row would lose anything typed or imported. */
+export function hasShowContent(candidate: ShowCandidate): boolean {
+  return CONTENT_FIELDS.some((field) => {
+    const value = candidate[field];
+    if (typeof value === "string") return value.trim() !== "";
+    if (Array.isArray(value)) return value.length > 0;
+    return typeof value === "number";
+  });
+}
+
+/** Unsaved rows that hold something, so discarding them needs a yes. */
+export function unsavedWithContent(
+  draft: ShowDraftState,
+  saved: Set<string>,
+): ShowCandidate[] {
+  return draft.candidates.filter(
+    (candidate) => !saved.has(candidate.item_id) && hasShowContent(candidate),
+  );
+}
+
 export function mergeImportedDraft(
   draft: ShowDraftState,
   imported: ShowDraft,
+  saved: ReadonlySet<string> = new Set(),
 ): ShowDraftState {
   // An import that found nothing keeps the draft, including its blank row.
   if (imported.candidates.length === 0) return draft;
   const existingById = new Map(
     draft.candidates.map((candidate) => [candidate.item_id, candidate]),
   );
-  const rows = imported.candidates.map((candidate) => {
+  // Running an import again finds the same shows again under new item IDs;
+  // an unsaved row that is already here stays as it is, edits included.
+  const publication = imported.publication ?? {};
+  const unsavedKeys = new Set(
+    draft.candidates
+      .filter(
+        (candidate) =>
+          !isBlankCandidate(candidate) &&
+          !saved.has(candidate.item_id) &&
+          !isShowSaved(publication[candidate.item_id]),
+      )
+      .map(identityKey),
+  );
+  const rows = imported.candidates.flatMap((candidate) => {
     const row = { ...candidate, source_draft_id: imported.draft_id };
     const existing = existingById.get(row.item_id);
-    return existing && !isShowSaved(imported.publication?.[row.item_id])
-      ? { ...row, ...existing }
-      : row;
+    if (!existing && unsavedKeys.has(identityKey(row))) return [];
+    return existing && !isShowSaved(publication[row.item_id])
+      ? [{ ...row, ...existing }]
+      : [row];
   });
+  if (rows.length === 0) return draft;
   const rowIds = new Set(rows.map((row) => row.item_id));
   const merged =
     isBlankCandidate(draft.candidates[0]!) && draft.candidates.length === 1

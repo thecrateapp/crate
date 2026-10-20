@@ -265,7 +265,10 @@ export function ShowSourcePanel({
           options={source.options}
           value={source.method}
           readiness={source.readiness}
-          ocrReason={source.availability?.ocr.reason}
+          along={{
+            pastedText: Boolean(source.text.trim()),
+            link: Boolean(source.url.trim()),
+          }}
           disabled={locked}
           onChange={source.chooseMethod}
           onRecheck={source.recheck}

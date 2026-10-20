@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { waitForShowJob } from "./show-import-jobs";
-import { showErrorText } from "./show-import-presentation";
-import type { ShowConsolidation } from "./ShowConsolidationEditor";
+import { showErrorText, type ApprovalAction } from "./show-import-presentation";
 import {
   isShowSaved,
   type ShowCandidate,
+  type ShowConsolidation,
   type ShowOutcome,
   type ShowPlan,
 } from "./show-import-types";
@@ -72,10 +73,13 @@ function jobFailure(execution?: { error?: string; error_code?: string }) {
  */
 export function useShowPlan({
   open,
+  approvalAction = "save",
   onApplied,
   onPartlySaved,
 }: {
   open: boolean;
+  /** The button an approved plan is sent with, named in approval errors. */
+  approvalAction?: ApprovalAction;
   onApplied: (
     rows: ShowOutcome[],
     outcomes: ShowOutcome[],
@@ -83,6 +87,11 @@ export function useShowPlan({
   /** A save that failed or wasn't verified, but still saved these rows. */
   onPartlySaved?: (rows: ShowOutcome[]) => void;
 }): ShowPlanFlow {
+  const { hasCapability } = useAuth();
+  const errorContext = {
+    action: approvalAction,
+    canApprove: hasCapability("agents.plans.review"),
+  };
   const [phase, setPhase] = useState<ShowPlanPhase>("editing");
   const [plan, setPlan] = useState<ShowPlan | null>(null);
   const [outcomes, setOutcomeState] = useState<ShowOutcome[]>([]);
@@ -151,6 +160,7 @@ export function useShowPlan({
             showErrorText(
               jobFailure(job.result?.execution),
               PREPARE_FAILED_TEXT,
+              errorContext,
             ),
             null,
           );
@@ -177,7 +187,11 @@ export function useShowPlan({
         job.result?.verification?.status !== "passed"
       ) {
         refuse(
-          showErrorText(jobFailure(job.result?.execution), APPLY_FAILED_TEXT),
+          showErrorText(
+            jobFailure(job.result?.execution),
+            APPLY_FAILED_TEXT,
+            errorContext,
+          ),
           null,
         );
         const savedRows = rows.filter(isShowSaved);
@@ -194,7 +208,7 @@ export function useShowPlan({
         status?: unknown;
         code?: unknown;
       };
-      const message = showErrorText(failure, REQUEST_FAILED_TEXT);
+      const message = showErrorText(failure, REQUEST_FAILED_TEXT, errorContext);
       // A stale plan can't be saved again; the editor reviews it anew.
       if (typeof status === "number" && status < 500)
         refuse(message, code === "PLAN_STALE" ? null : reviewed);
@@ -268,4 +282,22 @@ export function useShowPlan({
       if (rows.length) setOutcomes(mergeOutcomes(outcomesRef.current, rows));
     },
   };
+}
+
+/**
+ * However a panel closes once its work is done (corner button, Escape, its
+ * own «Close»), the next opening starts fresh. Closing with work pending
+ * keeps it, so a review or save resumes.
+ */
+export function useResetAfterClose(
+  open: boolean,
+  done: boolean,
+  reset: () => void,
+) {
+  const closed = useEffectEvent(() => {
+    if (done) reset();
+  });
+  useEffect(() => {
+    if (!open) closed();
+  }, [open]);
 }

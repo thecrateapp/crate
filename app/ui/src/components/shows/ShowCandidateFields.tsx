@@ -12,6 +12,7 @@ import {
   missingText,
   modelDisplayName,
   outcomeView,
+  showLinkPath,
   sourceLabel,
 } from "./show-import-presentation";
 import {
@@ -347,7 +348,7 @@ export function ShowCandidateFields({
             ) : null}
             {outcome.show_id ? (
               <a
-                href={`/shows?show_id=${outcome.show_id}`}
+                href={showLinkPath(outcome.show_id)}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"

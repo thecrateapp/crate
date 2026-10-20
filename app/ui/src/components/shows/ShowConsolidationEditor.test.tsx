@@ -6,8 +6,8 @@ import { api } from "@/lib/api";
 import {
   ShowConsolidationEditor,
   emptyConsolidationDraft,
-  type ShowConsolidation,
 } from "./ShowConsolidationEditor";
+import type { ShowConsolidation } from "./show-import-types";
 
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 beforeEach(() => vi.clearAllMocks());
@@ -38,8 +38,10 @@ const ROWS = [
 
 function Harness({
   onReview,
+  initialIds,
 }: {
   onReview: (selection: ShowConsolidation) => void;
+  initialIds?: number[];
 }) {
   const [value, setValue] = useState(emptyConsolidationDraft);
   return (
@@ -47,6 +49,7 @@ function Harness({
       value={value}
       onValueChange={setValue}
       disabled={false}
+      initialIds={initialIds}
       onReview={onReview}
     />
   );
@@ -65,7 +68,7 @@ it("loads real revisions and requires an explicit keep and merge choice", async 
   render(<Harness onReview={review} />);
   expect(
     screen.getByText(
-      "2 to 10 show IDs separated by commas. A show's ID is the number after show_id= in its link.",
+      "2 to 10 show IDs separated by commas. Open a show on Upcoming and choose Merge duplicates to fill this in, or enter the show IDs.",
     ),
   ).toBeInTheDocument();
   const user = await load("7,8");
@@ -144,4 +147,27 @@ it("uses design-system controls only", async () => {
       'select, details, pre, input[type="checkbox"]:not([aria-hidden]), input[type="radio"]:not([aria-hidden])',
     ),
   ).toBeNull();
+});
+
+it("fills in and loads the shows it opens with, the same way «Load shows» does", async () => {
+  vi.mocked(api).mockResolvedValue({ items: ROWS });
+  const review = vi.fn();
+  render(<Harness onReview={review} initialIds={[7, 8]} />);
+  expect(screen.getByLabelText("Show IDs")).toHaveValue("7, 8");
+  expect(
+    await screen.findByRole("radio", { name: "Keep show 7" }),
+  ).toBeChecked();
+  expect(vi.mocked(api)).toHaveBeenCalledOnce();
+  expect(vi.mocked(api).mock.calls[0]![0]).toContain("ids=7&ids=8");
+  expect(screen.getByRole("button", { name: "Review merge" })).toBeDisabled();
+  expect(review).not.toHaveBeenCalled();
+});
+
+it("fills in a lone show without loading it and asks for the others", () => {
+  render(<Harness onReview={vi.fn()} initialIds={[7]} />);
+  expect(screen.getByLabelText("Show IDs")).toHaveValue("7");
+  expect(
+    screen.getByText("Add the IDs of the other shows to merge with this one."),
+  ).toBeVisible();
+  expect(api).not.toHaveBeenCalled();
 });

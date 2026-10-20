@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { waitForShowJob } from "./show-import-jobs";
 import {
   countLabel,
+  isModelMethod,
   methodOptions,
   pickMethod,
   readinessKey,
@@ -13,7 +14,6 @@ import {
 } from "./show-import-presentation";
 import type {
   ExtractionMethod,
-  ModelMethod,
   ShowAvailability,
   ShowDraft,
   ShowDraftRow,
@@ -73,11 +73,6 @@ interface SavedDraft {
   };
 }
 
-const MODEL_METHODS = new Set<ExtractionMethod>([
-  "vision",
-  "text_llm",
-  "ocr_text_llm",
-]);
 const IMAGE_METHODS = new Set<ExtractionMethod>([
   "ocr",
   "ocr_text_llm",
@@ -121,10 +116,6 @@ function errorCode(error: unknown): string | undefined {
 function isRefusal(error: unknown): boolean {
   const status = errorStatus(error);
   return status !== undefined && status < 500;
-}
-
-function isModelMethod(method: ExtractionMethod): method is ModelMethod {
-  return MODEL_METHODS.has(method);
 }
 
 function uniqueWarnings(warnings?: string[]): string[] {
@@ -376,8 +367,10 @@ export function useShowSource({
   function receive(job: ShowJob) {
     const execution = job.result?.execution;
     const draft = job.result?.draft;
+    // «Pasted text» only ever holds what the editor typed or pasted: the
+    // text Crate read stays in each row's evidence, so running the import
+    // again never sends it back as if the editor had pasted it.
     if (draft?.candidates) {
-      setTextValue(draft.raw_text ?? "");
       onDraft({ ...draft, draft_id: execution?.draft_id });
       setWarnings(uniqueWarnings(draft.warnings));
       setStatus(foundText(draft));
@@ -511,10 +504,12 @@ export function useShowSource({
         { signal: abort.signal },
       );
       if (abort.signal.aborted) return;
+      // The stored input keeps the editor's own pasted text apart from the
+      // text Crate read, so only that comes back into «Pasted text».
+      setTextValue(saved.input?.raw_text ?? "");
       if (saved.input) {
         setStoredImages(saved.input.upload_ids ?? []);
         setImages([]);
-        setTextValue(saved.input.raw_text ?? "");
         setUrlValue(saved.input.source_url ?? "");
         // Only a free method is restored. An AI method must be picked again
         // on its card, with the model it shows now.
@@ -523,7 +518,6 @@ export function useShowSource({
       }
       if (saved.result?.candidates) {
         onDraft({ ...saved.result, draft_id: row.id });
-        setTextValue(saved.result.raw_text ?? "");
         setWarnings(uniqueWarnings(saved.result.warnings));
         setStatus(REOPENED_TEXT);
         return;

@@ -1,20 +1,47 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderPlain,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement, ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
+import { AuthContext } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { reasonText } from "@/lib/ai-models";
+import { createMockAuthValue } from "@/test/render-with-admin-providers";
 import { ShowSourcePanel } from "./ShowSourcePanel";
 import type { ShowAvailability, ShowDraft } from "./show-import-types";
 import { useShowSource } from "./use-show-source";
 
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
-beforeEach(() => vi.clearAllMocks());
+
+// The capabilities the signed-in editor has; every test starts with all.
+let denied = new Set<string>();
+beforeEach(() => {
+  vi.clearAllMocks();
+  denied = new Set();
+});
+
+// A wrapper (not a wrapped element), so `rerender` keeps the providers.
+function Providers({ children }: { children: ReactNode }) {
+  return (
+    <AuthContext.Provider
+      value={createMockAuthValue({
+        hasCapability: (capability: string) => !denied.has(capability),
+      })}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function render(ui: ReactElement) {
+  return renderPlain(ui, { wrapper: Providers });
+}
 
 type ApiArgs = [
   url: string,
@@ -190,9 +217,9 @@ it("lets the editor retry a lost readiness acceptance with the same key", async 
   await waitFor(() => expect(probeBodies()).toHaveLength(1));
   await user.upload(screen.getByLabelText("Images"), png());
   expect(
-    await screen.findByText("Couldn't check the OCR worker"),
+    (await screen.findAllByText("Couldn't check the OCR worker"))[0],
   ).toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Check again" }));
+  await user.click(screen.getAllByRole("button", { name: "Check again" })[0]!);
   await waitFor(() => expect(probeBodies()).toHaveLength(2));
   const [first, second] = probeBodies();
   expect(first).toEqual(
@@ -518,7 +545,8 @@ it("checks the worker once when readiness is stale and shows the result", async 
   render(<Harness />);
   await waitFor(() => expect(requests("/jobs/probe-1")).toHaveLength(1));
   await user.upload(screen.getByLabelText("Images"), png());
-  expect(screen.getByText("Checking the OCR worker…")).toBeVisible();
+  // Both OCR cards read the image with the worker's OCR engine.
+  expect(screen.getAllByText("Checking the OCR worker…")).toHaveLength(2);
   expect(screen.getByRole("button", { name: "Find dates" })).toBeEnabled();
   await act(async () =>
     probe.resolve({
@@ -527,7 +555,7 @@ it("checks the worker once when readiness is stale and shows the result", async 
       result: { draft: { readiness: { ocr: { available: true } } } },
     }),
   );
-  expect(await screen.findByText("OCR ready")).toBeVisible();
+  expect(await screen.findAllByText("OCR ready")).toHaveLength(2);
   expect(probeBodies()).toHaveLength(1);
   expect(probeBodies()[0]).toEqual({
     mode: "probe",
@@ -549,7 +577,7 @@ it("does not check the worker when readiness is fresh", async () => {
   render(<Harness />);
   await waitFor(() => expect(requests("/drafts")).toHaveLength(1));
   await user.upload(screen.getByLabelText("Images"), png());
-  expect(await screen.findByText("OCR ready")).toBeVisible();
+  expect(await screen.findAllByText("OCR ready")).toHaveLength(2);
   expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
   expect(requests("/extractions", "POST")).toHaveLength(0);
 });
@@ -734,12 +762,12 @@ it("forgets a failed readiness check once fresh availability arrives", async () 
   await waitFor(() => expect(probeBodies()).toHaveLength(1));
   await user.upload(screen.getByLabelText("Images"), png());
   expect(
-    await screen.findByText("Couldn't check the OCR worker"),
+    (await screen.findAllByText("Couldn't check the OCR worker"))[0],
   ).toBeVisible();
   rerender(<Harness active={false} />);
   rerender(<Harness />);
   await waitFor(() => expect(requests("/availability")).toHaveLength(2));
-  expect(await screen.findByText("OCR unavailable")).toBeVisible();
+  expect((await screen.findAllByText("OCR unavailable"))[0]).toBeVisible();
   expect(screen.queryByText("Couldn't check the OCR worker")).toBeNull();
   expect(radio("Local OCR")).toBeDisabled();
   for (const option of screen.getAllByRole("radio"))
@@ -785,7 +813,7 @@ it("explains when the import methods can't load and lets the editor try again", 
   expect(screen.queryByText("Checking AI models…")).toBeNull();
   expect(screen.getByRole("button", { name: "Find dates" })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "Try again" }));
-  expect(await screen.findByText("OCR ready")).toBeVisible();
+  expect((await screen.findAllByText("OCR ready"))[0]).toBeVisible();
   expect(radio("Local OCR")).toBeChecked();
   expect(screen.queryByText("Couldn't load the import methods.")).toBeNull();
 });
@@ -846,5 +874,176 @@ it("keeps the status region in the accessibility tree and headings in order", as
   await user.click(screen.getByRole("button", { name: "Find dates" }));
   expect(
     await screen.findByRole("heading", { level: 3, name: "Notes" }),
+  ).toBeVisible();
+});
+
+function methodCard(name: string) {
+  // The radio sits in the card's title row; the card holds its badges.
+  return radio(name).parentElement!.parentElement!;
+}
+
+it("shows the OCR status and «Check again» on Local OCR + AI too", async () => {
+  sourceApi({
+    availability: () => stale(),
+    extractions: () => {
+      throw Object.assign(new Error("Busy"), { status: 429 });
+    },
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  await waitFor(() => expect(probeBodies()).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  const card = methodCard("Local OCR + AI");
+  expect(await within(card).findByText("OCR not checked")).toBeVisible();
+  await user.click(within(card).getByRole("button", { name: "Check again" }));
+  await waitFor(() => expect(probeBodies()).toHaveLength(2));
+  expect(
+    within(methodCard("Local OCR")).getByText("OCR not checked"),
+  ).toBeVisible();
+});
+
+it("links AI models only for editors who can open it", async () => {
+  denied = new Set(["ai.config.read"]);
+  sourceApi({
+    availability: () =>
+      availability({
+        actions: {
+          vision: { configured: false, reason: "AI_ACTION_DISABLED" },
+          ocr_text_llm: { ...CONFIGURED },
+        },
+      }),
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  const card = methodCard("AI image reading");
+  expect(
+    within(card).getByText(reasonText("AI_ACTION_DISABLED")),
+  ).toBeVisible();
+  expect(
+    within(card).getByText("An admin can turn this on in AI models."),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("link", { name: "Manage in AI models" }),
+  ).toBeNull();
+});
+
+it("keeps only the editor's own text in «Pasted text» after an import", async () => {
+  const recognized = {
+    raw_text: "MAR 02 SALA NORTE\nMAR 04 SALA SUR",
+    coverage: "incomplete",
+    candidates: [
+      { item_id: "a", date: "2027-03-02" },
+      { item_id: "b", date: "2027-03-04" },
+    ],
+  };
+  sourceApi({
+    jobs: (url) => ({
+      job_id: url.split("/").pop(),
+      status: "completed",
+      result: {
+        draft: recognized,
+        execution: { status: "completed", draft_id: "d" },
+      },
+    }),
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  expect(radio("Local OCR")).toBeChecked();
+  await user.click(screen.getByRole("button", { name: "Find dates" }));
+  await screen.findByText(/Found 2 shows/);
+  expect(screen.getByLabelText("Pasted text")).toHaveValue("");
+  await user.click(screen.getByRole("button", { name: "Find dates" }));
+  await waitFor(() => expect(extractionBodies()).toHaveLength(2));
+  expect(extractionBodies()[1]).toEqual(
+    expect.objectContaining({ mode: "ocr", raw_text: "" }),
+  );
+
+  await user.type(screen.getByLabelText("Pasted text"), "Tour: March");
+  await user.click(screen.getByRole("button", { name: "Find dates" }));
+  await waitFor(() => expect(extractionBodies()).toHaveLength(3));
+  await screen.findByText(/Found 2 shows/);
+  expect(screen.getByLabelText("Pasted text")).toHaveValue("Tour: March");
+});
+
+it.each([
+  ["the editor's pasted text", { raw_text: "My notes" }, "My notes"],
+  ["nothing the editor pasted", { raw_text: "" }, ""],
+  ["no stored input", null, ""],
+] as const)(
+  "reopens an import with %s in «Pasted text»",
+  async (_name, input, expected) => {
+    sourceApi({
+      drafts: () => ({
+        items: [
+          {
+            id: "d1",
+            job_id: "job-123",
+            status: "completed",
+            mode: "ocr",
+            candidate_count: 1,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      }),
+      draft: () => ({
+        id: "d1",
+        job_id: "job-123",
+        status: "completed",
+        result: {
+          raw_text: "TEXT CRATE READ",
+          coverage: "incomplete",
+          candidates: [{ item_id: "a", date: "2027-03-02" }],
+        },
+        ...(input
+          ? {
+              input: {
+                mode: "ocr",
+                source_url: null,
+                upload_ids: [],
+                ...input,
+              },
+            }
+          : {}),
+      }),
+    });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.type(screen.getByLabelText("Pasted text"), "Typed before");
+    await user.click(
+      await screen.findByRole("button", { name: "Recent imports" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Open Local OCR import" }),
+    );
+    await screen.findByText(
+      "Import reopened. Saved shows stay linked; the rest are ready to review.",
+    );
+    expect(screen.getByLabelText("Pasted text")).toHaveValue(expected);
+  },
+);
+
+it("says what an image method sends besides the image", async () => {
+  sourceApi();
+  const user = userEvent.setup();
+  render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  await user.type(screen.getByLabelText("Pasted text"), "Tour text");
+  await user.click(radio("AI image reading"));
+  expect(
+    screen.getByText(
+      "Sends the image and your pasted text to gemini-3.8-flash once. This counts toward your AI usage.",
+    ),
+  ).toBeVisible();
+  await user.type(screen.getByLabelText("Event link"), "https://venue.test/x");
+  await user.click(radio("Local OCR + AI"));
+  expect(
+    screen.getByText(
+      "Sends the text read from the image, your pasted text and the linked page's text to gemini-3.8-flash once. The image stays on your server. This counts toward your AI usage.",
+    ),
   ).toBeVisible();
 });

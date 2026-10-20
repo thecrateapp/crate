@@ -2,14 +2,14 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { ShowPlanSummary } from "./ShowPlanSummary";
-import type { ShowCandidate, ShowPlan } from "./show-import-types";
+import type { ShowCandidate, ShowImportPlan } from "./show-import-types";
 
 const candidates: ShowCandidate[] = [
   { item_id: "a", artist_name: "Band", date: "2027-03-02" },
   { item_id: "b", artist_name: "Band", date: "2027-03-04" },
 ];
 
-function plan(overrides: Partial<ShowPlan>): ShowPlan {
+function plan(overrides: Partial<ShowImportPlan>): ShowImportPlan {
   return {
     plan_id: "d105bd45-92c0-4f99-b12a-bb1cc8910fa1",
     plan_version: "a".repeat(64),
@@ -73,7 +73,67 @@ it("shows an update as before → after, highlights each change and counts the r
   );
 
   expect(within(card).queryByText("Artist", { selector: "dt" })).toBeNull();
-  expect(within(card).getByText("3 unchanged fields")).toBeVisible();
+  // The artist of a show matched by its details is kept, so it isn't counted.
+  expect(within(card).getByText("2 unchanged fields")).toBeVisible();
+});
+
+it("reads an update that changes nothing as already in Crate", () => {
+  const saved = {
+    artist_name: "Band",
+    date: "2027-03-02",
+    venue: "Hall",
+    city: "Madrid",
+  };
+  render(
+    <ShowPlanSummary
+      plan={plan({
+        changes: [
+          {
+            item_id: "a",
+            before: saved,
+            after: { item_id: "a", ...saved, artist_name: "BAND" },
+          },
+        ],
+      })}
+      candidates={candidates}
+      onUseExisting={vi.fn()}
+      onUseArtist={vi.fn()}
+    />,
+  );
+  const card = screen.getByRole("listitem");
+  expect(within(card).getByText("Already in Crate · no changes")).toBeVisible();
+  expect(within(card).queryByText("Update")).toBeNull();
+  expect(within(card).queryByText(/unchanged field/)).toBeNull();
+  expect(within(card).queryByRole("term")).toBeNull();
+});
+
+it("shows the artist change of an explicitly chosen show", () => {
+  render(
+    <ShowPlanSummary
+      plan={plan({
+        changes: [
+          {
+            item_id: "a",
+            before: { artist_name: "Band", date: "2027-03-02" },
+            after: {
+              item_id: "a",
+              artist_name: "The Band",
+              date: "2027-03-02",
+              existing_show_id: 42,
+            },
+          },
+        ],
+      })}
+      candidates={candidates}
+      onUseExisting={vi.fn()}
+      onUseArtist={vi.fn()}
+    />,
+  );
+  const card = screen.getByRole("listitem");
+  expect(within(card).getByText("Update")).toBeVisible();
+  expect(fieldRow(card, "Artist").value).toHaveTextContent(
+    /^Band\s*→.*The Band$/,
+  );
 });
 
 it("names each issue's actions after its row while keeping the visible text", async () => {
@@ -104,7 +164,7 @@ it("names each issue's actions after its row while keeping the visible text", as
   expect(update).toHaveTextContent(/^Update the existing show$/);
   expect(
     screen.getByRole("link", { name: "View it (Show 1)" }),
-  ).toHaveAttribute("href", "/shows?show_id=41");
+  ).toHaveAttribute("href", "/upcoming?show_id=41");
   expect(
     screen.getByRole("link", { name: "View it (Show 2)" }),
   ).toHaveTextContent(/^View it$/);

@@ -200,7 +200,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
       } else {
         expect(
           await screen.findByRole("link", { name: "Open show" }),
-        ).toHaveAttribute("href", "/shows?show_id=7");
+        ).toHaveAttribute("href", "/upcoming?show_id=7");
         expect(saved).toHaveBeenCalledOnce();
       }
       expect(posts(kind === "prepare" ? "/plans" : "/apply")).toHaveLength(1);
@@ -294,7 +294,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
       screen
         .getAllByRole("link", { name: "Open show" })
         .map((link) => link.getAttribute("href")),
-    ).toEqual(["/shows?show_id=8"]);
+    ).toEqual(["/upcoming?show_id=8"]);
     expect(rows.every((row) => row.city === "Original City")).toBe(true);
   });
 
@@ -309,7 +309,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
     await user.click(await screen.findByRole("button", { name: "Save show" }));
     expect(
       await screen.findByRole("link", { name: "Open show" }),
-    ).toHaveAttribute("href", "/shows?show_id=7");
+    ).toHaveAttribute("href", "/upcoming?show_id=7");
     expect(screen.getByText("Show saved.")).toBeVisible();
     expect(saved).toHaveBeenCalledOnce();
     expect(
@@ -649,7 +649,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "View it (Show 1)" }),
-    ).toHaveAttribute("href", "/shows?show_id=42");
+    ).toHaveAttribute("href", "/upcoming?show_id=42");
     expect(
       screen.getByRole("button", { name: "Use Listed Band (Show 1)" }),
     ).toHaveAttribute("title", artistUid);
@@ -912,5 +912,236 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
         'select, details, pre, input[type="checkbox"]:not([aria-hidden]), input[type="radio"]:not([aria-hidden])',
       ),
     ).toBeNull();
+  });
+
+  it("starts over after a partial save, asking first and leaving saved shows alone", async () => {
+    tourApi(4);
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    await importTour(user);
+    await screen.findByLabelText("Select show 4");
+    for (const index of [1, 2, 3])
+      await user.click(screen.getByLabelText(`Select show ${index}`));
+    await user.click(screen.getByRole("button", { name: "Review 3 shows" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Save 3 shows" }),
+    );
+    await screen.findByText("1 of 1 shows selected · 3 saved");
+    const requests = vi.mocked(api).mock.calls.length;
+    await user.click(footerButton("Start over"));
+    const confirm = await screen.findByRole("alertdialog", {
+      name: "Discard 1 unsaved show?",
+    });
+    await user.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByLabelText("Date for show 4")).toHaveValue("2027-03-04");
+    await user.click(footerButton("Start over"));
+    await user.click(
+      within(
+        await screen.findByRole("alertdialog", {
+          name: "Discard 1 unsaved show?",
+        }),
+      ).getByRole("button", { name: "Discard" }),
+    );
+    expect(screen.getByRole("radio", { name: "Enter manually" })).toBeChecked();
+    expect(screen.getByLabelText("Artist")).toHaveValue("");
+    expect(screen.getByLabelText("Artist")).toBeEnabled();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Venue")).not.toHaveAttribute("aria-invalid");
+    expect(footerButton("Start over")).toBeDisabled();
+    // Discarding is local: nothing is sent, so saved shows stay in Crate.
+    expect(vi.mocked(api).mock.calls.length).toBe(requests);
+    await user.click(
+      screen.getByRole("radio", { name: "Import from flyer, text or link" }),
+    );
+    expect(await screen.findByLabelText("Pasted text")).toHaveValue("");
+  });
+
+  it("starts over at once when only the source holds something", async () => {
+    tourApi(1);
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    expect(footerButton("Start over")).toBeDisabled();
+    await user.click(
+      screen.getByRole("radio", { name: "Import from flyer, text or link" }),
+    );
+    await user.type(await screen.findByLabelText("Pasted text"), "tour");
+    await user.click(footerButton("Start over"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Enter manually" })).toBeChecked();
+    await user.click(
+      screen.getByRole("radio", { name: "Import from flyer, text or link" }),
+    );
+    expect(await screen.findByLabelText("Pasted text")).toHaveValue("");
+  });
+
+  it("keeps «Start over» off while a save runs", async () => {
+    const implementation = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (...args) =>
+      args[0].endsWith("/jobs/apply-1")
+        ? new Promise(() => {})
+        : implementation(...args),
+    );
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = await fillManual();
+    expect(footerButton("Start over")).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Review show" }));
+    await user.click(await screen.findByRole("button", { name: "Save show" }));
+    await screen.findByText("Saving the reviewed selection…");
+    expect(footerButton("Start over")).toBeDisabled();
+    await user.click(footerButton("Start over"));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Artist")).toHaveValue("External Band");
+  });
+
+  it("keeps a re-imported tour at one row per show", async () => {
+    let run = 0;
+    const implementation = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (...args) => {
+      const url = args[0];
+      if (url.endsWith("/availability")) return FRESH_AVAILABILITY;
+      if (url.endsWith("/drafts")) return { items: [] };
+      if (url.endsWith("/extractions")) {
+        run += 1;
+        return { job_id: `extract-${run}` };
+      }
+      if (url.includes("/jobs/extract-"))
+        return {
+          status: "completed",
+          result: {
+            execution: { status: "completed", draft_id: `draft-${run}` },
+            draft: {
+              raw_text: "tour",
+              coverage: "incomplete",
+              candidates: [2, 4, 6].map((day) => ({
+                item_id: `run-${run}-${day}`,
+                artist_name: "Band",
+                date: `2027-03-0${day}`,
+                venue: "Hall",
+                city: "City",
+              })),
+            },
+          },
+        };
+      return implementation(...args);
+    });
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    await importTour(user);
+    await screen.findByLabelText("Select show 3");
+    await user.click(screen.getByRole("button", { name: "Find dates" }));
+    await waitFor(() => expect(run).toBe(2));
+    await screen.findByText(/Found 3 shows/);
+    expect(screen.getByLabelText("Select show 3")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Select show 4")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Pasted text")).toHaveValue("tour");
+  });
+
+  it("asks to select shows when several rows have none selected", async () => {
+    tourApi(2);
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    await importTour(user);
+    await screen.findByLabelText("Select show 2");
+    expect(footerButton("Select shows to review")).toBeDisabled();
+    await user.click(screen.getByLabelText("Select show 1"));
+    expect(footerButton("Review show")).toBeEnabled();
+  });
+
+  it("announces every state in one status region that is always there", async () => {
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    const user = await fillManual();
+    await user.click(screen.getByRole("button", { name: "Review show" }));
+    await screen.findByRole("button", { name: "Save show" });
+    await user.type(screen.getByLabelText("Venue"), " Annex");
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent(
+      "The draft changed. Review again before saving.",
+    );
+    await user.click(screen.getByRole("button", { name: "Review show" }));
+    await user.click(await screen.findByRole("button", { name: "Save show" }));
+    await waitFor(() => expect(status).toHaveTextContent("Show saved."));
+    expect(screen.getByRole("status")).toBe(status);
+  });
+
+  it.each([
+    [
+      true,
+      "This change needs approval first. Approve it in Agent approvals, then save again.",
+    ],
+    [
+      false,
+      "This change needs approval first. Someone who can approve changes must approve it in Agent approvals. Then come back and save again.",
+    ],
+  ])(
+    "explains a save that still needs approval (can approve: %s)",
+    async (canApprove, text) => {
+      const implementation = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (...args) => {
+        if (args[0].endsWith("/apply"))
+          throw Object.assign(
+            new Error(JSON.stringify({ detail: "Approval required" })),
+            { status: 409, code: "APPROVAL_REQUIRED" },
+          );
+        return implementation(...args);
+      });
+      planOverrides = () => ({ approval_required: true });
+      renderWithAdminProviders(
+        <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+        {
+          auth: {
+            hasCapability: (capability: string) =>
+              canApprove || capability !== "agents.plans.review",
+          },
+        },
+      );
+      const user = await fillManual();
+      await user.click(screen.getByRole("button", { name: "Review show" }));
+      expect(
+        screen.queryAllByRole("link", { name: "Open in Agent approvals" }),
+      ).toHaveLength(canApprove ? 1 : 0);
+      await user.click(
+        await screen.findByRole("button", { name: "Save show" }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(text);
+    },
+  );
+
+  it("explains that another job of the editor's is still running", async () => {
+    const implementation = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (...args) => {
+      if (args[0].endsWith("/plans") && args[1] === "POST")
+        throw Object.assign(
+          new Error(
+            JSON.stringify({
+              detail: "This integration already has an active maintenance job",
+            }),
+          ),
+          { status: 429, code: "LIMIT_EXCEEDED" },
+        );
+      return implementation(...args);
+    });
+    renderWithAdminProviders(
+      <AddShowSheet open onOpenChange={vi.fn()} onSaved={vi.fn()} />,
+    );
+    const user = await fillManual();
+    await user.click(screen.getByRole("button", { name: "Review show" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Another import or save of yours is still running. Try again in a moment.",
+    );
+    expect(screen.getByLabelText("Artist")).toBeEnabled();
   });
 });

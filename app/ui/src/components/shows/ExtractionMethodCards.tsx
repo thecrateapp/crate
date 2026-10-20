@@ -2,25 +2,30 @@ import { useId } from "react";
 import { RadioGroup, RadioGroupItem } from "@crate/ui/primitives/RadioGroup";
 import { Button } from "@crate/ui/shadcn/button";
 import { StatusBadge } from "@/components/admin/StatusBadge";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   aiSendNote,
   readinessView,
   type MethodOption,
   type ReadinessState,
+  type SentAlong,
 } from "./show-import-presentation";
 import type { ExtractionMethod } from "./show-import-types";
+
+// Both read the image with the worker's OCR engine first.
+const OCR_METHODS = new Set<ExtractionMethod>(["ocr", "ocr_text_llm"]);
 
 function MethodCard({
   option,
   checked,
   readiness,
-  ocrReason,
+  canManageModels,
   onRecheck,
 }: {
   option: MethodOption;
   checked: boolean;
   readiness: ReadinessState;
-  ocrReason?: string | null;
+  canManageModels: boolean;
   onRecheck: () => void;
 }) {
   const id = useId();
@@ -28,8 +33,8 @@ function MethodCard({
   const descriptionId = `${id}-description`;
   const costId = `${id}-cost`;
   const reasonId = `${id}-reason`;
-  const isOcr = option.method === "ocr";
-  const view = isOcr ? readinessView(readiness, ocrReason) : null;
+  const isOcr = OCR_METHODS.has(option.method);
+  const view = isOcr ? readinessView(readiness) : null;
   const canRecheck =
     isOcr && (readiness === "unchecked" || readiness === "failed");
   return (
@@ -68,15 +73,23 @@ function MethodCard({
           <p id={reasonId} className="text-state-warning-text">
             {option.disabledReason}
           </p>
+          {/* AI models is gated by ai.config.read; without it the link
+              only leads to «Permission required». */}
           {option.manageInAiModels ? (
-            <a
-              href="/ai"
-              target="_blank"
-              rel="noreferrer"
-              className="text-foreground underline underline-offset-2"
-            >
-              Manage in AI models
-            </a>
+            canManageModels ? (
+              <a
+                href="/ai"
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                Manage in AI models
+              </a>
+            ) : (
+              <p className="text-muted-foreground">
+                An admin can turn this on in AI models.
+              </p>
+            )
           ) : null}
         </div>
       ) : null}
@@ -98,7 +111,7 @@ export function ExtractionMethodCards({
   options,
   value,
   readiness,
-  ocrReason,
+  along,
   disabled = false,
   onChange,
   onRecheck,
@@ -106,13 +119,16 @@ export function ExtractionMethodCards({
   options: MethodOption[];
   value: ExtractionMethod | null;
   readiness: ReadinessState;
-  ocrReason?: string | null;
+  /** The text sources an image method sends along with the image. */
+  along: SentAlong;
   disabled?: boolean;
   onChange: (method: ExtractionMethod) => void;
   onRecheck: () => void;
 }) {
+  const { hasCapability } = useAuth();
+  const canManageModels = hasCapability("ai.config.read");
   const selected = options.find((option) => option.method === value) ?? null;
-  const note = selected ? aiSendNote(selected) : null;
+  const note = selected ? aiSendNote(selected, along) : null;
   return (
     <div className="space-y-2">
       <RadioGroup
@@ -128,7 +144,7 @@ export function ExtractionMethodCards({
             option={option}
             checked={option.method === value}
             readiness={readiness}
-            ocrReason={ocrReason}
+            canManageModels={canManageModels}
             onRecheck={onRecheck}
           />
         ))}

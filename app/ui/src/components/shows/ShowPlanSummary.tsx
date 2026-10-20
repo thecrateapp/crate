@@ -8,11 +8,14 @@ import {
   countLabel,
   issueText,
   planChangeView,
+  showLinkPath,
   type PlanChangeView,
 } from "./show-import-presentation";
-import type { ShowCandidate, ShowPlan } from "./show-import-types";
-
-type ShowIssue = NonNullable<ShowPlan["issues"]>[number];
+import type {
+  ShowCandidate,
+  ShowImportPlan,
+  ShowPlanIssue,
+} from "./show-import-types";
 
 function fieldValue(key: string, value: unknown): unknown {
   return key === "status" && typeof value === "string"
@@ -21,7 +24,9 @@ function fieldValue(key: string, value: unknown): unknown {
 }
 
 function FieldRows({ view }: { view: PlanChangeView }) {
-  if (!view.fields.length && !view.unchanged) return null;
+  // «Already in Crate · no changes» says it all; no field list is needed.
+  if (view.unchangedUpdate || (!view.fields.length && !view.unchanged))
+    return null;
   return (
     <div className="space-y-1">
       <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[minmax(7rem,auto)_1fr]">
@@ -113,7 +118,7 @@ function IssueRow({
   onUseExisting,
   onUseArtist,
 }: {
-  issue: ShowIssue;
+  issue: ShowPlanIssue;
   label: string | null;
   disabled: boolean;
   onUseExisting: (itemId: string, showId: number) => void;
@@ -154,7 +159,7 @@ function IssueRow({
                   : "Update the existing show"}
               </Button>
               <a
-                href={`/shows?show_id=${showId}`}
+                href={showLinkPath(showId)}
                 target="_blank"
                 rel="noreferrer"
                 aria-label={named(
@@ -194,7 +199,7 @@ export function ShowPlanSummary({
   onUseExisting,
   onUseArtist,
 }: {
-  plan: ShowPlan;
+  plan: ShowImportPlan;
   candidates: ShowCandidate[];
   disabled?: boolean;
   onUseExisting: (itemId: string, showId: number) => void;
@@ -235,8 +240,20 @@ export function ShowPlanSummary({
             className="space-y-3 rounded-md border border-border p-3"
           >
             <div className="flex flex-wrap items-start gap-2">
-              <StatusBadge tone={view.isUpdate ? "warning" : "info"}>
-                {view.isUpdate ? "Update" : "New"}
+              <StatusBadge
+                tone={
+                  view.unchangedUpdate
+                    ? "neutral"
+                    : view.isUpdate
+                      ? "warning"
+                      : "info"
+                }
+              >
+                {view.unchangedUpdate
+                  ? "Already in Crate · no changes"
+                  : view.isUpdate
+                    ? "Update"
+                    : "New"}
               </StatusBadge>
               <div className="min-w-0 flex-1">
                 <h4 className="text-sm font-medium">{view.title}</h4>

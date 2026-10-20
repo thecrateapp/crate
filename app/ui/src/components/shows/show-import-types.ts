@@ -71,29 +71,69 @@ export interface ShowDraftRow {
   candidate_count?: number | null;
 }
 
-export interface ShowPlan {
+export interface ShowPlanIssue {
+  item_id: string;
+  reason?: string;
+  missing?: string[];
+  matches?: number[];
+  artist_matches?: { artist_uid: string; name: string }[];
+  status?: string;
+  related_item_id?: string;
+}
+
+interface ShowPlanBase {
   plan_id: string;
   plan_version: string;
   executable: boolean;
   approval_required?: boolean;
-  kind?: string;
   notices?: string[];
   reversibility?: string;
+  issues?: ShowPlanIssue[];
+}
+
+export interface ShowImportChange {
+  item_id: string;
+  before: Record<string, unknown>;
+  after: ShowCandidate & { source_manifest?: unknown };
+}
+
+/** A plan that creates or updates the selected shows. */
+export interface ShowImportPlan extends ShowPlanBase {
+  kind?: undefined;
+  changes: ShowImportChange[];
+}
+
+/** A saved show as the merge editor and the merge review read it. */
+export interface ConsolidationShow {
+  id: number;
+  revision: number;
+  artist_name?: string | null;
+  date?: string | null;
+  local_time?: string | null;
+  venue?: string | null;
+  city?: string | null;
+  merged_into_id?: number | null;
+  attendance_count: number;
+  reminder_count: number;
+}
+
+export interface ShowConsolidation {
+  canonical_show_id: number;
+  duplicate_show_ids: number[];
+  revisions: Record<string, number>;
+}
+
+/** A plan that merges duplicate saved shows into one. */
+export interface ShowConsolidationPlan extends ShowPlanBase {
+  kind: "consolidation";
   changes: {
     item_id: string;
-    before: Record<string, unknown>;
-    after: ShowCandidate & { source_manifest?: unknown };
-  }[];
-  issues?: {
-    item_id: string;
-    reason?: string;
-    missing?: string[];
-    matches?: number[];
-    artist_matches?: { artist_uid: string; name: string }[];
-    status?: string;
-    related_item_id?: string;
+    before: { shows?: ConsolidationShow[] };
+    after: ShowConsolidation;
   }[];
 }
+
+export type ShowPlan = ShowImportPlan | ShowConsolidationPlan;
 
 export interface ShowJob {
   job_id: string;

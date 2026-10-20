@@ -78,8 +78,8 @@ it("keeps every tour row, counts pending shows and locks saved rows", async () =
   expect(screen.getByText("Not saved")).toBeVisible();
   const links = screen.getAllByRole("link", { name: "Open show" });
   expect(links.map((link) => link.getAttribute("href"))).toEqual([
-    "/shows?show_id=7",
-    "/shows?show_id=8",
+    "/upcoming?show_id=7",
+    "/upcoming?show_id=8",
   ]);
   for (const link of links) {
     expect(link).toHaveAttribute("target", "_blank");
