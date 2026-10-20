@@ -40,15 +40,49 @@ export interface ShowOutcome {
   code?: string;
 }
 
+export type ExtractionMethod =
+  "ocr" | "parse" | "vision" | "text_llm" | "ocr_text_llm";
+
+export type ModelMethod = Extract<
+  ExtractionMethod,
+  "vision" | "text_llm" | "ocr_text_llm"
+>;
+
+export interface ShowModelAvailability {
+  configured: boolean;
+  model?: string | null;
+  provider?: string | null;
+  configuration_fingerprint?: string | null;
+  reason?: string | null;
+}
+
+export interface ShowAvailability {
+  ocr: { available: boolean; reason?: string | null };
+  checked_at?: string;
+  actions?: Partial<Record<ModelMethod, ShowModelAvailability>>;
+}
+
+export interface ShowDraftRow {
+  id: string;
+  job_id: string;
+  status: string;
+  mode?: ExtractionMethod | null;
+  created_at?: string | null;
+  candidate_count?: number | null;
+}
+
 export interface ShowPlan {
   plan_id: string;
   plan_version: string;
   executable: boolean;
   approval_required?: boolean;
+  kind?: string;
+  notices?: string[];
+  reversibility?: string;
   changes: {
     item_id: string;
     before: Record<string, unknown>;
-    after: ShowCandidate;
+    after: ShowCandidate & { source_manifest?: unknown };
   }[];
   issues?: {
     item_id: string;
@@ -56,6 +90,8 @@ export interface ShowPlan {
     missing?: string[];
     matches?: number[];
     artist_matches?: { artist_uid: string; name: string }[];
+    status?: string;
+    related_item_id?: string;
   }[];
 }
 
@@ -64,25 +100,7 @@ export interface ShowJob {
   status: string;
   result?: {
     draft?: ShowDraft & {
-      readiness?: {
-        actions?: Partial<
-          Record<
-            "vision" | "text_llm" | "ocr_text_llm",
-            {
-              configured: boolean;
-              model?: string;
-              configuration_fingerprint?: string;
-              connectivity: string;
-              vision: string;
-            }
-          >
-        >;
-        configured: boolean;
-        model?: string;
-        connectivity: string;
-        vision: string;
-        ocr: { available: boolean; reason?: string };
-      };
+      readiness?: ShowAvailability;
     };
     plan?: ShowPlan;
     execution?: {

@@ -111,7 +111,12 @@ export function ShowSourceImport({
   async function receive(job: ShowJob) {
     const draft = job.result?.draft;
     if (draft?.readiness) {
-      setAvailability(draft.readiness);
+      // `ShowJob`'s readiness is typed narrowly for the new pure helpers
+      // (`show-import-presentation.ts`); the worker still sends this
+      // component's richer legacy shape (connectivity/vision) at runtime.
+      // This component is replaced by the Sheet-based import flow in a
+      // later task, so it keeps its own local `Availability` shape here.
+      setAvailability(draft.readiness as unknown as Availability);
       setStatus("Worker readiness checked; no billable extraction was made.");
       return;
     }
