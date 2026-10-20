@@ -4027,6 +4027,10 @@
     "sourceHash": "sha256:9c8a47f0c3237cbc529f32513c4327bb4df55fe24214393bc8e9650f7935e91e",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "player.info.error": {
+    "sourceHash": "sha256:d0aee57b2c509130f30cd349901cfca27d29b3a36dc16f98553f61856fa5bbfb",
+    "reviewedAt": "2026-10-20T21:55:47.581Z"
+  },
   "player.info.helper.crateScore": {
     "sourceHash": "sha256:5ebb51824d8d40259a1bf45cfb7481733015b5b792b02f3f937ef6ca3c5fd51d",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -4058,6 +4062,10 @@
   "player.info.helper.normalizedScore": {
     "sourceHash": "sha256:fc7e6eb561138f1ec5070001ee8fdaec408c3a91e766270ac5529a48b8fe3e1c",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.info.loading": {
+    "sourceHash": "sha256:07a1fef7dac6ad5288b76ddf87f3613f8eab29f3f57a22d1325be4aaf35c2afb",
+    "reviewedAt": "2026-10-20T21:55:47.581Z"
   },
   "player.info.metric.acousticness": {
     "sourceHash": "sha256:80f25097ea623bdbee3c4c01f73e591b425760710ac07a8c85035c989c5392c1",
@@ -4142,6 +4150,10 @@
   "player.info.openArtist": {
     "sourceHash": "sha256:71ef1d35d1aecf012c2817d5832b5f21029a9d24ea0d008805cd242f8c280fa1",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.info.playbackQuality": {
+    "sourceHash": "sha256:c8fa07e164c775557f292cca02aac35f7d868728c66699cf0be92e8ce0e50971",
+    "reviewedAt": "2026-10-20T22:03:06.409Z"
   },
   "player.info.rating": {
     "sourceHash": "sha256:c8e5accb3fe954a1d5edb432b84bb7fb6ebbcdcc229ae5930c305850171bf753",
@@ -4234,6 +4246,10 @@
   "player.lyrics.empty": {
     "sourceHash": "sha256:63363c4756137763f47d751308f88bf978452959c1d9a4489fb39712cb3742b9",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.lyrics.error": {
+    "sourceHash": "sha256:af3ba235e04dfe60deee2d9f62ca35c155897d0d9a6a27da8f1548ddb538dc26",
+    "reviewedAt": "2026-10-20T21:55:47.581Z"
   },
   "player.lyrics.loading": {
     "sourceHash": "sha256:26cc5c13da04465f075a4e4f67986c52d0bf90a3d754e653443dda6806fdbe4a",

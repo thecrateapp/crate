@@ -85,6 +85,9 @@ export type FullscreenPlayerViewProps = {
   refs: ViewRefs;
   actions: ViewActions;
   lyrics: FullscreenLyrics | null;
+  lyricsLoading?: boolean;
+  lyricsError?: boolean;
+  onRetryLyrics?: () => void;
   activeLyricIndex: number;
   playerTabBottomClearance: string;
   scrollTabBottomClearance: string;

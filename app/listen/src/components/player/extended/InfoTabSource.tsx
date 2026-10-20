@@ -1,16 +1,18 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { HardDrive } from "@crate/ui/icons";
 
-import type { TrackInfo } from "@/lib/track-info";
+import type { TrackInfo } from "../../../lib/track-info-data";
 
 import { SectionCard, StatCard } from "./InfoTabPrimitives";
 
 export function InfoTabSource({
   info,
   qualityPills,
+  badge,
 }: {
   info: TrackInfo;
   qualityPills: string[];
+  badge?: ReactNode;
 }) {
   const { t } = useTranslation();
   const hasSourceDetails =
@@ -22,8 +24,8 @@ export function InfoTabSource({
     <SectionCard
       title={t("player.info.sections.source.title")}
       subtitle={t("player.info.sections.source.subtitle")}
-      icon={HardDrive}
     >
+      {badge ? <div className="flex">{badge}</div> : null}
       <div className="grid grid-cols-2 gap-3">
         {qualityPills.map((pill) => (
           <StatCard
@@ -35,14 +37,16 @@ export function InfoTabSource({
         {info.loudness != null ? (
           <StatCard
             label={t("player.info.metric.loudness")}
-            value={`${info.loudness.toFixed(1)} dB`}
+            value={info.loudness.toFixed(1)}
+            unit="dB"
             helper={t("player.info.helper.integratedLevel")}
           />
         ) : null}
         {info.dynamic_range != null ? (
           <StatCard
             label={t("player.info.metric.dynamics")}
-            value={`${info.dynamic_range.toFixed(1)} dB`}
+            value={info.dynamic_range.toFixed(1)}
+            unit="dB"
             helper={t("player.info.helper.dynamicRange")}
           />
         ) : null}

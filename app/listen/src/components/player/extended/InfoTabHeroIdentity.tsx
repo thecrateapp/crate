@@ -1,102 +1,76 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { useNavigate } from "react-router";
+import { FormField } from "@crate/ui/primitives/FormField";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { Track } from "@/contexts/player-types";
-import { albumPagePath, artistPagePath } from "@/lib/library-routes";
-import type { TrackInfo } from "@/lib/track-info";
-
+import { Button } from "@crate/ui/shadcn/button";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import type { Track } from "../../../contexts/player-types";
+import type { TrackInfo } from "../../../lib/track-info-data";
 export function InfoTabHeroIdentity({
   info,
   currentTrack,
-  audioSummary,
+  qualityBadge,
+  qualityLabel,
+  onOpenArtist,
+  onOpenAlbum,
 }: {
   info: TrackInfo;
   currentTrack: Track;
-  audioSummary: string[];
+  qualityBadge?: ReactNode;
+  qualityLabel?: string;
+  onOpenArtist?: () => void;
+  onOpenAlbum?: () => void;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const artistName = info.artist || currentTrack.artist;
-  const albumName = info.album || currentTrack.album;
-
-  const openArtist = () =>
-    navigate(
-      currentTrack.globalArtistUid
-        ? artistPagePath({
-            artistId: currentTrack.artistId,
-            globalArtistUid: currentTrack.globalArtistUid,
-            artistSlug: currentTrack.artistSlug,
-            artistName,
-          })
-        : artistPagePath({
-            artistId: currentTrack.artistId,
-            artistSlug: currentTrack.artistSlug,
-            artistName,
-          }),
-    );
-
-  const openAlbum = () =>
-    navigate(
-      currentTrack.globalAlbumUid
-        ? albumPagePath({
-            albumId: currentTrack.albumId,
-            globalAlbumUid: currentTrack.globalAlbumUid,
-            albumSlug: currentTrack.albumSlug,
-            albumName,
-            artistName,
-          })
-        : albumPagePath({
-            albumId: currentTrack.albumId,
-            albumSlug: currentTrack.albumSlug,
-            albumName,
-            artistName,
-          }),
-    );
-
+  const artist = info.artist || currentTrack.artist;
+  const album = info.album || currentTrack.album;
   return (
-    <div className="min-w-0 flex-1 pt-1">
-      <p className="text-xs font-semibold uppercase tracking-eyebrow-wide text-text-muted">
-        {t("player.info.nowInspecting")}
-      </p>
-      <h3 className="mt-1 text-xl font-semibold leading-tight text-text-primary text-balance">
+    <div className="grid min-w-0 flex-1 content-start gap-2 wrap-anywhere">
+      <MonoLabel>{t("player.info.nowInspecting")}</MonoLabel>
+      <h2 className="font-display text-2xl font-bold leading-tight text-text-primary">
         {info.title || currentTrack.title}
-      </h3>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-        {currentTrack.globalArtistUid || currentTrack.artistId ? (
-          <button
-            type="button"
-            aria-label={t("player.info.openArtist", { name: artistName })}
-            onClick={openArtist}
-            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-primary transition-colors hover:bg-surface-quiet"
+      </h2>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {onOpenArtist ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="max-w-full"
+            onClick={onOpenArtist}
+            aria-label={t("player.info.openArtist", { name: artist })}
           >
-            <span className="block truncate">{artistName}</span>
-          </button>
+            <span className="min-w-0 truncate">{artist}</span>
+          </Button>
         ) : (
-          <span className="truncate text-text-secondary">{artistName}</span>
+          <span className="text-sm text-text-muted">{artist}</span>
         )}
-
-        {albumName && (currentTrack.globalAlbumUid || currentTrack.albumId) ? (
-          <button
-            type="button"
-            aria-label={t("player.info.openAlbum", { name: albumName })}
-            onClick={openAlbum}
-            className="min-w-0 rounded-full border border-border-quiet bg-surface-quiet-subtle px-3 py-1 text-text-secondary transition-colors hover:bg-surface-quiet hover:text-text-primary"
-          >
-            <span className="block truncate">{albumName}</span>
-          </button>
-        ) : albumName ? (
-          <span className="truncate text-text-muted">{albumName}</span>
+        {album ? (
+          onOpenAlbum ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="max-w-full"
+              onClick={onOpenAlbum}
+              aria-label={t("player.info.openAlbum", { name: album })}
+            >
+              <span className="min-w-0 truncate">{album}</span>
+            </Button>
+          ) : (
+            <span className="text-sm text-text-muted">{album}</span>
+          )
         ) : null}
       </div>
-
-      {audioSummary.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {audioSummary.map((item) => (
-            <InfoBadge key={item}>{item}</InfoBadge>
-          ))}
-        </div>
+      {qualityBadge ? (
+        <FormField kind="group" label={qualityLabel}>
+          {(group) => (
+            <div
+              {...group}
+              role="group"
+              className="flex min-w-0 flex-wrap gap-2"
+            >
+              {qualityBadge}
+            </div>
+          )}
+        </FormField>
       ) : null}
     </div>
   );

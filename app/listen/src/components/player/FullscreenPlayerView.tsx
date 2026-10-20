@@ -18,6 +18,9 @@ export function FullscreenPlayerView({
   refs,
   actions,
   lyrics,
+  lyricsLoading,
+  lyricsError,
+  onRetryLyrics,
   activeLyricIndex,
   playerTabBottomClearance,
   scrollTabBottomClearance,
@@ -116,6 +119,9 @@ export function FullscreenPlayerView({
               <FullscreenPlayerLyricsTab
                 activeLyricIndex={activeLyricIndex}
                 lyrics={lyrics}
+                lyricsLoading={lyricsLoading}
+                lyricsError={lyricsError}
+                onRetryLyrics={onRetryLyrics}
                 refs={refs}
                 seek={actions.seek}
                 t={t}

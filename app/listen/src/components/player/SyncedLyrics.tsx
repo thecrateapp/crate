@@ -36,10 +36,22 @@ function LyricsClock({
         if (i === active) row.setAttribute("aria-current", "true");
         else row.removeAttribute("aria-current");
       });
-      rows[active]?.scrollIntoView?.({
-        block: "center",
-        behavior: isMotionBlocked() ? "instant" : "smooth",
-      });
+      const row = rows[active];
+      const surface = root.current?.closest<HTMLElement>(
+        '[data-slot="player-lyrics-surface"]',
+      );
+      if (row && surface) {
+        const rowBox = row.getBoundingClientRect();
+        const surfaceBox = surface.getBoundingClientRect();
+        surface.scrollTo?.({
+          top:
+            surface.scrollTop +
+            rowBox.top -
+            surfaceBox.top -
+            (surface.clientHeight - rowBox.height) / 2,
+          behavior: isMotionBlocked() ? "instant" : "smooth",
+        });
+      }
       previous.current = active;
     }
     const start = lines[active]?.time ?? 0;

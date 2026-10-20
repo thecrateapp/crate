@@ -1,7 +1,10 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { FullscreenPlayerQueueTab } from "@/components/player/FullscreenPlayerTabs";
+import {
+  FullscreenPlayerLyricsTab,
+  FullscreenPlayerQueueTab,
+} from "@/components/player/FullscreenPlayerTabs";
 import type { ViewPlayer } from "@/components/player/fullscreen-player-view-types";
 import type { Track } from "@/contexts/PlayerContext";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -36,4 +39,24 @@ describe("FullscreenPlayerQueueTab", () => {
     expect(row).toHaveAttribute("inert");
     expect(row).toHaveClass("grayscale");
   });
+});
+
+it("uses the shared retryable lyrics content on the fullscreen renderer", () => {
+  const retry = vi.fn();
+  renderWithListenProviders(
+    <FullscreenPlayerLyricsTab
+      lyrics={null}
+      lyricsLoading={false}
+      lyricsError
+      onRetryLyrics={retry}
+      refs={{ lyricsContainerRef: { current: null } } as never}
+      activeLyricIndex={-1}
+      seek={vi.fn()}
+      t={((key: string) => key) as never}
+      scrollTabBottomClearance="32px"
+    />,
+  );
+  expect(screen.getByRole("alert")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(retry).toHaveBeenCalledOnce();
 });

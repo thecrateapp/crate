@@ -700,3 +700,19 @@ first section. Do not hide these rules with CSS selectors or change InstrumentPa
 The Storybook/standalone Settings scene uses the same props and preserves separators inside
 Account and Connections. Browser checks measure the border in all five tabs and both Connect
 feature states at375/1200px.
+
+### 1BE · Lyrics and Info
+
+`review-1be-player-reading.html` and `Reviews/1BE/Lyrics and Info` reuse the same scene and the
+actual Listen presentation views. Synced/plain lyrics, drawer/fullscreen placement, seek,
+loading/retry/empty and complete/partial/zero/long track information are available through shared
+fixture controls. Source quality uses the complete QualityBadge; metadata uses canonical
+MonoLabel, StatNumber, Meter and InstrumentPanel. Source dynamics appear once. Lyrics keep the
+flat surface and center active lines inside their own scrolling panel. Artwork remains96/112px.
+The scene uses local media/actions only: no production API, audio or preference writes.
+
+The `delivery` case shows AAC playback separately from the original hi-res file, using the same
+QualityBadge renderer. Production Info receives the exact player reading through a local context,
+without another playback-resolution request. Section captions are accent and flush with content;
+Mood uses GenrePill with real percentages and no genre navigation. The mobile fullscreen renderer
+also uses the common Lyrics content and retry states.

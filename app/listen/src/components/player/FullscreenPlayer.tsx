@@ -100,7 +100,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   });
   const isCdMode = surfaceMode === "cd";
 
-  const { activeLyricIndex, lyrics } = useFullscreenPlayerLyrics({
+  const {
+    activeLyricIndex,
+    lyrics,
+    loading: lyricsLoading,
+    error: lyricsError,
+    retry: onRetryLyrics,
+  } = useFullscreenPlayerLyrics({
     activeLyricRef,
     activePanel,
     currentTime,
@@ -237,6 +243,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         toggleShuffleWithFeedback,
         toggleSurfaceModeWithFeedback,
       }}
+      lyricsLoading={lyricsLoading}
+      lyricsError={lyricsError}
+      onRetryLyrics={onRetryLyrics}
       lyrics={lyrics}
       activeLyricIndex={activeLyricIndex}
       playerTabBottomClearance={playerTabBottomClearance}

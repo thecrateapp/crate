@@ -434,3 +434,8 @@ Otros puntos de entrada/soporte que completan la cobertura: [App](../../app/list
 [LinuxWindowTitlebar](../../app/listen-desktop/src/components/LinuxWindowTitlebar.tsx),
 [platform](../../app/listen/src/lib/platform.ts) y
 [reglas Desktop](../../app/listen-desktop/AGENTS.md).
+
+1BE · Lyrics/info: adopción local de PlayerLyricsContent e InfoTabView, con adaptadores de datos,
+media y navegación conservados. Catálogo inglés y review aislada cubren synced/plain/empty/error,
+seek y lectura parcial/0/calidad completa. Pendiente revisión de Diego antes de commit. Output,
+targets, visualizer y chrome nativo permanecen pendientes del siguiente lote interno.

@@ -657,3 +657,31 @@ lint45archivos, i18n0/0, catálogo63/93/120, tres builds/bundle correctos (20487
 Sin segunda revisión ni regeneración de baselines; QA física nativa/AT de fase pendiente. Tres
 servicios activos, HEAD295f283a e índice vacío; se para para revisión sin commit/push de1BE.
 Capturas1be-search-loading.png y1be-stats-final.png bajo.artifacts/crate-v3.
+
+### 1BE · siguiente lote interno: Lyrics e Info (2026-10-20)
+
+Diego aprueba Stats/Digging/loading: publicado `6b05848b`. Claude continúa Stats; este lote no
+modifica esas vistas. LyricsPanel y LyricsTab comparten PlayerLyricsContent con estados reales
+loading/error/retry/empty, fallback a letra plana si la sincronizada no se puede leer, y el reloj
+leaf existente. El centrado solo desplaza PlayerLyricsSurface, sin mover la página exterior.
+InfoTab conserva datos/API/navegación/media en su adaptador; InfoTabView reutiliza los componentes
+reales y distingue0 de ausencia, con QualityBadge completo. Sin piel de paleta, cajas KPI locales
+ni lecturas dinámicas duplicadas. El frame de artwork mantiene96/112px; la rejilla responde al
+ancho del panel. No se añaden instrumentos H3 ni se deduce provenance no disponible.
+Storybook Listen/Player/Lyrics and Info y Reviews/1BE/Lyrics and Info reutilizan el mismo escenario
+que5186/review-1be-player-reading.html. Se mantiene sin commit para revisión. Output/targets,
+Cast/Connect, visualizer y chrome Tauri siguen siendo lotes posteriores de1BE.
+
+Ampliación del lote: los captions de sección usan MonoLabel tone="accent", sin slot vacío que
+introduzca sangría. Mood usa GenrePill con el porcentaje real, sin navegación de género. PlayerBar
+inyecta su lectura exacta de calidad en los portales del player mediante contexto local; Info
+muestra esa calidad de reproducción en la cabecera y la original en Source & Dynamics. Sin nuevas
+peticiones de resolución. También el fullscreen móvil reutiliza PlayerLyricsContent y useLyrics,
+con sus gates de visibilidad/panel conservados; la línea activa sigue en el reloj leaf.
+
+Cierre local de Lyrics/Info: revisión fresca única, dos hallazgos importantes corregidos en una
+pasada TDD. El fade de fullscreen queda limitado a letra sincronizada lista; texto plano y
+loading/error/empty mantienen contraste completo. Las líneas sincronizadas poseen su wrapping
+incluso sin Card antecesor. Reproducción RED y posterior GREEN en ambos hosts. Validación final:
+163testsListen/4skips existentes,48Desktop y8casos browser; tres tipos y tres builds correctos,
+lint acotado, i18n0/0 y catálogo63/93/120. Tres servicios activos; se para sin commit para revisión.

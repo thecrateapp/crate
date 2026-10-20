@@ -4,8 +4,7 @@ import type { TFunction } from "i18next";
 import { FullscreenPlayerArtwork } from "@/components/player/FullscreenPlayerArtwork";
 import { FullscreenPlayerControls } from "@/components/player/FullscreenPlayerControls";
 import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
-import { SyncedLyrics } from "./SyncedLyrics";
-import { PlayerLyricsSurface } from "./PlayerLyricsSurface";
+import { PlayerLyricsContent } from "./PlayerLyricsContent";
 import { PlayerStage } from "./PlayerStage";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import type {
@@ -143,42 +142,36 @@ export function FullscreenPlayerQueueTab({
 
 export function FullscreenPlayerLyricsTab({
   lyrics,
-  refs,
+  lyricsLoading,
+  lyricsError,
+  onRetryLyrics,
   seek,
-  t,
   scrollTabBottomClearance,
 }: {
   activeLyricIndex: number;
   lyrics: FullscreenLyrics | null;
+  lyricsLoading?: boolean;
+  lyricsError?: boolean;
+  onRetryLyrics?: () => void;
   refs: ViewRefs;
   seek: (time: number) => void;
   t: TFunction;
   scrollTabBottomClearance: string;
 }) {
   return (
-    <PlayerLyricsSurface
-      ref={refs.lyricsContainerRef}
-      className="px-5 py-4"
+    <div
+      className="flex min-h-0 flex-1 flex-col px-5 py-4"
       style={{ paddingBottom: scrollTabBottomClearance }}
     >
-      {!lyrics ? (
-        <p className="relative z-10 mt-20 text-center text-sm text-text-muted">
-          {t("player.lyrics.loading")}
-        </p>
-      ) : lyrics.synced ? (
-        <div className="relative z-10 mx-auto w-full max-w-[560px]">
-          <SyncedLyrics lines={lyrics.synced} onSeek={seek} />
-        </div>
-      ) : lyrics.plain ? (
-        <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left font-sans text-sm leading-relaxed text-text-muted">
-          {lyrics.plain}
-        </pre>
-      ) : (
-        <p className="relative z-10 mt-20 text-center text-sm text-text-muted">
-          {t("player.lyrics.unavailable")}
-        </p>
-      )}
-    </PlayerLyricsSurface>
+      <PlayerLyricsContent
+        lyrics={lyrics}
+        loading={lyricsLoading ?? !lyrics}
+        error={lyricsError}
+        onRetry={onRetryLyrics}
+        presentation="fullscreen"
+        onSeek={seek}
+      />
+    </div>
   );
 }
 

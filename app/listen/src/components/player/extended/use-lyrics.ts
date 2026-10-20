@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
@@ -9,7 +9,12 @@ export function useLyrics(currentTrack: Track | null | undefined) {
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
   useEffect(() => {
+    setError(false);
     if (!currentTrack) {
       setLyrics(null);
       setLoading(false);
@@ -30,24 +35,25 @@ export function useLyrics(currentTrack: Track | null | undefined) {
     )
       .then((data) => {
         if (controller.signal.aborted) return;
+        const synced = data.syncedLyrics
+          ? parseSyncedLyrics(data.syncedLyrics)
+          : [];
         setLyrics({
-          synced: data.syncedLyrics
-            ? parseSyncedLyrics(data.syncedLyrics)
-            : null,
+          synced: synced.length ? synced : null,
           plain: data.plainLyrics || null,
         });
       })
       .catch((error) => {
         if (controller.signal.aborted || (error as Error).name === "AbortError")
           return;
-        setLyrics({ synced: null, plain: null });
+        setError(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();
-  }, [currentTrack?.id, currentTrack?.artist, currentTrack?.title]);
+  }, [currentTrack?.id, currentTrack?.artist, currentTrack?.title, attempt]);
 
-  return { lyrics, loading };
+  return { lyrics, loading, error, retry };
 }

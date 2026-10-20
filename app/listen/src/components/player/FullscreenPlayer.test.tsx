@@ -907,7 +907,9 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("Loading lyrics...")).toBeInTheDocument();
+        expect(
+          screen.getByRole("status", { name: "Loading lyrics..." }),
+        ).toBeInTheDocument();
       });
 
       apiResolve!({ syncedLyrics: null, plainLyrics: "Hello world" });
@@ -1297,11 +1299,13 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("Loading lyrics...")).toBeInTheDocument();
+        expect(
+          screen.getByRole("status", { name: "Loading lyrics..." }),
+        ).toBeInTheDocument();
       });
     });
 
-    it('shows "No lyrics available" when API resolves with no lyrics', async () => {
+    it('shows "No lyrics found" when API resolves with no lyrics', async () => {
       apiMock.mockReset();
       apiMock.mockImplementation(() => Promise.resolve({}));
 
@@ -1323,7 +1327,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("No lyrics available")).toBeInTheDocument();
+        expect(screen.getByText("No lyrics found")).toBeInTheDocument();
       });
     });
 

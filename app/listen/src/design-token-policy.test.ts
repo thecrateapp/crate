@@ -22,8 +22,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "components/home/HomeListeningHistory.tsx": { "tracking-[-0.035em]": 1 },
   "components/player/SpectrumPlayButton.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
   "components/player/bar/PlayerBarFrame.tsx": { "rounded-t-[2rem]": 1 },
-  "components/player/extended/InfoTabPrimitives.tsx": { "text-[0.75rem]": 1 },
-  "components/player/extended/LyricsTab.tsx": { "text-[0.875rem]": 1 },
   "components/playlists/EditorialPlaylistArtwork.tsx": {
     "rounded-[3px]": 1,
     "tracking-[-0.09em]": 1,
@@ -42,7 +40,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/FullscreenPlayerArtwork.tsx": { "64": 1 },
   "components/player/SpinningDiscArtwork.tsx": { "88": 1 },
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
-  "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
 };
 
