@@ -42,9 +42,11 @@ npm run --workspace=app/cast-receiver build && npm run --workspace=app/cast-rece
 
 - CI runs lint, typecheck, test, build and `check:bundle`; lint is not in pre-commit, so
   run it before pushing.
-- Docker build context is `app/` and installs with `--package-lock=false`, so the image
-  can resolve different versions than the workspace lockfile. Verify the image build when
-  bumping deps.
+- The Docker build context is the repo root and the image installs the root lockfile
+  with `npm ci --workspace=app/cast-receiver --workspace=app/shared/cast`.
+  `Dockerfile.dockerignore` is an allowlist: if the receiver starts importing another
+  `app/shared/*` folder, add it there (`app/tests/test_frontend_image_lockfile_contract.py`
+  fails otherwise). The ui and listen images follow the same pattern.
 - Real Cast hardware behaves differently from the dev preview (`src/dev-preview.ts`);
   artwork transitions and canvas work must stay bounded for older devices.
 - Host is `CRATE_CAST_RECEIVER_HOST`; the receiver app ID registered with Google points

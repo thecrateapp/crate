@@ -1057,8 +1057,8 @@ services:
     logging: *default-logging
     image: ${CRATE_UI_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: ui/Dockerfile
+      context: .
+      dockerfile: app/ui/Dockerfile
       args:
         VITE_CARTO_API_KEY: ${VITE_CARTO_API_KEY:-}
     container_name: crate-ui
@@ -1080,8 +1080,8 @@ services:
     logging: *default-logging
     image: ${CRATE_LISTEN_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: listen/Dockerfile
+      context: .
+      dockerfile: app/listen/Dockerfile
       args:
         VITE_CRATE_CONNECT_FEATURE_ENABLED: ${CRATE_CONNECT_FEATURE_ENABLED:-false}
         VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${LISTEN_APPEARANCE_SETTINGS_ENABLED:-false}
@@ -1112,8 +1112,8 @@ services:
     logging: *default-logging
     image: ${CRATE_CAST_RECEIVER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-cast-receiver:${CRATE_IMAGE_TAG:-latest}}
     build:
-      context: ./app
-      dockerfile: cast-receiver/Dockerfile
+      context: .
+      dockerfile: app/cast-receiver/Dockerfile
       args:
         VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}

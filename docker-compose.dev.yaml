@@ -690,8 +690,8 @@ services:
 
   cast-receiver:
     build:
-      context: ./app
-      dockerfile: cast-receiver/Dockerfile
+      context: .
+      dockerfile: app/cast-receiver/Dockerfile
       args:
         VITE_SENTRY_DSN: ${SENTRY_CAST_RECEIVER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
