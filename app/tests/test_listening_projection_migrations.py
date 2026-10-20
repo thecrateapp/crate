@@ -81,26 +81,45 @@ def test_health_identity_migration_matches_its_schema_section(monkeypatch):
 
 
 def test_v109_creates_instance_rollups_and_indexes(monkeypatch):
-    migration, section = _replay(
-        "109_instance_listening_rollups",
-        "activity_v109",
-        "create_instance_listening_rollups_v109_schema",
-        monkeypatch,
+    from contextlib import nullcontext
+
+    migration = import_module(
+        "crate.db.migrations.versions.109_instance_listening_rollups"
     )
-    assert migration == section
-    assert len(migration) == 4
-    statements = "\n".join(migration)
+    section = import_module("crate.db.schema_sections.activity_v109")
+    executor = RecordingExecutor()
+    blocks: list[int] = []
+
+    class Context:
+        def autocommit_block(self):
+            blocks.append(len(executor.statements))
+            return nullcontext()
+
+    executor.get_context = lambda: Context()
+    monkeypatch.setattr(migration, "op", executor)
+    migration.upgrade()
+    section_executor = RecordingExecutor()
+    section.create_instance_listening_rollups_v109_schema(section_executor)
+
+    # Section (tables + indexes on the new empty tables) replays verbatim first.
+    assert executor.statements[: len(section_executor.statements)] == (
+        section_executor.statements
+    )
+    statements = "\n".join(section_executor.statements)
     assert "CREATE TABLE IF NOT EXISTS instance_track_daily" in statements
     assert "PRIMARY KEY (day, entity_key, artist, album)" in statements
     assert "listener_count INTEGER NOT NULL DEFAULT 0" in statements
-    assert "user_id" not in migration[0]
+    assert "user_id" not in section_executor.statements[0]
     assert "CREATE TABLE IF NOT EXISTS instance_entity_firsts" in statements
     assert "PRIMARY KEY (entity_type, entity_key)" in statements
     assert (
-        "CREATE INDEX IF NOT EXISTS idx_user_track_daily_day ON user_track_daily(day)"
-        in migration
-    )
-    assert (
-        "CREATE INDEX IF NOT EXISTS idx_user_entity_firsts_key ON user_entity_firsts(entity_type, entity_key)"
-        in migration
-    )
+        "CREATE INDEX IF NOT EXISTS idx_instance_entity_firsts_recent "
+        "ON instance_entity_firsts(entity_type, first_day DESC)"
+    ) in section_executor.statements
+    # Indexes on the large existing tables are built concurrently, outside a transaction.
+    concurrent = executor.statements[len(section_executor.statements) :]
+    assert concurrent == [
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_track_daily_day ON user_track_daily(day)",
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_entity_firsts_key ON user_entity_firsts(entity_type, entity_key)",
+    ]
+    assert blocks == [len(section_executor.statements)]

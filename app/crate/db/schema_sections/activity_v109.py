@@ -35,8 +35,5 @@ def create_instance_listening_rollups_v109_schema(cur: Any) -> None:
         )
     """)
     cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_user_track_daily_day ON user_track_daily(day)"
-    )
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_user_entity_firsts_key ON user_entity_firsts(entity_type, entity_key)"
+        "CREATE INDEX IF NOT EXISTS idx_instance_entity_firsts_recent ON instance_entity_firsts(entity_type, first_day DESC)"
     )
