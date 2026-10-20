@@ -17,12 +17,20 @@ vi.mock("@/hooks/use-api", () => ({
   useApi: useApiMock,
 }));
 
+let pathStatus: {
+  available: boolean;
+  status: "configured" | "unavailable" | "legacy";
+  model_id: string | null;
+  error_code: string | null;
+} | null = {
+  available: true,
+  status: "configured",
+  model_id: "paths-model",
+  error_code: null,
+};
+
 vi.mock("@/hooks/use-llm", () => ({
-  useActionLLMStatus: () => ({
-    available: true,
-    status: "configured",
-    model_id: "paths-model",
-  }),
+  useActionLLMStatus: () => pathStatus,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -95,6 +103,12 @@ describe("Settings", () => {
     apiMock.mockReset();
     refetchMock.mockReset();
     resetTaskCatalogForTests();
+    pathStatus = {
+      available: true,
+      status: "configured",
+      model_id: "paths-model",
+      error_code: null,
+    };
     useApiMock.mockReturnValue({
       data: settingsData,
       loading: false,
@@ -102,16 +116,59 @@ describe("Settings", () => {
     });
   });
 
-  it("saves the Music Paths LLM refinement toggle", async () => {
+  it("shows one AI refinement state after setup", async () => {
     const user = userEvent.setup();
-    apiMock.mockResolvedValue({ ok: true });
 
     render(<Settings />);
 
     await user.click(
       screen.getAllByRole("button", { name: /enrichment/i })[0]!,
     );
-    await user.click(screen.getByRole("switch", { name: /llm refinement/i }));
+
+    expect(
+      screen.getByText(/AI refinement: On · uses paths-model/),
+    ).toBeVisible();
+    const link = screen.getByRole("link", { name: /manage in ai models/i });
+    expect(link).toHaveAttribute("href", "/ai");
+    expect(
+      screen.queryByRole("switch", { name: /ai refinement/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows AI refinement as off when its feature is turned off", async () => {
+    const user = userEvent.setup();
+    pathStatus = {
+      available: false,
+      status: "unavailable",
+      model_id: null,
+      error_code: "AI_ACTION_DISABLED",
+    };
+
+    render(<Settings />);
+
+    await user.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+
+    expect(screen.getByText(/AI refinement: Off/)).toBeVisible();
+  });
+
+  it("keeps the server-settings toggle before setup", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({ ok: true });
+    pathStatus = {
+      available: true,
+      status: "legacy",
+      model_id: "paths-model",
+      error_code: null,
+    };
+
+    render(<Settings />);
+
+    await user.click(
+      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
+    );
+    await user.click(screen.getByRole("switch", { name: /ai refinement/i }));
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/settings/paths", "PUT", {
@@ -119,7 +176,9 @@ describe("Settings", () => {
       });
     });
     expect(refetchMock).toHaveBeenCalled();
-    expect(screen.getByText(/Configured action: paths-model/)).toBeVisible();
+    expect(
+      screen.getByText(/Uses paths-model from server settings/),
+    ).toBeVisible();
   });
 
   it("exposes a targeted Music Paths AI cache clear action", async () => {

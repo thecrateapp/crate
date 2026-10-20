@@ -10,6 +10,7 @@ sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
   - app/crate/ai/configuration.py
+  - app/crate/ai/default_model.py
   - app/crate/ai/discovery.py
   - app/crate/ai/runtime.py
   - app/crate/ai/transport.py
@@ -20,8 +21,10 @@ sources:
   - app/crate/db/repositories/ai_configuration.py
   - app/crate/db/repositories/ai_usage.py
   - app/crate/db/repositories/show_extraction_jobs.py
+  - app/crate/db/migrations/versions/121_ai_default_model.py
   - app/crate/worker_handlers/ai_configuration.py
   - app/tests/test_ai_workflow.py
+  - app/tests/test_ai_model_assignment.py
   - docker-compose.yaml
   - docker-compose.dev.yaml
   - docker-compose.home.yaml
@@ -31,10 +34,10 @@ sources:
 
 Crate routes its eleven registered language model actions through explicit provider
 connections and immutable model profile versions. Admin exposes the configuration
-at `/ai-agents`, with Actions, Providers, Models/profiles and Activity views.
-Domain buttons check their own action availability and permission. A configured
-biography action does not imply that show vision, OCR text or playlist descriptions
-are available.
+at `/ai` (**AI models**), with Default model, Features, Providers, Advanced and
+Activity panels; `/ai-agents` redirects to it. Domain buttons check their own action
+availability and permission. A configured biography action does not imply that show
+vision, OCR text or playlist descriptions are available.
 
 A **connection** owns a supported provider, endpoint, credential reference and usage
 limits. Its cached **model catalog** supplies validated capabilities. A **profile
@@ -53,16 +56,22 @@ establish live readiness or a known version.
 
 1. Create a connection, or inspect read-only metadata for an inherited environment
    connection. Stored cloud credentials require a configured encryption key.
-2. Explicitly refresh its catalog. Crate queues `ai_catalog_refresh`; reading a
-   page, snapshot, model list or availability never discovers models or runs inference.
-3. Select a validated model and its advertised native controls. Save a profile
-   or append a new immutable version with the expected current version.
-4. Optionally acknowledge and queue one synthetic compatibility test. It uses the
-   selected profile's exact bounds and may be billable. Compatibility does not
-   certify quality, remaining credit or suitability for every action.
-5. Review migration separately, then explicitly apply selected action bindings.
-   The batch includes every selected binding's expected revision. A stale row
-   rejects the entire batch; reload and review before trying again.
+2. On Providers, explicitly refresh its catalog. Crate queues `ai_catalog_refresh`;
+   reading a page, snapshot, model list or availability never discovers models or
+   runs inference.
+3. On Default model, choose one validated model and its advertised native reasoning.
+   Its first use computes every action's derived limits and activates the whole
+   configuration in one reviewed transaction; an action whose derived limits are
+   incompatible with that model keeps its existing binding, or its inherited legacy
+   snapshot, instead of blocking the other ten.
+4. On Features, give one feature its own model when it should diverge from the
+   default. This creates or reuses a profile version scoped to that single feature
+   and leaves every other feature's binding untouched.
+5. On Advanced, create a profile by hand or append a new immutable version with
+   the expected current version, then optionally acknowledge and queue one
+   synthetic compatibility test. It uses the selected profile's exact bounds and
+   may be billable. Compatibility does not certify quality, remaining credit or
+   suitability for every action.
 6. Inspect Activity and Usage for metadata, safe errors and unknown measurements.
    Domain results remain subject to their normal preview, validation and approval.
 
@@ -118,6 +127,48 @@ and bindings. It preserves native omitted options and each action's inherited
 behavior. It does not copy environment API keys into the database. Prepared bindings
 remain pending before activation. Activation is explicit and one-time; creating a
 connection or profile does not activate it.
+
+**Default model.** Choosing a default model (`POST /api/admin/ai/default-model`) is
+the normal way to reach activation. For each of the eleven actions, Crate derives a
+profile from the chosen model and requested reasoning alone, with no read of prior
+configuration: an image action requires an image-capable model with a known
+per-image token bound (`AI_ACTION_NEEDS_IMAGE`, `AI_IMAGE_BOUND_UNKNOWN`); output and
+input tokens are clamped to the model's own limits and the action's maxima, and an
+action left with fewer than 4096 usable input tokens is incompatible
+(`AI_CONTEXT_TOO_SMALL`); image detail prefers `ultra_high` for
+`shows.extract.vision`, then `high`, then `default`; a requested reasoning token
+budget is clamped to the model's thinking-budget range, falling back to the provider
+default when it cannot be honored. An action without a derivable profile keeps its
+current binding when the configuration is already active, or its validated legacy
+snapshot otherwise; only when neither can be kept does the whole assignment fail
+closed with `AI_SETUP_BLOCKED`, and activation itself stays all-or-nothing across
+the other ten actions.
+
+A profile is **owned** by an action only when it is referenced by exactly one
+binding and labelled for that action. Assigning a model reuses or appends to an
+owned profile in place, and otherwise creates a new one, so a profile an operator
+created or shared across actions by hand is never renamed or rewritten by a later
+default-model choice.
+
+Assignment is idempotent: re-submitting the same connection, model and reasoning
+reports every outcome as `unchanged`, writes no new profile version, advances no
+binding revision and leaves the stored default untouched, since saving the default
+is a compare-and-swap keyed on actually differing from the current value. A stale
+`expected_revision` or `expected_review_fingerprint`, caught either in the pre-check
+or under the row lock, is rejected without any write.
+
+| Code                        | Status | When                                                                                |
+| --------------------------- | -----: | ----------------------------------------------------------------------------------- |
+| `AI_CONFIGURATION_CONFLICT` |    409 | the revision or review fingerprint differs, in the pre-check or under the lock      |
+| `AI_CONNECTION_UNKNOWN`     |    404 | the UUID connection does not exist                                                  |
+| `AI_ACTION_UNKNOWN`         |    404 | an unknown action on the single-feature route                                       |
+| `AI_CONNECTION_UNAVAILABLE` |    422 | the connection is disabled                                                          |
+| `AI_CREDENTIAL_REQUIRED`    |    422 | a cloud connection has no environment key or stored secret                          |
+| `AI_MODEL_UNVALIDATED`      |    422 | the model is absent or pending, or an environment provider was never refreshed      |
+| `AI_PROFILE_INCOMPATIBLE`   |    422 | the requested reasoning is not native to the model                                  |
+| `AI_MODEL_INCOMPATIBLE`     |    422 | the model can run none of the target actions                                        |
+| `AI_SETUP_BLOCKED`          |    422 | before activation, an action can keep neither the new model nor its legacy snapshot |
+| `AI_CONFIGURATION_INVALID`  |    422 | a single-feature assignment is attempted before activation                          |
 
 After activation, connection admission limits apply. Legacy snapshots remain scoped
 to their original action and cannot be edited or reused as arbitrary profiles.
