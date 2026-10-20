@@ -38,8 +38,6 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
   "lib/color-contrast":
     "Contrast helper consumed by the appearance registry and resolver.",
   "lib/use-sheet-drag": "Drag engine shared by AppModal and MobileActionSheet.",
-  "primitives/RadioGroup":
-    "Phase 1 form primitive, also consumed by the shadcn dropdown menu.",
   "primitives/Spinner": "Phase 1 base loading primitive.",
   "primitives/StarRating":
     "Rating primitive; admin and listen still render local rating copies.",
