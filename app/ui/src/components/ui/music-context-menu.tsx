@@ -53,7 +53,7 @@ export function MusicContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-48 bg-card border-border">
+      <ContextMenuContent className="w-48">
         {type !== "artist" && (
           <ContextMenuItem
             onClick={() =>
