@@ -189,7 +189,7 @@ def _queue_backfill(
     response_status: Literal["queued", "resumed"],
 ) -> SmartMixBackfillResponse:
     active = _active_backfill_task()
-    campaign = start_smart_mix_campaign(
+    start_smart_mix_campaign(
         batch_size=body.batch_size,
         max_attempts=body.max_attempts,
     )
@@ -201,7 +201,7 @@ def _queue_backfill(
                 "deduplicated": True,
             }
         )
-    task_id = queue_next_smart_mix_batch(campaign)
+    task_id = queue_next_smart_mix_batch()
     return SmartMixBackfillResponse.model_validate(
         {
             "taskId": task_id,

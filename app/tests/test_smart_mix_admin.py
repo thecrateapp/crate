@@ -445,7 +445,7 @@ def test_backfill_starts_a_bounded_campaign(test_app, monkeypatch) -> None:
         lambda **kwargs: started.append(kwargs) or _campaign(),
     )
     monkeypatch.setattr(
-        smart_mix_admin, "queue_next_smart_mix_batch", lambda _campaign: "task-new"
+        smart_mix_admin, "queue_next_smart_mix_batch", lambda: "task-new"
     )
 
     response = test_app.post(
@@ -481,7 +481,7 @@ def test_backfill_with_an_active_batch_reuses_it(test_app, monkeypatch) -> None:
     monkeypatch.setattr(
         smart_mix_admin,
         "queue_next_smart_mix_batch",
-        lambda _campaign: (_ for _ in ()).throw(AssertionError("no second batch")),
+        lambda: (_ for _ in ()).throw(AssertionError("no second batch")),
     )
 
     response = test_app.post(
@@ -513,7 +513,7 @@ def test_pause_cancel_and_resume_drive_the_campaign(test_app, monkeypatch) -> No
         smart_mix_admin, "start_smart_mix_campaign", lambda **_kwargs: _campaign()
     )
     monkeypatch.setattr(
-        smart_mix_admin, "queue_next_smart_mix_batch", lambda _campaign: "task-resumed"
+        smart_mix_admin, "queue_next_smart_mix_batch", lambda: "task-resumed"
     )
 
     paused = test_app.post("/api/admin/smart-mix/backfill/pause")
