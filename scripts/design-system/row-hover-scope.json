@@ -213,10 +213,5 @@
     "path": "app/ui/src/components/album/TrackTable.tsx",
     "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
     "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/playlists/PlaylistTrackSearch.tsx",
-    "prefix": "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors",
-    "kind": "row"
   }
 ]

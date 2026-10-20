@@ -382,12 +382,7 @@ describe("Collection Crates", () => {
       screen.getByRole("textbox", { name: "Name" }),
       "Unranked favorites",
     );
-    await user.click(
-      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
-        "radio",
-        { name: "No order" },
-      ),
-    );
+    chooseField("Ordering", "No order");
     await user.click(screen.getByRole("button", { name: "Create Crate" }));
 
     await waitFor(() => {
@@ -414,9 +409,7 @@ describe("Collection Crates", () => {
     openCrateEditor();
 
     expect(screen.getByTestId("crate-form")).toBeInTheDocument();
-    expect(
-      screen.getByRole("radiogroup", { name: "Visibility" }),
-    ).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Visibility" })).toBeVisible();
     expect(
       screen.getByRole("checkbox", { name: "Allow collaboration" }),
     ).toBeVisible();
@@ -436,7 +429,7 @@ describe("Collection Crates", () => {
     openCrateEditor();
 
     expect(
-      screen.queryByRole("radiogroup", { name: "Visibility" }),
+      screen.queryByRole("combobox", { name: "Visibility" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create collaboration invite" }),
@@ -535,3 +528,8 @@ describe("Collection Crates", () => {
     });
   });
 });
+
+function chooseField(name: string, value: string) {
+  fireEvent.click(screen.getByRole("combobox", { name }));
+  fireEvent.click(screen.getByRole("option", { name: value }));
+}

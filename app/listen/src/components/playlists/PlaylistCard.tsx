@@ -1,3 +1,4 @@
+import { PlaylistListRowView } from "./PlaylistListRowView";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
@@ -19,11 +20,7 @@ import {
 } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
-import {
-  EntityCard,
-  EntityRow,
-  type EntityCardOverlay,
-} from "@crate/ui/domain/entity";
+import { EntityCard, type EntityCardOverlay } from "@crate/ui/domain/entity";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { IconButton } from "@crate/ui/primitives/IconButton";
@@ -131,19 +128,6 @@ function tileSurfaceClass(state: OfflineItemState): string | undefined {
   if (isOfflineBusy(state)) return "bg-accent-action/[0.05]";
   if (state === "error") return "bg-state-warning/[0.05]";
   return undefined;
-}
-
-function rowSurfaceClass(state: OfflineItemState): string | undefined {
-  if (state === "ready") {
-    return "bg-accent-action/[0.04] focus-within:bg-accent-action/[0.08]";
-  }
-  if (isOfflineBusy(state)) {
-    return "bg-accent-action/[0.05] focus-within:bg-accent-action/[0.09]";
-  }
-  if (state === "error") {
-    return "bg-state-warning/[0.05] focus-within:bg-state-warning/[0.09]";
-  }
-  return "focus-within:bg-text-primary/5";
 }
 
 function OfflineMeta({
@@ -545,7 +529,7 @@ function PlaylistRow(props: PlaylistCardProps) {
   );
 
   return (
-    <EntityRow
+    <PlaylistListRowView
       title={name}
       titleAccessory={
         <>
@@ -595,7 +579,8 @@ function PlaylistRow(props: PlaylistCardProps) {
       menuLabel={t("actions.menu.more")}
       menuButton="always"
       actionMenu={actionMenu}
-      className={cn(rowSurfaceClass(offlineState), props.className)}
+      offlineState={offlineState}
+      className={props.className}
       classNames={{
         meta: "mt-1 text-text-primary/40",
         trailing: "gap-1",

@@ -27,6 +27,14 @@ function renderWithRoutes(element: ReactElement, options = {}) {
 }
 
 describe("PlaylistCard tile", () => {
+  it("illuminates collection playlist rows on pointer hover without changing tiles", () => {
+    renderWithListenProviders(
+      <PlaylistCard variant="row" name="Night hover" onClick={vi.fn()} />,
+    );
+    expect(
+      screen.getByText("Night hover").closest('[data-slot="entity-row"]'),
+    ).toHaveClass("pointer-fine:hover:bg-accent-action/[0.04]");
+  });
   it.each(["tile", "featured", "row"] as const)(
     "uses MonoLabel for %s playlist counts, preserving prose",
     (variant) => {

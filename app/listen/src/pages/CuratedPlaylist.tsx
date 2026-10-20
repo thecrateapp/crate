@@ -21,13 +21,8 @@ export function CuratedPlaylist() {
     );
   }
 
-  if (!page.data) {
-    return (
-      <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-text-muted">{page.t("playlist.notFound")}</p>
-      </div>
-    );
-  }
+  if (!page.data)
+    return <ErrorState kind="notFound" title={page.t("playlist.notFound")} />;
 
   return <CuratedPlaylistContent page={page} />;
 }

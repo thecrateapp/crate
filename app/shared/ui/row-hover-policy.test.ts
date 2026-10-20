@@ -54,17 +54,34 @@ describe("shared row interaction contract", () => {
     expect(recipes).toContain('.track-row[data-selected="true"]');
     expect(recipes).toContain('.track-row[data-active="true"]::before');
   });
-  it("retains offline row state and keyboard focus without extra pointer tint", () => {
+  it("keeps Diego's collection playlist hover amendment scoped to its domain row, including offline states", () => {
     const source = readFileSync(
-      resolve(root, "app/listen/src/components/playlists/PlaylistCard.tsx"),
+      resolve(
+        root,
+        "app/listen/src/components/playlists/PlaylistListRowView.tsx",
+      ),
       "utf8",
     );
-    const fn = source
-      .split("function rowSurfaceClass(")[1]!
-      .split("function OfflineMeta")[0]!;
-    expect(fn).not.toMatch(fill);
-    expect(fn).toContain("focus-within:bg-");
-    expect(fn).toContain("bg-state-warning/");
+    expect(source).toContain("pointer-fine:hover:bg-accent-action/[0.04]");
+    expect(source).toContain("focus-within:bg-");
+    expect(source).toContain("bg-state-warning/");
+  });
+  it("delegates playlist search result rows to the canonical non-hover EntityRow", () => {
+    const source = readFileSync(
+      resolve(
+        root,
+        "app/listen/src/components/playlists/PlaylistTrackSearch.tsx",
+      ),
+      "utf8",
+    );
+    expect(source).toContain("<CatalogSearch");
+    const view = readFileSync(
+      resolve(root, "app/listen/src/components/search/CatalogSearchView.tsx"),
+      "utf8",
+    );
+    expect(view).toContain("<EntityRow");
+    expect(view).not.toMatch(/hover:bg-/);
+    expect(source).not.toMatch(/<button\b/);
   });
   it("records Diego's track-row exception while preserving disabled and selection states", () => {
     const recipes = readFileSync(

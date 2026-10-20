@@ -33,6 +33,8 @@ export interface EntityRowProps
     EntityMenuProps,
     EntityFrameAttributes {
   title: string;
+  /** Rich identity content; plain title remains the menu/accessibility fallback. */
+  titleContent?: ReactNode;
   truncate?: boolean;
   subtitle?: ReactNode;
   meta?: ReactNode;
@@ -62,6 +64,7 @@ const MENU_BUTTON_CLASS_NAME: Record<
 
 export const EntityRow = memo(function EntityRow({
   title,
+  titleContent,
   subtitle,
   meta,
   titleAccessory,
@@ -173,7 +176,7 @@ export const EntityRow = memo(function EntityRow({
                 classNames?.title,
               )}
             >
-              {title}
+              {titleContent ?? title}
             </span>
             {titleAccessory}
           </span>

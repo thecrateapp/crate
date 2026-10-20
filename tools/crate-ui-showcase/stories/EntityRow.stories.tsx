@@ -34,3 +34,12 @@ export const FullText: Story = {
     meta: 0,
   },
 };
+
+export const RichIdentity: Story = {
+  args: {
+    title: "Jane McKay",
+    href: undefined,
+    titleContent: <a href="/users/DJCase">Jane McKay</a>,
+    subtitle: "@DJCase",
+  },
+};

@@ -12,6 +12,8 @@ type Control = {
 };
 
 const DYNAMIC_SELECTS: Record<string, string> = {
+  "app/listen/src/components/settings/SleepTimerView.tsx:Select:value":
+    "Existing1AZ SleepTimer presentation extracted from controller; typed timer preset choices, no added control.",
   "app/listen/src/pages/LibraryCollectionSortDropdown.tsx:Select:selected.value":
     "One shared collection Sort form adapter takes the typed artist/album/liked choice arrays; Sort uses Select by Diego's1AQ amendment, reconciled1AY.",
   'app/ui/src/components/layout/Sidebar.tsx:AdminSelect:previewRole ?? ""':
@@ -58,7 +60,17 @@ type FormSelect = { choices: number; sites: number; reason: string };
 // Diego's1AQ amendment: categorical form fields use Select, while existing filter chips stay.
 // Exact cardinality and site count prevent blanket exemptions or accidental extra controls.
 const FORM_SELECTS: Record<string, FormSelect> = {
-  "app/listen/src/components/playlists/PlaylistIdentitySection.tsx:Select:visibility":
+  "app/listen/src/components/crates/CrateForm.tsx:Select:values.visibility": {
+    choices: 2,
+    sites: 1,
+    reason: "1BB categorical Visibility follows Diego's Select rule.",
+  },
+  "app/listen/src/components/crates/CrateForm.tsx:Select:values.ordering": {
+    choices: 3,
+    sites: 1,
+    reason: "1BB categorical Ordering follows Diego's Select rule.",
+  },
+  "app/listen/src/components/playlists/PlaylistIdentityView.tsx:Select:visibility":
     {
       choices: 2,
       sites: 1,

@@ -1,12 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@crate/ui/shadcn/button";
 import { notify } from "@crate/ui/lib/notify";
-import {
-  AppModal,
-  ModalBody,
-  ModalFooter,
-} from "@crate/ui/primitives/AppModal";
+import { CollectionEditorDialog } from "./collections/CollectionEditorDialog";
 
 import {
   CrateForm,
@@ -85,52 +80,32 @@ export function CrateCreateModal({
   }
 
   return (
-    <AppModal
+    <CollectionEditorDialog
       open={open}
-      onClose={close}
-      size="lg"
       title={t("library.crates.createTitle")}
       description={
         initialAlbum ? (
-          <span className="mt-1 block truncate">
+          <span>
             {initialAlbum.name} · {initialAlbum.artistName}
           </span>
         ) : undefined
       }
+      formId={FORM_ID}
+      submitLabel={t("library.crates.create")}
+      cancelLabel={t("common.cancel")}
       closeLabel={t("common.close")}
-      closeDisabled={submitting}
-      headerClassName="bg-transparent"
-      panelClassName="flex flex-col border-border-quiet"
-      closeOnEscape={!submitting}
-      closeOnOverlay={!submitting}
+      pending={submitting}
+      submitDisabled={!isCrateFormValid(values)}
+      onCancel={close}
     >
-      <div className="flex min-h-0 flex-col">
-        <ModalBody className="p-5">
-          <CrateForm
-            id={FORM_ID}
-            values={values}
-            isOwner
-            disabled={submitting}
-            onChange={(patch) =>
-              setValues((current) => ({ ...current, ...patch }))
-            }
-            onSubmit={(event) => void handleSubmit(event)}
-          />
-        </ModalBody>
-        <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <Button variant="ghost" onClick={close} disabled={submitting}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            form={FORM_ID}
-            loading={submitting}
-            disabled={!isCrateFormValid(values)}
-          >
-            {t("library.crates.create")}
-          </Button>
-        </ModalFooter>
-      </div>
-    </AppModal>
+      <CrateForm
+        id={FORM_ID}
+        values={values}
+        isOwner
+        disabled={submitting}
+        onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
+        onSubmit={(event) => void handleSubmit(event)}
+      />
+    </CollectionEditorDialog>
   );
 }

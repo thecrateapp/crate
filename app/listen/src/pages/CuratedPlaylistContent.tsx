@@ -1,3 +1,4 @@
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import {
   TrackList,
   type TrackListVirtualListProps,
@@ -94,17 +95,9 @@ export function CuratedPlaylistContent({
         />
 
         {data.tracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noTracks")}
-            </p>
-          </div>
+          <EmptyState message={t("playlist.empty.noTracks")} />
         ) : filteredTracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {t("playlist.empty.noFilter")}
-            </p>
-          </div>
+          <EmptyState message={t("playlist.empty.noFilter")} />
         ) : (
           <TrackList
             items={filteredTracks}

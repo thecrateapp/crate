@@ -7,6 +7,7 @@ import { useApi } from "@/hooks/use-api";
 import { Playlist } from "./Playlist";
 import { CuratedPlaylist } from "./CuratedPlaylist";
 import { HomePlaylist } from "./HomePlaylist";
+import { HomeSection } from "./HomeSection";
 
 const trackRowProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 
@@ -84,9 +85,9 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
     <section data-testid="playlist-hero">
       <h1>{title}</h1>
       {subtitle ? <p>{subtitle}</p> : null}
-      {metaItems
-        ?.filter(Boolean)
-        .map((item) => <span key={String(item)}>{item}</span>)}
+      {metaItems?.filter(Boolean).map((item) => (
+        <span key={String(item)}>{item}</span>
+      ))}
       <div role="group" aria-label="Secondary playlist actions">
         {secondaryActions?.map((action) => (
           <button
@@ -101,7 +102,9 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
       <div>
         {menuItems
           ?.filter((item) => item.type !== "divider" && item.label)
-          .map((item) => <span key={item.label}>{item.label}</span>)}
+          .map((item) => (
+            <span key={item.label}>{item.label}</span>
+          ))}
       </div>
       {artwork("hero-artwork")}
     </section>
@@ -374,3 +377,25 @@ describe("playlist page access", () => {
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
   });
 });
+
+it.each([
+  [Playlist, "/playlist/7", "/playlist/:id"],
+  [HomePlaylist, "/home/playlist/mix", "/home/playlist/:playlistId"],
+  [HomeSection, "/home/section/favorite-artists", "/home/section/:sectionId"],
+] as const)(
+  "keeps read failures retryable instead of claiming a missing collection",
+  (Page, route, path) => {
+    const refetch = vi.fn();
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Failed",
+      status: 503,
+      refetch,
+    });
+    renderWithListenProviders(<Page />, { route, path });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalled();
+  },
+);

@@ -18,6 +18,14 @@ const secondAlbum = { artist: "High Vis", name: "Album Two", year: 2025 };
 describe("CrateAlbumPicker", () => {
   beforeEach(() => mocks.api.mockReset());
 
+  it("uses the common section heading role", () => {
+    renderWithListenProviders(
+      <CrateAlbumPicker existingAlbumUids={new Set()} onAdd={async () => {}} />,
+    );
+    expect(
+      screen.getByRole("heading").closest('[data-testid="section-header"]'),
+    ).toBeInTheDocument();
+  });
   it("uses the shared input primitive and relies on live search", () => {
     renderWithListenProviders(
       <CrateAlbumPicker existingAlbumUids={new Set()} onAdd={async () => {}} />,

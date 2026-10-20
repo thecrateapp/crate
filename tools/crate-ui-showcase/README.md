@@ -112,7 +112,6 @@ controls use the same canonical component/size/variant. Explicit compatibility o
 retain their separate contracts. Browser checks measure these relationships in both hosts;
 passing intrinsic component checks alone does not validate composition.
 
-
 ## Header family — local 1AU
 
 PageHeader and PageHeaderLayout own ordinary identity/metadata and container-aware artwork/action
@@ -141,7 +140,6 @@ active/selection, full titles,0/1/many, profiles and loaded/reserved grids remai
 MediaCover owns the48px minimum; legacy managed/raw thumbnails use the same `crate-media-thumbnail`
 recipe until their page adoption. Person avatars and internal collage tiles are separate roles.
 V2 track identity stays white18px play glyph in a24px visual slot over artwork48px, active ring40px with effects/progress.
-
 
 ## Listen Shell, search and collection — local1AY
 
@@ -218,3 +216,75 @@ capability and confirmation/pending/cancel. Grid slots document geometry, not a 
 CrateCard. Details/editors/coverflow/collaborators remain next; see the scope matrix in the plan.
 MonoLabel/ContextualMetrics documents Diego's counts/captions amendment. Only mono-label's
 documented catalogue entry is refreshed; no pending baseline is regenerated.
+
+### 1BB Collection details and editors — second batch
+
+The first Home/Library batch was approved and published as `0f8cf24f`.
+`Reviews/1BB/Collection details`, `Listen/Collection details and editors` and the small
+`review-1bb-collection-details.html` now share CollectionDetailsReview. The historical mockup
+is unchanged. This batch remains local for review.
+
+| Family          | Actual production presentation and consumers                                                                                 | Review coverage                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Playlist detail | PlaylistHeroView, PlaylistTrackFilterBar, TrackList/TrackRow; Playlist/CuratedPlaylist/HomePlaylist retain their controllers | Ordinary/curated/generated identity, MonoLabel counts, canonical search/clear, playback fixture and read states                   |
+| HomeSection     | Existing PageHeader, card/row/grid compositions retained; route read retry added                                             | Recommended-track section context and common read states; actual route retry covered in consumer tests                            |
+| Crate detail    | CrateHeroFrame/CrateCoverFlowView, CrateAlbumListView/Item; public ranked preview EntityRow and authenticated AlbumCard rows | Public vs authenticated identity/action semantics, actual section count and V2 coverflow sizes, empty state                       |
+| Create/edit     | CollectionEditorDialog; PlaylistIdentityView/TrackSearch/ComposerTrackList and CrateForm                                     | Native form submit, editable identity, uploads, canonical labels/Selects, add/remove, create/edit, owner fields and pending close |
+| Crate albums    | CollectionEditorItemRow/CrateAlbumPickerView; controllers keep managed images, debounce, payloads and rollback               | Picker/add state and ordered pointer/keyboard handles; actual app DND/rollback suites remain authoritative                        |
+| Collaboration   | CollectionMembersDialog/MemberRow, CollaboratorSearchView                                                                    | Owner/self restrictions, mixed-case profile identity, remove/add, collaborator leave/cancel/confirm                               |
+
+Only the existing shared EntityRow receives the additive `titleContent` slot. Its catalogue,
+story and docs are updated; no shared component or foundation variant is added. Listen domain
+frames stay local. Drag handles deliberately use canonical ghost/icon-lg Button with a native
+title so Escape cancels DND rather than being intercepted by a Tooltip.
+
+Diego's follow-up restores pointer illumination for crate album lists and collection playlist
+rows. CrateAlbumListItem owns its list surface and PlaylistListRowView owns its offline-aware
+feedback, using the same accent tint as TrackRow. Generic EntityRow and all other no-hover
+families retain their contract. Scenes use these actual domain views, not local hover repairs.
+
+Fixture actions never call the API, audio engine or persisted preferences. Full card artwork,
+Home instruments, native/AT certification and real production writes are not claimed here.
+
+Second-batch checks: initial consumer pack114/17files; final affected follow-up102/9files,
+including native DND7, public/authenticated crate pages, picker, create/edit and playlist hover.
+Shared57/6files, Listen policy31/7files and Desktop50/7files pass. Four browser cases pass at
+375/1200px × both hosts: real8px field gaps,40px Input/Select,44px actions,48px row artwork,
+V2 coverflow304/400px, both hover families, native submit, picker/move/remove, owner restrictions,
+create/edit/pending/confirm/read states and no overflow/API requests. All5typechecks (Listen,
+Desktop, Admin, shared UI, Storybook), changed lint,3builds and catalogue pass. Initial Listen
+JS202302Bgzip/24assets stays below307200B. One fresh independent review's composition mismatch
+was reproduced and corrected; no rereview loop. No native/AT or live-write certification.
+Evidence: `.artifacts/review/1bb-details-*` and `1bb-collection-details.png`.
+
+### 1BB amendment — domain catalog search and playlist artwork
+
+`Listen/Search/CatalogSearch` documents the actual Listen-local controlled search view.
+Its `kinds` accepts tracks, albums, artists or any subset; the existing controllers retain
+query/debounce, API calls, permissions and mutation authority. Playlist track search and the
+crate album picker adopt it. TopBarSearch retains its specialized combobox/recents behavior
+and is not migrated in this amendment. This adds no shared component or invented Admin consumer.
+
+`listen-catalog-search--all-kinds` and `review-1bb-catalog-search.html` share CatalogSearchReview,
+with all three types, individual/subset stories, real field/row components, 48px artwork,
+loading/error/retry/empty states and local add/remove callbacks. Existing results remain mounted
+while refreshing. The review uses the actual playlist composer view and conversion helper.
+
+Playlist search, newly selected tracks, reopened editable tracks and collage artwork now retain
+the album identity supplied by the API. Canonical global/local/entity routes and managed
+CrateImage handle artwork; missing identity retains the fallback rather than inventing a route
+from names. No per-row metadata requests or new catalog endpoint parameters are introduced.
+
+Checks: 24 targeted tests across 7 files, 32 consumer/policy tests across 6 files and 28 shared
+policy tests across 3 files pass. Eight browser cases cover both search and collection details
+at 375/1200px in Storybook and the standalone host: subsets, artwork preservation, read states,
+8px field gaps, 44px actions and no overflow/API requests. Listen, Desktop and Storybook types,
+changed-file lint and all three builds pass. Initial Listen JS is 202335B gzip across 24 assets,
+below 307200B; catalogue remains 53 documented/93 entries/120 sources. RED-to-GREEN coverage
+includes missing artwork identity, selected-row artwork and composer collage artwork.
+
+Read-only production search also verified that Meds loads the same album cover in results,
+the local selected row and collage. The unsaved draft was canceled; no production playlist
+was changed. Evidence: `.artifacts/review/1bb-search-*`, including
+`1bb-search-real-covers.png`. All three preview services remain active; the second 1BB batch
+and this amendment remain uncommitted for review.

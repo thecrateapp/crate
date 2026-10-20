@@ -74,12 +74,13 @@ export function HomeSection() {
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { sectionId } = useParams<{ sectionId: HomeSectionId }>();
-  const { data, loading } = useApi<HomeSectionDetailPayload>(
-    sectionId ? `/api/me/home/sections/${sectionId}?limit=42` : null,
-    "GET",
-    undefined,
-    { safetyNetMs: 120_000 },
-  );
+  const { data, loading, error, status, refetch } =
+    useApi<HomeSectionDetailPayload>(
+      sectionId ? `/api/me/home/sections/${sectionId}?limit=42` : null,
+      "GET",
+      undefined,
+      { safetyNetMs: 120_000 },
+    );
 
   const recommendedTracks = useMemo(
     () =>
@@ -186,6 +187,15 @@ export function HomeSection() {
   if (loading) {
     return <CrateLoader label={t("home.section.loading")} />;
   }
+
+  if (!data && error && status !== 404)
+    return (
+      <ErrorState
+        message={t("search.errors.tryAgain")}
+        retryLabel={t("common.retry")}
+        onRetry={refetch}
+      />
+    );
 
   if (!data) {
     return (

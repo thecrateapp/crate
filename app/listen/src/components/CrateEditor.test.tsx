@@ -1,5 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -118,6 +117,18 @@ describe("CrateEditor", () => {
     }));
   });
 
+  it("keeps editor read failures retryable", () => {
+    const refetch = vi.fn();
+    mocks.useApi.mockReturnValue({
+      data: null,
+      loading: false,
+      error: new Error("Read failed"),
+      refetch,
+    });
+    renderWithListenProviders(<CrateEditor {...editorProps} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalled();
+  });
   it("keeps the editable draft when the server snapshot refetches", () => {
     renderWithListenProviders(<CrateEditorHarness />, {
       locale: "en",
@@ -153,11 +164,8 @@ describe("CrateEditor", () => {
     });
 
     expect(
-      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
-        "radio",
-        { name: "No order" },
-      ),
-    ).toBeChecked();
+      screen.getByRole("combobox", { name: "Ordering" }),
+    ).toHaveTextContent("No order");
 
     mocks.crate = {
       ...crateDetail("Saved name"),
@@ -175,24 +183,17 @@ describe("CrateEditor", () => {
       "Saved name",
     );
     expect(
-      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
-        "radio",
-        { name: "Ascending" },
-      ),
-    ).toBeChecked();
+      screen.getByRole("combobox", { name: "Ordering" }),
+    ).toHaveTextContent("Ascending");
     expect(
-      within(screen.getByRole("radiogroup", { name: "Visibility" })).getByRole(
-        "radio",
-        { name: "Public" },
-      ),
-    ).toBeChecked();
+      screen.getByRole("combobox", { name: "Visibility" }),
+    ).toHaveTextContent("Public");
     expect(
       screen.getByRole("checkbox", { name: "Loop playback" }),
     ).toBeChecked();
   });
 
   it("drops the cached Crate after saving so reopening loads the saved ordering", async () => {
-    const user = userEvent.setup();
     const onBack = vi.fn();
     mocks.crate = { ...crateDetail("Original name"), is_ordered: false };
     cacheSet(`/api/crates/${crateId}`, mocks.crate);
@@ -202,12 +203,7 @@ describe("CrateEditor", () => {
       { locale: "en" },
     );
 
-    await user.click(
-      within(screen.getByRole("radiogroup", { name: "Ordering" })).getByRole(
-        "radio",
-        { name: "Ascending" },
-      ),
-    );
+    chooseField("Ordering", "Ascending");
     fireEvent.submit(screen.getByTestId("crate-form"));
 
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
@@ -282,7 +278,6 @@ describe("CrateEditor", () => {
   });
 
   it("saves the selected ordering mode and loop presentation settings", async () => {
-    const user = userEvent.setup();
     const onBack = vi.fn();
     mocks.api.mockResolvedValue({ ok: true });
     renderWithListenProviders(
@@ -292,11 +287,9 @@ describe("CrateEditor", () => {
       },
     );
 
-    const ordering = screen.getByRole("radiogroup", { name: "Ordering" });
-    expect(ordering).toHaveAttribute("data-slot", "segmented-control");
-    await user.click(
-      within(ordering).getByRole("radio", { name: "Descending" }),
-    );
+    const ordering = screen.getByRole("combobox", { name: "Ordering" });
+    expect(ordering).toHaveAttribute("data-slot", "select-trigger");
+    chooseField("Ordering", "Descending");
     fireEvent.click(screen.getByRole("checkbox", { name: "Loop playback" }));
     fireEvent.submit(
       screen.getByRole("textbox", { name: "Name" }).closest("form")!,
@@ -314,19 +307,16 @@ describe("CrateEditor", () => {
     await waitFor(() => expect(onBack).toHaveBeenCalledOnce());
   });
 
-  it("uses the shared filter chips for crate visibility", async () => {
-    const user = userEvent.setup();
+  it("uses the shared Select for crate visibility", async () => {
     renderWithListenProviders(<CrateEditor {...editorProps} />, {
       locale: "en",
     });
 
-    const visibility = screen.getByRole("radiogroup", { name: "Visibility" });
-    expect(visibility).toHaveAttribute("data-slot", "segmented-control");
-    await user.click(within(visibility).getByRole("radio", { name: "Public" }));
+    const visibility = screen.getByRole("combobox", { name: "Visibility" });
+    expect(visibility).toHaveAttribute("data-slot", "select-trigger");
+    chooseField("Visibility", "Public");
 
-    expect(
-      within(visibility).getByRole("radio", { name: "Public" }),
-    ).toBeChecked();
+    expect(visibility).toHaveTextContent("Public");
   });
 
   it("renders the shared CrateForm fields in order for owners", () => {
@@ -359,7 +349,7 @@ describe("CrateEditor", () => {
       locale: "en",
     });
 
-    expect(screen.queryByRole("radiogroup", { name: "Visibility" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Visibility" })).toBeNull();
     expect(
       screen.queryByRole("checkbox", { name: "Allow collaboration" }),
     ).toBeNull();
@@ -422,3 +412,8 @@ describe("CrateEditor", () => {
     );
   });
 });
+
+function chooseField(name: string, value: string) {
+  fireEvent.click(screen.getByRole("combobox", { name }));
+  fireEvent.click(screen.getByRole("option", { name: value }));
+}

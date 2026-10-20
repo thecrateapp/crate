@@ -1,3 +1,4 @@
+import { trackAlbumIdentity } from "../search/catalog-search-model";
 import { albumCoverAssetPath } from "@/lib/library-routes";
 import {
   PlaylistArtwork as PlaylistArtworkBase,
@@ -13,11 +14,7 @@ function buildCoverUrl(track: PlaylistArtworkTrack): string | null {
   return (
     albumCoverAssetPath(
       {
-        albumId: track.album_id,
-        globalAlbumUid: track.global_album_uid,
-        albumEntityUid: track.album_entity_uid,
-        artistEntityUid: track.artist_entity_uid,
-        albumSlug: track.album_slug,
+        ...trackAlbumIdentity(track),
         artistName: track.artist,
         albumName: track.album,
       },

@@ -154,6 +154,14 @@ describe("Crate page", () => {
     return within(screen.getByRole("list")).getByText(name).closest("article")!;
   }
 
+  it("uses the canonical album section heading", () => {
+    renderCrate();
+    expect(
+      screen
+        .getByRole("heading", { name: "The records" })
+        .closest('[data-testid="section-header"]'),
+    ).toBeInTheDocument();
+  });
   it("renders Crate albums as canonical album rows with the album menu", async () => {
     renderCrate();
 

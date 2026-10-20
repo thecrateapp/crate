@@ -47,3 +47,23 @@ body {
 @source "../../app/listen/src/components/library";
 @source "../../app/listen/src/components/crates/CrateIndexGrid.tsx";
 @source "../../app/listen/src/pages/LibraryBandcampHeader.tsx";
+
+@source "../../app/listen/src/components/collections";
+@source "../../app/listen/src/components/crates/CrateForm.tsx";
+@source "../../app/listen/src/components/crates/CrateHeroFrame.tsx";
+@source "../../app/listen/src/components/crates/CrateCoverFlowView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistHeroView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistIdentityView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearch.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackList.tsx";
+@source "../../app/listen/src/components/social/CollaboratorSearchView.tsx";
+@source "../../node_modules/@ashishgogula/coverflow/dist";
+@source "../../app/listen/node_modules/@ashishgogula/coverflow/dist";
+
+@source "../../app/listen/src/components/crates/CrateAlbumListView.tsx";
+@source "../../app/listen/src/components/CrateAlbumPickerView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistListRowView.tsx";
+
+@source "../../app/listen/src/components/search/CatalogSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackListView.tsx";

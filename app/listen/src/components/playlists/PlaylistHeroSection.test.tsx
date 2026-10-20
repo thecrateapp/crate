@@ -110,7 +110,7 @@ describe("PlaylistHeroSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses an explicit mobile hero height so copy sits directly above CTAs", () => {
+  it("uses the shared minimum hero height so long copy cannot be clipped", () => {
     const { container } = renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
@@ -131,7 +131,7 @@ describe("PlaylistHeroSection", () => {
     );
 
     const hero = container.querySelector("section") as HTMLElement;
-    expect(hero).toHaveClass("h-hero-md");
+    expect(hero).toHaveClass("min-h-hero-md");
     expect(hero).not.toHaveClass("min-h-hero-lg");
   });
 

@@ -1,4 +1,10 @@
 import {
+  CrateAlbumListView,
+  CrateAlbumListItem,
+  CrateAlbumPreviewRowView,
+} from "../components/crates/CrateAlbumListView";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import {
   lazy,
   memo,
   Suspense,
@@ -32,7 +38,7 @@ import {
   HERO_SECONDARY_ACTION_CLASS,
   type HeroSecondaryAction,
 } from "@crate/ui/domain/hero";
-import { EmptyState, ErrorState } from "@crate/ui/domain/states";
+import { ErrorState } from "@crate/ui/domain/states";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { useTranslation } from "react-i18next";
@@ -58,7 +64,6 @@ import {
   type NumberedCrateAlbum,
 } from "@/components/crates/crate-model";
 import {
-  CRATE_SECONDARY_ACTION_CLASS,
   CrateHero,
   crateShareAction,
 } from "@/components/crates/CratePageHeader";
@@ -549,34 +554,28 @@ function CrateAlbumPreviewRow({
 }) {
   const albumCover = coverUrl(album, 192);
   return (
-    <div className="flex items-center gap-[var(--content-row-gap)] px-3 py-[var(--content-row-padding-y)]">
-      <span className="w-6 shrink-0 text-right text-xs tabular-nums text-text-muted">
-        {album.displayNumber}
-      </span>
-      <div className="size-12 shrink-0 overflow-hidden rounded-md bg-text-primary/5">
-        {albumCover ? (
-          <CrateImage
-            src={albumCover}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover"
-          />
-        ) : (
-          <div className="flex size-full items-center justify-center text-text-primary/35">
-            <Disc3 size={CRATE_ICON_SIZE.md} />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-text-primary">
-          {album.name}
-        </p>
-        <p className="truncate text-xs text-text-muted">
-          {album.year ? `${album.year} · ` : ""}
-          {album.artist_name}
-        </p>
-      </div>
-    </div>
+    <CrateAlbumPreviewRowView
+      title={album.name}
+      artist={album.artist_name}
+      rank={album.displayNumber}
+      year={album.year}
+      artwork={
+        <MediaCover
+          src={albumCover}
+          alt=""
+          className="size-12 shrink-0"
+          fallbackIcon={Disc3}
+          renderImage={(image) => (
+            <CrateImage
+              src={image.src}
+              alt=""
+              loading="lazy"
+              className={image.className}
+            />
+          )}
+        />
+      }
+    />
   );
 }
 
@@ -591,37 +590,22 @@ function CrateAlbumList({
   linkAlbums: boolean;
   onRemoveAlbum?: (album: CrateAlbum) => void;
 }) {
-  const { t } = useTranslation();
   return (
-    <section className="mx-auto max-w-content space-y-4 px-4 sm:px-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-xl font-bold text-text-primary">
-          {t("crate.page.albums")}
-        </h2>
-        <span className="text-sm text-text-muted">
-          {t("common.albumCountLabel", { count: albums.length })}
-        </span>
-      </div>
-      {albums.length > 0 ? (
-        <ol className="space-y-1">
-          {albums.map((album) => (
-            <li key={album.global_album_uid}>
-              {linkAlbums ? (
-                <CrateAlbumRow
-                  album={album}
-                  coverUrl={coverUrl}
-                  onRemoveAlbum={onRemoveAlbum}
-                />
-              ) : (
-                <CrateAlbumPreviewRow album={album} coverUrl={coverUrl} />
-              )}
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <EmptyState variant="dashed" message={t("crate.page.noAlbums")} />
-      )}
-    </section>
+    <CrateAlbumListView count={albums.length}>
+      {albums.map((album) => (
+        <CrateAlbumListItem key={album.global_album_uid}>
+          {linkAlbums ? (
+            <CrateAlbumRow
+              album={album}
+              coverUrl={coverUrl}
+              onRemoveAlbum={onRemoveAlbum}
+            />
+          ) : (
+            <CrateAlbumPreviewRow album={album} coverUrl={coverUrl} />
+          )}
+        </CrateAlbumListItem>
+      ))}
+    </CrateAlbumListView>
   );
 }
 
@@ -701,7 +685,7 @@ function CratePageActions({
     subtitle: crateOwnerName(crate) ?? undefined,
     detail: t("common.albumCountLabel", { count: albums.length }),
     imageUrl: coverAlbum
-      ? authenticatedCrateCoverUrl(coverAlbum, 192) ?? undefined
+      ? (authenticatedCrateCoverUrl(coverAlbum, 192) ?? undefined)
       : undefined,
     imageAlt: crate.name,
     imageShape: "square",
@@ -717,7 +701,6 @@ function CratePageActions({
       ariaLabel: t("actions.crate.radio"),
       title: t("actions.crate.radio"),
       onClick: onRadio,
-      className: CRATE_SECONDARY_ACTION_CLASS,
     });
   }
   if (offlineSupported) {
@@ -736,7 +719,6 @@ function CratePageActions({
       disabled: offlineBusy,
       onClick: onOffline,
       className: cn(
-        CRATE_SECONDARY_ACTION_CLASS,
         offlineActive && "text-text-accent drop-shadow-accent-action",
       ),
     });
@@ -749,7 +731,6 @@ function CratePageActions({
       ariaLabel: t("library.crates.collaborators"),
       title: t("library.crates.collaborators"),
       onClick: onMembers,
-      className: CRATE_SECONDARY_ACTION_CLASS,
     });
   }
   if (canEdit) {
@@ -760,7 +741,6 @@ function CratePageActions({
       ariaLabel: t("crate.page.edit"),
       title: t("crate.page.edit"),
       onClick: onEdit,
-      className: CRATE_SECONDARY_ACTION_CLASS,
     });
   }
   secondaryActions.push(crateShareAction(crate, onShare, t));
@@ -794,7 +774,6 @@ function CratePageActions({
           <FollowHeartButton
             className={cn(
               HERO_SECONDARY_ACTION_CLASS,
-              CRATE_SECONDARY_ACTION_CLASS,
               followed && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
             )}
             following={followed}

@@ -22,6 +22,22 @@ vi.mock("@/components/artwork/CrateImage", () => ({
 import { PlaylistArtwork } from "./PlaylistArtwork";
 
 describe("PlaylistArtwork", () => {
+  it("keeps canonical album covers in the collage for normalized composer tracks", () => {
+    const tracks = [
+      {
+        artist: "High Vis",
+        album: "Blending",
+        globalAlbumUid: "composer-blending",
+      },
+    ];
+    const { container } = render(
+      <PlaylistArtwork name="Composer set" tracks={tracks} />,
+    );
+    expect(container.querySelector("img[alt='Composer set']")).toHaveAttribute(
+      "src",
+      expect.stringContaining("composer-blending"),
+    );
+  });
   it("uses global album artwork when playlist tracks only have global refs", () => {
     const { container } = render(
       <PlaylistArtwork

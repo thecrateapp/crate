@@ -21,6 +21,7 @@ export interface PlaylistTrack {
   id: number;
   track_id?: number;
   global_track_uid?: string;
+  global_album_uid?: string;
   globalTrackUid?: string;
   track_entity_uid?: string;
   track_path?: string | null;

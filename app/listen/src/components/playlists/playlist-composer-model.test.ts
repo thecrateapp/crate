@@ -114,3 +114,27 @@ describe("playlist composer model", () => {
     });
   });
 });
+
+it("retains album identity when a search result becomes an editable playlist track", () => {
+  const track = {
+    title: "Talk For Hours",
+    artist: "High Vis",
+    album: "Blending",
+    duration: 183,
+    global_track_uid: "track-1",
+    global_album_uid: "album-1",
+    album_id: 12,
+    album_entity_uid: "album-entity",
+    artist_entity_uid: "artist-entity",
+    album_slug: "blending",
+    artist_slug: "high-vis",
+  };
+  expect(toComposerTrack(track)).toMatchObject({
+    globalAlbumUid: "album-1",
+    albumId: 12,
+    albumEntityUid: "album-entity",
+    artistEntityUid: "artist-entity",
+    albumSlug: "blending",
+    artistSlug: "high-vis",
+  });
+});

@@ -1,3 +1,4 @@
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Sparkles, Globe, Lock, Users } from "@crate/ui/icons";
 
@@ -109,17 +110,9 @@ export function PlaylistContent({
           filteredCount={page.filteredTracks.length}
         />
         {data.tracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {page.t("playlist.empty.noTracks")}
-            </p>
-          </div>
+          <EmptyState message={page.t("playlist.empty.noTracks")} />
         ) : page.filteredTracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {page.t("playlist.empty.noFilter")}
-            </p>
-          </div>
+          <EmptyState message={page.t("playlist.empty.noFilter")} />
         ) : (
           <PlaylistTrackList
             filteredTracks={page.filteredTracks}

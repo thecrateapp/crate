@@ -1,3 +1,4 @@
+import { PlaylistHeroView } from "./PlaylistHeroView";
 import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -7,7 +8,6 @@ import {
   Shuffle,
   type CrateIcon,
 } from "@crate/ui/icons";
-import { PageHero } from "@crate/ui/domain/hero";
 
 import type { ContextMenuEntry } from "@/components/actions/ItemActionMenu";
 import { ListenHeroActionBar } from "@/components/hero/ListenHeroActionBar";
@@ -67,21 +67,12 @@ export function PlaylistHeroSection({
   );
 
   return (
-    <PageHero
-      variant="media"
-      eyebrow={badges}
+    <PlaylistHeroView
       title={title}
       description={description}
-      meta={visibleMetaItems}
-      artwork={artwork("size-full rounded-none")}
-      background={{
-        gradient: "strong",
-        render: (className) => (
-          <div className={className}>
-            {artwork("h-full w-full rounded-none")}
-          </div>
-        ),
-      }}
+      metaItems={visibleMetaItems}
+      badges={badges}
+      artwork={artwork}
       actions={
         <ListenHeroActionBar
           primaryLabel={t("playlist.actions.primaryGroup")}

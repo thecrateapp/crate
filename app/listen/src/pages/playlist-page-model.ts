@@ -1,3 +1,4 @@
+import { trackAlbumIdentity } from "../components/search/catalog-search-model";
 import type { TFunction } from "i18next";
 
 import type { Track } from "@/contexts/PlayerContext";
@@ -46,6 +47,7 @@ export function buildPlaylistEditableTracks(
 ): PlaylistComposerTrack[] {
   if (!data?.tracks.length) return [];
   return data.tracks.map((track) => ({
+    ...trackAlbumIdentity(track),
     title: track.title || t("common.unknown"),
     artist: track.artist || "",
     album: track.album,

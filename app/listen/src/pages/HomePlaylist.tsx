@@ -70,14 +70,15 @@ export function HomePlaylist() {
     usePlaylistComposer();
   const [filterQuery, setFilterQuery] = useState("");
   const deferredFilterQuery = useDeferredValue(filterQuery);
-  const { data, loading } = useApi<HomeGeneratedPlaylistDetail>(
-    playlistId
-      ? `/api/me/home/playlists/${encodeURIComponent(playlistId)}?v=2`
-      : null,
-    "GET",
-    undefined,
-    { safetyNetMs: 120_000 },
-  );
+  const { data, loading, error, status, refetch } =
+    useApi<HomeGeneratedPlaylistDetail>(
+      playlistId
+        ? `/api/me/home/playlists/${encodeURIComponent(playlistId)}?v=2`
+        : null,
+      "GET",
+      undefined,
+      { safetyNetMs: 120_000 },
+    );
   const releaseWindowLabel = useMemo(
     () => newArrivalsWindowLabel(data),
     [data],
@@ -198,6 +199,15 @@ export function HomePlaylist() {
   if (loading) {
     return <CrateLoader label={t("playlist.loading")} />;
   }
+
+  if (!data && error && status !== 404)
+    return (
+      <ErrorState
+        message={t("playlist.toasts.loadFailed")}
+        retryLabel={t("common.retry")}
+        onRetry={refetch}
+      />
+    );
 
   if (!data) {
     return (

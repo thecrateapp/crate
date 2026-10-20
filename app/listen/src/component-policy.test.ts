@@ -11,8 +11,8 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-// 1BA removes five raw buttons through canonical selection/import/offline actions and SuggestedTrackRow.
-const RAW_CONTROL_BUDGET = { button: 77, input: 6, textarea: 1 };
+// 1BB replaces the composer row remove control with canonical ActionButton.
+const RAW_CONTROL_BUDGET = { button: 76, input: 6, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":

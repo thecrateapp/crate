@@ -530,3 +530,19 @@ it("forwards native article attributes without nesting trailing actions in the p
     screen.getByRole("article").querySelector('[data-slot="entity-primary"]'),
   ).not.toContainElement(screen.getByRole("button", { name: "Select" }));
 });
+
+it("keeps rich identity links inside the title recipe while preserving plain menu identity", () => {
+  render(
+    <EntityRow
+      title="Jane McKay"
+      titleContent={<a href="/users/DJCase">Jane McKay</a>}
+    />,
+  );
+  const link = screen.getByRole("link", { name: "Jane McKay" });
+  expect(link).toHaveAttribute("href", "/users/DJCase");
+  expect(link.parentElement).toHaveClass(
+    "crate-entity-title",
+    "text-sm",
+    "font-medium",
+  );
+});

@@ -201,6 +201,12 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        catalogSearch1bb: fileURLToPath(
+          new URL("review-1bb-catalog-search.html", import.meta.url),
+        ),
+        review1BBDetails: fileURLToPath(
+          new URL("review-1bb-collection-details.html", import.meta.url),
+        ),
         review1BB: fileURLToPath(
           new URL("review-1bb-home-library.html", import.meta.url),
         ),

@@ -71,6 +71,9 @@ describe("PlaylistCreateModal", () => {
         .closest("[data-app-modal-panel]"),
     ).toHaveClass("crate-overlay-panel");
     expect(
+      screen.getByRole("dialog").querySelector(".crate-overlay-footer"),
+    ).not.toHaveClass("bg-transparent");
+    expect(
       screen.getByRole("dialog").querySelector(".listen-glass-panel"),
     ).toBeNull();
   });
@@ -105,6 +108,7 @@ describe("PlaylistCreateModal", () => {
           album: "Blending",
           duration: 183,
           global_track_uid: "track-global-1",
+          global_album_uid: "album-global-1",
         },
       ],
     });
@@ -122,6 +126,9 @@ describe("PlaylistCreateModal", () => {
       </I18nProvider>,
     );
 
+    expect(
+      screen.getByPlaceholderText("Search tracks to add").className,
+    ).not.toMatch(/md:text-base|bg-text-primary\/5/);
     fireEvent.change(screen.getByPlaceholderText("Search tracks to add"), {
       target: { value: "high vis" },
     });
@@ -135,7 +142,20 @@ describe("PlaylistCreateModal", () => {
         "/api/catalog/search?q=high%20vis&limit=20",
       );
     });
+    const result = screen.getByRole("button", { name: /Talk For Hours/i });
+    expect(result.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("album-global-1"),
+    );
     fireEvent.click(screen.getByRole("button", { name: /Talk For Hours/i }));
+    const selected = screen
+      .getByRole("button", { name: "Remove Talk For Hours" })
+      .closest('[data-slot="entity-row"]')!;
+    expect(selected.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("album-global-1"),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "Playlist" }));
     fireEvent.change(screen.getByPlaceholderText("My next obsession"), {
       target: { value: "Favourites" },

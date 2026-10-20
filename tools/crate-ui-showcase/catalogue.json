@@ -624,9 +624,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/entity/EntityRow.tsx": "09970ba6d3b55baf675b87c161d6eb734151e4a57152a56966d634e1a0e0da11",
-        "tools/crate-ui-showcase/stories/EntityRow.stories.tsx": "88e3469fe715d260e7ceb4ecdb80aca81b6ef82186996a6ed67a0d39efde7473",
-        "tools/crate-ui-showcase/docs/EntityRow.mdx": "0f1b440cec5ab1b24449cd5946e5662575f46551d555846344866496e640d12b"
+        "app/shared/ui/domain/entity/EntityRow.tsx": "2728e888b9c85ace5cef9f9e7561e0c30db1f39f318ded1526a9c0a242c5e765",
+        "tools/crate-ui-showcase/stories/EntityRow.stories.tsx": "d72ac702d7d969b036b458e33ad318c78a5008345176683084acf59e9c0c9294",
+        "tools/crate-ui-showcase/docs/EntityRow.mdx": "1d32fe9e72efd9a7c3fee355076abb018fed301467fe1361b719ca519c9d68b0"
       },
       "category": "Data Display"
     },

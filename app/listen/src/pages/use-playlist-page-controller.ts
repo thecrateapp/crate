@@ -29,6 +29,7 @@ export interface PlaylistPageController extends PlaylistActions {
   editableTracks: ReturnType<typeof buildPlaylistEditableTracks>;
   editorOpen: boolean;
   error: unknown;
+  status?: number | null;
   filterQuery: string;
   filteredTracks: PlaylistData["tracks"];
   leaving: boolean;
@@ -62,7 +63,7 @@ export function usePlaylistPageController(): PlaylistPageController {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { data, loading, error, refetch } = useApi<PlaylistData>(
+  const { data, loading, error, status, refetch } = useApi<PlaylistData>(
     id ? `/api/playlists/${id}` : null,
     "GET",
     undefined,
@@ -150,6 +151,7 @@ export function usePlaylistPageController(): PlaylistPageController {
     editableTracks,
     editorOpen,
     error,
+    status,
     filterQuery,
     filteredTracks,
     leaving,

@@ -285,13 +285,11 @@ play/aura/ring y la estela/dot. [Plan y decisiones](2026-10-19-crate-v3-player.m
 [validación y límites](2026-10-19-crate-v3-current-state.md). Storybook y preview pequeño usan
 las mismas piezas reales; Listen autenticado sigue activo. Detención antes de commit/push y de1BA.
 
-
 ## 2026-10-19 — 1AZ aprobado; publicación autorizada
 
 Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
 Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
 las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.
-
 
 ## 2026-10-19 — 1AZ publicado;1BA local para revisión
 
@@ -301,7 +299,6 @@ actualiza Storybook con las piezas reales. [Plan y límites](2026-10-19-crate-v3
 [estado vigente](2026-10-19-crate-v3-current-state.md). Revisión pequeña review-1ba-album-access.html,
 Storybook Reviews/1BA/Album and access; tres servicios activos. Stop1BA sin commit/push para Diego.
 No certifica dispositivos nativos, AT, escrituras reales ni cierra toda la migración de Listen.
-
 
 ## 2026-10-19 — 1BA aprobado; publicación autorizada
 
@@ -317,3 +314,25 @@ Detalles/editores de Playlist/Curated/HomePlaylist/HomeSection/Crate, coverflow 
 continúan en el próximo lote1BB; no están cerrados. [Plan y matriz de alcance](2026-10-19-crate-v3-home-library.md).
 Enmienda de Diego: métricas contextuales (plays, albums/tracks, duración, match) usan MonoLabel
 con mayúsculas del componente; identidad y prosa conservan su escritura. Stop1BB sin commit.
+
+## 1BB primer lote publicado; detalles y editores en revisión
+
+Primer lote aprobado/publicado `0f8cf24f`. El segundo lote aplica
+[el plan de detalles y editores](2026-10-20-crate-v3-collection-details.md): presentación común
+Playlist/Curated/HomePlaylist, estados de lectura de HomeSection, detalle público/autenticado de
+Crate, formularios y diálogos de creación/edición/colaboración. El inventario y la matriz de
+adopción se documentan en el README de Storybook; la revisión pequeña es
+`review-1bb-collection-details.html` / `reviews-1bb-collection-details--complete`.
+La enmienda posterior de Diego restaura hover en filas de álbumes de crate y en listados de
+playlists; las demás filas mantienen su contrato. V2 coverflow, imágenes, controladores y API
+conservados. Segundo lote sin commit/push hasta revisión;5186/6006/5174 siguen activos.
+
+## 1BB segundo lote aprobado — publicación autorizada
+
+Diego aprueba detalles/editores/colaboración y la enmienda CatalogSearch con artwork real.
+Autoriza commit/push y continuar con el siguiente grupo. El segundo lote incluye la búsqueda
+de dominio reutilizada en playlists/crates y la conservación de portadas en resultados,
+selección, reapertura y collage. La evidencia focalizada queda en el README de Storybook y
+el plan de detalles. Próximo checkpoint:1BC, dividido en lotes revisables según H2; primer
+lote Explore y browse de género/década/categoría. Storybook y las tres instancias continúan;
+parar cada lote nuevo para revisión antes de commit.

@@ -1,9 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
-import { IconButton } from "@crate/ui/primitives/IconButton";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
-
-import { cn } from "@/lib/utils";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { FilterBar } from "@crate/ui/domain/filters/FilterBar";
 
 interface FilterablePlaylistTrack {
   title?: string | null;
@@ -53,33 +51,22 @@ export function PlaylistTrackFilterBar({
     : `${totalCount}`;
 
   return (
-    <div className={cn("flex w-full", className)}>
-      <div className="relative min-w-0 flex-1">
+    <FilterBar
+      className={className}
+      search={
         <SearchInput
           value={query}
           onValueChange={onQueryChange}
-          clearable={false}
           label={t("playlist.filter.placeholder")}
           placeholder={t("playlist.filter.placeholder")}
-          className="rounded-lg bg-surface-canvas/10 pr-28 placeholder:text-text-muted sm:pr-36 md:text-base"
+          clearLabel={t("playlist.filter.clear")}
         />
-        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium uppercase tracking-eyebrow text-accent-action/85">
-          {countLabel}
-          <span className="ml-1 text-accent-action/65">
-            {t("playlist.filter.tracks")}
-          </span>
-        </div>
-        {filtering ? (
-          <IconButton
-            label={t("playlist.filter.clear")}
-            size="sm"
-            onClick={() => onQueryChange("")}
-            className="absolute top-1/2 right-24 size-7 -translate-y-1/2 hover:-translate-y-1/2 sm:right-32"
-          >
-            <X size={CRATE_ICON_SIZE.xs} />
-          </IconButton>
-        ) : null}
-      </div>
-    </div>
+      }
+      actions={
+        <MonoLabel>
+          {countLabel} {t("playlist.filter.tracks")}
+        </MonoLabel>
+      }
+    />
   );
 }

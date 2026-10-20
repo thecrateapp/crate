@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useId,
   useEffect,
   useReducer,
   useRef,
@@ -8,12 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { type DragEndEvent } from "@dnd-kit/core";
-import {
-  AppModal,
-  ModalBody,
-  ModalFooter,
-} from "@crate/ui/primitives/AppModal";
-import { Button } from "@crate/ui/shadcn/button";
+import { CollectionEditorDialog } from "../collections/CollectionEditorDialog";
 import { api } from "@/lib/api";
 import {
   fileToDataUrl,
@@ -69,6 +65,7 @@ export function PlaylistCreateModal({
   onSubmit,
 }: PlaylistCreateModalProps) {
   const { t } = useTranslation();
+  const formId = useId();
   const [state, dispatch] = useReducer(
     playlistComposerReducer,
     initialPlaylistComposerState,
@@ -221,81 +218,58 @@ export function PlaylistCreateModal({
   }
 
   return (
-    <AppModal
+    <CollectionEditorDialog
       open={open}
-      onClose={() => {
-        if (!submitting) onClose();
-      }}
       title={modalTitle}
       description={modalSubtitle}
-      closeLabel={t("common.close")}
-      closeDisabled={submitting}
-      headerClassName="bg-transparent"
       maxWidthClassName="sm:max-w-3xl"
-      panelClassName="flex flex-col border-border-quiet"
-      closeOnEscape={!submitting}
-      closeOnOverlay={!submitting}
+      formId={formId}
+      submitLabel={submitLabel}
+      cancelLabel={t("common.cancel")}
+      closeLabel={t("common.close")}
+      pending={submitting}
+      submitDisabled={!name.trim()}
+      onCancel={onClose}
     >
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
-        <ModalBody className="space-y-5 p-5 ">
-          <PlaylistIdentitySection
-            state={{
-              name,
-              description,
-              coverDataUrl,
-              visibility,
-              isCollaborative,
-              tracks,
-              titleEditing,
-              descriptionEditing,
-            }}
-            refs={{
-              fileInputRef,
-              titleInputRef,
-              descriptionInputRef,
-            }}
-            dispatch={dispatch}
-            handleFileChange={handleFileChange}
-            canManageSettings={canManageSettings}
-            t={t}
-          />
+      <form id={formId} onSubmit={handleSubmit} className="space-y-5">
+        <PlaylistIdentitySection
+          state={{
+            name,
+            description,
+            coverDataUrl,
+            visibility,
+            isCollaborative,
+            tracks,
+            titleEditing,
+            descriptionEditing,
+          }}
+          refs={{
+            fileInputRef,
+            titleInputRef,
+            descriptionInputRef,
+          }}
+          dispatch={dispatch}
+          handleFileChange={handleFileChange}
+          canManageSettings={canManageSettings}
+          t={t}
+        />
 
-          <PlaylistTrackSearch
-            search={search}
-            searching={searching}
-            results={results}
-            t={t}
-            onSearchChange={(value) => dispatch({ type: "set-search", value })}
-            onAddTrack={(track) => addTrack(toComposerTrack(track))}
-          />
+        <PlaylistTrackSearch
+          search={search}
+          searching={searching}
+          results={results}
+          t={t}
+          onSearchChange={(value) => dispatch({ type: "set-search", value })}
+          onAddTrack={(track) => addTrack(toComposerTrack(track))}
+        />
 
-          <PlaylistTrackList
-            tracks={tracks}
-            t={t}
-            onDragEnd={handleDragEnd}
-            onRemove={removeTrack}
-          />
-        </ModalBody>
-
-        <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <Button
-            variant="ghost"
-            className="rounded-lg"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            className="rounded-lg"
-            loading={submitting}
-            disabled={!name.trim()}
-          >
-            {submitLabel}
-          </Button>
-        </ModalFooter>
+        <PlaylistTrackList
+          tracks={tracks}
+          t={t}
+          onDragEnd={handleDragEnd}
+          onRemove={removeTrack}
+        />
       </form>
-    </AppModal>
+    </CollectionEditorDialog>
   );
 }

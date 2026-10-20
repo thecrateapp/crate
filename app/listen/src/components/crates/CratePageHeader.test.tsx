@@ -40,4 +40,5 @@ it("keeps the empty crate on the shared content-sized hero contract with its act
   );
   expect(screen.getByRole("button", { name: "Add albums" })).toBeVisible();
   expect(screen.queryByTestId("crate-coverflow")).not.toBeInTheDocument();
+  expect(screen.getByText("0 albums")).toHaveClass("font-mono", "uppercase");
 });
