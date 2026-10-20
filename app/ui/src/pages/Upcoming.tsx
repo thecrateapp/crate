@@ -123,7 +123,13 @@ function showAnchorId(showId: number): string {
   return `upcoming-show-${showId}`;
 }
 
+/**
+ * The list key, also used to expand an item. A show is keyed by its ID, so
+ * exact twins (two saved shows with the same details) stay apart.
+ */
 function itemKey(item: UpcomingItem): string {
+  if (item.type === "show" && item.show_id != null)
+    return `show-${item.show_id}`;
   return `${item.type}-${item.artist}-${
     item.release_id ?? item.url ?? item.venue ?? item.title
   }-${item.date}`;
@@ -368,6 +374,7 @@ export function Upcoming() {
             type="button"
             variant="outline"
             size="sm"
+            aria-label="Merge duplicates of this show"
             onClick={() => {
               setMergeIds(sameShowIds(items, item));
               setMergeOpen(true);
@@ -491,11 +498,12 @@ export function Upcoming() {
             )}
           </div>
 
-          {linkNotice ? (
-            <div className="mt-3 flex items-center gap-2">
-              <p role="status" className="text-sm text-white/70">
-                {linkNotice}
-              </p>
+          {/* Always mounted, so a screen reader hears the notice arrive. */}
+          <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
+            <p role="status" className="text-sm text-white/70 empty:sr-only">
+              {linkNotice}
+            </p>
+            {linkNotice ? (
               <ActionIconButton
                 onClick={() => setLinkNotice("")}
                 title="Dismiss"
@@ -503,8 +511,8 @@ export function Upcoming() {
               >
                 <X size={14} />
               </ActionIconButton>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {(["all", "releases", "shows"] as const).map((f) => (

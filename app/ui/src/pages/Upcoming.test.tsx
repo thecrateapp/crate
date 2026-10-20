@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { api } from "@/lib/api";
 import { Upcoming } from "./Upcoming";
@@ -123,7 +123,9 @@ it("merges from a show's detail with its look-alikes already loaded", async () =
   const detail = await waitFor(() => card(8));
   const user = userEvent.setup();
   await user.click(
-    await within(detail).findByRole("button", { name: "Merge duplicates" }),
+    await within(detail).findByRole("button", {
+      name: "Merge duplicates of this show",
+    }),
   );
   const panel = await screen.findByRole("dialog", {
     name: "Merge duplicate shows",
@@ -175,5 +177,89 @@ it("offers the detail merge only to show curators", async () => {
   await waitFor(() =>
     within(card(7)).getByRole("button", { name: "Close show details" }),
   );
-  expect(screen.queryByRole("button", { name: "Merge duplicates" })).toBe(null);
+  expect(screen.queryByRole("button", { name: /Merge duplicates/ })).toBe(null);
+});
+
+it("has the not-listed notice's status region in place before the notice", async () => {
+  let resolve!: (value: { items: unknown[] }) => void;
+  const upcoming = new Promise<{ items: unknown[] }>((done) => {
+    resolve = done;
+  });
+  vi.mocked(api).mockImplementation(async (url: string) => {
+    if (url === "/api/upcoming") return upcoming;
+    throw new Error(`Unexpected request: ${url}`);
+  });
+  renderWithAdminProviders(<Upcoming />, { route: "/upcoming?show_id=99" });
+  const status = screen.getByRole("status");
+  expect(status).toBeEmptyDOMElement();
+  await act(async () => resolve({ items: ITEMS }));
+  await waitFor(() =>
+    expect(status).toHaveTextContent("That show isn't in the upcoming list."),
+  );
+  expect(screen.getByRole("status")).toBe(status);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Dismiss" }));
+  expect(screen.getByRole("status")).toBe(status);
+  expect(status).toBeEmptyDOMElement();
+});
+
+describe("exact twin shows", () => {
+  // Two saved shows with the very same details, so only their IDs differ.
+  const TWINS = [
+    show(11, "Fix Wave Band", "2099-07-10", "Sala Sol"),
+    show(12, "Fix Wave Band", "2099-07-10", "Sala Sol"),
+  ];
+
+  beforeEach(() => {
+    vi.mocked(api).mockImplementation(async (url: string) => {
+      if (url === "/api/upcoming") return { items: [...ITEMS, ...TWINS] };
+      if (url.startsWith("/api/show-imports/shows?")) return { items: ROWS };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+  });
+
+  function isOpen(showId: number) {
+    return (
+      within(card(showId)).queryByRole("button", {
+        name: "Close show details",
+      }) !== null
+    );
+  }
+
+  it("expands each one on its own, with no duplicate-key warning", async () => {
+    const errors = vi.spyOn(console, "error");
+    try {
+      renderWithAdminProviders(<Upcoming />);
+      await waitFor(() => card(12));
+      const user = userEvent.setup();
+      await user.click(
+        within(card(11)).getByRole("button", { expanded: false }),
+      );
+      expect(isOpen(11)).toBe(true);
+      expect(isOpen(12)).toBe(false);
+      await user.click(
+        within(card(12)).getByRole("button", { expanded: false }),
+      );
+      expect(isOpen(12)).toBe(true);
+      expect(isOpen(11)).toBe(false);
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it("opens only the linked one, with a merge button named for that show", async () => {
+    renderWithAdminProviders(<Upcoming />, { route: "/upcoming?show_id=12" });
+    await waitFor(() => expect(isOpen(12)).toBe(true));
+    expect(isOpen(11)).toBe(false);
+    expect(scrollIntoView.mock.contexts[0]).toBe(card(12));
+    const merge = within(card(12)).getByRole("button", {
+      name: "Merge duplicates of this show",
+    });
+    expect(merge).toHaveTextContent("Merge duplicates");
+    expect(
+      within(card(11)).queryByRole("button", { name: /Merge duplicates/ }),
+    ).toBeNull();
+  });
 });
