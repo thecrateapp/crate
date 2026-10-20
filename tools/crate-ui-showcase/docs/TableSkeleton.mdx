@@ -1,0 +1,21 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/TableSkeleton.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">TableSkeleton</DocHeading>
+<EntryDetails
+  id="composites-tableskeleton"
+  review="Loading amendment · awaiting1BEreview"
+/>
+<DocHeading as="h2">Contract</DocHeading>A named fixed-column table placeholder.
+Header and row cells contain neutral text-sized blocks, never dash data.
+
+Unknown values stay unknown. A skeleton is decorative, not a count, dash reading or live progress.
+Composite placeholders provide one localized status; inner blocks are hidden from assistive tech.
+Static geometry respects reduced motion without spinning or shimmer. Keep final consumer geometry,
+not an unrelated table for a general section. Production and review import the same components.
+
+<Canvas of={Stories.Base} />
+<Controls />

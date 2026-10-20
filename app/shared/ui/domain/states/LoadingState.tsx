@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
-import { TableSkeleton } from "@crate/ui/composites/TableSkeleton";
 
 export type LoadingStateVariant = "section" | "route" | "page" | "screen";
 
@@ -12,6 +11,8 @@ export interface LoadingStateProps {
   /** @deprecated Route indicators no longer use marketing phrases. */
   phrases?: readonly string[];
   className?: string;
+  /** Stretch a section beam across its available content area. Route geometry is unchanged. */
+  fullWidth?: boolean;
   /** The section's final layout, with reserved readings instead of invented data. */
   children?: ReactNode;
 }
@@ -55,6 +56,7 @@ export function LoadingState({
   label = "Loading",
   className,
   children,
+  fullWidth = false,
 }: LoadingStateProps) {
   if (variant !== "section")
     return (
@@ -75,7 +77,17 @@ export function LoadingState({
     >
       <span className="sr-only">{label}</span>
       <div aria-hidden="true">
-        {children ?? <TableSkeleton rows={3} columns={3} />}
+        {children ?? (
+          <div
+            className={cn(
+              "crate-loading-section",
+              fullWidth && "crate-loading-section-full",
+            )}
+          >
+            <MonoLabel>{label}</MonoLabel>
+            <ProgressHairline label={label} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -632,3 +632,28 @@ Se conservan periodos, alcance propio/global/usuario, privacidad, datos horarios
 Lyrics/Info/output/targets/Tauri quedan para siguientes lotes internos1BE; sin nuevos instrumentos
 H3 ni cambios de protocolo. Storybook y preview pequeño, tres servicios activos y parada para
 revisión antes del próximo commit.
+
+
+1BD publicado como295f283a. Implementación local1BE Stats/Digging: vistas reales de cabecera,
+estados, resúmenes, artista/ranking/highlights, perfil sonoro y tarjetas de cierre separadas de
+sus adaptadores de API/rutas/imagen/acciones. Se conservan tape/heatmap/décadas y las escalas
+editoriales; carga/error/vacío/lecturas antiguas y caché diferenciados. Digging reutiliza su
+builder real en Storybook y añade cierre/foco/scroll sin cambiar el payload de compartir.
+Enmiendas: Skeleton/Card/Grid/Table ahora reservan bloques neutrales estáticos en vez de datos
+con guiones; LoadingState sección usa caption/beam y ruta conserva200ms. Búsqueda global/mixta
+Finding your music...; CatalogSearch acotado identifica albums/artists/tracks/genres, localizado
+en7catálogos, beam de todo el ancho y resultados previos conservados. Cuatro entradas pendientes
+de skeleton se completan; catálogo63/93/120. Reviews/1BE/Stats and Digging y5186/review-1be-stats.html
+usan las mismas vistas; casos de carga de búsqueda en el ancla#search-loading. Sin nuevas entradas
+en el mockup grande, nuevas analíticas ni mutaciones de producción. Pendiente revisión final y
+aprobación de Diego antes de commit. Lyrics/Info/output/targets/Tauri siguen para otros lotes.
+
+Cierre local1BE: revisión fresca única (gpt-6-astra), dos hallazgos importantes y uno de espaciado
+reclasificado importante por drift de producción/preview. Una pasada TDD resuelve snapshots fríos
+conpending/version0, bloqueo/foco al desmontar Digging antes de Share y doble espaciado heredado.
+AppModal/Digging comparten el lock contado de documento y las vistas de Stats poseen sus gaps.
+131testsListen,88shared,54Desktop,2Admin y8casos browser375/1200en ambos hosts verdes. Cinco tipos,
+lint45archivos, i18n0/0, catálogo63/93/120, tres builds/bundle correctos (204871/307200gzipbytes).
+Sin segunda revisión ni regeneración de baselines; QA física nativa/AT de fase pendiente. Tres
+servicios activos, HEAD295f283a e índice vacío; se para para revisión sin commit/push de1BE.
+Capturas1be-search-loading.png y1be-stats-final.png bajo.artifacts/crate-v3.

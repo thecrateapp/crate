@@ -3614,9 +3614,9 @@ label
   }
 }
 
-/* Static placeholder geometry; route progress uses the shared motion gates. */
+/* Static loading blocks; unknown values never render as table data. */
 .crate-skeleton {
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 .crate-skeleton-card {
   min-block-size: 108px;
@@ -3644,6 +3644,16 @@ label
   font-family: var(--font-mono-stack);
   font-size: 11.5px;
   border-bottom: 1px solid var(--border-quiet);
+}
+.crate-loading-section {
+  display: grid;
+  gap: 12px;
+  inline-size: min(100%, 16rem);
+  padding-block: 16px;
+}
+
+.crate-loading-section-full {
+  inline-size: 100%;
 }
 .crate-loading-route {
   min-block-size: 120px;

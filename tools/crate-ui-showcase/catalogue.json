@@ -61,14 +61,14 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "0abcafa844cef3d5527696292a2f81a72919254bc8145edabfad070813ba515c",
+        "app/shared/ui/tokens/recipes.css": "7158234804171b56b60c2f3804e21f18bb85ffe8b3310d0927d9f0ba8d4df8f3",
         "app/shared/ui/tokens/semantic.css": "a97db8f14e54c52c1a74049914168760fdaf0589b4a9db71862439f9b3ba0ae0",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "4b97d4d4a3589a5cdd1faf9f624ac5dc11863ac4ffaef07525e74ecd6736b319",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "113c81a2a8351a2336690cb9856d1d09c628108d5f20ff9478530d994cf934c5",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "74b3e60b677421edbe88f2a519e183f2e1fb95866ed4a7c65c57a0a24c6abe39"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "184d12f9fedc4c0ad7215174b0742996d5d4d67f9b56d394c35912217a095787"
       },
       "category": "Foundations"
     },
@@ -279,18 +279,20 @@
     {
       "id": "composites-cardskeleton",
       "name": "CardSkeleton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "A named summary placeholder with two neutral blocks and stable reserved metric geometry.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-cardskeleton",
+      "story": "tools/crate-ui-showcase/stories/CardSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/CardSkeleton.mdx",
       "sources": [
         "app/shared/ui/composites/CardSkeleton.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/CardSkeleton.tsx": "9d4fb911dc7c6ad544c5f015d27b38dd6edfc90c1856c18247760e1399e09b00"
+        "app/shared/ui/composites/CardSkeleton.tsx": "0f40fa6b1fac063326342171f323beb94f63dbef24745066bc061677f5c0ed28",
+        "tools/crate-ui-showcase/stories/CardSkeleton.stories.tsx": "31e2ce7b10623adc4c4c7734378fec34bc00aea783bfd3b45c88e2e42f2aa374",
+        "tools/crate-ui-showcase/docs/CardSkeleton.mdx": "7de55799e7196f9a7103d15be10e9936665fbc53cc89c3a5377ae0b31e92b298"
       },
       "category": "Feedback"
     },
@@ -315,36 +317,40 @@
     {
       "id": "composites-gridskeleton",
       "name": "GridSkeleton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Media placeholders share actual MediaGrid and MediaRail columns, artwork shape and text slots.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-gridskeleton",
+      "story": "tools/crate-ui-showcase/stories/GridSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/GridSkeleton.mdx",
       "sources": [
         "app/shared/ui/composites/GridSkeleton.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/GridSkeleton.tsx": "29c5d88bb02b4bc1987d81be53c3d2536fd9ef0ed58d55c5503305aa90614b5f"
+        "app/shared/ui/composites/GridSkeleton.tsx": "2b5caf2baab70084a52791b4af0c0a76a5315b73880da5e8ef0bfe0222e29f42",
+        "tools/crate-ui-showcase/stories/GridSkeleton.stories.tsx": "c1f112ff4f7397fcbf9015304956b68095a57a51b5b2b9126b273e4960f37787",
+        "tools/crate-ui-showcase/docs/GridSkeleton.mdx": "525ae2f6a2f92516117182f12e5c0e3ca003be4426edbac6296024ca502204d8"
       },
       "category": "Feedback"
     },
     {
       "id": "composites-tableskeleton",
       "name": "TableSkeleton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "A named fixed-column table placeholder. Header and row cells contain neutral text-sized blocks, never dash data.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-tableskeleton",
+      "story": "tools/crate-ui-showcase/stories/TableSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/TableSkeleton.mdx",
       "sources": [
         "app/shared/ui/composites/TableSkeleton.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/TableSkeleton.tsx": "1c2fefe6c0dcd211bef0716fb6c6dadc2c6f92a5c95ef612b250ad616aabf75b"
+        "app/shared/ui/composites/TableSkeleton.tsx": "8167f6d50724984379b03f1acf20e8ef000073647a01aedd9bab3f1b81d53f44",
+        "tools/crate-ui-showcase/stories/TableSkeleton.stories.tsx": "8b3535e8d052e1d18e979b4ba8a3f8b9ad55d3283dfafa88afcc1a991b805d71",
+        "tools/crate-ui-showcase/docs/TableSkeleton.mdx": "1b0e04e0497695a549ca1eff40a59f3f11bebf2973a88d047bebf953bd19ae07"
       },
       "category": "Feedback"
     },
@@ -944,9 +950,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/states/LoadingState.tsx": "8c38accdcf65342375b5e1fe8003bb26fa0f1ef98d86a30b339c2e5325e54055",
-        "tools/crate-ui-showcase/stories/LoadingState.stories.tsx": "400c8ec4ad060ad87bf5d92175827816c0f0af2aaaf939097f66deddf5dc382e",
-        "tools/crate-ui-showcase/docs/LoadingState.mdx": "87da02bf2c60864f9bdf34d2ce6117adc81a5cd23d314f86248501d6d91a0973"
+        "app/shared/ui/domain/states/LoadingState.tsx": "4901e202a0dc208ed99b2fcdcdf882578e796129c5d3c9ab7b6d03785caff54c",
+        "tools/crate-ui-showcase/stories/LoadingState.stories.tsx": "0ad31fe4ab8578d4521becb12cf31016b8e80980fb73e5f9b4f7e0c07143d9a7",
+        "tools/crate-ui-showcase/docs/LoadingState.mdx": "c0518620777c5bf88ddf70c7c0c3f7dcbd5672dbe125c6d8d65a42e9bd3004ef"
       },
       "category": "Feedback"
     },
@@ -1042,9 +1048,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/AppModal.tsx": "ccc17862833c8a7d5edf7e310f33409ea29c3b1cfe49f6730658ee2fd63f55a9",
+        "app/shared/ui/primitives/AppModal.tsx": "3b889911996b81e40d876a929b26b1e928a5c92785052a5960d0c6eac1d1d2be",
         "tools/crate-ui-showcase/stories/AppModal.stories.tsx": "aa46b8773dc2e95d3d69b6c6cd9e0cf19bc328dc278c0a827831fef196ac7804",
-        "tools/crate-ui-showcase/docs/AppModal.mdx": "19357b3f30440fced5e04eae969d84300aae63b8ee1b731b2672d62354a1edde"
+        "tools/crate-ui-showcase/docs/AppModal.mdx": "cd700a3509ad25153ab2de1c8049922dd5f5af556a678e34662c22b254670649"
       },
       "category": "Overlays"
     },
@@ -1717,18 +1723,20 @@
     {
       "id": "shadcn-skeleton",
       "name": "skeleton",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "A decorative, static neutral block. Callers reserve real dimensions; no fabricated text or shimmer.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-skeleton",
+      "story": "tools/crate-ui-showcase/stories/Skeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Skeleton.mdx",
       "sources": [
         "app/shared/ui/shadcn/skeleton.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/skeleton.tsx": "eedfaf6612ffc9f63bc07d060648d4307787374df7cd202bde5b31e9716a2cd5"
+        "app/shared/ui/shadcn/skeleton.tsx": "eedfaf6612ffc9f63bc07d060648d4307787374df7cd202bde5b31e9716a2cd5",
+        "tools/crate-ui-showcase/stories/Skeleton.stories.tsx": "37cf270f9ed67e80c945ebaa8751c4c8504dc7b4d5476967df7cb87c7cbe3a97",
+        "tools/crate-ui-showcase/docs/Skeleton.mdx": "bf8bb2bf301effa5a7270ddcfd0182648ac20b7ffaeb11941ac73d73ea4dfe4e"
       },
       "category": "Feedback"
     },

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  formatStatsPercent,
-  type StatsHeatmap,
-} from "@/components/stats/stats-model";
+import { formatStatsPercent } from "./stats-format";
+import type { StatsHeatmap } from "./stats-types";
+import { Card } from "@crate/ui/shadcn/card";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 const MONDAY = Date.UTC(2024, 0, 1);
 
@@ -31,10 +31,10 @@ export function StatsHeatmapCard({ heatmap }: { heatmap: StatsHeatmap }) {
   const peak = heatmap.peak;
 
   return (
-    <div className="stats-card rounded-panel p-5">
-      <h3 className="text-sm font-semibold text-accent-action">
+    <Card className="gap-4 p-5">
+      <MonoLabel as="h3" tone="accent">
         {t("stats.heatmap.title")}
-      </h3>
+      </MonoLabel>
       <div
         className="stats-heatmap mt-4"
         role="img"
@@ -86,6 +86,6 @@ export function StatsHeatmapCard({ heatmap }: { heatmap: StatsHeatmap }) {
           })}
         </p>
       ) : null}
-    </div>
+    </Card>
   );
 }

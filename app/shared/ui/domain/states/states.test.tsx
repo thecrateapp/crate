@@ -9,15 +9,17 @@ describe("LoadingState", () => {
     vi.restoreAllMocks();
   });
 
-  it("names section loading and reserves visible static readings without a spinner", () => {
+  it("names section loading without inventing table data or a table layout", () => {
     const { container } = render(<LoadingState label="Loading albums" />);
     expect(
       screen.getByRole("status", { name: "Loading albums" }),
     ).not.toHaveAttribute("aria-busy", "true");
+    expect(container.querySelector('[data-slot="skeleton-table"]')).toBeNull();
+    expect(container.textContent).not.toContain("—");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(
-      container.querySelector('[data-slot="skeleton-table"]'),
-    ).toBeInTheDocument();
-    expect(container.textContent).toContain("—");
+      screen.getByText("Loading albums", { selector: ".crate-mono-label" }),
+    ).toBeVisible();
     expect(
       container.querySelector(".animate-spin, .animate-pulse, svg"),
     ).toBeNull();

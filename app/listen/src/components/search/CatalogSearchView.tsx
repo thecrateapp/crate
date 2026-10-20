@@ -36,6 +36,12 @@ const countKeys = {
   track: "search.tracksCount",
   genre: "common.genre",
 } as const;
+const findingKeys = {
+  artist: "search.findingArtists",
+  album: "search.findingAlbums",
+  track: "search.findingTracks",
+  genre: "search.findingGenres",
+} as const;
 const icons = { artist: User, album: Disc3, track: Music2, genre: Music2 };
 /** Controlled domain search. Owning controllers retain debounce, transport and selection authority. */
 export function CatalogSearchView<T>({
@@ -56,7 +62,13 @@ export function CatalogSearchView<T>({
   renderImage,
 }: CatalogSearchProps<T>) {
   const { t } = useTranslation();
-  const groups = [...new Set(kinds)]
+  const uniqueKinds = [...new Set(kinds)];
+  const loadingLabel = t(
+    uniqueKinds.length === 1
+      ? findingKeys[uniqueKinds[0]!]
+      : "search.loadingResults",
+  );
+  const groups = uniqueKinds
     .map((kind) => ({
       kind,
       items: items.filter((item) => item.kind === kind),
@@ -79,7 +91,7 @@ export function CatalogSearchView<T>({
       </FormField>
       {query.trim().length >= 2 ? (
         searching && !groups.length ? (
-          <LoadingState label={t("search.loadingResults")} />
+          <LoadingState label={loadingLabel} fullWidth />
         ) : error ? (
           <ErrorState
             message={error}
@@ -91,9 +103,7 @@ export function CatalogSearchView<T>({
             className="max-h-64 space-y-3 overflow-y-auto"
             aria-busy={searching}
           >
-            {searching ? (
-              <LoadingState label={t("search.loadingResults")} />
-            ) : null}
+            {searching ? <LoadingState label={loadingLabel} fullWidth /> : null}
             {groups.map((group) => (
               <section
                 key={group.kind}

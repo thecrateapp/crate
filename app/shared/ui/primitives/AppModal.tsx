@@ -14,6 +14,7 @@ import {
 import { createPortal } from "react-dom";
 import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
 
+import { acquireBodyScrollLock } from "@crate/ui/lib/body-scroll-lock";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
@@ -68,39 +69,6 @@ const FOCUSABLE_SELECTOR = [
 ].join(",");
 
 const ModalDepth = createContext(0);
-const scrollLocks = new WeakMap<
-  Document,
-  { count: number; restore: () => void }
->();
-
-function acquireScrollLock(doc: Document) {
-  let lock = scrollLocks.get(doc);
-  if (!lock) {
-    const elements = [doc.body, doc.documentElement];
-    const previous = elements.map(
-      ({ style }) => [style.overflow, style.overscrollBehavior] as const,
-    );
-    lock = {
-      count: 0,
-      restore: () =>
-        elements.forEach(({ style }, index) => {
-          [style.overflow, style.overscrollBehavior] = previous[index]!;
-        }),
-    };
-    scrollLocks.set(doc, lock);
-    elements.forEach(({ style }) => {
-      style.overflow = "hidden";
-      style.overscrollBehavior = "none";
-    });
-  }
-  lock.count++;
-  return () => {
-    if (--lock.count === 0) {
-      lock.restore();
-      scrollLocks.delete(doc);
-    }
-  };
-}
 
 function topModal(doc: Document) {
   const panels = Array.from(
@@ -163,7 +131,7 @@ export function AppModal({
     if (!open) return undefined;
 
     const releaseScrollLock = lockBodyScroll
-      ? acquireScrollLock(document)
+      ? acquireBodyScrollLock(document)
       : undefined;
 
     const onKeyDown = (event: KeyboardEvent) => {

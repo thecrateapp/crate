@@ -5267,13 +5267,29 @@
     "sourceHash": "sha256:18b22d5d398de8911d4b0c62d92051b9c9a3515218aa962b62cee44e062c7f15",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "search.findingAlbums": {
+    "sourceHash": "sha256:1d050dc2afb44aaaccd8d996ff886cce0bb6b49fe6f4b4fafbfbc9744f22fac4",
+    "reviewedAt": "2026-10-20T21:22:28.745Z"
+  },
+  "search.findingArtists": {
+    "sourceHash": "sha256:7df09d8c2a04bc2ad63696eec07793fc426683072fe81e365c297c4a5ddbd566",
+    "reviewedAt": "2026-10-20T21:22:28.745Z"
+  },
+  "search.findingGenres": {
+    "sourceHash": "sha256:b788569b8bb2d7ddf5911f90a61869823cc0bb671c7a5df14453ed5dcbf7de19",
+    "reviewedAt": "2026-10-20T21:22:28.745Z"
+  },
+  "search.findingTracks": {
+    "sourceHash": "sha256:87e8fa128a903e14285e0df638fbb4110da3d6c3b02f53a2c9b0eb02546a7306",
+    "reviewedAt": "2026-10-20T21:22:28.745Z"
+  },
   "search.label": {
     "sourceHash": "sha256:320b17718167315f48d8caa438ce8b36916887b1c5baa304b33bc72ebd8ec40a",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "search.loadingResults": {
-    "sourceHash": "sha256:1dd1f189780267c9b4119b56005991916bcf109fd9c7aa9e2b8401f19797b599",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:1fe6b91a28f3eeac10cf6ddb02e2b533e08f2a9c8d07aaafe2f89e4678b96ad4",
+    "reviewedAt": "2026-10-20T21:22:28.502231Z"
   },
   "search.noMusicFound": {
     "sourceHash": "sha256:3e1caa796391036435ef7310d15acd22966134251869705470316c6b1a008652",

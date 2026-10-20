@@ -96,7 +96,11 @@ export function TopBarSearchDropdownView<
       style={dropdownStyle}
     >
       {loading ? (
-        <LoadingState label={t("common.loading")} className="p-3" />
+        <LoadingState
+          label={t("search.loadingResults")}
+          fullWidth
+          className="px-3"
+        />
       ) : null}
       {showRecents ? (
         <MonoLabel className="px-3 py-2">{t("search.recent")}</MonoLabel>

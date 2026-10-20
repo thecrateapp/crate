@@ -405,7 +405,7 @@ describe("TopBarSearch", () => {
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 
-  it("does not show the empty state before the current query completes", async () => {
+  it("names a pending global search without showing a premature empty state", async () => {
     vi.useFakeTimers();
     vi.mocked(api).mockReturnValue(new Promise(() => {}));
     mockSearchBoxRect();
@@ -418,6 +418,12 @@ describe("TopBarSearch", () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "high" } });
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(
+      screen.getByRole("status", { name: "Finding your music..." }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 

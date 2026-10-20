@@ -66,6 +66,24 @@ describe("buildStatsGenreProfile", () => {
 });
 
 describe("SoundProfileCard", () => {
+  it("uses a canonical meter with a true empty rail for a confirmed zero", () => {
+    renderWithListenProviders(
+      <SoundProfileCard
+        profile={{ ...profile, energy: 0 }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+    expect(screen.getByRole("meter", { name: "Energy" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+    expect(screen.getByRole("meter", { name: "Energy" })).toHaveAttribute(
+      "aria-valuemax",
+      "1",
+    );
+  });
+
   it("renders shared genre pills with percentages and links to genre pages", () => {
     renderWithListenProviders(
       <SoundProfileCard

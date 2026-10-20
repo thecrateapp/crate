@@ -1,4 +1,5 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { useReducer } from "react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -43,7 +44,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
   mockUseApi.mockImplementation((url: string | null) => ({
-    data: url === "/api/me/stats/today" ? today ?? null : dashboard,
+    data: url === "/api/me/stats/today" ? (today ?? null) : dashboard,
     loading: false,
     error: null,
     refetch: vi.fn(),
@@ -51,6 +52,148 @@ function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
 }
 
 describe("Stats page", () => {
+  it("reserves loading geometry without claiming zero activity or an empty library", () => {
+    mockUseApi.mockImplementation(() => ({
+      data: null,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(
+      container.querySelector('[data-slot="skeleton-card"]'),
+    ).not.toBeNull();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("offers retry after an uncached read failure instead of claiming no activity", async () => {
+    const refetch = vi.fn();
+    mockUseApi.mockImplementation(() => ({
+      data: null,
+      loading: false,
+      error: "Internal request error",
+      refetch,
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("alert")).toBeVisible();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Internal request error"),
+    ).not.toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a cold pending snapshot loading until a real result is available", () => {
+    const cold = {
+      ...baseDashboard(),
+      provisional: true,
+      snapshot: { pending: true, version: 0 },
+    };
+    mockUseApi.mockImplementation(() => ({
+      data: cold,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    function Fixture() {
+      const [, refresh] = useReducer((value) => value + 1, 0);
+      return (
+        <>
+          <button type="button" onClick={refresh}>
+            Refresh fixture
+          </button>
+          <Stats />
+        </>
+      );
+    }
+    renderWithListenProviders(<Fixture />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByTestId("loading-state")).toBeVisible();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    mockApis(signalDashboard());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh fixture" }));
+    expect(screen.queryByTestId("loading-state")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
+    mockApis({ ...baseDashboard(), snapshot: { pending: false, version: 1 } });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh fixture" }));
+    expect(screen.getByTestId("empty-state")).toBeVisible();
+  });
+
+  it("retains a cached dashboard during a failed refresh", () => {
+    mockUseApi.mockImplementation(() => ({
+      data: signalDashboard(),
+      loading: false,
+      error: "Refresh failed",
+      refetch: vi.fn(),
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
+    expect(
+      screen.queryByText("Your stats are waiting for a signal"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retains ranked entities while a cached dashboard refreshes", () => {
+    const dashboard = signalDashboard();
+    dashboard.top_artists.items = [
+      {
+        artist_id: 9,
+        artist_name: "High Vis",
+        artist_slug: "high-vis",
+        play_count: 12,
+        complete_play_count: 12,
+        minutes_listened: 43,
+      },
+    ];
+    mockUseApi.mockImplementation(() => ({
+      data: dashboard,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("link", { name: /High Vis/ })).toBeVisible();
+  });
+
+  it("uses canonical uppercase mono captions throughout editorial metrics", () => {
+    mockApis(signalDashboard());
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    for (const key of [
+      "Your artist of the period",
+      "Longest streak",
+      "Music age",
+    ]) {
+      expect(screen.getByText(key)).toHaveClass("font-mono", "uppercase");
+    }
+  });
+
   beforeEach(() => {
     mockApis(null);
   });
@@ -186,7 +329,9 @@ describe("Stats page", () => {
       locale: "en",
     });
 
-    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: /de escucha en .* barras/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Top tracks")).toBeInTheDocument();
   });
 

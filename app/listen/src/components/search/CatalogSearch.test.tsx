@@ -76,7 +76,9 @@ it("distinguishes loading, failed reads with retry and a true empty result", () 
       onRetry={retry}
     />,
   );
-  expect(screen.getByTestId("loading-state")).toBeInTheDocument();
+  expect(
+    screen.getByRole("status", { name: "Finding your music..." }),
+  ).toBeInTheDocument();
   expect(screen.queryByTestId("empty-state")).toBeNull();
   rerender(
     <CatalogSearch
@@ -130,3 +132,31 @@ it("supports a genre alongside artist/album kinds and disables selection while a
   fireEvent.click(genre);
   expect(onSelect).not.toHaveBeenCalled();
 });
+
+it.each([
+  { kinds: ["album"] as const, label: "Finding albums..." },
+  { kinds: ["artist"] as const, label: "Finding artists..." },
+  { kinds: ["track"] as const, label: "Finding tracks..." },
+  { kinds: ["genre"] as const, label: "Finding genres..." },
+  { kinds: ["track", "album"] as const, label: "Finding your music..." },
+])(
+  "names the pending $kinds search and retains previous results",
+  ({ kinds, label }) => {
+    renderWithListenProviders(
+      <CatalogSearch
+        label="Catalog search"
+        query="high"
+        onQueryChange={vi.fn()}
+        items={items}
+        kinds={kinds}
+        searching
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("status", { name: label })).toBeInTheDocument();
+    if (kinds.includes("track" as never))
+      expect(
+        screen.getByRole("button", { name: "Talk For Hours" }),
+      ).toBeInTheDocument();
+  },
+);

@@ -291,3 +291,28 @@ first section. Do not hide these rules with CSS selectors or change InstrumentPa
 The Storybook/standalone Settings scene uses the same props and preserves separators inside
 Account and Connections. Browser checks measure the border in all five tabs and both Connect
 feature states at375/1200px.
+
+
+## Stats and Crate Digging presentation —1BE
+
+Stats views keep controller scope/period/snapshot/privacy authority and injected media/player/menu
+adapters. Initial loading/error/empty are distinct; a cached dashboard stays visible while refreshing.
+Unknown sound analysis is null, not a confirmed zero; Meter keeps real zero rails empty. Headline,
+editorial/collection captions and ordinary readings use MonoLabel/StatNumber; existing signal,
+heatmap/decade instruments and larger Digging editorial values keep their approved geometry.
+Pure views and the actual Digging chapter/share-summary builder feed English Storybook and the
+small1BEreview with local artwork/actions. The story contains focus/Tab, restores its launcher and
+background scroll, and retains chapter timing/hold/keyboard/motion behavior. Real sharing stays
+in the authenticated adapter.
+
+CatalogSearch section loading names a single requested kind (albums/artists/tracks/genres), or
+Finding your music... for mixed kinds, also used by global search. LoadingState fullWidth owns
+panel-wide beams; do not stretch internal classes from callers. Cached results remain visible while
+searching. The specialized global combobox/recents/IME/debounce/navigation authority is unchanged.
+
+Cold Stats snapshots (`snapshot.pending` with version0 and zero plays) remain loading until a
+versioned reading arrives. A versioned empty cache and populated stale cache remain usable.
+StatsPageView owns32px region gaps; StatsEditorialStack owns16px artist/highlights spacing and
+StatsListeningView owns its heading/card spacing. Production/review reuse these owners; do not
+add old per-section margins. Digging/AppModal share acquireBodyScrollLock, including out-of-order
+navigation teardown while a global ShareSheet is open; neither restores scroll before the last owner.

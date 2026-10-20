@@ -1,3 +1,5 @@
+import { Skeleton } from "@crate/ui/shadcn/skeleton";
+
 interface TableSkeletonProps {
   rows?: number;
   columns?: number;
@@ -21,7 +23,9 @@ export function TableSkeleton({
         <thead>
           <tr>
             {Array.from({ length: columns }, (_, index) => (
-              <th key={index}>—</th>
+              <th key={index}>
+                <Skeleton className="h-3 w-1/2" />
+              </th>
             ))}
           </tr>
         </thead>
@@ -29,7 +33,13 @@ export function TableSkeleton({
           {Array.from({ length: rows }, (_, row) => (
             <tr key={row}>
               {Array.from({ length: columns }, (_, column) => (
-                <td key={column}>—</td>
+                <td key={column}>
+                  <Skeleton
+                    className={
+                      column === columns - 1 ? "h-3 w-1/3" : "h-3 w-3/4"
+                    }
+                  />
+                </td>
               ))}
             </tr>
           ))}

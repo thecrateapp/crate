@@ -1,4 +1,4 @@
-import type { StatsDashboard } from "@/components/stats/stats-model";
+import type { StatsDashboard } from "../components/stats/stats-types";
 
 export function baseDashboard(window = "30d"): StatsDashboard {
   return {

@@ -181,3 +181,9 @@ h3.showcase-doc-heading {
 @source "../../app/listen/src/components/bandcamp";
 @source "../../app/listen/src/pages/BandcampPageView.tsx";
 @source "../../app/listen/src/pages/UploadView.tsx";
+
+@source "../../app/listen/src/components/stats";
+@source "../../app/listen/src/pages/StatsPageView.tsx";
+@source "../../app/listen/src/pages/StatsSoundProfileView.tsx";
+@source "../../app/listen/src/pages/StatsAnalyticsPrimitives.tsx";
+@source "../../app/listen/src/pages/StatsArtistRankView.tsx";

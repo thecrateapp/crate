@@ -1,8 +1,11 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-import { CountUpNumber } from "@/components/stats/CountUpNumber";
-import type { StatsToday } from "@/components/stats/stats-model";
+import { CountUpNumber } from "./CountUpNumber";
+import type { StatsToday } from "./stats-types";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export function StatsHeadlineNumbers({
   minutes,
@@ -41,24 +44,36 @@ export function StatsHeadlineNumbers({
   ];
 
   return (
-    <dl className="mt-6 flex flex-wrap gap-x-9 gap-y-4">
+    <dl className="flex flex-wrap gap-x-9 gap-y-4">
       {items.map((item) => (
-        <div key={item.key}>
-          <dd className="stats-headline-value">
-            <CountUpNumber value={item.value} format={formatInteger} />
+        <div key={item.key} className="flex flex-col gap-1.5">
+          <MonoLabel as="dt" className="order-last">
+            {item.label}
+          </MonoLabel>
+          <dd className="m-0">
+            <StatNumber
+              size="md"
+              value={
+                <CountUpNumber value={item.value} format={formatInteger} />
+              }
+            />
           </dd>
-          <dt className="mt-1 text-xs text-text-muted">{item.label}</dt>
         </div>
       ))}
       {today ? (
-        <div>
-          <dd className="stats-headline-value text-accent-action">
-            <CountUpNumber value={today.minutes} format={formatInteger} />
-          </dd>
-          <dt className="mt-1 flex items-center gap-2 text-xs text-text-muted">
-            <span className="stats-live-dot" aria-hidden="true" />
+        <div className="flex flex-col gap-1.5">
+          <MonoLabel as="dt" className="order-last flex items-center gap-2">
+            <StatusDot tone="on" />
             {t("stats.headline.today")}
-          </dt>
+          </MonoLabel>
+          <dd className="m-0">
+            <StatNumber
+              size="md"
+              value={
+                <CountUpNumber value={today.minutes} format={formatInteger} />
+              }
+            />
+          </dd>
         </div>
       ) : null}
     </dl>

@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
-import type { StatsSelection } from "@/components/stats/stats-model";
-import type { StatsSelectionOption } from "@/pages/stats-page-model";
+import type { StatsSelection } from "./stats-types";
+import type { StatsSelectionOption } from "../../pages/stats-page-model";
 
 export function StatsPeriodPicker({
   options,

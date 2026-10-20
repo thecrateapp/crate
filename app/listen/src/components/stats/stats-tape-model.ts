@@ -1,8 +1,4 @@
-import type {
-  StatsTape,
-  StatsTapeMonth,
-  StatsTapePeak,
-} from "@/components/stats/stats-model";
+import type { StatsTape, StatsTapeMonth, StatsTapePeak } from "./stats-types";
 
 export const TAPE_WIDTH = 1000;
 export const TAPE_HEIGHT = 220;

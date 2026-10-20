@@ -39,8 +39,8 @@ export function GridSkeleton({
       <Skeleton className="crate-skeleton-media-cover" />
       {variant !== "station" ? (
         <>
-          <p className="m-0 h-5 text-sm text-text-muted">—</p>
-          <p className="m-0 h-4 font-mono text-label text-text-subtle">—</p>
+          <Skeleton className="mb-2 h-3 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
         </>
       ) : null}
     </div>

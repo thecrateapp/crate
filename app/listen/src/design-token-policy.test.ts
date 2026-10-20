@@ -30,7 +30,7 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "tracking-[0.13em]": 1,
   },
   "i18n/translation-mode/TranslationOverlay.tsx": { "rounded-[4px]": 1 },
-  "pages/StatsCollectionPanels.tsx": {
+  "pages/StatsArtistRankView.tsx": {
     "text-[8.5rem]": 1,
     "tracking-[-0.12em]": 1,
   },
@@ -44,7 +44,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
   "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
-  "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };
 
 function productionSourceFiles(directory: string): string[] {

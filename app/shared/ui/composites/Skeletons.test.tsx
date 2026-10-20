@@ -25,7 +25,7 @@ describe("reserved static loading geometry", () => {
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
       2,
     );
-    expect(container.textContent).toContain("—");
+    expect(container.textContent).not.toContain("—");
   });
   it.each([CardSkeleton, GridSkeleton, TableSkeleton])(
     "does not suppress its named loading announcement",
@@ -73,6 +73,10 @@ describe("reserved static loading geometry", () => {
     ).toHaveLength(3);
     expect(screen.getByRole("status")).toHaveClass("grid-cols-2");
     expect(container.querySelector(".animate-pulse, .animate-spin")).toBeNull();
+    expect(container.textContent).not.toContain("—");
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(
+      9,
+    );
   });
   it("reserves the default/custom number of table rows and columns", () => {
     const { container, rerender } = render(
@@ -82,6 +86,10 @@ describe("reserved static loading geometry", () => {
       screen.getByRole("status", { name: "Loading tracks" }),
     ).toBeInTheDocument();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(
+      container.querySelectorAll('tbody [data-slot="skeleton"]'),
+    ).toHaveLength(20);
+    expect(container.querySelector("table")?.textContent).toBe("");
     expect(container.querySelectorAll("thead th")).toHaveLength(4);
     rerender(<TableSkeleton rows={3} columns={2} />);
     expect(container.querySelectorAll("tbody tr")).toHaveLength(3);

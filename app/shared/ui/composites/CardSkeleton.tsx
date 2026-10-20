@@ -12,7 +12,6 @@ export function CardSkeleton({ label = "Loading" }: { label?: string }) {
       <div aria-hidden="true">
         <Skeleton className="mb-2 h-8 w-20" />
         <Skeleton className="h-4 w-16" />
-        <span className="font-display text-numeral-sm text-text-muted">—</span>
       </div>
     </div>
   );

@@ -148,3 +148,9 @@ interaction recipe. Disabled options retain their resting feedback.
 Meter reserves its full formatted reading on one line (minimum5ch), with a flexible track; units and separators never wrap and displace adjacent instrument captions. See Components/Data Display/Meter.
 
 Meter owns its narrow layout: below320px available width, captions move above the rail and single-line reading. This keeps localized neighboring instruments aligned without caller overrides.
+
+Loading reserves neutral static blocks for known card/media/table layouts. Generic sections use
+a compact caption/hairline, never table-shaped dash readings. Route delay and motion gates stay
+unchanged. See the four Feedback skeleton entries and LoadingState for actual compositions.
+
+Search loading is an immediate section state: `fullWidth` fills its available panel content width. CatalogSearch names a single requested entity type; global/mixed searches say Finding your music... in the active locale. The 200ms route mark keeps its separate fixed geometry.

@@ -41,6 +41,8 @@ export interface StatsPageController {
   changeSelection: (selection: StatsSelection) => void;
   dashboard: StatsDashboard | null | undefined;
   dashboardLoading: boolean;
+  dashboardError: string | null;
+  retryDashboard: () => void;
   discoveries: StatsStory["discoveries"];
   hasStats: boolean;
   isGlobalStats: boolean;
@@ -142,6 +144,7 @@ export function useStatsPageController(): StatsPageController {
   const {
     data: dashboard,
     loading: dashboardLoading,
+    error: dashboardError,
     refetch: refetchDashboard,
   } = useApi<StatsDashboard>(
     `${statsEndpoint}?${periodQuery}&${STATS_DASHBOARD_LIMITS}`,
@@ -189,6 +192,8 @@ export function useStatsPageController(): StatsPageController {
     changeSelection,
     dashboard,
     dashboardLoading,
+    dashboardError,
+    retryDashboard: refetchDashboard,
     discoveries: story?.discoveries ?? EMPTY_DISCOVERIES,
     hasStats: Boolean(overview?.play_count),
     isGlobalStats,
