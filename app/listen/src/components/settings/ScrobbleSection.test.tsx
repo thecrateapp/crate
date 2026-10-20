@@ -125,4 +125,69 @@ describe("ScrobbleSection native Last.fm flow", () => {
     expect(mocks.cancelNativeLastfmLink).toHaveBeenCalledWith(42);
     expect(screen.getAllByRole("button", { name: "Connect" })[0]).toBeEnabled();
   });
+  it("keeps preferences and linking unavailable when the initial provider read fails, then retries", async () => {
+    mocks.api.mockRejectedValueOnce(new Error("offline"));
+    const user = userEvent.setup();
+    renderWithListenProviders(<ScrobbleSection />, { locale: "en" });
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("switch")).toBeEnabled();
+    expect(mocks.api.mock.calls.every((call) => call.length === 1)).toBe(true);
+  });
+  it("blocks finishing while native cancellation is pending and reports a failure without discarding the pending link", async () => {
+    mocks.hasPendingNativeLastfmLink.mockResolvedValue(true);
+    let rejectCancel!: (error: Error) => void;
+    mocks.cancelNativeLastfmLink.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectCancel = reject;
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithListenProviders(<ScrobbleSection />, {
+      locale: "en",
+      auth: { user: createMockAuthUser({ id: 42 }) },
+    });
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(
+      screen.getByRole("button", { name: "Finish connection" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    rejectCancel(new Error("Secure store unavailable"));
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Could not cancel the connection. Try again.",
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: "Finish connection" }),
+    ).toBeEnabled();
+  });
+  it("blocks competing provider actions during disconnect and keeps the connected status until confirmed", async () => {
+    let resolveDisconnect!: (value: unknown) => void;
+    mocks.api.mockResolvedValueOnce({
+      lastfm: { connected: true, username: "Mixed Case" },
+      listenbrainz: { connected: true, username: "Listener" },
+    });
+    const usual = mocks.api.getMockImplementation()!;
+    mocks.api.mockImplementation((path: string, method?: string) =>
+      method === "DELETE"
+        ? new Promise((resolve) => {
+            resolveDisconnect = resolve;
+          })
+        : usual(path),
+    );
+    const user = userEvent.setup();
+    renderWithListenProviders(<ScrobbleSection />, { locale: "en" });
+    await user.click(
+      (await screen.findAllByRole("button", { name: "Disconnect" }))[0]!,
+    );
+    for (const button of screen.getAllByRole("button", { name: "Disconnect" }))
+      expect(button).toBeDisabled();
+    resolveDisconnect({});
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Connect" })).toBeEnabled(),
+    );
+  });
 });

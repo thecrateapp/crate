@@ -489,3 +489,39 @@ button from production and both review hosts. The unused field/view/test are rem
 app-shell TimezoneAutodetect retains its initial detection/persistence behavior; Settings no
 longer exposes an automatic value as an editable preference. Pulse remains under Listening
 preferences. The automatic timezone tests and Account-absence regression cover this boundary.
+
+
+## Listen Settings — remaining 1BD compositions
+
+`listen-settings-integrations` inventories ShowsLocationView, OpenSubsonicSettingsView,
+ScrobbleSettingsView, BandcampSettingsView, OfflineSettingsView and ServersSettingsView. `reviews-1bd-settings-remaining--complete` and
+`review-1bd-settings-remaining.html` share the exact same scene; the earlier full Settings
+scene also consumes these real views, replacing its pending annotations. The new review has
+Location, Connections, Offline and Servers tabs and explicit local controls for read,
+busy, native, connected, long-value, empty, unsupported and quota-less cases.
+
+FormField owns uppercase captions and8px gaps; SelectRow owns stable scalar choices; Input,
+Textarea and Button retain canonical geometry. City lookup composes AppPopover/AppMenuButton
+with combobox keyboard/IME semantics. Provider/server lists reuse EntityRow and StatusDot.
+Offline uses actual meter semantics including0/0 and quota absence, with canonical text actions.
+Bandcamp artwork rendering remains injected from the production managed-image adapter.
+
+Read failures in location, scrobbling and Bandcamp expose retry rather than claiming default,
+disconnected or zero-count data. API payloads, key reveal/copy/confirm, OAuth/native completion,
+server-session removal order, offline storage and navigation remain in existing adapters.
+Server view props contain display descriptors only. Fixture actions do not read or write APIs,
+preferences, credentials or audio. The automatic timezone is not reintroduced. Social, imports,
+sharing and the later1BE families remain outside this Settings cut. Stop for review before commit.
+
+
+The final review pass preserves verified Bandcamp identity/Disconnect when only totals fail;
+a separate totals retry cannot relink the account. Native cancellation and provider disconnect
+use the existing busy gate. Manual IP detection retains notifications. City suggestions ignore
+obsolete responses, respect focus/Escape dismissal and visibly identify the keyboard choice.
+Connected usernames preserve case outside StatusDot. These cases have adapter/view/browser tests.
+
+
+Diego’s Account amendment removes the redundant Quick links region from production and both
+review hosts. LinksSection, its unused LinksSettingsView and fixture are removed. The normal
+user-menu sign-out remains available; Account ends with Security. The server story retains its
+stable id and is now displayed as Servers. Account regression tests check the reduced composition.

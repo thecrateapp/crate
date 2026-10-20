@@ -2,13 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
-import { Section } from "@/components/settings/SettingsPrimitives";
-import {
-  FixedCityPicker,
-  LocationModePicker,
-  RadiusPicker,
-  type CityResult,
-} from "@/components/settings/ShowsLocationControls";
+import { ShowsLocationView } from "./ShowsLocationView";
+import type { CityResult } from "./ShowsLocationControls";
 import { api } from "@/lib/api";
 
 interface LocationData {
@@ -31,6 +26,9 @@ interface DetectedLocation {
 
 export function ShowsLocationSection() {
   const { t } = useTranslation();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [mode, setMode] = useState<"fixed" | "near_me">("fixed");
   const [city, setCity] = useState("");
@@ -42,15 +40,27 @@ export function ShowsLocationSection() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
     api<LocationData>("/api/me/location")
       .then((data) => {
+        if (!active) return;
         setLocation(data);
         setMode((data.show_location_mode as "fixed" | "near_me") || "fixed");
         setCity(data.city || "");
         setRadius(data.show_radius_km || 60);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        if (active) setLoadError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refreshAttempt]);
 
   const fetchDetectedLocation =
     useCallback(async (): Promise<DetectedLocation> => {
@@ -85,23 +95,35 @@ export function ShowsLocationSection() {
   }, [fetchDetectedLocation, location]);
 
   useEffect(() => {
+    let active = true;
+    setSearchResults([]);
+    setSearching(false);
     if (searchQuery.length < 2) {
-      setSearchResults([]);
+      setShowDropdown(false);
       return;
     }
     const timer = setTimeout(() => {
       setSearching(true);
-      api<CityResult[]>(
+      void api<CityResult[]>(
         `/api/me/cities/search?q=${encodeURIComponent(searchQuery)}`,
       )
         .then((results) => {
-          setSearchResults(results);
-          setShowDropdown(true);
+          if (active) {
+            setSearchResults(results);
+            setShowDropdown(true);
+          }
         })
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false));
+        .catch(() => {
+          if (active) setSearchResults([]);
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
     }, 400);
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
 
   const detectFromIp = useCallback(
@@ -182,32 +204,25 @@ export function ShowsLocationSection() {
   const displayCountry = location?.country;
 
   return (
-    <Section
-      title={t("settings.shows.title")}
-      description={t("settings.shows.description")}
-    >
-      <LocationModePicker
-        mode={mode}
-        displayCity={displayCity}
-        displayCountry={displayCountry}
-        onChange={saveMode}
-      />
-      {mode === "fixed" ? (
-        <FixedCityPicker
-          city={city}
-          searchQuery={searchQuery}
-          searchResults={searchResults}
-          searching={searching}
-          detecting={detecting}
-          showDropdown={showDropdown}
-          setCity={setCity}
-          setSearchQuery={setSearchQuery}
-          setShowDropdown={setShowDropdown}
-          detectFromIp={detectFromIp}
-          selectCity={selectCity}
-        />
-      ) : null}
-      <RadiusPicker radius={radius} onChange={saveRadius} />
-    </Section>
+    <ShowsLocationView
+      loading={loading}
+      error={loadError}
+      onRetry={() => setRefreshAttempt((value) => value + 1)}
+      mode={{ mode, displayCity, displayCountry, onChange: saveMode }}
+      city={{
+        city,
+        searchQuery,
+        searchResults,
+        searching,
+        detecting,
+        showDropdown,
+        setCity,
+        setSearchQuery,
+        setShowDropdown,
+        detectFromIp,
+        selectCity,
+      }}
+      radius={{ radius, onChange: saveRadius }}
+    />
   );
 }

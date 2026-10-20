@@ -1961,5 +1961,10 @@
   "paths.journey.next": "Passaggio successivo",
   "paths.journey.stepAction": "Riproduci il passaggio {step}: {title} di {artist}",
   "paths.journey.position": "{step} di {total}",
-  "paths.journey.empty": "Nessun brano in questo percorso"
+  "paths.journey.empty": "Nessun brano in questo percorso",
+  "settings.readError": "Impossibile caricare queste impostazioni. Riprova.",
+  "settings.bandcamp.cookieLabel": "Cookie di sessione",
+  "settings.openSubsonic.keyValue": "Chiave generata",
+  "settings.bandcamp.countsError": "I totali della raccolta non sono disponibili. Il tuo account è ancora collegato.",
+  "settings.scrobbling.toasts.cancelFailed": "Impossibile annullare la connessione. Riprova."
 }

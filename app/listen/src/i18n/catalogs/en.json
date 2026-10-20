@@ -1961,5 +1961,10 @@
   "paths.journey.next": "Next step",
   "paths.journey.stepAction": "Play step {step}: {title} by {artist}",
   "paths.journey.position": "{step} of {total}",
-  "paths.journey.empty": "No tracks in this path"
+  "paths.journey.empty": "No tracks in this path",
+  "settings.readError": "Could not load these settings. Try again.",
+  "settings.bandcamp.cookieLabel": "Session cookie",
+  "settings.openSubsonic.keyValue": "Generated key",
+  "settings.bandcamp.countsError": "Collection totals are unavailable. Your account is still connected.",
+  "settings.scrobbling.toasts.cancelFailed": "Could not cancel the connection. Try again."
 }

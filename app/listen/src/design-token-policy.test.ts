@@ -29,7 +29,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
     "tracking-[-0.09em]": 1,
     "tracking-[0.13em]": 1,
   },
-  "components/settings/ServersSection.tsx": { "text-[0.75rem]": 1 },
   "components/social/ProfileHoverCardContent.tsx": { "text-[8rem]": 1 },
   "i18n/translation-mode/TranslationOverlay.tsx": { "rounded-[4px]": 1 },
   "pages/StatsCollectionPanels.tsx": {

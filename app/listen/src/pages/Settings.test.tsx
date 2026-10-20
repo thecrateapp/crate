@@ -125,7 +125,7 @@ describe("Settings", () => {
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("tab", { name: "Cuenta" }));
     expect(screen.getByPlaceholderText("tu-handle")).toBeVisible();
-    expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
+    expect(screen.queryByText("Enlaces rápidos")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Conexiones" }));
     expect(screen.getByText("OpenSubsonic")).toBeVisible();
     expect(container.querySelector(".settings-header")).toBeInTheDocument();
@@ -221,6 +221,14 @@ describe("Settings", () => {
       name: "Listening preferences",
     });
     const security = screen.getByRole("region", { name: "Security" });
+    expect(
+      screen.queryByRole("region", { name: "Quick links" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).queryByRole("link", {
+        name: "Public profile",
+      }),
+    ).not.toBeInTheDocument();
     const email = within(profile).getByRole("textbox", { name: "Email" });
     expect(email).toHaveAttribute("readonly");
     expect(within(profile).getAllByRole("textbox")[0]).toBe(email);

@@ -1961,5 +1961,10 @@
   "paths.journey.next": "Pas següent",
   "paths.journey.stepAction": "Reprodueix el pas {step}: {title} de {artist}",
   "paths.journey.position": "{step} de {total}",
-  "paths.journey.empty": "Aquesta ruta no té cançons"
+  "paths.journey.empty": "Aquesta ruta no té cançons",
+  "settings.readError": "No s’han pogut carregar aquests ajustos. Torna-ho a provar.",
+  "settings.bandcamp.cookieLabel": "Galeta de sessió",
+  "settings.openSubsonic.keyValue": "Clau generada",
+  "settings.bandcamp.countsError": "Els totals de la col·lecció no estan disponibles. El teu compte continua connectat.",
+  "settings.scrobbling.toasts.cancelFailed": "No s’ha pogut cancel·lar la connexió. Torna-ho a provar."
 }

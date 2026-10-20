@@ -14,6 +14,11 @@ import {
   SettingsPageView,
   type SettingsTab,
 } from "../../../app/listen/src/pages/SettingsPageView";
+import {
+  SettingsLocationFixture,
+  SettingsConnectionsFixture,
+  SettingsServersFixture,
+} from "./SettingsRemainingFixtures";
 import { OfflineSettingsView } from "../../../app/listen/src/components/settings/OfflineSettingsView";
 import { SleepTimerView } from "../../../app/listen/src/components/settings/SleepTimerView";
 import { InterfacePreferencesControls } from "../../../app/listen/src/components/settings/InterfacePreferencesControls";
@@ -207,13 +212,7 @@ function Scene() {
                   setEvent(`Language choice: ${value}`);
                 }}
               />
-              <Section title={t("settings.shows.title")}>
-                <p className="text-caption text-text-muted">
-                  Show location belongs here. Its existing production controls
-                  are preserved; visual consolidation follows in the next
-                  Settings cut.
-                </p>
-              </Section>
+              <SettingsLocationFixture onEvent={setEvent} />
             </>
           ),
           playback: (
@@ -331,13 +330,6 @@ function Scene() {
                   />
                 }
               />
-              <Section title={t("settings.links.title")}>
-                <p className="text-caption text-text-muted">
-                  Existing profile, people, upload, stats and sign-out links
-                  stay in Account. Navigation and sign-out are not executed by
-                  this isolated fixture.
-                </p>
-              </Section>
             </>
           ),
           connections: (
@@ -374,14 +366,14 @@ function Scene() {
                   Feature disabled: Connect section is omitted
                 </MonoLabel>
               )}
-              <Section title={t("settings.tabs.connections")}>
-                <p className="text-caption text-text-muted">
-                  OpenSubsonic, Last.fm and Bandcamp keep their existing
-                  production controls in this group. Native server management
-                  also appears here on supported runtimes. These integrations
-                  are outside the first visual cut.
-                </p>
-              </Section>
+              <SettingsConnectionsFixture
+                busy={pending}
+                long={long}
+                onEvent={setEvent}
+              />
+              {runtime === "android" ? (
+                <SettingsServersFixture onEvent={setEvent} />
+              ) : null}
             </>
           ),
           offline: (

@@ -216,6 +216,12 @@ for (const host of ["storybook", "standalone"] as const)
       await page.getByRole("tab", { name: "Account", exact: true }).click();
       await measure();
       await expect(
+        page.getByRole("region", { name: "Quick links", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Public profile", exact: true }),
+      ).toHaveCount(0);
+      await expect(
         page.getByText(en["settings.account.timezone"], { exact: true }),
       ).toHaveCount(0);
       const email = page.getByRole("textbox", { name: "Email", exact: true });

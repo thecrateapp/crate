@@ -1961,5 +1961,10 @@
   "paths.journey.next": "Nächster Schritt",
   "paths.journey.stepAction": "Schritt {step} abspielen: {title} von {artist}",
   "paths.journey.position": "{step} von {total}",
-  "paths.journey.empty": "Keine Titel in diesem Pfad"
+  "paths.journey.empty": "Keine Titel in diesem Pfad",
+  "settings.readError": "Diese Einstellungen konnten nicht geladen werden. Versuche es erneut.",
+  "settings.bandcamp.cookieLabel": "Sitzungs-Cookie",
+  "settings.openSubsonic.keyValue": "Generierter Schlüssel",
+  "settings.bandcamp.countsError": "Die Sammlungssummen sind nicht verfügbar. Dein Konto ist weiterhin verbunden.",
+  "settings.scrobbling.toasts.cancelFailed": "Die Verbindung konnte nicht abgebrochen werden. Versuche es erneut."
 }

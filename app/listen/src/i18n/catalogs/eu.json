@@ -1961,5 +1961,10 @@
   "paths.journey.next": "Hurrengo urratsa",
   "paths.journey.stepAction": "Erreproduzitu {step}. urratsa: {artist} artistaren {title}",
   "paths.journey.position": "{step} / {total}",
-  "paths.journey.empty": "Ez dago abestirik ibilbide honetan"
+  "paths.journey.empty": "Ez dago abestirik ibilbide honetan",
+  "settings.readError": "Ezin izan dira ezarpen hauek kargatu. Saiatu berriro.",
+  "settings.bandcamp.cookieLabel": "Saioko cookiea",
+  "settings.openSubsonic.keyValue": "Sortutako gakoa",
+  "settings.bandcamp.countsError": "Bildumaren guztizkoak ez daude erabilgarri. Zure kontuak konektatuta jarraitzen du.",
+  "settings.scrobbling.toasts.cancelFailed": "Ezin izan da konexioa ezeztatu. Saiatu berriro."
 }

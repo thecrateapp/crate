@@ -5639,9 +5639,17 @@
     "sourceHash": "sha256:353e2f95042384d181d888192fb00329dcaac74f2474aac7467fa0440ddfba60",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.bandcamp.cookieLabel": {
+    "sourceHash": "sha256:05e93ac4eb6ca54547835e6287cb6e538718065cbd50ca1b77cc87fdbc9e2613",
+    "reviewedAt": "2026-10-20T13:31:52.583Z"
+  },
   "settings.bandcamp.cookiePlaceholder": {
     "sourceHash": "sha256:64046de65c9bd45357546c1a5747f8fb9ba84ca2511e5cbb39e14ab1458799b4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.bandcamp.countsError": {
+    "sourceHash": "sha256:c274adadd2d43db13af5fecf84d40ae33d7fe9a80905ca4417fda28b581594ef",
+    "reviewedAt": "2026-10-20T13:42:50.220Z"
   },
   "settings.bandcamp.description": {
     "sourceHash": "sha256:ee5a228321b8fd1e9faf886685b41c75179ab9c3054fa55f696ff2fe229be8db",
@@ -5999,6 +6007,10 @@
     "sourceHash": "sha256:0d0a91b4418d57f04883ad3d4505b49aced86cde3640589c7f97e680ab5e74eb",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "settings.openSubsonic.keyValue": {
+    "sourceHash": "sha256:7879e6ad056bc032cc912727425926f25161c3eb4d0a34965d57f88cd566691b",
+    "reviewedAt": "2026-10-20T13:31:52.583Z"
+  },
   "settings.openSubsonic.legacyDescription": {
     "sourceHash": "sha256:c0f0b3f954363c569773edf2de78bc0b3673f9bd4065fd6128f70f111f50e746",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -6187,6 +6199,10 @@
     "sourceHash": "sha256:cbfef332810276d164fdee71a7c8906b1bcef24b42a056bb45caea74f37c4d5c",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "settings.readError": {
+    "sourceHash": "sha256:e8974814348f284520559b19e7b14f27d17b32ce8a39c14c73a7909a69823373",
+    "reviewedAt": "2026-10-20T13:31:52.583Z"
+  },
   "settings.scrobbling.apiToken": {
     "sourceHash": "sha256:d3c72631d26ba1409058cfac0c6811e92555036fd60a53a1652a6dce85b3ec63",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -6226,6 +6242,10 @@
   "settings.scrobbling.title": {
     "sourceHash": "sha256:88fb1bc81ca87c9423da445c5f2b8e61a27136d7989dac3a1a67b4db609d1703",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "settings.scrobbling.toasts.cancelFailed": {
+    "sourceHash": "sha256:af475c2f068215968c45f7dd35e5129b0f7b09b44eef97c083536f14ed6d1c94",
+    "reviewedAt": "2026-10-20T13:42:50.220Z"
   },
   "settings.scrobbling.toasts.disconnected": {
     "sourceHash": "sha256:82c1067ca46c9b77d2923ce72d56dc628debea77d022a4f43e395609d6ff620f",

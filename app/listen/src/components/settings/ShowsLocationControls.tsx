@@ -1,10 +1,13 @@
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-import { CRATE_ICON_SIZE, Loader2, MapPin, Navigation } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Navigation } from "@crate/ui/icons";
+import { AppPopover, AppMenuButton } from "@crate/ui/primitives/AppPopover";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Input } from "@crate/ui/shadcn/input";
+import { Button } from "@crate/ui/shadcn/button";
+import { SelectRow } from "./SettingsPrimitives";
 
 const RADIUS_OPTIONS = [20, 40, 60, 100, 150, 200];
-
 export interface CityResult {
   city: string;
   country: string;
@@ -13,7 +16,6 @@ export interface CityResult {
   latitude: number;
   longitude: number;
 }
-
 export function LocationModePicker({
   mode,
   displayCity,
@@ -26,95 +28,28 @@ export function LocationModePicker({
   onChange: (mode: "fixed" | "near_me") => void;
 }) {
   const { t } = useTranslation();
-
   return (
-    <div className="crate-form-field">
-      <div className="text-sm font-medium text-text-primary">
-        {t("settings.shows.location")}
-      </div>
-      <div className="flex flex-col gap-2">
-        <LocationModeOption
-          active={mode === "fixed"}
-          icon="map"
-          title={t("settings.shows.fixedCity")}
-          description={
-            displayCity
-              ? `${displayCity}${displayCountry ? `, ${displayCountry}` : ""}`
-              : t("settings.shows.notSet")
-          }
-          onClick={() => onChange("fixed")}
-        />
-        <LocationModeOption
-          active={mode === "near_me"}
-          icon="navigation"
-          title={t("settings.shows.nearMe")}
-          description={t("settings.shows.nearMeDescription")}
-          onClick={() => onChange("near_me")}
-        />
-      </div>
-    </div>
+    <SelectRow
+      label={t("settings.shows.location")}
+      value={mode}
+      onChange={onChange}
+      options={[
+        {
+          value: "fixed",
+          label: t("settings.shows.fixedCity"),
+          description: displayCity
+            ? `${displayCity}${displayCountry ? `, ${displayCountry}` : ""}`
+            : t("settings.shows.notSet"),
+        },
+        {
+          value: "near_me",
+          label: t("settings.shows.nearMe"),
+          description: t("settings.shows.nearMeDescription"),
+        },
+      ]}
+    />
   );
 }
-
-function LocationModeOption({
-  active,
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  active: boolean;
-  icon: "map" | "navigation";
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-        active
-          ? "border-accent-action/30 bg-accent-action/8"
-          : "border-border-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]"
-      }`}
-    >
-      {icon === "map" ? (
-        <MapPin
-          size={CRATE_ICON_SIZE.sm}
-          className={active ? "text-accent-action" : "text-text-primary/40"}
-        />
-      ) : (
-        <Navigation
-          size={CRATE_ICON_SIZE.sm}
-          className={active ? "text-accent-action" : "text-text-primary/40"}
-        />
-      )}
-      <div className="min-w-0 flex-1">
-        <div
-          className={`text-sm font-medium ${
-            active ? "text-accent-action" : "text-text-primary"
-          }`}
-        >
-          {title}
-        </div>
-        <div className="text-xs text-text-muted">{description}</div>
-      </div>
-      <div
-        className={` size-4 rounded-full border-2 ${
-          active
-            ? "border-accent-action bg-accent-action"
-            : "border-border-quiet/20"
-        }`}
-      >
-        {active ? (
-          <div className=" size-full scale-[0.4] rounded-full bg-text-primary" />
-        ) : null}
-      </div>
-    </button>
-  );
-}
-
 export function FixedCityPicker({
   city,
   searchQuery,
@@ -141,70 +76,127 @@ export function FixedCityPicker({
   selectCity: (result: CityResult) => void;
 }) {
   const { t } = useTranslation();
-
+  const listId = useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [focused, setFocused] = useState(false);
+  const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
+  const expanded =
+    focused &&
+    dismissedQuery !== searchQuery &&
+    showDropdown &&
+    searchResults.length > 0;
+  const active =
+    expanded && activeIndex >= 0 && activeIndex < searchResults.length
+      ? activeIndex
+      : -1;
   return (
-    <div className="crate-form-field">
-      <div className="flex items-center justify-between">
-        <label htmlFor="settings-city" className="text-xs text-text-muted">
-          {t("settings.shows.city")}
-        </label>
-        <button
-          type="button"
-          onClick={() => detectFromIp()}
-          disabled={detecting}
-          className="flex items-center gap-1 text-xs link-accent disabled:opacity-50"
-        >
-          {detecting ? (
-            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
-          ) : (
-            <Navigation size={CRATE_ICON_SIZE.micro} />
-          )}
-          {t("settings.shows.detectFromIp")}
-        </button>
-      </div>
-      <div className="relative">
-        <Input
-          id="settings-city"
-          type="text"
-          value={searchQuery || city}
-          onChange={(event) => {
-            setSearchQuery(event.target.value);
-            if (!event.target.value) setCity("");
-          }}
-          onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          placeholder={t("settings.shows.cityPlaceholder")}
-          className="h-10 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 shadow-none backdrop-blur-none focus-visible:border-accent-action/40 md:text-base"
-        />
-        {searching ? (
-          <Loader2
-            size={CRATE_ICON_SIZE.xs}
-            className="absolute right-3 top-3 animate-spin text-text-primary/40"
-          />
-        ) : null}
-        {showDropdown && searchResults.length > 0 ? (
-          <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-border-quiet/10 bg-surface-overlay">
-            {searchResults.map((result) => (
-              <button
-                key={`${result.latitude}-${result.longitude}`}
-                type="button"
-                onMouseDown={() => selectCity(result)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:bg-text-primary/5"
+    <div className="flex min-w-0 flex-wrap items-end gap-3">
+      <FormField
+        className="min-w-0 flex-1 basis-64"
+        label={t("settings.shows.city")}
+      >
+        {(field) => (
+          <div className="relative min-w-0">
+            <Input
+              {...field}
+              type="text"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={expanded}
+              aria-controls={listId}
+              aria-busy={searching || undefined}
+              aria-activedescendant={
+                active >= 0 ? `${listId}-${active}` : undefined
+              }
+              value={searchQuery || city}
+              placeholder={t("settings.shows.cityPlaceholder")}
+              onChange={(event) => {
+                setActiveIndex(-1);
+                setDismissedQuery(null);
+                setSearchQuery(event.target.value);
+                if (!event.target.value) setCity("");
+              }}
+              onFocus={() => {
+                setFocused(true);
+                setDismissedQuery(null);
+                if (searchResults.length) setShowDropdown(true);
+              }}
+              onBlur={() => {
+                setFocused(false);
+                setShowDropdown(false);
+                setActiveIndex(-1);
+              }}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.keyCode === 229)
+                  return;
+                if (event.key === "Escape") {
+                  if (expanded) event.stopPropagation();
+                  setDismissedQuery(searchQuery);
+                  setShowDropdown(false);
+                  setActiveIndex(-1);
+                  return;
+                }
+                if (
+                  (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+                  searchResults.length
+                ) {
+                  event.preventDefault();
+                  setShowDropdown(true);
+                  setActiveIndex((previous) =>
+                    event.key === "ArrowDown"
+                      ? (previous + 1) % searchResults.length
+                      : (previous <= 0 ? searchResults.length : previous) - 1,
+                  );
+                } else if (event.key === "Enter" && active >= 0) {
+                  event.preventDefault();
+                  selectCity(searchResults[active]!);
+                  setActiveIndex(-1);
+                }
+              }}
+            />
+            {expanded ? (
+              <AppPopover
+                id={listId}
+                role="listbox"
+                aria-labelledby={field["aria-labelledby"]}
+                className="absolute inset-x-0 top-full mt-2 max-h-64 overflow-auto"
               >
-                <MapPin
-                  size={CRATE_ICON_SIZE.micro}
-                  className="shrink-0 text-accent-action/60"
-                />
-                <span>{result.display_name}</span>
-              </button>
-            ))}
+                {searchResults.map((result, index) => (
+                  <AppMenuButton
+                    key={`${result.latitude}-${result.longitude}`}
+                    id={`${listId}-${index}`}
+                    role="option"
+                    aria-selected={active === index}
+                    data-active={active === index || undefined}
+                    data-highlighted={active === index ? "" : undefined}
+                    tabIndex={-1}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      selectCity(result);
+                      setActiveIndex(-1);
+                    }}
+                  >
+                    {result.display_name}
+                  </AppMenuButton>
+                ))}
+              </AppPopover>
+            ) : null}
           </div>
+        )}
+      </FormField>
+      <Button
+        variant="secondary"
+        loading={detecting}
+        onClick={() => detectFromIp()}
+      >
+        {!detecting ? (
+          <Navigation size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
         ) : null}
-      </div>
+        {t("settings.shows.detectFromIp")}
+      </Button>
     </div>
   );
 }
-
 export function RadiusPicker({
   radius,
   onChange,
@@ -213,34 +205,14 @@ export function RadiusPicker({
   onChange: (radius: number) => void;
 }) {
   const { t } = useTranslation();
-
   return (
-    <div className="crate-form-field">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-text-primary">
-          {t("settings.shows.searchRadius")}
-        </div>
-        <div className="rounded-full border border-border-quiet/10 bg-text-primary/[0.03] px-3 py-2 text-xs text-text-primary/70">
-          {radius} km
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {RADIUS_OPTIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={radius === option}
-            onClick={() => onChange(option)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              radius === option
-                ? "bg-accent-action text-accent-action-foreground"
-                : "bg-text-primary/5 text-text-muted hover:bg-text-primary/10"
-            }`}
-          >
-            {option} km
-          </button>
-        ))}
-      </div>
-    </div>
+    <SelectRow
+      label={t("settings.shows.searchRadius")}
+      value={String(radius)}
+      onChange={(value) => onChange(Number(value))}
+      options={[...new Set([...RADIUS_OPTIONS, radius])]
+        .sort((a, b) => a - b)
+        .map((value) => ({ value: String(value), label: `${value} km` }))}
+    />
   );
 }
