@@ -3559,6 +3559,10 @@
     "sourceHash": "sha256:74a33a5d25bebd64065a1281c8baf664170465246b1ecc8082b9d24f70c455dc",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "paths.empty": {
+    "sourceHash": "sha256:ea9489c508b220355ef7a0b5b6ed5d8949f27eea3a96c27a1e0a807ad01f1682",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
+  },
   "paths.endpoint.from": {
     "sourceHash": "sha256:ba3c2a73c4560a68e7cfdc50f41e53515641b977ef71e9c073a5c65ccc1ae779",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -3570,6 +3574,26 @@
   "paths.endpoint.to": {
     "sourceHash": "sha256:b446dcc1cd8ef3b7a58803849cbe67987a478ebad942f2026c8c557507afa23d",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "paths.journey.empty": {
+    "sourceHash": "sha256:153df942282b86839f6758c696cdf34ecccb3ebe00981a6bfda5ea17bd6c6580",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
+  },
+  "paths.journey.next": {
+    "sourceHash": "sha256:cdcc8325f93e60ba0552b302bd20df8647c8de412a37c5893576f11eec38a036",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
+  },
+  "paths.journey.position": {
+    "sourceHash": "sha256:73278f5708510468f499c788910aade05d73217b58168d6da66f1f890191c917",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
+  },
+  "paths.journey.previous": {
+    "sourceHash": "sha256:bea41567aa4cba87faebabbd4f752f3f6903e844734a357273dfa1f4e2daef52",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
+  },
+  "paths.journey.stepAction": {
+    "sourceHash": "sha256:13ce9201eae7198912633570c3769eeda9e0e7995856c2aac47d03d9d5133505",
+    "reviewedAt": "2026-10-20T10:58:24.993Z"
   },
   "paths.length": {
     "sourceHash": "sha256:3dfee3fb4543e33fae1120d9182db7ac25e8012418ae107753a3ce8b12585d54",

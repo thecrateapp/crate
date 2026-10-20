@@ -1181,7 +1181,9 @@ describe("RadioStationCard", () => {
     expect(screen.getByText("Artist Radio")).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
-    expect(container.querySelector(".home-radio-card")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="entity-card"]'),
+    ).toBeInTheDocument();
     expect(
       container.querySelector('.crate-info-badge[data-surface="overlay"]'),
     ).toBeInTheDocument();

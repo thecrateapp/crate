@@ -32,8 +32,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "components/settings/ServersSection.tsx": { "text-[0.75rem]": 1 },
   "components/social/ProfileHoverCardContent.tsx": { "text-[8rem]": 1 },
   "i18n/translation-mode/TranslationOverlay.tsx": { "rounded-[4px]": 1 },
-  "pages/PathDetail.tsx": { "text-[0.75rem]": 1 },
-  "pages/Paths.tsx": { "text-[0.75rem]": 1 },
   "pages/StatsCollectionPanels.tsx": {
     "text-[8.5rem]": 1,
     "tracking-[-0.12em]": 1,
@@ -48,7 +46,6 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
   "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
-  "pages/Paths.tsx": { "22": 1 },
   "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };
 

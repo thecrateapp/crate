@@ -428,3 +428,15 @@ opt into reporting cached HTTP failures so an authoritative404 hides stale event
 transient failures keep cached content. The default behavior of useApi stays unchanged for
 other callers. Genre profiles skip initial revalidation on reopen while normal invalidation
 and explicit refresh remain available.
+
+### 1BC Radio and Paths
+
+`Listen/Radio and Paths`, `Reviews/1BC/Radio and Paths` and
+`review-1bc-radio-paths.html` share actual Listen-local page/seed/station/endpoint/detail and
+coverflow views. Shared foundations are reused without internal scene repairs. Search now
+supports the genre domain alongside artist/album/track; each caller still limits its kinds.
+The final visual choice is Diego's original coverflow: automatic advancement on actual track
+changes, independent manual inspection, keyboard access, bounded artwork window and static
+hidden/reduced-motion presentation. The spatial experiment was removed. Complete track rows,
+real IDs, radio debounce/start, path create/save/regenerate/delete and managed artwork remain.
+Fixture callbacks are local; no API/audio/preferences are changed. This cut stops before commit.

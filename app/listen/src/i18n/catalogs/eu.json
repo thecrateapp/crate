@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Jada ez duzu {name} jarraitzen.",
   "actions.confirmation.eyebrow": "Berrespena",
   "trackRow.explicit": "Esplizitua",
-  "trackRow.via": "{node} bidez"
+  "trackRow.via": "{node} bidez",
+  "paths.empty": "Ez dago gordetako ibilbiderik. Aukeratu bi mutur bat sortzeko.",
+  "paths.journey.previous": "Aurreko urratsa",
+  "paths.journey.next": "Hurrengo urratsa",
+  "paths.journey.stepAction": "Erreproduzitu {step}. urratsa: {artist} artistaren {title}",
+  "paths.journey.position": "{step} / {total}",
+  "paths.journey.empty": "Ez dago abestirik ibilbide honetan"
 }

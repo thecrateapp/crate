@@ -11,8 +11,8 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-// 1BC Artist replaces the remaining raw biography disclosure with canonical Button.
-const RAW_CONTROL_BUDGET = { button: 71, input: 6, textarea: 1 };
+// 1BC Radio/Paths retire five raw button renderers and one range input.
+const RAW_CONTROL_BUDGET = { button: 66, input: 5, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":

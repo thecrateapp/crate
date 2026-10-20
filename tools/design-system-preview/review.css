@@ -74,3 +74,12 @@ body {
 
 @source "../../app/listen/src/components/upcoming";
 @source "../../app/listen/src/pages/ShowsPageView.tsx";
+
+@source "../../app/listen/src/components/paths";
+@source "../../app/listen/src/components/radio/RadioStationCardView.tsx";
+@source "../../app/listen/src/pages/RadioPageView.tsx";
+@source "../../app/listen/src/pages/RadioSeedPanelView.tsx";
+@source "../../app/listen/src/pages/RadioStationRailView.tsx";
+@source "../../app/listen/src/pages/PathsPageView.tsx";
+@source "../../app/listen/src/pages/PathEndpointPanelView.tsx";
+@source "../../app/listen/src/pages/PathDetailHeaderView.tsx";

@@ -1,8 +1,8 @@
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 
-export type EndpointType = "artist" | "genre" | "album" | "track";
+import type { RadioMode, SearchResult } from "./radio-types";
+export type { EndpointType, RadioMode, SearchResult } from "./radio-types";
 export type StationSeedType = "artist" | "genre";
-export type RadioMode = "seeded" | "discovery";
 
 export interface PersonalizedRadioStation {
   type: StationSeedType;
@@ -27,13 +27,6 @@ export interface PersonalizedRadioStation {
 export interface PersonalizedRadioStationsResponse {
   artist_stations: PersonalizedRadioStation[];
   genre_stations: PersonalizedRadioStation[];
-}
-
-export interface SearchResult {
-  type: EndpointType;
-  value: string;
-  label: string;
-  imageUrl?: string;
 }
 
 export interface RadioSearchResponse {
@@ -67,6 +60,7 @@ export type RadioState = {
   query: string;
   results: SearchResult[];
   searching: boolean;
+  searchError: boolean;
 };
 
 export type RadioAction =
@@ -95,6 +89,7 @@ export const initialRadioState: RadioState = {
   query: "",
   results: [],
   searching: false,
+  searchError: false,
 };
 
 export function radioReducer(
@@ -119,13 +114,18 @@ export function radioReducer(
     case "set-query":
       return { ...state, query: action.value };
     case "search-started":
-      return { ...state, searching: true };
+      return { ...state, searching: true, searchError: false };
     case "search-cleared":
-      return { ...state, results: [], searching: false };
+      return { ...state, results: [], searching: false, searchError: false };
     case "search-succeeded":
-      return { ...state, results: action.value, searching: false };
+      return {
+        ...state,
+        results: action.value,
+        searching: false,
+        searchError: false,
+      };
     case "search-failed":
-      return { ...state, results: [], searching: false };
+      return { ...state, results: [], searching: false, searchError: true };
     case "search-finished":
       return { ...state, searching: false };
   }

@@ -102,3 +102,31 @@ it("distinguishes loading, failed reads with retry and a true empty result", () 
   );
   expect(screen.getByTestId("empty-state")).toBeInTheDocument();
 });
+
+it("supports a genre alongside artist/album kinds and disables selection while an action is pending", () => {
+  const onSelect = vi.fn();
+  renderWithListenProviders(
+    <CatalogSearch
+      label="Seed"
+      query="punk"
+      onQueryChange={vi.fn()}
+      searching={false}
+      disabled
+      kinds={["genre", "artist"]}
+      items={[
+        {
+          key: "genre:punk",
+          kind: "genre",
+          title: "Punk",
+          data: { id: "punk" },
+        },
+      ]}
+      onSelect={onSelect}
+    />,
+  );
+  expect(screen.getByRole("searchbox")).toBeDisabled();
+  const genre = screen.getByRole("button", { name: "Punk" });
+  expect(genre).toBeDisabled();
+  fireEvent.click(genre);
+  expect(onSelect).not.toHaveBeenCalled();
+});

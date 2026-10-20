@@ -2,7 +2,7 @@ import {
   albumCoverAssetPath,
   artistPhotoAssetPath,
 } from "../../../../shared/web/library-routes";
-export type CatalogSearchKind = "track" | "album" | "artist";
+export type CatalogSearchKind = "track" | "album" | "artist" | "genre";
 export interface CatalogSearchItem<T = unknown> {
   key: string;
   kind: CatalogSearchKind;

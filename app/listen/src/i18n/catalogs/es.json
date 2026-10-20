@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Has dejado de seguir {name}.",
   "actions.confirmation.eyebrow": "Confirmación",
   "trackRow.explicit": "Explícito",
-  "trackRow.via": "vía {node}"
+  "trackRow.via": "vía {node}",
+  "paths.empty": "Todavía no hay rutas guardadas. Elige dos extremos para crear una.",
+  "paths.journey.previous": "Paso anterior",
+  "paths.journey.next": "Paso siguiente",
+  "paths.journey.stepAction": "Reproducir paso {step}: {title} de {artist}",
+  "paths.journey.position": "{step} de {total}",
+  "paths.journey.empty": "Esta ruta no tiene canciones"
 }

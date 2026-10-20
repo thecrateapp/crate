@@ -1,0 +1,63 @@
+/* Listen-local coverflow; transforms change only when inspecting or changing track. */
+.path-cover-journey {
+  container-type: inline-size;
+}
+.path-cover-stage {
+  --path-spacing: clamp(82px, 15cqw, 150px);
+  position: relative;
+  height: clamp(240px, 32cqw, 360px);
+  perspective: 1000px;
+  isolation: isolate;
+  overflow: hidden;
+}
+.path-cover-step {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: clamp(96px, 18cqw, 176px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-quiet);
+  background: var(--surface-control);
+  transform: translateX(calc(-50% + var(--path-offset) * var(--path-spacing)))
+    translateY(calc(var(--path-distance) * 14px))
+    rotateY(calc(var(--path-offset) * -12deg)) scale(var(--path-scale));
+  opacity: calc(1 - var(--path-distance) * 0.16);
+  transition:
+    transform 600ms var(--ease-snap, ease-out),
+    opacity 400ms ease-out,
+    border-color 300ms ease-out;
+}
+.path-cover-step[data-focused] {
+  opacity: 1;
+}
+.path-cover-step[data-current],
+.path-cover-step:hover {
+  border-color: var(--accent-action-hi);
+}
+.path-cover-journey[data-motion="off"] .path-cover-step {
+  transition: none;
+}
+@container (max-width:500px) {
+  .path-cover-stage {
+    --path-spacing: 82px;
+  }
+  .path-cover-step[data-distance="2"],
+  .path-cover-step[data-distance="3"] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .path-cover-step {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .path-cover-step {
+    border-color: ButtonText;
+  }
+  .path-cover-step[data-current] {
+    outline: 2px solid Highlight;
+  }
+}

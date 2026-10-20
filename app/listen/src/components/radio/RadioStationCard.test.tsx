@@ -28,7 +28,10 @@ describe("RadioStationCard", () => {
     const start = screen.getByRole("button", {
       name: "Start Converge Artist Radio",
     });
-    expect(start.closest("article")).toHaveClass("home-radio-card");
+    expect(start.closest("article")).toHaveAttribute(
+      "data-slot",
+      "entity-card",
+    );
     fireEvent.click(start);
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("24 plays")).toBeNull();

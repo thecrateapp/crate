@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Vous ne suivez plus {name}.",
   "actions.confirmation.eyebrow": "Confirmation",
   "trackRow.explicit": "Explicite",
-  "trackRow.via": "via {node}"
+  "trackRow.via": "via {node}",
+  "paths.empty": "Aucun parcours enregistré. Choisissez deux points pour en créer un.",
+  "paths.journey.previous": "Étape précédente",
+  "paths.journey.next": "Étape suivante",
+  "paths.journey.stepAction": "Lire l’étape {step} : {title} par {artist}",
+  "paths.journey.position": "{step} sur {total}",
+  "paths.journey.empty": "Aucun titre dans ce parcours"
 }

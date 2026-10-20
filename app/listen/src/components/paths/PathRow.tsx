@@ -1,11 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { CRATE_ICON_SIZE, Play, Route } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Route } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { EntityRow } from "@crate/ui/domain/entity";
-import { IconButton } from "@crate/ui/primitives/IconButton";
+import { PlayButton } from "@crate/ui/domain/media/PlayButton";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import {
   buildPathActions,
@@ -68,29 +69,27 @@ export const PathRow = memo(function PathRow({
   return (
     <EntityRow
       title={path.name}
-      subtitle={`${t("common.trackCountLabel", {
-        count: path.track_count,
-      })} · ${new Date(path.created_at).toLocaleDateString(i18n.language)}`}
-      meta={route || undefined}
+      subtitle={
+        <MonoLabel
+          as="span"
+          meta={[
+            t("common.trackCountLabel", { count: path.track_count }),
+            new Date(path.created_at).toLocaleDateString(i18n.language),
+          ]}
+        />
+      }
+      meta={<MonoLabel as="span">{route}</MonoLabel>}
       leading={
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
           <Route size={CRATE_ICON_SIZE.sm} />
         </span>
       }
       href={href}
       trailing={
-        <IconButton
-          tone="primary"
-          label={t("player.play")}
-          onClick={onPlay}
-          className="size-9 bg-accent-action/15 hover:bg-accent-action/25 [&_svg:not([class*='size-'])]:size-3.5"
-        >
-          <Play size={CRATE_ICON_SIZE.xs} className="ml-0.5 fill-current" />
-        </IconButton>
+        <PlayButton size="sm" label={t("player.play")} onClick={onPlay} />
       }
       actionMenu={actionMenu}
       menuLabel={t("actions.menu.more")}
-      className="border border-text-primary/6 bg-text-primary/[0.02] hover:border-accent-action/20"
     />
   );
 });

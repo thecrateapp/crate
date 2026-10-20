@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Non segui più {name}.",
   "actions.confirmation.eyebrow": "Conferma",
   "trackRow.explicit": "Esplicito",
-  "trackRow.via": "via {node}"
+  "trackRow.via": "via {node}",
+  "paths.empty": "Nessun percorso salvato. Scegli due estremi per crearne uno.",
+  "paths.journey.previous": "Passaggio precedente",
+  "paths.journey.next": "Passaggio successivo",
+  "paths.journey.stepAction": "Riproduci il passaggio {step}: {title} di {artist}",
+  "paths.journey.position": "{step} di {total}",
+  "paths.journey.empty": "Nessun brano in questo percorso"
 }

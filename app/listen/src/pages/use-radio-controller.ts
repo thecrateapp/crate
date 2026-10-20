@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
@@ -27,7 +27,9 @@ export function useRadioController() {
     data: stationGroups,
     loading: stationsLoading,
     error: stationsError,
+    refetch: retryStations,
   } = useApi<PersonalizedRadioStationsResponse>("/api/radio/stations");
+  const [searchAttempt, setSearchAttempt] = useState(0);
   const [state, dispatch] = useReducer(radioReducer, initialRadioState);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export function useRadioController() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [state.query]);
+  }, [state.query, searchAttempt]);
 
   const onQueryChange = useCallback((query: string) => {
     dispatch({ type: "set-query", value: query });
@@ -139,6 +141,9 @@ export function useRadioController() {
     genreStations: stationGroups?.genre_stations ?? [],
     stationsLoading,
     stationsError,
+    retryStations,
+    searchError: state.searchError,
+    retrySearch: () => setSearchAttempt((value) => value + 1),
     discoveryAvailable: state.discoveryAvailable,
     starting: state.starting,
     activeSession: state.activeSession,

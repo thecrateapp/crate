@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Du folgst {name} nicht mehr.",
   "actions.confirmation.eyebrow": "Bestätigung",
   "trackRow.explicit": "Explizit",
-  "trackRow.via": "über {node}"
+  "trackRow.via": "über {node}",
+  "paths.empty": "Noch keine gespeicherten Pfade. Wähle zwei Endpunkte, um einen zu erstellen.",
+  "paths.journey.previous": "Vorheriger Schritt",
+  "paths.journey.next": "Nächster Schritt",
+  "paths.journey.stepAction": "Schritt {step} abspielen: {title} von {artist}",
+  "paths.journey.position": "{step} von {total}",
+  "paths.journey.empty": "Keine Titel in diesem Pfad"
 }

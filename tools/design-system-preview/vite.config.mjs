@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        radioPathsReview: fileURLToPath(
+          new URL("review-1bc-radio-paths.html", import.meta.url),
+        ),
         upcomingShows1bc: resolve(
           import.meta.dirname,
           "review-1bc-upcoming-shows.html",

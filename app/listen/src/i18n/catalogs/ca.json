@@ -1947,5 +1947,11 @@
   "playlist.toasts.unfollowed": "Has deixat de seguir {name}.",
   "actions.confirmation.eyebrow": "Confirmació",
   "trackRow.explicit": "Explícit",
-  "trackRow.via": "via {node}"
+  "trackRow.via": "via {node}",
+  "paths.empty": "Encara no hi ha rutes desades. Tria dos extrems per crear-ne una.",
+  "paths.journey.previous": "Pas anterior",
+  "paths.journey.next": "Pas següent",
+  "paths.journey.stepAction": "Reprodueix el pas {step}: {title} de {artist}",
+  "paths.journey.position": "{step} de {total}",
+  "paths.journey.empty": "Aquesta ruta no té cançons"
 }

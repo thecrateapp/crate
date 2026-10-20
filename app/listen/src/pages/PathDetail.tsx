@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { BackLink } from "@crate/ui/domain/navigation";
 import { ErrorState } from "@crate/ui/domain/states";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { PlayButton } from "@crate/ui/domain/media/PlayButton";
-import { CRATE_ICON_SIZE, Loader2, RefreshCw, Trash2 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { Button } from "@crate/ui/shadcn/button";
+import { PathCoverJourney } from "@/components/paths/PathCoverJourney";
+import { PathDetailHeaderView } from "./PathDetailHeaderView";
+import { usePlayerState } from "@/contexts/PlayerContext";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
@@ -15,11 +15,8 @@ import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { PathRouteVisualization, PathTrackList } from "./PathDetailParts";
+import { PathTrackList } from "./PathDetailParts";
 import type { PathDetail as PathData, PathTrack } from "./paths-model";
-
-const PILL_ACTION_CLASS_NAME =
-  "h-auto gap-1.5 border border-border-quiet bg-text-primary/5 px-3 py-1.5 has-[>svg]:px-3 text-xs text-text-primary/60 hover:bg-text-primary/5 hover:text-text-primary [&_svg:not([class*='size-'])]:size-3";
 
 function mapToPlayerTrack(track: PathTrack): Track {
   return toPlayableTrack(track, {
@@ -51,8 +48,7 @@ export function PathDetail() {
   const { playAll, currentTrack } = usePlayerActions();
   const [regenerating, setRegenerating] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [animate, setAnimate] = useState(true);
-  const activeTrackRef = useRef<HTMLDivElement>(null);
+  const { isPlaying } = usePlayerState();
 
   const activeStep =
     path?.tracks.findIndex(
@@ -85,18 +81,6 @@ export function PathDetail() {
     }
   };
 
-  useEffect(() => {
-    activeTrackRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  }, [activeStep]);
-
-  useEffect(() => {
-    setAnimate(false);
-    requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
-  }, []);
-
   if (!path) {
     if (loading) {
       return <CrateLoader label={t("paths.loadingDetail")} />;
@@ -117,65 +101,36 @@ export function PathDetail() {
 
   return (
     <div className="animate-page-in sm:py-6">
-      <BackLink to="/paths" label={t("paths.back")} className="mb-5" />
-
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">{path.name}</h1>
-          <div className="mt-1.5 flex items-center gap-2 text-[0.75rem] text-text-primary/40">
-            <span className="font-medium text-accent-action/70">
-              {path.origin.label}
-            </span>
-            <span className="text-text-primary/15">→</span>
-            <span className="font-medium text-accent-action/70">
-              {path.destination.label}
-            </span>
-            <span className="text-text-primary/15">·</span>
-            <span>
-              {t("common.trackCountLabel", { count: path.tracks.length })}
-            </span>
-          </div>
-        </div>
-        <PlayButton
-          size="md"
-          label={t("player.play")}
-          onClick={() => playFromStep(0)}
-          className="shadow-accent-action-strong hover:bg-accent-action/90"
+      <div className="mb-6">
+        <PathDetailHeaderView
+          name={path.name}
+          origin={path.origin.label}
+          destination={path.destination.label}
+          count={path.tracks.length}
+          regenerating={regenerating}
+          onPlay={() => playFromStep(0)}
+          onRegenerate={() => void regenerate()}
+          onDelete={() => setConfirmingDelete(true)}
         />
       </div>
-
-      <PathRouteVisualization
-        path={path}
-        activeStep={activeStep}
-        animate={animate}
-        onPlayFromStep={playFromStep}
-      />
-
-      <div className="mb-4 flex items-center gap-2">
-        <Button
-          variant="ghost"
-          shape="pill"
-          onClick={() => void regenerate()}
-          disabled={regenerating}
-          className={`${PILL_ACTION_CLASS_NAME} hover:border-text-primary/20 disabled:opacity-30`}
-        >
-          {regenerating ? (
-            <Loader2 size={CRATE_ICON_SIZE.micro} className="animate-spin" />
-          ) : (
-            <RefreshCw size={CRATE_ICON_SIZE.micro} />
-          )}
-          {t("paths.regenerate")}
-        </Button>
-        <Button
-          variant="ghost"
-          shape="pill"
-          onClick={() => setConfirmingDelete(true)}
-          className={`${PILL_ACTION_CLASS_NAME} hover:border-state-danger/30 hover:text-state-danger-text`}
-        >
-          <Trash2 size={CRATE_ICON_SIZE.micro} /> {t("common.delete")}
-        </Button>
+      <div className="mb-6">
+        <PathCoverJourney
+          key={path.id}
+          path={path}
+          activeStep={activeStep}
+          currentTrackKey={
+            currentTrack
+              ? String(
+                  currentTrack.libraryTrackId ??
+                    currentTrack.entityUid ??
+                    currentTrack.id,
+                )
+              : undefined
+          }
+          playing={isPlaying}
+          onPlay={playFromStep}
+        />
       </div>
-
       <ConfirmDialog
         eyebrow={t("actions.confirmation.eyebrow")}
         open={confirmingDelete}
@@ -196,11 +151,7 @@ export function PathDetail() {
         backdropLabel={t("common.close")}
       />
 
-      <PathTrackList
-        path={path}
-        activeStep={activeStep}
-        activeTrackRef={activeTrackRef}
-      />
+      <PathTrackList path={path} />
     </div>
   );
 }

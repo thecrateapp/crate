@@ -231,6 +231,14 @@ describe("useRadioController seed search", () => {
     expect(result.current.results).toEqual([]);
     expect(result.current.searching).toBe(false);
     expect(mocks.notifyError).not.toHaveBeenCalled();
+    expect(result.current.searchError).toBe(true);
+    mocks.api.mockImplementation(async (url) =>
+      url === "/api/genres" ? [] : artistResults("Recovered"),
+    );
+    act(() => result.current.retrySearch());
+    await elapse(300);
+    expect(result.current.searchError).toBe(false);
+    expect(result.current.results[0]?.label).toBe("Recovered");
   });
 
   it("cancels a pending search when the hook unmounts", async () => {

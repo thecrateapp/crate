@@ -14,6 +14,8 @@ import type {
 } from "./catalog-search-model";
 export interface CatalogSearchProps<T> {
   label: string;
+  placeholder?: string;
+  disabled?: boolean;
   query: string;
   onQueryChange: (value: string) => void;
   items: readonly CatalogSearchItem<T>[];
@@ -32,11 +34,14 @@ const countKeys = {
   artist: "search.artistsCount",
   album: "search.albumsCount",
   track: "search.tracksCount",
+  genre: "common.genre",
 } as const;
-const icons = { artist: User, album: Disc3, track: Music2 };
+const icons = { artist: User, album: Disc3, track: Music2, genre: Music2 };
 /** Controlled domain search. Owning controllers retain debounce, transport and selection authority. */
 export function CatalogSearchView<T>({
   label,
+  placeholder,
+  disabled = false,
   query,
   onQueryChange,
   items,
@@ -64,7 +69,8 @@ export function CatalogSearchView<T>({
           <SearchInput
             {...control}
             label={label}
-            placeholder={label}
+            placeholder={placeholder ?? label}
+            disabled={disabled}
             clearLabel={t("search.clear")}
             value={query}
             onValueChange={onQueryChange}
@@ -107,6 +113,7 @@ export function CatalogSearchView<T>({
                     <li key={item.key}>
                       <EntityRow
                         title={item.title}
+                        disabled={disabled}
                         subtitle={item.subtitle}
                         meta={
                           item.meta ? (

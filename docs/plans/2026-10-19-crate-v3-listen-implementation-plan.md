@@ -393,3 +393,21 @@ focalizada final86tests Listen/17archivos,52Desktop,31i18n,25políticas y4checks
 en375/1200px y ambos hosts. Tipado, lint, tres builds, bundle y catálogo correctos. Las tres
 instancias siguen activas; tercer corte sin commit/push hasta revisión. Radio/Paths y nuevos
 instrumentos siguen pendientes; este lote no certifica toda H2 ni plataformas nativas.
+
+## Upcoming publicado; Radio y Paths en revisión local
+
+Upcoming/shows y la enmienda de hover/timing se publicaron en668a9a8a. El siguiente corte1BC
+aplica [el diseño visual de Radio y Paths](2026-10-20-crate-v3-radio-paths-design.md), con vistas
+reales en Storybook y `review-1bc-radio-paths.html`. Diego aclara que busca presentación visual;
+se conserva el flujo funcional actual. Su elección final es el coverflow original, que avanza
+con cambios de tema; se retira el experimento de cámara espacial. Los instrumentos/mapasH3
+siguen pendientes. Las tres instancias permanecen activas; este corte se detiene antes de commit.
+
+## Radio y Paths aprobado — publicación autorizada; siguiente corte1BD
+
+Diego aprueba Radio y Paths con el coverflow que solo avanza al cambiar de pista y autoriza
+commit/push. El siguiente lote será1BD Ajustes de Listen: composición/navegación actual de
+Settings, cuenta, interfaz, reproducción y conexiones. Mantener los controladores, permisos,
+capability gates y acciones existentes; normalizar con componentes reales y revisión aislada
+en5186/Storybook. Social, imports y compartir continúan en los siguientes lotes1BD. Las tres
+instancias siguen activas y el nuevo corte se detiene para revisión antes de commit.
