@@ -7,7 +7,7 @@ import json
 import os
 from collections import Counter
 from uuid import NAMESPACE_URL, UUID, uuid5
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn, cast
 
 from pydantic import TypeAdapter
 
@@ -29,6 +29,9 @@ from crate.ai.default_model import derive_all, require_supported_reasoning
 from crate.ai.discovery import validate_endpoint
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories import ai_configuration as store
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
 
 _PROVIDERS = ("gemini", "deepseek", "ollama")
 _KEYS = {
@@ -174,7 +177,10 @@ def _has_credential(connection):
     return False
 
 
-_MODEL_ID = TypeAdapter(ModelID)
+# ModelID is an Annotated alias, a valid PEP 747 type form, but pyright only
+# recognises such aliases as TypeForm with experimental features on. The cast
+# states that fact and is a no-op at runtime.
+_MODEL_ID = TypeAdapter(cast("TypeForm[str]", ModelID))
 
 
 def _valid_or_none(parse, value):

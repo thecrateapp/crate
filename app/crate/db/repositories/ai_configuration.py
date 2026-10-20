@@ -21,15 +21,17 @@ from crate.db.serialize import serialize_row
 from crate.db.tx import optional_scope, read_scope
 
 
+# Rows arrive as SQLAlchemy RowMapping, whose key type is wider than str
+# (Mapping[_KeyType, Any]); Mapping is invariant in its key, so accept any key.
 @overload
 def _json(row: None) -> None: ...
 
 
 @overload
-def _json(row: Mapping[str, Any]) -> dict[str, Any]: ...
+def _json(row: Mapping[Any, Any]) -> dict[str, Any]: ...
 
 
-def _json(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
+def _json(row: Mapping[Any, Any] | None) -> dict[str, Any] | None:
     if row is None:
         return None
     return {
@@ -66,10 +68,10 @@ def _connection(row: None, private=False) -> None: ...
 
 
 @overload
-def _connection(row: Mapping[str, Any], private=False) -> dict[str, Any]: ...
+def _connection(row: Mapping[Any, Any], private=False) -> dict[str, Any]: ...
 
 
-def _connection(row: Mapping[str, Any] | None, private=False) -> dict[str, Any] | None:
+def _connection(row: Mapping[Any, Any] | None, private=False) -> dict[str, Any] | None:
     data = _json(row)
     if data is not None:
         data["has_secret"] = bool(data.get("secret_ref"))
@@ -623,10 +625,26 @@ def ensure_environment_connection(
         return get_connection(id, private=True, session=s)
 
 
+@overload
 def apply_validated_bindings(
-    changes, actor_id, validate, *, activate_revision=None, session=None
-):
-    """Validate current catalog under locks and apply the complete CAS batch."""
+    changes, actor_id, validate, *, activate_revision: None = None, session=None
+) -> list[dict]: ...
+
+
+@overload
+def apply_validated_bindings(
+    changes, actor_id, validate, *, activate_revision: int, session=None
+) -> dict: ...
+
+
+def apply_validated_bindings(
+    changes, actor_id, validate, *, activate_revision: int | None = None, session=None
+) -> dict | list[dict]:
+    """Validate current catalog under locks and apply the complete CAS batch.
+
+    Returns the activated state row when ``activate_revision`` is given, else the
+    applied binding rows.
+    """
     with optional_scope(session) as s:
         with s.begin_nested():
             s.execute(

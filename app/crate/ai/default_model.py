@@ -73,7 +73,9 @@ def _image_detail(
             "default" if "default" in model.image_details else model.image_details[0]
         )
         candidates = [preferred]
-    chosen = next(
+    # The annotation keeps the literal type: pyright widens a comprehension variable
+    # filtered by `in` to str.
+    chosen: ImageDetail | None = next(
         (detail for detail in candidates if detail in model.image_details), None
     )
     return chosen, chosen is not None and chosen != candidates[0]
