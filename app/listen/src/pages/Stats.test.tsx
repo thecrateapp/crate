@@ -134,18 +134,23 @@ describe("Stats page", () => {
     expect(screen.getByTestId("empty-state")).toBeVisible();
   });
 
-  it("shows the building state, not the empty state, for a pending cold snapshot", () => {
+  it("keeps the dashboard content, not the empty state, while a versioned empty snapshot is rebuilding", () => {
+    const dashboard = signalDashboard();
     mockApis({
-      ...baseDashboard(),
-      overview: { ...baseDashboard().overview, play_count: 0 },
-      snapshot: { pending: true, version: 0 },
+      ...dashboard,
+      overview: { ...dashboard.overview, play_count: 0 },
+      snapshot: { pending: true, version: 1 },
     });
     renderWithListenProviders(<Stats />, {
       route: "/stats",
       path: "/stats",
       locale: "en",
     });
-    expect(screen.queryByTestId("empty-state")).toBeNull();
+    expect(
+      screen.queryByText("Your stats are waiting for signal"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("loading-state")).toBeNull();
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
   });
 
   it("retains a cached dashboard during a failed refresh", () => {
