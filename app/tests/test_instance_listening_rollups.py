@@ -566,3 +566,61 @@ def test_deleting_a_listener_queues_the_backfill_that_drops_them(pg_db, monkeypa
         ).one()
     assert remaining[0] == remaining[1]
     assert remaining[2] == 1
+
+
+def test_instance_range_sums_listeners(pg_db):
+    from crate.db.queries.user_library_stats_range import (
+        get_instance_stats_range,
+        get_user_stats_range,
+    )
+
+    _seed_two_listeners()
+    _rebuild_all()
+    start, end = date(2020, 1, 1), date(2030, 1, 1)
+
+    both = get_instance_stats_range(start, end, limit=5)
+    mine = get_user_stats_range(1, start, end, limit=5)
+
+    assert both["available"] is True
+    assert both["top_artists"]
+    assert set(both) == set(mine)
+    assert set(both["top_artists"][0]) == set(mine["top_artists"][0])
+    with read_scope() as session:
+        expected = session.execute(
+            text(
+                "SELECT artist, SUM(minutes_listened) m, SUM(play_count) p "
+                "FROM user_track_daily WHERE artist != '' GROUP BY artist "
+                "ORDER BY m DESC, p DESC, artist LIMIT 5"
+            )
+        ).all()
+    assert [a["artist_name"] for a in both["top_artists"]] == [
+        r.artist for r in expected
+    ]
+    for got, row in zip(both["top_artists"], expected):
+        assert got["minutes"] == pytest.approx(row.m)
+        assert got["plays"] == row.p
+    # Discoveries are first plays by anyone on the instance.
+    with read_scope() as session:
+        firsts = {
+            r.entity_key: str(r.first_day)
+            for r in session.execute(
+                text(
+                    "SELECT entity_key, first_day FROM instance_entity_firsts "
+                    "WHERE entity_type = 'artist'"
+                )
+            )
+        }
+    assert both["discoveries"]
+    for item in both["discoveries"]:
+        assert item["first_day"] == firsts[item["artist_name"]]
+
+
+def test_instance_range_unavailable_before_backfill(pg_db):
+    from crate.db.queries.user_library_stats_range import get_instance_stats_range
+
+    _seed_two_listeners()
+    # Listening exists but the rollups were never built.
+    result = get_instance_stats_range(date(2020, 1, 1), date(2030, 1, 1))
+    assert result["available"] is False
+    assert result["top_artists"] == result["top_albums"] == []
+    assert result["top_tracks"] == result["discoveries"] == []

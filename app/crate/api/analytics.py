@@ -1,4 +1,5 @@
 import re as _re
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -19,7 +20,12 @@ from crate.api.schemas.analytics import (
     StatsResponse,
     TimelineResponse,
 )
-from crate.api.schemas.me import StatsDashboardResponse
+from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
+from crate.db.queries.user_library_stats_range import (
+    get_instance_stats_range,
+    instance_stats_today,
+    validate_stats_range,
+)
 from crate.missing import find_missing_albums
 from crate.quality import quality_report
 from crate.api._deps import (
@@ -125,6 +131,26 @@ def api_instance_listening_stats_dashboard(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/api/stats/range",
+    response_model=StatsRangeResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get an instance-wide listening summary for a date range",
+)
+def api_instance_listening_stats_range(
+    request: Request,
+    start: date = Query(...),
+    end: date = Query(...),
+    limit: int = Query(3, ge=1, le=20),
+):
+    _require_auth(request)
+    try:
+        validate_stats_range(start, end, today=instance_stats_today())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return get_instance_stats_range(start, end, limit=limit)
 
 
 @router.get(

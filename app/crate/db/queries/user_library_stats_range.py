@@ -1,7 +1,8 @@
 """Per-user listening range query behind the Stats explorer.
 
 Reads only the per-day projections (``user_track_daily`` through its primary
-key prefix, ``user_entity_firsts``); library joins resolve refs for the
+key prefix, ``user_entity_firsts``; the instance variant reads
+``instance_track_daily`` and ``instance_entity_firsts``); library joins resolve refs for the
 returned rows only.
 """
 
@@ -12,13 +13,18 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
+from crate.db.jobs.instance_listening_rollups import (
+    instance_listening_rollups_incomplete,
+)
 from crate.db.queries.user_library_stats_signal import _TRACK_REF_JOINS
 from crate.db.queries.user_stats_periods import user_stats_timezone
 from crate.db.tx import read_scope
 
 __all__ = [
     "MAX_RANGE_DAYS",
+    "get_instance_stats_range",
     "get_user_stats_range",
+    "instance_stats_today",
     "user_stats_today",
     "validate_stats_range",
 ]
@@ -26,12 +32,17 @@ __all__ = [
 MAX_RANGE_DAYS = 400
 _DISCOVERY_LIMIT = 10
 
-_RANGE_SQL = f"""
+
+def _range_sql(daily_table: str, firsts_table: str, *, scoped: bool) -> str:
+    """Range query over one projection pair; ``scoped`` filters by ``:user_id``."""
+    daily_scope = "user_id = :user_id AND " if scoped else ""
+    firsts_scope = "f.user_id = :user_id AND " if scoped else ""
+    return f"""
 WITH rng AS MATERIALIZED (
     SELECT day, entity_key, artist, album, track_id, track_entity_uid, title,
            play_count, minutes_listened
-    FROM user_track_daily
-    WHERE user_id = :user_id AND day >= :start AND day <= :end
+    FROM {daily_table}
+    WHERE {daily_scope}day >= :start AND day <= :end
 ),
 total AS (
     SELECT COALESCE(SUM(minutes_listened), 0) AS minutes FROM rng
@@ -75,9 +86,9 @@ top_tracks AS (
 discovered AS (
     SELECT f.entity_key AS name, f.first_day,
            SUM(r.minutes_listened) AS minutes
-    FROM user_entity_firsts f
+    FROM {firsts_table} f
     JOIN rng r ON r.artist = f.entity_key
-    WHERE f.user_id = :user_id AND f.entity_type = 'artist'
+    WHERE {firsts_scope}f.entity_type = 'artist'
       AND f.first_day >= :start AND f.first_day <= :end
     GROUP BY f.entity_key, f.first_day
     ORDER BY minutes DESC, f.entity_key
@@ -140,6 +151,12 @@ SELECT 'discovery', to_jsonb(x) FROM (
 ) x
 """
 
+
+_USER_RANGE_SQL = _range_sql("user_track_daily", "user_entity_firsts", scoped=True)
+_INSTANCE_RANGE_SQL = _range_sql(
+    "instance_track_daily", "instance_entity_firsts", scoped=False
+)
+
 _SECTIONS = {
     "artist": "top_artists",
     "album": "top_albums",
@@ -164,19 +181,9 @@ def user_stats_today(user_id: int, *, session=None) -> date:
     return datetime.now(ZoneInfo(tz)).date()
 
 
-def get_user_stats_range(
-    user_id: int,
-    start: date,
-    end: date,
-    *,
-    limit: int = 3,
-    session=None,
-) -> dict:
+def _run_range(sql: str, params: dict, start: date, end: date, *, session=None) -> dict:
     def _impl(current) -> dict:
-        rows = current.execute(
-            text(_RANGE_SQL),
-            {"user_id": user_id, "start": start, "end": end, "limit": limit},
-        ).all()
+        rows = current.execute(text(sql), {"start": start, "end": end, **params}).all()
         payload: dict = {
             "start": start.isoformat(),
             "end": end.isoformat(),
@@ -189,6 +196,55 @@ def get_user_stats_range(
                 item["first_day"] = str(item["first_day"])
             payload[_SECTIONS[kind]].append(item)
         return payload
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_user_stats_range(
+    user_id: int,
+    start: date,
+    end: date,
+    *,
+    limit: int = 3,
+    session=None,
+) -> dict:
+    return _run_range(
+        _USER_RANGE_SQL,
+        {"user_id": user_id, "limit": limit},
+        start,
+        end,
+        session=session,
+    )
+
+
+def instance_stats_today() -> date:
+    """Today's date in UTC, the instance tape's day boundary."""
+    return datetime.now(ZoneInfo("UTC")).date()
+
+
+def get_instance_stats_range(
+    start: date,
+    end: date,
+    *,
+    limit: int = 3,
+    session=None,
+) -> dict:
+    """Same summary over every listener; empty until the rollups are complete."""
+
+    def _impl(current) -> dict:
+        if instance_listening_rollups_incomplete(current):
+            return {
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "available": False,
+                **{section: [] for section in _SECTIONS.values()},
+            }
+        return _run_range(
+            _INSTANCE_RANGE_SQL, {"limit": limit}, start, end, session=current
+        )
 
     if session is not None:
         return _impl(session)

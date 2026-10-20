@@ -158,3 +158,39 @@ def test_user_stats_today_follows_the_listener_timezone():
     with patch.object(mod, "user_stats_timezone", return_value="Pacific/Pago_Pago"):
         behind = mod.user_stats_today(5)
     assert ahead > behind
+
+
+def _instance(test_app, qs):
+    with (
+        patch("crate.api.analytics.instance_stats_today", return_value=TODAY),
+        patch(
+            "crate.api.analytics.get_instance_stats_range",
+            return_value=dict(_PAYLOAD),
+        ) as q,
+    ):
+        return test_app.get(f"/api/stats/range?{qs}"), q
+
+
+def test_instance_range_route_returns_the_summary_and_validates(test_app):
+    resp, q = _instance(test_app, "start=2026-10-01&end=2026-10-21&limit=4")
+    assert resp.status_code == 200
+    _assert_shape(resp.json())
+    assert q.call_args.args == (date(2026, 10, 1), date(2026, 10, 21))
+    assert q.call_args.kwargs["limit"] == 4
+    for qs in (
+        "start=2026-10-10&end=2026-10-01",
+        "start=2026-10-10&end=2026-10-22",
+        "start=2025-09-15&end=2026-10-21",
+        "start=2026-10-01&end=2026-10-21&limit=21",
+    ):
+        bad, q = _instance(test_app, qs)
+        assert bad.status_code == 422
+        q.assert_not_called()
+
+
+def test_instance_stats_today_is_the_utc_day():
+    from datetime import datetime, timezone
+
+    from crate.db.queries.user_library_stats_range import instance_stats_today
+
+    assert abs((instance_stats_today() - datetime.now(timezone.utc).date()).days) <= 1
