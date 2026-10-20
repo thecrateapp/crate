@@ -106,10 +106,17 @@ describe("admin surface color tokens", () => {
     const css = compiler.build([...used.keys()]);
 
     for (const [utility, token] of used) {
-      const selector = `.${utility.replace("/", "\\/")} {`;
-      const start = css.indexOf(selector);
-      expect(start, utility).toBeGreaterThanOrEqual(0);
-      const rule = css.slice(start, css.indexOf("\n}", start));
+      // The class can be the whole selector (.bg-card) or part of one:
+      // Tailwind 4.3 emits divide-border as
+      // :where(.divide-border > :not(:last-child)) { ... }.
+      const className = `.${utility.replace("/", "\\/")}`.replace(
+        /[.*+?^${}()|[\]\\/]/g,
+        "\\$&",
+      );
+      const rule = css.match(
+        new RegExp(`${className}(?![\\w-])[^{}]*\\{([^}]*)\\}`),
+      )?.[1];
+      expect(rule, utility).toBeDefined();
       expect(rule, utility).toContain(`var(--color-${token},`);
     }
     // `reference` neither inlines the value nor emits a :root declaration
