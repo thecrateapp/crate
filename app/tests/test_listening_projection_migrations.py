@@ -78,3 +78,29 @@ def test_health_identity_migration_matches_its_schema_section(monkeypatch):
     assert "DROP INDEX IF EXISTS idx_health_issues_dedup" in joined
     assert "idx_health_issues_open_identity" in joined
     assert "CREATE TABLE IF NOT EXISTS health_check_runs" in joined
+
+
+def test_v109_creates_instance_rollups_and_indexes(monkeypatch):
+    migration, section = _replay(
+        "109_instance_listening_rollups",
+        "activity_v109",
+        "create_instance_listening_rollups_v109_schema",
+        monkeypatch,
+    )
+    assert migration == section
+    assert len(migration) == 4
+    statements = "\n".join(migration)
+    assert "CREATE TABLE IF NOT EXISTS instance_track_daily" in statements
+    assert "PRIMARY KEY (day, entity_key, artist, album)" in statements
+    assert "listener_count INTEGER NOT NULL DEFAULT 0" in statements
+    assert "user_id" not in migration[0]
+    assert "CREATE TABLE IF NOT EXISTS instance_entity_firsts" in statements
+    assert "PRIMARY KEY (entity_type, entity_key)" in statements
+    assert (
+        "CREATE INDEX IF NOT EXISTS idx_user_track_daily_day ON user_track_daily(day)"
+        in migration
+    )
+    assert (
+        "CREATE INDEX IF NOT EXISTS idx_user_entity_firsts_key ON user_entity_firsts(entity_type, entity_key)"
+        in migration
+    )

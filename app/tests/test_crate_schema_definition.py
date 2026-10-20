@@ -95,7 +95,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("106").down_revision == "105"
     assert scripts.get_revision("107").down_revision == "106"
     assert scripts.get_revision("108").down_revision == "107"
-    assert scripts.get_heads() == ["108"]
+    assert scripts.get_revision("109").down_revision == "108"
+    assert scripts.get_heads() == ["109"]
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:
