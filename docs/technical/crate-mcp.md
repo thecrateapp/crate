@@ -1670,15 +1670,29 @@ only candidate/outcome counts, without actors, source text, URLs or arbitrary me
 
 ### Admin and worker extraction
 
-`Add show` in Shows and Upcoming opens a side panel gated by `curation.shows.write`. «Enter
+`Add show` in Upcoming opens a side panel gated by `curation.shows.write`. «Enter
 manually» is a one-show form; «Add another date» adds rows with explicit selection. «Import from
 flyer, text or link» takes dropped or pasted images, text or one public URL. Methods show their
-cost and model, and AI methods that are off or incompatible link to AI models. Opening the import
-view runs the non-billable worker readiness check at most once per editor per 15 minutes, and
-readiness checks are not listed as recent imports. Every candidate is edited in place; filling a
-field for several shows affects the selected shows, or every unsaved show when none is selected.
-Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming. Excluded dates
-remain pending. Changing any selected content invalidates the preview.
+cost and model, and what an image method sends along with the image (pasted text, the linked
+page's text). AI methods that are off or incompatible link to AI models for editors with
+`ai.config.read`; anyone else is told an admin can turn them on. Opening the import view runs the
+non-billable worker readiness check at most once per editor per 15 minutes, and readiness checks
+are not listed as recent imports. «Pasted text» holds only what the editor typed or pasted: the
+text Crate read stays in each row's evidence, and reopening an import restores only the editor's
+own text. Running an import again skips a show already in the draft as an unsaved row (same
+artist, date, time, venue and city, trimmed and case-insensitive). Every candidate is edited in
+place; filling a field for several shows affects the selected shows, or every unsaved show when
+none is selected. «Start over» discards the draft and its source, after a confirmation when
+unsaved rows hold anything; shows already saved stay in Crate. Excluded dates remain pending.
+Changing any selected content invalidates the preview.
+
+Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming: from the
+toolbar with typed show IDs, or from a show's detail, which loads that show and the other upcoming
+shows with the same artist and date. Every merge still needs its review and approval. A plan that
+needs approval links to Agent approvals only for editors with `agents.plans.review`; anyone else is
+told that someone who can approve changes must approve it. «Open show», «View it» and «Open the kept
+show» open `/upcoming?show_id=<id>`: Upcoming expands that show's detail and scrolls to it, or says
+the show isn't in the upcoming list. Show items of `GET /api/upcoming` carry their `show_id`.
 Results retain canonical links and saved-row locks; a network-uncertain request retries its exact
 key. Owned private drafts can be resumed, including pending/failed jobs and staged image references.
 A stop request is distinct from the worker's actual acknowledgement.
@@ -1735,7 +1749,10 @@ Gemini 2.5 and non-Gemini providers retain their default detail. See the provide
 [media resolution contract](https://ai.google.dev/gemini-api/docs/generate-content/media-resolution?authuser=01&hl=en).
 
 Configuration, connectivity and model vision support are exposed separately to curators by the
-narrow show API. Worker readiness is checked explicitly without a billable model request. A key
+narrow show API. Worker readiness is checked automatically when the import view opens (at most
+once per editor per 15 minutes), without a billable model request. The readiness probe never takes
+or waits for the editor's one outstanding job, so it can't block an import, a show review or a
+merge review; it still counts toward the ten-jobs allowance and replays its window key. A key
 alone is not a connectivity/vision probe. Model and endpoint configuration are bound to the
 configuration fingerprint reviewed by the user; changes before acceptance/execution stop the
 call, preserving the draft. The selected Ollama endpoint is frozen for the actual call. Ollama uses model capabilities; an unavailable registry
