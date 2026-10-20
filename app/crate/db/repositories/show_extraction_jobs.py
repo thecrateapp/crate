@@ -313,7 +313,14 @@ def read_show_drafts(principal, draft_id: str | None = None, *, session=None) ->
         rows = (
             current.execute(
                 text(
-                    "SELECT d.id::text,d.task_id AS job_id,t.status,d.expires_at::text FROM show_extraction_drafts d JOIN tasks t ON t.id=d.task_id WHERE d.actor_user_id=:actor AND d.expires_at>NOW() ORDER BY d.created_at DESC LIMIT 10"
+                    "SELECT d.id::text,d.task_id AS job_id,t.status,d.expires_at::text,"
+                    "d.created_at,d.input->>'mode' AS mode,"
+                    "CASE WHEN jsonb_typeof(d.result->'candidates')='array'"
+                    " THEN jsonb_array_length(d.result->'candidates') END AS candidate_count"
+                    " FROM show_extraction_drafts d JOIN tasks t ON t.id=d.task_id"
+                    " WHERE d.actor_user_id=:actor AND d.expires_at>NOW()"
+                    " AND d.input->>'mode' <> 'probe'"
+                    " ORDER BY d.created_at DESC LIMIT 10"
                 ),
                 {"actor": principal.human_actor_id},
             )

@@ -155,6 +155,9 @@ def show_llm_configuration(
         "model": model,
         "provider": state["provider"],
         "configured": state["available"],
+        "reason": None
+        if state["available"]
+        else (state.get("error_code") or "AI_UNAVAILABLE"),
         "connectivity": "not_checked",
         "vision": "unknown",
         "dependency_available": state["available"],

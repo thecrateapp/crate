@@ -580,6 +580,37 @@ def test_action_availability_for_bio_and_show_modes_uses_bindings(monkeypatch):
     )
 
 
+def test_show_actions_say_why_a_model_method_is_unavailable(monkeypatch):
+    from crate.ai import configuration
+    from crate.ai.contracts import AIConfigurationError
+    from crate import show_extraction
+
+    def configured(action):
+        return {
+            "action_id": action,
+            "mode": "configured",
+            "provider": "gemini",
+            "model_id": "bound-model",
+            "config_fingerprint": "bound",
+        }
+
+    monkeypatch.setattr(configuration, "get_action_configuration", configured)
+    for mode in show_extraction.SHOW_ACTIONS:
+        assert show_extraction.show_llm_configuration(mode)["reason"] is None
+
+    monkeypatch.setattr(
+        configuration,
+        "get_action_configuration",
+        lambda action: (_ for _ in ()).throw(
+            AIConfigurationError("AI_ACTION_DISABLED", "Disabled")
+        ),
+    )
+    for mode in show_extraction.SHOW_ACTIONS:
+        state = show_extraction.show_llm_configuration(mode)
+        assert state["configured"] is False
+        assert state["reason"] == "AI_ACTION_DISABLED"
+
+
 @pytest.mark.parametrize(
     ("handler", "target", "action"),
     [
@@ -704,3 +735,4 @@ def test_show_availability_exposes_each_action_without_global_model(monkeypatch)
     }
     assert result["limits"]["selected_shows"] == 50
     assert result["limits"]["draft_candidates"] == 200
+    assert all("reason" in item for item in result["actions"].values())

@@ -292,3 +292,38 @@ def test_accepted_show_identity_rejects_credential_and_option_changes(
     assert full["execution"]["error_code"] == "CONFIGURATION_CHANGED"
     assert full["draft"]["candidates"]
     provider.assert_not_called()
+
+
+def test_recent_drafts_skip_readiness_checks_and_summarise_each_import(show_world):
+    from datetime import datetime
+    from crate.db.repositories.show_extraction_jobs import read_show_drafts
+
+    actor = show_world["principal"]
+    # `agent_requests._accept` admits only one outstanding job per editor at a
+    # time (`_ACTIVE = ("pending", "running", "delegated", "completing")`), so
+    # the completed import and the readiness probe must each be run before the
+    # next job is accepted; only the still-pending import is left unprocessed,
+    # and it is therefore the most recently created (and so the first) row.
+    done = accept_show_extraction(
+        actor, {"mode": "parse", "raw_text": "2027-03-02\n2027-03-04"}, "done"
+    )
+    start_task(done["job_id"])
+    handle_show_extraction(done["job_id"], {}, {})
+    probe = accept_show_extraction(actor, {"mode": "probe"}, "readiness-1")
+    start_task(probe["job_id"])
+    handle_show_extraction(probe["job_id"], {}, {})
+    pending = accept_show_extraction(
+        actor, {"mode": "parse", "raw_text": "2027-03-02"}, "pending"
+    )
+
+    items = read_show_drafts(actor)["items"]
+
+    assert [row["job_id"] for row in items] == [pending["job_id"], done["job_id"]]
+    assert items[0]["mode"] == "parse"
+    assert items[0]["candidate_count"] is None
+    assert (
+        items[1]["candidate_count"]
+        == len(read_show_drafts(actor, items[1]["id"])["result"]["candidates"])
+        == 2
+    )
+    assert isinstance(items[0]["created_at"], datetime)
