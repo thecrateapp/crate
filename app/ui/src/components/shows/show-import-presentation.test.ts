@@ -156,6 +156,41 @@ describe("methodOptions", () => {
     expect(ocr.disabledReason).toBe("The worker has no OCR engine installed.");
   });
 
+  it("disables Local OCR + AI too, since it needs the OCR engine", () => {
+    const options = methodOptions(
+      availability({ ocr: { available: false, reason: "OCR_UNAVAILABLE" } }),
+      { images: 1, hasText: false },
+      "unavailable",
+    );
+    const byMethod = new Map(options.map((o) => [o.method, o]));
+    for (const method of ["ocr", "ocr_text_llm"] as const) {
+      expect(byMethod.get(method)!.disabledReason).toBe(
+        "The worker has no OCR engine installed.",
+      );
+      expect(byMethod.get(method)!.manageInAiModels).toBe(false);
+    }
+    expect(byMethod.get("vision")!.disabledReason).toBeNull();
+  });
+
+  it("keeps the AI model reasons ahead of the OCR reason for Local OCR + AI", () => {
+    const options = methodOptions(
+      availability({
+        ocr: { available: false, reason: "OCR_UNAVAILABLE" },
+        actions: {
+          ocr_text_llm: {
+            configured: false,
+            reason: "AI_ACTION_DISABLED",
+          },
+        },
+      }),
+      { images: 1, hasText: false },
+      "unavailable",
+    );
+    const option = options.find((o) => o.method === "ocr_text_llm")!;
+    expect(option.disabledReason).toBe(reasonText("AI_ACTION_DISABLED"));
+    expect(option.manageInAiModels).toBe(true);
+  });
+
   it("describes each method card exactly", () => {
     const options = methodOptions(
       availability(),
@@ -221,6 +256,11 @@ describe("pickMethod", () => {
   });
   it("never falls back to an AI method, even when one is enabled", () => {
     expect(pickMethod("ocr", imageOptionsOcrDisabled)).toBeNull();
+  });
+  it("drops Local OCR + AI once the OCR engine is unavailable", () => {
+    expect(pickMethod("ocr_text_llm", imageOptions)).toBe("ocr_text_llm");
+    expect(pickMethod("ocr_text_llm", imageOptionsOcrDisabled)).toBeNull();
+    expect(pickMethod(null, imageOptionsOcrDisabled)).toBeNull();
   });
   it("keeps the current AI method when it is enabled", () => {
     expect(pickMethod("vision", imageOptions)).toBe("vision");

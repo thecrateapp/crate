@@ -223,6 +223,18 @@ describe("reviewSelection", () => {
     expect(reviewSelection(draft, new Set(["saved"]))).toEqual([unsaved]);
   });
 
+  it("returns the lone unsaved row whatever selected holds, even a stale id", () => {
+    const saved = candidate({ item_id: "saved" });
+    const unsaved = candidate({ item_id: "unsaved", artist_name: "Band" });
+    for (const selected of [["removed-row"], ["saved"], ["unsaved"]]) {
+      const draft: ShowDraftState = {
+        candidates: [saved, unsaved],
+        selected,
+      };
+      expect(reviewSelection(draft, new Set(["saved"]))).toEqual([unsaved]);
+    }
+  });
+
   it("returns the selected unsaved rows in draft order for multi-row drafts", () => {
     const a = candidate({ item_id: "a" });
     const b = candidate({ item_id: "b" });
@@ -269,6 +281,19 @@ describe("mergeImportedDraft", () => {
       result.candidates.every((c) => c.source_draft_id === "resume-draft"),
     ).toBe(true);
     expect(result.selected).toEqual([]);
+  });
+
+  it("keeps the blank row when an import finds no shows", () => {
+    const draft = newDraft();
+    const empty = mergeImportedDraft(draft, imported({ candidates: [] }));
+    expect(empty).toBe(draft);
+    expect(empty.candidates).toHaveLength(1);
+    expect(isBlankCandidate(empty.candidates[0]!)).toBe(true);
+    const next = mergeImportedDraft(
+      empty,
+      imported({ candidates: [rows[0]!] }),
+    );
+    expect(next.candidates.map((c) => c.item_id)).toEqual(["resume-1"]);
   });
 
   it("keeps an unsaved local edit, but lets a saved row take the imported value", () => {

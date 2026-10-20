@@ -143,7 +143,8 @@ export function reviewSelection(
   const unsaved = draft.candidates.filter(
     (candidate) => !saved.has(candidate.item_id),
   );
-  if (unsaved.length === 1 && draft.selected.length === 0) return unsaved;
+  // A lone unsaved row counts as selected, whatever `selected` holds.
+  if (unsaved.length === 1) return unsaved;
   const selected = new Set(draft.selected);
   return draft.candidates.filter(
     (candidate) =>
@@ -155,6 +156,8 @@ export function mergeImportedDraft(
   draft: ShowDraftState,
   imported: ShowDraft,
 ): ShowDraftState {
+  // An import that found nothing keeps the draft, including its blank row.
+  if (imported.candidates.length === 0) return draft;
   const existingById = new Map(
     draft.candidates.map((candidate) => [candidate.item_id, candidate]),
   );

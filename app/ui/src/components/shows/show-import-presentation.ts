@@ -115,9 +115,13 @@ function disabledReason(
       };
     if (!action.model || !action.configuration_fingerprint)
       return { reason: "Not available", manageInAiModels: true };
-    return { reason: null, manageInAiModels: false };
   }
-  if (method === "ocr" && readiness === "unavailable" && availability)
+  // Local OCR + AI reads the image with the same OCR engine first.
+  if (
+    (method === "ocr" || method === "ocr_text_llm") &&
+    readiness === "unavailable" &&
+    availability
+  )
     return {
       reason: ocrReasonText(availability.ocr.reason ?? null),
       manageInAiModels: false,
