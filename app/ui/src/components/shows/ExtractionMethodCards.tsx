@@ -26,6 +26,8 @@ function MethodCard({
   const id = useId();
   const itemId = `${id}-item`;
   const descriptionId = `${id}-description`;
+  const costId = `${id}-cost`;
+  const reasonId = `${id}-reason`;
   const isOcr = option.method === "ocr";
   const view = isOcr ? readinessView(readiness, ocrReason) : null;
   const canRecheck =
@@ -40,7 +42,13 @@ function MethodCard({
           id={itemId}
           value={option.method}
           disabled={option.disabledReason !== null}
-          aria-describedby={descriptionId}
+          aria-describedby={[
+            descriptionId,
+            costId,
+            option.disabledReason ? reasonId : null,
+          ]
+            .filter(Boolean)
+            .join(" ")}
           className="mt-0.5"
         />
         <label htmlFor={itemId} className="text-sm font-medium leading-5">
@@ -51,11 +59,15 @@ function MethodCard({
         {option.description}
       </p>
       <StatusBadge tone={option.billable ? "info" : "success"}>
-        <span title={option.model ?? undefined}>{option.cost}</span>
+        <span id={costId} title={option.model ?? undefined}>
+          {option.cost}
+        </span>
       </StatusBadge>
       {option.disabledReason ? (
         <div className="space-y-1 text-xs">
-          <p className="text-state-warning-text">{option.disabledReason}</p>
+          <p id={reasonId} className="text-state-warning-text">
+            {option.disabledReason}
+          </p>
           {option.manageInAiModels ? (
             <a
               href="/ai"

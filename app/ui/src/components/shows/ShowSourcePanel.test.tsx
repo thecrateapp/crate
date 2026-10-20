@@ -135,13 +135,15 @@ function png(name = "flyer.png") {
 
 function Harness({
   active = true,
+  disabled = false,
   onDraft = vi.fn(),
 }: {
   active?: boolean;
+  disabled?: boolean;
   onDraft?: (draft: ShowDraft) => void;
 }) {
   const source = useShowSource({ active, onDraft });
-  return <ShowSourcePanel source={source} />;
+  return <ShowSourcePanel source={source} disabled={disabled} />;
 }
 
 function radio(name: string) {
@@ -616,7 +618,9 @@ it("lists recent imports by method and size, without job ids", async () => {
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("Local OCR")).toBeVisible();
   expect(screen.getByText("3 shows found")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Open" })).toBeVisible();
+  const open = screen.getByRole("button", { name: "Open Local OCR import" });
+  expect(open).toBeVisible();
+  expect(open).toHaveTextContent(/^Open$/);
   expect(document.body.textContent).not.toContain("job-123");
   expect(document.body.textContent).not.toContain("d1");
 });
@@ -659,7 +663,9 @@ it("reopens a recent import without restoring an AI method", async () => {
   await user.click(
     await screen.findByRole("button", { name: "Recent imports" }),
   );
-  await user.click(screen.getByRole("button", { name: "Open" }));
+  await user.click(
+    screen.getByRole("button", { name: "Open AI image reading import" }),
+  );
   expect(
     await screen.findByText(
       "Import reopened. Saved shows stay linked; the rest are ready to review.",
@@ -708,4 +714,137 @@ it("uses design-system controls only", async () => {
       'select, details, pre, input[type="checkbox"]:not([aria-hidden]), input[type="radio"]:not([aria-hidden])',
     ),
   ).toBeNull();
+});
+
+it("forgets a failed readiness check once fresh availability arrives", async () => {
+  let loads = 0;
+  sourceApi({
+    availability: () =>
+      ++loads === 1
+        ? stale()
+        : availability({
+            ocr: { available: false, reason: "OCR_UNAVAILABLE" },
+          }),
+    extractions: () => {
+      throw new Error("Acceptance response lost");
+    },
+  });
+  const user = userEvent.setup();
+  const { rerender } = render(<Harness />);
+  await waitFor(() => expect(probeBodies()).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  expect(
+    await screen.findByText("Couldn't check the OCR worker"),
+  ).toBeVisible();
+  rerender(<Harness active={false} />);
+  rerender(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(2));
+  expect(await screen.findByText("OCR unavailable")).toBeVisible();
+  expect(screen.queryByText("Couldn't check the OCR worker")).toBeNull();
+  expect(radio("Local OCR")).toBeDisabled();
+  for (const option of screen.getAllByRole("radio"))
+    expect(option).not.toBeChecked();
+  expect(probeBodies()).toHaveLength(1);
+});
+
+it("replays an aborted readiness acceptance with the same key when reopened", async () => {
+  sourceApi({
+    availability: () => stale(),
+    extractions: (_url, _method, _body, options) =>
+      new Promise((_, reject) =>
+        options?.signal?.addEventListener("abort", () =>
+          reject(new DOMException("Closed", "AbortError")),
+        ),
+      ),
+  });
+  const { rerender } = render(<Harness />);
+  await waitFor(() => expect(probeBodies()).toHaveLength(1));
+  rerender(<Harness active={false} />);
+  rerender(<Harness />);
+  await waitFor(() => expect(probeBodies()).toHaveLength(2));
+  const [first, second] = probeBodies();
+  expect(second!.idempotency_key).toBe(first!.idempotency_key);
+});
+
+it("explains when the import methods can't load and lets the editor try again", async () => {
+  let loads = 0;
+  sourceApi({
+    availability: () => {
+      loads += 1;
+      if (loads === 1) throw new Error("Service unavailable");
+      return availability();
+    },
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  await user.upload(screen.getByLabelText("Images"), png());
+  expect(
+    await screen.findByText("Couldn't load the import methods."),
+  ).toBeVisible();
+  expect(screen.queryByText("Checking the OCR worker…")).toBeNull();
+  expect(screen.queryByText("Checking AI models…")).toBeNull();
+  expect(screen.getByRole("button", { name: "Find dates" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByText("OCR ready")).toBeVisible();
+  expect(radio("Local OCR")).toBeChecked();
+  expect(screen.queryByText("Couldn't load the import methods.")).toBeNull();
+});
+
+it("describes each method radio by its cost and why it is off", async () => {
+  sourceApi({
+    availability: () =>
+      availability({
+        actions: {
+          vision: { configured: false, reason: "AI_ACTION_DISABLED" },
+          ocr_text_llm: { ...CONFIGURED },
+        },
+      }),
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(1));
+  await user.upload(screen.getByLabelText("Images"), png());
+  expect(radio("Local OCR")).toHaveAccessibleDescription(
+    "Reads the image on your server. Nothing leaves Crate. Free · local OCR",
+  );
+  expect(radio("AI image reading")).toHaveAccessibleDescription(
+    `Sends the poster or screenshot to the AI model. AI ${reasonText("AI_ACTION_DISABLED")}`,
+  );
+});
+
+it("does not highlight the drop zone while the panel is locked", () => {
+  sourceApi();
+  render(<Harness disabled />);
+  const zone = screen.getByRole("group", { name: "Source images" });
+  fireEvent.dragOver(zone, { dataTransfer: { files: [] } });
+  expect(zone).not.toHaveAttribute("data-dragging");
+  fireEvent.drop(zone, { dataTransfer: { files: [png("dropped.png")] } });
+  expect(screen.queryByText("dropped.png")).toBeNull();
+});
+
+it("keeps the status region in the accessibility tree and headings in order", async () => {
+  sourceApi({
+    jobs: () => ({
+      job_id: "job-1",
+      status: "completed",
+      result: {
+        draft: {
+          raw_text: "x",
+          coverage: "incomplete",
+          candidates: [{ item_id: "a", date: "2027-03-02" }],
+          warnings: ["Check the year"],
+        },
+      },
+    }),
+  });
+  const user = userEvent.setup();
+  render(<Harness />);
+  const status = screen.getByRole("status");
+  expect(status).toBeEmptyDOMElement();
+  expect(status.className.split(/\s+/)).not.toContain("empty:hidden");
+  await user.type(screen.getByLabelText("Pasted text"), "x");
+  await user.click(screen.getByRole("button", { name: "Find dates" }));
+  expect(
+    await screen.findByRole("heading", { level: 3, name: "Notes" }),
+  ).toBeVisible();
 });

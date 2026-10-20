@@ -32,8 +32,9 @@ function SourceImages({
       data-dragging={dragging ? "" : undefined}
       className="space-y-3 rounded-md border border-dashed border-border p-4 transition-colors data-[dragging]:border-accent-action data-[dragging]:bg-accent-action/5"
       onDragOver={(event) => {
+        // Always claim the drop so the browser never opens the file instead.
         event.preventDefault();
-        setDragging(true);
+        if (!locked) setDragging(true);
       }}
       onDragLeave={(event) => {
         const next = event.relatedTarget;
@@ -171,6 +172,7 @@ function RecentImports({
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-label={`Open ${view.title} import`}
                   disabled={locked}
                   onClick={() => source.recover(row)}
                 >
@@ -244,7 +246,21 @@ export function ShowSourcePanel({
           screenshot or its text instead.
         </p>
       </div>
-      {source.options.length ? (
+      {!source.availability && source.availabilityFailed ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <p role="alert" className="text-state-danger-text">
+            Couldn&apos;t load the import methods.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={source.reloadAvailability}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : source.options.length ? (
         <ExtractionMethodCards
           options={source.options}
           value={source.method}
@@ -264,12 +280,12 @@ export function ShowSourcePanel({
           {source.error}
         </p>
       ) : null}
-      <p role="status" className="text-sm empty:hidden">
+      <p role="status" className="text-sm empty:sr-only">
         {source.status}
       </p>
       {source.warnings.length ? (
         <div className="space-y-1">
-          <h4 className="text-xs font-medium text-muted-foreground">Notes</h4>
+          <h3 className="text-xs font-medium text-muted-foreground">Notes</h3>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
             {source.warnings.map((warning) => (
               <li key={warning}>{warning}</li>

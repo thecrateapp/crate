@@ -259,11 +259,15 @@ describe("AddShowSheet", () => {
     await user.click(
       await screen.findByRole("button", { name: "Recent imports" }),
     );
-    await user.click(await screen.findByRole("button", { name: "Open" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Open Text rules import" }),
+    );
     await user.clear(await screen.findByLabelText("City for show 1"));
     await user.type(screen.getByLabelText("City for show 1"), "Manual City");
     restoring = true;
-    await user.click(screen.getByRole("button", { name: "Open" }));
+    await user.click(
+      screen.getByRole("button", { name: "Open Text rules import" }),
+    );
     await waitFor(() =>
       expect(screen.getByLabelText("City for show 2")).toBeDisabled(),
     );

@@ -27,6 +27,7 @@ export interface ShowSourceImage {
 
 export interface ShowSourceState {
   availability: ShowAvailability | null;
+  availabilityFailed: boolean;
   readiness: ReadinessState;
   text: string;
   url: string;
@@ -53,6 +54,7 @@ export interface ShowSourceState {
   stop(): void;
   recheck(): void;
   recover(row: ShowDraftRow): void;
+  reloadAvailability(): void;
 }
 
 interface PendingExtraction {
@@ -145,6 +147,7 @@ export function useShowSource({
   const [availability, setAvailability] = useState<ShowAvailability | null>(
     null,
   );
+  const [availabilityFailed, setAvailabilityFailed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkFailed, setCheckFailed] = useState(false);
   const [text, setTextValue] = useState("");
@@ -200,6 +203,7 @@ export function useShowSource({
   );
   const canExtract = Boolean(
     active &&
+    availability &&
     !busy &&
     !uncertain &&
     method &&
@@ -219,8 +223,15 @@ export function useShowSource({
       );
       if (signal?.aborted) return null;
       setAvailability(value);
+      setAvailabilityFailed(false);
+      if (value.checked_at) {
+        // Fresh readiness supersedes an earlier failed or lost check.
+        setCheckFailed(false);
+        probeKey.current = null;
+      }
       return value;
     } catch {
+      if (!signal?.aborted) setAvailabilityFailed(true);
       return null;
     }
   }
@@ -304,15 +315,26 @@ export function useShowSource({
     }
   }
 
+  // The automatic check posts at most once per window, unless an accepted
+  // job or a kept key is pending: waiting or replaying costs nothing.
+  function checkWhenStale(value: ShowAvailability | null, signal: AbortSignal) {
+    if (!value || value.checked_at || signal.aborted) return;
+    const windowKey = readinessKey(Date.now());
+    if (
+      !probeJob.current &&
+      !probeKey.current &&
+      autoProbeWindow.current === windowKey
+    )
+      return;
+    autoProbeWindow.current = windowKey;
+    void checkReadiness(signal, false);
+  }
+
   const activate = useEffectEvent((signal: AbortSignal) => {
     void loadRecent(signal);
-    void loadAvailability(signal).then((value) => {
-      if (!value || value.checked_at || signal.aborted) return;
-      const windowKey = readinessKey(Date.now());
-      if (!probeJob.current && autoProbeWindow.current === windowKey) return;
-      autoProbeWindow.current = windowKey;
-      void checkReadiness(signal, false);
-    });
+    void loadAvailability(signal).then((value) =>
+      checkWhenStale(value, signal),
+    );
   });
 
   const deactivate = useEffectEvent(() => {
@@ -561,6 +583,7 @@ export function useShowSource({
 
   return {
     availability,
+    availabilityFailed,
     readiness,
     text,
     url,
@@ -612,6 +635,13 @@ export function useShowSource({
     },
     recover(row) {
       if (active && !busy) void reopen(row);
+    },
+    reloadAvailability() {
+      const signal = activation.current?.signal;
+      if (signal && !signal.aborted)
+        void loadAvailability(signal).then((value) =>
+          checkWhenStale(value, signal),
+        );
     },
   };
 }
