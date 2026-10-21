@@ -40,3 +40,34 @@ it("moves the active underline without re-rendering lyric rows, and seeks by lin
   fireEvent.click(second);
   expect(seek).toHaveBeenCalledWith(10);
 });
+it("centers the active line inside its own surface without scrolling the outer page", () => {
+  const scroll = vi.fn();
+  const pageScroll = vi.fn();
+  const originalScroll = HTMLElement.prototype.scrollTo;
+  const originalIntoView = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollTo = scroll;
+  HTMLElement.prototype.scrollIntoView = pageScroll;
+  const motion = document.documentElement.dataset.crateMotion;
+  document.documentElement.dataset.crateMotion = "reduced";
+  try {
+    render(
+      <div data-slot="player-lyrics-surface">
+        <PlayerProgressContext value={{ currentTime: 12, duration: 30 }}>
+          <SyncedLyrics
+            lines={[{ time: 10, text: "Inside panel" }]}
+            onSeek={vi.fn()}
+          />
+        </PlayerProgressContext>
+      </div>,
+    );
+    expect(scroll).toHaveBeenCalledWith(
+      expect.objectContaining({ behavior: "instant" }),
+    );
+    expect(pageScroll).not.toHaveBeenCalled();
+  } finally {
+    HTMLElement.prototype.scrollTo = originalScroll;
+    HTMLElement.prototype.scrollIntoView = originalIntoView;
+    if (motion) document.documentElement.dataset.crateMotion = motion;
+    else delete document.documentElement.dataset.crateMotion;
+  }
+});

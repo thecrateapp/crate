@@ -2,13 +2,37 @@
 export function PlayerProgressBeam({
   progressPercent,
   trackClassName = "h-0.5",
+  orientation = "horizontal",
 }: {
   progressPercent: number;
   trackClassName?: string;
+  orientation?: "horizontal" | "vertical";
 }) {
   const progress = Number.isFinite(progressPercent)
     ? Math.max(0, Math.min(100, progressPercent))
     : 0;
+  if (orientation === "vertical")
+    return (
+      <>
+        <div
+          aria-hidden="true"
+          className="listen-player-progress-track absolute bottom-0 left-1/2 h-full w-0.5 -translate-x-1/2 rounded-full"
+        />
+        <div
+          aria-hidden="true"
+          className="listen-player-volume-position"
+          style={{ height: `${progress}%` }}
+        >
+          <div className="listen-player-progress-trail pointer-events-none absolute inset-y-0 left-1/2 w-2 -translate-x-1/2 overflow-hidden rounded-full opacity-65">
+            <div className="listen-player-progress-glow--vertical absolute inset-0 blur-[2px]" />
+          </div>
+          <div className="listen-player-progress-fill--vertical absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full" />
+          <div
+            className={`listen-player-progress-thumb pointer-events-none absolute left-1/2 top-0 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full ${progress > 0 ? "opacity-[0.72]" : "opacity-[0.45]"}`}
+          />
+        </div>
+      </>
+    );
   return (
     <>
       <div

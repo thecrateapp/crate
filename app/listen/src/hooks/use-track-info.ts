@@ -1,4 +1,10 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type { Track } from "@/contexts/player-types";
 import { api } from "@/lib/api";
@@ -17,6 +23,8 @@ export interface UseTrackInfoOptions {
 export interface UseTrackInfoState {
   info: TrackInfo | null;
   loading: boolean;
+  error: boolean;
+  retry: () => void;
 }
 
 const TRACK_INFO_TTL_MS = 15 * 60 * 1000;
@@ -72,7 +80,12 @@ export function useTrackInfo(
     Boolean(url && !getCachedTrackInfo(url)),
   );
 
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
   useEffect(() => {
+    setError(false);
     if (!enabled || !url) {
       setInfo(null);
       setLoading(false);
@@ -100,6 +113,7 @@ export function useTrackInfo(
       .catch(() => {
         if (!cancelled) {
           setInfo(null);
+          setError(true);
         }
       })
       .finally(() => {
@@ -111,9 +125,9 @@ export function useTrackInfo(
     return () => {
       cancelled = true;
     };
-  }, [enabled, url]);
+  }, [enabled, url, attempt]);
 
-  return { info, loading };
+  return { info, loading, error, retry };
 }
 
 export function __resetTrackInfoCacheForTests(): void {

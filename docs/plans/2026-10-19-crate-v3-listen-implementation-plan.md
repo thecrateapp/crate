@@ -658,6 +658,86 @@ Sin segunda revisión ni regeneración de baselines; QA física nativa/AT de fas
 servicios activos, HEAD295f283a e índice vacío; se para para revisión sin commit/push de1BE.
 Capturas1be-search-loading.png y1be-stats-final.png bajo.artifacts/crate-v3.
 
+### 1BE · siguiente lote interno: Lyrics e Info (2026-10-20)
+
+Diego aprueba Stats/Digging/loading: publicado `6b05848b`. Claude continúa Stats; este lote no
+modifica esas vistas. LyricsPanel y LyricsTab comparten PlayerLyricsContent con estados reales
+loading/error/retry/empty, fallback a letra plana si la sincronizada no se puede leer, y el reloj
+leaf existente. El centrado solo desplaza PlayerLyricsSurface, sin mover la página exterior.
+InfoTab conserva datos/API/navegación/media en su adaptador; InfoTabView reutiliza los componentes
+reales y distingue0 de ausencia, con QualityBadge completo. Sin piel de paleta, cajas KPI locales
+ni lecturas dinámicas duplicadas. El frame de artwork mantiene96/112px; la rejilla responde al
+ancho del panel. No se añaden instrumentos H3 ni se deduce provenance no disponible.
+Storybook Listen/Player/Lyrics and Info y Reviews/1BE/Lyrics and Info reutilizan el mismo escenario
+que5186/review-1be-player-reading.html. Se mantiene sin commit para revisión. Output/targets,
+Cast/Connect, visualizer y chrome Tauri siguen siendo lotes posteriores de1BE.
+
+Ampliación del lote: los captions de sección usan MonoLabel tone="accent", sin slot vacío que
+introduzca sangría. Mood usa GenrePill con el porcentaje real, sin navegación de género. PlayerBar
+inyecta su lectura exacta de calidad en los portales del player mediante contexto local; Info
+muestra esa calidad de reproducción en la cabecera y la original en Source & Dynamics. Sin nuevas
+peticiones de resolución. También el fullscreen móvil reutiliza PlayerLyricsContent y useLyrics,
+con sus gates de visibilidad/panel conservados; la línea activa sigue en el reloj leaf.
+
+Cierre local de Lyrics/Info: revisión fresca única, dos hallazgos importantes corregidos en una
+pasada TDD. El fade de fullscreen queda limitado a letra sincronizada lista; texto plano y
+loading/error/empty mantienen contraste completo. Las líneas sincronizadas poseen su wrapping
+incluso sin Card antecesor. Reproducción RED y posterior GREEN en ambos hosts. Validación final:
+163testsListen/4skips existentes,48Desktop y8casos browser; tres tipos y tres builds correctos,
+lint acotado, i18n0/0 y catálogo63/93/120. Tres servicios activos; se para sin commit para revisión.
+
+### 1BE · siguiente lote interno: Output y dispositivos (2026-10-21)
+
+Lyrics/Info aprobado y publicado como`a193a1b2`. Output conserva proveedores Cast/Connect/local/
+native y autoridad Jam/remote; PlaybackTargetMenu queda como adaptador, con cancelación de
+refresh/eventos y contexto por ref. Panel/Picker reales comparten AppPopover, AppMenuButton,
+FormField8px, MonoLabel, StatusDot y estados de carga/error/empty. Motivos no disponibles
+visibles, retry de proveedor sin ocultar salidas sanas, pending sin acciones duplicadas y errores
+amigables. Desconectar Cast y detener playback siguen siendo acciones diferentes. Teclado/foco,
+scroll y altura/ancho se resuelven en el Picker que usan producción y review.
+Enmienda de Diego: volumen comparte trazo2px con progreso, objetivo44px y control nativo de
+teclado/wheel/pointer intacto. CSS vertical vive con seek/volume; el review usa los controles reales.
+Storybook Listen/Player/Output and Devices y Reviews/1BE/Output and Devices comparten escena
+con5186/review-1be-player-output.html, sin API/audio/preferences writes. No se añade DevicesH3
+ni se certifican protocolos nativos; visualizer/Tauri chrome siguen para próximos lotes.
+Se para sin commit para revisión; Stats sigue fuera de alcance de este lote.
+
+Ampliación aprobada de volumen: hover abre sin robar foco, click mute/restaura último nivel;
+2.5s fuera/inactivo cierra, drag/foco de teclado conservan el panel. Touch abre con tap y ofrece
+mute interno; flechas en el icono abren con foco. Icono con glow proporcional sin pulsación y
+gate Effects. Se corrige centrado24px a la derecha por competencia de transform de entrada;
+PlayerProgressBeam comparte orientación vertical y una sola posición para cabeza/relleno/estela.
+La rueda sobre icono/popover ajusta3% (Shift1%) sin desplazar la página, incluso en0/100;
+listeners nativos no pasivos limitados a esas superficies, con limpieza al cerrar/desmontar.
+Fuera del control el scroll permanece normal. Corregidos también click externo consumido,
+mute en dispositivos híbridos y foco de teclado pendiente al reabrir con hover.
+Validación de cierre:170testsListen,48Desktop y16casos browser; tipos Listen/Desktop/Storybook,
+tres builds, presupuesto inicial204902/307200gzipbytes, lint, i18n0/0 y catálogo correctos.
+Servicios5174(APIprod),5186y6006activos. Diego aprueba Output/Volume y autoriza commit/push;
+la siguiente entrega interna de1BE es Visualizador y estados de análisis.
+
+### 1BE · Visualizador y estados de análisis (2026-10-21)
+
+Output/Volume aprobado y publicado como`91b011a8`. Siguiente lote interno: ajustes del visualizador
+con InstrumentPanel/MonoLabel accent, FormField/Switch/Slider/Readout, manteniendo rangos, valores
+base/efectivos y callback de preferencias. Separación conserva precisión0.01;0 real y análisis
+pendiente siguen separados. El cálculo efectivo se extrae a un módulo puro Listen reutilizado
+por runtime y fixture. El header Extended deja espacio al panel y conserva sus gates.
+MusicVisualizer permite un fotograma estático; su propietario usa motion/Effects/visibilidad
+para static/start/stop con un único renderer y limpieza. Sin analyser no se construye uno ficticio.
+PD47: retirados SpectrumRibbonCanvas y drawer privado tras demostrar0consumidores runtime;
+WaveformCanvas y sus tokens siguen activos. Sin cambio de shader, paleta, artwork ni audio authority.
+Escena inglesa compartida en6006y5186/review-1be-player-visualizer.html con callbacks locales.
+Stats/Tauri chrome/DevicesH3 fuera de este lote. Se para para revisión antes de commit.
+
+Cierre local: revisión fresca con3hallazgos importantes, corregidos en una pasada TDD.
+Popover real compartido por Extended/review con altura acotada al padre y scroll; lectura
+base/efectiva accesible y traducida; invalidación one-shot de static para ajustes/reset/paleta/
+pista, con interpolación asentada y sin nuevo loop.115testsListen,48Desktop,8browser;3tipos,
+3builds,lint,i18n0/0,catálogo y presupuesto inicial204903/307200gzipbytes correctos.
+Tres instancias activas; Diego aprueba Visualizer y autoriza commit/push.
+Siguiente lote interno de1BE: chrome de escritorio Tauri, conservando las operaciones nativas.
+
 ## Refactor de Stats — explorador, rango e instrumento de escucha · 2026-10-21
 
 Rama `feat/stats-explorer`; spec `2026-10-21-crate-v3-stats-refactor-design.md`, plan
@@ -677,16 +757,17 @@ sigue en el mini tape de Home. Modos adaptativos (completo para 7d/30d/mes, vent
 para el resto), `useStatsRange` con caché por cuenta e invalidación `history`, panel con
 artistas/álbumes/pistas/descubrimientos del tramo y del día. Vistas puras con `links`/`renderImage`
 como props (showcase). Comparación con el periodo anterior, hero de artista, acción/replay,
-movimiento (Rising/Falling) y perfil sonoro con marcador previo; se retiran las tarjetas de
+movimiento (Rising/New/Back) y perfil sonoro con marcador previo; se retiran las tarjetas de
 discoveries y las claves `stats.signal.*`/`stats.story.*Body`.
 
 **C · Instrumento de escucha.** `ListeningHeatmap` en variante banda con contadores del propio
 mapa (pico, noche, género principal), PD43 en servidor (`hidden_reason: "few_listeners"`), título
 neutro fuera del ámbito personal, ola una vez por sujeto y sesión.
 
-**Decisiones.** Rulings R1–R28 en `.superpowers/sdd/2026-10-21-crate-v3-stats-refactor-plan/progress.md`;
-reflejados en `design-system.md` §4.7 y §4.26, `app/listen/AGENTS.md` y
-`docs/technical/listening-stats-projections.md`.
+**Decisiones.** Rulings R1–R29 de la ejecución por subagentes, reflejados en `design-system.md`
+§4.7 y §4.26, `app/listen/AGENTS.md` y `docs/technical/listening-stats-projections.md`. La
+revisión final corrigió el 500 de los dashboards calientes/obsoletos en FastAPI (timestamps del
+bloque `snapshot`).
 
 **Diferido.** Scramble del género principal (no existe `scramble.ts`), count-up de 1,6 s (se
 entrega 1,2 s), arrastre táctil para explorar el heatmap, tarea de backfill "quiet" (no hay

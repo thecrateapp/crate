@@ -1,8 +1,7 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { useTranslation } from "react-i18next";
-import { Sparkles } from "@crate/ui/icons";
 
-import type { TrackInfo } from "@/lib/track-info";
+import type { TrackInfo } from "../../../lib/track-info-data";
 
 import { MetricBar, SectionCard } from "./InfoTabPrimitives";
 import type { MoodEntry } from "./info-tab-data";
@@ -23,14 +22,14 @@ export function InfoTabMood({
           ? t("player.info.sections.mood.subtitle")
           : t("player.info.sections.mood.emptySubtitle")
       }
-      icon={Sparkles}
     >
       {topMoods.length ? (
         <div className="flex flex-wrap gap-2">
           {topMoods.map((mood) => (
-            <InfoBadge key={mood.label}>
-              {mood.label} {Math.round(mood.value * 100)}%
-            </InfoBadge>
+            <GenrePill
+              key={mood.label}
+              item={{ name: mood.label, percent: Math.round(mood.value * 100) }}
+            />
           ))}
         </div>
       ) : null}
@@ -41,7 +40,6 @@ export function InfoTabMood({
       <MetricBar
         label={t("player.info.metric.instrumentalness")}
         value={info.instrumentalness}
-        tone="accent"
       />
     </SectionCard>
   );

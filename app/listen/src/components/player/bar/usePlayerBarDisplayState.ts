@@ -44,6 +44,7 @@ type DisplayState = {
 };
 
 type DisplayQuality = {
+  sourceTrackQuality?: ReturnType<typeof mergeTrackQualityParts>;
   qualityBadge: QualityBadge | null;
   showsDeliveryQuality: boolean;
 };
@@ -115,6 +116,7 @@ function getDisplayQuality(
       : sourceTrackQuality;
 
   return {
+    sourceTrackQuality,
     qualityBadge: getQualityBadge({
       id: displayTrack.id,
       path: displayTrack.path,

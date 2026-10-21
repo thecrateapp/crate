@@ -434,3 +434,27 @@ Otros puntos de entrada/soporte que completan la cobertura: [App](../../app/list
 [LinuxWindowTitlebar](../../app/listen-desktop/src/components/LinuxWindowTitlebar.tsx),
 [platform](../../app/listen/src/lib/platform.ts) y
 [reglas Desktop](../../app/listen-desktop/AGENTS.md).
+
+1BE · Lyrics/info: adopción local de PlayerLyricsContent e InfoTabView, con adaptadores de datos,
+media y navegación conservados. Catálogo inglés y review aislada cubren synced/plain/empty/error,
+seek y lectura parcial/0/calidad completa. Pendiente revisión de Diego antes de commit. Output,
+targets, visualizer y chrome nativo permanecen pendientes del siguiente lote interno.
+
+1BE Output/targets: PlaybackTargetPanel/Picker son vistas Listen reutilizadas por producción,
+Storybook y preview pequeño. Canónicas en carga/error/partial/empty/pending, motivos, acciones
+Cast separadas y foco/teclado. Providers/autoridad/gates se conservan en Menu. Volume2px/44px
+usa control real y comparte estilos de seek. Sin nueva página DevicesH3 ni QA física implícita.
+Hover/mute/touch/foco y glow aprobados implementados; wheel consume scroll solo en las dos
+superficies de volumen y conserva Shift1%/paso3%.170testsListen,48Desktop y16browser locales;
+tipos/builds correctos. Output/Volume aprobado por Diego; siguiente lote: visualizador y estados
+de análisis, conservando gates de analyser/motion y límites lazy.
+
+1BE Visualizer: VisualizerSettingsPanel adopta formas y lecturas canónicas, mantiene análisis
+pendiente/0/completo, rangos/modos/preferencias. MusicVisualizer/useMusicVisualizer conservan
+capability y analyser real, congelan con motion/Effects y paran ocultos. SpectrumRibbonCanvas
+sin importadores runtime y su drawer retirados(PD47); waveform vivo conservado. Escena real
+Listen/Player/Visualizer and Analysis y preview pequeño. Aprobado por Diego para publicación.
+
+Cierre Visualizer:115Listen/48Desktop/8browser,3tipos/3builds correctos. Popover padre/scroll
+compartido, lecturas efectivas accesibles, static invalidado ante cambios y sin interpolación
+pendiente. Diego aprueba el lote y autoriza commit/push; sigue chrome Tauri de1BE.

@@ -700,3 +700,50 @@ first section. Do not hide these rules with CSS selectors or change InstrumentPa
 The Storybook/standalone Settings scene uses the same props and preserves separators inside
 Account and Connections. Browser checks measure the border in all five tabs and both Connect
 feature states at375/1200px.
+
+### 1BE · Lyrics and Info
+
+`review-1be-player-reading.html` and `Reviews/1BE/Lyrics and Info` reuse the same scene and the
+actual Listen presentation views. Synced/plain lyrics, drawer/fullscreen placement, seek,
+loading/retry/empty and complete/partial/zero/long track information are available through shared
+fixture controls. Source quality uses the complete QualityBadge; metadata uses canonical
+MonoLabel, StatNumber, Meter and InstrumentPanel. Source dynamics appear once. Lyrics keep the
+flat surface and center active lines inside their own scrolling panel. Artwork remains96/112px.
+The scene uses local media/actions only: no production API, audio or preference writes.
+
+The `delivery` case shows AAC playback separately from the original hi-res file, using the same
+QualityBadge renderer. Production Info receives the exact player reading through a local context,
+without another playback-resolution request. Section captions are accent and flush with content;
+Mood uses GenrePill with real percentages and no genre navigation. The mobile fullscreen renderer
+also uses the common Lyrics content and retry states.
+
+### 1BE · Output and devices
+
+`review-1be-player-output.html` reuses PlayerOutputReview and the actual Listen Panel/Picker.
+English Storybook: `Listen/Player/Output and Devices`, `Reviews/1BE/Output and Devices`.
+Local, Cast, Connect, native, unavailable, loading, retryable/partial failure, empty, pending
+and long-name cases use local data/actions. No discovery or real output changes. The actual
+volume control matches the seek rail at2px and retains44px interaction, wheel and keyboard.
+Keyboard/focus,8px captions and narrow/short viewports are checked in both hosts. Physical
+routing remains native/device QA; this cut does not add the H3 Devices page.
+
+Volume amendment: hover opens, click mutes/restores;2.5s outside idle closes, drag/focus hold.
+Touch has separate mute inside the slider. Arrow keys open it. Centering avoids competing
+transforms; head/trail/fill share one edge; glyph glow follows level and respects Effects.
+Wheel over the icon or popover adjusts volume without scrolling the page, including at endpoints.
+Normal steps are3%, Shift steps1%; scrolling outside the volume surfaces remains unchanged.
+
+### 1BE · Visualizer and analysis
+
+`review-1be-player-visualizer.html` shares PlayerVisualizerReview with Storybook
+`Listen/Player/Visualizer and Analysis` and `Reviews/1BE/Visualizer and Analysis`.
+The actual settings panel/mode switch cover saved/adaptive/waiting/zero/long/CD/cover/capability
+states. Config callbacks use the same effective-settings calculation as production, without
+persisting preferences or creating audio. Canonical FormField8px/MonoLabel/Slider/Switch/Readout
+replace local labels/ranges. Renderer lifecycle tests cover static motion/Effects, hidden, resume,
+no analyser and cleanup; real audio/WebGL rendering remains in Listen. The unused ribbon is retired.
+
+The production VisualizerSettingsPopover is also mounted inside a short clipped player region;
+its actual scrolling bounds preserve access to the final slider. Adapted values have localized
+saved/effective aria-valuetext. Static frames repaint changed settings/reset/track/palette once,
+settle without interpolation, and ignore unchanged/stopped/running invalidations.

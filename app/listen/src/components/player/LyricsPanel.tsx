@@ -1,10 +1,10 @@
-import { CRATE_ICON_SIZE, X, Loader2 } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useTranslation } from "react-i18next";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useLyrics } from "./extended/use-lyrics";
-import { SyncedLyrics } from "./SyncedLyrics";
+import { PlayerLyricsContent } from "./PlayerLyricsContent";
 export function LyricsPanel({
   open,
   onClose,
@@ -14,7 +14,9 @@ export function LyricsPanel({
 }) {
   const { t } = useTranslation();
   const { currentTrack, seek } = usePlayerActions();
-  const { lyrics, loading } = useLyrics(open ? currentTrack : null);
+  const { lyrics, loading, error, retry } = useLyrics(
+    open ? currentTrack : null,
+  );
   if (!open) return null;
   return (
     <div className="z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[480px] max-w-full flex-col overflow-hidden border-l border-border-quiet bg-surface-canvas">
@@ -34,25 +36,15 @@ export function LyricsPanel({
           </p>
         </div>
       ) : null}
-      <div className="relative flex-1 overflow-y-auto px-4">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2
-              size={CRATE_ICON_SIZE.lg}
-              className="animate-spin text-accent-action"
-            />
-          </div>
-        ) : lyrics?.synced?.length ? (
-          <SyncedLyrics lines={lyrics.synced} onSeek={seek} />
-        ) : lyrics?.plain ? (
-          <pre className="whitespace-pre-wrap py-8 font-sans text-sm leading-relaxed text-text-muted">
-            {lyrics.plain}
-          </pre>
-        ) : (
-          <p className="py-16 text-center text-sm text-text-faint">
-            {t("player.lyrics.empty")}
-          </p>
-        )}
+      <div className="flex min-h-0 flex-1 px-4">
+        <PlayerLyricsContent
+          lyrics={lyrics}
+          loading={loading}
+          error={error}
+          onRetry={retry}
+          presentation="drawer"
+          onSeek={seek}
+        />
       </div>
     </div>
   );

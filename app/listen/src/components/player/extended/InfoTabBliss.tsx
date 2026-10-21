@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Activity } from "@crate/ui/icons";
 
-import type { TrackInfo } from "@/lib/track-info";
+import type { TrackInfo } from "../../../lib/track-info-data";
 
 import { MetricBar, SectionCard } from "./InfoTabPrimitives";
 
@@ -15,7 +14,6 @@ export function InfoTabBliss({ info }: { info: TrackInfo }) {
           ? t("player.info.sections.bliss.subtitle")
           : t("player.info.sections.bliss.emptySubtitle")
       }
-      icon={Activity}
     >
       {info.bliss_signature ? (
         <>
@@ -26,12 +24,10 @@ export function InfoTabBliss({ info }: { info: TrackInfo }) {
           <MetricBar
             label={t("player.info.metric.motion")}
             value={info.bliss_signature.motion}
-            tone="accent"
           />
           <MetricBar
             label={t("player.info.metric.density")}
             value={info.bliss_signature.density}
-            tone="warm"
           />
         </>
       ) : (

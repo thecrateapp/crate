@@ -1,5 +1,5 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
@@ -148,4 +148,35 @@ describe("useTrackInfo", () => {
     expect(result.result.current.loading).toBe(false);
     expect(vi.mocked(api)).not.toHaveBeenCalled();
   });
+});
+
+it("exposes an error and allows retry without caching the failure", async () => {
+  vi.mocked(api)
+    .mockRejectedValueOnce(new Error("network"))
+    .mockResolvedValueOnce({ title: "Recovered" });
+  const { result } = renderHook(() => useTrackInfo(TEST_TRACK));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.error).toBe(true);
+  await act(async () => result.current.retry());
+  await waitFor(() => expect(result.current.info?.title).toBe("Recovered"));
+  expect(result.current.error).toBe(false);
+});
+
+it("ignores an old response after switching tracks", async () => {
+  const old = deferred<unknown>();
+  vi.mocked(api)
+    .mockReturnValueOnce(old.promise)
+    .mockResolvedValueOnce({ title: "New" });
+  const { result, rerender } = renderHook(({ track }) => useTrackInfo(track), {
+    initialProps: { track: TEST_TRACK },
+  });
+  rerender({ track: { ...TEST_TRACK, id: "43", libraryTrackId: 43 } });
+  await waitFor(() => expect(result.current.info?.title).toBe("New"));
+  await act(async () => old.resolve({ title: "Old" }));
+  expect(result.current.info?.title).toBe("New");
+});
+
+beforeEach(() => {
+  vi.mocked(api).mockReset();
+  __resetTrackInfoCacheForTests();
 });

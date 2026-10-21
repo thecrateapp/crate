@@ -102,3 +102,62 @@
     transition: none;
   }
 }
+
+/* Volume rotates the same thin beam into a vertical control. */
+.listen-player-volume-position {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transition: height var(--motion-duration-fast);
+}
+.listen-player-progress:active .listen-player-volume-position,
+.listen-player-progress:focus-within .listen-player-volume-position {
+  transition: none;
+}
+.listen-player-volume-icon {
+  opacity: calc(0.55 + var(--volume-level) * 0.45);
+  filter: drop-shadow(
+    0 0 calc(var(--volume-level) * 6px)
+      color-mix(
+        in srgb,
+        var(--accent-action) calc(var(--volume-level) * 55%),
+        transparent
+      )
+  );
+  transition:
+    opacity 150ms,
+    filter 150ms;
+}
+.listen-player-volume-icon[data-muted],
+[data-crate-effects="off"] .listen-player-volume-icon {
+  filter: none;
+}
+[data-crate-motion="reduced"] .listen-player-volume-position,
+[data-crate-motion="reduced"] .listen-player-volume-icon {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-player-volume-position,
+  .listen-player-volume-icon {
+    transition: none;
+  }
+}
+
+.listen-player-progress-glow--vertical {
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 0%, transparent) 0%,
+    color-mix(in srgb, var(--accent-action) 8%, transparent) 38%,
+    color-mix(in srgb, var(--accent-action) 28%, transparent) 78%,
+    color-mix(in srgb, var(--accent-action) 55%, var(--text-primary)) 100%
+  );
+}
+
+.listen-player-progress-fill--vertical {
+  background: linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--accent-action) 14%, transparent),
+    color-mix(in srgb, var(--accent-action) 56%, transparent),
+    color-mix(in srgb, var(--accent-action) 78%, var(--text-primary))
+  );
+}

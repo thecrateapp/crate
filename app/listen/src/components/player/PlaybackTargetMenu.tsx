@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@crate/ui/lib/cn";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { notify } from "@crate/ui/lib/notify";
 
 import {
@@ -23,8 +21,7 @@ import {
 } from "@/lib/cast-sender";
 import { onNativeOutputRouteChanged } from "@/lib/native-output-router";
 
-import { PlaybackTargetButton } from "./PlaybackTargetButton";
-import { PlaybackTargetPopover } from "./PlaybackTargetPopover";
+import { PlaybackTargetPicker } from "./PlaybackTargetPicker";
 
 interface PlaybackTargetMenuProps {
   className?: string;
@@ -44,12 +41,9 @@ export function PlaybackTargetMenu({
     null,
   );
   const [groups, setGroups] = useState<PlaybackTargetGroup[]>([]);
-  const [popoverPosition, setPopoverPosition] = useState<{
-    right: number;
-    bottom: number;
-  } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState(false);
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
+  const actionBusyRef = useRef(false);
   const targetContextRef = useRef(targetContext);
   useEffect(() => {
     targetContextRef.current = targetContext;
@@ -58,21 +52,16 @@ export function PlaybackTargetMenu({
   const activeConnectInstanceId = targetContext?.connect?.activeInstanceId;
   const connectedInstanceCount =
     targetContext?.connect?.connectedInstances.length ?? 0;
-  const activeTarget = useMemo(
-    () =>
-      groups.flatMap((group) => group.targets).find((target) => target.active),
-    [groups],
-  );
-
   const refreshTargets = useCallback(() => {
     let cancelled = false;
     setLoading(true);
+    setError(false);
     loadPlaybackTargetGroups(targetContextRef.current)
       .then((nextGroups) => {
         if (!cancelled) setGroups(nextGroups);
       })
       .catch(() => {
-        if (!cancelled) setGroups([]);
+        if (!cancelled) setError(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -87,38 +76,13 @@ export function PlaybackTargetMenu({
     refreshTargetsCleanupRef.current = refreshTargets();
   }, [refreshTargets]);
 
-  const updatePopoverPosition = useCallback(() => {
-    const button = buttonRef.current;
-    if (!button) return;
-    const rect = button.getBoundingClientRect();
-    setPopoverPosition({
-      right: Math.max(8, window.innerWidth - rect.right),
-      bottom: window.innerHeight - rect.top + 8,
-    });
-  }, []);
-
-  const close = useCallback(() => {
-    setOpen(false);
-    setPopoverPosition(null);
-    onOverlayChange?.(false);
-  }, [onOverlayChange]);
-
-  useDismissibleLayer({
-    active: open,
-    refs: [buttonRef, popoverRef],
-    onDismiss: close,
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    updatePopoverPosition();
-    window.addEventListener("resize", updatePopoverPosition);
-    window.addEventListener("scroll", updatePopoverPosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePopoverPosition);
-      window.removeEventListener("scroll", updatePopoverPosition, true);
-    };
-  }, [open, updatePopoverPosition]);
+  const handleOverlayChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      onOverlayChange?.(nextOpen);
+    },
+    [onOverlayChange],
+  );
 
   useEffect(() => {
     runRefreshTargets();
@@ -170,76 +134,77 @@ export function PlaybackTargetMenu({
   }, [open, runRefreshTargets]);
 
   const handleTarget = useCallback(
-    async (target: PlaybackTarget) => {
+    async (target: PlaybackTarget): Promise<boolean> => {
+      if (actionBusyRef.current) return false;
       if (!target.available) {
         notify.info(
           target.unavailableReason || t("player.output.unavailableToast"),
         );
-        return;
+        return false;
       }
-      const result = await selectPlaybackTarget(
-        target,
-        targetContextRef.current,
-      );
-      if (!result.ok && result.message) {
-        notify.info(result.message);
-        return;
+      actionBusyRef.current = true;
+      setPendingTargetId(target.id);
+      try {
+        const result = await selectPlaybackTarget(
+          target,
+          targetContextRef.current,
+        );
+        if (!result.ok) {
+          notify.info(result.message || t("player.output.unavailableToast"));
+          return false;
+        }
+        runRefreshTargets();
+        return true;
+      } catch {
+        notify.info(t("player.output.unavailableToast"));
+        return false;
+      } finally {
+        actionBusyRef.current = false;
+        setPendingTargetId(null);
       }
-      runRefreshTargets();
-      close();
     },
-    [close, runRefreshTargets, t],
+    [runRefreshTargets, t],
   );
-
   const handleCastAction = useCallback(
-    async (action: "disconnect" | "stop") => {
+    async (action: "disconnect" | "stop"): Promise<boolean> => {
+      if (actionBusyRef.current) return false;
+      actionBusyRef.current = true;
       setCastAction(action);
-      const result =
-        action === "disconnect"
-          ? await disconnectCastSession()
-          : await stopCastSession();
-      setCastAction(null);
-      if (!result.ok) {
-        notify.info(result.message || t("player.output.cast.actionFailed"));
-        return;
+      try {
+        const result =
+          action === "disconnect"
+            ? await disconnectCastSession()
+            : await stopCastSession();
+        if (!result.ok) {
+          notify.info(result.message || t("player.output.cast.actionFailed"));
+          return false;
+        }
+        runRefreshTargets();
+        return true;
+      } catch {
+        notify.info(t("player.output.cast.actionFailed"));
+        return false;
+      } finally {
+        actionBusyRef.current = false;
+        setCastAction(null);
       }
-      runRefreshTargets();
-      close();
     },
-    [close, runRefreshTargets, t],
+    [runRefreshTargets, t],
   );
-
-  const toggle = useCallback(() => {
-    const nextOpen = !open;
-    if (nextOpen) updatePopoverPosition();
-    setOpen(nextOpen);
-    onOverlayChange?.(nextOpen);
-  }, [onOverlayChange, open, updatePopoverPosition]);
-
   return (
     <div className={cn("flex items-center", className)}>
-      <PlaybackTargetButton
-        buttonRef={buttonRef}
-        open={open}
-        activeTarget={activeTarget}
-        onToggle={toggle}
+      <PlaybackTargetPicker
+        groups={groups}
+        loading={loading}
+        error={error}
+        pendingTargetId={pendingTargetId}
+        castAction={castAction}
+        onRetry={runRefreshTargets}
+        onOverlayChange={handleOverlayChange}
+        onTarget={handleTarget}
+        onDisconnectCast={() => handleCastAction("disconnect")}
+        onStopCast={() => handleCastAction("stop")}
       />
-
-      {open && popoverPosition
-        ? createPortal(
-            <PlaybackTargetPopover
-              popoverRef={popoverRef}
-              position={popoverPosition}
-              loading={loading}
-              castAction={castAction}
-              groups={groups}
-              onTarget={(target) => void handleTarget(target)}
-              onDisconnectCast={() => void handleCastAction("disconnect")}
-              onStopCast={() => void handleCastAction("stop")}
-            />,
-            document.body,
-          )
-        : null}
     </div>
   );
 }

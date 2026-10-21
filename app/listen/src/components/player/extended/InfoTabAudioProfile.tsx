@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { AudioLines } from "@crate/ui/icons";
 
-import type { TrackInfo } from "@/lib/track-info";
+import type { TrackInfo } from "../../../lib/track-info-data";
 
 import { MetricBar, SectionCard } from "./InfoTabPrimitives";
 
@@ -21,7 +20,6 @@ export function InfoTabAudioProfile({
           ? t("player.info.sections.audioProfile.subtitle")
           : t("player.info.sections.audioProfile.emptySubtitle")
       }
-      icon={AudioLines}
     >
       {hasAnalysis ? (
         <>
@@ -32,12 +30,10 @@ export function InfoTabAudioProfile({
           <MetricBar
             label={t("player.info.metric.danceability")}
             value={info.danceability}
-            tone="accent"
           />
           <MetricBar
             label={t("player.info.metric.valence")}
             value={info.valence}
-            tone="warm"
           />
         </>
       ) : (

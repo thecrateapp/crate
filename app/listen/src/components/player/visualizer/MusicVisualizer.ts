@@ -31,6 +31,8 @@ export class MusicVisualizer {
   private time = 0;
   private rafId = 0;
   private running = false;
+  private staticFrame = false;
+  private staticSignature = "";
   private canvas: HTMLCanvasElement;
   private width = 0;
   private height = 0;
@@ -180,9 +182,9 @@ export class MusicVisualizer {
     this.audioAnalyzer.accentTrackChange(strength);
   }
 
-  private updateTrackMorph() {
-    const ease = 0.085;
-    const colorEase = 0.065;
+  private updateTrackMorph(instant = false) {
+    const ease = instant ? 1 : 0.085;
+    const colorEase = instant ? 1 : 0.065;
 
     this.renderedSeparation = lerp(
       this.renderedSeparation,
@@ -351,11 +353,15 @@ export class MusicVisualizer {
 
   start() {
     if (this.running) return;
+    this.staticFrame = false;
+    this.staticSignature = "";
     this.running = true;
     this.tick();
   }
 
   stop() {
+    this.staticFrame = false;
+    this.staticSignature = "";
     this.running = false;
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
@@ -365,7 +371,59 @@ export class MusicVisualizer {
 
   tick() {
     if (!this.running) return;
+    this.drawFrame();
+    if (this.running) this.rafId = requestAnimationFrame(() => this.tick());
+  }
 
+  renderStaticFrame() {
+    if (!this.staticFrame) this.stop();
+    this.staticFrame = true;
+    this.invalidateFrame();
+  }
+
+  /** Repaint changed static content once; stopped/hidden and animated owners keep authority. */
+  invalidateFrame(force = false) {
+    if (
+      !this.staticFrame ||
+      document.visibilityState === "hidden" ||
+      this.canvas.clientWidth <= 0 ||
+      this.canvas.clientHeight <= 0
+    )
+      return;
+    const signature = JSON.stringify([
+      this.canvas.clientWidth,
+      this.canvas.clientHeight,
+      this.mode,
+      this.separation,
+      this.glow,
+      this.scale,
+      this.persistence,
+      this.octaves,
+      this.orbitSpeed,
+      this.cameraDrift,
+      this.cameraDepth,
+      this.pulseGain,
+      this.turbulence,
+      this.orbitPhase,
+      this.shellDensity,
+      this.beatResponse,
+      this.beatDecay,
+      this.sectionRate,
+      this.sectionDepth,
+      this.lowBandWeight,
+      this.midBandWeight,
+      this.highBandWeight,
+      this.analysisGainCompensation,
+      this.color1,
+      this.color2,
+      this.color3,
+    ]);
+    if (!force && signature === this.staticSignature) return;
+    this.staticSignature = signature;
+    this.drawFrame();
+  }
+
+  private drawFrame() {
     const g = this.resources.glCtx;
     this.time++;
 
@@ -384,7 +442,7 @@ export class MusicVisualizer {
       this.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
     }
 
-    this.updateTrackMorph();
+    this.updateTrackMorph(this.staticFrame);
     const metrics = this.readAudioMetrics();
     this.updateCamera(metrics);
 
@@ -434,8 +492,6 @@ export class MusicVisualizer {
     this.resources.renderer.render(this.resources.camera, this.resources.quad, [
       this.resources.square,
     ]);
-
-    this.rafId = requestAnimationFrame(() => this.tick());
   }
 
   destroy() {

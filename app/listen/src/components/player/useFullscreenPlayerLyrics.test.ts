@@ -18,3 +18,9 @@ describe("parseSyncedLyrics", () => {
     );
   });
 });
+
+it("parses millisecond precision without stretching a lyric timestamp", () => {
+  expect(parseSyncedLyrics("[00:01.050]First")).toEqual([
+    { time: 1.05, text: "First" },
+  ]);
+});

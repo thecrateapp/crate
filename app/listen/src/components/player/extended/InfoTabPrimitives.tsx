@@ -1,100 +1,69 @@
 import type { ReactNode } from "react";
-import { AudioLines, CRATE_ICON_SIZE, Star } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Star } from "@crate/ui/icons";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { Meter } from "@crate/ui/primitives/Meter";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
 
-import { cn } from "@/lib/utils";
-
+/** Domain adapters compose canonical foundations, without local visual recipes. */
 export function MetricBar({
   label,
   value,
-  tone = "primary",
 }: {
   label: string;
   value: number | null;
-  tone?: "primary" | "accent" | "warm";
 }) {
-  if (value == null) return null;
-
-  const percent = Math.max(0, Math.min(value, 1)) * 100;
-
+  if (value == null || !Number.isFinite(value)) return null;
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium uppercase tracking-kicker text-text-muted">
-          {label}
-        </span>
-        <span className="text-xs font-medium tabular-nums text-text-secondary">
-          {Math.round(percent)}%
-        </span>
-      </div>
-      <div className="info-tab-metric-track h-2 overflow-hidden rounded-full">
-        <div
-          className={cn(
-            "info-tab-metric-fill h-full rounded-full transition-[width]",
-          )}
-          data-tone={tone}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </div>
+    <Meter
+      label={label}
+      value={value}
+      max={1}
+      valueText={`${Math.round(Math.max(0, Math.min(value, 1)) * 100)}%`}
+    />
   );
 }
-
 export function StatCard({
   label,
   value,
   helper,
+  unit,
 }: {
   label: string;
   value: string;
   helper?: string;
+  unit?: string;
 }) {
   return (
-    <div className="info-tab-stat-card rounded-lg px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-eyebrow text-text-subtle">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-semibold tabular-nums text-text-primary">
-        {value}
-      </p>
-      {helper ? <p className="mt-1 text-xs text-text-muted">{helper}</p> : null}
+    <div className="grid min-w-0 content-start gap-2 wrap-anywhere">
+      <StatNumber size="sm" value={value} label={label} unit={unit} />
+      {helper ? <MonoLabel>{helper}</MonoLabel> : null}
     </div>
   );
 }
-
 export function SectionCard({
   title,
   subtitle,
-  icon: Icon,
   children,
 }: {
   title: string;
   subtitle?: string;
-  icon: typeof AudioLines;
   children: ReactNode;
 }) {
   return (
-    <section className="info-tab-section-card overflow-hidden rounded-panel">
-      <div className="info-tab-section-header flex items-start justify-between gap-4 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-eyebrow text-text-muted">
-            {title}
-          </p>
-          {subtitle ? (
-            <p className="mt-1 text-[0.75rem] text-text-muted">{subtitle}</p>
-          ) : null}
-        </div>
-        <div className="info-tab-section-icon rounded-full p-2 text-text-secondary">
-          <Icon size={CRATE_ICON_SIZE.md} />
-        </div>
-      </div>
-      <div className="space-y-4 p-4 ">{children}</div>
-    </section>
+    <InstrumentPanel
+      as="section"
+      headingLevel={3}
+      label={{ children: title, tone: "accent" }}
+      description={subtitle}
+    >
+      <div className="grid min-w-0 gap-4">{children}</div>
+    </InstrumentPanel>
   );
 }
-
 export function StarRating({ rating }: { rating: number }) {
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-1" aria-hidden="true">
       {[1, 2, 3, 4, 5].map((score) => (
         <Star
           key={score}

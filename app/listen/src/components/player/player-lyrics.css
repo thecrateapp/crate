@@ -6,6 +6,7 @@
   padding: 8px 4px;
   border-radius: var(--radius-md);
   text-align: left;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
   font-size: clamp(1.25rem, 3vw, 1.9rem);
   font-weight: 700;

@@ -12,7 +12,7 @@ const COMPONENT_DECLARATION =
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
 // 1BD sharing/imports retires the share row, upload clear button and native raw file copy.
-const RAW_CONTROL_BUDGET = { button: 54, input: 4, textarea: 1 };
+const RAW_CONTROL_BUDGET = { button: 48, input: 3, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":
