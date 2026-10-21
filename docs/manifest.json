@@ -180,6 +180,15 @@
     "order": 120
   },
   {
+    "sourcePath": "docs/technical/crate-operator.md",
+    "route": "/operations/independent-operator",
+    "section": "operations",
+    "title": "Independent deterministic operator",
+    "summary": "Standalone incident state, bounded job watches, fixed delivery and an external watchdog without model dependence.",
+    "keywords": ["supervisor", "incidents", "watchdog", "delivery", "Hermes"],
+    "order": 125
+  },
+  {
     "sourcePath": "docs/technical/ops-runbook.md",
     "route": "/operations/backup-and-recovery",
     "section": "operations",

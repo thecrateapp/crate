@@ -12,6 +12,30 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes independent operator delivery and human callback boundaries", async () => {
+    window.history.pushState(null, "", "/operations/independent-operator");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Independent deterministic operator",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Native human decision integration boundary",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "External watchdog" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "MCP observations" })
+        .getAttribute("href"),
+    ).toBe("/architecture/agents-and-mcp");
+  });
+
   it("publishes the exact acquisition and schedule operator flow", async () => {
     window.history.pushState(null, "", "/operations/crate-mcp-acquisition");
     render(<App />);
@@ -22,7 +46,9 @@ describe("docs app", () => {
       }),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Operator flow" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Schedule audit" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Schedule audit" }),
+    ).toBeTruthy();
   });
 
   it("publishes AI configuration with native controls and operational limits", async () => {

@@ -25,6 +25,11 @@ sources:
 
 # Operations
 
+The optional [independent deterministic operator](./crate-operator.md) documents
+standalone incident persistence, job watches, delivery retries and the external
+watchdog. Its opt-in deployment and native callback integration remain separate
+from the read-only pilot.
+
 ## Runtime responsibilities
 
 | Component     | Operational responsibility                                                |
