@@ -129,12 +129,12 @@ describe("Radar with the real cached API hook", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /Converge.*The Forum/ }),
     );
-    await screen.findByTitle("hardcore · 83%");
+    await screen.findByText("83%");
     fireEvent.click(screen.getByRole("button", { name: "Close show details" }));
     fireEvent.click(
       screen.getByRole("button", { name: /Converge.*The Forum/ }),
     );
-    await screen.findByTitle("hardcore · 83%");
+    await screen.findByText("83%");
     expect(
       vi
         .mocked(api)

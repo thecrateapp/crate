@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { CRATE_ICON_SIZE, ListMusic, Loader2, Zap } from "@crate/ui/icons";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
@@ -246,48 +247,56 @@ function JamQueueSearch(props: JamQueueSearchProps) {
               playerTracksMatch(item.track, playable),
             );
             return (
-              <button
+              <TooltipHint
+                content={
+                  alreadyQueued
+                    ? t("jam.toasts.trackAlreadyInQueue")
+                    : undefined
+                }
                 key={
                   playable.id ||
                   playable.path ||
                   `${track.artist}-${track.title}`
                 }
-                type="button"
-                onClick={() => addSearchTrackToRoom(track)}
-                disabled={alreadyQueued}
-                title={
-                  alreadyQueued
-                    ? t("jam.toasts.trackAlreadyInQueue")
-                    : undefined
-                }
-                className="jam-queue-search-item flex w-full items-center gap-3 px-3 py-2.5 text-left disabled:cursor-default disabled:opacity-45"
               >
-                {playable.albumCover ? (
-                  <CrateImage
-                    src={playable.albumCover}
-                    alt=""
-                    className="crate-media-thumbnail size-12 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 items-center justify-center rounded-lg">
-                    <ListMusic size={CRATE_ICON_SIZE.sm} />
+                <button
+                  key={
+                    playable.id ||
+                    playable.path ||
+                    `${track.artist}-${track.title}`
+                  }
+                  type="button"
+                  onClick={() => addSearchTrackToRoom(track)}
+                  disabled={alreadyQueued}
+                  className="jam-queue-search-item flex w-full items-center gap-3 px-3 py-2.5 text-left disabled:cursor-default disabled:opacity-45"
+                >
+                  {playable.albumCover ? (
+                    <CrateImage
+                      src={playable.albumCover}
+                      alt=""
+                      className="crate-media-thumbnail size-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 items-center justify-center rounded-lg">
+                      <ListMusic size={CRATE_ICON_SIZE.sm} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-text-primary">
+                      {playable.title}
+                    </div>
+                    <div className="truncate text-xs text-text-muted">
+                      {playable.artist}
+                      {playable.album ? ` · ${playable.album}` : ""}
+                    </div>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-text-primary">
-                    {playable.title}
-                  </div>
-                  <div className="truncate text-xs text-text-muted">
-                    {playable.artist}
-                    {playable.album ? ` · ${playable.album}` : ""}
-                  </div>
-                </div>
-                <span className="jam-accent-text text-xs font-medium">
-                  {canAddToQueue
-                    ? t("jam.room.addToQueue")
-                    : t("jam.room.suggestTrack")}
-                </span>
-              </button>
+                  <span className="jam-accent-text text-xs font-medium">
+                    {canAddToQueue
+                      ? t("jam.room.addToQueue")
+                      : t("jam.room.suggestTrack")}
+                  </span>
+                </button>
+              </TooltipHint>
             );
           })}
         </div>

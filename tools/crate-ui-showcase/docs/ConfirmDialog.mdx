@@ -1,0 +1,21 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ConfirmDialog.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ConfirmDialog</DocHeading>
+<EntryDetails
+  id="composites-confirmdialog"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Controlled destructive confirmation, optional typed value, cancel/confirm focus, internal or controlled pending, async failure and focus return. Confirmation is a local fixture action.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Typed} />
+<Canvas of={Stories.Failure} />

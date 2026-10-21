@@ -1,20 +1,27 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { Sparkles } from "@crate/ui/icons";
 import { InfoBadge } from "./InfoBadge";
 
 describe("InfoBadge", () => {
-  it("derives a complete title from composed text and keeps explicit titles", () => {
+  it("keeps composed and explicit detail in a custom tooltip", async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<InfoBadge>alias: {"a-long-alias"}</InfoBadge>);
-    expect(screen.getByText("alias: a-long-alias")).toHaveAttribute(
-      "title",
-      "alias: a-long-alias",
-    );
+    const badge = screen.getByText("alias: a-long-alias");
+    expect(badge).not.toHaveAttribute("title");
+    await user.hover(badge);
+    expect(
+      await screen.findByRole("tooltip", { name: "alias: a-long-alias" }),
+    ).toBeVisible();
+    await user.unhover(badge);
+    await user.keyboard("{Escape}");
     rerender(<InfoBadge title="Explicit">alias: {"a-long-alias"}</InfoBadge>);
-    expect(screen.getByText("alias: a-long-alias")).toHaveAttribute(
-      "title",
-      "Explicit",
-    );
+    expect(screen.getByText("alias: a-long-alias")).toBe(badge);
+    await user.hover(badge);
+    expect(
+      await screen.findByRole("tooltip", { name: "Explicit" }),
+    ).toBeVisible();
   });
   it("retains semantic icon color on overlay surfaces", () => {
     const { container } = render(
@@ -28,11 +35,11 @@ describe("InfoBadge", () => {
     render(<InfoBadge variant="counter">3</InfoBadge>);
     expect(screen.getByText("3")).toHaveAttribute("data-variant", "counter");
   });
-  it("exposes full long text through its title without creating a toggle", () => {
+  it("exposes full long text through its custom tooltip without creating a toggle", () => {
     const label =
       "A long metadata value that must remain available in a narrow row";
     render(<InfoBadge>{label}</InfoBadge>);
-    expect(screen.getByText(label)).toHaveAttribute("title", label);
+    expect(screen.getByText(label)).not.toHaveAttribute("title");
     expect(screen.getByText(label)).toHaveAttribute("data-slot", "info-badge");
     expect(screen.getByText(label)).not.toHaveAttribute("aria-pressed");
   });
@@ -75,9 +82,8 @@ describe("InfoBadge", () => {
       "data-surface",
       "overlay",
     );
-    expect(screen.getByLabelText("Available offline")).toHaveAttribute(
+    expect(screen.getByLabelText("Available offline")).not.toHaveAttribute(
       "title",
-      "Download complete",
     );
   });
 });

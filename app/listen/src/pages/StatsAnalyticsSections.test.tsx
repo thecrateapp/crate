@@ -117,8 +117,12 @@ describe("SoundProfileCard", () => {
       />,
     );
 
-    expect(screen.getByTitle("punk rock · 75%")).toHaveClass("genre-pill");
-    expect(screen.getByTitle("post-punk · 25%")).toBeInTheDocument();
+    expect(screen.getByText("punk rock").closest(".genre-pill")!).toHaveClass(
+      "genre-pill",
+    );
+    expect(
+      screen.getByText("post-punk").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /punk/ })).toBeNull();
   });
 

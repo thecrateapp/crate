@@ -132,7 +132,9 @@ describe("ShowCard row", () => {
       undefined,
       { revalidateIfCached: "never" },
     );
-    expect(screen.getByTitle("hardcore · 0% · enrichment")).toBeInTheDocument();
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
   });
 
   it("does not fetch or replace a percentage-bearing show profile", () => {
@@ -148,7 +150,9 @@ describe("ShowCard row", () => {
     expect(useApi).toHaveBeenLastCalledWith(null, "GET", undefined, {
       revalidateIfCached: "never",
     });
-    expect(screen.getByTitle("hardcore · 83% · manual")).toBeInTheDocument();
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
   });
 
   it("never assigns a cached profile belonging to a different artist", () => {
@@ -163,7 +167,9 @@ describe("ShowCard row", () => {
       refetch: vi.fn(),
     });
     renderWithListenProviders(<ShowCard item={item} expanded />);
-    expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.queryByText("99%")).not.toBeInTheDocument();
   });
 

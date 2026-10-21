@@ -155,51 +155,6 @@
     "kind": "row"
   },
   {
-    "path": "app/listen/src/pages/PathsParts.tsx",
-    "prefix": "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/artist/ArtistSetlistSection.tsx",
-    "prefix": "flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/home/HomeSectionCards.tsx",
-    "prefix": "group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/home/HomeSectionCards.tsx",
-    "prefix": "absolute inset-0 opacity-20 grayscale transition-opacity ",
-    "kind": "artwork-opacity"
-  },
-  {
-    "path": "app/listen/src/components/settings/LinksSection.tsx",
-    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/settings/LinksSection.tsx",
-    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/settings/LinksSection.tsx",
-    "prefix": "flex items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/settings/LinksSection.tsx",
-    "prefix": "hidden items-center gap-3 rounded-xl p-3 text-sm text-text-primary transition-colors",
-    "kind": "row"
-  },
-  {
-    "path": "app/listen/src/components/settings/LinksSection.tsx",
-    "prefix": "flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-state-danger transition-colors",
-    "kind": "row"
-  },
-  {
     "path": "app/ui/src/components/ui/EventRow.tsx",
     "prefix": "@container relative w-full min-w-0 overflow-hidden rounded-md border border-border-quiet bg-transparent",
     "kind": "row"

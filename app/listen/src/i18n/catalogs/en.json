@@ -1296,7 +1296,7 @@
   "player.equalizer.manualHelpers": "Manual helpers",
   "player.equalizer.smart.label": "Smart",
   "player.equalizer.smart.resolving": "Resolving Smart EQ…",
-  "player.equalizer.smart.waiting": "Smart EQ is waiting for a resolvable library track.",
+  "player.equalizer.smart.waiting": "No EQ curve is available for this track.",
   "player.equalizer.adaptive.label": "Adaptive",
   "player.equalizer.adaptive.loading": "Loading analysis…",
   "player.equalizer.adaptive.unavailable": "No analysis for this track — adaptive is holding flat.",
@@ -2046,5 +2046,9 @@
   "player.output.connecting": "Connecting...",
   "player.output.cast.session": "Cast session",
   "player.volume.mute": "Mute",
-  "player.visualizer.valuePair": "Saved {base}; adapted {effective}"
+  "player.visualizer.valuePair": "Saved {base}; adapted {effective}",
+  "player.equalizer.trackCurves": "Track curves",
+  "player.equalizer.currentCurveOnly": "Only the current curve is available from this server.",
+  "player.equalizer.presetPicker": "Presets",
+  "player.equalizer.preset": "Preset"
 }

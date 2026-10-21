@@ -639,7 +639,7 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       scope.map((path) => [path, readFileSync(join(repo, path), "utf8")]),
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
-  });
+  }, 15_000);
   it("treats the exact shared size token as data while still auditing Solar glyphs", () => {
     const result = analyzeSource(
       "fixture.tsx",

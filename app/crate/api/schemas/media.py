@@ -152,6 +152,14 @@ class EqFeaturesResponse(BaseModel):
     instrumentalness: float | None = None
 
 
+class EqCurveResponse(BaseModel):
+    source: str
+    gains: list[float]
+    label: str = ""
+    reasoning: str = ""
+    genre: dict[str, Any] | None = None
+
+
 class EffectiveEqResponse(BaseModel):
     trackId: int
     trackEntityUid: str | None = None

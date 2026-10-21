@@ -124,7 +124,7 @@ describe("TrackRow playback behavior", () => {
     renderWithListenProviders(<TrackRow track={track} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByTitle("Like track"));
+    await user.click(screen.getByRole("button", { name: "Like track" }));
 
     expect(screen.getByTestId("track-like-particles")).toBeInTheDocument();
     expect(screen.getByTestId("track-like-heart")).toHaveClass(
@@ -650,7 +650,9 @@ describe("TrackRow playback behavior", () => {
       expect(row).toHaveAttribute("data-density", "compact");
       expect(within(row).getByText("3")).toBeInTheDocument();
       expect(within(row).getByText("12 plays")).toBeInTheDocument();
-      expect(screen.queryByTitle("Like track")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Like track" }),
+      ).not.toBeInTheDocument();
 
       fireEvent.contextMenu(row);
       fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
@@ -743,7 +745,7 @@ it("shows supplied explicit and remote provenance without turning it into a loca
       }}
     />,
   );
-  expect(screen.getByTitle("Explicit")).toHaveTextContent("E");
+  expect(screen.getByText("E")).toHaveTextContent("E");
   expect(screen.getByText("via north.crate").firstChild).toHaveClass(
     "crate-track-source-ring",
   );

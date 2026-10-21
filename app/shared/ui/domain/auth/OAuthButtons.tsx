@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { cn } from "@crate/ui/lib/cn";
+import { Button } from "@crate/ui/shadcn/button";
 
 interface ProviderConfig {
   enabled: boolean;
@@ -107,38 +107,38 @@ export function OAuthButtons({
 
       <div className="flex items-center justify-center gap-3">
         {google?.enabled ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
+            shape="pill"
             disabled={!google.configured}
             onClick={() => handleOAuth(google)}
-            className={cn(
-              "flex h-10 w-10 items-center justify-center border border-border-quiet bg-text-primary/5 transition-colors hover:bg-text-primary/10 disabled:opacity-30 disabled:cursor-not-allowed",
-              buttonClassName,
-            )}
+            className={buttonClassName}
             aria-label={labels?.google ?? "Continue with Google"}
             title={labels?.google ?? "Continue with Google"}
           >
             <GoogleIcon className=" size-5" />
-          </button>
+          </Button>
         ) : null}
         {apple?.enabled ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
+            shape="pill"
             disabled={!apple.configured}
             onClick={() => apple.configured && handleOAuth(apple)}
-            className={cn(
-              "flex h-10 w-10 items-center justify-center border border-border-quiet bg-text-primary/5 text-text-primary transition-colors hover:bg-text-primary/10 disabled:opacity-30 disabled:cursor-not-allowed",
-              buttonClassName,
-            )}
+            className={buttonClassName}
             aria-label={labels?.apple ?? "Continue with Apple"}
             title={
               apple.configured
-                ? labels?.apple ?? "Continue with Apple"
-                : labels?.appleUnavailable ?? "Apple Sign In — coming soon"
+                ? (labels?.apple ?? "Continue with Apple")
+                : (labels?.appleUnavailable ?? "Apple Sign In — coming soon")
             }
           >
             <AppleIcon className=" size-5" />
-          </button>
+          </Button>
         ) : null}
       </div>
     </>

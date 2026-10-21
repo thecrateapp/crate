@@ -63,7 +63,7 @@ describe("Admin page header composition", () => {
       </PageHeaderActions>,
     );
     const button = screen.getByRole("button", { name: "Edit Costa de noche" });
-    expect(button).toHaveAttribute("title", "Edit");
+    expect(button).not.toHaveAttribute("title");
     await userEvent.tab();
     expect(
       await screen.findByRole("tooltip", { name: /^Edit$/ }),

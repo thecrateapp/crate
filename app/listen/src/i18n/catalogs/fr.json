@@ -1274,7 +1274,7 @@
   "player.equalizer.manualHelpers": "Aides manuelles",
   "player.equalizer.smart.label": "Intelligent",
   "player.equalizer.smart.resolving": "Résolution de l'EQ intelligente…",
-  "player.equalizer.smart.waiting": "L'EQ intelligente attend un titre de bibliothèque résoluble.",
+  "player.equalizer.smart.waiting": "Aucune courbe d’égalisation n’est disponible pour ce titre.",
   "player.equalizer.adaptive.label": "Adaptatif",
   "player.equalizer.adaptive.loading": "Chargement de l'analyse…",
   "player.equalizer.adaptive.unavailable": "Aucune analyse pour ce titre — l'adaptatif reste plat.",
@@ -2046,5 +2046,9 @@
   "player.output.connecting": "Connexion...",
   "player.output.cast.session": "Session Cast",
   "player.volume.mute": "Couper le son",
-  "player.visualizer.valuePair": "Enregistré {base} ; adapté {effective}"
+  "player.visualizer.valuePair": "Enregistré {base} ; adapté {effective}",
+  "player.equalizer.trackCurves": "Courbes du titre",
+  "player.equalizer.currentCurveOnly": "Ce serveur fournit uniquement la courbe actuelle.",
+  "player.equalizer.presetPicker": "Préréglages",
+  "player.equalizer.preset": "Préréglage"
 }

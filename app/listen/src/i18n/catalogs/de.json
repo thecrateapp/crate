@@ -1274,7 +1274,7 @@
   "player.equalizer.manualHelpers": "Manuelle Hilfen",
   "player.equalizer.smart.label": "Intelligent",
   "player.equalizer.smart.resolving": "Intelligente EQ wird aufgelöst…",
-  "player.equalizer.smart.waiting": "Die intelligente EQ wartet auf einen auflösbaren Bibliothekstitel.",
+  "player.equalizer.smart.waiting": "Für diesen Titel ist keine EQ-Kurve verfügbar.",
   "player.equalizer.adaptive.label": "Adaptiv",
   "player.equalizer.adaptive.loading": "Analyse wird geladen…",
   "player.equalizer.adaptive.unavailable": "Keine Analyse für diesen Titel — adaptiv bleibt flach.",
@@ -2046,5 +2046,9 @@
   "player.output.connecting": "Verbindung wird hergestellt...",
   "player.output.cast.session": "Cast-Sitzung",
   "player.volume.mute": "Stummschalten",
-  "player.visualizer.valuePair": "Gespeichert {base}; angepasst {effective}"
+  "player.visualizer.valuePair": "Gespeichert {base}; angepasst {effective}",
+  "player.equalizer.trackCurves": "Titelkurven",
+  "player.equalizer.currentCurveOnly": "Dieser Server stellt nur die aktuelle Kurve bereit.",
+  "player.equalizer.presetPicker": "Voreinstellungen",
+  "player.equalizer.preset": "Voreinstellung"
 }

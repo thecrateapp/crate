@@ -1296,7 +1296,7 @@
   "player.equalizer.manualHelpers": "Ayudas manuales",
   "player.equalizer.smart.label": "Inteligente",
   "player.equalizer.smart.resolving": "Resolviendo EQ inteligente…",
-  "player.equalizer.smart.waiting": "La EQ inteligente está esperando una pista resoluble de la biblioteca.",
+  "player.equalizer.smart.waiting": "No hay una curva de EQ disponible para esta pista.",
   "player.equalizer.adaptive.label": "Adaptativo",
   "player.equalizer.adaptive.loading": "Cargando análisis…",
   "player.equalizer.adaptive.unavailable": "No hay análisis para esta pista; el adaptativo se mantiene plano.",
@@ -2046,5 +2046,9 @@
   "player.output.connecting": "Conectando...",
   "player.output.cast.session": "Sesión de Cast",
   "player.volume.mute": "Silenciar",
-  "player.visualizer.valuePair": "Guardado {base}; adaptado {effective}"
+  "player.visualizer.valuePair": "Guardado {base}; adaptado {effective}",
+  "player.equalizer.trackCurves": "Curvas de la pista",
+  "player.equalizer.currentCurveOnly": "Este servidor solo proporciona la curva actual.",
+  "player.equalizer.presetPicker": "Preajustes",
+  "player.equalizer.preset": "Preajuste"
 }

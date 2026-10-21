@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createMockTrack,
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
-import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
+import { getEqualizerEnabled } from "@/lib/equalizer-prefs";
 import type { Track } from "@/contexts/player-types";
 import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
@@ -91,8 +91,8 @@ vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
 
-vi.mock("@/components/player/lazy-player-surfaces", () => ({
-  LazyEqualizerPopover: () => null,
+vi.mock("@/components/player/lazy-player-surfaces", async () => ({
+  LazyEqualizerPopover: (await import("./EqualizerPopover")).EqualizerPopover,
   LazyExtendedPlayer: () => null,
   LazyFullscreenPlayer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="fullscreen-player" /> : null,
@@ -362,7 +362,7 @@ describe("PlayerBar mobile mini-player", () => {
     expect(queueCounter).not.toHaveClass("text-xs");
   });
 
-  it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
+  it("keeps the desktop Equalizer panel and access while powered off, so it can be powered on again", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");
     const track = createMockTrack({
@@ -374,13 +374,32 @@ describe("PlayerBar mobile mini-player", () => {
       playerActions: { currentTrack: track, queue: [track] },
     });
 
-    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
-
-    setEqualizerEnabled(false);
-
-    await waitFor(() => {
-      expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    const access = screen.getByRole("button", {
+      name: "Equalizer",
     });
+    fireEvent.click(access);
+    const panel = await screen.findByRole("dialog", {
+      name: "Equalizer",
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "On" }));
+    expect(getEqualizerEnabled()).toBe(false);
+    expect(panel).toBeInTheDocument();
+    expect(access).toBeInTheDocument();
+    expect(access).toHaveAttribute("aria-pressed", "true");
+    expect(within(panel).getByRole("button", { name: "Off" })).toBeEnabled();
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Close equalizer" }),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Equalizer" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(access);
+    const reopened = await screen.findByRole("dialog", {
+      name: "Equalizer",
+    });
+    fireEvent.click(within(reopened).getByRole("button", { name: "Off" }));
+    expect(getEqualizerEnabled()).toBe(true);
+    expect(within(reopened).getByRole("button", { name: "On" })).toBeEnabled();
   });
 
   it("opens the track menu with a long press without opening fullscreen", async () => {

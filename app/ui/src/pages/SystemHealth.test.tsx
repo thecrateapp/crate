@@ -114,7 +114,7 @@ describe("SystemHealth Resources instrument", () => {
     );
     const refresh = screen.getByRole("button", { name: "Refresh metrics" });
     expect(refresh).toHaveAccessibleName("Refresh metrics");
-    expect(refresh).toHaveAttribute("title", "Refresh metrics");
+    expect(refresh).not.toHaveAttribute("title");
     expect(refresh.textContent).toBe("");
     await user.click(refresh);
     expect(refetchMock).toHaveBeenCalledOnce();

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -19,7 +20,7 @@ export const HERO_PRIMARY_ACTIONS_GROUP_CLASS =
   "grid min-w-0 max-w-full grid-cols-2 gap-3 md:flex md:flex-wrap md:items-center md:gap-3";
 
 export const HERO_PRIMARY_ACTION_CLASS =
-  "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm whitespace-normal py-2 font-semibold text-accent-action-foreground shadow-action-solid transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
+  "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full border border-accent-action bg-transparent px-5 text-sm whitespace-normal py-2 font-semibold text-accent-action transition-[color,border-color] hover:border-accent-action-hi hover:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
 
 export const HERO_NEUTRAL_ACTION_CLASS =
   "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm whitespace-normal py-2 font-semibold text-text-primary shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
@@ -122,46 +123,48 @@ function HeroActionMenuControl({
         right: "max(1rem, var(--listen-safe-right, 0px))",
       }}
     >
+      <TooltipHint content={moreLabel}>
+        <button
+          ref={controller.triggerRef}
+          type="button"
+          aria-label={moreLabel}
+          aria-haspopup="menu"
+          aria-expanded={controller.open}
+          data-testid="hero-mobile-menu-trigger"
+          onClick={controller.openFromTrigger}
+          onContextMenu={controller.handleContextMenu}
+          className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
+        >
+          <MoreHorizontal
+            size={CRATE_ICON_SIZE.navMobile}
+            className="rotate-90"
+            aria-hidden="true"
+          />
+        </button>
+      </TooltipHint>
+    </div>
+  ) : (
+    <TooltipHint content={moreLabel}>
       <button
         ref={controller.triggerRef}
         type="button"
         aria-label={moreLabel}
-        title={moreLabel}
         aria-haspopup="menu"
         aria-expanded={controller.open}
-        data-testid="hero-mobile-menu-trigger"
+        data-testid="hero-menu-trigger"
         onClick={controller.openFromTrigger}
         onContextMenu={controller.handleContextMenu}
-        className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
+        className={HERO_SECONDARY_ACTION_CLASS}
       >
-        <MoreHorizontal
-          size={CRATE_ICON_SIZE.navMobile}
-          className="rotate-90"
-          aria-hidden="true"
-        />
+        <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
+        <MonoLabel
+          as="span"
+          className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+        >
+          {moreLabel}
+        </MonoLabel>
       </button>
-    </div>
-  ) : (
-    <button
-      ref={controller.triggerRef}
-      type="button"
-      aria-label={moreLabel}
-      title={moreLabel}
-      aria-haspopup="menu"
-      aria-expanded={controller.open}
-      data-testid="hero-menu-trigger"
-      onClick={controller.openFromTrigger}
-      onContextMenu={controller.handleContextMenu}
-      className={HERO_SECONDARY_ACTION_CLASS}
-    >
-      <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
-      <MonoLabel
-        as="span"
-        className="max-w-full whitespace-normal wrap-anywhere text-inherit"
-      >
-        {moreLabel}
-      </MonoLabel>
-    </button>
+    </TooltipHint>
   );
 
   return (
@@ -266,30 +269,31 @@ export function HeroActionBar({
         >
           {secondaryLeading}
           {secondaryActions.map((action) => (
-            <button
-              key={action.key}
-              type="button"
-              onClick={action.onClick}
-              disabled={action.disabled}
-              aria-label={action.ariaLabel}
-              aria-pressed={
-                action.active === undefined ? undefined : action.active
-              }
-              title={action.title}
-              className={cn(
-                HERO_SECONDARY_ACTION_CLASS,
-                action.active && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
-                action.className,
-              )}
-            >
-              {action.icon}
-              <MonoLabel
-                as="span"
-                className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+            <TooltipHint content={action.title} key={action.key}>
+              <button
+                key={action.key}
+                type="button"
+                onClick={action.onClick}
+                disabled={action.disabled}
+                aria-label={action.ariaLabel}
+                aria-pressed={
+                  action.active === undefined ? undefined : action.active
+                }
+                className={cn(
+                  HERO_SECONDARY_ACTION_CLASS,
+                  action.active && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+                  action.className,
+                )}
               >
-                {action.label}
-              </MonoLabel>
-            </button>
+                {action.icon}
+                <MonoLabel
+                  as="span"
+                  className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+                >
+                  {action.label}
+                </MonoLabel>
+              </button>
+            </TooltipHint>
           ))}
           {secondaryExtra}
           {menu ? (

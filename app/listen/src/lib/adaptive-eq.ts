@@ -1,5 +1,5 @@
-import { EQ_BAND_COUNT, type EqGains } from "@/lib/equalizer";
-import type { EqFeatures } from "@/hooks/use-eq-features";
+import { EQ_BAND_COUNT, type EqGains } from "./equalizer";
+import type { EqFeatures } from "./equalizer-types";
 
 /**
  * Translate the analysis-pipeline features of a track into a per-band

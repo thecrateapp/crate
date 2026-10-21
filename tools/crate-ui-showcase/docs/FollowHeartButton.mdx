@@ -1,0 +1,27 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/FollowHeartButton.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">FollowHeartButton</DocHeading>
+<EntryDetails
+  id="primitives-followheartbutton"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Controlled follow/like action with accessible pressed state and alternate label. Pending/disabled prevent repeated activation. Existing particle and heart effects obey the shared motion CSS; callers retain persistence and labels.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Loading} />
+<Canvas of={Stories.Disabled} />
+
+<DocHeading as="h2">Custom tooltip amendment</DocHeading>
+
+Legacy title hints use the shared Tooltip, never a browser tooltip. Contextual accessible names, refs, handlers and disabled/loading semantics stay with the original native control. An existing outer Tooltip retains ownership without duplication.
+
+Icon-only compatibility controls that previously relied on a title retain that name through aria-label; named text actions keep their visible label. The title metadata is exclusively a custom hint.

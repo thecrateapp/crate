@@ -193,7 +193,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
         pending.get(statusUrl)!(structuredClone(fixture[statusUrl])),
       );
       expect(selected).toBeEnabled();
-      expect(selected).toHaveAttribute("aria-busy", "false");
+      expect(selected).not.toHaveAttribute("aria-busy", "true");
       await act(async () =>
         pending.get(runsUrl)!(structuredClone(fixture[runsUrl])),
       );

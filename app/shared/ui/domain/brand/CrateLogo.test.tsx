@@ -40,6 +40,8 @@ describe("CrateLogo", () => {
     );
     const logo = container.querySelector("svg")!;
 
+    expect(logo).toHaveAccessibleName("Static Crate");
+    expect(logo.querySelector("title")).toBeNull();
     expect(logo).toHaveAttribute("data-crate-logo-effects", "off");
     expect(logo).toHaveAttribute("data-crate-logo-motion", "reduced");
     expect(container.querySelector("linearGradient stop")).toHaveAttribute(

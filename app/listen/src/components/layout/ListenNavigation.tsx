@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import {
   useEffect,
   useId,
@@ -12,6 +13,7 @@ import { VtNavLink } from "@crate/ui/primitives/VtNavLink";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import {
   ChevronRight,
@@ -47,7 +49,9 @@ function CollectionLinks({
             onClick={onSelect}
           >
             {item.icon}
-            <span>{item.label}</span>
+            <MonoLabel as="span" className="text-inherit">
+              {item.label}
+            </MonoLabel>
           </Link>
         </li>
       ))}
@@ -126,18 +130,25 @@ export function SidebarNavigationView({
     <>
       <nav aria-label={collectionLabel} className={expanded ? "px-3" : "px-1"}>
         {items.map((item) => (
-          <VtNavLink
+          <TooltipHint
             key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            title={item.label}
-            aria-label={item.label}
-            className="listen-nav-item"
-            data-collapsed={!expanded || undefined}
+            content={!expanded ? item.label : undefined}
           >
-            {item.icon}
-            {expanded && <span>{item.label}</span>}
-          </VtNavLink>
+            <VtNavLink
+              to={item.to}
+              end={item.to === "/"}
+              aria-label={item.label}
+              className="listen-nav-item"
+              data-collapsed={!expanded || undefined}
+            >
+              {item.icon}
+              {expanded && (
+                <MonoLabel as="span" className="text-inherit">
+                  {item.label}
+                </MonoLabel>
+              )}
+            </VtNavLink>
+          </TooltipHint>
         ))}
         <button
           ref={trigger}
@@ -155,7 +166,9 @@ export function SidebarNavigationView({
           <Collection size={CRATE_ICON_SIZE.navMobile} />
           {expanded && (
             <>
-              <span className="flex-1 text-left">{collectionLabel}</span>
+              <MonoLabel as="span" className="flex-1 text-left text-inherit">
+                {collectionLabel}
+              </MonoLabel>
               <ChevronRight
                 size={CRATE_ICON_SIZE.sm}
                 className={open ? "rotate-90" : undefined}

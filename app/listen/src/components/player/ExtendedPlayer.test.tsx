@@ -245,12 +245,14 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Equalizer" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByText("Now playing", { exact: true }),
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText("Equalizer"));
-    expect(screen.getByLabelText("Equalizer")).toHaveAttribute(
+    await userEvent.click(screen.getByRole("button", { name: "Equalizer" }));
+    expect(screen.getByRole("button", { name: "Equalizer" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -279,7 +281,9 @@ describe("ExtendedPlayer", () => {
     );
 
     const closeButton = screen.getByLabelText("Close player");
-    const equalizerButton = screen.getByLabelText("Equalizer");
+    const equalizerButton = screen.getByRole("button", {
+      name: "Equalizer",
+    });
     const visualizerSettingsButton = screen.getByRole("button", {
       name: "Visualizer settings",
     });

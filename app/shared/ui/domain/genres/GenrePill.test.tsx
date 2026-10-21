@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
@@ -51,11 +52,9 @@ describe("GenrePill", () => {
   it("uses chip typography with a tabular percentage instead of a nested badge", () => {
     render(<GenrePill item={{ name: "Hardcore punk", percent: 42 }} />);
 
-    expect(screen.getByTitle("Hardcore punk · 42%")).toHaveClass(
-      "font-mono",
-      "text-filter-chip",
-      "tracking-chip",
-    );
+    expect(
+      screen.getByText("hardcore punk").closest(".genre-pill")!,
+    ).toHaveClass("font-mono", "text-filter-chip", "tracking-chip");
     const percent = screen.getByText("42%");
     expect(percent).toHaveAttribute("data-slot", "genre-percent");
     expect(percent).toHaveClass("tabular-nums");
@@ -66,7 +65,7 @@ describe("GenrePill", () => {
   it("renders the name in primary text and keeps the percentage accented", () => {
     render(<GenrePill item={{ name: "Shoegaze", share: 0.314 }} />);
 
-    const pill = screen.getByTitle("Shoegaze · 31%");
+    const pill = screen.getByText("shoegaze").closest(".genre-pill")!;
     expect(pill).toHaveAttribute("data-slot", "chip");
     expect(pill).toHaveClass("genre-pill", "rounded-full", "border");
     expect(pill.className).not.toContain("--active-text");
@@ -106,7 +105,7 @@ describe("GenrePill", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("keeps source provenance in the tooltip without changing the percentage", () => {
+  it("keeps source provenance in the tooltip without changing the percentage", async () => {
     render(
       <GenrePill
         item={{
@@ -118,14 +117,23 @@ describe("GenrePill", () => {
       />,
     );
 
-    expect(screen.getByTitle("Shoegaze · 37.5% · musicbrainz")).toBeVisible();
+    await userEvent.hover(screen.getByText("shoegaze"));
+    expect(
+      await screen.findByRole("tooltip", {
+        name: "Shoegaze · 37.5% · musicbrainz",
+      }),
+    ).toBeVisible();
     expect(screen.getByText("37.5%")).toBeVisible();
   });
 
-  it("includes provenance without inventing a percentage for a source-only genre", () => {
+  it("includes provenance without inventing a percentage for a source-only genre", async () => {
     render(<GenrePill item={{ name: "Ambient", source: "manual" }} />);
 
-    expect(screen.getByTitle("Ambient · manual")).toBeVisible();
+    expect(screen.getByText("ambient").closest(".genre-pill")!).toBeVisible();
+    await userEvent.hover(screen.getByText("ambient"));
+    expect(
+      await screen.findByRole("tooltip", { name: "Ambient · manual" }),
+    ).toBeVisible();
   });
 
   it("keeps genre navigation and removal as independent accessible buttons", () => {
@@ -171,7 +179,9 @@ describe("GenrePill", () => {
   it("preserves custom layout classes", () => {
     render(<GenrePill item={{ name: "Ambient" }} className="max-w-xs" />);
 
-    expect(screen.getByTitle("Ambient")).toHaveClass("max-w-xs");
+    expect(screen.getByText("ambient").closest(".genre-pill")!).toHaveClass(
+      "max-w-xs",
+    );
   });
 });
 
@@ -194,10 +204,12 @@ describe("GenrePillRow", () => {
     expect(
       Array.from(
         container.querySelectorAll<HTMLElement>(".genre-pill"),
-        (pill) => pill.title,
+        (pill) => pill.textContent,
       ),
     ).toEqual(
-      items.slice(0, 6).map((item) => `${item.name} · ${item.percent}%`),
+      items
+        .slice(0, 6)
+        .map((item) => `${item.name.toLowerCase()} ${item.percent}%`),
     );
     expect(screen.queryByText("genre 7")).not.toBeInTheDocument();
   });

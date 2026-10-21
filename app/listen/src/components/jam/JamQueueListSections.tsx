@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { type ReactNode } from "react";
 import {
   ArrowDown,
@@ -54,16 +55,17 @@ function SortableJamQueueItem({
       }}
       className={jamQueueItemClassName}
     >
-      <button
-        type="button"
-        aria-label={dragLabel}
-        title={dragLabel}
-        className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={CRATE_ICON_SIZE.sm} />
-      </button>
+      <TooltipHint content={dragLabel}>
+        <button
+          type="button"
+          aria-label={dragLabel}
+          className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={CRATE_ICON_SIZE.sm} />
+        </button>
+      </TooltipHint>
       {children}
     </div>
   );

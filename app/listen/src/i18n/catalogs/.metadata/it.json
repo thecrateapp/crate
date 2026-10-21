@@ -3807,6 +3807,10 @@
     "sourceHash": "sha256:91a3607ccef343ab769f01216978c85f166bdc45e61eb619dc1ea83a8a380838",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "player.equalizer.currentCurveOnly": {
+    "sourceHash": "sha256:7200d80b5f5856cdcca6f03279c39230b2b0f6df1fc4301823fdae1463fd3bfa",
+    "reviewedAt": "2026-10-21T07:55:23.905Z"
+  },
   "player.equalizer.custom": {
     "sourceHash": "sha256:fc4998f1e19b0160d0160bf1a60d203415898acf701df5624d777317b39c4c65",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -3850,6 +3854,14 @@
   "player.equalizer.manualHelpers": {
     "sourceHash": "sha256:625968baeda2c53e90184b6500f1f8e33e40ad6a50da3107fffde085817311be",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.equalizer.preset": {
+    "sourceHash": "sha256:dbc6e405faf45f79fdba885e4416a329a1b518c4ac071c66062d1a267fd72fb6",
+    "reviewedAt": "2026-10-21T10:20:11.140Z"
+  },
+  "player.equalizer.presetPicker": {
+    "sourceHash": "sha256:a5811669c43c15b6679e493f7dbf2a0282ee4cb25c3f69e98201031d27104d8a",
+    "reviewedAt": "2026-10-21T08:02:46.694Z"
   },
   "player.equalizer.presets.acoustic": {
     "sourceHash": "sha256:a737cf668a1e72e879d500f00899293c454e74db357207e0b24f01b8feb4aeb3",
@@ -3952,8 +3964,8 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "player.equalizer.smart.waiting": {
-    "sourceHash": "sha256:7beab329980a07d58b4f8e3e60c7fdcd0595b571bf5947105fb8ddd16e5b42bb",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:7d785c28b68dcdf3f1d4475286a56047555a6334b1dfd76cb2bc02d5e2aa4d9a",
+    "reviewedAt": "2026-10-21T10:03:47.885285Z"
   },
   "player.equalizer.smartCurve": {
     "sourceHash": "sha256:6dafc64647812a1a24b4515ac7e17711dba055b00f7d09967c25dc7ce0baf073",
@@ -4006,6 +4018,10 @@
   "player.equalizer.track": {
     "sourceHash": "sha256:d29a235aeaf844c107d5f988a0b8143efa4d1b1f94cbac9830ebbd00e010e087",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.equalizer.trackCurves": {
+    "sourceHash": "sha256:7b4061074351debe75fc7cd00f8d54cc4b6404a3735609f8d35f51a1b19d375a",
+    "reviewedAt": "2026-10-21T07:55:23.905Z"
   },
   "player.expand": {
     "sourceHash": "sha256:96150defeda5effede815c603dba844a44f18399a7639c66d59d81dbd63820da",

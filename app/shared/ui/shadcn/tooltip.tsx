@@ -16,10 +16,17 @@ function TooltipProvider({
   );
 }
 
+const InsideTooltip = React.createContext(false);
+
 function Tooltip({
+  children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
+  return (
+    <TooltipPrimitive.Root data-slot="tooltip" {...props}>
+      <InsideTooltip.Provider value={true}>{children}</InsideTooltip.Provider>
+    </TooltipPrimitive.Root>
+  );
 }
 
 function TooltipTrigger({
@@ -52,3 +59,33 @@ function TooltipContent({
 }
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+
+/** Legacy title metadata uses our tooltip, never a browser tooltip. An outer
+ * Tooltip already owns the description, so nested controls do not create a second one. */
+function TooltipHint({
+  content,
+  children,
+}: {
+  content?: React.ReactNode;
+  children: React.ReactElement;
+}) {
+  const inside = React.useContext(InsideTooltip);
+  const [open, setOpen] = React.useState(false);
+  if (inside) return children;
+  return (
+    <TooltipProvider>
+      <Tooltip
+        open={Boolean(content) && open}
+        onOpenChange={(next) => setOpen(Boolean(content) && next)}
+      >
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        {content ? (
+          <TooltipContent side="top" onEscapeKeyDown={() => setOpen(false)}>
+            {content}
+          </TooltipContent>
+        ) : null}
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+export { TooltipHint };

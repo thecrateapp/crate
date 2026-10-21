@@ -154,7 +154,9 @@ describe("Upcoming event presentation", () => {
         variant="feature"
       />,
     );
-    expect(screen.getByTitle("Hardcore · 0% · tags")).toHaveClass("genre-pill");
+    expect(screen.getByText("hardcore").closest(".genre-pill")!).toHaveClass(
+      "genre-pill",
+    );
     expect(screen.getAllByText("0%")).toHaveLength(2);
   });
 });

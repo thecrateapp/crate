@@ -12,6 +12,8 @@ type Control = {
 };
 
 const DYNAMIC_SELECTS: Record<string, string> = {
+  "app/listen/src/components/settings/SettingsPrimitives.tsx:Select:value":
+    "Existing1BD typed scalar Settings form adapter; callers inject their approved choices. This extraction adds no control.",
   "app/listen/src/components/settings/SleepTimerView.tsx:Select:value":
     "Existing1AZ SleepTimer presentation extracted from controller; typed timer preset choices, no added control.",
   "app/listen/src/pages/LibraryCollectionSortDropdown.tsx:Select:selected.value":

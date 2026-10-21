@@ -170,12 +170,14 @@ describe("ProfileHoverCard", () => {
     fireEvent.pointerEnter(screen.getByText("@jane").parentElement!);
     await screen.findByText("Jane");
 
-    fireEvent.click(screen.getByTitle("Follow"));
+    fireEvent.click(screen.getByRole("button", { name: "Follow" }));
 
     await waitFor(() => {
       expect(mockApi).toHaveBeenCalledWith("/api/users/7/follow", "POST");
     });
-    expect(await screen.findByTitle("Following")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Following" }),
+    ).toBeInTheDocument();
   });
 
   it("does not offer follow on the signed-in user's hover card", async () => {

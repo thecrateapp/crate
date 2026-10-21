@@ -636,3 +636,11 @@ first section. Do not hide these rules with CSS selectors or change InstrumentPa
 The Storybook/standalone Settings scene uses the same props and preserves separators inside
 Account and Connections. Browser checks measure the border in all five tabs and both Connect
 feature states at375/1200px.
+
+## Listen web closure checkpoint
+
+Reviews/1BE/Listen web closure and the matching 5186 review share WebClosureReview.
+System/Listen web closure provides the same Coverage evidence without a second scene.
+See [scope, evidence and follow-up](./LISTEN_WEB_CLOSURE.md). Active Listen contracts are
+documented; the remaining 15 global entries retain their explicit Admin/gated/unreferenced
+classification. Native-device certification remains separate.

@@ -181,7 +181,9 @@ describe("Shows page", () => {
       "href",
       expect.stringContaining("maps"),
     );
-    expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
   });
 
   it("keeps release rows focused on date, countdown, and album access", () => {

@@ -50,7 +50,7 @@ describe("OAuthButtons", () => {
       await screen.findByLabelText("Continuar con Google"),
     ).toBeInTheDocument();
     expect(
-      await screen.findByTitle("Inicio de sesión con Apple - próximamente"),
+      await screen.findByRole("button", { name: "Continuar con Apple" }),
     ).toBeInTheDocument();
   });
 });

@@ -575,7 +575,7 @@ describe("ContextMenu", () => {
       }
     });
 
-    expect(longText).toHaveAttribute("title", longLabel);
+    expect(longText).not.toHaveAttribute("title");
   });
 
   it("wraps long labels to two lines and exposes the full label when clamped", () => {
@@ -599,7 +599,7 @@ describe("ContextMenu", () => {
     Object.defineProperty(longText, "scrollHeight", { value: 60 });
     Object.defineProperty(longText, "clientHeight", { value: 40 });
     fireEvent.pointerEnter(longText);
-    expect(longText).toHaveAttribute("title", longLabel);
+    expect(longText).not.toHaveAttribute("title");
 
     const shortText = screen.getByText("Play now");
     fireEvent.pointerEnter(shortText);

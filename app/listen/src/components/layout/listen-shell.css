@@ -7,9 +7,6 @@
   min-height: 44px;
   padding: 8px 12px;
   color: var(--text-subtle);
-  font-family: var(--font-brand), sans-serif;
-  font-size: 14px;
-  line-height: 20px;
   transition: color 200ms var(--ease-snap);
 }
 .listen-nav-item[data-collapsed] {
@@ -17,11 +14,11 @@
   padding-inline: 0;
   min-width: 44px;
 }
-.listen-nav-item:hover {
-  color: var(--text-primary);
-}
 .listen-nav-item:is([aria-current="page"], [data-active="true"]) {
   color: var(--text-primary);
+}
+.listen-nav-item:is(:hover, :focus-visible) {
+  color: var(--accent-action-hi);
 }
 .listen-nav-item::before {
   content: "";

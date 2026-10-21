@@ -116,3 +116,26 @@ describe("ActionIconLink", () => {
     expect(screen.getByRole("link")).toHaveAttribute("href", "#");
   });
 });
+
+it("renders contextual hints without native titles on buttons and links", async () => {
+  const { container } = render(
+    <>
+      <ActionIconButton title="Edit album" aria-label="Edit">
+        <svg />
+      </ActionIconButton>
+      <ActionIconLink href="#album" title="Open album" aria-label="Open">
+        <svg />
+      </ActionIconLink>
+    </>,
+  );
+  expect(container.querySelector("[title]")).toBeNull();
+  await userEvent.tab();
+  expect(
+    await screen.findByRole("tooltip", { name: "Edit album" }),
+  ).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await userEvent.tab();
+  expect(
+    await screen.findByRole("tooltip", { name: "Open album" }),
+  ).toBeVisible();
+});

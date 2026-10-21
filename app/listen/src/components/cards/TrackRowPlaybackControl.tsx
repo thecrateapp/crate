@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useId, type MouseEvent, type ReactNode } from "react";
 import { Play, Pause, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
@@ -118,42 +119,43 @@ export function TrackRowPlaybackControl({
 }) {
   const Icon = isActive && isPlaying ? Pause : Play;
   return (
-    <button
-      type="button"
-      className={cn(
-        "crate-track-leading shrink-0",
-        isActive && "crate-track-leading-active",
-        artwork != null && "crate-track-leading-artwork",
-      )}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {artwork}
-      {!isActive && artwork == null ? (
-        <span aria-hidden="true" className="crate-track-index">
-          {index}
-        </span>
-      ) : null}
-      {!disabled ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "crate-track-glyph",
-            isActive && activeGlyph && "crate-track-glyph-progress",
-          )}
-        >
-          {isActive && activeGlyph ? (
-            activeGlyph
-          ) : (
-            <Icon
-              size={artwork != null ? CRATE_ICON_SIZE.md : CRATE_ICON_SIZE.sm}
-              fill="currentColor"
-            />
-          )}
-        </span>
-      ) : null}
-    </button>
+    <TooltipHint content={label}>
+      <button
+        type="button"
+        className={cn(
+          "crate-track-leading shrink-0",
+          isActive && "crate-track-leading-active",
+          artwork != null && "crate-track-leading-artwork",
+        )}
+        aria-label={label}
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {artwork}
+        {!isActive && artwork == null ? (
+          <span aria-hidden="true" className="crate-track-index">
+            {index}
+          </span>
+        ) : null}
+        {!disabled ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "crate-track-glyph",
+              isActive && activeGlyph && "crate-track-glyph-progress",
+            )}
+          >
+            {isActive && activeGlyph ? (
+              activeGlyph
+            ) : (
+              <Icon
+                size={artwork != null ? CRATE_ICON_SIZE.md : CRATE_ICON_SIZE.sm}
+                fill="currentColor"
+              />
+            )}
+          </span>
+        ) : null}
+      </button>
+    </TooltipHint>
   );
 }

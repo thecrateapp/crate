@@ -33,7 +33,7 @@ describe("Upcoming bounded icon retirement", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Clear caches" }),
-    ).toHaveAttribute("title", "Clear caches");
+    ).not.toHaveAttribute("title");
     expect(
       screen.getByRole("button", { name: "Download release" }),
     ).toHaveTextContent("");

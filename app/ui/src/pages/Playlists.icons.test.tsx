@@ -146,7 +146,7 @@ describe("System Playlists reviewed rendering and contracts", () => {
       const button = screen.getByRole("button", { name });
       expect(button).toHaveAttribute("data-size", "icon-lg");
       expect(button).toHaveAttribute("data-variant", "ghost");
-      expect(button).toHaveAttribute("title", name.split(" ")[0]);
+      expect(button).not.toHaveAttribute("title");
       expect(button.textContent).toBe("");
       expect(button.querySelector("svg")).toHaveAttribute(
         "aria-hidden",

@@ -47,6 +47,19 @@ function scrollWindowTo(y: number) {
 }
 
 describe("Shell", () => {
+  it("uses uppercase MonoLabel for primary and Collection sidebar destinations", () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library?tab=artists" });
+    const nav = screen.getByRole("navigation", { name: "Collection" });
+    for (const label of ["Music", "Artists", "Albums", "Collection"]) {
+      expect(within(nav).getByText(label)).toHaveClass(
+        "crate-mono-label",
+        "uppercase",
+        "font-mono",
+        "text-inherit",
+      );
+    }
+  });
   it("uses the same navigation item recipe for Collection children and first-level destinations", async () => {
     viewportState.isDesktop = true;
     renderWithListenProviders(<Shell />, { route: "/library?tab=artists" });
@@ -141,7 +154,9 @@ describe("Shell", () => {
     expect(screen.getByRole("link", { name: /Albums/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /Crates/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /Liked tracks/i })).toBeVisible();
-    expect(screen.getByRole("link", { name: /Bandcamp/i })).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: /Bandcamp/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Contributions/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /Playlists/i })).not.toHaveClass(
       "rounded-2xl",
@@ -162,7 +177,6 @@ describe("Shell", () => {
       "Playlists",
       "Albums",
       "Liked tracks",
-      "Bandcamp",
       "Contributions",
     ]);
   });

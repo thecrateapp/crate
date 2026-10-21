@@ -1,10 +1,11 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Track } from "@/contexts/player-types";
 import { EQ_PRESETS } from "@/lib/equalizer";
 import {
   setEqualizerEnabled,
+  applyEqualizerPreset,
   setEqualizerGenreAdaptive,
 } from "@/lib/equalizer-prefs";
 import { useEqualizerRuntime } from "./use-equalizer-runtime";
@@ -103,5 +104,22 @@ describe("useEqualizerRuntime", () => {
         EQ_PRESETS.jazz,
       );
     });
+  });
+  it("bypasses processing on OFF and restores the saved curve on ON", async () => {
+    const { setEqualizer } = await import("@/lib/gapless-player");
+    applyEqualizerPreset("rock");
+    setEqualizerEnabled(true);
+    renderHook(() => useEqualizerRuntime(undefined));
+    await waitFor(() =>
+      expect(setEqualizer).toHaveBeenLastCalledWith(true, EQ_PRESETS.rock),
+    );
+    act(() => setEqualizerEnabled(false));
+    await waitFor(() =>
+      expect(setEqualizer).toHaveBeenLastCalledWith(false, EQ_PRESETS.rock),
+    );
+    act(() => setEqualizerEnabled(true));
+    await waitFor(() =>
+      expect(setEqualizer).toHaveBeenLastCalledWith(true, EQ_PRESETS.rock),
+    );
   });
 });

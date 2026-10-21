@@ -1274,7 +1274,7 @@
   "player.equalizer.manualHelpers": "Ajudes manuals",
   "player.equalizer.smart.label": "Intel·ligent",
   "player.equalizer.smart.resolving": "Resolent EQ intel·ligent…",
-  "player.equalizer.smart.waiting": "L'EQ intel·ligent espera una pista resoluble de la biblioteca.",
+  "player.equalizer.smart.waiting": "No hi ha cap corba d’EQ disponible per a aquesta pista.",
   "player.equalizer.adaptive.label": "Adaptatiu",
   "player.equalizer.adaptive.loading": "Carregant anàlisi…",
   "player.equalizer.adaptive.unavailable": "No hi ha anàlisi per a aquesta pista — l'adaptatiu es manté pla.",
@@ -2046,5 +2046,9 @@
   "player.output.connecting": "Connectant...",
   "player.output.cast.session": "Sessió de Cast",
   "player.volume.mute": "Silenciar",
-  "player.visualizer.valuePair": "Desat {base}; adaptat {effective}"
+  "player.visualizer.valuePair": "Desat {base}; adaptat {effective}",
+  "player.equalizer.trackCurves": "Corbes de la pista",
+  "player.equalizer.currentCurveOnly": "Aquest servidor només proporciona la corba actual.",
+  "player.equalizer.presetPicker": "Preajustos",
+  "player.equalizer.preset": "Preajust"
 }

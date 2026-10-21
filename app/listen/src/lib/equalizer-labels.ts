@@ -1,5 +1,5 @@
-import type { EffectiveEq } from "@/hooks/use-effective-eq";
-import type { EqPresetName } from "@/lib/equalizer";
+import type { EffectiveEq } from "./equalizer-types";
+import type { EqPresetName } from "./equalizer";
 
 export const EQ_PRESET_LABEL_KEYS: Record<EqPresetName, string> = {
   flat: "player.equalizer.presets.flat",

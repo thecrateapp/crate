@@ -76,7 +76,9 @@ describe("SearchResults", () => {
     expect(surface).toBeNull();
     await user.type(input, "Converge");
     expect(screen.getByRole("button", { name: "Search" })).toHaveClass(
-      "shadow-action",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
@@ -190,7 +192,9 @@ describe("SearchResults", () => {
     await waitFor(() => {
       expect(screen.getByText("Travel by Telephone")).toBeInTheDocument();
     });
-    expect(screen.getByTitle("Play Travel by Telephone")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play Travel by Telephone" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Remote")).not.toBeInTheDocument();
   });
 

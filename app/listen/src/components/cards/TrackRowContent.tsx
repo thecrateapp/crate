@@ -76,9 +76,7 @@ export function TrackRowContent({
             <span className="crate-track-analysis">
               <span className="crate-track-bpm">{tempo}</span>
               <span aria-hidden="true">{tempo && musicalKey ? "·" : null}</span>
-              <span className="crate-track-key" title={musicalKey ?? undefined}>
-                {musicalKey}
-              </span>
+              <span className="crate-track-key">{musicalKey}</span>
             </span>
           ) : null}
         </div>

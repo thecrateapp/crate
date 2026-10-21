@@ -25,6 +25,7 @@ import { cn } from "@crate/ui/lib/cn";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { MobileActionSheet } from "./MobileActionSheet";
 import type {
   ContextMenuEntry,
@@ -100,44 +101,43 @@ const DEFAULT_SURFACE_CLASS_NAME = "crate-overlay-surface";
 const MENU_ITEM_FOCUS_CLASS_NAME = "crate-focus-inset";
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
 
-function syncClampedLabelTitle(element: HTMLElement, label: string) {
-  const clamped =
+function isClampedLabel(element: HTMLElement) {
+  return (
     element.scrollHeight > element.clientHeight ||
-    element.scrollWidth > element.clientWidth;
-  if (clamped) element.title = label;
-  else element.removeAttribute("title");
+    element.scrollWidth > element.clientWidth
+  );
 }
 
 function ContextMenuItemLabel({ label }: { label: string }) {
   const labelRef = useRef<HTMLSpanElement>(null);
-
+  const [clamped, setClamped] = useState(false);
   useLayoutEffect(() => {
     const element = labelRef.current?.querySelector<HTMLElement>(
       '[data-slot="context-menu-item-label"]',
     );
     if (!element) return;
-    syncClampedLabelTitle(element, label);
+    const measure = () => setClamped(isClampedLabel(element));
+    measure();
     if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() =>
-      syncClampedLabelTitle(element, label),
-    );
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
   }, [label]);
-
   return (
-    <span ref={labelRef} className="min-w-0">
-      <MonoLabel
-        as="span"
-        data-slot="context-menu-item-label"
-        className="line-clamp-2 min-w-0 break-words text-inherit"
-        onPointerEnter={(event) =>
-          syncClampedLabelTitle(event.currentTarget, label)
-        }
-      >
-        {label}
-      </MonoLabel>
-    </span>
+    <TooltipHint content={clamped ? label : undefined}>
+      <span ref={labelRef} className="min-w-0">
+        <MonoLabel
+          as="span"
+          data-slot="context-menu-item-label"
+          className="line-clamp-2 min-w-0 break-words text-inherit"
+          onPointerEnter={(event) =>
+            setClamped(isClampedLabel(event.currentTarget))
+          }
+        >
+          {label}
+        </MonoLabel>
+      </span>
+    </TooltipHint>
   );
 }
 

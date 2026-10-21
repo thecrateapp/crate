@@ -12,7 +12,7 @@ describe("IconButton", () => {
       </IconButton>,
     );
     const button = screen.getByRole("button", { name: "Shuffle" });
-    expect(button).toHaveAttribute("title", "Shuffle");
+    expect(button).not.toHaveAttribute("title");
     expect(button).toHaveAttribute("type", "button");
   });
 
@@ -22,10 +22,7 @@ describe("IconButton", () => {
         <svg />
       </IconButton>,
     );
-    expect(screen.getByRole("button")).toHaveAttribute(
-      "title",
-      "Shuffle queue",
-    );
+    expect(screen.getByRole("button")).not.toHaveAttribute("title");
   });
 
   it("applies sizes and the coarse-pointer hit area", () => {

@@ -27,7 +27,7 @@ describe("Contributions text and real contracts", () => {
     const refresh = screen.getByRole("button", { name: "Refresh" });
     expect(refresh).toHaveAttribute("data-size", "icon-lg");
     expect(refresh).toHaveAttribute("data-variant", "ghost");
-    expect(refresh).toHaveAttribute("title", "Refresh");
+    expect(refresh).not.toHaveAttribute("title");
     expect(document.querySelectorAll("svg")).toHaveLength(1);
     expect(refresh.querySelector("svg")).toHaveAttribute(
       "data-admin-ux",
@@ -106,7 +106,7 @@ describe("Contributions text and real contracts", () => {
     expect(mockApi).toHaveBeenCalledTimes(1);
     await act(async () => resolve(fixture));
     expect(refresh).toBeEnabled();
-    expect(refresh).toHaveAttribute("aria-busy", "false");
+    expect(refresh).not.toHaveAttribute("aria-busy", "true");
     expect(document.querySelectorAll("svg")).toHaveLength(1);
     expect(refresh.querySelector("svg")).toHaveAttribute(
       "data-admin-ux",

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { FollowHeartButton } from "./FollowHeartButton";
@@ -202,4 +203,30 @@ describe("FollowHeartButton labels and loading", () => {
     fireEvent.click(button);
     expect(onClick).not.toHaveBeenCalled();
   });
+});
+
+it("keeps the heart named and uses only a custom contextual hint", async () => {
+  const { container } = render(
+    <FollowHeartButton
+      following={false}
+      label="Like track"
+      title="Save to liked tracks"
+    />,
+  );
+  expect(container.querySelector("[title]")).toBeNull();
+  await userEvent.tab();
+  expect(
+    await screen.findByRole("tooltip", { name: "Save to liked tracks" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "Like track" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+it("preserves the legacy title-only accessible name", () => {
+  render(<FollowHeartButton following={false} title="Like track" />);
+  expect(
+    screen.getByRole("button", { name: "Like track" }),
+  ).not.toHaveAttribute("title");
 });

@@ -15,10 +15,8 @@ import {
   setSmartPlaylistSuggestionsCadencePreference,
   setSmartPlaylistSuggestionsPreference,
 } from "@/lib/player-playback-prefs";
-import {
-  getEqualizerEnabled,
-  setEqualizerEnabled,
-} from "@/lib/equalizer-prefs";
+import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
+import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import {
   PlaybackSettingsView,
@@ -27,7 +25,10 @@ import {
 export function PlaybackSection({ ruled }: { ruled?: boolean } = {}) {
   const mobilePlaybackRuntime = isMobilePlaybackRuntime();
   const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
-  const [value, setValue] = useState<PlaybackSettingsValue>(() => ({
+  const equalizerEnabled = useEqualizerEnabled(androidNativePlayerEnabled);
+  const [value, setValue] = useState<
+    Omit<PlaybackSettingsValue, "equalizerEnabled">
+  >(() => ({
     crossfadeSeconds: getCrossfadeDurationPreference(),
     smartCrossfadeEnabled: getSmartCrossfadePreference(),
     infinitePlaybackEnabled: getInfinitePlaybackPreference(),
@@ -35,7 +36,6 @@ export function PlaybackSection({ ruled }: { ruled?: boolean } = {}) {
     smartPlaylistSuggestionsCadence:
       getSmartPlaylistSuggestionsCadencePreference(),
     playbackDeliveryPolicy: getPlaybackDeliveryPolicyPreference(),
-    equalizerEnabled: getEqualizerEnabled(androidNativePlayerEnabled),
   }));
   const change = (patch: Partial<PlaybackSettingsValue>) => {
     if (patch.crossfadeSeconds !== undefined)
@@ -54,14 +54,14 @@ export function PlaybackSection({ ruled }: { ruled?: boolean } = {}) {
       );
     if (patch.playbackDeliveryPolicy !== undefined)
       setPlaybackDeliveryPolicyPreference(patch.playbackDeliveryPolicy);
-    if (patch.equalizerEnabled !== undefined)
-      setEqualizerEnabled(patch.equalizerEnabled);
-    setValue((current) => ({ ...current, ...patch }));
+    const { equalizerEnabled: eqPower, ...preferences } = patch;
+    if (eqPower !== undefined) setEqualizerEnabled(eqPower);
+    setValue((current) => ({ ...current, ...preferences }));
   };
   return (
     <PlaybackSettingsView
       ruled={ruled}
-      value={value}
+      value={{ ...value, equalizerEnabled }}
       onChange={change}
       mobilePlaybackRuntime={mobilePlaybackRuntime}
       androidNativePlayerEnabled={androidNativePlayerEnabled}

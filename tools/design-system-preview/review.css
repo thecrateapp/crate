@@ -110,3 +110,12 @@ body {
 @source "../../app/listen/src/pages/StatsSoundProfileView.tsx";
 @source "../../app/listen/src/pages/StatsAnalyticsPrimitives.tsx";
 @source "../../app/listen/src/pages/StatsArtistRankView.tsx";
+
+@source "../../app/listen/src/components/player/EqualizerPanelSections.tsx";
+@source "../../app/listen/src/components/player/EqualizerSmartReadout.tsx";
+@source "../../app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx";
+@source "../../app/listen/src/components/player/EqualizerPanelSurface.tsx";
+
+@source "../../app/listen/src/components/home";
+@source "../../app/listen/src/components/stats/TapeBars.tsx";
+@source "../../app/listen/src/components/upcoming";

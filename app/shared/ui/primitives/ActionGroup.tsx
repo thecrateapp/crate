@@ -84,11 +84,7 @@ function ActionHelp({
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <ActionTrigger
-            unavailable={unavailable}
-            label={label}
-            title={tooltip}
-          >
+          <ActionTrigger unavailable={unavailable} label={label}>
             {children}
           </ActionTrigger>
         </TooltipTrigger>
@@ -133,7 +129,6 @@ export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
           variant="ghost"
           className="aria-pressed:text-accent-action-hi"
           aria-label={label}
-          title={tooltip ?? label}
         >
           {asChild && isValidElement<{ children?: ReactNode }>(children) ? (
             cloneElement(children, {
@@ -190,13 +185,7 @@ export const ActionLink = forwardRef<HTMLAnchorElement, ActionLinkProps>(
           size="icon-lg"
           variant="ghost"
         >
-          <a
-            {...props}
-            ref={ref}
-            href={href || "#"}
-            aria-label={label}
-            title={tooltip ?? label}
-          >
+          <a {...props} ref={ref} href={href || "#"} aria-label={label}>
             {loading ? (
               <Loader2 aria-hidden="true" className="animate-spin" />
             ) : (

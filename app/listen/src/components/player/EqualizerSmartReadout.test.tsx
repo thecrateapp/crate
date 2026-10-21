@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -7,10 +8,7 @@ import deCatalog from "@/i18n/catalogs/de.json";
 import enCatalog from "@/i18n/catalogs/en.json";
 import esCatalog from "@/i18n/catalogs/es.json";
 import euCatalog from "@/i18n/catalogs/eu.json";
-import {
-  SMART_EQ_CHAIN,
-  SMART_EQ_SOURCE_LABEL_KEYS,
-} from "@/lib/equalizer-labels";
+import { SMART_EQ_SOURCE_LABEL_KEYS } from "@/lib/equalizer-labels";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const CATALOGS = {
@@ -35,23 +33,27 @@ function smartEq(overrides: Partial<EffectiveEq> = {}): EffectiveEq {
 }
 
 describe("EqualizerSmartReadout", () => {
+  it("shows the resolved genre visibly rather than only in a native tooltip", () => {
+    renderWithListenProviders(
+      <EqualizerSmartReadout eq={smartEq()} status="ready" />,
+    );
+    expect(screen.getByText("Thrash metal")).toBeVisible();
+  });
+
   it.each(["en", "es", "de", "eu"] as const)(
-    "renders every Smart EQ source with its %s label",
+    "renders only the confirmed Smart EQ source with its %s label",
     (locale) => {
       const { container } = renderWithListenProviders(
         <EqualizerSmartReadout eq={smartEq()} status="ready" />,
         { locale },
       );
 
-      const labels = Array.from(
-        container.querySelectorAll("[data-source]"),
-        (node) => node.textContent?.trim(),
+      const sources = container.querySelectorAll("[data-source]");
+      expect(sources).toHaveLength(1);
+      expect(sources[0]).toHaveTextContent(
+        CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS.genre_taxonomy_preset]!,
       );
-      expect(labels).toEqual(
-        SMART_EQ_CHAIN.map(
-          (source) => CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS[source]],
-        ),
-      );
+      expect(sources[0]).toHaveTextContent("Thrash metal");
     },
   );
 
@@ -65,7 +67,10 @@ describe("EqualizerSmartReadout", () => {
 
       const sources = container.querySelectorAll<HTMLElement>("[data-source]");
       sources.forEach((node) => {
-        expect(node.className).not.toMatch(OVERFLOW_CLASS);
+        expect(node).not.toHaveAttribute("title");
+        expect(node).toHaveTextContent(
+          CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS.genre_taxonomy_preset]!,
+        );
       });
       for (
         let node: HTMLElement | null = sources[0]!.parentElement;
@@ -77,7 +82,7 @@ describe("EqualizerSmartReadout", () => {
     },
   );
 
-  it("names the genre an inherited preset comes from through the catalog", () => {
+  it("keeps the inherited source in a localized tooltip and the band concise", async () => {
     renderWithListenProviders(
       <EqualizerSmartReadout
         eq={smartEq({
@@ -88,6 +93,15 @@ describe("EqualizerSmartReadout", () => {
       { locale: "es" },
     );
 
-    expect(screen.getByText("de Metal")).toBeInTheDocument();
+    expect(screen.getByText("Thrash metal")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "Curvas de la pista" }),
+    ).not.toHaveAttribute("title");
+    await userEvent.hover(
+      screen.getByRole("group", { name: "Curvas de la pista" }),
+    );
+    expect(
+      await screen.findByRole("tooltip", { name: "Genre · de Metal" }),
+    ).toBeVisible();
   });
 });

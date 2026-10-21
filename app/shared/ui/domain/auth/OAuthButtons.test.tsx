@@ -65,7 +65,9 @@ describe("OAuthButtons", () => {
     expect(
       await screen.findByLabelText("Continuar con Google"),
     ).toBeInTheDocument();
-    expect(await screen.findByTitle("Apple no disponible")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Continuar con Apple" }),
+    ).toBeInTheDocument();
   });
 
   it("renders nothing when google is enabled but not configured and apple is disabled", async () => {

@@ -7,6 +7,7 @@ from crate.db.queries.browse_media_track_genres import (
     get_track_album_genres,
     get_track_artist_genres,
 )
+from crate.db.queries.equalizer_curves import get_track_eq_curve_context
 from crate.db.repositories.equalizer_presets import (
     EqualizerPresetRecord,
     TrackEqualizerContext,
@@ -495,3 +496,64 @@ __all__ = [
     "save_instance_track_eq_preset",
     "save_user_track_eq_preset",
 ]
+
+
+def available_track_eq_curves(track_id: int, *, user_id: int) -> list[dict] | None:
+    """Describe existing curves without selecting or changing the audio resolver."""
+    data = get_track_eq_curve_context(track_id, user_id=user_id)
+    if data is None:
+        return None
+    context = TrackEqualizerContext(**data["context"])
+    curves = []
+    order = ["user_track_preset", "instance_track_preset", "instance_album_preset"]
+    for preset in data["presets"]:
+        source = (
+            "user_track_preset"
+            if preset["scope"] == "user"
+            else "instance_track_preset"
+            if preset["target_type"] == "track"
+            else "instance_album_preset"
+        )
+        curves.append(
+            {
+                "source": source,
+                "gains": normalize_eq_gains(preset["gains"]),
+                "label": preset["label"],
+                "reasoning": preset["reasoning"],
+                "genre": None,
+            }
+        )
+    curves.sort(key=lambda curve: order.index(curve["source"]))
+    picked = _pick_primary_genre(
+        data["album_genres"], canonical_only=True
+    ) or _pick_primary_genre(data["artist_genres"], canonical_only=True)
+    if picked and picked.get("preset"):
+        curves.append(
+            {
+                "source": "genre_taxonomy_preset",
+                "gains": normalize_eq_gains(picked["preset"]["gains"]),
+                "label": picked["primary"]["name"],
+                "reasoning": "",
+                "genre": picked["primary"],
+            }
+        )
+    if _has_audio_analysis_features(context):
+        curves.append(
+            {
+                "source": "audio_analysis_preset",
+                "gains": compute_audio_analysis_gains(context),
+                "label": "",
+                "reasoning": "",
+                "genre": None,
+            }
+        )
+    curves.append(
+        {
+            "source": "flat",
+            "gains": list(FLAT_EQ_GAINS),
+            "label": "",
+            "reasoning": "",
+            "genre": None,
+        }
+    )
+    return curves

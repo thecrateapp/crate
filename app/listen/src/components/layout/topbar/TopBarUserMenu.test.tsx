@@ -98,7 +98,9 @@ describe("TopBarUserMenu", () => {
     renderMenu();
 
     expect(screen.getByRole("button", { name: "User menu" })).toHaveClass(
-      "shadow-icon-control",
+      "rounded-full",
+      "border-border-quiet",
+      "bg-surface-canvas",
     );
     fireEvent.click(screen.getByRole("button", { name: "User menu" }));
 

@@ -33,7 +33,7 @@ export function TrackRowView({
         "item-action-target group track-row flex items-center gap-[var(--content-row-gap)] transition-colors",
         (active || selected) && "crate-row-highlight",
         density === "compact"
-          ? "px-2 py-1.5"
+          ? "px-3 py-1.5"
           : "px-3 py-[var(--content-row-padding-y)]",
         className,
       )}

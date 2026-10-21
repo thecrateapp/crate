@@ -131,10 +131,13 @@ for (const host of ["storybook", "standalone"] as const) {
         '[data-slot="context-menu-item-label"]',
       );
       await expect(longLabel).toHaveCSS("-webkit-line-clamp", "2");
-      await expect(longLabel).toHaveAttribute(
-        "title",
-        "Add this unusually long translated track title to the end of the current playback queue",
-      );
+      await expect(longLabel).not.toHaveAttribute("title");
+      await longLabel.hover();
+      await expect(
+        page.getByRole("tooltip", {
+          name: "Add this unusually long translated track title to the end of the current playback queue",
+        }),
+      ).toBeVisible();
       expect((await longLabel.boundingBox())!.height).toBeLessThanOrEqual(32);
       await page.keyboard.press("Escape");
       await expect(page.getByRole("menu")).toHaveCount(0);

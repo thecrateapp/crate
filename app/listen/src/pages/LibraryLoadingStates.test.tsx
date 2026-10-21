@@ -31,9 +31,15 @@ it.each([LibraryAlbumsTab, LibraryArtistsTab])(
     expect(
       container.querySelector('[data-slot="library-sort-placeholder"]'),
     ).toBeInTheDocument();
+    const placeholder = container.querySelector(
+      '[data-slot="library-sort-placeholder"]',
+    );
+    expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    expect(placeholder).toHaveAttribute("inert");
+    expect(placeholder).toHaveTextContent("Sort");
     expect(
-      container.querySelector('[data-slot="library-sort-placeholder"]'),
-    ).toHaveTextContent("——");
+      placeholder?.querySelector('[data-slot="select-trigger"]'),
+    ).toBeInTheDocument();
     expect(
       container.querySelector('[data-slot="skeleton-cover"]'),
     ).toHaveAttribute(

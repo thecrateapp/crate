@@ -5,7 +5,6 @@ import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
@@ -61,10 +60,10 @@ export function usePlayerBarController() {
     cycleRepeat,
   } = usePlayerActions();
   const isDesktop = useIsDesktop();
-  const equalizerEnabled = useEqualizerEnabled();
   const equalizerRuntimeAvailable =
     canUseWebAudioEffects || shouldUseAndroidNativePlayer();
-  const allowEqualizer = equalizerEnabled && equalizerRuntimeAvailable;
+  // Power controls audio bypass; access depends only on runtime capability.
+  const allowEqualizer = equalizerRuntimeAvailable;
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && equalizerRuntimeAvailable;
 

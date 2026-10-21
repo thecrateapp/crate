@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@crate/ui/lib/cn";
 import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
 
@@ -60,58 +61,62 @@ export function GenrePill({
 
   if (onRemove) {
     return (
-      <span
-        className={cn(pillClassName, onClick ? "p-0" : "py-0 pr-0", className)}
-        title={title}
-        data-slot="chip"
-      >
-        {onClick ? (
+      <TooltipHint content={title}>
+        <span
+          className={cn(
+            pillClassName,
+            onClick ? "p-0" : "py-0 pr-0",
+            className,
+          )}
+          data-slot="chip"
+        >
+          {onClick ? (
+            <button
+              type="button"
+              onClick={onClick}
+              data-slot="chip"
+              className="inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left pointer-coarse:min-h-11"
+            >
+              {content}
+            </button>
+          ) : (
+            content
+          )}
           <button
             type="button"
-            onClick={onClick}
+            aria-label={removeLabel ?? `Remove ${item.name}`}
+            onClick={onRemove}
             data-slot="chip"
-            className="inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left pointer-coarse:min-h-11"
+            className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
-            {content}
+            <X size={CRATE_ICON_SIZE.micro} />
           </button>
-        ) : (
-          content
-        )}
-        <button
-          type="button"
-          aria-label={removeLabel ?? `Remove ${item.name}`}
-          onClick={onRemove}
-          data-slot="chip"
-          className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-        >
-          <X size={CRATE_ICON_SIZE.micro} />
-        </button>
-      </span>
+        </span>
+      </TooltipHint>
     );
   }
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        title={title}
-        data-slot="chip"
-        className={cn(pillClassName, "transition-colors", className)}
-      >
-        {content}
-      </button>
+      <TooltipHint content={title}>
+        <button
+          type="button"
+          onClick={onClick}
+          data-slot="chip"
+          className={cn(pillClassName, "transition-colors", className)}
+        >
+          {content}
+        </button>
+      </TooltipHint>
     );
   }
 
   return (
-    <span
-      title={title}
-      data-slot="chip"
-      className={cn(pillClassName, className)}
-    >
-      {content}
-    </span>
+    <TooltipHint content={title}>
+      <span data-slot="chip" className={cn(pillClassName, className)}>
+        {content}
+      </span>
+    </TooltipHint>
   );
 }
 

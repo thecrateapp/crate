@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { Loader2 } from "@crate/ui/icons";
@@ -70,33 +71,34 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     const isActive = active ?? (pressed === true || pressed === "true");
 
     return (
-      <button
-        ref={ref}
-        type={type}
-        aria-label={label}
-        title={title ?? label}
-        disabled={disabled || loading}
-        aria-busy={loading || undefined}
-        data-size={size}
-        data-variant={variant}
-        data-active={isActive || undefined}
-        className={cn(
-          "relative inline-flex shrink-0 items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px disabled:pointer-events-none disabled:opacity-50",
-          "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-          SIZE_CLASS_NAME[size],
-          VARIANT_CLASS_NAME[variant],
-          iconButtonToneClassName(isActive ? "primary" : tone),
-          isActive && "animate-crate-icon-active-pulse",
-          className,
-        )}
-        {...props}
-      >
-        {loading ? (
-          <Loader2 aria-hidden="true" className="animate-spin" />
-        ) : (
-          children
-        )}
-      </button>
+      <TooltipHint content={title ?? label}>
+        <button
+          ref={ref}
+          type={type}
+          aria-label={label}
+          disabled={disabled || loading}
+          aria-busy={loading || undefined}
+          data-size={size}
+          data-variant={variant}
+          data-active={isActive || undefined}
+          className={cn(
+            "relative inline-flex shrink-0 items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px disabled:pointer-events-none disabled:opacity-50",
+            "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+            SIZE_CLASS_NAME[size],
+            VARIANT_CLASS_NAME[variant],
+            iconButtonToneClassName(isActive ? "primary" : tone),
+            isActive && "animate-crate-icon-active-pulse",
+            className,
+          )}
+          {...props}
+        >
+          {loading ? (
+            <Loader2 aria-hidden="true" className="animate-spin" />
+          ) : (
+            children
+          )}
+        </button>
+      </TooltipHint>
     );
   },
 );

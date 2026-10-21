@@ -1,4 +1,4 @@
-import { AppPopover } from "@crate/ui/primitives/AppPopover";
+import { EqualizerAnchoredSurface } from "./EqualizerPanelSurface";
 import type { TFunction } from "i18next";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
@@ -42,12 +42,12 @@ export function ExtendedPlayerHeader({
         />
       ) : null}
       {showEqualizer ? (
-        <AppPopover
+        <EqualizerAnchoredSurface
           ref={refs.equalizerRef}
-          className="absolute top-14 right-4 z-30 w-[480px] max-w-[min(480px,calc(100%-2rem))] p-4"
+          label={t("player.equalizer")}
         >
           <EqualizerPanel onClose={() => actions.setShowEqualizer(false)} />
-        </AppPopover>
+        </EqualizerAnchoredSurface>
       ) : null}
     </>
   );

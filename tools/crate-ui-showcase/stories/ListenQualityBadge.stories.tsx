@@ -17,7 +17,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "One actual Listen component for album heroes, every TrackRow and the player. Solar soundwave glyph; cyan lossless/high, amber hi-res, neutral standard/low. Built on the unchanged 24px InfoBadge recipe. Individual source depth/rate/bitrate are optional; no album-quality inference or per-row detail requests. Streaming delivery remains distinct from source through origin. The adapter remains app-local because Admin does not consume this quality contract.",
+          "One actual Listen component for album heroes, every TrackRow and the player. Solar soundwave glyph; cyan lossless/high, amber hi-res, neutral standard/low. Built on the unchanged 24px InfoBadge recipe. Individual source depth/rate/bitrate are optional; no album-quality inference or per-row detail requests. Streaming delivery remains distinct from source through origin. The approved Caspian row order remains quality, BPM/key, duration, like and menu, with fixed empty slots for missing fields. Compact rows retain the same12px horizontal inset; density changes vertical spacing only. Container breakpoints retain the established narrow-row visibility rules. The adapter remains app-local because Admin does not consume this quality contract.",
       },
     },
   },

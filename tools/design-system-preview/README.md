@@ -747,3 +747,52 @@ The production VisualizerSettingsPopover is also mounted inside a short clipped 
 its actual scrolling bounds preserve access to the final slider. Adapted values have localized
 saved/effective aria-valuetext. Static frames repaint changed settings/reset/track/palette once,
 settle without interpolation, and ignore unchanged/stopped/running invalidations.
+
+### 1BE · Equalizer refinement
+
+`http://127.0.0.1:5186/review-1be-player-eq.html` shares `PlayerEqReview` with
+Storybook `Reviews/1BE/Equalizer` and imports the actual panel/anchored surface.
+The compact panel retains720px desktop bounds. Title/power/close share one row;
+Smart/Genre/Adaptive occupy three stable positions beneath it. All ten bands remain visible,
+with12px mono gain readings and no horizontal scroll. Below30rem of instrument width the
+single numeric row rounds gains; touch/focus reveals the exact signed gain. Audio/curve/ARIA
+precision remains0.5dB. Visible wrapping preset pills replace the Select; mobile bounds their
+vertical group, preserving keyboard access to every preset. One information slot between the bands and presets covers Smart source details (including
+the genre name), Genre resolution, audio-analysis features and manual presets. Every state uses
+the same accent-tinted information band with uppercase MonoLabel typography. Manual choices read PRESET: JAZZ; Smart and Genre taxonomy curves both read GENRE TAXONOMY: JAZZ. Inherited-source details remain in the tooltip. Only the applied
+source is reported; inventory badges and the duplicate footer readout are removed. Save/reset
+remain last; technical server notices are omitted. Local library identity takes precedence for
+genre resolution when a catalog track also belongs to the instance.
+OFF bypasses audio, shows flat and retains gains for ON, without removing access. Local
+callbacks only; scenarios cover manual/Smart/off/loading/missing/older-server/long/short parent.
+This2026-10-21 mobile iteration supersedes the14px horizontally scrolling trial.
+
+EQ amendments: enabled bands can be edited directly from Smart/Adaptive/Genre, using the displayed curve as the starting point and retaining the other gains. The first edit becomes Custom and persists manual mode. Pointer gestures retain their initial scale through panel reflow. OFF bypasses audio while keeping the player-bar access and panel available for ON; capability gates remain separate.
+
+### 1BE · Home signals and stable track rows
+
+`http://127.0.0.1:5186/review-1be-home-signals.html` and Storybook
+`Listen/Home signals` share `HomeSignalsReview`. Radar, its next-up list and show-prep
+cards now compose actual Card, MonoLabel, HairlineRow, countdown/date and action
+components. Crate DNA uses Card/StatNumber and the existing StatsMiniTape instrument.
+Artwork, live data and audio remain app adapters. A single event has no empty next-up
+panel; absent summaries stay absent. Replay row conversion preserves supplied source
+quality and analysis without inventing missing values or requesting details per row.
+
+Diego's Caspian album rows are the column reference: quality, BPM/key, duration, like,
+menu. Every slot remains reserved when empty. Both densities keep12px horizontal inset;
+compact changes vertical spacing only. Responsive visibility remains container-based.
+Sidebar destinations and Collection children use actual uppercase MonoLabel and
+foreground-only accent hover/focus, preserving44px targets and pinned Collection.
+
+The standalone review includes ready, single-event, empty/no-signals and released
+fixtures, long labels, missing metadata and both densities. Actual callbacks run locally;
+there are no production requests, audio playback or saved preference writes.
+
+Current action experiment: [Primary and tooltips](http://127.0.0.1:5186/review-1be-primary-hints.html), matching Reviews/1BE/Primary and tooltips in Storybook. Actual Button/HeroActionBar primary styles and custom hints, with local fixture actions only. Awaiting review; no commit.
+
+Current web closure checkpoint: [Listen web closure](http://127.0.0.1:5186/review-1be-web-closure.html),
+matching Reviews/1BE/Listen web closure in Storybook. Playback/Actions/Feedback/Navigation
+compose actual components with local callbacks. Coverage distinguishes 25 route groups,
+11 read-only live observations and14 source/automated inspections; native and production-write
+limits stay explicit. See `../crate-ui-showcase/LISTEN_WEB_CLOSURE.md`. Approved by Diego for commit and push.

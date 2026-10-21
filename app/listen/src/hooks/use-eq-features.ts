@@ -9,16 +9,8 @@ import { trackEqFeaturesApiPath } from "@/lib/library-routes";
  * fields are nullable because analysis hasn't necessarily finished for
  * every track — callers treat missing values as "no signal, stay flat".
  */
-export interface EqFeatures {
-  energy: number | null;
-  loudness: number | null; // LUFS, roughly -30..-6
-  dynamicRange: number | null; // dB crest-like
-  brightness: number | null; // normalized spectral centroid, 0..1
-  danceability: number | null;
-  valence: number | null;
-  acousticness: number | null;
-  instrumentalness: number | null;
-}
+import type { EqFeatures } from "@/lib/equalizer-types";
+export type { EqFeatures } from "@/lib/equalizer-types";
 
 export type EqFeaturesState =
   | { status: "idle" } // No track, or no hook consumer (adaptive off).

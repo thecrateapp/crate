@@ -5,11 +5,16 @@ import {
   EQ_PREFS_EVENT,
   getEqualizerGains,
   setCustomEqualizerGains,
+  setEqualizerSmart,
+  setEqualizerAdaptive,
+  setEqualizerGenreAdaptive,
+  getEqualizerSnapshot,
 } from "@/lib/equalizer-prefs";
 import { NATIVE_EQ_LIVE_INTERVAL_MS, useEqualizer } from "./use-equalizer";
 
 const engine = vi.hoisted(() => ({
   android: false,
+  resolvedGains: null as number[] | null,
   setEq: vi.fn(() => Promise.resolve()),
   setEqualizer: vi.fn(),
 }));
@@ -23,8 +28,17 @@ vi.mock("@/hooks/use-equalizer-runtime", async (importOriginal) => {
     await importOriginal<typeof import("@/hooks/use-equalizer-runtime")>();
   return {
     ...actual,
-    useResolvedEqualizer: (snapshot: { gains: number[] }) => ({
-      effectiveGains: snapshot.gains,
+    useResolvedEqualizer: (snapshot: {
+      gains: number[];
+      smart: boolean;
+      adaptive: boolean;
+      genreAdaptive: boolean;
+    }) => ({
+      effectiveGains:
+        (snapshot.smart || snapshot.adaptive || snapshot.genreAdaptive) &&
+        engine.resolvedGains
+          ? engine.resolvedGains
+          : snapshot.gains,
       effectiveEqState: { status: "idle" },
       effectiveEq: null,
       featuresState: { status: "idle" },
@@ -62,6 +76,7 @@ describe("useEqualizer drag writes", () => {
     localStorage.clear();
     setCustomEqualizerGains(Array.from({ length: 10 }, () => 0));
     engine.android = false;
+    engine.resolvedGains = null;
     engine.setEq.mockClear();
     engine.setEqualizer.mockClear();
   });
@@ -85,7 +100,7 @@ describe("useEqualizer drag writes", () => {
 
     act(() => result.current.commitBand(3, 4.5));
 
-    expect(storageWrites).toHaveBeenCalledTimes(3);
+    expect(storageWrites).toHaveBeenCalledTimes(5);
     expect(prefsEvents).toHaveBeenCalledTimes(1);
     expect(result.current.preset).toBe("custom");
     expect(result.current.gains[3]).toBe(4.5);
@@ -105,6 +120,54 @@ describe("useEqualizer drag writes", () => {
 
     expect(result.current.gains.slice(0, 3)).toEqual([0, 5, -2]);
   });
+
+  it.each([
+    ["smart", setEqualizerSmart],
+    ["adaptive", setEqualizerAdaptive],
+    ["genre", setEqualizerGenreAdaptive],
+  ] as const)(
+    "starts a %s edit from the audible curve and persists manual mode",
+    (_mode, enable) => {
+      engine.resolvedGains = [4, 3, -1, -3, -2, 1, 3, 5, 5, 5];
+      enable(true);
+      const { result, unmount } = renderHook(() => useEqualizer());
+      act(() => result.current.updateBand(0, 4.5));
+      expect(result.current.gains).toEqual([4.5, 3, -1, -3, -2, 1, 3, 5, 5, 5]);
+      act(() => result.current.commitBand(0, 4.5));
+      expect(getEqualizerSnapshot()).toMatchObject({
+        preset: "custom",
+        smart: false,
+        adaptive: false,
+        genreAdaptive: false,
+        gains: [4.5, 3, -1, -3, -2, 1, 3, 5, 5, 5],
+      });
+      unmount();
+      const restored = renderHook(() => useEqualizer());
+      expect(restored.result.current.gains).toEqual([
+        4.5, 3, -1, -3, -2, 1, 3, 5, 5, 5,
+      ]);
+    },
+  );
+
+  it.each([setEqualizerAdaptive, setEqualizerGenreAdaptive])(
+    "persists a generic preset as manual after an automatic helper",
+    (enable) => {
+      enable(true);
+      const { result, unmount } = renderHook(() => useEqualizer());
+      act(() => result.current.applyPreset("rock"));
+      expect(getEqualizerSnapshot()).toMatchObject({
+        preset: "rock",
+        smart: false,
+        adaptive: false,
+        genreAdaptive: false,
+      });
+      unmount();
+      const restored = renderHook(() => useEqualizer());
+      expect(restored.result.current.smart).toBe(false);
+      expect(restored.result.current.adaptive).toBe(false);
+      expect(restored.result.current.genreAdaptive).toBe(false);
+    },
+  );
 
   it("throttles native setEq to the 15-20 Hz live rate during a drag", () => {
     engine.android = true;

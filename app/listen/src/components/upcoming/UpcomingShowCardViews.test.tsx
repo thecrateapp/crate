@@ -110,7 +110,9 @@ describe("UpcomingShowExpandedView", () => {
     expect(venueLine).toHaveTextContent(
       "Circolo Magnolia · Via Circonvallazione Idroscalo, 41 20054 · Segrate, Milano, Italy",
     );
-    expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
       "href",
       expect.stringContaining("maps"),
@@ -145,10 +147,12 @@ describe("UpcomingShowExpandedView", () => {
         { name: "Mathcore", share: 0 },
       ],
     } as UpcomingItem);
-    expect(screen.getByTitle("Hardcore · 83% · tags")).toHaveClass(
+    expect(screen.getByText("hardcore").closest(".genre-pill")!).toHaveClass(
       "genre-pill",
     );
-    expect(screen.getByTitle("Mathcore · 0%")).toBeInTheDocument();
+    expect(
+      screen.getByText("mathcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.getByText("83%")).toHaveAttribute(
       "data-slot",
       "genre-percent",

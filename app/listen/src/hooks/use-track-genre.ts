@@ -16,18 +16,8 @@ import { trackGenreApiPath } from "@/lib/library-routes";
  * `preset === null` means nothing was found on the inheritance chain —
  * the UI should hold flat.
  */
-export interface TrackGenrePreset {
-  gains: number[];
-  source: "direct" | "inherited";
-  inheritedFrom: { slug: string; name: string } | null;
-}
-
-export interface TrackGenre {
-  primary: { slug: string; name: string; canonical: boolean } | null;
-  topLevel: { slug: string; name: string } | null;
-  source: "album" | "artist" | "track" | null;
-  preset: TrackGenrePreset | null;
-}
+import type { TrackGenre } from "@/lib/equalizer-types";
+export type { TrackGenre, TrackGenrePreset } from "@/lib/equalizer-types";
 
 export type TrackGenreState =
   | { status: "idle" }
@@ -42,7 +32,16 @@ export type TrackGenreState =
 const cache = new Map<string, TrackGenreState>();
 
 function endpointFor(track: Track): string | null {
-  return trackGenreApiPath(track) || null;
+  // Library EQ uses the instance's tag/taxonomy data. Catalog identity can
+  // coexist with that local identity while its separate genre surface is empty.
+  return (
+    trackGenreApiPath({
+      entityUid: track.entityUid,
+      libraryTrackId: track.libraryTrackId,
+    }) ||
+    trackGenreApiPath(track) ||
+    null
+  );
 }
 
 /**

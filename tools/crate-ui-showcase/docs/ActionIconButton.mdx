@@ -31,3 +31,9 @@ The approved persistent mockup and Diego’s confirmed adjustments are the refer
 Consumer adoption, assistive technology and native QA remain separate from catalogue coverage.
 
 Unavailable links also suppress caller capture handlers; the disabled state cannot execute an action before the bubble guard.
+
+<DocHeading as="h2">Custom tooltip amendment</DocHeading>
+
+Legacy title hints use the shared Tooltip, never a browser tooltip. Contextual accessible names, refs, handlers and disabled/loading semantics stay with the original native control. An existing outer Tooltip retains ownership without duplication.
+
+Icon-only compatibility controls that previously relied on a title retain that name through aria-label; named text actions keep their visible label. The title metadata is exclusively a custom hint.

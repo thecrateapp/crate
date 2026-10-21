@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from starlette.datastructures import URL
 
 from crate.api.auth import _require_auth as _require_authenticated_user
+from crate.api.browse_album import api_cover_by_entity_uid, api_cover_by_id
 from crate.api.browse_artist import (
     api_artist_background_by_entity_uid,
     api_artist_background_by_id,
@@ -16,7 +17,6 @@ from crate.api.browse_artist import (
     api_artist_photo_by_entity_uid,
     api_artist_photo_by_id,
 )
-from crate.api.browse_album import api_cover_by_entity_uid, api_cover_by_id
 from crate.api.browse_media import (
     _playback_payload_for_track,
     api_eq_features_by_entity_uid,
@@ -31,6 +31,8 @@ from crate.api.browse_media import (
 from crate.api.catalog_artist_compat import router as artist_compat_router
 from crate.api.federation_remote import (
     remote_album_cover_cached as remote_album_cover,
+)
+from crate.api.federation_remote import (
     remote_artist_background,
     remote_artist_photo,
     resolve_remote_playback,
@@ -38,30 +40,31 @@ from crate.api.federation_remote import (
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas.media import (
     EffectiveEqResponse,
+    EqCurveResponse,
     EqFeaturesResponse,
     PlaybackResolutionResponse,
     SearchResponse,
     TrackGenreResponse,
     TrackInfoResponse,
 )
-from crate.db.repositories.streaming import (
-    get_track_delivery_row_by_entity_uid,
-    get_track_delivery_row_by_id,
-)
-from crate.db.queries.global_catalog import (
-    get_global_decade_artists,
-    get_global_album_detail,
-    get_global_artist_page,
-    get_global_genre_detail,
-    get_global_track_info,
-    get_global_track_genres,
-    list_global_catalog_genres,
-    search_global_catalog,
-)
 from crate.db.queries.catalog_local_browse import (
     get_local_catalog_genre_detail,
     get_local_decade_artists,
     list_local_catalog_genres,
+)
+from crate.db.queries.global_catalog import (
+    get_global_album_detail,
+    get_global_artist_page,
+    get_global_decade_artists,
+    get_global_genre_detail,
+    get_global_track_genres,
+    get_global_track_info,
+    list_global_catalog_genres,
+    search_global_catalog,
+)
+from crate.db.repositories.global_catalog_state import (
+    catalog_serving_mode,
+    get_catalog_state,
 )
 from crate.db.repositories.global_user_library import (
     is_global_album_saved,
@@ -69,19 +72,19 @@ from crate.db.repositories.global_user_library import (
     list_user_global_album_saves,
     list_user_global_artist_follows,
 )
-from crate.db.repositories.global_catalog_state import (
-    catalog_serving_mode,
-    get_catalog_state,
+from crate.db.repositories.streaming import (
+    get_track_delivery_row_by_entity_uid,
+    get_track_delivery_row_by_id,
 )
 from crate.federation.global_artwork import (
-    GlobalArtistNotFound,
     GlobalAlbumNotFound,
+    GlobalArtistNotFound,
     NoArtistBackgroundSource,
     NoArtistPhotoSource,
     NoArtworkSource,
+    resolve_global_album_artwork,
     resolve_global_artist_background,
     resolve_global_artist_photo,
-    resolve_global_album_artwork,
 )
 from crate.federation.global_playback import (
     GlobalTrackNotFound,
@@ -1220,6 +1223,38 @@ def catalog_track_eq_features(request: Request, global_track_uid: str):
         "acousticness": None,
         "instrumentalness": None,
     }
+
+
+@router.get(
+    "/api/catalog/tracks/{global_track_uid}/eq/curves",
+    response_model=list[EqCurveResponse],
+    responses=AUTH_ERROR_RESPONSES,
+)
+def catalog_track_eq_curves(request: Request, global_track_uid: str):
+    from crate.api.browse_media import (
+        api_track_eq_curves_by_entity_uid,
+        api_track_eq_curves_by_id,
+    )
+
+    _require_auth(request)
+    payload = get_global_track_info(global_track_uid)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    entity_uid = payload.get("local_track_entity_uid")
+    if entity_uid:
+        try:
+            return api_track_eq_curves_by_entity_uid(request, str(entity_uid))
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+    local_id = payload.get("local_track_id")
+    if local_id is not None:
+        try:
+            return api_track_eq_curves_by_id(request, int(local_id))
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+    return []
 
 
 @router.get(

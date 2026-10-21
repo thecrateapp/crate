@@ -98,7 +98,9 @@ afterEach(() => {
 describe("PlaylistEditor text actions with real consumers", () => {
   it("keeps only marked UX glyphs and names the formerly icon-only removals", () => {
     render(<PlaylistEditor />);
-    const disclosures = document.querySelectorAll("svg:not([data-admin-ux])");
+    const disclosures = [
+      ...document.querySelectorAll("svg:not([data-admin-ux])"),
+    ].filter((glyph) => !glyph.closest("[data-admin-ux]"));
     expect(disclosures).toHaveLength(7);
     for (const glyph of disclosures)
       expect(glyph.closest('[data-slot="select-trigger"]')).not.toBeNull();
@@ -146,7 +148,7 @@ describe("PlaylistEditor text actions with real consumers", () => {
     });
     expect(
       screen.getByRole("button", { name: "Save + generate" }),
-    ).toHaveAttribute("title", "Save + generate");
+    ).not.toHaveAttribute("title");
   });
 
   it("uses standard Category, Match and Sort selects with unchanged saved values", async () => {
