@@ -1,0 +1,178 @@
+{
+  "model": {
+    "default": "gpt-6-luna",
+    "provider": "openai-codex"
+  },
+  "toolsets": [
+    "crate",
+    "crate_context",
+    "memory"
+  ],
+  "platform_toolsets": {
+    "telegram": [
+      "crate",
+      "crate_context",
+      "memory"
+    ],
+    "cli": [
+      "crate",
+      "crate_context",
+      "memory"
+    ]
+  },
+  "agent": {
+    "max_turns": 15,
+    "disabled_toolsets": [
+      "terminal",
+      "file",
+      "code_execution",
+      "delegation",
+      "connections",
+      "catalog",
+      "cronjob",
+      "skills",
+      "browser",
+      "web",
+      "search",
+      "messaging",
+      "vision",
+      "image_gen",
+      "tts",
+      "computer_use",
+      "kanban",
+      "project",
+      "session_search"
+    ]
+  },
+  "approvals": {
+    "mode": "manual",
+    "cron_mode": "deny",
+    "unattended_mode": "deny",
+    "single_query_mode": "deny"
+  },
+  "platforms": {
+    "telegram": {
+      "enabled": true,
+      "extra": {
+        "drop_pending_on_cold_boot": false
+      }
+    },
+    "api_server": {
+      "enabled": false
+    }
+  },
+  "security": {
+    "redact_secrets": true
+  },
+  "mcp_servers": {
+    "crate": {
+      "url": "${CRATE_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${CRATE_MCP_TOKEN}",
+        "Host": "${CRATE_MCP_HOST}"
+      },
+      "timeout": 30,
+      "tools": {
+        "include": [
+          "apply_acquisition",
+          "apply_acquisition_publication",
+          "apply_job_cancel",
+          "apply_job_retry",
+          "apply_metadata_update",
+          "apply_repairs",
+          "apply_runtime_update",
+          "apply_schedule_update",
+          "apply_shows_import",
+          "editorial_candidates_search",
+          "editorial_options",
+          "editorial_plan_apply",
+          "editorial_plan_get",
+          "editorial_plan_prepare",
+          "editorial_plan_validate",
+          "editorial_playlist_get",
+          "editorial_playlists_list",
+          "editorial_publication_set",
+          "get_acquisition_readiness",
+          "get_analysis_status",
+          "get_confirmation_policy",
+          "get_instance_inventory",
+          "get_instance_status",
+          "get_job",
+          "get_library_quality",
+          "get_observability_summary",
+          "get_operation_catalog",
+          "get_pipeline_status",
+          "get_plan",
+          "get_runtime_policy",
+          "get_smart_mix_status",
+          "inspect_artist",
+          "list_jobs",
+          "list_library_issues",
+          "list_schedules",
+          "plan_analysis",
+          "plan_enrichment",
+          "plan_library_sync",
+          "plan_metadata_export",
+          "plan_metadata_rehydrate",
+          "preview_acquisition",
+          "preview_acquisition_publication",
+          "preview_job_cancel",
+          "preview_job_retry",
+          "preview_metadata_update",
+          "preview_repairs",
+          "preview_runtime_update",
+          "preview_schedule_update",
+          "preview_shows_import",
+          "read_audit",
+          "read_diagnostics",
+          "request_plan_confirmation",
+          "run_analysis",
+          "run_enrichment",
+          "run_health_check",
+          "run_library_sync",
+          "run_metadata_export",
+          "run_metadata_rehydrate",
+          "run_quality_check",
+          "run_schedule",
+          "search_acquisition",
+          "search_shows"
+        ],
+        "prompts": false,
+        "resources": false
+      },
+      "trust": "full"
+    },
+    "crate_context": {
+      "command": "/opt/hermes/.venv/bin/python",
+      "args": [
+        "/opt/crate-hermes/context_server.py"
+      ],
+      "env": {
+        "CRATE_CONTEXT_ROOT": "/opt/crate-context/active"
+      },
+      "tools": {
+        "include": [
+          "get_release_context",
+          "search_crate_context",
+          "read_crate_context"
+        ]
+      }
+    }
+  },
+  "mcp_single_query_discovery_timeout": 45,
+  "auxiliary": {
+    "title_generation": {
+      "model_upgrade_enabled": false
+    }
+  },
+  "tools": {
+    "tool_search": {
+      "enabled": "off"
+    }
+  },
+  "plugins": {
+    "enabled": [
+      "crate-confirmation"
+    ]
+  }
+}

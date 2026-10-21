@@ -439,3 +439,9 @@ class DiagnosticOutput(ClosedInput):
     window: dict[str, str] | None = None
     interpretation: str | None = None
     error: dict[str, Any] | None = None
+
+
+class ConfirmationInput(ClosedInput):
+    plan_id: Identifier
+    plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    apply_after_approval: Annotated[bool, Field(strict=True)] = False

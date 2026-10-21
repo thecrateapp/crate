@@ -1162,6 +1162,20 @@
       "read_only": true
     },
     {
+      "base_grant": null,
+      "contract_version": "1.2.0",
+      "description": "Read current integration approval requirement, policy revision and grants; no decisions.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "InstanceInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "a59a965335384b70e1556caa53e5201d45d43d5054fbacc8a504477bbd7b8e87",
+      "name": "get_confirmation_policy",
+      "read_only": true
+    },
+    {
       "base_grant": "ops.status.read",
       "contract_version": "1.2.0",
       "description": "Read bounded persisted service image references and schema/MCP versions. Release/context provenance and live image IDs remain explicitly unknown when unavailable.",
@@ -3521,6 +3535,41 @@
       "input_schema_sha256": "759b01a835f37455fcaa06bf54b13fab343d57080cb3a254b72140f29e0e724d",
       "name": "read_diagnostics",
       "read_only": true
+    },
+    {
+      "base_grant": null,
+      "contract_version": "1.2.0",
+      "description": "Request bounded exact-plan presentation to the independently bound human. Cannot approve. Optionally bind deterministic apply on the human button.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "apply_after_approval": {
+            "default": false,
+            "title": "Apply After Approval",
+            "type": "boolean"
+          },
+          "plan_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "plan_version": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Plan Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "plan_version"
+        ],
+        "title": "ConfirmationInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "57452f0b6e9d805249bca1d90d87ac0018c94da2faa567600b532f90abb79256",
+      "name": "request_plan_confirmation",
+      "read_only": false
     },
     {
       "base_grant": "ops.jobs.retry",

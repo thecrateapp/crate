@@ -210,6 +210,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/federation-upgrade-and-rollback.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/hermes-plan-confirmation.md": () =>
+    import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/crate-operator.md": () =>
     import("../../../docs/technical/crate-operator.md?raw").then(
       (module) => module.default,

@@ -189,6 +189,21 @@
     "order": 125
   },
   {
+    "sourcePath": "docs/technical/hermes-plan-confirmation.md",
+    "route": "/operations/native-plan-confirmation",
+    "section": "operations",
+    "title": "Native Telegram plan confirmation",
+    "summary": "Exact human button review, deterministic job admission and the opt-in Hermes write profile.",
+    "keywords": [
+      "Hermes",
+      "Telegram",
+      "approval",
+      "plans",
+      "operator"
+    ],
+    "order": 126
+  },
+  {
     "sourcePath": "docs/technical/ops-runbook.md",
     "route": "/operations/backup-and-recovery",
     "section": "operations",

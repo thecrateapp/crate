@@ -42,6 +42,7 @@ ACTION_CASES = [
 ACTION_NAMES = {case[0] for case in ACTION_CASES}
 ACTION_GRANTS = frozenset(case[1] for case in ACTION_CASES)
 READ_NAMES = {
+    "get_confirmation_policy",
     "get_operation_catalog",
     "get_plan",
     "get_library_quality",
@@ -123,6 +124,7 @@ def test_enabled_actions_publish_closed_schemas_and_accurate_effect_hints(
             assert {tool.name for tool in tools} == READ_NAMES | ACTION_NAMES | {
                 "preview_job_retry",
                 "apply_job_retry",
+                "request_plan_confirmation",
             }
             for tool in tools:
                 assert tool.input_schema["additionalProperties"] is False
@@ -171,7 +173,7 @@ def test_actions_are_disabled_by_default_even_with_action_grants(
 @pytest.mark.parametrize(
     "grants,expected",
     [
-        (PILOT_GRANTS, READ_NAMES - {"get_plan"}),
+        (PILOT_GRANTS, READ_NAMES - {"get_plan", "get_confirmation_policy"}),
         (frozenset(), set()),
         (
             frozenset({"library.health.run"}),
@@ -201,6 +203,8 @@ def test_discovery_and_direct_calls_respect_independent_action_grants(
     action_transport, monkeypatch, grants, expected
 ):
     app, token, principal, credentials, admission = action_transport
+    if "get_plan" in expected:
+        expected = expected | {"get_confirmation_policy", "request_plan_confirmation"}
     credentials[token] = AgentPrincipal(
         principal.id, principal.credential_id, principal.name, grants
     )

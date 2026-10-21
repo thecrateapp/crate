@@ -18,6 +18,7 @@ from crate import (
     agent_observability,
     agent_operations,
     agent_shows,
+    agent_telegram,
 )
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
@@ -51,6 +52,7 @@ from crate.mcp.schemas import (
     AnalysisPlanInput,
     AnalysisStatusInput,
     ArtistInput,
+    ConfirmationInput,
     DiagnosticOutput,
     DiagnosticsInput,
     EnrichmentPlanInput,
@@ -98,6 +100,11 @@ OBSERVATION_TOOLS = {
 }
 
 CATALOG = {
+    "get_confirmation_policy": (
+        InstanceInput,
+        None,
+        "Read current integration approval requirement, policy revision and grants; no decisions.",
+    ),
     **OBSERVATION_TOOLS,
     "get_acquisition_readiness": (
         AcquisitionReadiness,
@@ -207,6 +214,11 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "request_plan_confirmation": (
+        ConfirmationInput,
+        None,
+        "Request bounded exact-plan presentation to the independently bound human. Cannot approve. Optionally bind deterministic apply on the human button.",
+    ),
     "search_acquisition": (
         AcquisitionSearch,
         "library.acquisition.search",
@@ -439,7 +451,7 @@ def _allowed(principal, name, arguments=None):
         return bool(principal.grants)
     if name == "read_diagnostics" and arguments is None:
         return bool(principal.grants & {"ops.status.read", "ops.logs.read"})
-    if name == "get_plan":
+    if name in {"get_plan", "get_confirmation_policy", "request_plan_confirmation"}:
         from crate.agent_operation_catalog import OPERATIONS
 
         return bool(
@@ -498,7 +510,9 @@ def _execute(principal, name, arguments, trace_id):
         with admission(principal.id):
             if name in ACTION_CATALOG:
                 module = (
-                    agent_acquisition
+                    agent_telegram
+                    if name == "request_plan_confirmation"
+                    else agent_acquisition
                     if hasattr(agent_acquisition, name)
                     else agent_shows
                     if name in {"preview_shows_import", "apply_shows_import"}
@@ -513,6 +527,15 @@ def _execute(principal, name, arguments, trace_id):
                 )
                 action_finished = True
                 return result
+            if name == "get_confirmation_policy":
+                from crate.db.repositories.agent_telegram import approval_policy
+
+                return {
+                    "schema_version": "1",
+                    "availability": "available",
+                    "source": "current_approval_policy",
+                    "data": approval_policy(principal),
+                }
             if name == "get_acquisition_readiness":
                 return agent_acquisition.get_acquisition_readiness(
                     principal, **arguments

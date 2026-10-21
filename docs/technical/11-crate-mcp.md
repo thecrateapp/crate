@@ -345,3 +345,14 @@ source envelopes become explicitly unavailable and truncated; top-level `truncat
 analysis and import counters must be nonnegative integers within signed 64-bit bounds;
 worker engine must be a string of at most 128 characters. Invalid fields are omitted and
 reported in `invalid_fields`, never turned into healthy zero counters.
+
+
+## Native Telegram human confirmation
+
+The opt-in managed operator can request exact native bot review using
+`request_plan_confirmation`; its model cannot submit a human decision. The
+existing plan engine admits an explicitly approved operation with its stable key
+on the human button, without another Admin review or model invocation. Current
+approval policy and worker authority remain server-enforced, including denial of
+legacy direct-command bypasses. See [Native Telegram plan confirmation](hermes-plan-confirmation.md)
+for binding, page review, replay/expiry, operator profile and reconciliation.

@@ -105,3 +105,8 @@ def create_schema(cur):
     )
 
     create_agent_acquisition_v132_schema(cur)
+    from crate.db.schema_sections.agent_telegram_v133 import (
+        create_agent_telegram_v133_schema,
+    )
+
+    create_agent_telegram_v133_schema(cur)
