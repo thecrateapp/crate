@@ -102,7 +102,11 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           artist={
             dashboard?.artist_of_period ? (
               <StatsReveal>
-                <StatsArtistOfPeriod artist={dashboard.artist_of_period} />
+                <StatsArtistOfPeriod
+                  artist={dashboard.artist_of_period}
+                  periodStart={dashboard.tape?.start}
+                  allTime={page.selection === "all_time"}
+                />
               </StatsReveal>
             ) : null
           }
@@ -129,6 +133,8 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           <TopArtistsPanel
             items={page.topArtistItems}
             loading={dashboardLoading && !dashboard}
+            heroArtistName={dashboard?.artist_of_period?.artist_name}
+            totalMinutes={page.overview?.minutes_listened ?? 0}
           />
         </StatsReveal>
         <StatsReveal>

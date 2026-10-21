@@ -94,10 +94,16 @@ function TopTrackRow({
   queueTracks: TrackRowData[];
   playSource: PlaySource;
 }) {
-  const { play_count: playCount, minutes_listened: minutes } = item;
+  const {
+    play_count: playCount,
+    minutes_listened: minutes,
+    is_new: isNew,
+  } = item;
   const meta = useMemo(
-    () => <StatsPlayMeta playCount={playCount} minutes={minutes} />,
-    [playCount, minutes],
+    () => (
+      <StatsPlayMeta playCount={playCount} minutes={minutes} isNew={isNew} />
+    ),
+    [playCount, minutes, isNew],
   );
   return (
     <TrackRow
@@ -114,14 +120,43 @@ function TopTrackRow({
   );
 }
 
+const TOP_ARTISTS_LIMIT = 10;
+
+/** Top artists after dropping the hero; each keeps its true rank index. */
+function visibleTopArtists(
+  items: StatsArtist[],
+  heroArtistName?: string | null,
+) {
+  const skip =
+    heroArtistName != null &&
+    items[0] != null &&
+    items[0].artist_name.trim() === heroArtistName.trim()
+      ? 1
+      : 0;
+  return items
+    .slice(0, TOP_ARTISTS_LIMIT)
+    .map((item, index) => ({ item, index }))
+    .slice(skip);
+}
+
 export function TopArtistsPanel({
   items,
   loading,
+  heroArtistName,
+  totalMinutes = 0,
 }: {
   items: StatsArtist[];
   loading: boolean;
+  /** Artist already shown by the hero; skipped when it is the #1 entry. */
+  heroArtistName?: string | null;
+  /** Period total (overview.minutes_listened) the share bars divide by. */
+  totalMinutes?: number;
 }) {
   const { t } = useTranslation();
+  const visible = useMemo(
+    () => visibleTopArtists(items, heroArtistName),
+    [items, heroArtistName],
+  );
   return (
     <StatsPanel
       title={t("stats.topArtists.title")}
@@ -130,16 +165,15 @@ export function TopArtistsPanel({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         {loading ? (
           <PanelLoading />
-        ) : items.length ? (
-          items
-            .slice(0, 6)
-            .map((item, index) => (
-              <TopArtistCard
-                key={statsArtistKey(item)}
-                item={item}
-                index={index}
-              />
-            ))
+        ) : visible.length ? (
+          visible.map(({ item, index }) => (
+            <TopArtistCard
+              key={statsArtistKey(item)}
+              item={item}
+              index={index}
+              totalMinutes={totalMinutes}
+            />
+          ))
         ) : (
           <PanelEmpty text={t("stats.topArtists.empty")} />
         )}
@@ -148,7 +182,15 @@ export function TopArtistsPanel({
   );
 }
 
-function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
+function TopArtistCard({
+  item,
+  index,
+  totalMinutes,
+}: {
+  item: StatsArtist;
+  index: number;
+  totalMinutes: number;
+}) {
   const { t } = useTranslation();
   const photo = artistPhotoApiUrl(
     {
@@ -167,6 +209,7 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
       <StatsArtistRankView
         item={item}
         index={index}
+        share={totalMinutes > 0 ? item.minutes_listened / totalMinutes : null}
         href={artistPagePath({
           artistId: item.artist_id,
           globalArtistUid: item.global_artist_uid,
@@ -274,10 +317,16 @@ export function TopAlbumsPanel({
 }
 
 function TopAlbumCard({ item, rank }: { item: StatsAlbum; rank: number }) {
-  const { play_count: playCount, minutes_listened: minutes } = item;
+  const {
+    play_count: playCount,
+    minutes_listened: minutes,
+    is_new: isNew,
+  } = item;
   const meta = useMemo(
-    () => <StatsPlayMeta playCount={playCount} minutes={minutes} />,
-    [playCount, minutes],
+    () => (
+      <StatsPlayMeta playCount={playCount} minutes={minutes} isNew={isNew} />
+    ),
+    [playCount, minutes, isNew],
   );
   return (
     <AlbumCard

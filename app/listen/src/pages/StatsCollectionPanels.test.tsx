@@ -354,6 +354,109 @@ describe("Stats collection panels", () => {
     ).toBeInTheDocument();
   });
 
+  it("starts top artists at #2 when the hero is #1", () => {
+    const items = ["Fugazi", "Slint", "Shellac"].map((name, i) => ({
+      ...artist,
+      artist_id: 10 + i,
+      artist_name: name,
+      artist_slug: name.toLowerCase(),
+      minutes_listened: 30 - i,
+    }));
+    renderWithListenProviders(
+      <TopArtistsPanel
+        items={items}
+        loading={false}
+        heroArtistName="Fugazi"
+        totalMinutes={100}
+      />,
+    );
+
+    expect(screen.queryByText("Fugazi")).toBeNull();
+    expect(screen.getByText("Rank #2")).toBeInTheDocument();
+    expect(screen.getByText("Rank #3")).toBeInTheDocument();
+    expect(screen.queryByText("Rank #1")).toBeNull();
+    expect(screen.getByText("Slint")).toBeInTheDocument();
+  });
+
+  it("keeps the first artist when the hero is somebody else", () => {
+    renderWithListenProviders(
+      <TopArtistsPanel
+        items={[artist]}
+        loading={false}
+        heroArtistName="Slint"
+        totalMinutes={100}
+      />,
+    );
+    expect(screen.getByText("Rank #1")).toBeInTheDocument();
+  });
+
+  it("renders up to ten artists with share bars", () => {
+    const items = Array.from({ length: 12 }, (_, i) => ({
+      ...artist,
+      artist_id: 100 + i,
+      artist_name: `Artist ${i + 1}`,
+      artist_slug: `artist-${i + 1}`,
+      minutes_listened: i === 0 ? 50 : 5,
+    }));
+    renderWithListenProviders(
+      <TopArtistsPanel items={items} loading={false} totalMinutes={200} />,
+    );
+
+    expect(screen.getAllByText(/^Artist \d+$/)).toHaveLength(10);
+    const bars = screen.getAllByRole("progressbar");
+    expect(bars).toHaveLength(10);
+    expect(bars[0]).toHaveAttribute("aria-valuenow", "25");
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "2.5");
+  });
+
+  it("clamps the share and hides it when the total is zero", () => {
+    const { unmount } = renderWithListenProviders(
+      <TopArtistsPanel items={[artist]} loading={false} totalMinutes={10} />,
+    );
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "100",
+    );
+    unmount();
+    renderWithListenProviders(
+      <TopArtistsPanel items={[artist]} loading={false} totalMinutes={0} />,
+    );
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("badges new tracks, artists and albums", () => {
+    const tracks = renderTopTracks([
+      { ...track, is_new: true },
+      { ...secondTrack, is_new: false },
+    ]);
+    expect(screen.getAllByText("New")).toHaveLength(1);
+    tracks.unmount();
+
+    const artists = renderWithListenProviders(
+      <TopArtistsPanel
+        items={[
+          { ...artist, is_new: true },
+          { ...artist, artist_id: 9, artist_name: "Slint" },
+        ]}
+        loading={false}
+        totalMinutes={100}
+      />,
+    );
+    expect(screen.getAllByText("New")).toHaveLength(1);
+    artists.unmount();
+
+    renderWithListenProviders(
+      <TopAlbumsPanel
+        items={[
+          { ...album, is_new: true },
+          { ...album, album_id: 7, album: "Repeater" },
+        ]}
+        loading={false}
+      />,
+    );
+    expect(screen.getAllByText("New")).toHaveLength(1);
+  });
+
   it("computes artist menu entries only when the menu opens", async () => {
     vi.mocked(useArtistActionEntries).mockClear();
     renderWithListenProviders(

@@ -6715,6 +6715,10 @@
     "sourceHash": "sha256:e28dbc98f6b99e5870e033912796a8fa6f0b2b20f1a8efb1aabe3d82f2ceadc6",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
+  "stats.artistOfPeriod.discovered": {
+    "sourceHash": "sha256:0eb1e8374bef5121a6c3086cd8b5e988b1fe45c3904e58f1c7570917bef1326a",
+    "reviewedAt": "2026-10-21T01:29:08.432Z"
+  },
   "stats.artistOfPeriod.kicker": {
     "sourceHash": "sha256:c5404c1aa74d5203534e2d2a04d802ad96fbd9e8dd8d6bfb787d52067ea0d29c",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
@@ -6727,6 +6731,10 @@
     "sourceHash": "sha256:c93719d33dcae975b68c1f8eb88e1e75295855f40f84ce5fd20ba0d83f6334e4",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
+  "stats.artistOfPeriod.since": {
+    "sourceHash": "sha256:7ecf83d6ac1d5634cacf712b180e1a381f3e4210cb75705fb2ca391d63610080",
+    "reviewedAt": "2026-10-21T01:29:08.432Z"
+  },
   "stats.artistOfPeriod.topAlbum": {
     "sourceHash": "sha256:240fb9a9bd936caabcb180f8b54b49407f82d43e689d97073c720272b9f107c6",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
@@ -6738,6 +6746,10 @@
   "stats.artistOfPeriod.topPercentLabel": {
     "sourceHash": "sha256:ef4849168114e27f19cd4c66c3420ef97136025de538475f5a51f2aaf2c83b12",
     "reviewedAt": "2026-10-08T00:47:13.880Z"
+  },
+  "stats.badges.new": {
+    "sourceHash": "sha256:e4da97fa425ad8332f0de486e71fdeeba499b3bf88310be4722c3c74a80ee073",
+    "reviewedAt": "2026-10-21T01:29:08.432Z"
   },
   "stats.compare.noPrevious": {
     "sourceHash": "sha256:f5aa747ea0a50d8700e9912eb1477bea5900ab5511697518b4970bf5898c8cf0",
@@ -7526,6 +7538,10 @@
   "stats.topArtists.empty": {
     "sourceHash": "sha256:0647a0499b16957c3c9bdc5fddee3b6151147e9bad9d27834923b0e28701bd91",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.topArtists.share": {
+    "sourceHash": "sha256:5765ecac48e926f5e254deea14e84ba6c775610e3cde8426be07fbf005be7249",
+    "reviewedAt": "2026-10-21T01:29:08.432Z"
   },
   "stats.topArtists.subtitle": {
     "sourceHash": "sha256:22c9d30fb45610c209658c8a4e154f3f1015adcaf007c63d0cc5e21cd915bbc5",

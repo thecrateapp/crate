@@ -125,6 +125,7 @@ export function StatsOverviewReview({
     artist_name: long
       ? "A very long artist name with an uninterruptedidentitythatmustwrapwithinitsframe"
       : "Converge",
+    first_ever_day: "2026-09-12",
   };
   const chapters = buildDiggingChapters(
     dashboard,
@@ -277,6 +278,7 @@ export function StatsOverviewReview({
             artist={
               <StatsArtistOfPeriodView
                 artist={artist}
+                periodStart={dashboard.tape?.start}
                 href="/fixture/artist"
                 artwork={photo("size-full object-cover")}
               />
@@ -313,7 +315,7 @@ export function StatsOverviewReview({
                   }
                   title="Darkness"
                   details={<MonoLabel>The Lovecraft Sextet</MonoLabel>}
-                  meta={<StatsPlayMeta playCount={22} minutes={132} />}
+                  meta={<StatsPlayMeta playCount={22} minutes={132} isNew />}
                   actions={null}
                 />
               </TrackRowView>
@@ -330,8 +332,10 @@ export function StatsOverviewReview({
                 play_count: 204,
                 complete_play_count: 200,
                 minutes_listened: 720,
+                is_new: true,
               }}
-              index={0}
+              index={1}
+              share={0.18}
               href="/fixture/artist"
               artwork={photo(
                 "absolute inset-0 size-full object-cover grayscale opacity-55",
@@ -350,7 +354,7 @@ export function StatsOverviewReview({
                 title={`Album ${index + 1}`}
                 subtitle="Converge"
                 artwork={<MediaCover src={src} alt="" />}
-                meta={<StatsPlayMeta playCount={70} minutes={310} />}
+                meta={<StatsPlayMeta playCount={70} minutes={310} isNew />}
                 href="/fixture/album"
               />
             ))}

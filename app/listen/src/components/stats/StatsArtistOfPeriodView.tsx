@@ -16,16 +16,34 @@ function formatDay(value: string | null | undefined, locale: string) {
   });
 }
 
+/** ISO day strings compare lexicographically; no Date objects, no timezone shifts. */
+function originLine(
+  firstEverDay: string | null | undefined,
+  periodStart: string | null | undefined,
+  allTime: boolean,
+): { kind: "discovered" } | { kind: "since"; year: string } | null {
+  if (!firstEverDay) return null;
+  if (!allTime && periodStart && firstEverDay >= periodStart)
+    return { kind: "discovered" };
+  return { kind: "since", year: firstEverDay.slice(0, 4) };
+}
+
 export function StatsArtistOfPeriodView({
   artist,
   href,
   artwork,
+  periodStart,
+  allTime = false,
 }: {
   artist: ArtistOfPeriod;
   href: string;
   artwork: ReactNode;
+  /** First local day of the selected period (tape.start). */
+  periodStart?: string | null;
+  allTime?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const origin = originLine(artist.first_ever_day, periodStart, allTime);
   const firstDay = formatDay(artist.first_day_in_period, i18n.language);
 
   return (
@@ -41,6 +59,13 @@ export function StatsArtistOfPeriodView({
         <Link to={href} className="stats-artist-of-period-name">
           {artist.artist_name}
         </Link>
+        {origin ? (
+          <MonoLabel as="p" className="mt-3">
+            {origin.kind === "discovered"
+              ? t("stats.artistOfPeriod.discovered")
+              : t("stats.artistOfPeriod.since", { year: origin.year })}
+          </MonoLabel>
+        ) : null}
         <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
           {t("stats.artistOfPeriod.body", {
             days: artist.active_days,
