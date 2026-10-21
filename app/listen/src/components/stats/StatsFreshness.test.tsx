@@ -46,3 +46,18 @@ it("renders nothing without built_at and omits counting when final", () => {
   );
   expect(screen.getByText("Updated 3 hours ago")).toBeVisible();
 });
+
+it.each([
+  // FastAPI (pydantic) serialises TIMESTAMPTZ with microseconds and Z.
+  ["FastAPI", "2026-10-21T11:56:00.318791Z"],
+  // The Go read plane emits RFC3339Nano: a trimmed fraction, and an offset
+  // when the process runs outside UTC.
+  ["read plane", "2026-10-21T13:56:00.3187+02:00"],
+])("parses the %s snapshot timestamp format", (_source, builtAt) => {
+  vi.useFakeTimers({ now: new Date("2026-10-21T12:00:00Z") });
+  renderWithListenProviders(
+    <StatsFreshness snapshot={{ built_at: builtAt }} provisional={false} />,
+    { locale: "en" },
+  );
+  expect(screen.getByText("Updated 4 minutes ago")).toBeVisible();
+});

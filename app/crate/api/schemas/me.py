@@ -814,9 +814,10 @@ class StatsSnapshotMetaResponse(BaseModel):
     scope: str | None = None
     subject_key: str | None = None
     version: int | None = None
-    built_at: str | None = None
+    # ui_snapshots stores TIMESTAMPTZ; warm and stale rows arrive as datetimes.
+    built_at: datetime | str | None = None
     source_seq: int | None = None
-    stale_after: str | None = None
+    stale_after: datetime | str | None = None
     stale: bool = False
     pending: bool = False
     generation_ms: int | None = None
