@@ -77,6 +77,16 @@ for (const host of ["storybook", "standalone"] as const)
       await back.click();
       await expect(back).toHaveCount(0);
       await expect(chart).toBeFocused();
+      const heatmap = review.getByRole("grid", {
+        name: "Listening by weekday and hour",
+      });
+      await expect(heatmap.getByRole("gridcell")).toHaveCount(168);
+      await expect(heatmap.locator("[data-now]")).toHaveCount(1);
+      await heatmap.locator("[tabindex='0']").focus();
+      await heatmap.press("ArrowLeft");
+      await expect(review.locator("[data-slot='heatmap-readout']")).toHaveText(
+        "Sunday 21:00 · 5m",
+      );
       const launcher = review.getByRole("button", {
         name: "Open the story",
       });
@@ -107,6 +117,12 @@ for (const host of ["storybook", "standalone"] as const)
       };
       await choose("Stats scope", "global");
       await expect(launcher).toHaveCount(0);
+      await expect(heatmap).toHaveCount(0);
+      await expect(
+        review.getByText(
+          "The hourly pattern appears once at least 3 listeners have played music in this period.",
+        ),
+      ).toBeVisible();
       await expect(
         review.getByRole("link", { name: "Crate Pulse", exact: true }),
       ).toHaveAttribute("aria-current", "page");

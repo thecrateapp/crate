@@ -366,7 +366,14 @@ describe("Stats page", () => {
     expect(screen.getAllByText("Spectral Wound").length).toBeGreaterThan(0);
     expect(screen.getByText("31×")).toBeInTheDocument();
     expect(screen.getByText("Cómo escuchas")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /22:00/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("grid", { name: "Escucha por día de la semana y hora" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Se escucha sobre todo el domingo hacia las 22:00; el 38 %, de noche.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/ha crecido 9 puntos/)).toBeInTheDocument();
     expect(screen.getByText("2009")).toBeInTheDocument();
     expect(screen.getByText(/When Forever Comes Crashing/)).toBeInTheDocument();
@@ -502,6 +509,52 @@ describe("Stats page", () => {
       screen.queryByRole("radio", { name: String(CURRENT_YEAR) }),
     ).toBeNull();
     expect(mockUseApi).toHaveBeenCalledWith(null);
+  });
+
+  it.each([
+    ["personal", "/stats", "/stats", null, 1],
+    ["user", "/users/ana/stats", "/users/:username/stats", null, 0],
+    ["global", "/stats/global", "/stats/global", 4, 0],
+  ] as const)(
+    "wires the listening heatmap band for %s stats",
+    (_scope, route, path, listeners, nowCells) => {
+      const dashboard = signalDashboard();
+      dashboard.heatmap!.listener_count = listeners;
+      mockApis(dashboard);
+      const { container } = renderWithListenProviders(<Stats />, {
+        route,
+        path,
+        locale: "en",
+      });
+      const listening = container.querySelector<HTMLElement>("#listening")!;
+      const grid = within(listening).getByRole("grid", {
+        name: "Listening by weekday and hour",
+      });
+      expect(within(grid).getAllByRole("gridcell")).toHaveLength(168);
+      // The now outline only on the viewer's own stats.
+      expect(grid.querySelectorAll("[data-now]")).toHaveLength(nowCells);
+      // The top genre skips the appended faller.
+      expect(within(listening).getByText("Metalcore")).toBeInTheDocument();
+      expect(within(listening).getByText("Night 22–05")).toBeInTheDocument();
+    },
+  );
+
+  it("hides the Crate Pulse heatmap grid below three listeners", () => {
+    const dashboard = signalDashboard();
+    dashboard.heatmap!.listener_count = 2;
+    mockApis(dashboard);
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats/global",
+      path: "/stats/global",
+      locale: "en",
+    });
+    const listening = container.querySelector<HTMLElement>("#listening")!;
+    expect(within(listening).queryByRole("grid")).toBeNull();
+    expect(
+      within(listening).getByText(
+        "The hourly pattern appears once at least 3 listeners have played music in this period.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it.each([

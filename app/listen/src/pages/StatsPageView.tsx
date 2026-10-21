@@ -208,12 +208,21 @@ export function StatsEditorialStack({
     </div>
   );
 }
-export function StatsListeningView({ children }: { children: ReactNode }) {
+/** The Listening section: the full-width heatmap band, then the profile cards. */
+export function StatsListeningView({
+  band,
+  children,
+}: {
+  /** ListeningHeatmap; spans the section's full width. */
+  band?: ReactNode;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
   return (
-    <section className="grid min-w-0 gap-4">
+    <section id="listening" className="grid min-w-0 gap-4">
       <SectionHeader title={t("stats.listening.title")} />
-      <div className="grid min-w-0 gap-5 lg:grid-cols-3">{children}</div>
+      {band}
+      <div className="grid min-w-0 gap-5 lg:grid-cols-2">{children}</div>
     </section>
   );
 }

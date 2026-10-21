@@ -172,3 +172,20 @@ and legend recipes (`stats-signal-tape`, `-cursor`, `-tip`, `-axis`, `-legend-*`
 bar and mood-line recipes that Home's mini tape still draws remain (`stats-signal-svg`, `-bar`,
 `-mood`), plus the loading skeleton. The Listen/Stats review hosts the explorer's real view and
 panel with local fixtures and no network.
+
+The listening heatmap band (`stats-heatmap-*`) replaces Listen's old heatmap card. It is an HTML
+`role="grid"` of 168 hours where each `role="row"` is its own grid: an aria-hidden weekday column
+plus `repeat(24, minmax(0, 1fr))`, with no subgrid or `display: contents`. A cell's one shared
+style carries `--stats-level` and `--stats-delay`. The level is a `::before` opacity of
+`0.05 + level * 0.95` over `accent-action-hi`, with glow only from level 0.6. Night hours,
+the peak and the current hour are attributes, not inline styles. Night cells get the quiet-subtle
+surface and the night hours get a hairline on the hour axis. The peak and now outlines sit on
+`::after` (the now outline is dashed), so the focus ring stays free. Rows grow from 18px to 24px
+in bands of 40rem or wider. Forced colors show cell borders, the level in `Highlight`, the peak
+outline in `Highlight` and the axis rule under night hours only.
+
+The heatmap's only entrance is a diagonal wave on the first real payload. It waits for its
+section's reveal, and later payloads transition the level's opacity. Reduced motion renders the
+final state. The actual view is Listen's `ListeningHeatmap`. The Listen/Stats review shows it with
+the now hour (personal), with its grid hidden below three Crate Pulse listeners (D30), and with
+a flat zero-minute grid.

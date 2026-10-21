@@ -7019,17 +7019,57 @@
     "sourceHash": "sha256:05f9e67b0ab9dc290de2fdfd4e2bbff6817d859e480bf8baadc1c685e08a35b4",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
-  "stats.heatmap.detail": {
-    "sourceHash": "sha256:37e6efa18c9b9f83f30c1321e4d7c718880a637636712267960f4d9e38578622",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  "stats.heatmap.building": {
+    "sourceHash": "sha256:20939e564573f6ce832f493ed157f9a20ed913b0dcb09bd75133e9e8bae9eaa8",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
   },
-  "stats.heatmap.summary": {
-    "sourceHash": "sha256:0fa67330d599975b7137e3fc08544490a31ce62cb0fdd39a1e5c538f1713a07a",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
+  "stats.heatmap.cell": {
+    "sourceHash": "sha256:dde09661daa99ad3875f0aba8c0c3a8b2ff2d3a35ac53b78d5363ebacc129692",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.empty": {
+    "sourceHash": "sha256:07b552259ad133cdc50c75ceb24705035ea185f66b85b3eb680f0021fb6ec406",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.fewListeners": {
+    "sourceHash": "sha256:e55286ece08f767bff2ea77ab060b0f93fbf113e22b7cb95758e418341958cd9",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.figure": {
+    "sourceHash": "sha256:0118eab69cc7e7e8e7dc49e154819ab29e6ca12ed4090a3e8a776c97eb5c4d7f",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.grid": {
+    "sourceHash": "sha256:4d9f3054d6fc091f7020836553d402a5e34c7dd83e3428202afa221c7819bc9f",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.localTime": {
+    "sourceHash": "sha256:5c2eac13926b243f8a2368c8c2c4ce9d9a1dc70aa139c0d9258610e197e7e804",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.night": {
+    "sourceHash": "sha256:ca9cf445fd643d0a213195548f4e83b0f9cbc6982c9dbf584f53717672d1bd38",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.nowCell": {
+    "sourceHash": "sha256:51dd69571029775d842ec4a2f46235fd047bb4d4796e0cf35e1d03ce42a288a3",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.peak": {
+    "sourceHash": "sha256:05dcb63824d7a973c128a6643739c1abf7014edaef4cb6b060fe3edc5a443c0c",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
+  },
+  "stats.heatmap.readout": {
+    "sourceHash": "sha256:f0eaca6fb8b98e6bc2eb35090bfeea47f102c40f87dfe5ded9d50408d0bf8a1a",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
   },
   "stats.heatmap.title": {
     "sourceHash": "sha256:ff50bdb4e4a5a7a843a7e083e6417a66b7d16b18dda837211070a5862319a4a7",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.heatmap.topGenre": {
+    "sourceHash": "sha256:00f870db619f70fa968432538a6f6952a028d8bd1e88b8ad6662d7c412a165cc",
+    "reviewedAt": "2026-10-21T02:33:58.603Z"
   },
   "stats.hero.badge": {
     "sourceHash": "sha256:cd6c1eca5faa430338ca63539e24458e9bc83dd68b7233369e27cc23779116b7",

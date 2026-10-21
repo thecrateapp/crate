@@ -32,7 +32,8 @@ import { StatsArtistOfPeriodView } from "../../../app/listen/src/components/stat
 import { StatsReplayCard } from "../../../app/listen/src/components/stats/StatsReplayCard";
 import { StatsHighlightsView } from "../../../app/listen/src/components/stats/StatsHighlightsView";
 import { StatsSoundProfileView } from "../../../app/listen/src/pages/StatsSoundProfileView";
-import { StatsHeatmapCard } from "../../../app/listen/src/components/stats/StatsHeatmapCard";
+import { ListeningHeatmap } from "../../../app/listen/src/components/stats/ListeningHeatmap";
+import { heatmapTopGenre } from "../../../app/listen/src/components/stats/heatmap-model";
 import { StatsGenreTrendView } from "../../../app/listen/src/components/stats/StatsGenreTrendView";
 import {
   StatsDecadeColumnsView,
@@ -133,6 +134,15 @@ const renderDecades: DiggingMedia["renderDecades"] = (age) => (
     className="stats-digging-decades"
   />
 );
+// Heatmap fixtures: Crate Pulse below three listeners hides its grid (D30);
+// "long and zero" shows the flat zero-minute grid.
+const globalHeatmap = { ...dashboard.heatmap!, listener_count: 2 };
+const zeroHeatmap = {
+  cells: Array.from({ length: 7 }, () => Array<number>(24).fill(0)),
+  peak: null,
+  night_share: 0,
+  night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+};
 const media: DiggingMedia = {
   albumCover: () => IMAGE_SAMPLES[0]!,
   renderImage: (src) => <img src={src} alt="" />,
@@ -422,8 +432,28 @@ export function StatsOverviewReview({
             ))}
           </MediaGrid>
         </StatsPanel>
-        <StatsListeningView>
-          {!legacy ? <StatsHeatmapCard heatmap={dashboard.heatmap!} /> : null}
+        <StatsListeningView
+          band={
+            legacy ? null : (
+              <ListeningHeatmap
+                heatmap={
+                  long
+                    ? zeroHeatmap
+                    : scope === "global"
+                      ? globalHeatmap
+                      : dashboard.heatmap
+                }
+                timezone={dashboard.timezone}
+                showNow={scope === "personal"}
+                scope={scope}
+                topGenre={heatmapTopGenre(
+                  dashboard.top_genres.items,
+                  dashboard.genre_trend,
+                )}
+              />
+            )
+          }
+        >
           <StatsSoundProfileView
             profile={{
               energy: long ? 0 : legacy ? null : 0.79,

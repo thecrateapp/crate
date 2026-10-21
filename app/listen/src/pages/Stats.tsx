@@ -23,7 +23,8 @@ import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
 import { StatsFreshness } from "@/components/stats/StatsFreshness";
 import { StatsHeadlineNumbers } from "@/components/stats/StatsHeadlineNumbers";
-import { StatsHeatmapCard } from "@/components/stats/StatsHeatmapCard";
+import { ListeningHeatmap } from "@/components/stats/ListeningHeatmap";
+import { heatmapTopGenre } from "@/components/stats/heatmap-model";
 import { StatsHighlights } from "@/components/stats/StatsHighlights";
 import { StatsReplayCard } from "@/components/stats/StatsReplayCard";
 import { StatsPeriodPicker } from "@/components/stats/StatsPeriodPicker";
@@ -91,6 +92,12 @@ function statsComparison(page: StatsPageController) {
     });
   }
   return { previous: page.overview?.previous ?? null, caption };
+}
+
+/** Whose stats these are: the viewer's own, another listener's or the instance. */
+function statsScope(page: StatsPageController): "personal" | "user" | "global" {
+  if (page.isUserStats) return "user";
+  return page.isGlobalStats ? "global" : "personal";
 }
 
 /** Artists already featured above Movement: the hero and the top three. */
@@ -167,13 +174,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
             <StatsMovement
               story={dashboard.story}
               exclude={movementExclusions(page)}
-              scope={
-                page.isUserStats
-                  ? "user"
-                  : page.isGlobalStats
-                    ? "global"
-                    : "personal"
-              }
+              scope={statsScope(page)}
             />
           </StatsReveal>
         ) : null}
@@ -219,12 +220,25 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
 
 function StatsListeningSection({ page }: { page: StatsPageController }) {
   const { dashboard } = page;
+  const scope = statsScope(page);
   return (
     <StatsReveal>
-      <StatsListeningView>
-        {dashboard?.heatmap ? (
-          <StatsHeatmapCard heatmap={dashboard.heatmap} />
-        ) : null}
+      <StatsListeningView
+        band={
+          <ListeningHeatmap
+            heatmap={dashboard?.heatmap}
+            timezone={dashboard?.timezone}
+            showNow={scope === "personal"}
+            scope={scope}
+            topGenre={heatmapTopGenre(
+              page.topGenreItems,
+              dashboard?.genre_trend,
+            )}
+            loading={page.dashboardLoading && !dashboard}
+            pending={dashboard?.snapshot?.pending === true}
+          />
+        }
+      >
         <SoundProfileCard
           profile={page.soundProfile}
           previousProfile={page.previousSoundProfile}
@@ -252,9 +266,7 @@ function StatsHeader({ page }: { page: StatsPageController }) {
           </span>
         </>
       }
-      scope={
-        page.isUserStats ? "user" : page.isGlobalStats ? "global" : "personal"
-      }
+      scope={statsScope(page)}
       kicker={page.kicker}
       freshness={
         <StatsFreshness

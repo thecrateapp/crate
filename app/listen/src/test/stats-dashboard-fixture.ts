@@ -111,6 +111,7 @@ export function signalDashboard(): StatsDashboard {
       ),
       peak: { weekday: 6, hour: 22 },
       night_share: 0.38,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
     },
     music_age: {
       median_year: 2009,
