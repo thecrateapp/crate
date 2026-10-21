@@ -44,17 +44,19 @@ export function Stats() {
 }
 
 function statsComparison(page: StatsPageController) {
-  if (page.selectedMonth || page.selection === "all_time") return null;
-  const option = page.selectionOptions.find(
-    (candidate) => candidate.value === page.selection,
-  );
-  if (!option) return null;
-  return {
-    previous: page.overview?.previous ?? null,
-    periodLabel: /^\d{4}$/.test(option.label)
-      ? option.label
-      : page.t(option.label),
-  };
+  const { selection, selectedMonth, t } = page;
+  if (!selectedMonth && selection === "all_time") return null;
+  let caption: string;
+  if (selectedMonth) caption = t("stats.compare.vsPreviousMonth");
+  else if (selection === "365d" || selection.startsWith("year:"))
+    caption = t("stats.compare.vsPreviousYear");
+  else {
+    const days = selection.replace(/d$/, "");
+    caption = t("stats.compare.vsPrevious", {
+      period: t(`stats.period.${days}d`),
+    });
+  }
+  return { previous: page.overview?.previous ?? null, caption };
 }
 
 function StatsPageContent({ page }: { page: StatsPageController }) {

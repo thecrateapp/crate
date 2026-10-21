@@ -85,6 +85,30 @@ describe("Stats page", () => {
     expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
   });
 
+  it.each([
+    [`/stats?window=year:${CURRENT_YEAR}`, "vs previous year"],
+    ["/stats?window=365d", "vs previous year"],
+    ["/stats?month=2026-09", "vs previous month"],
+  ])("captions the comparison for %s as %s", (route, caption) => {
+    const dashboard = signalDashboard();
+    dashboard.overview.previous = {
+      start: "2025-01-01",
+      end: "2025-12-31",
+      minutes_listened: 1710,
+      play_count: 406,
+      active_days: 27,
+      artist_count: 10,
+    };
+    mockApis(dashboard);
+    renderWithListenProviders(<Stats />, {
+      route,
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByText(caption)).toBeVisible();
+    expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
+  });
+
   it("reserves loading geometry without claiming zero activity or an empty library", () => {
     mockUseApi.mockImplementation(() => ({
       data: null,

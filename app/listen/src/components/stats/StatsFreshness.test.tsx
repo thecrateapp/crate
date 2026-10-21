@@ -20,6 +20,15 @@ it("shows relative update time and counting state", () => {
   ).toBeVisible();
 });
 
+it("falls back to computed_until when built_at is missing", () => {
+  vi.useFakeTimers({ now: new Date("2026-10-21T12:00:00Z") });
+  renderWithListenProviders(
+    <StatsFreshness snapshot={{}} computedUntil="2026-10-21T11:50:00Z" />,
+    { locale: "en" },
+  );
+  expect(screen.getByText("Updated 10 minutes ago")).toBeVisible();
+});
+
 it("renders nothing without built_at and omits counting when final", () => {
   vi.useFakeTimers({ now: new Date("2026-10-21T12:00:00Z") });
   const { container, unmount } = renderWithListenProviders(

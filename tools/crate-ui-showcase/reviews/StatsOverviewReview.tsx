@@ -237,7 +237,7 @@ export function StatsOverviewReview({
                     active_days: 0,
                     artist_count: 64,
                   },
-                  periodLabel: "30 days",
+                  caption: "vs previous 30 days",
                 }
           }
           today={{

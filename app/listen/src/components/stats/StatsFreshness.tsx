@@ -10,16 +10,17 @@ const MINUTE_MS = 60_000;
 
 export function StatsFreshness({
   snapshot,
+  computedUntil,
   provisional,
 }: {
   snapshot?: StatsSnapshot | null;
-  /** The dashboard's `computed_until` day; the line reads the snapshot build time instead. */
+  /** Fallback timestamp when the snapshot has no `built_at`. */
   computedUntil?: string | null;
   provisional?: boolean | null;
 }) {
   const { t, i18n } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
-  const builtAt = snapshot?.built_at ?? null;
+  const builtAt = snapshot?.built_at ?? computedUntil ?? null;
   useEffect(() => {
     if (!builtAt) return;
     setNow(Date.now());

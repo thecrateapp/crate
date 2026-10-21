@@ -24,7 +24,8 @@ export function StatsHeadlineNumbers({
   /** null for all time (no comparison row); `previous: null` for a period without one. */
   comparison?: {
     previous: StatsOverviewPrevious | null;
-    periodLabel: string;
+    /** Localized caption, e.g. "vs previous 30 days". */
+    caption: string;
   } | null;
 }) {
   const { t, i18n } = useTranslation();
@@ -110,7 +111,7 @@ export function StatsHeadlineNumbers({
       {comparison ? (
         <MonoLabel as="p">
           {comparison.previous
-            ? t("stats.compare.vsPrevious", { period: comparison.periodLabel })
+            ? comparison.caption
             : t("stats.compare.noPrevious")}
         </MonoLabel>
       ) : null}

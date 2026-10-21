@@ -6747,6 +6747,14 @@
     "sourceHash": "sha256:a89f64535f82d905fce959771a6c59f7a0ec9ee6818ee49be5768c91264991da",
     "reviewedAt": "2026-10-21T01:22:07.185Z"
   },
+  "stats.compare.vsPreviousMonth": {
+    "sourceHash": "sha256:a533a8a947f6b0b1bc0969ddbf927d1115fc6e57402ab1b3b052670e54b0745f",
+    "reviewedAt": "2026-10-21T01:24:19.317Z"
+  },
+  "stats.compare.vsPreviousYear": {
+    "sourceHash": "sha256:33acca050ce75650627f0815db4b65e2794f8b9e9c95c5241ad86e2889509c55",
+    "reviewedAt": "2026-10-21T01:24:19.317Z"
+  },
   "stats.digging.age.body": {
     "sourceHash": "sha256:6d6bfebabbaa48d70df0f8eed987e83cf21bcc5313810f7f892468b305c30979",
     "reviewedAt": "2026-10-08T14:46:50.978Z"
@@ -7118,6 +7126,10 @@
   "stats.period.365d": {
     "sourceHash": "sha256:900fedf0e2427df24193b764f7879f8b8c541645cbec3b43c3929c6444100e74",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.period.7d": {
+    "sourceHash": "sha256:9252deb3477674df7d2a322135b43b853a4faef700f0e7dfb5997777880f93b9",
+    "reviewedAt": "2026-10-21T01:24:19.317Z"
   },
   "stats.period.90d": {
     "sourceHash": "sha256:81a2597e3684b215af9379f3e262208bafad100f7a08ccec039a96e454e470db",

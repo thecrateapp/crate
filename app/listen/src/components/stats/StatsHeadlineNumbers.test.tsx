@@ -41,7 +41,7 @@ it("shows signed deltas against the previous period", () => {
       activeDays={5}
       artists={20}
       today={null}
-      comparison={{ previous, periodLabel: "30 days" }}
+      comparison={{ previous, caption: "vs previous 30 days" }}
     />,
     { locale: "en" },
   );
@@ -61,7 +61,7 @@ it("shows a no-previous note when the period has no previous data", () => {
       activeDays={1}
       artists={null}
       today={null}
-      comparison={{ previous: null, periodLabel: "30 days" }}
+      comparison={{ previous: null, caption: "vs previous 30 days" }}
     />,
     { locale: "en" },
   );
