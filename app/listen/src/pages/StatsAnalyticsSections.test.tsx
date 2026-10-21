@@ -121,4 +121,56 @@ describe("SoundProfileCard", () => {
     expect(screen.getByTitle("post-punk · 25%")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /punk/ })).toBeNull();
   });
+
+  it("marks the previous sound profile", () => {
+    renderWithListenProviders(
+      <SoundProfileCard
+        profile={profile}
+        previousProfile={{
+          energy: 0.3,
+          danceability: 0,
+          valence: null,
+          bpm: 118,
+        }}
+        favourite={{ title: "Wild Thing", artist: "Converge" }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    expect(screen.getByText("Previous period 30%")).toBeInTheDocument();
+    expect(screen.getByText("Previous period 0%")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Previous period/)).toHaveLength(2);
+    expect(
+      screen.getByText("Your most energetic favourite: Wild Thing by Converge"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no previous marker or favourite without them", () => {
+    renderWithListenProviders(
+      <SoundProfileCard profile={profile} skipRate={0} genres={[]} />,
+    );
+
+    expect(screen.queryByText(/^Previous period/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/most energetic favourite/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders unknown audio values as a dash", () => {
+    renderWithListenProviders(
+      <SoundProfileCard
+        profile={{ energy: null, danceability: 0, valence: null, bpm: null }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryByRole("meter", { name: "Energy" })).toBeNull();
+    expect(screen.getByRole("meter", { name: "Movement" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+  });
 });

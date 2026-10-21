@@ -6983,6 +6983,14 @@
     "sourceHash": "sha256:5189da143bbd15a43d0c3746aa2ad9f717cad0784c5c238519010b59301035c6",
     "reviewedAt": "2026-10-21T01:22:07.185Z"
   },
+  "stats.genreTrend.delta": {
+    "sourceHash": "sha256:46883c8bb45dd8c1dabbe1fa976c480a24ab25ce6683d8c4010c73624936ee12",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
+  },
+  "stats.genreTrend.falling": {
+    "sourceHash": "sha256:d00906fdc5e27a36476f424d12113a52096d7b97538a0c33c1df9049ec0cff59",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
+  },
   "stats.genreTrend.rising": {
     "sourceHash": "sha256:9c71132813055b5aeff946398ad7771cdd97337bf13a5877dcdc96c07e215eb1",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
@@ -7119,9 +7127,17 @@
     "sourceHash": "sha256:9c43275fc503e020daaaa67a9d5910c436ebacc7c45d527ff02fdb8a031ae05a",
     "reviewedAt": "2026-10-10T18:23:08.711Z"
   },
+  "stats.musicAge.newest": {
+    "sourceHash": "sha256:e0cda5c283ae66f9cf85b15c1833e4a75ce9b83fee543c8884561c322a4d136e",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
+  },
   "stats.musicAge.oldest": {
     "sourceHash": "sha256:7a8cb52f5e475fd9bc243dede4f850b2e2c319f88b7d81a9ff8e31b6151878bc",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.musicAge.shareThisYear": {
+    "sourceHash": "sha256:5f5c2a1e4a8f790372b192a4592013d02411bd7090179976394d5b126d40439e",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
   },
   "stats.musicAge.title": {
     "sourceHash": "sha256:2af49321bc45fb9c78dc75c3ef18cf845ef2f7def6b6e71df66a37a9a29fd0cf",
@@ -7439,6 +7455,10 @@
     "sourceHash": "sha256:011ecae8c85ec311b9011304b464e2bba347d67e4131027f317da3f7e3d08140",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "stats.soundProfile.favourite": {
+    "sourceHash": "sha256:6993715934ed1d04269a55d49455a4c93e3b3a65b50c2c62de4cfb5c8bd76093",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
+  },
   "stats.soundProfile.genreEmpty": {
     "sourceHash": "sha256:f0bdba701dbe7255a388c3a6f57ec51d18658fe6c6fddd57ef6e7c34a3005efc",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -7446,6 +7466,10 @@
   "stats.soundProfile.movement": {
     "sourceHash": "sha256:b582648f0bd6379ced588cefa427fa71e0efb638fd816d3a01a18c9f98c48b8f",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.soundProfile.previous": {
+    "sourceHash": "sha256:11a79172668c9bbdd563b9afd9548d88061f97eb502d73b32b8844660a1a2711",
+    "reviewedAt": "2026-10-21T01:59:38.871Z"
   },
   "stats.soundProfile.skipRate": {
     "sourceHash": "sha256:38b6a9debc10235b17a365db732e36bac51f7a35cdd3b72cd669d667a60e6e4c",

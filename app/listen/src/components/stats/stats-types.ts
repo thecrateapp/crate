@@ -144,9 +144,9 @@ export interface StatsRhythm {
 }
 
 export interface StatsAudioProfile {
-  energy: number;
-  danceability: number;
-  valence: number;
+  energy: number | null;
+  danceability: number | null;
+  valence: number | null;
   bpm?: number | null;
 }
 
@@ -363,6 +363,8 @@ export interface StatsGenreTrend {
   slug?: string | null;
   share: number;
   delta_vs_previous?: number | null;
+  /** The biggest faller outside the top genres; appended by the API. */
+  faller?: boolean;
 }
 
 export interface StatsToday {

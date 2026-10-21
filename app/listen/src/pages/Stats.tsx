@@ -227,6 +227,8 @@ function StatsListeningSection({ page }: { page: StatsPageController }) {
         ) : null}
         <SoundProfileCard
           profile={page.soundProfile}
+          previousProfile={page.previousSoundProfile}
+          favourite={page.energeticFavourite}
           genres={[]}
           skipRate={page.overview?.skip_rate ?? 0}
           hideGenres

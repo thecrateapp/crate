@@ -120,6 +120,8 @@ export function signalDashboard(): StatsDashboard {
         { decade: 2010, share: 0.3 },
       ],
       oldest_album: { album: "When Forever Comes Crashing", year: 1998 },
+      newest_album: { album: "Heaven Is a Place", year: 2026 },
+      share_this_year: 0.12,
     },
     genre_trend: [
       {
@@ -127,6 +129,19 @@ export function signalDashboard(): StatsDashboard {
         slug: "metalcore",
         share: 0.34,
         delta_vs_previous: 0.09,
+      },
+      {
+        genre_name: "Post-Rock",
+        slug: "post-rock",
+        share: 0.21,
+        delta_vs_previous: -0.03,
+      },
+      {
+        genre_name: "Hardcore",
+        slug: "hardcore",
+        share: 0,
+        delta_vs_previous: -0.11,
+        faller: true,
       },
     ],
     story: {
@@ -147,6 +162,12 @@ export function signalDashboard(): StatsDashboard {
         danceability: 0.32,
         valence: 0.5,
         bpm: 137,
+      },
+      audio_profile_previous: {
+        energy: 0.64,
+        danceability: 0.4,
+        valence: 0.5,
+        bpm: 131,
       },
       monthly_snapshots: [],
     },

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { StatsStory, StatsTrack } from "@/components/stats/stats-types";
 import {
   normalizeSelectionParam,
+  buildPreviousSoundProfile,
+  pickEnergeticFavourite,
   statsDashboardReadState,
   selectionDays,
   selectionYear,
@@ -69,4 +72,53 @@ it("distinguishes a cold snapshot from versioned cached emptiness and preserves 
   expect(statsDashboardReadState(null, false, "Read failed")).toBe("error");
   expect(statsDashboardReadState(null, true, null)).toBe("loading");
   expect(statsDashboardReadState(undefined, true, null)).toBe("loading");
+});
+
+describe("pickEnergeticFavourite", () => {
+  const track = (title: string, energy?: number | null) =>
+    ({ title, artist: "A", energy }) as StatsTrack;
+
+  it("returns the top track with the highest known energy", () => {
+    expect(
+      pickEnergeticFavourite([
+        track("a", 0.2),
+        track("b", 0.9),
+        track("c", null),
+      ]),
+    ).toMatchObject({ title: "b", artist: "A" });
+  });
+
+  it("returns null when no top track has energy", () => {
+    expect(pickEnergeticFavourite([track("a", null), track("b")])).toBeNull();
+    expect(pickEnergeticFavourite([])).toBeNull();
+  });
+});
+
+describe("buildPreviousSoundProfile", () => {
+  const reading = { energy: 0.4, danceability: null, valence: 0.2, bpm: 120 };
+
+  it("uses the previous server profile only next to the current one", () => {
+    const story = {
+      audio_profile: reading,
+      audio_profile_previous: { ...reading, energy: 0.3 },
+    } as StatsStory;
+    expect(buildPreviousSoundProfile(story)).toEqual({
+      energy: 0.3,
+      danceability: null,
+      valence: 0.2,
+      bpm: 120,
+    });
+  });
+
+  it("is null without a server current profile or a previous window", () => {
+    expect(buildPreviousSoundProfile(undefined)).toBeNull();
+    expect(
+      buildPreviousSoundProfile({ audio_profile: reading } as StatsStory),
+    ).toBeNull();
+    expect(
+      buildPreviousSoundProfile({
+        audio_profile_previous: reading,
+      } as StatsStory),
+    ).toBeNull();
+  });
 });

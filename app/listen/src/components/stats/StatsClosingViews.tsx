@@ -98,6 +98,21 @@ export function StatsMusicAgeCardView({
           })}
         </p>
       ) : null}
+      {musicAge.newest_album ? (
+        <p className="text-sm leading-6 text-text-secondary">
+          {t("stats.musicAge.newest", {
+            album: musicAge.newest_album.album,
+            year: musicAge.newest_album.year,
+          })}
+        </p>
+      ) : null}
+      {musicAge.share_this_year != null ? (
+        <p className="text-sm leading-6 text-text-secondary">
+          {t("stats.musicAge.shareThisYear", {
+            share: Math.round(musicAge.share_this_year * 100),
+          })}
+        </p>
+      ) : null}
     </Card>
   );
 }

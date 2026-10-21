@@ -431,6 +431,14 @@ export function StatsOverviewReview({
               valence: legacy ? null : 0.5,
               bpm: legacy ? null : 137,
             }}
+            previousProfile={
+              legacy
+                ? null
+                : { energy: 0.64, danceability: 0.4, valence: null, bpm: 131 }
+            }
+            favourite={
+              legacy ? null : { title: "Concubine", artist: "Converge" }
+            }
             skipRate={0.05}
             genres={[]}
             hideGenres

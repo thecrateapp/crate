@@ -1,6 +1,7 @@
 import type {
   StatsDashboard,
   StatsSelection,
+  StatsStory,
   StatsTrack,
   StatsWindow,
 } from "../components/stats/stats-types";
@@ -105,6 +106,40 @@ export function formatMonthTitle(month: string, locale: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+export interface EnergeticFavourite {
+  title: string;
+  artist: string;
+}
+
+/** The top track with the highest known energy; null when none is analysed. */
+export function pickEnergeticFavourite(
+  items: StatsTrack[],
+): EnergeticFavourite | null {
+  let best: StatsTrack | null = null;
+  for (const item of items) {
+    if (typeof item.energy !== "number") continue;
+    if (!best || item.energy > (best.energy as number)) best = item;
+  }
+  return best ? { title: best.title, artist: best.artist } : null;
+}
+
+/**
+ * The previous reading only compares against the server profile; the
+ * top-track fallback is never a valid reference.
+ */
+export function buildPreviousSoundProfile(
+  story: StatsStory | undefined,
+): SoundProfile | null {
+  const previous = story?.audio_profile ? story.audio_profile_previous : null;
+  if (!previous) return null;
+  return {
+    energy: previous.energy,
+    danceability: previous.danceability,
+    valence: previous.valence,
+    bpm: previous.bpm ?? null,
+  };
 }
 
 export function buildSoundProfile(items: StatsTrack[]): SoundProfile {

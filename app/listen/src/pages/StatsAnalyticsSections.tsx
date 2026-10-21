@@ -17,8 +17,12 @@ export function SoundProfileCard({
   genres,
   skipRate,
   hideGenres = false,
+  previousProfile,
+  favourite,
 }: {
   profile: SoundProfile;
+  previousProfile?: SoundProfile | null;
+  favourite?: { title: string; artist: string } | null;
   genres: StatsGenre[];
   skipRate: number;
   hideGenres?: boolean;
@@ -36,6 +40,8 @@ export function SoundProfileCard({
   return (
     <StatsSoundProfileView
       profile={profile}
+      previousProfile={previousProfile}
+      favourite={favourite}
       genres={genreProfile}
       skipRate={skipRate}
       hideGenres={hideGenres}

@@ -20,7 +20,10 @@ import { shuffleArray } from "@/lib/utils";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
   STATS_DASHBOARD_LIMITS,
+  buildPreviousSoundProfile,
   buildSoundProfile,
+  pickEnergeticFavourite,
+  type EnergeticFavourite,
   formatMonthTitle,
   normalizeMonthParam,
   normalizeSelectionParam,
@@ -58,6 +61,8 @@ export interface StatsPageController {
   selectionOptions: StatsSelectionOption[];
   signalTitle: { lead: string; accent: string };
   soundProfile: SoundProfile;
+  previousSoundProfile: SoundProfile | null;
+  energeticFavourite: EnergeticFavourite | null;
   subjectName: string | null;
   t: ReturnType<typeof useTranslation>["t"];
   today: StatsToday | null;
@@ -231,6 +236,8 @@ export function useStatsPageController(): StatsPageController {
     selectionOptions,
     signalTitle: buildSignalTitle(selectedMonth, selection, i18n.language, t),
     soundProfile: buildStatsSoundProfile(story, topTrackItems),
+    previousSoundProfile: buildPreviousSoundProfile(story),
+    energeticFavourite: pickEnergeticFavourite(topTrackItems),
     subjectName,
     t,
     today: today ?? null,
