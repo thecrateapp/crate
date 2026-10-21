@@ -16,13 +16,9 @@ import { useTranslation } from "react-i18next";
 
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
-import { formatStatsMinutes } from "@/components/stats/stats-format";
-import type {
-  StatsTape,
-  StatsTapePeak,
-  StatsTapePoint,
-} from "@/components/stats/stats-types";
-import { isMotionBlocked } from "@/lib/motion-availability";
+import { formatStatsMinutes } from "../stats-format";
+import type { StatsTape, StatsTapePeak, StatsTapePoint } from "../stats-types";
+import { isMotionBlocked } from "../../../lib/motion-availability";
 
 import {
   bucketOfDay,

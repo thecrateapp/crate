@@ -26,7 +26,7 @@ import {
   StatsListeningView,
 } from "../../../app/listen/src/pages/StatsPageView";
 import { StatsHeadlineNumbers } from "../../../app/listen/src/components/stats/StatsHeadlineNumbers";
-import { StatsSignalTapeView } from "../../../app/listen/src/components/stats/StatsSignalTapeView";
+import { StatsExplorerReview } from "./StatsExplorerReview";
 import { StatsArtistOfPeriodView } from "../../../app/listen/src/components/stats/StatsArtistOfPeriodView";
 import { StatsHighlightsView } from "../../../app/listen/src/components/stats/StatsHighlightsView";
 import { StatsSoundProfileView } from "../../../app/listen/src/pages/StatsSoundProfileView";
@@ -224,11 +224,10 @@ export function StatsOverviewReview({
           }}
         />
         {!legacy ? (
-          <StatsSignalTapeView
+          <StatsExplorerReview
+            key={period}
             tape={dashboard.tape!}
-            renderAlbum={() => (
-              <MediaCover src={IMAGE_SAMPLES[0]} alt="" className="size-12" />
-            )}
+            selection={period}
           />
         ) : null}
         <StatsActionBandView

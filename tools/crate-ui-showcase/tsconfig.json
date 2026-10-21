@@ -11,7 +11,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node", "vite/client"],
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": { "@/lib/api": ["./fixtures/listen-api-types.ts"] }
   },
   "include": [
     ".storybook/**/*.ts",

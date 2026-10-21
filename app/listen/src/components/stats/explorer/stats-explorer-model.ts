@@ -1,4 +1,4 @@
-import type { StatsPeriodKey, StatsTape } from "@/components/stats/stats-types";
+import type { StatsPeriodKey, StatsTape } from "../stats-types";
 
 /** Bucket indexes into `tape.points`; `to` is exclusive. */
 export type ExplorerWindow = { from: number; to: number };

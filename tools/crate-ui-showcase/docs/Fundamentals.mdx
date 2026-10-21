@@ -166,3 +166,9 @@ window keeps its body draggable; the press position, not the hit element, choose
 resize. The strip keeps `touch-action: none` above app-level coarse `[tabindex]` rules, or the
 browser cancels the drag to pan. While a new stretch loads, the previous server blocks stay
 dimmed in place; a failed read says so instead of showing an empty stretch.
+
+The explorer replaces Listen's old signal tape on the Stats page; the tape's cursor, tooltip, axis
+and legend recipes (`stats-signal-tape`, `-cursor`, `-tip`, `-axis`, `-legend-*`) are gone. Only the
+bar and mood-line recipes that Home's mini tape still draws remain (`stats-signal-svg`, `-bar`,
+`-mood`), plus the loading skeleton. The Listen/Stats review hosts the explorer's real view and
+panel with local fixtures and no network.

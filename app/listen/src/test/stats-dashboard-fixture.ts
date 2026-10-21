@@ -47,7 +47,9 @@ export function signalDashboard(): StatsDashboard {
       start: "2026-09-09",
       end: "2026-10-09",
       points: Array.from({ length: 30 }, (_, index) => ({
-        bucket: `2026-09-${String(9 + Math.min(index, 21)).padStart(2, "0")}`,
+        bucket: new Date(Date.UTC(2026, 8, 9 + index))
+          .toISOString()
+          .slice(0, 10),
         minutes: 20 + index,
         plays: 5,
       })),

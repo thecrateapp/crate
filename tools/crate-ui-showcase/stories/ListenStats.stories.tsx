@@ -12,7 +12,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Actual Stats header, states, metric, artist, highlight, ranked poster, sound profile, tape, heatmap and closing views. Adapters retain API, canonical routes, managed images, playback and context menus. Initial loading reserves geometry; errors retry; cached data persists; unknown analysis is distinct from a confirmed zero. Existing signal/decade/heatmap instruments and editorial artwork scale remain. Crate Digging uses the production chapter builder, keyboard/timer/pointer and share summary, with local media/actions only. Search/skeleton loading evidence is in Reviews/1BE/Stats and Digging. No API writes, analytics changes or new instruments.",
+          "Actual Stats header, states, metric, artist, highlight, ranked poster, sound profile, stats explorer (real view and panel, local fixture blocks), heatmap and closing views. Adapters retain API, canonical routes, managed images, playback and context menus. Initial loading reserves geometry; errors retry; cached data persists; unknown analysis is distinct from a confirmed zero. Existing explorer/decade/heatmap instruments and editorial artwork scale remain. Crate Digging uses the production chapter builder, keyboard/timer/pointer and share summary, with local media/actions only. Search/skeleton loading evidence is in Reviews/1BE/Stats and Digging. No API writes, analytics changes or new instruments.",
       },
     },
   },

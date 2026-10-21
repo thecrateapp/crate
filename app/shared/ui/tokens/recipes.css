@@ -1979,17 +1979,6 @@ button.genre-pill:hover,
   animation: stats-blink 1.4s ease-in-out infinite;
 }
 
-.stats-signal {
-  margin-top: 1.75rem;
-}
-
-.stats-signal-tape {
-  position: relative;
-  height: 14rem;
-  cursor: crosshair;
-  border-radius: var(--radius-md);
-}
-
 .stats-signal-svg {
   display: block;
   width: 100%;
@@ -2023,79 +2012,6 @@ button.genre-pill:hover,
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: stats-draw 2.2s 0.8s ease-out forwards;
-}
-
-.stats-signal-cursor {
-  position: absolute;
-  top: -0.625rem;
-  bottom: -1.5rem;
-  width: 1px;
-  background: var(--accent-action);
-  box-shadow: 0 0 14px var(--accent-action);
-  pointer-events: none;
-}
-
-.stats-signal-cursor::before {
-  content: "";
-  position: absolute;
-  top: -0.25rem;
-  left: -0.25rem;
-  width: 0.5625rem;
-  height: 0.5625rem;
-  background: var(--accent-action);
-  transform: rotate(45deg);
-}
-
-.stats-signal-tip {
-  position: absolute;
-  top: 0.5rem;
-  display: flex;
-  width: 15rem;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid color-mix(in srgb, var(--accent-action) 50%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--surface-canvas) 94%, transparent);
-  pointer-events: none;
-  transform: translateX(0.75rem);
-}
-
-.stats-signal-tip[data-side="left"] {
-  transform: translateX(calc(-100% - 0.75rem));
-}
-
-.stats-signal-axis {
-  position: relative;
-  height: 1.5rem;
-  margin-top: 1.75rem;
-  border-top: 1px solid var(--border-quiet);
-  color: var(--text-muted);
-  font-size: 0.625rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.stats-signal-axis span {
-  position: absolute;
-  top: 0.5rem;
-  white-space: nowrap;
-}
-
-.stats-signal-legend-bar {
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--text-primary) 30%, transparent);
-}
-
-.stats-signal-legend-bar[data-hot] {
-  background: var(--accent-action);
-}
-
-.stats-signal-legend-line {
-  width: 0.875rem;
-  border-top: 2px solid var(--text-primary);
 }
 
 .stats-signal-skeleton {

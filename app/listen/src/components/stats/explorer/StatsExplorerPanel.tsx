@@ -11,23 +11,20 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { Button } from "@crate/ui/shadcn/button";
 
-import {
-  formatStatsMinutes,
-  formatStatsPercent,
-} from "@/components/stats/stats-format";
+import { formatStatsMinutes, formatStatsPercent } from "../stats-format";
 import type {
   StatsRange,
   StatsRangeAlbum,
   StatsRangeArtist,
   StatsRangeTrack,
-} from "@/components/stats/stats-types";
+} from "../stats-types";
 import {
   albumCoverApiUrl,
   albumPagePath,
   artistPagePath,
   artistPhotoApiUrl,
-} from "@/lib/library-routes";
-import { cn } from "@/lib/utils";
+} from "../../../lib/library-routes";
+import { cn } from "../../../lib/utils";
 
 import {
   formatExplorerDay,

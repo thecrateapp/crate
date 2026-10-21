@@ -16,13 +16,13 @@ import {
   StatsDiscoveriesCard,
   StatsMusicAgeCard,
 } from "@/components/stats/StatsClosingCards";
+import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
 import { StatsHeadlineNumbers } from "@/components/stats/StatsHeadlineNumbers";
 import { StatsHeatmapCard } from "@/components/stats/StatsHeatmapCard";
 import { StatsHighlights } from "@/components/stats/StatsHighlights";
 import { StatsPeriodPicker } from "@/components/stats/StatsPeriodPicker";
 import { StatsReveal } from "@/components/stats/StatsReveal";
-import { StatsSignalTape } from "@/components/stats/StatsSignalTape";
 import {
   useStatsPageController,
   type StatsPageController,
@@ -66,7 +66,15 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           today={page.today}
         />
         {tape?.points.length ? (
-          <StatsSignalTape tape={tape} />
+          <StatsExplorer
+            tape={tape}
+            selection={
+              page.selectedMonth
+                ? `month:${page.selectedMonth}`
+                : page.selection
+            }
+            rangeEndpoint={page.rangeEndpoint}
+          />
         ) : dashboardLoading && !dashboard ? (
           <div className="stats-signal-skeleton" aria-hidden="true" />
         ) : null}

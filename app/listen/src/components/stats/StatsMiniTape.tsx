@@ -5,7 +5,7 @@ import {
   formatStatsMinutes,
   type StatsTape,
 } from "@/components/stats/stats-model";
-import { TapeBars, localToday } from "@/components/stats/StatsSignalTape";
+import { TapeBars, localToday } from "@/components/stats/TapeBars";
 import { buildTapeModel } from "@/components/stats/stats-tape-model";
 
 export function StatsMiniTape({ tape }: { tape: StatsTape }) {

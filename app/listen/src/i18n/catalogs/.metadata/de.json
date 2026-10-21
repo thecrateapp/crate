@@ -7315,40 +7315,12 @@
     "sourceHash": "sha256:106127a7d843ebdc1ace76265543d655992b0707e3432c2f2731b4d1ac118a38",
     "reviewedAt": "2026-10-08T14:46:50.978Z"
   },
-  "stats.signal.legend.dayMinutes": {
-    "sourceHash": "sha256:32f72ed91a17856b260f59563317ff31e89eb6b1aa69af30d526fe5fd530a128",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.legend.energy": {
-    "sourceHash": "sha256:ae5ed05a78a5cb5a414c6002aa432ef000a749ab9e29facabcba1215243ffc32",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.legend.peaks": {
-    "sourceHash": "sha256:63e139b515fb99262534dcf6662b3208ba748d1f6e083bde82956755c42e73dd",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.legend.weekMinutes": {
-    "sourceHash": "sha256:a9b1d317c89ba670838c2d6ebc6ce488de4b9c1d3f7b7ba5643d2091e662311e",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
   "stats.signal.playReplay": {
     "sourceHash": "sha256:babd3d46d6272adadb9db6272dd6a5d05df80e84ce588e32aee761bfafe19c01",
     "reviewedAt": "2026-10-08T10:47:07.617Z"
   },
   "stats.signal.tapeLabel": {
     "sourceHash": "sha256:7341d95837cbc06cb88bd284c5ed3506b49d6635c12a9196588c85f544d0d546",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.tip.minutes": {
-    "sourceHash": "sha256:491a3e4a24961905040266b89de7e25f3161836a5e73c2003052d85f029d4f8b",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.tip.obsession": {
-    "sourceHash": "sha256:4fe7d4105cc011dd548c34da39563c75654d9add3ad1f371151344d85e165f06",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.signal.tip.weekOf": {
-    "sourceHash": "sha256:02a7508772ed1c71e4781aedce764eb846337351ca994da9b3eae865f35ed7de",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
   "stats.signal.title.accent": {

@@ -50,6 +50,7 @@ export interface StatsPageController {
   kicker: string;
   overview: StatsDashboard["overview"] | undefined;
   playReplay: () => void;
+  rangeEndpoint: string;
   replayItems: ReplayMix["items"];
   selectedMonth: string | null;
   selection: StatsSelection;
@@ -77,6 +78,17 @@ function buildStatsEndpoint(
     return `/api/users/${encodeURIComponent(username)}/stats/dashboard`;
   }
   return "/api/me/stats/dashboard";
+}
+
+function buildRangeEndpoint(
+  isGlobalStats: boolean,
+  username: string | undefined,
+): string {
+  if (isGlobalStats) return "/api/stats/range";
+  if (username) {
+    return `/api/users/${encodeURIComponent(username)}/stats/range`;
+  }
+  return "/api/me/stats/range";
 }
 
 function buildKicker(
@@ -202,6 +214,7 @@ export function useStatsPageController(): StatsPageController {
     kicker: buildKicker(isGlobalStats, isUserStats, subjectName, t),
     overview,
     playReplay,
+    rangeEndpoint: buildRangeEndpoint(isGlobalStats, username),
     replayItems,
     selectedMonth,
     selection,

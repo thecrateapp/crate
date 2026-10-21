@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import type {
   StatsDashboard,
@@ -15,6 +16,11 @@ import { Stats } from "./Stats";
 
 vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
+}));
+
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  api: vi.fn(() => new Promise(() => {})),
 }));
 
 vi.mock("@/hooks/use-lazy-crate-options", () => ({
@@ -270,7 +276,7 @@ describe("Stats page", () => {
     expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
   });
 
-  it("renders the signal tape and every section of the redesigned page", () => {
+  it("renders the explorer and every section of the redesigned page", () => {
     mockApis(signalDashboard(), {
       day: "2026-10-08",
       timezone: "Europe/Madrid",
@@ -285,7 +291,7 @@ describe("Stats page", () => {
     });
 
     expect(
-      screen.getByRole("group", { name: /de escucha en 30 barras/ }),
+      screen.getByRole("group", { name: "Escucha en el tramo seleccionado" }),
     ).toBeInTheDocument();
     expect(screen.getByText("minutos hoy")).toBeInTheDocument();
     expect(screen.getByText("artistas")).toBeInTheDocument();
@@ -349,7 +355,7 @@ describe("Stats page", () => {
     });
 
     expect(
-      screen.queryByRole("group", { name: /de escucha en .* barras/ }),
+      screen.queryByRole("group", { name: "Escucha en el tramo seleccionado" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("Top tracks")).toBeInTheDocument();
   });
@@ -371,4 +377,35 @@ describe("Stats page", () => {
     ).toBeNull();
     expect(mockUseApi).toHaveBeenCalledWith(null);
   });
+
+  it.each([
+    ["personal", "/stats", "/stats", "/api/me/stats/range?"],
+    ["global", "/stats/global", "/stats/global", "/api/stats/range?"],
+    [
+      "user",
+      "/users/ana%20b/stats",
+      "/users/:username/stats",
+      "/api/users/ana%20b/stats/range?",
+    ],
+  ])(
+    "renders the explorer for %s stats with their range endpoint",
+    async (_scope, route, path, expected) => {
+      vi.mocked(api).mockClear();
+      mockApis(signalDashboard());
+      renderWithListenProviders(<Stats />, { route, path, locale: "en" });
+      expect(
+        screen.getByRole("group", {
+          name: "Listening in the selected stretch",
+        }),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(vi.mocked(api)).toHaveBeenCalledWith(
+          expect.stringContaining(expected),
+          "GET",
+          undefined,
+          expect.anything(),
+        ),
+      );
+    },
+  );
 });

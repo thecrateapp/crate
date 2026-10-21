@@ -59,6 +59,24 @@ for (const host of ["storybook", "standalone"] as const)
       expect(readings[1]!.left - readings[0]!.left).toBeGreaterThanOrEqual(
         readings[0]!.width + 35,
       );
+      const chart = review.getByRole("group", {
+        name: "Listening in the selected stretch",
+      });
+      await expect(chart).toBeVisible();
+      await expect(review.getByText("In this stretch")).toBeVisible();
+      await chart.focus();
+      await chart.press("Enter");
+      const back = review.getByRole("button", { name: "Back to the stretch" });
+      await expect(back).toBeVisible();
+      await expect(review.getByText("Day in detail")).toBeVisible();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await back.click();
+      await expect(back).toHaveCount(0);
+      await expect(chart).toBeFocused();
       const launcher = review.getByRole("button", {
         name: "Open the story",
       });
@@ -108,11 +126,11 @@ for (const host of ["storybook", "standalone"] as const)
       await choose("Dashboard state", "empty");
       await expect(review.getByTestId("empty-state")).toBeVisible();
       await choose("Dashboard state", "legacy");
-      await expect(review.locator(".stats-signal-svg")).toHaveCount(0);
+      await expect(chart).toHaveCount(0);
       await expect(review.getByRole("meter")).toHaveCount(0);
       await choose("Dashboard state", "long and zero");
       await expect(
-        review.getByRole("meter", { name: "Energy", exact: true }),
+        review.getByRole("meter", { name: "Energy", exact: true }).last(),
       ).toHaveAttribute("aria-valuenow", "0");
       const longName = review.getByRole("link", {
         name: /A very long artist name/,

@@ -1,4 +1,4 @@
-import type { StatsTape } from "@/components/stats/stats-types";
+import type { StatsTape } from "../stats-types";
 
 import {
   clampWindow,
