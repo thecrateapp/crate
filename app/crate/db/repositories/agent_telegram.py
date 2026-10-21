@@ -121,7 +121,10 @@ def approval_policy(principal, *, session=None):
             .mappings()
             .one()
         )
+        from crate.operator_provenance import is_operator
+
         return {
+            "operator_provenance_required": is_operator(principal.id),
             "principal_id": principal.id,
             "credential_id": principal.credential_id,
             "require_approval": row["require_approval"],
@@ -202,6 +205,9 @@ def request_confirmation(
             },
             session=current,
         )
+        from crate.operator_provenance import validate
+
+        validate(principal.id, plans._reviewed_provenance(plan))
         document = plans._document(plan, identity=True)
         confirmation_id = secrets.token_hex(16)
         pages = plan_pages(document, apply_after_approval=apply_after_approval)

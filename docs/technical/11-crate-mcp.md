@@ -232,7 +232,6 @@ For the surrounding runtime read [Workers and tasks](03-worker-tasks-and-backgro
 [Auth and sessions](07-auth-users-social-and-sessions.md) and
 [Frontend architecture](08-frontends-admin-and-listen.md).
 
-
 ## Exact structured show review and publication
 
 Verified against implementation and tests on 2026-10-21. Admin manual/structured import
@@ -276,7 +275,6 @@ binding. Current instance show/job state requires authorized MCP evidence. If th
 read grants lack that surface, report it unavailable instead of invoking an import or
 assuming publication from these source contracts.
 
-
 ## Bounded observation coverage (contract 1.2 candidate)
 
 Contract 1.2.0 adds four read tools with the existing envelope schema `1`.
@@ -292,17 +290,17 @@ retain their own creation/update/heartbeat timestamps. No tool invokes an HTTP h
 rebuilds a snapshot, refreshes coverage, probes Docker/Redis or enqueues domain work.
 The usual bounded MCP admission and diagnostic audit still apply.
 
-| Surface / subsystem | Persisted source and implementation | Coverage | Explicitly missing evidence |
-| --- | --- | --- | --- |
-| Instance inventory | `agent_observability.read_observation_evidence`: `alembic_version`; fixed service allowlist from stored `ui_snapshots` `ops:stack/global`; current MCP contract constant | Partial | Release/context manifests are not mounted in the API; image IDs and source commits are unknown. A stored image reference or container state is not current functional health. Use the separate `get_release_context` for release versus reused image source provenance. |
-| Worker and import | Stored `ops_runtime_state.worker_live` counters and `imports_pending.count`, produced by worker/import queue updates | Partial | Live worker/dependency probes, complete pipeline progress and fresh storage validation |
-| Analysis / Bliss | Worker-produced `ops_runtime_state.analysis_status` counters; the two pipelines remain distinct | Partial | Live daemon probes, exact complete backlog from counters, Smart Mix profile coverage |
-| Enrichment / playback / federation / acquisition | At most 20 matching newest task rows created in the last 24 hours (21st row is a truncation sentinel); task categories come from `task_registry` | Partial | Complete backlog, older long-running tasks, provider connectivity, end-to-end playback/federation success |
-| Projector | Stored `ops/dashboard.eventing.outbox` allowlisted counters with snapshot build time/version/source sequence | Partial | Live relay/Redis probes, complete consumer lag, per-event delivery; producer `unavailable` survives and is never a healthy zero |
-| Smart Mix coverage / campaign | Stored `smart_mix:coverage` and `smart_mix:backfill_campaign` with independent DB timestamps and stored versions | Implemented stored read, partial operational coverage | No coverage recompute, campaign control or proof of DSP completion from enqueue. Missing coverage is null, not an empty zero-count default. |
-| Smart Mix exact profiles | One UUID-batched lookup of `track_mix_profiles` and `track_processing_state` for at most 50 unique exact track UUIDs | Implemented bounded read, partial library coverage | No library scan, new acoustic validation, candidate ranking, transition plan or physical/platform acceptance |
-| Provider / storage / streaming / Redis health | No functional probe is called by these tools | Unavailable | Current functional health; HTTP 200 or a running process cannot establish it |
-| Operational event cursor | No global UI-event journal is synthesized | Unavailable in these tools | A supervisor supplies its own durable operational event cursor |
+| Surface / subsystem                              | Persisted source and implementation                                                                                                                                      | Coverage                                              | Explicitly missing evidence                                                                                                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instance inventory                               | `agent_observability.read_observation_evidence`: `alembic_version`; fixed service allowlist from stored `ui_snapshots` `ops:stack/global`; current MCP contract constant | Partial                                               | Release/context manifests are not mounted in the API; image IDs and source commits are unknown. A stored image reference or container state is not current functional health. Use the separate `get_release_context` for release versus reused image source provenance. |
+| Worker and import                                | Stored `ops_runtime_state.worker_live` counters and `imports_pending.count`, produced by worker/import queue updates                                                     | Partial                                               | Live worker/dependency probes, complete pipeline progress and fresh storage validation                                                                                                                                                                                  |
+| Analysis / Bliss                                 | Worker-produced `ops_runtime_state.analysis_status` counters; the two pipelines remain distinct                                                                          | Partial                                               | Live daemon probes, exact complete backlog from counters, Smart Mix profile coverage                                                                                                                                                                                    |
+| Enrichment / playback / federation / acquisition | At most 20 matching newest task rows created in the last 24 hours (21st row is a truncation sentinel); task categories come from `task_registry`                         | Partial                                               | Complete backlog, older long-running tasks, provider connectivity, end-to-end playback/federation success                                                                                                                                                               |
+| Projector                                        | Stored `ops/dashboard.eventing.outbox` allowlisted counters with snapshot build time/version/source sequence                                                             | Partial                                               | Live relay/Redis probes, complete consumer lag, per-event delivery; producer `unavailable` survives and is never a healthy zero                                                                                                                                         |
+| Smart Mix coverage / campaign                    | Stored `smart_mix:coverage` and `smart_mix:backfill_campaign` with independent DB timestamps and stored versions                                                         | Implemented stored read, partial operational coverage | No coverage recompute, campaign control or proof of DSP completion from enqueue. Missing coverage is null, not an empty zero-count default.                                                                                                                             |
+| Smart Mix exact profiles                         | One UUID-batched lookup of `track_mix_profiles` and `track_processing_state` for at most 50 unique exact track UUIDs                                                     | Implemented bounded read, partial library coverage    | No library scan, new acoustic validation, candidate ranking, transition plan or physical/platform acceptance                                                                                                                                                            |
+| Provider / storage / streaming / Redis health    | No functional probe is called by these tools                                                                                                                             | Unavailable                                           | Current functional health; HTTP 200 or a running process cannot establish it                                                                                                                                                                                            |
+| Operational event cursor                         | No global UI-event journal is synthesized                                                                                                                                | Unavailable in these tools                            | A supervisor supplies its own durable operational event cursor                                                                                                                                                                                                          |
 
 `get_pipeline_status.pipeline` is the closed enum `import`, `enrichment`, `analysis`,
 `bliss`, `playback`, `projector`, `federation`, `acquisition`. The returned exact task type
@@ -337,7 +335,6 @@ Unit, PostgreSQL read-only and actual SDK authorization/no-refresh tests are in
 `test_agent_observability.py`, `test_agent_observability_db.py`, and
 `test_mcp_observability.py`. Local tests do not establish real-host rollout acceptance.
 
-
 The assembled summary also has a 55,000-byte UTF-8 budget. If needed, it omits the largest
 source data blocks while retaining source names, timestamps, freshness and versions. Those
 source envelopes become explicitly unavailable and truncated; top-level `truncated` and
@@ -345,7 +342,6 @@ source envelopes become explicitly unavailable and truncated; top-level `truncat
 analysis and import counters must be nonnegative integers within signed 64-bit bounds;
 worker engine must be a string of at most 128 characters. Invalid fields are omitted and
 reported in `invalid_fields`, never turned into healthy zero counters.
-
 
 ## Native Telegram human confirmation
 
@@ -356,3 +352,9 @@ on the human button, without another Admin review or model invocation. Current
 approval policy and worker authority remain server-enforced, including denial of
 legacy direct-command bypasses. See [Native Telegram plan confirmation](hermes-plan-confirmation.md)
 for binding, page review, replay/expiry, operator profile and reconciliation.
+
+The [integrated Hermes operator candidate](hermes-operator-release.md) binds
+server-configured operator principals to fresh release/context/per-image evidence
+at direct MCP, native approval, admission and worker effect boundaries. It packages
+independent recovery/monitoring, native incident decisions and automatic job watches;
+production activation remains separately reviewed.

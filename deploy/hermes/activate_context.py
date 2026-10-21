@@ -18,11 +18,22 @@ def record_deployment(root: Path, deployment: dict, state: str) -> None:
     marker = root / (".deployment-" + uuid4().hex)
     marker.write_text(json.dumps({**deployment, "state": state}) + "\n")
     os.replace(marker, root / "deployment.json")
+    public = root / "public"
+    public.mkdir(exist_ok=True)
+    marker = public / (".deployment-" + uuid4().hex)
+    marker.write_text(
+        json.dumps({"release_sha": deployment.get("release_sha"), "state": state})
+        + "\n"
+    )
+    os.replace(marker, public / "deployment.json")
 
 
 def activate_context(root: Path, archive: Path | None, revision: str) -> None:
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise ValueError("A full release SHA is required")
+    # Keep the public mutation gate closed until both the active link and its
+    # exact manifest hash have changed, including same-SHA context replacement.
+    record_deployment(root, {"release_sha": revision}, "deploying")
     releases = root / "releases"
     releases.mkdir(parents=True, exist_ok=True)
     target = None
@@ -85,10 +96,22 @@ def activate_context(root: Path, archive: Path | None, revision: str) -> None:
     manifest = json.loads((target / "context-manifest.json").read_text())
     if manifest["release_sha"] != revision:
         raise ValueError("Stored context belongs to another release")
-    record_deployment(root, manifest["deployment"], "verified")
     link = root / (".active-" + uuid4().hex)
     link.symlink_to("releases/" + target.name)
     os.replace(link, root / "active")
+    marker = root / "public" / (".context-" + uuid4().hex)
+    marker.write_text(
+        json.dumps(
+            {
+                "context_sha256": hashlib.sha256(
+                    (target / "context-manifest.json").read_bytes()
+                ).hexdigest()
+            }
+        )
+        + "\n"
+    )
+    os.replace(marker, root / "public/context.json")
+    record_deployment(root, manifest["deployment"], "verified")
 
 
 def main():

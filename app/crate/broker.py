@@ -6,6 +6,7 @@ but Dramatiq queue keys (no TTL) are never lost.
 """
 
 import logging
+import os
 
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
@@ -27,6 +28,31 @@ log = logging.getLogger(__name__)
 _BROKER_URL = get_durable_redis_url().rsplit("/", 1)[0] + "/1"
 
 
+class ReadinessBroker(RedisBroker):
+    def consume(self, queue_name, prefetch=1, timeout=5000):
+        consumer = super().consume(queue_name, prefetch=prefetch, timeout=timeout)
+        if not os.environ.get("CRATE_READINESS_ROLE"):
+            return consumer
+
+        class ObservedConsumer:
+            def __getattr__(self, name):
+                return getattr(consumer, name)
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                result = next(consumer)
+                from crate.role_readiness import progress
+
+                # Successful consumer iteration, independent broker probe in the
+                # health command, and per-container files; no global worker cache.
+                progress("queue_" + queue_name.replace(".DQ", "_delay"))
+                return result
+
+        return ObservedConsumer()
+
+
 def get_broker() -> RedisBroker:
     """Create and configure the Dramatiq Redis broker."""
     middleware = [
@@ -37,7 +63,7 @@ def get_broker() -> RedisBroker:
         Pipelines(),
         Retries(max_retries=0),  # default no retry; actors override per-type
     ]
-    broker = RedisBroker(url=_BROKER_URL, middleware=middleware)
+    broker = ReadinessBroker(url=_BROKER_URL, middleware=middleware)
     return broker
 
 

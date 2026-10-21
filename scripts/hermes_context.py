@@ -46,6 +46,8 @@ SOURCE_ROOTS = (
     "tools/vdj-plugin/src/",
     "tools/vdj-plugin/include/",
     "scripts/",
+    "deploy/operator/",
+    "deploy/hermes/",
 )
 SOURCE_SUFFIXES = {
     ".py",
@@ -63,6 +65,9 @@ SOURCE_SUFFIXES = {
     ".swift",
     ".cpp",
     ".hpp",
+    ".json",
+    ".yaml",
+    ".service",
     ".h",
 }
 

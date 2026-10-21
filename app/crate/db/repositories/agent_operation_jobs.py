@@ -47,6 +47,11 @@ def prepare_operation(
         "required_grants": [grant],
         "target_keys": [],
     }
+    from crate.operator_provenance import capture
+
+    provenance = capture(principal.id)
+    if provenance is not None:
+        payload["operator_provenance"] = provenance
     control = operation in {"job_retry", "job_cancel"}
     request_hash = (
         requests._hash({"domain_operation": operation, "parameters": parameters})
@@ -108,6 +113,13 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
             raise DiagnosticError(
                 "STATE_CONFLICT", "Compiled operation does not match its job"
             )
+        from crate.operator_provenance import validate
+
+        reviewed = job["payload"].get("operator_provenance")
+        validate(job["principal_id"], reviewed)
+        if reviewed is not None:
+            document = {**document, "operator_provenance": reviewed}
+            execution = {**execution, "operator_provenance": reviewed}
         policy = (
             current.execute(
                 text(
@@ -119,7 +131,8 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
             .one()
         )
         mandatory = (
-            document.get("risk") in {"high", "destructive"}
+            reviewed is not None
+            or document.get("risk") in {"high", "destructive"}
             or document.get("impact", {}).get("scope") == "global"
         )
         approval = bool(mandatory or policy["require_approval"])

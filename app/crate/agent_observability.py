@@ -288,6 +288,20 @@ def get_instance_inventory():
             live_image_verified=False,
         )
         services[service] = item
+    from crate.operator_provenance import observation
+
+    provenance = observation()
+    identity = provenance["identity"]
+    if identity:
+        for service, image in identity["images"].items():
+            if service in services:
+                services[service].update(
+                    image_id=image["image_id"],
+                    image_source_sha=image["source_sha"],
+                    image_digest_reference=image["reference"],
+                    image_provenance_observed_at=provenance["observed_at"],
+                    live_image_verified=True,
+                )
     schema = evidence.get("database_schema_version")
     sources = {
         "database_schema": _source(
@@ -296,13 +310,19 @@ def get_instance_inventory():
             {"version": schema} if schema else None,
             failure,
         ),
-        "release_manifest": _missing(
-            "release_manifest",
-            "Release manifest is not available to this API; consult get_release_context on the context MCP",
+        "release_manifest": _source(
+            "host_verified_release",
+            {"observed_at": provenance["observed_at"]},
+            identity,
+            None,
+            fresh=90,
         ),
-        "context": _missing(
-            "release_context",
-            "Context version and image source revisions are available only from the separate context MCP",
+        "context": _source(
+            "host_verified_context",
+            {"observed_at": provenance["observed_at"]},
+            {"sha256": identity["context_sha256"]} if identity else None,
+            None,
+            fresh=90,
         ),
         "stack": _source(
             "ops:stack",
@@ -324,8 +344,8 @@ def get_instance_inventory():
             "services": services,
             "service_limit": 32,
             "services_truncated": isinstance(containers, list) and len(containers) > 32,
-            "release_sha": None,
-            "context_version": None,
+            "release_sha": identity["release_sha"] if identity else None,
+            "context_version": identity["context_sha256"] if identity else None,
         },
     )
 

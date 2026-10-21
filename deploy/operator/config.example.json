@@ -1,13 +1,13 @@
 {
   "instance": "crate-lab",
   "state_directory": "/var/lib/crate-operator",
-  "listen_host": "127.0.0.1",
+  "listen_host": "0.0.0.0",
   "listen_port": 8791,
   "poll_seconds": 45,
   "mcp_url": "http://crate-api:8585/mcp",
   "mcp_token_file": "/run/secrets/operator_mcp_read",
   "api_token_file": "/run/secrets/operator_api",
-  "webhook_url": "http://crate-hermes:8644/webhooks/crate-operator",
+  "webhook_url": "http://crate-hermes-operator:8644/webhooks/crate-operator",
   "webhook_secret_file": "/run/secrets/operator_webhook",
   "webhook_route": "crate-operator",
   "rules": [

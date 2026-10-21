@@ -17,6 +17,14 @@ from crate.db.repositories.agent_requests import _hash
 from crate.db.tx import optional_scope, read_scope
 
 
+def _reviewed_provenance(row):
+    # Original directed photo plans have no document; their existing immutable
+    # execution JSON holds the same reviewed evidence as generalized plans.
+    return (row.get("document") or row.get("execution_data") or {}).get(
+        "operator_provenance"
+    )
+
+
 def _document(row, *, identity=False):
     # The three identity fields (who the connection is, who requested the plan) are
     # Admin-only. Every agent-facing read (MCP tools, get_owned_plan and its callers)
@@ -86,6 +94,8 @@ def _document(row, *, identity=False):
         "approval_required": row["approval_required"],
         "expires_at": row["expires_at"].isoformat(),
     }
+    if _reviewed_provenance(row) is not None:
+        content["operator_provenance"] = _reviewed_provenance(row)
     return {
         "plan_id": row["id"],
         "principal_id": str(row["principal_id"]),
@@ -286,6 +296,9 @@ def count_pending_plans(*, operations: list[str] | None = None, session=None) ->
 
 
 def validate_plan_authorization(current, plan, principal, *, worker=False, job_id=None):
+    from crate.operator_provenance import validate
+
+    validate(plan["principal_id"], _reviewed_provenance(plan))
     policy = (
         current.execute(
             text("""
@@ -397,6 +410,13 @@ def decide_plan(
             session=current,
         )
         plan = _get(current, plan_id, lock=True)
+        if decision == "approved":
+            from crate.operator_provenance import validate
+
+            validate(
+                plan["principal_id"],
+                _reviewed_provenance(plan),
+            )
         # Cookie and verified native-human callers receive the complete review identity.
         document = _document(plan, identity=True)
         if decision == "approved" and document.get("executable") is False:

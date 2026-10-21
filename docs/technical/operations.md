@@ -239,3 +239,8 @@ an exact source symbol/heading. The final rollout check must ask these questions
 the real operator model, confirm its source paths and release SHA, and verify that it
 states unavailable/stale evidence instead of claiming live health or effects. That check
 requires the real conversational transport and remains deferred from local acceptance.
+
+For the opt-in Hermes operator, use the [candidate and consolidated rollout
+contract](hermes-operator-release.md): root-owned host assets, independent native
+recovery, health coverage, exact release context, provenance gates and rollback.
+The existing read-only pilot remains the default.

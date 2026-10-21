@@ -10,6 +10,9 @@ from crate.agent_discovery import get_operation_catalog
 from crate.mcp.tools import OBSERVATION_TOOLS
 
 from tests.test_agent_observability import fixture_evidence
+from tests.test_agent_observability import (
+    observation_clock as observation_clock,  # noqa: PLC0414
+)
 from tests.test_mcp_transport import (
     _client,
 )

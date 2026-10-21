@@ -12,6 +12,27 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes operator candidate authority, provisioning and rollback", async () => {
+    window.history.pushState(null, "", "/operations/hermes-operator-release");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Hermes operator candidate and rollout",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Root-managed provisioning for one future rollout",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Version transition, health and rollback",
+      }),
+    ).toBeTruthy();
+  });
+
   it("publishes independent operator delivery and human callback boundaries", async () => {
     window.history.pushState(null, "", "/operations/independent-operator");
     render(<App />);

@@ -20,6 +20,7 @@ from .infra_deploy import (
     generated_backup_inputs,
     host_inputs,
     staged_inputs,
+    validate_context_archive,
     validate_host,
 )
 from .infra_policy import DIGEST, SERVICES, SHA, canonical, digest, trusted_file
@@ -207,17 +208,31 @@ class Executor:
                 "docker-compose.project.yaml",
             )
         }
+        environment = (
+            (Path(self.c["server_path"]) / ".env").read_bytes().decode("utf-8")
+        )
+        managed = [
+            line.partition("=")[2]
+            for line in environment.split("\n")
+            if line.startswith("CRATE_OPERATOR_ROOT=")
+        ]
+        if managed and managed[-1].strip("\"'"):
+            files["hermes-context.tar.gz"] = root / "hermes-context.tar.gz"
         hashes = {}
         for name, path in files.items():
             if self.policy.provisioned:
                 trusted_file(path)
-            if path.is_symlink() or path.stat().st_size > 2 * 1024 * 1024:
+            if path.is_symlink() or path.stat().st_size > (
+                64 * 1024 * 1024 if name.endswith(".tar.gz") else 2 * 1024 * 1024
+            ):
                 raise ValueError("Invalid approved asset")
             hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
         manifest = json.loads(files["release-manifest.json"].read_bytes())
         validate_manifest(
             manifest, expected_release_sha=sha, registry="ghcr.io", owner="thecrateapp"
         )
+        if "hermes-context.tar.gz" in files:
+            validate_context_archive(files["hermes-context.tar.gz"], manifest)
         if files["release.env"].read_text() != render_release_env(manifest):
             raise ValueError("Release environment disagrees with immutable digests")
         # Explicit host approval binds every executable/configuration asset.
@@ -658,8 +673,16 @@ class Executor:
                     )
                 for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
                     shutil.copyfile(root / name, server / name)
+                if "hermes-context.tar.gz" in assets:
+                    shutil.copyfile(
+                        root / "hermes-context.tar.gz",
+                        server / ".deploy/hermes-context.candidate.tar.gz",
+                    )
                 expected = staged
-                for step in ("preflight", "config", "pull", "up", "verify"):
+                steps = ("preflight", "config", "pull", "up", "verify")
+                if "hermes-context.tar.gz" in assets:
+                    steps += ("hermes-context",)
+                for step in steps:
                     checkpoint()
                     self._assert_deploy_inputs(plan, expected)
                     assert_backup_inputs(server, plan["id"], backup_expected)
@@ -678,6 +701,7 @@ class Executor:
                     "docker-compose.project.yaml",
                     ".deploy/release.env.candidate",
                     ".deploy/release-manifest.json.candidate",
+                    ".deploy/hermes-context.candidate.tar.gz",
                 }
                 safe = all(current[key] == original[key] for key in stable)
                 safe = safe and current[".env"] in {

@@ -22,6 +22,7 @@ def plugin():
         ROOT / "deploy/hermes/plugins/crate_confirmation/__init__.py",
     )
     result = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = result
     spec.loader.exec_module(result)
     return result
 
@@ -325,7 +326,7 @@ def test_write_profile_is_explicit_and_native_approval_is_not_a_model_tool():
     assert "callback-key" not in json.dumps(operator)
 
 
-def test_profile_validates_current_approval_and_has_no_domain_tools_during_outage(
+def test_profile_validates_current_approval_and_retains_bounded_reconnect_adapter(
     tmp_path, monkeypatch
 ):
     runtime = _runtime()
@@ -343,6 +344,7 @@ def test_profile_validates_current_approval_and_has_no_domain_tools_during_outag
         ]
     ]
     policy = {
+        "operator_provenance_required": True,
         "require_approval": True,
         "actions_enabled": True,
         "instance_id": "test",
@@ -363,9 +365,9 @@ def test_profile_validates_current_approval_and_has_no_domain_tools_during_outag
     with pytest.raises(ValueError, match="separate"):
         runtime.operator_preflight("http://loopback", "same", "same", config)
     runtime.configure_operator(tmp_path, ROOT / "deploy/hermes", domain_available=False)
-    assert (
-        "crate" not in json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]
-    )
+    assert json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]["crate"][
+        "args"
+    ] == ["/opt/crate-hermes/domain_mcp.py"]
     assert "exclusivamente lectura" not in (tmp_path / "SOUL.md").read_text()
     runtime.configure_operator(tmp_path, ROOT / "deploy/hermes", domain_available=True)
     assert "crate" in json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]
@@ -389,6 +391,7 @@ def test_operator_preflight_checks_independent_read_discovery_then_current_polic
         ]
     ]
     policy = {
+        "operator_provenance_required": True,
         "require_approval": True,
         "actions_enabled": True,
         "instance_id": "test",

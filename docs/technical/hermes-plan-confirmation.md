@@ -90,14 +90,13 @@ dedicated Hermes home plugin directory. The operator profile enables
 narrow `ct:d:<nonce>:<action>` callback handler on the existing PTB application;
 it does not create another Telegram poller, webhook or core patch.
 
-The write profile validates `get_confirmation_policy`, current `require_approval`,
-actions-enabled state, instance/principal/credential identity, grants and tool
-annotations. Its optional startup uses a distinct `supervisor-token` in the
-managed secret directory to verify that the supervisor's discovery remains purely
-read-only. That token is never added to the model environment. The read-only pilot
-startup is unchanged. If operator validation or API availability fails, the
-operator config omits the domain MCP server, allowing independent native recovery
-providers to remain available. Revalidate and restart to restore domain exposure.
+The write profile validates live `get_confirmation_policy`, current mandatory
+approval, actions-enabled state, server-configured operator provenance binding,
+instance/principal/credential identity, grants and tool annotations per mutation.
+Its fixed stdio catalog remains discoverable when API/context is unavailable;
+independent native recovery starts first and current domain calls recover without
+a gateway restart. The separate supervisor credential is mounted only to its own
+service, not exported to the model. The read-only pilot startup is unchanged.
 
 Only the controlled Crate MCP server uses `trust: full`. The pinned Hermes v0.22.2
 client otherwise adds a generic per-tool consent prompt for `trust: untrusted`.
@@ -139,10 +138,11 @@ callback prefixes, patterns, allowlists and `async event(payload)` transports.
 Each provider runs in its own supervised task. A replacement PTB application
 cancels the previous generation, and plugin unload cancels all presenter tasks.
 An independent infrastructure provider can use its own transport and approval
-store without depending on the domain API. Release/context provenance binding,
-independent supervisor delivery, deployment mounts and real pinned gateway smoke
-belong to the integrated runtime acceptance; this component alone does not claim
-those are wired or production-tested.
+store without depending on the domain API. The
+[integrated candidate](hermes-operator-release.md) wires separate domain/infra
+providers, fresh stable provenance at native and worker boundaries, independent
+supervisor delivery and automatic durable job watches. The pinned gateway smoke
+uses a loopback fake Bot API with no inference. Real target activation remains pending.
 
 The model obtains this guide through the existing bounded release-context tools.
 No arbitrary filesystem, shell, skill installation, signing or approval tool is

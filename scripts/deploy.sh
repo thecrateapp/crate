@@ -316,7 +316,7 @@ sync_config() {
     "$REMOTE:$SERVER_PATH/deploy/traefik/federation-readplane.yml"
   ssh_remote "mkdir -p '$SERVER_PATH/deploy/hermes'"
   if [[ -f "$TMP_DIR/deploy/hermes/activate_context.py" ]]; then
-    scp "$TMP_DIR/deploy/hermes/"* "$REMOTE:$SERVER_PATH/deploy/hermes/"
+    scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
   scp "$TMP_DIR/hermes-context.tar.gz" "$REMOTE:$SERVER_PATH/.deploy/hermes-context.candidate.tar.gz"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"

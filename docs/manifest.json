@@ -194,13 +194,7 @@
     "section": "operations",
     "title": "Native Telegram plan confirmation",
     "summary": "Exact human button review, deterministic job admission and the opt-in Hermes write profile.",
-    "keywords": [
-      "Hermes",
-      "Telegram",
-      "approval",
-      "plans",
-      "operator"
-    ],
+    "keywords": ["Hermes", "Telegram", "approval", "plans", "operator"],
     "order": 126
   },
   {
@@ -482,5 +476,21 @@
       "diagnostics"
     ],
     "order": 165
+  },
+  {
+    "sourcePath": "docs/technical/hermes-operator-release.md",
+    "route": "/operations/hermes-operator-release",
+    "section": "operations",
+    "title": "Hermes operator candidate and rollout",
+    "summary": "Complete opt-in operator architecture, authority and coverage matrix, root provisioning, disposable acceptance and rollback.",
+    "order": 127,
+    "keywords": [
+      "hermes",
+      "operator",
+      "provenance",
+      "approval",
+      "recovery",
+      "rollout"
+    ]
   }
 ]

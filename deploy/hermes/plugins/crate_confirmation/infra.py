@@ -1,4 +1,4 @@
-"""Independent native infrastructure provider. Install/register separately in Task7."""
+"""Independent native infrastructure provider with its own policy and signing key."""
 
 import asyncio
 import hashlib

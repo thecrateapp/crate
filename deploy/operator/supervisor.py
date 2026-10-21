@@ -658,7 +658,8 @@ class Supervisor:
 
         Dedicated callback HMAC secret and allowlist come from trusted local config, never
         request/model arguments. Read/model/delivery credentials cannot authenticate this interface.
-        This method is deliberately absent from HTTP/model tool routing.
+        Only the dedicated signed native HTTP route invokes it; read/watch bearers
+        and model tools cannot authenticate a decision.
         """
         fields = {
             "audience",

@@ -647,6 +647,10 @@ async def _call_tool(context, params):
             raise DiagnosticError(
                 "FORBIDDEN", "Integration is not permitted to perform this operation"
             )
+        if params.name in ACTION_CATALOG:
+            from crate.operator_provenance import capture
+
+            await anyio.to_thread.run_sync(capture, principal.id)
         trace_id = context.request.scope.get("trace_id")
         try:
             _request_limiter.acquire_nowait()

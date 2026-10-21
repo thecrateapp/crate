@@ -62,8 +62,17 @@ def _mcp_request(url, token, method, params, request_id):
             {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
         ).encode(),
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        result = json.load(response)
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            raise ValueError("MCP redirects forbidden")
+
+    opener = urllib.request.build_opener(NoRedirect(), urllib.request.ProxyHandler({}))
+    with opener.open(request, timeout=20) as response:
+        raw = response.read(262145)
+    if len(raw) > 262144:
+        raise ValueError("MCP response too large")
+    result = json.loads(raw)
     if "error" in result:
         raise ValueError("MCP readiness request was rejected")
     return result["result"]
@@ -100,6 +109,7 @@ def validate_operator_profile(tools: list, policy: dict, config: dict) -> None:
         or not required <= advertised.keys()
         or server.get("trust") != "full"
         or included & {"retry_job", "cancel_job"}
+        or policy.get("operator_provenance_required") is not True
         or policy.get("require_approval") is not True
         or policy.get("actions_enabled") is not True
         or not policy.get("instance_id")
@@ -197,10 +207,37 @@ def configure_operator(home: Path, assets: Path, *, domain_available: bool) -> N
         + "\n\n"
         + (assets / "OPERATOR.md").read_text()
     )
-    if not domain_available:
-        # Task7 can continue independent recovery; no domain mutation tool is
-        # discoverable during outage. Recovery/revalidation needs a gateway restart.
-        del config["mcp_servers"]["crate"]
+    # Fixed local catalog remains discoverable during API/context outages. Every
+    # call revalidates current server authority; recovery needs no gateway restart.
+    del domain_available
+    delivery = Path("/run/crate-hermes-delivery")
+    if delivery.exists():
+        secret = (delivery / "secret").read_text().strip()
+        destination = (delivery / "destination").read_text().strip()
+        if (
+            len(secret) < 32
+            or not destination.isdecimal()
+            or destination
+            not in os.environ.get("TELEGRAM_ALLOWED_USERS", "").split(",")
+        ):
+            raise ValueError("Dedicated fixed allowlisted delivery route required")
+        config["platforms"]["webhook"] = {
+            "enabled": True,
+            "extra": {
+                "host": "0.0.0.0",
+                "port": 8644,
+                "routes": {
+                    "crate-operator": {
+                        "secret": secret,
+                        "prompt": "{message}",
+                        "deliver": "telegram",
+                        "deliver_extra": {"chat_id": destination},
+                        "deliver_only": True,
+                        "mirror_to_session": False,
+                    }
+                },
+            },
+        }
     managed = home / "crate-operator-managed"
     managed.mkdir(exist_ok=True)
     encoded = json.dumps(config, indent=2)
@@ -223,6 +260,11 @@ def healthy(home: Path) -> bool:
             and time.time() - when < 180
             and status.get("platforms", {}).get("telegram", {}).get("state")
             == "connected"
+            and (
+                os.environ.get("CRATE_HERMES_PROFILE") != "operator"
+                or status.get("platforms", {}).get("webhook", {}).get("state")
+                == "connected"
+            )
         )
     except (OSError, ValueError, TypeError):
         return False
@@ -245,32 +287,18 @@ def main() -> int:
     try:
         settings = load_secrets(Path("/run/crate-hermes-secrets"))
         os.environ.update(settings)
-        from context_server import ContextStore
-
-        context = ContextStore(Path("/opt/crate-context/active")).summary()
-        install_identity(home, Path("/opt/crate-hermes"))
-        url = os.environ.get("CRATE_MCP_URL", "http://crate-api:8585/mcp")
+        assets = Path("/opt/crate-hermes")
         operator = os.environ.get("CRATE_HERMES_PROFILE", "pilot") == "operator"
-        domain_available = False
+        url = os.environ.get("CRATE_MCP_URL", "http://crate-api:8585/mcp")
+        context = {"release_sha": None}
         if operator:
-            config = json.loads(
-                Path("/opt/crate-hermes/config.operator.json").read_text()
-            )
-            try:
-                supervisor_token = (
-                    Path("/run/crate-hermes-secrets/supervisor-token")
-                    .read_text()
-                    .strip()
-                )
-                operator_preflight(
-                    url, settings["CRATE_MCP_TOKEN"], supervisor_token, config
-                )
-                domain_available = True
-            except (OSError, ValueError, KeyError):
-                pass  # independent native recovery may remain available in Task7
-            configure_operator(
-                home, Path("/opt/crate-hermes"), domain_available=domain_available
-            )
+            # Independent recovery starts without API, DB or a usable context.
+            configure_operator(home, assets, domain_available=False)
+        else:
+            from context_server import ContextStore
+
+            context = ContextStore(Path("/opt/crate-context/active")).summary()
+            install_identity(home, assets)
         for attempt in range(0 if operator else 6):
             try:
                 _preflight(url, settings["CRATE_MCP_TOKEN"])
@@ -284,16 +312,14 @@ def main() -> int:
                 {
                     "service": "crate-hermes-agent",
                     "release_sha": context["release_sha"],
-                    "mcp": ("operator" if domain_available else "domain-unavailable")
-                    if operator
-                    else "read-only",
+                    "mcp": "live-per-call" if operator else "read-only",
                 }
             ),
             flush=True,
         )
     except (OSError, ValueError):
         print(
-            "Crate Hermes startup blocked: check dedicated secrets, context integrity and read-only MCP access.",
+            "Crate Hermes startup blocked: check dedicated secrets and managed profile configuration.",
             file=sys.stderr,
         )
         return 1

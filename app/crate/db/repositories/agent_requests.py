@@ -124,11 +124,13 @@ def _authorize(current, principal, grants, *, worker=False):
 
 
 def _require_legacy_policy(current, principal):
+    from crate.operator_provenance import is_operator
+
     required = current.execute(
         text("SELECT require_approval FROM agent_principals WHERE id=:id FOR SHARE"),
         {"id": principal.id},
     ).scalar_one()
-    if required:
+    if required or is_operator(principal.id):
         raise DiagnosticError(
             "APPROVAL_REQUIRED", "Use an exact reviewed plan for this integration"
         )

@@ -89,7 +89,9 @@ def load_config(path):
         "rules",
     }
     if (
-        set(config) != required
+        not required
+        <= set(config)
+        <= required | {"human_callback_secret_file", "allowed_operators"}
         or type(config["poll_seconds"]) is not int
         or not 30 <= config["poll_seconds"] <= 60
     ):
@@ -168,7 +170,9 @@ class Poller:
         self.delivery.tick(current)
 
 
-def make_http_server(supervisor, token, host="127.0.0.1", port=0, *, delivery=None):
+def make_http_server(
+    supervisor, token, host="127.0.0.1", port=0, *, delivery=None, human_policy=None
+):
     if len(token) < 16:
         raise ValueError("Dedicated supervisor read/watch bearer required")
 
@@ -233,6 +237,29 @@ def make_http_server(supervisor, token, host="127.0.0.1", port=0, *, delivery=No
                 self._respond(400, {"error": "invalid_bounds"})
 
         def do_POST(self):
+            if self.path == "/v1/native/decision":
+                try:
+                    if (
+                        self.headers.get("Authorization")
+                        or self.headers.get("Transfer-Encoding")
+                        or len(self.headers.get_all("Content-Length", [])) != 1
+                    ):
+                        raise ValueError("Native signature only")
+                    length = int(self.headers["Content-Length"])
+                    if not 0 < length <= 4096:
+                        raise ValueError("Bounded receipt required")
+                    receipt = json.loads(self.rfile.read(length))
+                    if human_policy is not None:
+                        human_policy(receipt)
+                    supervisor.apply_signed_human_decision(
+                        receipt, self.headers.get("X-Crate-Signature", ""), time.time()
+                    )
+                    self._respond(200, {"state": "recorded"})
+                except StateUnavailable:
+                    self._respond(503, {"error": "state_unavailable"})
+                except (ValueError, PermissionError, TypeError, KeyError):
+                    self._respond(403, {"error": "native_decision_denied"})
+                return
             if not self._authorized():
                 self._respond(401, {"error": "unauthorized"})
                 return
@@ -290,12 +317,31 @@ def main(argv=None):
         raise ValueError(
             "Observer, supervisor API and webhook secrets must be distinct"
         )
+    human_secret = (
+        read_secret(config["human_callback_secret_file"])
+        if config.get("human_callback_secret_file")
+        else None
+    )
+    if human_secret is not None and (
+        len(human_secret) < 32
+        or human_secret in {mcp_token, api_token, webhook_secret}
+        or not config.get("allowed_operators")
+    ):
+        raise ValueError(
+            "Separate human callback secret and current operator map required"
+        )
     if args.check:
         return
     state = State(config["state_directory"])
     server = None
     try:
-        supervisor = Supervisor(state, config["instance"], config["parsed_rules"])
+        supervisor = Supervisor(
+            state,
+            config["instance"],
+            config["parsed_rules"],
+            human_callback_secret=human_secret.encode() if human_secret else None,
+            allowed_operators=set(config.get("allowed_operators", [])),
+        )
         delivery = Delivery(
             state,
             HermesTransport(
@@ -307,12 +353,23 @@ def main(argv=None):
             return
         delivery.recover(time.time())
         poller = Poller(supervisor, MCPReader(config["mcp_url"], mcp_token), delivery)
+
+        def current_human_policy(receipt):
+            current = load_config(args.config)
+            if (
+                current["instance"] != config["instance"]
+                or receipt.get("operator") not in current.get("allowed_operators", [])
+                or read_secret(current["human_callback_secret_file"]) != human_secret
+            ):
+                raise ValueError("Current native authority changed")
+
         server = make_http_server(
             supervisor,
             api_token,
             config["listen_host"],
             config["listen_port"],
             delivery=delivery,
+            human_policy=current_human_policy,
         )
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()

@@ -1,5 +1,6 @@
 """Release provenance and filesystem boundaries of the operator's context MCP."""
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -462,3 +463,42 @@ def test_operational_corpus_marks_drift_and_missing_evidence(operational_context
             store.read("instance/current-status.json")
     finally:
         marker.unlink(missing_ok=True)
+
+
+def test_public_mutation_gate_stays_closed_through_context_link_and_hash_switch(
+    repo, tmp_path, monkeypatch
+):
+    import tarfile
+
+    source = tmp_path / "bundle"
+    _build(repo, source)
+    archive = tmp_path / "context.tar.gz"
+    with tarfile.open(archive, "w:gz") as handle:
+        handle.add(source, arcname=".")
+    activate = _module(ROOT / "deploy/hermes/activate_context.py")
+    parent = tmp_path / "installed"
+    original = activate.os.replace
+    checked = []
+
+    def replace(source, destination):
+        if Path(destination).name in {"active", "context.json"}:
+            assert (
+                json.loads((parent / "public/deployment.json").read_text())["state"]
+                == "deploying"
+            )
+            checked.append(Path(destination).name)
+        return original(source, destination)
+
+    monkeypatch.setattr(activate.os, "replace", replace)
+    activate.activate_context(parent, archive, repo[1])
+    assert checked == ["active", "context.json"]
+    assert (
+        json.loads((parent / "public/deployment.json").read_text())["state"]
+        == "verified"
+    )
+    assert (
+        json.loads((parent / "public/context.json").read_text())["context_sha256"]
+        == hashlib.sha256(
+            (parent / "active/context-manifest.json").read_bytes()
+        ).hexdigest()
+    )

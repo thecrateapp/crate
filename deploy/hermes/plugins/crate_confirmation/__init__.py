@@ -14,6 +14,8 @@ PATH = "/api/internal/agent-telegram/events"
 URL = "http://crate-api:8585" + PATH
 KEY_FILE = Path("/run/crate-hermes-native/callback-key")
 IDENTITY_FILE = Path("/run/crate-hermes-native/identity.json")
+WATCH_URL = "http://crate-operator-supervisor:8791/v1/watch-job"
+WATCH_TOKEN_FILE = Path("/run/crate-supervisor-client/read-token")
 PATTERN = r"^ct:d:[a-f0-9]{32}:(next|approve|reject)$"
 
 
@@ -77,8 +79,31 @@ class DomainProvider:
             raise ValueError("Native response is too large")
         return json.loads(raw)
 
+    def _watch_outcome(self, result):
+        if result.get("state") != "outcome" or not result.get("result", {}).get("job"):
+            return
+        job_id = result["result"]["job"]["job_id"]
+        token = WATCH_TOKEN_FILE.read_text().strip()
+        request = urllib.request.Request(
+            WATCH_URL,
+            data=json.dumps({"job_id": job_id, "ttl": 86400}).encode(),
+            method="POST",
+            headers={
+                "Authorization": "Bearer " + token,
+                "Content-Type": "application/json",
+            },
+        )
+        with self.opener.open(request, timeout=5) as response:
+            raw = response.read(16385)
+        if len(raw) > 16384 or json.loads(raw).get("job_id") != job_id:
+            raise ValueError("Durable job watch unavailable")
+
     async def event(self, event):
-        return await asyncio.to_thread(self._post, event)
+        result = await asyncio.to_thread(self._post, event)
+        # The persisted native outcome retries until this independent read-only
+        # watch is durable, before acknowledging outcome delivery. No model turn.
+        await asyncio.to_thread(self._watch_outcome, result)
+        return result
 
 
 class NativePresenter:
@@ -230,8 +255,21 @@ class NativePresenter:
 
 
 def register(ctx):
-    # Later independent recovery providers have their own fixed transport,
-    # namespace and presenter task. Domain outage cannot block another provider.
-    presenter = NativePresenter(ctx, [DomainProvider()])
+    from .infra import InfraProvider
+    from .supervisor import SupervisorCommands
+
+    providers = []
+    for factory in (DomainProvider, InfraProvider):
+        try:
+            providers.append(factory())
+        except (OSError, ValueError, KeyError):
+            pass  # One unprovisioned authority cannot disable another authority.
+    presenter = NativePresenter(ctx, providers)
     ctx.register_telegram_handler(presenter.factory)
+    try:
+        commands = SupervisorCommands()
+    except (OSError, ValueError, KeyError):
+        commands = None
+    if commands is not None:
+        ctx.register_telegram_handler(commands.factory)
     ctx.on_unload(presenter.close)

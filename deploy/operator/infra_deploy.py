@@ -20,7 +20,9 @@ OPTIONAL = (
     ".deploy/release-manifest.json",
     ".deploy/release.env.candidate",
     ".deploy/release-manifest.json.candidate",
+    ".deploy/hermes-context.candidate.tar.gz",
     "deploy/traefik/federation-readplane.yml",
+    "app/config.yaml",
 )
 DIRECTORIES = (".deploy", ".deploy-backups")
 HELPER_IMPORTS = frozenset(
@@ -79,6 +81,21 @@ def _context_root(root):
     )
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
         raise ValueError("Unsupported control character in DATA_DIR")
+    operator = [
+        line.partition("=")[2]
+        for line in raw.split("\n")
+        if line.startswith("CRATE_OPERATOR_ROOT=")
+    ]
+    managed = operator[-1] if operator else ""
+    managed = (
+        managed.removesuffix('"').removeprefix('"').removesuffix("'").removeprefix("'")
+    )
+    if any(ord(c) < 32 or ord(c) == 127 for c in managed):
+        raise ValueError("Unsupported control character in CRATE_OPERATOR_ROOT")
+    if managed:
+        if not Path(managed).is_absolute():
+            raise ValueError("Operator root must be absolute")
+        return Path(managed) / "context"
     directory = Path(value + "/hermes-agent")
     if not directory.is_absolute():
         directory = root / directory
@@ -125,6 +142,21 @@ def validate_host(root, *, backup_id=None):
     if context.parent.exists() or context.parent.is_symlink():
         _check_optional(context)
         _check_optional(context / "deployment.json")
+        _check_optional(context / "public")
+        for name in (
+            "deployment.json",
+            "context.json",
+            "target.json",
+            "observation.json",
+        ):
+            _check_optional(context / "public" / name)
+        _check_optional(context / "releases")
+        active = context / "active"
+        if active.exists() or active.is_symlink():
+            resolved = active.resolve(strict=True)
+            if not resolved.is_relative_to(context / "releases"):
+                raise ValueError("Active context escaped managed releases")
+            trusted_file(resolved / "context-manifest.json")
     if backup_id is not None:
         backup = root / ".deploy-backups" / ("infra-" + backup_id)
         _check_optional(backup)
@@ -142,7 +174,9 @@ def host_inputs(root, *, provisioned):
         if path.is_symlink():
             raise ValueError("Symlink host dependency forbidden")
         if path.exists():
-            if not path.is_file() or path.stat().st_size > 2 * 1024 * 1024:
+            if not path.is_file() or path.stat().st_size > (
+                64 * 1024 * 1024 if relative.endswith(".tar.gz") else 2 * 1024 * 1024
+            ):
                 raise ValueError("Invalid host input")
             result[relative] = file_digest(path)
         elif relative in REQUIRED:
@@ -186,6 +220,10 @@ def staged_inputs(original, assets):
         expected[name] = assets[name]
     for name in ("release.env", "release-manifest.json"):
         expected[".deploy/" + name + ".candidate"] = assets[name]
+    if "hermes-context.tar.gz" in assets:
+        expected[".deploy/hermes-context.candidate.tar.gz"] = assets[
+            "hermes-context.tar.gz"
+        ]
     return expected
 
 
@@ -251,3 +289,49 @@ def assert_backup_inputs(root, plan_id, expected):
             or (file_digest(path) if path.exists() else None) != expected_hash
         ):
             raise ValueError("Generated deployment input changed")
+
+
+def validate_context_archive(path, manifest):
+    """Validate the exact approved bundle before the first deployment effect."""
+    import json
+    import tarfile
+    from pathlib import PurePosixPath
+
+    with tarfile.open(path, "r:gz") as archive:
+        members = archive.getmembers()
+        if (
+            len(members) > 10000
+            or sum(item.size for item in members) > 128 * 1024 * 1024
+        ):
+            raise ValueError("Context archive exceeds bound")
+        files = {}
+        for item in members:
+            relative = PurePosixPath(item.name)
+            if (
+                relative.is_absolute()
+                or ".." in relative.parts
+                or not (item.isfile() or item.isdir())
+            ):
+                raise ValueError("Unsafe approved context archive")
+            if item.isfile():
+                name = str(relative)
+                if name in files or item.size > 2 * 1024 * 1024:
+                    raise ValueError("Duplicate or oversized context entry")
+                files[name] = archive.extractfile(item).read()
+        context = json.loads(files.pop("context-manifest.json"))
+        if (
+            context["release_sha"] != manifest["release_sha"]
+            or context["deployment"]["release_sha"] != manifest["release_sha"]
+            or context["deployment"]["images"] != manifest["images"]
+        ):
+            raise ValueError(
+                "Approved context must describe exact release and expected per-image entries"
+            )
+        if files.keys() != context["files"].keys():
+            raise ValueError("Context index differs from archive")
+        for name, raw in files.items():
+            if context["files"][name] != {
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "bytes": len(raw),
+            }:
+                raise ValueError("Context content hash mismatch")

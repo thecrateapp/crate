@@ -876,17 +876,27 @@ cmd_verify() {
     wait_for_public_url "https://cratemusic.app"
     wait_for_public_url "https://docs.cratemusic.app"
   fi
-  record_hermes_deployment verified
+  # The opt-in operator stays closed until its exact approved context activates.
+  [[ -n "$(env_value CRATE_OPERATOR_ROOT)" ]] || record_hermes_deployment verified
 }
 
 cmd_hermes_context() {
-  local data_dir context_root revision
+  local data_dir context_root revision operator_root
   data_dir="$(env_value DATA_DIR)"
+  operator_root="$(env_value CRATE_OPERATOR_ROOT)"
   context_root="${data_dir}/hermes-agent/context"
-  [[ -d "${data_dir}/hermes-agent" ]] || return 0
+  [[ -z "$operator_root" ]] || context_root="${operator_root}/context"
+  if [[ -n "$operator_root" && ! -d "$context_root" ]]; then
+    echo "Managed operator context destination is missing" >&2
+    return 1
+  fi
+  [[ -d "$context_root" ]] || return 0
   revision="$(env_value CRATE_RELEASE_SHA)"
-  record_hermes_deployment verified
-  if compgen -G "${context_root}/releases/${revision}*/context-manifest.json" >/dev/null; then
+  if [[ -n "$operator_root" ]]; then
+    # Never substitute a cached same-SHA bundle for the exact reviewed archive.
+    python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
+      --archive .deploy/hermes-context.candidate.tar.gz
+  elif compgen -G "${context_root}/releases/${revision}*/context-manifest.json" >/dev/null; then
     python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision"
   else
     python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
@@ -895,19 +905,25 @@ cmd_hermes_context() {
 }
 
 record_hermes_deployment() {
-  local data_dir
+  local data_dir context_root
   data_dir="$(env_value DATA_DIR)"
-  [[ -d "${data_dir}/hermes-agent" && -f deploy/hermes/activate_context.py ]] || return 0
+  context_root="${data_dir}/hermes-agent/context"
+  [[ -z "$(env_value CRATE_OPERATOR_ROOT)" ]] || context_root="$(env_value CRATE_OPERATOR_ROOT)/context"
+  [[ -d "$context_root" && -f deploy/hermes/activate_context.py ]] || return 0
   if [[ ! -f .deploy/release-manifest.json ]]; then
-    python3 -I - "${data_dir}/hermes-agent/context/deployment.json" <<'PY'
+    python3 -I - "${context_root}/deployment.json" <<'PY'
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
 path.parent.mkdir(parents=True, exist_ok=True)
-path.write_text(json.dumps({"release_sha": None, "state": "unverified"}) + "\n")
+value = json.dumps({"release_sha": None, "state": "unverified"}) + "\n"
+path.write_text(value)
+public = path.parent / "public"
+public.mkdir(exist_ok=True)
+(public / "deployment.json").write_text(value)
 PY
     return 0
   fi
-  python3 -I deploy/hermes/activate_context.py --root "${data_dir}/hermes-agent/context" \
+  python3 -I deploy/hermes/activate_context.py --root "$context_root" \
     --revision "$(env_value CRATE_RELEASE_SHA)" \
     --record-deployment .deploy/release-manifest.json --state "$1"
 }

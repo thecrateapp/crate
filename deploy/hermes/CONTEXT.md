@@ -9,9 +9,10 @@ Rutas de entrada:
 - Arquitectura: `docs/technical/01-system-overview.md`, `02-backend-api-and-data.md`, `03-worker-tasks-and-background-services.md`.
 - Biblioteca: almacenamiento/importación/sync, enriquecimiento/adquisición y análisis en los capítulos `04`, `05` y `06`.
 - Usuarios y reproducción: capítulos `07`, `08`, `09`; documentación OpenSubsonic.
-- Smart Mix: `docs/technical/smart-mix-operations.md` para funcionamiento, versiones y diagnóstico; diseño/plan de continuación para trabajo futuro y gates pendientes. El MCP actual no expone cobertura/campaña dedicada.
+- Smart Mix: `docs/technical/smart-mix-operations.md` para funcionamiento, versiones y diagnóstico; diseño/plan de continuación para trabajo futuro y gates pendientes. El MCP expone `get_smart_mix_status` con cobertura/campaña dedicada, antigüedad y límites de evidencia.
 - Agentes: `docs/technical/11-crate-mcp.md`, `crate-mcp.md`, `crate-mcp-distribution.md` y contrato JSON.
-- Operación: `docs/technical/operations.md`, `ops-runbook.md`, `deployment-profiles.md`.
+- Operación: `docs/technical/operations.md`, `ops-runbook.md`, `deployment-profiles.md`, `hermes-operator-release.md`, `crate-operator.md` y `hermes-plan-confirmation.md`.
+- Operador dedicado: `deploy/operator/` contiene supervisor, puente/relay de infraestructura, procedencia, perfiles y contratos; `deploy/hermes/` contiene runtime, adaptadores, contexto y proveedores nativos.
 - Federación: overview, protocolo, threat model y runbooks en `docs/technical/federation-*`.
 - Backend: `app/crate/`; autorización y contratos en `mcp/`, `agent_*.py`; SQL y transacciones en `db/`; efectos en `worker_handlers/`.
 - Read plane: `app/readplane/`; snapshots, projector y outbox en backend.

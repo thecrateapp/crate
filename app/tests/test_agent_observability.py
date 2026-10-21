@@ -12,8 +12,25 @@ from crate.mcp.schemas import PipelineInput, SmartMixStatusInput
 from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 from pydantic import ValidationError
 
-NOW = datetime.now(UTC)
+# Deliberately historical: evidence and evaluation use the same test-local clock,
+# regardless of collection order or time spent running native/worker tests.
+NOW = datetime(2025, 1, 1, tzinfo=UTC)
 UIDS = [str(UUID(int=i)) for i in range(1, 52)]
+
+
+@pytest.fixture(autouse=True)
+def observation_clock(monkeypatch):
+    monkeypatch.setattr("crate.agent_diagnostics._now", lambda: NOW)
+    monkeypatch.setattr(observations, "_now", lambda: NOW)
+
+
+def test_observation_clock_is_independent_of_import_age():
+    from crate.agent_diagnostics import _fresh
+
+    assert observations._now() == NOW
+    assert _fresh(NOW)[0] == "available"
+    assert _fresh(NOW - timedelta(seconds=61))[0] == "stale"
+    assert _fresh(NOW + timedelta(seconds=60))[0] == "unavailable"
 
 
 def record(source, payload, age=0, **kwargs):

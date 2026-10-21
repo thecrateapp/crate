@@ -214,6 +214,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/hermes-operator-release.md": () =>
+    import("../../../docs/technical/hermes-operator-release.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/crate-operator.md": () =>
     import("../../../docs/technical/crate-operator.md?raw").then(
       (module) => module.default,

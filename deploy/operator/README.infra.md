@@ -8,7 +8,7 @@ contacts Telegram, approves releases or starts production jobs automatically.
 ## Host provisioning
 
 Install the Python package (`deploy/operator`, `scripts/release_manifest.py`) under
-`/opt/crate-infra`, owned by root with no group/other write permission. Copy the
+`/opt/crate-operator/assets`, owned by root with no group/other write permission. Copy the
 example policy to `/etc/crate-infra/policy.json`. Provision four **different** secrets
 of 32–256 bytes, private mode 0600: read, prepare, apply, and native callback HMAC.
 Infrastructure credentials must also differ from domain and supervisor credentials.
@@ -65,7 +65,7 @@ state directory. A second process with the same store fails its host writer lock
   meaningful healthchecks before enabling their operations; unhealthy/timeout
   after execution still yields indeterminate.
 - `backup`: target `postgresql`, version null. Online `pg_dump --format=custom
-  --no-owner --no-acl` from the captured `crate-postgres` container ID. Local PostgreSQL
+--no-owner --no-acl` from the captured `crate-postgres` container ID. Local PostgreSQL
   socket authentication must be provisioned; passwords are never request arguments.
   **Coverage is PostgreSQL only. Redis, audio, artwork, configuration and image
   rollback are excluded.** These exclusions appear in the exact human-reviewed
@@ -87,7 +87,7 @@ state directory. A second process with the same store fails its host writer lock
   the filename→SHA256 mapping of those four assets. The native review binds those
   hashes, full immutable manifest, current fleet fingerprints and local deploy-script
   hash. Before effects, the candidate is resolved with fixed `docker compose config
-  --format json` arguments and exact approved image variables; every application
+--format json` arguments and exact approved image variables; every application
   service must have an explicit non-disabled candidate Compose healthcheck. Thus a
   candidate that removes checks is rejected even when current containers are healthy.
   `release.env` must exactly match `render_release_env`; the repository's
@@ -116,8 +116,11 @@ its `rollback` and remain indeterminate. These are local host commands, never th
 laptop SSH orchestrator `make deploy`. Rollback preserves the existing script's
 image/config contract; it does not promise reversal of database migrations. No
 cleanup/prune or production state-rollback is exposed. Public HTTP checks are off;
-local host verification and stronger image/health checks are required. Native context
-activation/provenance publication is the separate packaging layer's responsibility.
+local host verification and stronger image/health checks are required. With `CRATE_OPERATOR_ROOT` configured, the exact approved `hermes-context.tar.gz`
+is also validated/hashed before effects, staged under the sealed closure and activated
+after verify. The separate root publisher observes actual images and publishes fresh
+bounded evidence. Rollback markers close domain mutations. See the canonical
+`docs/technical/hermes-operator-release.md` for provisioning and explicit limits.
 
 Each deployed container must match its expected image ID; each exact image reference
 must occur in Docker `RepoDigests`, and the OCI revision label must equal that
@@ -126,11 +129,10 @@ entry also covers `crate-fast-worker`, in addition to its manifest aliases
 `crate-worker`, `crate-projector`, `crate-maintenance-worker`. Every allowed deployed
 service requires meaningful Docker health. Missing check coverage rejects
 preparation/pre-effect before mutation; failing health after effect is indeterminate.
-Current source Compose config explicitly checks API, readplane and cast receiver.
-Checks are still needed for worker, fast-worker, projector, maintenance-worker,
-analysis-worker, playback-worker, media-worker, UI, Listen, site and docs. Task 7
-owns a meaningful operator overlay; the bridge does not silently add generic
-process-running checks or API-dependent recovery checks.
+The opt-in `compose.operator.yaml` closes healthcheck coverage with own-container
+consumer/projector progress plus broker/DB checks and local HTTP service checks.
+The canonical rollout guide defines exactly what each proves; these are not generic
+PID checks and recovery does not depend on API availability.
 
 The subprocess runner uses fixed argv and `shell=False`, a sanitized environment,
 process-group timeout/termination, bounded captured output, and an 8 GiB dump cap.
@@ -145,13 +147,13 @@ Host listener: Unix HTTP `/run/crate-infra/bridge.sock`, mode 0660. No TCP port.
 All requests are POST, bounded to 16 KiB, fixed Content-Length, no chunked bodies;
 eight concurrent connections maximum. Routes:
 
-| Route | Authority | Body |
-|---|---|---|
-| `/v1/read` | dedicated read bearer | exactly one of `service` or `plan_id` |
-| `/v1/prepare` | dedicated prepare bearer | `operation,target,version?,human_id` |
-| `/v1/apply` | dedicated apply bearer | `plan_id,plan_hash` |
-| `/v1/reconcile` | read bearer | `plan_id` |
-| `/v1/native/events` | separate native HMAC only | native event schema |
+| Route               | Authority                 | Body                                  |
+| ------------------- | ------------------------- | ------------------------------------- |
+| `/v1/read`          | dedicated read bearer     | exactly one of `service` or `plan_id` |
+| `/v1/prepare`       | dedicated prepare bearer  | `operation,target,version?,human_id`  |
+| `/v1/apply`         | dedicated apply bearer    | `plan_id,plan_hash`                   |
+| `/v1/reconcile`     | read bearer               | `plan_id`                             |
+| `/v1/native/events` | separate native HMAC only | native event schema                   |
 
 `prepare` persists the immutable document/hash and begins paginated native delivery.
 The current locally provisioned numeric human must have that operation capability.
@@ -177,7 +179,9 @@ paths to this one Unix socket, with method/body/timeout/concurrency bounds. The 
 must not accept caller-selected destinations or redirects, own host execution/native
 HMAC keys, mount Docker's socket, or depend on API/DB. Only that relay mounts the
 bridge Unix socket. Hermes uses the private relay URL; host loopback is not reachable
-from an ordinary container. Task 7 owns relay/Compose installation and cold-start tests.
+from an ordinary container. `compose.operator.yaml` supplies the fixed private relay;
+`scripts/operator_gateway_smoke.py` exercises cold start and native recovery with the
+pinned gateway and a loopback Bot API.
 
 Native module `deploy/hermes/plugins/crate_confirmation/infra.py` exports
 `InfraProvider()`, with namespace `ct:i:`, pattern
@@ -241,3 +245,20 @@ target, uses network none, restores real vector(20) data with HNSW/trigram index
 extensions twice, rejects a corrupt dump and cleans
 up its containers. It never executes a production deployment or touches an existing
 application container. Full deployment acceptance remains separately provisioned.
+
+## Integrated root paths and provisioning
+
+The offline `provision.py` installs only a root-owned scaffold at `/opt/crate-host`
+and `/opt/crate-operator`. It refuses existing trees, leaves `.env` and secrets
+unprovisioned, never starts services and never moves the existing live checkout.
+The host `.env` opt-in `CRATE_OPERATOR_ROOT` selects the exact root-managed context
+destination. Its parser and trust closure use the same strict LF/quote/control rules
+as the existing DATA_DIR fallback. Consumed candidate context archives are hashed,
+validated and included in expected staging transitions. API/worker mounts expose only
+the bounded public directory; Hermes has neither host root nor Docker socket.
+
+The limited relay and independent gateway/supervisor profiles are executable in
+`compose.operator.yaml`, with no API/DB startup dependencies. The actual pinned
+gateway disposable harness is `scripts/operator_gateway_smoke.py`. The normal
+SSH deployment entry point does not gain root ownership or privilege; future
+release automation must explicitly provision approved artifacts to this boundary.

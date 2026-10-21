@@ -6,18 +6,24 @@
   "toolsets": [
     "crate",
     "crate_context",
-    "memory"
+    "memory",
+    "crate_infra",
+    "crate_supervisor"
   ],
   "platform_toolsets": {
     "telegram": [
       "crate",
       "crate_context",
-      "memory"
+      "memory",
+      "crate_infra",
+      "crate_supervisor"
     ],
     "cli": [
       "crate",
       "crate_context",
-      "memory"
+      "memory",
+      "crate_infra",
+      "crate_supervisor"
     ]
   },
   "agent": {
@@ -66,11 +72,6 @@
   },
   "mcp_servers": {
     "crate": {
-      "url": "${CRATE_MCP_URL}",
-      "headers": {
-        "Authorization": "Bearer ${CRATE_MCP_TOKEN}",
-        "Host": "${CRATE_MCP_HOST}"
-      },
       "timeout": 30,
       "tools": {
         "include": [
@@ -140,13 +141,13 @@
         "prompts": false,
         "resources": false
       },
-      "trust": "full"
+      "trust": "full",
+      "command": "/opt/hermes/.venv/bin/python",
+      "args": ["/opt/crate-hermes/domain_mcp.py"]
     },
     "crate_context": {
       "command": "/opt/hermes/.venv/bin/python",
-      "args": [
-        "/opt/crate-hermes/context_server.py"
-      ],
+      "args": ["/opt/crate-hermes/context_server.py"],
       "env": {
         "CRATE_CONTEXT_ROOT": "/opt/crate-context/active"
       },
@@ -157,6 +158,22 @@
           "read_crate_context"
         ]
       }
+    },
+    "crate_infra": {
+      "command": "/opt/hermes/.venv/bin/python",
+      "args": ["-m", "deploy.operator.infra_mcp"],
+      "env": {
+        "PYTHONPATH": "/opt/crate-operator"
+      },
+      "trust": "full"
+    },
+    "crate_supervisor": {
+      "command": "/opt/hermes/.venv/bin/python",
+      "args": ["-m", "deploy.operator.supervisor_mcp"],
+      "env": {
+        "PYTHONPATH": "/opt/crate-operator"
+      },
+      "trust": "full"
     }
   },
   "mcp_single_query_discovery_timeout": 45,
@@ -171,8 +188,6 @@
     }
   },
   "plugins": {
-    "enabled": [
-      "crate-confirmation"
-    ]
+    "enabled": ["crate-confirmation"]
   }
 }

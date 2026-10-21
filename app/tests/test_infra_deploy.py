@@ -235,7 +235,7 @@ def test_isolated_helper_imports_cannot_load_writable_local_shadow(tmp_path):
         Path(__file__).resolve().parents[2] / "scripts/deploy-remote.sh"
     ).read_text()
     assert "python3 deploy/hermes/activate_context.py" not in script
-    assert script.count("python3 -I deploy/hermes/activate_context.py") == 3
+    assert script.count("python3 -I deploy/hermes/activate_context.py") == 4
 
 
 @pytest.mark.skipif(
@@ -496,3 +496,53 @@ def test_startup_rejects_actual_shell_selected_untrusted_destination(raw):
         assert not runner.calls
     finally:
         shutil.rmtree(root)
+
+
+def test_operator_deploy_seals_staged_bundle_and_activates_context_after_verify(lab):
+    import hashlib
+    import tarfile
+
+    root, manifest = release(lab)
+    server = Path(lab.config["server_path"])
+    with (server / ".env").open("a") as stream:
+        stream.write("\nCRATE_OPERATOR_ROOT=/opt/crate-operator\n")
+    context = root / "context"
+    context.mkdir()
+    (context / "context-manifest.json").write_text(
+        json.dumps(
+            {
+                "release_sha": manifest["release_sha"],
+                "deployment": manifest,
+                "files": {},
+            }
+        )
+    )
+    with tarfile.open(root / "hermes-context.tar.gz", "w:gz") as archive:
+        archive.add(context / "context-manifest.json", arcname="context-manifest.json")
+    approval = json.loads((root / "approved.json").read_text())
+    approval["hermes-context.tar.gz"] = hashlib.sha256(
+        (root / "hermes-context.tar.gz").read_bytes()
+    ).hexdigest()
+    (root / "approved.json").write_text(json.dumps(approval))
+    plan = prepare(
+        lab, operation="deploy", target="crate", version=manifest["release_sha"]
+    )
+    result = lab.executor.execute(plan["document"])
+    assert (
+        result["host_inputs"][".deploy/hermes-context.candidate.tar.gz"]
+        == approval["hermes-context.tar.gz"]
+    )
+    stages = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
+    assert stages[-2:] == ["verify", "hermes-context"]
+
+
+def test_operator_deploy_rejects_missing_context_before_effects(lab):
+    _root, manifest = release(lab)
+    server = Path(lab.config["server_path"])
+    with (server / ".env").open("a") as stream:
+        stream.write("\nCRATE_OPERATOR_ROOT=/opt/crate-operator\n")
+    with pytest.raises((OSError, ValueError)):
+        prepare(
+            lab, operation="deploy", target="crate", version=manifest["release_sha"]
+        )
+    assert not [args for args, _ in lab.runner.calls if args[0] == "/bin/bash"]

@@ -32,9 +32,9 @@ can report missing Crate evidence through a fixed Hermes `deliver_only` route.
 An external watchdog on another host probes the observer and gateway and sends
 fallback alerts directly to its own allowlisted Telegram destination.
 
-This is a locally tested implementation, not deployed acceptance. Compose,
-native human callback transport and opt-in activation are separate integration
-work. The existing read-only Hermes pilot remains the default. Nothing here
+This is a locally tested integrated candidate, not deployed acceptance.
+[Operator candidate and rollout](hermes-operator-release.md) describes the opt-in
+Compose, native transport, root provisioning, health and provenance contracts. The existing read-only Hermes pilot remains the default. Nothing here
 changes the legacy bot or assumes a setting stops its poller. Never run a
 second Telegram poller with the same bot token.
 
@@ -59,7 +59,7 @@ The supervisor needs a dedicated MCP read credential with `ops.status.read`,
 The supervisor read/watch API bearer and webhook HMAC secret are distinct from
 that credential and from each other. Mount secret files separately from the
 model runtime. Use private networking or authenticated TLS termination for
-service bearers; the default listener is loopback. No client follows redirects
+service bearers; the integrated listener is restricted to the private Compose network. No client follows redirects
 or uses environment proxy settings. Transport failures retain fixed reason
 codes, never token-bearing URLs or raw remote exceptions.
 
@@ -178,7 +178,8 @@ Sequence numbers increase across durable restarts; retention does not reset them
 
 ## Native human decision integration boundary
 
-There is deliberately no HTTP/model `ack`, `silence`, `requeue` or human boolean.
+There is no model/read-bearer `ack`, `silence`, `requeue` or human boolean.
+The separate `/v1/native/decision` route accepts only the trusted native HMAC receipt.
 The internal integration method is:
 
 ```python
@@ -203,13 +204,16 @@ issuance window, TTL, and durable replay nonce before changing state.
 The dedicated callback verification secret is separate from the read/model and
 delivery keys. It confers only incident acknowledgement/silence authority, never
 domain or infrastructure approval authority. Constructor trust configuration is
-not request data. Native callback transport, signer provisioning and deployment
-wiring are pending integration; interpreting chat text as a human decision is
-not supported.
+not request data. The native plugin registers only `/crate_ack` and
+`/crate_silence` commands, with incident key, revision, TTL and explicit reason.
+It checks a private numeric human and signs the exact Telegram update. The server
+reloads the current local operator map and rejects replay, stale revision or expiry.
+Ordinary chat and model tool calls never authenticate a decision. Activation remains
+separate from the locally tested integration.
 
 ## Durable fixed-route delivery
 
-Configure Hermes v0.2.22 with a single fixed `deliver_only: true` route, fixed
+Configure Hermes v0.22.2 with a single fixed `deliver_only: true` route, fixed
 Telegram destination, a `prompt` that renders `{message}`, and no dynamic
 destination, agent skills, cron job or model invocation. Route configuration is
 a deployment prerequisite; the observer cannot establish it by merely receiving
