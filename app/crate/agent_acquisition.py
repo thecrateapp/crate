@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import time
+from urllib.parse import quote
 from uuid import UUID
 
 import requests
@@ -61,6 +62,13 @@ def _transport(method, endpoint, body=None):
                 and endpoint == "transfers/downloads/batches"
             ):
                 return {"duplicate_batch": True}
+            if (
+                response.status_code == 404
+                and method == "GET"
+                and endpoint.startswith("transfers/downloads/")
+                and endpoint.count("/") == 2
+            ):
+                return None
             response.raise_for_status()
             if response.status_code >= 300:
                 raise ValueError("Redirect refused")
@@ -353,14 +361,21 @@ def compile_operation(operation, parameters, config, *, principal, task_id=None)
     }
 
 
-def _downloads():
-    raw = _transport("GET", "transfers/downloads")
-    if not isinstance(raw, list):
-        raise DiagnosticError("PROVIDER_UNAVAILABLE", "Transfer state unavailable")
+def _downloads(peer):
+    raw = _transport("GET", "transfers/downloads/" + quote(_identifier(peer), safe=""))
+    if raw is None:
+        return []
+    if (
+        not isinstance(raw, dict)
+        or raw.get("username") != peer
+        or not isinstance(raw.get("directories"), list)
+    ):
+        raise DiagnosticError(
+            "PROVIDER_UNAVAILABLE", "Selected peer transfer state unavailable"
+        )
     return [
-        {**file, "username": peer.get("username")}
-        for peer in raw
-        for directory in peer.get("directories", [])
+        {**file, "username": peer}
+        for directory in raw["directories"]
         for file in directory.get("files", [])
     ]
 
@@ -394,7 +409,7 @@ def apply_operation(operation, execution, config, *, task_id, authorize):
     ):
         raise DiagnosticError("EVIDENCE_STALE", "Target library identity changed")
     names = {f["filename"] for f in source["files"]}
-    prior = _downloads()
+    prior = _downloads(source["peer"])
     if any(f.get("filename") in names for f in prior):
         raise DiagnosticError(
             "RECONCILIATION_REQUIRED",

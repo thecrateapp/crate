@@ -70,7 +70,10 @@ def _materialize_artwork(
     source_content: bytes,
     *,
     source_media_type: str | None = None,
+    authorize=None,
 ) -> dict[str, Any]:
+    if authorize:
+        authorize()
     if not source_content:
         raise ArtworkMaterializationError("invalid image: empty payload")
 
@@ -129,10 +132,15 @@ def _materialize_artwork(
             variants[str(requested_size)] = f"{source_revision}/{filename}"
             dimensions[str(requested_size)] = list(output_dimensions)
 
+        if authorize:
+            authorize()
         if final_revision.exists():
             shutil.rmtree(temporary)
         else:
-            temporary.replace(final_revision)
+            if authorize:
+                authorize(lambda: temporary.replace(final_revision))
+            else:
+                temporary.replace(final_revision)
 
         manifest = {
             "version": 1,
@@ -146,10 +154,17 @@ def _materialize_artwork(
             "variants": variants,
             "dimensions": dimensions,
         }
-        publish_manifest_atomically(asset, manifest)
+        if authorize:
+            authorize()
+        if authorize:
+            authorize(lambda: publish_manifest_atomically(asset, manifest))
+        else:
+            publish_manifest_atomically(asset, manifest)
     except Exception as exc:
         shutil.rmtree(temporary, ignore_errors=True)
-        if isinstance(exc, ArtworkMaterializationError):
+        from crate.agent_diagnostics import DiagnosticError
+
+        if isinstance(exc, (ArtworkMaterializationError, DiagnosticError)):
             raise
         raise ArtworkMaterializationError(
             f"failed to materialize artwork: {exc}"
@@ -167,11 +182,15 @@ def materialize_artwork(
     source_content: bytes,
     *,
     source_media_type: str | None = None,
+    authorize=None,
 ) -> dict[str, Any]:
     started = time.monotonic()
     try:
         result = _materialize_artwork(
-            asset, source_content, source_media_type=source_media_type
+            asset,
+            source_content,
+            source_media_type=source_media_type,
+            authorize=authorize,
         )
     except ArtworkMaterializationError as exc:
         reason = "invalid_source" if "invalid image" in str(exc) else "write_failed"

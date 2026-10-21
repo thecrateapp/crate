@@ -89,6 +89,16 @@ def compile_operation(operation, parameters, config, *, principal: AgentPrincipa
 
 
 def apply_operation(operation, execution, config, *, task_id, authorize):
+    if execution.get("operator_provenance") is not None:
+        from crate.db.repositories.agent_descendants import parent_reference
+
+        execution = {
+            **execution,
+            "principal": {
+                **execution["principal"],
+                "parent_authority": parent_reference(task_id),
+            },
+        }
     if operation == "schedule_run":
         from crate.scheduler import guarded_run_schedule
 

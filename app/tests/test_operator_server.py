@@ -419,3 +419,89 @@ def test_running_service_exits_after_watch_thread_durability_failure(
     restarted = State(config["state_directory"])
     restarted.ensure_available()
     restarted.close()
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "*",
+        "api.example/a",
+        "api.example\r\nX: y",
+        "api.example:99999",
+        "https://api.example",
+        "",
+    ],
+)
+def test_fixed_mcp_host_rejects_untrusted_authority(host):
+    from deploy.operator.server import validate_mcp_host
+
+    with pytest.raises(ValueError):
+        validate_mcp_host(host)
+
+
+def test_actual_mcp_supervisor_pages_advance_and_keep_retention_gap(
+    setup, tmp_path, monkeypatch
+):
+    from deploy.operator import supervisor_mcp
+    from deploy.operator.state import enqueue
+
+    state, supervisor = setup
+    with state.transaction() as data:
+        data["incidents"] = {
+            str(i): {"key": str(i), "state": "open"} for i in range(65)
+        }
+        for i in range(65):
+            enqueue(data, "synthetic " + str(i), i)
+        data["sequence"] = 75
+        data["events"] = [{"seq": i, "at": 1, "kind": "fixture"} for i in range(10, 76)]
+    delivery = Delivery(state, lambda *_: None)
+    service = make_http_server(
+        supervisor, "synthetic-read-api-token", delivery=delivery
+    )
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    (tmp_path / "read-token").write_text("synthetic-read-api-token")
+    monkeypatch.setattr(supervisor_mcp, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        supervisor_mcp, "BASE", f"http://127.0.0.1:{service.server_port}"
+    )
+
+    def read(name, args):
+        response = supervisor_mcp.dispatch(
+            {"method": "tools/call", "params": {"name": name, "arguments": args}}
+        )
+        assert not response["isError"], response
+        return response["structuredContent"]
+
+    try:
+        first = read("supervisor_events", {"cursor": 0, "limit": 20})
+        assert first["retention_gap"]
+        second = read(
+            "supervisor_events", {"cursor": first["next_cursor"], "limit": 100}
+        )
+        assert second["events"][0]["seq"] > first["events"][-1]["seq"]
+        assert second["events"][-1]["seq"] == 75
+        for tool, field in [
+            ("supervisor_incidents", "incidents"),
+            ("supervisor_delivery", "items"),
+        ]:
+            first = read(tool, {"offset": 0, "limit": 20})
+            second = read(tool, {"offset": first["next_offset"], "limit": 50})
+            assert len(first[field]) == 20 and len(second[field]) == 45
+            assert second["next_offset"] is None
+        for tool, args in [
+            ("supervisor_events", {"cursor": -1}),
+            ("supervisor_events", {"cursor": True}),
+            ("supervisor_events", {"limit": "2"}),
+            ("supervisor_incidents", {"offset": 501}),
+            ("supervisor_delivery", {"limit": 51}),
+            ("supervisor_delivery", {"offset": 1001}),
+            ("supervisor_status", {"limit": 1}),
+            ("supervisor_events", {"x": 1}),
+        ]:
+            with pytest.raises(ValueError):
+                read(tool, args)
+    finally:
+        service.shutdown()
+        service.server_close()
+        thread.join()

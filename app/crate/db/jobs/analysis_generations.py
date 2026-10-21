@@ -68,14 +68,21 @@ def accepted_claim_ids(
     claims: dict[int, dict] | None,
     verify_source: bool = False,
 ) -> set[int]:
+    from crate.db.jobs.operator_generations import allowed_generation_ids
+
     accepted = set()
-    for row in lock_processing_rows(session, track_ids, [pipeline]):
+    rows = lock_processing_rows(session, track_ids, [pipeline])
+    allowed = allowed_generation_ids(session, rows=rows, pipeline=pipeline)
+    for row in rows:
+        if int(row["track_id"]) not in allowed:
+            continue
         track_id = int(row["track_id"])
         claim = claims.get(track_id) if claims is not None else None
         if claim is None:
             # Compatibility writes may populate legacy data, never a managed generation.
             if (
                 claims is None
+                and row.get("operator_authority") is None
                 and int(row["generation"]) == 0
                 and row["claim_token"] is None
             ):
@@ -132,4 +139,4 @@ def record_signatures(session, *, pipeline: str, signatures: dict[int, str]) -> 
         )
 
 
-__all__ = ["lock_processing_rows", "accepted_claim_ids", "record_signatures"]
+__all__ = ["accepted_claim_ids", "lock_processing_rows", "record_signatures"]

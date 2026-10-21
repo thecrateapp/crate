@@ -10,6 +10,10 @@ from crate.db.repositories.auth_user_accounts import get_user_by_id
 from crate.db.tx import read_scope
 
 
+class ApprovedHuman(dict):
+    """Durable decision: current account authority, independent of browser lifetime."""
+
+
 class TelegramHuman(dict):
     """Internal provenance minted only from a persisted native binding."""
 
@@ -54,6 +58,17 @@ def require_agent_human_capabilities(
         text("SELECT role FROM user_roles WHERE user_id = :id FOR SHARE"),
         {"id": actor["id"]},
     ).all()
+    if isinstance(actor, ApprovedHuman):
+        user = get_user_by_id(actor["id"], session=session)
+        if (
+            user is None
+            or (user.get("status") or "active") != "active"
+            or not capabilities <= get_user_capabilities(user)
+        ):
+            raise DiagnosticError(
+                "FORBIDDEN", "The approving human no longer permits this decision"
+            )
+        return {**user, "capabilities": sorted(get_user_capabilities(user))}
     if isinstance(actor, TelegramHuman):
         binding = session.execute(
             text(

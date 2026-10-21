@@ -8,6 +8,7 @@ from crate.db.analytics_quality_surface import (
     begin_quality_report_scan,
     complete_quality_report_scan,
 )
+from crate.db.repositories.agent_task_control import with_task_authority
 from crate.quality import QualityScanCancelled, quality_report
 from crate.worker_handlers import audio_extensions, is_cancelled
 
@@ -48,10 +49,13 @@ def _handle_quality_check(task_id: str, params: dict, config: dict) -> dict:
         return {"status": "cancelled", "published": False}
     if is_cancelled(task_id):
         return {"status": "cancelled", "published": False}
-    published = complete_quality_report_scan(
-        report,
-        observation=observation,
-        generation_ms=int((time.monotonic() - started) * 1000),
+    published = with_task_authority(
+        task_id,
+        lambda: complete_quality_report_scan(
+            report,
+            observation=observation,
+            generation_ms=int((time.monotonic() - started) * 1000),
+        ),
     )
     return {
         "status": "completed" if published else "conflict",

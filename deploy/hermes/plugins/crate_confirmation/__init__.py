@@ -241,7 +241,13 @@ class NativePresenter:
                             message_text += "\nJob: " + value["job"]["job_id"]
                         if value.get("reason"):
                             message_text += "\nApply unavailable: " + value["reason"]
-                        if value.get("job"):
+                        if value.get("job") and provider.prefix == "ct:i:":
+                            message_text += (
+                                "\nInfrastructure status: read infra_inspect with plan_id "
+                                + result["confirmation_id"]
+                                + ". For an indeterminate effect, use infra_reconcile; do not replay."
+                            )
+                        elif value.get("job"):
                             monitoring = value.get("monitoring", {})
                             message_text += (
                                 "\nMonitoring: supervisor watch enrolled; effect verification pending."

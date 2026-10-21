@@ -1,15 +1,5 @@
 """Idempotent schema bootstrap for fresh installs and bridge upgrades."""
 
-from crate.db.schema_sections.ai_configuration_v120 import (
-    create_ai_configuration_v120_schema,
-)
-from crate.db.schema_sections.ai_configuration_v121 import (
-    create_ai_default_model_v121_schema,
-)
-from crate.db.schema_sections.show_extraction_v119 import (
-    create_show_extraction_v119_schema,
-)
-
 from crate.db.schema_sections import (
     create_acquisition_schema,
     create_activity_schema,
@@ -20,17 +10,26 @@ from crate.db.schema_sections import (
 )
 from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
 from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
+from crate.db.schema_sections.agent_commands_v111 import (
+    create_agent_commands_v111_schema,
+)
 from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
 from crate.db.schema_sections.agent_operations_v115 import (
     create_agent_operations_v115_schema,
 )
-from crate.db.schema_sections.agent_commands_v111 import (
-    create_agent_commands_v111_schema,
+from crate.db.schema_sections.ai_configuration_v120 import (
+    create_ai_configuration_v120_schema,
 )
-from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
+from crate.db.schema_sections.ai_configuration_v121 import (
+    create_ai_default_model_v121_schema,
+)
 from crate.db.schema_sections.editorial_v116 import create_editorial_v116_schema
-from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
+from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
+from crate.db.schema_sections.show_extraction_v119 import (
+    create_show_extraction_v119_schema,
+)
 from crate.db.schema_sections.show_plans_v118 import create_show_plans_v118_schema
+from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
 
 
 def create_schema(cur):
@@ -110,3 +109,8 @@ def create_schema(cur):
     )
 
     create_agent_telegram_v133_schema(cur)
+    from crate.db.schema_sections.operator_generations_v134 import (
+        create_operator_generations_v134_schema,
+    )
+
+    create_operator_generations_v134_schema(cur)

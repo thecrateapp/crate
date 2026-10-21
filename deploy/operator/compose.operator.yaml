@@ -136,8 +136,14 @@ services:
 
   crate-analysis-worker:
     environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
       CRATE_READINESS_ROLE: worker
       CRATE_READINESS_QUEUES: heavy
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-/opt/crate-operator}/context/public:/run/crate-provenance:ro
     healthcheck: *worker-health
 
   crate-playback-worker:

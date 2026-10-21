@@ -10,6 +10,7 @@ from crate.agent_access import AgentPrincipal, authorization_context
 from crate.agent_diagnostics import DiagnosticError, _safe
 from crate.agent_operation_catalog import interrupted_operation_result
 from crate.db.repositories.agent_human_sessions import (
+    ApprovedHuman,
     TelegramHuman,
     require_agent_human_capabilities,
 )
@@ -350,14 +351,22 @@ def validate_plan_authorization(current, plan, principal, *, worker=False, job_i
         raise DiagnosticError(
             "APPROVAL_REQUIRED", "An exact current human approval is required"
         )
-    if approval.get("telegram_binding_id"):
+    from crate.operator_provenance import is_operator
+
+    if (
+        approval.get("telegram_binding_id")
+        or _reviewed_provenance(plan) is not None
+        or is_operator(plan["principal_id"])
+    ):
         from crate.agent_operation_catalog import OPERATIONS
 
         require_agent_human_capabilities(
             TelegramHuman(
                 id=approval["approved_by"],
                 telegram_binding_id=str(approval["telegram_binding_id"]),
-            ),
+            )
+            if approval.get("telegram_binding_id")
+            else ApprovedHuman(id=approval["approved_by"]),
             {
                 "agents.plans.approve",
                 "agents.plans.review",

@@ -177,7 +177,10 @@ One consolidated rollout must provision:
    read/watch bearer and incident HMAC, and delivery HMAC. Never reuse secrets.
    Native identity files use the same fixed instance and reviewed numeric users.
    Model adapters have no native signing keys in arguments/environment/results.
-4. Supervisor config from `config.operator.example.json`; dedicated gateway
+4. Supervisor config from `config.operator.example.json`; set its fixed `mcp_host`
+   to the API’s exact allowed public authority (`api.lespedants.org` in the example),
+   even while `mcp_url` uses the private `http://crate-api:8585/mcp` route. Match any
+   custom `CRATE_MCP_ALLOWED_HOSTS` without wildcard expansion. Dedicated gateway
    `secrets/delivery/{secret,destination}` for the fixed private allowlisted
    `deliver_only` route; distinct supervisor state, infra state/backups and external
    watchdog state. No service gets the Docker socket except the separately
@@ -296,3 +299,46 @@ role health under actual load, real bot ownership/identity, signed destination
 reachability, backup capacity, external watchdog failure/recovery, public client
 checks and a model conversation using the released context. No live-target claim
 is made by the local candidate.
+
+## Delayed effect authority and migration 134
+
+Operator-created one-off schedule/retry tasks, sync artwork and analysis/Bliss
+generations retain the exact admitted parent job, plan version and human decision.
+A completed enqueue parent stays readable for this proof; it is never reopened or
+replayed. Current credentials, grants, account/binding authority, approval expiry
+and fresh stable release/context identity are checked again before child work and
+publication. Nested copying/scanning checks also reread provenance. Refreshed
+observation timestamps for the same stable identity remain valid.
+
+Migration 134 adds nullable `track_processing_state.operator_authority`. Operator
+generations retain their approved physical source and generation; a denied
+generation is durably failed, and ordinary resets preserve that proof and cannot
+launder it into ordinary pending work. A fresh separately approved analysis plan
+can replace it. The analysis worker receives the same opt-in identity environment
+and public provenance mount as the other executing workers. Queued artwork binds
+the reviewed local cover or embedded source and digest, never a newly selected
+provider/source at execution. Owned acquisition transfer/publication jobs support
+reviewed cancellation only; legacy Soulseek retries remain unavailable and a
+stopped transfer can still continue remotely.
+
+Existing independent Admin/scheduler/nonoperator pipelines remain supported. Future
+recurrences of an approved persistent schedule are platform policy. Routine
+projector/read-plane/dirty-index consistency from committed facts is platform
+authority. These boundaries do not exempt operator-created processing generations
+or one-off child tasks.
+
+Upgrade the database and executing workers together before enabling the operator.
+Drain or reconcile any preupgrade operator work first: raw tasks without retained
+parent proof are rejected, and old processing generations have no reconstructable
+parent lineage.
+Rollback must first stop/drain or reconcile operator-bound queued work; retaining
+migration 134 is safe for older source, but older workers cannot enforce its proof.
+Do not run them against retained operator work. Dropping the column discards its
+lineage and requires a separately reviewed rollback after that work is resolved.
+
+Supervisor event, incident and delivery reads expose bounded cursor/offset pages;
+retention gaps remain explicit. Infra outcomes direct follow-up to `infra_inspect`
+and `infra_reconcile`; domain outcomes retain their exact confirmation/watch status.
+Invalid local MCP request shapes are protocol errors. Current-authority outages or
+lost forwarded responses remain ordinary unavailable/unverified observations so
+the pinned gateway can recover without replaying uncertain mutations.

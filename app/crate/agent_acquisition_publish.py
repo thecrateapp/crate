@@ -335,7 +335,15 @@ def apply_publication(execution, config, *, task_id, authorize):
         temporary = None
 
     try:
-        result = authorize(lambda: store.publish_album(execution, publish_files))
+        result = authorize(
+            lambda: store.publish_album(
+                execution,
+                publish_files,
+                operator_task_id=task_id
+                if execution.get("operator_provenance")
+                else None,
+            )
+        )
     finally:
         if temporary is not None:
             shutil.rmtree(temporary)

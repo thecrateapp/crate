@@ -15,6 +15,20 @@ ROUTES = {
     "supervisor_delivery": "/v1/delivery",
     "supervisor_watch_job": "/v1/watch-job",
 }
+PAGES = {
+    "supervisor_events": {
+        "cursor": {"type": "integer", "minimum": 0},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+    },
+    "supervisor_incidents": {
+        "offset": {"type": "integer", "minimum": 0, "maximum": 500},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+    },
+    "supervisor_delivery": {
+        "offset": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+    },
+}
 TOOLS = [
     {
         "name": name,
@@ -25,7 +39,7 @@ TOOLS = [
                 "ttl": {"type": "integer", "minimum": 1, "maximum": 259200},
             }
             if name == "supervisor_watch_job"
-            else {},
+            else PAGES.get(name, {}),
             ["job_id"] if name == "supervisor_watch_job" else [],
         ),
         "annotations": {
@@ -53,11 +67,24 @@ def dispatch(message):
     if method != "tools/call" or params["name"] not in ROUTES:
         raise ValueError("Unknown supervisor tool")
     name, arguments = params["name"], params.get("arguments", {})
-    if (name != "supervisor_watch_job" and arguments) or set(arguments) - {
-        "job_id",
-        "ttl",
-    }:
+    schema = next(tool["inputSchema"] for tool in TOOLS if tool["name"] == name)
+    if (
+        not isinstance(arguments, dict)
+        or set(arguments) - schema["properties"].keys()
+        or not set(schema["required"]) <= arguments.keys()
+    ):
         raise ValueError("Closed supervisor arguments")
+    for key, value in arguments.items():
+        shape = schema["properties"][key]
+        if shape["type"] == "integer":
+            if (
+                type(value) is not int
+                or value < shape["minimum"]
+                or ("maximum" in shape and value > shape["maximum"])
+            ):
+                raise ValueError("Invalid supervisor bounds")
+        elif not isinstance(value, str) or not value:
+            raise ValueError("Invalid supervisor identifier")
     status, value = request_json(
         BASE + ROUTES[name],
         payload=json.dumps(arguments).encode()
@@ -68,6 +95,7 @@ def dispatch(message):
             "Content-Type": "application/json",
         },
         timeout=5,
+        query=arguments if name in PAGES else None,
     )
     return {
         "content": [{"type": "text", "text": json.dumps(value)}],

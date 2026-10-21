@@ -165,7 +165,10 @@ def test_ack_failure_still_submits_once_and_delivers_durable_outcome(
             return {"state": "delivered"}
 
         provider = SimpleNamespace(
-            pattern=module.PATTERN, allowed={123}, event=AsyncMock(side_effect=event)
+            pattern=module.PATTERN,
+            prefix="ct:d:",
+            allowed={123},
+            event=AsyncMock(side_effect=event),
         )
         message = SimpleNamespace(
             chat=SimpleNamespace(id=123, type="private"),
@@ -433,3 +436,70 @@ def test_operator_preflight_checks_independent_read_discovery_then_current_polic
     policy["require_approval"] = False
     with pytest.raises(ValueError):
         runtime.operator_preflight("http://loopback", "operator", "supervisor", config)
+
+
+@pytest.mark.parametrize(
+    "prefix,state,monitoring,expected",
+    [
+        ("ct:i:", "succeeded", None, "infra_inspect"),
+        ("ct:i:", "indeterminate", None, "infra_reconcile"),
+        ("ct:d:", "approved", {"state": "confirmed"}, "supervisor watch enrolled"),
+        ("ct:d:", "approved", {"state": "unavailable"}, "get_confirmation_status"),
+    ],
+)
+def test_actual_native_presenter_gives_provider_valid_followup(
+    monkeypatch, prefix, state, monitoring, expected
+):
+    sdk(monkeypatch)
+    module = plugin()
+
+    async def run():
+        presenter = module.NativePresenter(None, [])
+        sent = []
+
+        async def send(**kwargs):
+            sent.append(kwargs["text"])
+            return SimpleNamespace(message_id=1)
+
+        app = SimpleNamespace(bot=SimpleNamespace(send_message=send))
+        presenter.application = app
+
+        async def event(data):
+            if data["kind"] == "outcome_delivered":
+                presenter.application = None
+                return {"state": "delivered"}
+            if prefix == "ct:i:":
+                from deploy.operator.infra_plans import Bridge
+
+                plan = {
+                    "id": "a" * 32,
+                    "state": state,
+                    "document": {"human_id": 123},
+                    "outcome_delivered": False,
+                    "attempts": 0,
+                    "next_delivery": 0,
+                }
+                return Bridge._pending(None, {"infra_plans": {"a" * 32: plan}}, 1)
+            return {
+                "state": "outcome",
+                "confirmation_id": "a" * 32,
+                "chat_id": 123,
+                "result": {
+                    "state": state,
+                    "job": {"job_id": "job-1"},
+                    **({"monitoring": monitoring} if monitoring else {}),
+                },
+            }
+
+        provider = SimpleNamespace(prefix=prefix, allowed={123}, event=event)
+        original_sleep = asyncio.sleep
+        monkeypatch.setattr(module.asyncio, "sleep", lambda _: original_sleep(0))
+        await presenter.present(app, provider)
+        assert expected in sent[0]
+        if prefix == "ct:i:":
+            assert (
+                "get_confirmation_status" not in sent[0]
+                and "Monitoring unavailable" not in sent[0]
+            )
+
+    asyncio.run(run())

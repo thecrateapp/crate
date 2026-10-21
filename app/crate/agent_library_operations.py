@@ -103,6 +103,12 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
         ):
             raise DiagnosticError("FORBIDDEN", "MCP library operations are disabled")
         if effect_depth:
+            from crate.operator_provenance import validate
+
+            validate(
+                job["principal_id"],
+                job["plan"]["execution_data"].get("operator_provenance"),
+            )
             return effect() if effect is not None else None
 
         def held():

@@ -5,6 +5,7 @@
   "listen_port": 8791,
   "poll_seconds": 45,
   "mcp_url": "http://crate-api:8585/mcp",
+  "mcp_host": "api.lespedants.org",
   "mcp_token_file": "/run/secrets/operator_mcp_read",
   "api_token_file": "/run/secrets/operator_api",
   "webhook_url": "http://crate-hermes-operator:8644/webhooks/crate-operator",

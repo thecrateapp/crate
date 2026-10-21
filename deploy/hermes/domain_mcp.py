@@ -10,6 +10,10 @@ from runtime import _mcp_request, validate_operator_profile
 ASSETS = Path(__file__).parent
 
 
+class InputError(ValueError):
+    pass
+
+
 def dispatch(message):
     method, params = message.get("method"), message.get("params", {})
     catalog = json.loads((ASSETS / "operator-catalog.json").read_text())
@@ -25,13 +29,17 @@ def dispatch(message):
         return {"tools": catalog}
     if method != "tools/call":
         raise ValueError("Unsupported method")
+    if not isinstance(params, dict) or not isinstance(params.get("name"), str):
+        raise InputError("A tool name is required")
     name = params["name"]
     tool = next((item for item in catalog if item["name"] == name), None)
     if tool is None or set(params) - {"name", "arguments", "_meta"}:
-        raise ValueError("Unsupported tool")
+        raise InputError("Unsupported tool")
     # Standard MCP client metadata is transport-only, never domain authority.
     if "_meta" in params and not isinstance(params["_meta"], dict):
-        raise ValueError("Invalid transport metadata")
+        raise InputError("Invalid transport metadata")
+    if not isinstance(params.get("arguments", {}), dict):
+        raise InputError("Tool arguments must be an object")
     params = {"name": name, "arguments": params.get("arguments", {})}
     url = os.environ.get("CRATE_MCP_URL", "http://crate-api:8585/mcp")
     token = Path("/run/crate-hermes-secrets/mcp-token").read_text().strip()
@@ -73,6 +81,12 @@ def main():
             if identity is None:
                 continue
             response = {"jsonrpc": "2.0", "id": identity, "result": dispatch(message)}
+        except InputError:
+            response = {
+                "jsonrpc": "2.0",
+                "id": identity,
+                "error": {"code": -32602, "message": "Invalid local tool request"},
+            }
         except Exception:  # noqa: BLE001 — never forward upstream secrets/error bodies
             if isinstance(message, dict) and message.get("method") == "tools/call":
                 # Domain unavailability is an observed result, not a broken local

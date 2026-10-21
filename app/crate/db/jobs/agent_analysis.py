@@ -22,6 +22,8 @@ def requeue_analysis_targets(
     *,
     expected_version: str,
     mode: str,
+    operator_task_id=None,
+    sources=None,
     session=None,
 ) -> dict:
     if mode not in {"pending", "refresh"}:
@@ -52,6 +54,16 @@ def requeue_analysis_targets(
                 ),
                 {"id": row["track_id"], "pipeline": row["pipeline"]},
             ).scalar_one()
+            if operator_task_id:
+                from crate.db.jobs.operator_generations import bind_generation
+
+                bind_generation(
+                    current,
+                    track_id=row["track_id"],
+                    pipelines=[row["pipeline"]],
+                    task_id=operator_task_id,
+                    source=sources[uids_by_id[row["track_id"]]],
+                )
             column = (
                 "analysis_state" if row["pipeline"] == "analysis" else "bliss_state"
             )

@@ -805,22 +805,18 @@ def test_approved_raw_task_rechecks_flags_and_authority_before_persisting_effect
     real_check_authority = agent_task_control.check_task_authority
     denial_codes = []
 
-    def check_authority(task_id):
+    def check_authority(task_id, *, session=None):
         try:
-            return real_check_authority(task_id)
+            return real_check_authority(task_id, session=session)
         except DiagnosticError as error:
             denial_codes.append(error.code)
             raise
 
     monkeypatch.setattr(agent_task_control, "check_task_authority", check_authority)
 
-    try:
-        actors._execute_task(task["type"], task["id"])
-    except DiagnosticError as error:
-        # The generic actor's fail_job bridge raises NOT_FOUND for raw tasks
-        # without agent_jobs; terminal task failure is still persisted.
-        assert withdrawal != "none"
-        assert error.code == "NOT_FOUND"
+    # Raw-task denial terminates the durable task without failing a nonexistent
+    # agent job. The authority spy preserves the caller's held proof session.
+    actors._execute_task(task["type"], task["id"])
 
     assert denial_codes == ([] if withdrawal == "none" else ["FORBIDDEN"])
     row = _row(task["id"])

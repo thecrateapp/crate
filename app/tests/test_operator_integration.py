@@ -583,3 +583,38 @@ def test_domain_stdio_unavailability_is_bounded_transport_success_not_effect_suc
     assert replies[4]["result"]["content"][0]["text"] == "recovered"
     assert replies[5]["error"]["code"] == -32603
     assert all("_meta" not in call for call in calls)
+
+
+def test_domain_stdio_local_validation_errors_are_distinct_from_outages(
+    monkeypatch, capsys
+):
+    import io
+    from types import SimpleNamespace
+
+    import domain_mcp
+
+    calls = []
+    monkeypatch.setattr(domain_mcp, "_mcp_request", lambda *args: calls.append(args))
+    invalid = [
+        {},
+        {"name": "unknown"},
+        {"name": "get_instance_inventory", "extra": True},
+        {"name": "get_instance_inventory", "_meta": []},
+        {"name": "get_instance_inventory", "arguments": []},
+    ]
+    messages = [
+        {"id": i + 1, "method": "tools/call", "params": params}
+        for i, params in enumerate(invalid)
+    ]
+    monkeypatch.setattr(
+        domain_mcp.sys,
+        "stdin",
+        SimpleNamespace(
+            buffer=io.BytesIO("".join(json.dumps(m) + "\n" for m in messages).encode())
+        ),
+    )
+    domain_mcp.main()
+    replies = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert len(replies) == len(invalid)
+    assert all(reply["error"]["code"] == -32602 for reply in replies)
+    assert calls == []

@@ -567,8 +567,8 @@ def _execute_task(task_type: str, task_id: str):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
-    from crate.db.repositories.tasks import fail_or_retry_task, start_task, update_task
     from crate.db.repositories.task_control import acknowledge_cancellation
+    from crate.db.repositories.tasks import fail_or_retry_task, start_task, update_task
     from crate.resource_governor import record_decision, should_defer_task
     from crate.worker import TASK_HANDLERS, _is_cancelled
 
@@ -749,7 +749,15 @@ def _execute_task(task_type: str, task_id: str):
             except DiagnosticError as error:
                 from crate.db.repositories.agent_requests import fail_job
 
-                result = fail_job(task_id, error.code, str(error))
+                if (task.get("params") or {}).get("agent_command"):
+                    result = fail_job(task_id, error.code, str(error))
+                else:
+                    result = {
+                        "status": "failed",
+                        "error": str(error),
+                        "error_code": error.code,
+                        "verification": {"status": "not_required"},
+                    }
                 authority_failed = True
         if not authority_failed:
             config = load_config()

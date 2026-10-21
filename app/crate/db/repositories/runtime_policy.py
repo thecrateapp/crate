@@ -312,6 +312,10 @@ def enqueue_schedule(
             session=current,
         )
         if task_id:
+            if (agent_context or {}).get("parent_authority"):
+                current.execute(
+                    text("UPDATE tasks SET max_retries=0 WHERE id=:id"), {"id": task_id}
+                )
             mark_schedule_enqueued(task_type, session=current)
         record_runtime_adoption(
             "scheduler",

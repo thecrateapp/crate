@@ -40,9 +40,15 @@ def validate_url(url):
     return url
 
 
-def request_json(url, *, payload=None, headers=None, timeout=5):
+def request_json(url, *, payload=None, headers=None, timeout=5, query=None):
     """Bounded standard-library HTTP; no proxies, redirects, or raw transport errors."""
     validate_url(url)
+    if query:
+        if set(query) - {"cursor", "offset", "limit"} or any(
+            type(v) is not int or v < 0 for v in query.values()
+        ):
+            raise ValueError("Invalid bounded read query")
+        url += "?" + urllib.parse.urlencode(query)
     if not 0 < timeout <= 10:
         raise ValueError("HTTP timeout outside bound")
     request = urllib.request.Request(

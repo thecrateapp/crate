@@ -76,8 +76,8 @@ def world(command_world, monkeypatch, tmp_path):
             return {"id": state["search_id"]}
         if endpoint.endswith("/responses"):
             return copy.deepcopy(state["raw"])
-        if endpoint == "transfers/downloads":
-            return []
+        if endpoint == "transfers/downloads/peer%20name":
+            return {"username": "peer name", "directories": []}
         if endpoint == "transfers/downloads/batches":
             state["posts"] += 1
             state["batch"] = {
@@ -318,9 +318,10 @@ def test_publication_reconciliation_checks_cancellation_between_files(
         assert "plan" not in prepared
         assert verified == ["One.flac"]
         assert scalar("SELECT count(*) FROM agent_repair_plans") == plans_before
-        assert store.owned_transfer(world["principal"], accepted["job_id"])[
-            "state"
-        ] == transfer["state"]
+        assert (
+            store.owned_transfer(world["principal"], accepted["job_id"])["state"]
+            == transfer["state"]
+        )
     else:
         assert prepared["execution"]["status"] == "prepared", prepared
         assert verified == ["One.flac", "Two.flac"]
@@ -700,3 +701,36 @@ def test_search_checks_current_authority_before_provider_call(world):
             world["principal"], provider="soulseek", query="Echo"
         )
     assert world["state"]["calls"] == []
+
+
+def test_transfer_history_reads_only_urlencoded_selected_peer(world, monkeypatch):
+    original = acquisition._transport
+
+    def provider(method, endpoint, body=None):
+        if endpoint == "transfers/downloads":
+            pytest.fail("Unrelated provider history must never be requested")
+        return original(method, endpoint, body)
+
+    monkeypatch.setattr(acquisition, "_transport", provider)
+    assert acquisition._downloads("peer name") == []
+    assert world["state"]["calls"][-1][1] == "transfers/downloads/peer%20name"
+
+
+@pytest.mark.parametrize(
+    "raw,valid",
+    [
+        (None, True),
+        ({"username": "peer", "directories": []}, True),
+        ([], False),
+        ({"username": "other", "directories": []}, False),
+    ],
+)
+def test_selected_peer_history_normalizes_404_and_rejects_wrong_peer(
+    monkeypatch, raw, valid
+):
+    monkeypatch.setattr(acquisition, "_transport", lambda *args: raw)
+    if valid:
+        assert acquisition._downloads("peer") == []
+    else:
+        with pytest.raises(DiagnosticError):
+            acquisition._downloads("peer")

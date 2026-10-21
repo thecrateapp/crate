@@ -5,6 +5,7 @@ from typing import Any, Callable, Mapping, TypeGuard
 
 from crate.audio_fingerprint import compute_audio_fingerprint_with_source
 from crate.db.cache_store import set_cache
+from crate.db.events import emit_task_event
 from crate.db.genres import cleanup_invalid_genre_taxonomy_nodes
 from crate.db.jobs.analysis import (
     get_albums_needing_popularity,
@@ -13,6 +14,8 @@ from crate.db.jobs.analysis import (
     list_tracks_missing_audio_fingerprints,
     requeue_tracks,
     store_track_audio_fingerprint,
+)
+from crate.db.jobs.analysis import (
     update_album_popularity as _db_update_album_popularity,
 )
 from crate.db.jobs.analysis_storage import (
@@ -32,7 +35,6 @@ from crate.db.jobs.smart_mix_backfill import (
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
 )
-from crate.db.events import emit_task_event
 from crate.db.repositories.library import (
     get_library_album,
     get_library_albums,
@@ -122,7 +124,9 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
             "status": "cancelled",
             "execution": {"status": "partial", "phase": "analytics"},
         }
-    set_cache("analytics", data, ttl=3600)
+    from crate.db.repositories.agent_task_control import with_task_authority
+
+    with_task_authority(task_id, lambda: set_cache("analytics", data, ttl=3600))
 
     p.phase = "stats"
     p.phase_index = 1
@@ -163,7 +167,7 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
         "formats": formats,
         "total_size_gb": round(total_size / (1024**3), 2),
     }
-    set_cache("stats", stats, ttl=3600)
+    with_task_authority(task_id, lambda: set_cache("stats", stats, ttl=3600))
 
     emit_task_event(
         task_id,
@@ -223,10 +227,10 @@ def _handle_refresh_user_stats_dashboard_snapshot(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del task_id, config
+    from crate.api.cache_events import broadcast_invalidation
     from crate.db.user_stats_dashboard_surface import (
         refresh_user_stats_dashboard_snapshot,
     )
-    from crate.api.cache_events import broadcast_invalidation
 
     user_id = int(params.get("user_id") or 0)
     if user_id <= 0:
@@ -772,8 +776,8 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
-    from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
     from crate.ai.consumers import resume_action, revalidate_call
+    from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
 
     ai_call = resume_action(
         "genres.description.generate",
@@ -838,8 +842,8 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
 def _handle_rebuild_genre_taxonomy_proposals(
     task_id: str, params: dict, config: dict
 ) -> dict:
-    from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
     from crate.ai.consumers import resume_action, revalidate_call
+    from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
 
     ai_call = resume_action(
         "genres.taxonomy.propose",

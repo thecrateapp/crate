@@ -1,6 +1,7 @@
 """The existing agent job/plan engine, extended to closed library operations."""
 
 import json
+from contextvars import ContextVar
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -16,6 +17,8 @@ from crate.db.repositories.agent_plans import (
     validate_plan_authorization,
 )
 from crate.db.tx import optional_scope
+
+_ACTIVE_AUTHORITY = ContextVar("crate_operation_authority", default=None)
 
 _MUTATES_QUALITY = {
     "acquisition_publish",
@@ -342,7 +345,11 @@ def with_operation_authority(task_id: str, effect, *, session=None):
             raise DiagnosticError("STATE_CONFLICT", "Operation is no longer running")
         plan = _get(current, job["payload"]["plan_id"])
         _validate_execution(current, job, plan)
-        return effect() if effect is not None else None
+        token = _ACTIVE_AUTHORITY.set((task_id, current))
+        try:
+            return effect() if effect is not None else None
+        finally:
+            _ACTIVE_AUTHORITY.reset(token)
 
 
 def finish_operation(task_id: str, result: dict, *, session=None) -> dict:

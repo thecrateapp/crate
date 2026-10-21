@@ -180,7 +180,7 @@ def owned_transfer(principal, source_job_id, *, session=None):
         return {"state": row["state"], "evidence": dict(row["evidence"])}
 
 
-def publish_album(execution, publish_files, *, session=None):
+def publish_album(execution, publish_files, *, operator_task_id=None, session=None):
     """Serialize target identity, refuse merges, publish exact files, then index them."""
     from crate.db.domain_events import append_domain_event
     from crate.db.repositories.library_album_upserts import upsert_album
@@ -222,7 +222,10 @@ def publish_album(execution, publish_files, *, session=None):
         album_id = upsert_album(album, session=current)
         for track in tracks:
             upsert_track(
-                {**track, "album_id": album_id}, strict_identity=True, session=current
+                {**track, "album_id": album_id},
+                strict_identity=True,
+                operator_task_id=operator_task_id,
+                session=current,
             )
         current.execute(
             text("""UPDATE library_artists SET album_count=COALESCE(album_count,0)+1,

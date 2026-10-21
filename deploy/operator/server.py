@@ -8,6 +8,7 @@ signatures and delivery maintenance have no model/service-bearer HTTP route.
 import argparse
 import hmac
 import json
+import re
 import signal
 import threading
 import time
@@ -27,11 +28,12 @@ from .supervisor import IDENTIFIER, TOOLS, Rule, Supervisor
 
 
 class MCPReader:
-    def __init__(self, url, token):
+    def __init__(self, url, token, host=None):
         self.url = validate_url(url)
         if not token:
             raise ValueError("Dedicated read-only MCP token required")
         self.token = token
+        self.host = validate_mcp_host(host or urlsplit(self.url).netloc)
 
     def call(self, name, arguments):
         if name not in TOOLS | {"get_job"}:
@@ -49,6 +51,7 @@ class MCPReader:
             payload=body,
             timeout=2,
             headers={
+                "Host": self.host,
                 "Authorization": "Bearer " + self.token,
                 "Content-Type": "application/json",
                 "Accept": "application/json, text/event-stream",
@@ -69,6 +72,16 @@ class MCPReader:
         return evidence
 
 
+def validate_mcp_host(host):
+    if not isinstance(host, str) or not re.fullmatch(
+        r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?(?::[0-9]{1,5})?", host
+    ):
+        raise ValueError("A fixed DNS MCP Host is required")
+    if ":" in host and not 1 <= int(host.rsplit(":", 1)[1]) <= 65535:
+        raise ValueError("Invalid MCP Host port")
+    return host
+
+
 def load_config(path):
     path = Path(path)
     if path.stat().st_size > 65536:
@@ -81,6 +94,7 @@ def load_config(path):
         "listen_port",
         "poll_seconds",
         "mcp_url",
+        "mcp_host",
         "mcp_token_file",
         "api_token_file",
         "webhook_url",
@@ -102,6 +116,7 @@ def load_config(path):
         or not 1 <= config["listen_port"] <= 65535
     ):
         raise ValueError("Invalid listener")
+    validate_mcp_host(config["mcp_host"])
     for field in ("mcp_url", "webhook_url"):
         validate_url(config[field])
     for field in (
@@ -352,7 +367,11 @@ def main(argv=None):
             delivery.requeue(args.requeue, time.time())
             return
         delivery.recover(time.time())
-        poller = Poller(supervisor, MCPReader(config["mcp_url"], mcp_token), delivery)
+        poller = Poller(
+            supervisor,
+            MCPReader(config["mcp_url"], mcp_token, config["mcp_host"]),
+            delivery,
+        )
 
         def current_human_policy(receipt):
             current = load_config(args.config)

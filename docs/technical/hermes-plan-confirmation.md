@@ -29,6 +29,11 @@ The default `config.json` remains the twelve-tool read-only pilot. The explicit
 presentation request. It never supplies a human decision tool to the model.
 Native Telegram buttons provide independent approval without a second Admin review.
 The Admin plan detail/approve/reject pages remain available as a fallback.
+For operator-bound plans, both channels recheck the approving account’s active status
+and current review, approval and domain capabilities at admission and execution.
+Native decisions additionally require the current binding. Closing a browser or
+expiring/revoking its session alone does not revoke an already admitted durable
+decision; disabling/demoting the account or removing its required capabilities does.
 
 ## Operator workflow
 
