@@ -4,7 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StatsRange } from "@/components/stats/stats-types";
 
 const apiMock = vi.hoisted(() => vi.fn());
+const cacheHooks = vi.hoisted(() => ({
+  listeners: [] as Array<(scope: string) => void>,
+}));
 vi.mock("@/lib/api", () => ({ api: apiMock }));
+vi.mock("@/lib/cache", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/cache")>();
+  return {
+    ...actual,
+    onCacheInvalidation: (fn: (scope: string) => void) => {
+      cacheHooks.listeners.push(fn);
+      return () => {};
+    },
+  };
+});
 
 import {
   __resetStatsRangeCache,
@@ -32,6 +45,8 @@ describe("useStatsRange", () => {
     vi.useFakeTimers();
     apiMock.mockReset();
     __resetStatsRangeCache();
+    localStorage.removeItem("crate-current-server");
+    localStorage.removeItem("listen-auth-user-id");
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -168,5 +183,88 @@ describe("useStatsRange", () => {
     expect(oldest.result.current.loading).toBe(true);
     const newest = renderHook(() => useStatsRange(BASE, A, 33));
     expect(newest.result.current.data).not.toBeNull();
+  });
+
+  it("does not share cached stretches across servers or users", async () => {
+    apiMock.mockResolvedValue(payload(A.start, A.end));
+    const first = renderHook(() => useStatsRange(BASE, A, 5));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(first.result.current.data).not.toBeNull();
+    first.unmount();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    localStorage.setItem("listen-auth-user-id", "user-b");
+    const otherUser = renderHook(() => useStatsRange(BASE, A, 5));
+    expect(otherUser.result.current.data).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    otherUser.unmount();
+
+    localStorage.setItem("crate-current-server", "server-b");
+    const otherServer = renderHook(() => useStatsRange(BASE, A, 5));
+    expect(otherServer.result.current.data).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("empties the cache on history invalidation and refetches", async () => {
+    apiMock.mockResolvedValue(payload(A.start, A.end));
+    const { result } = renderHook(() => useStatsRange(BASE, A, 5));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(result.current.data).not.toBeNull();
+    act(() => cacheHooks.listeners.forEach((fn) => fn("library")));
+    expect(result.current.data).not.toBeNull();
+    act(() => cacheHooks.listeners.forEach((fn) => fn("history")));
+    expect(result.current.data).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(result.current.data).not.toBeNull();
+  });
+
+  it("clears an error once the stretch is requested again", async () => {
+    apiMock.mockRejectedValueOnce(new Error("boom"));
+    apiMock.mockResolvedValue(payload(B.start, B.end));
+    const { result, rerender } = renderHook(
+      ({ range }) => useStatsRange(BASE, range, 5),
+      { initialProps: { range: A } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(result.current.error).toBe(true);
+    rerender({ range: B });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    apiMock.mockReturnValueOnce(new Promise(() => {}));
+    rerender({ range: A });
+    expect(result.current.error).toBe(false);
+    expect(result.current.loading).toBe(true);
+  });
+
+  it("does not refetch for a new range object with the same dates", async () => {
+    apiMock.mockResolvedValue(payload(A.start, A.end));
+    const { rerender } = renderHook(
+      ({ range }) => useStatsRange(BASE, range, 5),
+      { initialProps: { range: { ...A } } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    rerender({ range: { ...A } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
   });
 });

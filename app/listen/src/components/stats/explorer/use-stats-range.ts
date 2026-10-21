@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from "react";
 
 import type { StatsRange } from "@/components/stats/stats-types";
 import { api } from "@/lib/api";
+import { cacheScopedKey, onCacheInvalidation } from "@/lib/cache";
 
 const DEBOUNCE_MS = 300;
 const MAX_CACHE_ENTRIES = 32;
@@ -17,6 +18,16 @@ function cacheSet(key: string, value: StatsRange) {
     rangeCache.delete(oldest);
   }
 }
+
+// Stats URLs belong to the "history" scope: a play event refreshes stretches.
+let generation = 0;
+const generationListeners = new Set<() => void>();
+onCacheInvalidation((scope) => {
+  if (scope !== "history") return;
+  rangeCache.clear();
+  generation += 1;
+  for (const fn of generationListeners) fn();
+});
 
 /** Test-only: empties the module-level range cache. */
 export function __resetStatsRangeCache() {
@@ -42,16 +53,30 @@ export function useStatsRange(
   range: { start: string; end: string } | null,
   limit: number,
 ): UseStatsRangeResult {
-  const key = base && range ? buildKey(base, range, limit) : null;
+  const url = base && range ? buildUrl(base, range, limit) : null;
+  // Entries are scoped to the current server and user so accounts never mix.
+  const key = url ? cacheScopedKey(url) : null;
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => {
+    generationListeners.add(bump);
+    return () => {
+      generationListeners.delete(bump);
+    };
+  }, []);
+
+  const seenGeneration = generation;
 
   useEffect(() => {
     if (!key || rangeCache.has(key)) return;
     const controller = new AbortController();
     let cancelled = false;
+    setErrorKey(null);
     const timer = setTimeout(() => {
-      api<StatsRange>(key, "GET", undefined, { signal: controller.signal })
+      api<StatsRange>(url as string, "GET", undefined, {
+        signal: controller.signal,
+      })
         .then((payload) => {
           cacheSet(key, payload);
           if (cancelled) return;
@@ -68,14 +93,14 @@ export function useStatsRange(
       clearTimeout(timer);
       controller.abort();
     };
-  }, [key]);
+  }, [key, seenGeneration]);
 
   const data = key ? (rangeCache.get(key) ?? null) : null;
   const error = key !== null && data === null && errorKey === key;
   return { data, loading: key !== null && data === null && !error, error };
 }
 
-function buildKey(
+function buildUrl(
   base: string,
   range: { start: string; end: string },
   limit: number,
