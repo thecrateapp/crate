@@ -293,14 +293,48 @@ class LibrarySync:
                     }
                 )
 
+        try:
+            internal_removed = self.remove_internal_rows()
+        except Exception:
+            log.warning("Failed to remove internal library rows", exc_info=True)
+            internal_removed = 0
+
         return {
             "artists_added": artists_added,
             "artists_updated": artists_updated,
             "artists_removed": 0,
             "artists_merged": 0,
+            "internal_removed": internal_removed,
             "tracks_total": tracks_total,
             "failed_artists": failed_artists,
         }
+
+    def _is_internal_path(self, path: Path) -> bool:
+        try:
+            relative = path.resolve(strict=False).relative_to(
+                self.library_path.resolve(strict=False)
+            )
+        except ValueError:
+            return False
+        return any(part.startswith(".") for part in relative.parts)
+
+    def remove_internal_rows(self) -> int:
+        removed = 0
+        for row in get_all_album_paths():
+            if self._is_internal_path(Path(row["path"])):
+                delete_album(row["path"])
+                removed += 1
+                log.info("Removed internal library album row: %s", row["path"])
+
+        artists, _ = get_library_artists(per_page=100000, include_internal=True)
+        for row in artists:
+            if row["name"].startswith(".") or (row.get("folder_name") or "").startswith(
+                "."
+            ):
+                if self._delete_artist_if_current(row["name"]):
+                    removed += 1
+                    log.info("Removed internal library artist row: %s", row["name"])
+        return removed
 
     def sync_artist(self, artist_dir: Path) -> int:
         """Sync a single artist folder (used by watcher for incremental sync)."""
@@ -376,6 +410,9 @@ class LibrarySync:
         return latest_mtime
 
     def sync_artist_dirs(self, artist_name: str, artist_dirs: list[Path]) -> int:
+        artist_dirs = [d for d in artist_dirs if not self._is_internal_path(d)]
+        if not artist_dirs:
+            return 0
         with _artist_sync_lock(artist_name):
             return self._sync_artist_dirs_unlocked(artist_name, artist_dirs)
 
@@ -561,6 +598,8 @@ class LibrarySync:
         audio_files: list[Path] | None = None,
         tree_mtime: float | None = None,
     ) -> dict:
+        if self._is_internal_path(album_dir):
+            return {"skipped": "internal_path", "album_id": None}
         with _artist_sync_lock(artist_name):
             result = self._sync_album_unlocked(
                 album_dir,
@@ -582,6 +621,8 @@ class LibrarySync:
 
     def prepare_album_sync(self, album_dir: Path, artist_name: str) -> dict:
         """Compile the normal scanner payload without changing the library index."""
+        if self._is_internal_path(album_dir):
+            return {"skipped": "internal_path", "album_id": None}
         with _artist_sync_lock(artist_name):
             return self._sync_album_unlocked(album_dir, artist_name, prepare_only=True)
 
