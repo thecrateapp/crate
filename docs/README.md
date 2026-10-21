@@ -25,10 +25,12 @@ readers.
 
 ## Choose a path
 
+- **Understand or diagnose Smart Mix:** start with [Smart Mix operation](technical/smart-mix-operations.md).
 - **Continue Smart Mix, Android native crossfade or VirtualDJ:** use the
   [unified design](technical/smart-mix-design.md) and
-  [continuation plan](technical/smart-mix-implementation-plan.md). These are
-  the only current feature guides; earlier plans and spikes are historical.
+  [continuation plan](technical/smart-mix-implementation-plan.md). These own
+  continuation design and tasks; the operational reference owns implemented behavior.
+  Earlier plans and spikes are historical.
 
 - **Run Crate at home:** start with [Quickstart](technical/00-quickstart.md),
   then [Deployment profiles](technical/deployment-profiles.md) and
@@ -52,6 +54,7 @@ readers.
 | Start              | [Quickstart](technical/00-quickstart.md), [Development setup](technical/00b-development-setup.md)                                                                                                                                                                                                                                                                                                                                       |
 | Architecture       | [System overview](technical/01-system-overview.md), [Backend and data](technical/02-backend-api-and-data.md), [Workers](technical/03-worker-tasks-and-background-services.md), [Developer guide](technical/developer-guide.md)                                                                                                                                                                                                          |
 | Product subsystems | [Storage/imports](technical/04-library-storage-sync-and-imports.md), [Enrichment](technical/05-enrichment-acquisition-and-integrations.md), [Analysis](technical/06-audio-analysis-similarity-and-discovery.md), [Auth](technical/07-auth-users-social-and-sessions.md), [Frontends](technical/08-frontends-admin-and-listen.md), [Playback](technical/09-playback-realtime-and-subsonic.md), [OpenSubsonic](technical/opensubsonic.md) |
+| Smart Mix          | [Funcionamiento y operación](technical/smart-mix-operations.md), [Diseño](technical/smart-mix-design.md), [Continuación](technical/smart-mix-implementation-plan.md)                                                                                                                                                                                                                                                                    |
 | Deploy and operate | [Deployment profiles](technical/deployment-profiles.md), [Operations](technical/operations.md), [Backup and recovery](technical/ops-runbook.md), [Cast receiver](operators/cast-receiver.md), [Cast release checklist](testing/cast-release-checklist.md)                                                                                                                                                                               |
 | Federation         | [Overview](technical/federation-overview.md), [Protocol](technical/federation-protocol.md), [Security](technical/federation-threat-model.md), [Operations](technical/federation-operations-runbook.md), [Acceptance](technical/federation-production-acceptance.md)                                                                                                                                                                     |
 | Agents and MCP     | [Architecture and workflows](technical/11-crate-mcp.md), [Connection and operations](technical/crate-mcp.md), [Contract and acceptance](technical/crate-mcp-distribution.md)                                                                                                                                                                                                                                                            |

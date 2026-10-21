@@ -20,6 +20,8 @@ sources:
 
 # Smart Mix, crossfade Android nativo y VirtualDJ: diseño unificado
 
+> **Funcionamiento implementado y diagnóstico:** consultar [Smart Mix: funcionamiento y operación](smart-mix-operations.md), contrastado con la release indicada en esa página. Este documento conserva el diseño/plan de continuación y sus gates; una tarea propuesta no acredita una capacidad desplegada.
+
 **Fecha y baseline:** 2026-09-09; rama `codex/feat-smart-mix-phase-1`, HEAD `140f9e347976eec0d27cb71919afd6f71bee4e86`, incluyendo su working tree sin commit. **Estado:** diseño canónico de continuación; describe el objetivo, no acredita que esté implementado o listo para producción.
 
 ## 1. Autoridad, alcance y punto de partida

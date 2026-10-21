@@ -177,9 +177,10 @@ and `verified` metadata, then update the owning page and its links in the same c
 coverage gaps and completion status in the development PR; this guide owns the maintenance
 procedure. Inclusion in the corpus does not by itself prove documentation completeness.
 
-Smart Mix already has a [unified design](smart-mix-design.md) and a
-[continuation plan](smart-mix-implementation-plan.md). Review those pages and the audio, worker and playback chapters against the target implementation
-before using them as an operational explanation.
+Smart Mix has an [operational reference](smart-mix-operations.md), a
+[unified design](smart-mix-design.md) and a [continuation plan](smart-mix-implementation-plan.md).
+Use the operational reference for current behavior and diagnosis; review all three against
+the target implementation when the feature changes.
 The review must cover profile/analyzer/planner versions and provenance, cue-beat eligibility
 and fallbacks, source invalidation and cache generations, backfill lifecycle, consumer/platform
 support and physical acceptance gates. Keep implemented behavior, deployment flags and future

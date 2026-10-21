@@ -320,3 +320,16 @@ Crate intentionally mixes:
 
 That keeps high-complexity SQL visible while still gaining transaction and
 composition ergonomics where they help.
+
+## Smart Mix data and HTTP boundaries
+
+Smart Mix section verified against source on 2026-10-21.
+
+Smart Mix persists versioned per-track profiles in `track_mix_profiles`, with claim and
+processing state under pipeline `smart_mix`. Source/profile revisions govern publication;
+profile reads, planning and compatibility are separate from backfill and coverage refresh.
+The Go readplane serves the summary profile surface; full reads and planning retain their
+FastAPI contract. Admin control requires `library.analysis.manage`; the Admin status GET can
+schedule a coverage refresh, so HTTP method alone does not establish a pure read.
+See [Smart Mix operation](smart-mix-operations.md) for current state semantics, provenance,
+HTTP boundaries and evidence available to Hermes.

@@ -6,7 +6,13 @@ audience: [developer, operator]
 status: canonical
 order: 70
 verified: 2026-07-21
-sources: [app/crate/actors.py, app/crate/worker_handlers, docker-compose.yaml]
+sources:
+  [
+    app/crate/actors.py,
+    app/crate/worker_handlers,
+    app/crate/db/jobs/smart_mix_backfill.py,
+    docker-compose.yaml,
+  ]
 ---
 
 # Worker, Tasks, and Background Services
@@ -294,3 +300,16 @@ model.
 The service loop periodically normalizes external import sources into
 `import_queue_items`, which gives the admin UI and ops snapshot a read model for
 staging/import state rather than live rescans every time.
+
+## Smart Mix campaign and worker ownership
+
+Smart Mix section verified against source on 2026-10-21.
+
+`backfill_smart_mix_profiles` coordinates bounded claims and queues
+`compute_smart_mix_profile` children on `heavy`; `refresh_smart_mix_coverage` runs on
+`maintenance`. Workers validate the captured source, claim and profile revision before
+publication. Campaign pause/cancel stops further coordination without forcibly killing
+already accepted child analyses. A completed coordinator or campaign does not prove current
+coverage: exhausted failures and missing/outdated profiles remain separate observations.
+See [Smart Mix operation](smart-mix-operations.md) for backfill priority, generations,
+publication outcomes and the diagnostic sequence.

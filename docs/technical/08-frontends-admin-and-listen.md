@@ -6,7 +6,7 @@ audience: [developer]
 status: canonical
 order: 97
 verified: 2026-09-06
-sources: [app/ui, app/listen, app/shared/ui, app/shared/web]
+sources: [app/ui, app/listen, app/shared/ui, app/shared/web, app/crate/api/smart_mix_admin.py]
 ---
 
 # Frontend Architecture: Admin and Listen
@@ -241,3 +241,18 @@ invalidation feed for catalog-like scopes (`home`, `library`, `upcoming`,
 when those events arrive. This is important for Bandcamp imports and uploads:
 the user expects sections such as Just Landed to update after the worker commits
 new library content.
+
+## Smart Mix surfaces
+
+Smart Mix section verified against source on 2026-10-21.
+
+Admin's Analysis page embeds `SmartMixCoverage`, exposing coverage by version/quality,
+paginated profile and processing states, activity and campaign controls. It uses the Admin
+Smart Mix API; viewing its status can enqueue coverage refresh. This surface is distinct
+from the read-only MCP authority granted to Hermes.
+
+Listen discovers server capabilities and applies user preferences. In the current engine
+adapter, server transition planning and native continuation are selected for
+`android-native`. Sharing TypeScript with web/desktop/iOS does not establish equivalent
+native execution. See [Smart Mix operation](smart-mix-operations.md) for the consumer matrix,
+flag dependencies and outstanding platform/physical acceptance gates.

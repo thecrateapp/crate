@@ -312,9 +312,18 @@ def test_build_can_describe_a_release_before_the_canonical_docs_manifest(
     assert "docs/architecture.md" in result["files"]
 
 
-def test_build_includes_runbooks_deploy_scripts_and_site_sources(repo, tmp_path):
+def test_build_includes_runbooks_native_clients_and_site_sources(repo, tmp_path):
     root, _ = repo
-    for path in ("scripts/deploy.sh", "app/site/src/App.tsx", "app/docs/src/App.tsx"):
+    included = (
+        "scripts/deploy.sh",
+        "app/site/src/App.tsx",
+        "app/docs/src/App.tsx",
+        "app/listen/android/app/src/main/java/app/cratemusic/crate/NativeMix.java",
+        "app/listen/ios/App/App/NativeClient.swift",
+        "tools/vdj-plugin/src/client/smart_mix_client.cpp",
+        "tools/vdj-plugin/include/crate_vdj/smart_mix_client.hpp",
+    )
+    for path in included:
         file = root / path
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text("versioned deployment or architecture source\n")
@@ -338,6 +347,4 @@ def test_build_includes_runbooks_deploy_scripts_and_site_sources(repo, tmp_path)
         ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
     ).strip()
     result = _build((root, sha), tmp_path / "bundle")
-    assert {"scripts/deploy.sh", "app/site/src/App.tsx", "app/docs/src/App.tsx"} <= set(
-        result["files"]
-    )
+    assert set(included) <= set(result["files"])

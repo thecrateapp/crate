@@ -34,6 +34,8 @@ SOURCE_ROOTS = (
     "app/readplane/",
     "app/media-worker/src/",
     "app/listen/src/",
+    "app/listen/android/app/src/main/java/",
+    "app/listen/ios/App/App/",
     "app/ui/src/",
     "app/shared/",
     "app/site/src/",
@@ -41,6 +43,8 @@ SOURCE_ROOTS = (
     "app/listen-desktop/src-tauri/src/",
     "app/cast-receiver/src/",
     "tools/crate-cli/src/",
+    "tools/vdj-plugin/src/",
+    "tools/vdj-plugin/include/",
     "scripts/",
 )
 SOURCE_SUFFIXES = {
@@ -55,6 +59,11 @@ SOURCE_SUFFIXES = {
     ".toml",
     ".sh",
     ".md",
+    ".java",
+    ".swift",
+    ".cpp",
+    ".hpp",
+    ".h",
 }
 
 

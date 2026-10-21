@@ -117,6 +117,12 @@ describe("docs app", () => {
 
   it.each([
     {
+      route: "/operations/smart-mix",
+      heading: "Smart Mix: funcionamiento y operación",
+      linkName: "plan de continuación",
+      linkedRoute: "/developer/smart-mix-continuation",
+    },
+    {
       route: "/architecture/smart-mix",
       heading:
         "Smart Mix, crossfade Android nativo y VirtualDJ: diseño unificado",
