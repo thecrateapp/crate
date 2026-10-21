@@ -103,7 +103,56 @@ class FakeCommands:
         if "pg_dump" in argv:
             kwargs["output"].write(b"disposable-custom-dump")
         if "psql" in argv:
+            if "pg_extension" in argv[-1]:
+                return b'{"vector":"0.8.2","pg_trgm":"1.6","pgcrypto":"1.3"}'
             return b"7\n"
+        if argv[0] == "/bin/bash" and argv[-1] == "backup":
+            import shutil
+
+            server = Path(kwargs["env"]["SERVER_PATH"])
+            backup = server / ".deploy-backups" / kwargs["env"]["DEPLOY_ID"]
+            backup.mkdir(parents=True)
+            for name in (
+                ".env",
+                "docker-compose.yaml",
+                "docker-compose.project.yaml",
+                ".deploy/release-manifest.json",
+                "deploy/traefik/federation-readplane.yml",
+            ):
+                source = server / name
+                if source.exists():
+                    (backup / name).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(source, backup / name)
+            (backup / "rollback_tag").write_text(
+                "rollback-" + kwargs["env"]["DEPLOY_ID"] + "\n"
+            )
+        if argv[0] == "/bin/bash" and argv[-1] == "config":
+            from deploy.operator.infra_deploy import environment_versions
+
+            server = Path(kwargs["env"]["SERVER_PATH"])
+            manifest = json.loads(
+                (server / ".deploy/release-manifest.json.candidate").read_bytes()
+            )
+            # Execute the actual repository's fixed selection function on this
+            # disposable host fixture, without running any Docker command.
+            import subprocess
+
+            script = (
+                Path(__file__).resolve().parents[2] / "scripts/deploy-remote.sh"
+            ).read_text()
+            prefix = script[: script.index('\ncase "${1:-}" in')]
+            subprocess.run(
+                ["/bin/bash", "-c", prefix + "\nrecord_changed_release_services\n"],
+                env={"PATH": "/usr/bin:/bin", **kwargs["env"]},
+                check=True,
+                capture_output=True,
+            )
+            (server / ".env").write_bytes(
+                environment_versions((server / ".env").read_bytes(), manifest)[-1]
+            )
+            (server / ".deploy/release-manifest.json").write_bytes(
+                (server / ".deploy/release-manifest.json.candidate").read_bytes()
+            )
         return b""
 
 
@@ -117,7 +166,7 @@ def lab(tmp_path):
     config.update(
         instance="lab",
         enabled=True,
-        postgres_image="postgres:15@sha256:" + "a" * 64,
+        postgres_image="pgvector/pgvector:pg15@sha256:" + "a" * 64,
         humans={"123": ["restart", "backup", "deploy", "restore"]},
         services=["crate-api"],
         cooldown_seconds=10,
@@ -513,7 +562,17 @@ def release(lab):
     )
     scripts = Path(lab.config["server_path"]) / "scripts"
     scripts.mkdir()
-    (scripts / "deploy-remote.sh").write_text("#!/bin/bash\nexit 0\n")
+    (scripts / "deploy-remote.sh").write_text(
+        "#!/bin/bash\npython3 -I deploy/hermes/activate_context.py --root /tmp\n"
+    )
+    server = Path(lab.config["server_path"])
+    (server / "deploy/hermes").mkdir(parents=True)
+    (server / "deploy/hermes/activate_context.py").write_text("import json\n")
+    (server / "docker-compose.yaml").write_text("services: {}\n")
+    (server / "docker-compose.project.yaml").write_text("name: crate\n")
+    (server / ".env").write_text(
+        "CRATE_IMAGE_TAG=old\nDATA_DIR=./data\nSYNTHETIC_PASSWORD=never-return-this\n"
+    )
     lab.config["services"] = sorted(SERVICES)
     lab.path.write_text(json.dumps(lab.config))
     return root, manifest
@@ -554,6 +613,7 @@ def test_release_image_verification_uses_entry_source_and_digest(lab):
     plan = prepare(
         lab, operation="deploy", target="crate", version=manifest["release_sha"]
     )
+    result = lab.executor.execute(plan["document"])
     for entry in manifest["images"].values():
         ref = entry["repository"] + "@" + entry["digest"]
         lab.runner.images[ref] = {
@@ -563,11 +623,17 @@ def test_release_image_verification_uses_entry_source_and_digest(lab):
                 "Labels": {"org.opencontainers.image.revision": entry["source_sha"]}
             },
         }
-    assert lab.executor.verify(plan["document"], {})
+    assert lab.executor.verify(
+        plan["document"],
+        result,
+    )
     next(iter(lab.runner.images.values()))["RepoDigests"] = [
         "ghcr.io/thecrateapp/crate-api@sha256:" + "f" * 64
     ]
-    assert not lab.executor.verify(plan["document"], {})
+    assert not lab.executor.verify(
+        plan["document"],
+        result,
+    )
 
 
 def test_fail_closed_provisioning_and_default_executor(lab, tmp_path):
@@ -672,7 +738,7 @@ def test_infra_provider_independent_key_namespace_and_fixed_relay(lab, monkeypat
 )
 def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
     """Only new networkless fixtures; no existing application container is touched."""
-    image = "postgres:15@sha256:c99dd5066e988cd61a72ffe962da08e277eecaba000bbdda0bdaf9f63b56c174"
+    image = "pgvector/pgvector:pg15@sha256:47af0b65960b14f1c6945aa4ccae37836c632e9a6fe0eea9160936e616e5b2e9"
     source = "crate-infra-test-source-" + uuid.uuid4().hex[:12]
     real = Runner()
     real.run(
@@ -693,6 +759,9 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
             "-e",
             "POSTGRES_HOST_AUTH_METHOD=trust",
             image,
+            "postgres",
+            "-c",
+            "shared_preload_libraries=pg_stat_statements",
         ],
         timeout=60,
     )
@@ -720,7 +789,7 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
                 "-v",
                 "ON_ERROR_STOP=1",
                 "-c",
-                "CREATE TABLE fixture_proof (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO fixture_proof VALUES (1, 'restored-task6-proof');",
+                "CREATE EXTENSION vector; CREATE EXTENSION pg_trgm; CREATE EXTENSION pgcrypto; CREATE EXTENSION pg_stat_statements; CREATE TABLE fixture_proof (id integer PRIMARY KEY, value text NOT NULL, embedding vector(20)); CREATE INDEX fixture_vector_idx ON fixture_proof USING hnsw (embedding vector_l2_ops); CREATE INDEX fixture_trgm_idx ON fixture_proof USING gin (value gin_trgm_ops); INSERT INTO fixture_proof VALUES (1, 'restored-task6-proof', '[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]');",
             ],
             timeout=15,
         )
@@ -737,7 +806,11 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
                 if argv[1] == "inspect" and argv[-1] == "crate-postgres":
                     argv = [*argv[:-1], source]
                 result = real.run(argv, **kwargs)
-                if "psql" in argv and "crate_restore" in argv:
+                if (
+                    "psql" in argv
+                    and "crate_restore" in argv
+                    and "pg_class" in argv[-1]
+                ):
                     value = real.run(
                         [
                             "/usr/bin/docker",
@@ -754,7 +827,7 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
                             "-d",
                             "crate_restore",
                             "-c",
-                            "SELECT value FROM fixture_proof WHERE id=1;",
+                            "SELECT value || '|' || vector_dims(embedding) || '|' || (embedding <-> embedding)::text || '|' || (SELECT count(*) FROM pg_indexes WHERE indexname IN ('fixture_vector_idx','fixture_trgm_idx')) FROM fixture_proof WHERE id=1;",
                         ],
                         timeout=15,
                     )
@@ -774,10 +847,13 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
         assert lab.bridge.tick()
         outcome = lab.bridge.read(lab.keys["read"], plan_id=plan["id"])
         assert outcome["state"] == "succeeded", outcome
+        assert {"vector", "pg_trgm", "pgcrypto", "pg_stat_statements"} <= set(
+            outcome["result"]["restore_test"]["extensions"]
+        )
         assert evidence == [
             {
                 "restored_catalog_tables": 1,
-                "restored_row": "restored-task6-proof",
+                "restored_row": "restored-task6-proof|20|0|2",
                 "image": image,
                 "network": "none",
             }
@@ -803,11 +879,12 @@ def test_real_pg15_dump_restore_and_live_row_evidence(lab, tmp_path):
             {
                 "corrupt_restore_rejected": True,
                 "backup_digest": sha,
+                "extensions": outcome["result"]["restore_test"]["extensions"],
                 "coverage": "postgresql-only",
                 "excludes": outcome["result"]["excludes"],
             }
         )
-        Path("/tmp/task6-pg15-restore-evidence.json").write_text(
+        Path("/tmp/task6-fix1-pgvector-restore-evidence.json").write_text(
             json.dumps(evidence, indent=2)
         )
     finally:

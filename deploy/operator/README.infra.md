@@ -13,13 +13,25 @@ example policy to `/etc/crate-infra/policy.json`. Provision four **different** s
 of 32–256 bytes, private mode 0600: read, prepare, apply, and native callback HMAC.
 Infrastructure credentials must also differ from domain and supervisor credentials.
 The bridge validates paths, ownership of every ancestor, secret permissions,
-allowlisted services, human operation capabilities and immutable PostgreSQL image.
+allowlisted services, human operation capabilities and a pinned extension-compatible
+`pgvector/pgvector:pg15@sha256:...` (or versioned `0.x.y-pg15`) image. Vanilla
+PostgreSQL images are rejected: Crate requires vector, pg_trgm and pgcrypto.
 The example intentionally has an invalid placeholder image digest and `enabled:false`.
 
 Provision root-owned state/backups/release directories and a root-owned host checkout
 at the configured `server_path`. The checked-in unit uses `/opt/crate-host`; it is
 not directly compatible with a user-writable `/home/crate` checkout. All executable
-host scripts and live deployment configuration must be root-controlled. The unit
+host scripts and live deployment configuration must be root-controlled. The fixed
+closure in `infra_deploy.py` validates the actual `deploy/hermes/activate_context.py`,
+`deploy-remote.sh`, both live Compose files, `.env`, optional active Hermes overlay,
+active/candidate release files, optional federation config, staging/backup directories,
+per-operation backup descendants and the configured context marker destination.
+Present consumed files and their ancestors must be root-owned, non-writable by group
+or others, regular and not symlinks; dangling symlinks are also rejected. Optional
+absence is explicit. Install this revision of `deploy-remote.sh`: helper calls use
+`python3 -I`, preventing local-module/cwd/user-site shadow imports. The helper's fixed
+stdlib imports are checked; new local/import dependencies require a code review and
+closed enumeration update. The unit
 writes only its runtime/state/host directories, has no public listener, and runs as
 root because Docker host authority is privileged. Install the unit only after
 reviewing these explicit limits. The `crate-infra-relay` group permits the separate
@@ -57,9 +69,11 @@ state directory. A second process with the same store fails its host writer lock
   A failed dump or restore never produces a sealed successful backup.
 - `restore`: target `crate-infra-disposable`, version the exact SHA256 of a sealed
   backup manifest. Verify manifest identity and dump checksum, then actually restore
-  into a fresh PostgreSQL 15 container with no network, no persistent volume, read-only
+  into a fresh pgvector-compatible PostgreSQL 15 container with no network, no persistent volume, read-only
   rootfs and bounded tmpfs/resources. `pg_restore --exit-on-error` must succeed and a
-  live catalog query must find public tables. Evidence comes from the restored
+  live catalog query must find public tables, vector, pg_trgm and pgcrypto. Extension
+  versions are recorded; pg_stat_statements is also recorded when present and its
+  preload library matches Compose. Evidence comes from the restored
   instance. An existing target is never deleted to make room. Cleanup removes only
   the container successfully created by this job. Nothing restores production.
 - `deploy`: target `crate`, exact lowercase 40-hex release SHA. Requires explicit
@@ -75,6 +89,21 @@ state directory. A second process with the same store fails its host writer lock
   `release.env` must exactly match `render_release_env`; the repository's
   `validate_manifest` validates every immutable image. Root approval is provisioning,
   not a model tool. Plan review cannot approve arbitrary new asset files.
+
+The plan also binds non-secret SHA256 digests of **all fixed effective host inputs**,
+including `.env`, active overlay, executed helpers, current and staged release files,
+and the fully resolved candidate Compose configuration. Candidate resolution uses the
+host project directory, the same active overlay and exact intended release variables;
+resolved secret values never leave the process. Optional files appearing/disappearing
+invalidate approval. Host inputs are rechecked before effects and between stages.
+The exact final host-input digest map is reviewed too. The bridge predicts the existing
+script's environment setter byte-for-byte; staging/configuration may make only those
+specific approved transitions. It never accepts the newly observed state as a baseline.
+Generated rollback copies and changed-image/service lists are checked against expected
+content derived from the plan before pull/up/rollback consumes them. Unexpected drift
+stops execution. Rollback runs only when inputs remain trusted and are original or an
+exact known intermediate transition; altered helpers/overlays/selection files suppress
+rollback and leave the operation indeterminate for host inspection.
 
 Deploy runs the installed local `scripts/deploy-remote.sh` with fixed steps:
 `release-preflight`, `backup`, stage exact approved files, `preflight`, `config`,
@@ -198,12 +227,13 @@ active state. No production, real Telegram or model-provider acceptance is claim
 Run isolated tests with the repo's available Python environment:
 
 ```sh
-python -m pytest app/tests/test_infra_bridge.py -q
-CRATE_INFRA_DISPOSABLE_TEST=1 python -m pytest app/tests/test_infra_bridge.py -q
+python -m pytest app/tests/test_infra_bridge.py app/tests/test_infra_deploy.py -q
+CRATE_INFRA_DISPOSABLE_TEST=1 python -m pytest app/tests/test_infra_bridge.py app/tests/test_infra_deploy.py -q
 ```
 
-The explicit disposable case requires local Docker and the pinned official PG15
+The explicit disposable case requires local Docker and the pinned pgvector PG15
 image in the test. It creates a new source fixture and the reserved disposable restore
-target, uses network none, restores a real row twice, rejects a corrupt dump and cleans
+target, uses network none, restores real vector(20) data with HNSW/trigram indexes and four
+extensions twice, rejects a corrupt dump and cleans
 up its containers. It never executes a production deployment or touches an existing
 application container. Full deployment acceptance remains separately provisioned.

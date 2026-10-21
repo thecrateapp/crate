@@ -887,9 +887,9 @@ cmd_hermes_context() {
   revision="$(env_value CRATE_RELEASE_SHA)"
   record_hermes_deployment verified
   if compgen -G "${context_root}/releases/${revision}*/context-manifest.json" >/dev/null; then
-    python3 deploy/hermes/activate_context.py --root "$context_root" --revision "$revision"
+    python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision"
   else
-    python3 deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
+    python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
       --archive .deploy/hermes-context.candidate.tar.gz
   fi
 }
@@ -899,7 +899,7 @@ record_hermes_deployment() {
   data_dir="$(env_value DATA_DIR)"
   [[ -d "${data_dir}/hermes-agent" && -f deploy/hermes/activate_context.py ]] || return 0
   if [[ ! -f .deploy/release-manifest.json ]]; then
-    python3 - "${data_dir}/hermes-agent/context/deployment.json" <<'PY'
+    python3 -I - "${data_dir}/hermes-agent/context/deployment.json" <<'PY'
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
 path.parent.mkdir(parents=True, exist_ok=True)
@@ -907,7 +907,7 @@ path.write_text(json.dumps({"release_sha": None, "state": "unverified"}) + "\n")
 PY
     return 0
   fi
-  python3 deploy/hermes/activate_context.py --root "${data_dir}/hermes-agent/context" \
+  python3 -I deploy/hermes/activate_context.py --root "${data_dir}/hermes-agent/context" \
     --revision "$(env_value CRATE_RELEASE_SHA)" \
     --record-deployment .deploy/release-manifest.json --state "$1"
 }

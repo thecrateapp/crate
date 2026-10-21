@@ -117,10 +117,10 @@ class Policy:
         if c["restore_target"] != "crate-infra-disposable":
             raise ValueError("Only isolated disposable restore is implemented")
         if not re.fullmatch(
-            r"postgres:15(?:\.[0-9]+)?(?:-alpine)?@sha256:[a-f0-9]{64}",
+            r"pgvector/pgvector:(?:pg15|0\.[0-9]+\.[0-9]+-pg15)@sha256:[a-f0-9]{64}",
             c["postgres_image"],
         ):
-            raise ValueError("Pinned PostgreSQL 15 image required")
+            raise ValueError("Pinned pgvector PostgreSQL 15 image required")
         for name in ("postgres_user", "postgres_database"):
             if not re.fullmatch(r"[a-z_][a-z0-9_]{0,62}", c[name]):
                 raise ValueError("Invalid database identity")
@@ -159,6 +159,7 @@ class Policy:
                 "infra_policy.py",
                 "infra_plans.py",
                 "infra_executor.py",
+                "infra_deploy.py",
                 "infra_server.py",
             )
         ]

@@ -15,7 +15,7 @@
   "approved_releases": "/etc/crate-infra/releases",
   "backup_directory": "/var/lib/crate-infra/backups",
   "restore_target": "crate-infra-disposable",
-  "postgres_image": "postgres:15@sha256:REPLACE_WITH_VERIFIED_IMMUTABLE_DIGEST",
+  "postgres_image": "pgvector/pgvector:pg15@sha256:REPLACE_WITH_VERIFIED_IMMUTABLE_DIGEST",
   "postgres_user": "crate",
   "postgres_database": "crate",
   "cooldown_seconds": 60,

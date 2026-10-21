@@ -13,6 +13,15 @@ from pathlib import Path
 
 from scripts.release_manifest import render_release_env, validate_manifest
 
+from .infra_deploy import (
+    assert_backup_inputs,
+    configured_inputs,
+    environment_versions,
+    generated_backup_inputs,
+    host_inputs,
+    staged_inputs,
+    validate_host,
+)
 from .infra_policy import DIGEST, SERVICES, SHA, canonical, digest, trusted_file
 
 
@@ -94,14 +103,7 @@ class Executor:
         if real and (not policy.provisioned or not policy.config["enabled"]):
             raise ValueError("Real execution requires enabled root provisioning")
         if real:
-            for relative in (
-                "scripts/deploy-remote.sh",
-                "scripts/hermes_context.py",
-                "docker-compose.yaml",
-                "docker-compose.project.yaml",
-                ".env",
-            ):
-                trusted_file(Path(policy.config["server_path"]) / relative)
+            validate_host(Path(policy.config["server_path"]))
 
     @property
     def c(self):
@@ -230,10 +232,19 @@ class Executor:
         env = dict(
             line.split("=", 1) for line in render_release_env(manifest).splitlines()
         )
+        env.update(
+            CRATE_IMAGE_TAG=manifest["release_sha"],
+            CRATE_IMAGE_OWNER="thecrateapp",
+            CRATE_IMAGE_REGISTRY="ghcr.io",
+        )
+        server = Path(self.c["server_path"])
+        overlay = server / ".deploy/hermes.compose.yaml"
         raw = self._run(
             [
                 "/usr/bin/docker",
                 "compose",
+                "--project-directory",
+                str(server),
                 "--project-name",
                 "crate",
                 "--env-file",
@@ -242,6 +253,7 @@ class Executor:
                 str(root / "docker-compose.yaml"),
                 "-f",
                 str(root / "docker-compose.project.yaml"),
+                *(["-f", str(overlay)] if overlay.exists() else []),
                 "config",
                 "--format",
                 "json",
@@ -249,7 +261,8 @@ class Executor:
             env=env,
             timeout=30,
         )
-        services = json.loads(raw)["services"]
+        resolved = json.loads(raw)
+        services = resolved["services"]
         missing = []
         for service in self.c["services"]:
             check = services.get(service, {}).get("healthcheck", {})
@@ -263,6 +276,7 @@ class Executor:
                 missing.append(service)
         if missing:
             raise HealthCoverageError(missing)
+        return digest(resolved)
 
     def _backup(self, sha):
         if not isinstance(sha, str) or not DIGEST.fullmatch(sha):
@@ -274,6 +288,8 @@ class Executor:
             or manifest["instance"] != self.c["instance"]
             or manifest["coverage"] != "postgresql-only"
             or manifest["restore_test"]["verified"] is not True
+            or not {"vector", "pg_trgm", "pgcrypto"}
+            <= set(manifest["restore_test"].get("extensions", {}))
         ):
             raise ValueError("Unverified backup")
         if self._file_hash(root / "postgres.dump") != manifest["dump_sha256"]:
@@ -299,8 +315,25 @@ class Executor:
                     "Deploy requires explicit complete application fleet policy"
                 )
             root, assets, manifest = self._release(version)
-            self._candidate_health(root, manifest)
+            inputs = host_inputs(
+                self.c["server_path"], provisioned=self.policy.provisioned
+            )
+            effective = self._candidate_health(root, manifest)
+            if (
+                host_inputs(self.c["server_path"], provisioned=self.policy.provisioned)
+                != inputs
+            ):
+                raise ValueError("Host changed during candidate resolution")
             return {
+                "host_inputs": inputs,
+                "configured_host_inputs": configured_inputs(
+                    staged_inputs(inputs, assets),
+                    assets,
+                    environment_versions(
+                        (Path(self.c["server_path"]) / ".env").read_bytes(), manifest
+                    )[-1],
+                ),
+                "effective_compose_sha256": effective,
                 "fleet": self._fleet(require_health=True),
                 "assets": assets,
                 "manifest": manifest,
@@ -330,7 +363,7 @@ class Executor:
         root, _, _ = self._release(plan["version"])
         script = Path(self.c["server_path"]) / "scripts/deploy-remote.sh"
         if self.policy.provisioned:
-            trusted_file(script)
+            validate_host(Path(self.c["server_path"]), backup_id=plan["id"])
         env = {
             "SERVER_PATH": self.c["server_path"],
             "DEPLOY_ID": "infra-" + plan["id"],
@@ -342,6 +375,20 @@ class Executor:
             "CRATE_DEPLOY_PRUNE_UNUSED_IMAGES": "0",
         }
         return self._run(["/bin/bash", str(script), step], env=env, timeout=1200)
+
+    def _assert_deploy_inputs(self, plan, expected):
+        root, assets, manifest = self._release(plan["version"])
+        if (
+            assets != plan["preconditions"]["assets"]
+            or host_inputs(self.c["server_path"], provisioned=self.policy.provisioned)
+            != expected
+        ):
+            raise ValueError("Effective deployment inputs changed")
+        if (
+            self._candidate_health(root, manifest)
+            != plan["preconditions"]["effective_compose_sha256"]
+        ):
+            raise ValueError("Resolved deployment configuration changed")
 
     def _drill(self, dump):
         """Fresh networkless PostgreSQL; restore exit status plus live catalog query."""
@@ -374,6 +421,9 @@ class Executor:
                 "-e",
                 "POSTGRES_HOST_AUTH_METHOD=trust",
                 self.c["postgres_image"],
+                "postgres",
+                "-c",
+                "shared_preload_libraries=pg_stat_statements",
             ],
             timeout=60,
         )
@@ -452,8 +502,41 @@ class Executor:
             tables = int(raw.strip())
             if tables <= 0:
                 raise CommandError("Restored database has no public tables")
+            extensions = json.loads(
+                self._run(
+                    [
+                        "/usr/bin/docker",
+                        "exec",
+                        name,
+                        "psql",
+                        "-X",
+                        "-A",
+                        "-t",
+                        "-v",
+                        "ON_ERROR_STOP=1",
+                        "-U",
+                        "postgres",
+                        "-d",
+                        "crate_restore",
+                        "-c",
+                        "SELECT json_object_agg(extname, extversion) FROM pg_catalog.pg_extension WHERE extname IN ('vector','pg_trgm','pgcrypto','pg_stat_statements');",
+                    ],
+                    timeout=30,
+                )
+            )
+            if (
+                not isinstance(extensions, dict)
+                or not {"vector", "pg_trgm", "pgcrypto"} <= set(extensions)
+                or any(
+                    not isinstance(value, str)
+                    or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", value)
+                    for value in extensions.values()
+                )
+            ):
+                raise CommandError("Required restored PostgreSQL extensions missing")
             return {
                 "verified": True,
+                "extensions": extensions,
                 "method": "pg_restore-exit-on-error-and-live-catalog",
                 "public_tables": tables,
                 "image": self.c["postgres_image"],
@@ -540,6 +623,10 @@ class Executor:
                 "target": self.c["restore_target"],
             }
         if op == "deploy":
+            server = Path(self.c["server_path"])
+            original = plan["preconditions"]["host_inputs"]
+            expected = dict(original)
+            self._assert_deploy_inputs(plan, expected)
             self._remote("release-preflight", plan)
             checkpoint()
             if (
@@ -547,10 +634,23 @@ class Executor:
                 != plan["preconditions"]
             ):
                 raise ValueError("Host changed during release preflight")
+            root, assets, manifest = self._release(plan["version"])
+            environment = environment_versions((server / ".env").read_bytes(), manifest)
+            backup = server / ".deploy-backups" / ("infra-" + plan["id"])
+            if backup.exists() or backup.is_symlink():
+                raise ValueError("Deployment backup target already exists")
+            backup_initial, backup_configured = generated_backup_inputs(
+                original, assets, environment[0], manifest, plan["id"]
+            )
+            backup_expected = backup_initial
             self._remote("backup", plan)
-            root, _, _ = self._release(plan["version"])
-            server = Path(self.c["server_path"])
+            assert_backup_inputs(server, plan["id"], backup_expected)
+            self._assert_deploy_inputs(plan, expected)
             (server / ".deploy").mkdir(exist_ok=True)
+            staged = staged_inputs(original, assets)
+            configured = configured_inputs(staged, assets, environment[-1])
+            if configured != plan["preconditions"]["configured_host_inputs"]:
+                raise ValueError("Predicted configuration transition changed")
             try:
                 for name in ("release.env", "release-manifest.json"):
                     shutil.copyfile(
@@ -558,15 +658,61 @@ class Executor:
                     )
                 for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
                     shutil.copyfile(root / name, server / name)
+                expected = staged
                 for step in ("preflight", "config", "pull", "up", "verify"):
                     checkpoint()
+                    self._assert_deploy_inputs(plan, expected)
+                    assert_backup_inputs(server, plan["id"], backup_expected)
                     self._remote(step, plan)
-            except Exception:  # noqa: BLE001 — rollback must cover every failed local stage.
-                self._remote("rollback", plan)
+                    if step == "config":
+                        expected = configured
+                        backup_expected = backup_configured
+                    self._assert_deploy_inputs(plan, expected)
+                    assert_backup_inputs(server, plan["id"], backup_expected)
+            except Exception:  # noqa: BLE001 — only known own transitions permit rollback.
+                current = host_inputs(server, provisioned=self.policy.provisioned)
+                stable = set(original) - {
+                    ".env",
+                    ".deploy/release-manifest.json",
+                    "docker-compose.yaml",
+                    "docker-compose.project.yaml",
+                    ".deploy/release.env.candidate",
+                    ".deploy/release-manifest.json.candidate",
+                }
+                safe = all(current[key] == original[key] for key in stable)
+                safe = safe and current[".env"] in {
+                    hashlib.sha256(raw).hexdigest() for raw in environment
+                }
+                for key in set(original) - stable - {".env"}:
+                    safe = safe and current[key] in {
+                        original[key],
+                        staged[key],
+                        configured[key],
+                    }
+                if safe:
+                    # A partial config failure may have written either exact predicted
+                    # selection; rollback never consumes arbitrary retained inputs.
+                    backup_actual = dict(backup_initial)
+                    for name in ("changed_image_refs", "changed_services"):
+                        path = backup / name
+                        value = self._file_hash(path) if path.exists() else None
+                        if value not in {backup_initial[name], backup_configured[name]}:
+                            raise CommandError(
+                                "Deployment backup selection drifted"
+                            ) from None
+                        backup_actual[name] = value
+                    assert_backup_inputs(server, plan["id"], backup_actual)
+                    self._remote("rollback", plan)
                 raise CommandError(
-                    "Deployment failed; image/config rollback attempted"
+                    "Deployment failed; rollback only attempted for known trusted inputs"
                 ) from None
-            return {"release_sha": plan["version"]}
+            return {
+                "release_sha": plan["version"],
+                "host_inputs": expected,
+                "effective_compose_sha256": plan["preconditions"][
+                    "effective_compose_sha256"
+                ],
+            }
         raise ValueError("Unknown operation")
 
     def verify(self, plan, result):
@@ -584,6 +730,12 @@ class Executor:
                 and current["started_at"] != plan["preconditions"]["started_at"]
             )
         if plan["operation"] == "deploy":
+            if (
+                result.get("host_inputs")
+                != plan["preconditions"]["configured_host_inputs"]
+            ):
+                return False
+            self._assert_deploy_inputs(plan, result["host_inputs"])
             _, assets, manifest = self._release(plan["version"])
             if assets != plan["preconditions"]["assets"]:
                 return False
