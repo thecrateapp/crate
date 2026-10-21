@@ -292,3 +292,130 @@ def test_maximum_observations_and_thirty_watches_fit_existing_mcp_window(tmp_pat
     assert len({args["job_id"] for _, name, args in calls if name == "get_job"}) == 30
     assert all(name in {"get_pipeline_status", "get_job"} for _, name, _ in calls)
     state.close()
+
+
+@pytest.mark.parametrize("failed_fsync", [1, 2])
+def test_http_watch_durability_fault_blocks_status_and_all_future_writes(
+    setup, monkeypatch, failed_fsync
+):
+    import os
+    import time
+
+    state, supervisor = setup
+    supervisor.observe({}, time.time())
+    server = make_http_server(supervisor, "synthetic-read-api-token")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}"
+    headers = {
+        "Authorization": "Bearer synthetic-read-api-token",
+        "Content-Type": "application/json",
+    }
+    fsync = os.fsync
+    calls = []
+
+    def faulty_fsync(fd):
+        calls.append(fd)
+        if len(calls) == failed_fsync:
+            raise OSError("private disk failure")
+        fsync(fd)
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "fsync", faulty_fsync)
+            code, body = request_json(
+                url + "/v1/watch-job",
+                payload=b'{"job_id":"uncertain-watch"}',
+                headers=headers,
+            )
+        assert code == 503 and body["error"] == "state_unavailable"
+        saved = state.path.read_bytes()
+        code, status = request_json(url + "/v1/status", headers=headers)
+        assert code == 503 and status["state"] == "unavailable"
+        assert "heartbeat_at" not in status
+        code, _ = request_json(
+            url + "/v1/watch-job",
+            payload=b'{"job_id":"must-not-write"}',
+            headers=headers,
+        )
+        assert code == 503 and state.path.read_bytes() == saved
+
+        class Reader:
+            def call(self, *_):
+                pytest.fail("Poisoned poller must stop before requesting observations")
+
+        with pytest.raises(OSError):
+            Poller(supervisor, Reader(), None).tick()
+        assert state.path.read_bytes() == saved
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def test_running_service_exits_after_watch_thread_durability_failure(
+    tmp_path, monkeypatch
+):
+    import os
+
+    from deploy.operator import server as service
+    from deploy.operator.state import StateUnavailable
+
+    path, config = config_file(tmp_path)
+    first_cycle = threading.Event()
+    captured = {}
+    failures = []
+    original_server = service.make_http_server
+    original_tick = service.Poller.tick
+
+    class Reader:
+        def call(self, *_):
+            return {}
+
+    class Sender:
+        def send(self, *_):
+            return "delivered"
+
+    def local_server(supervisor, token, *_args, **kwargs):
+        server = original_server(supervisor, token, port=0, **kwargs)
+        captured["server"] = server
+        return server
+
+    def first_tick(self):
+        original_tick(self)
+        first_cycle.set()
+
+    def run():
+        try:
+            service.main(["--config", str(path)])
+        except StateUnavailable as error:
+            failures.append(str(error))
+
+    monkeypatch.setattr(service, "MCPReader", lambda *_: Reader())
+    monkeypatch.setattr(service, "HermesTransport", lambda *_: Sender())
+    monkeypatch.setattr(service, "make_http_server", local_server)
+    monkeypatch.setattr(service.Poller, "tick", first_tick)
+    monkeypatch.setattr(service.signal, "signal", lambda *_: None)
+    runner = threading.Thread(target=run, daemon=True)
+    runner.start()
+    assert first_cycle.wait(3)
+    url = f"http://127.0.0.1:{captured['server'].server_port}/v1/watch-job"
+    headers = {"Authorization": "Bearer " + Path(config["api_token_file"]).read_text()}
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            os,
+            "fsync",
+            lambda *_: (_ for _ in ()).throw(OSError("synthetic write fault")),
+        )
+        code, _ = request_json(
+            url, payload=b'{"job_id":"watch-trigger"}', headers=headers
+        )
+    assert code == 503
+    runner.join(3)
+    assert not runner.is_alive() and failures == [
+        "Operator state unavailable; restart required"
+    ]
+    # Main's finally block released the process lock; a new writer can reopen.
+    restarted = State(config["state_directory"])
+    restarted.ensure_available()
+    restarted.close()

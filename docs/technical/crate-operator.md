@@ -65,8 +65,11 @@ codes, never token-bearing URLs or raw remote exceptions.
 
 Each process exclusively locks its state directory with `writer.lock`. A
 transaction writes a mode-0600 temporary file, fsyncs it, atomically replaces
-`state.json`, then fsyncs the directory. Directory/fsync errors are fatal; an
-external watchdog can detect the missing heartbeat. Do not run two writers or
+`state.json`, then fsyncs the directory. Directory/fsync errors latch a fatal store condition across every polling and
+HTTP request thread. All subsequent reads/writes fail, HTTP reads return 503
+without a heartbeat, and the main loop exits (checking the latch at least every
+second while idle). Recovery requires a new writer after process restart; an
+external watchdog can detect the unavailable observer. Do not run two writers or
 put the observer and external watchdog on the same state directory. Preserve the
 entire volume across restart. An unrelated empty state directory has a new
 journal history; consumers must detect instance/store replacement operationally.
@@ -113,7 +116,13 @@ malformed and out-of-order evidence cannot prove recovery.
 
 Task samples contain at most 20 rows. Empty samples never mean zero backlog.
 A stuck task that ages out of the sample remains unresolved until affirmative
-evidence is obtained; the rule does not broaden its query. A task's terminal
+evidence is obtained; the rule does not broaden its query. Tracked task identities
+remain until the full configured recovery sequence commits. If more than 20
+distinct unresolved identities accumulate across valid samples, a durable
+`stuck_tracking_overflow` coverage gap prevents automatic recovery. The retained
+20 identities do not stand in for omitted tasks; that gap requires independent
+operator reconciliation before any reviewed local state maintenance. Restart,
+acknowledgement, silence, and recovery of only the visible sample do not clear it. A task's terminal
 state only resolves its heartbeat-stuck condition, not downstream verification.
 Source availability indicates evidence availability, not functional health.
 Status `state` describes the observer heartbeat and eligible delivery queue;

@@ -172,8 +172,15 @@ def _stuck_sample(rule, rows, memory, observed):
         ages[row["id"]] = observed - beat
     stuck = [key for key, age in ages.items() if age >= rule.threshold]
     if stuck:
-        memory["stuck_ids"] = list(dict.fromkeys(previous + stuck))[:20]
+        identities = list(dict.fromkeys(previous + stuck))
+        if len(identities) > 20:
+            # Keep the bounded identities and a durable conservative gap marker.
+            # Later partial samples cannot prove recovery of an omitted identity.
+            memory["stuck_tracking_overflow"] = True
+        memory["stuck_ids"] = identities[:20]
         return max(ages.values())
+    if memory.get("stuck_tracking_overflow"):
+        return None
     if previous:
         for key in previous:
             row = indexed.get(key, {})
@@ -181,7 +188,8 @@ def _stuck_sample(rule, rows, memory, observed):
                 continue
             if key not in ages or ages[key] > rule.clear_threshold:
                 return None
-        memory["stuck_ids"] = []
+        # Retain identities through every affirmative sample in the configured
+        # recovery sequence; observe() clears them in the resolution transaction.
         return 0
     # Empty/partial samples cannot establish zero backlog or general health.
     return None
@@ -233,6 +241,9 @@ def _evaluate(rule, source, memory, now):
         if isinstance(source.get("data"), dict) and "rows" in source["data"]:
             value = _stuck_sample(rule, source["data"]["rows"], memory, observed)
             evidence["stuck_task_ids"] = memory.get("stuck_ids", [])
+            evidence["stuck_tracking_overflow"] = memory.get(
+                "stuck_tracking_overflow", False
+            )
         else:
             value = timestamp(value)
             value = (
@@ -416,6 +427,8 @@ class Supervisor:
                         revision=incident["revision"] + 1,
                     )
                     self._notify(data, incident, "resolved", now)
+                    if rule.kind == "stuck":
+                        memory["stuck_ids"] = []
             active_keys = {
                 f"{self.instance}/{rule.subsystem}/{rule.id}" for rule in self.rules
             }

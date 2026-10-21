@@ -594,3 +594,103 @@ def test_silence_and_bounded_history_survive_same_rule_reopening(state):
     )
     assert len(incident["evidence"]) == 3
     assert len(state.snapshot()["outbox"]) == 1
+
+
+@pytest.mark.parametrize("terminal", [True, False])
+def test_sampled_stuck_default_recovery_keeps_ids_through_hysteresis(state, terminal):
+    supervisor = Supervisor(
+        state,
+        "lab",
+        [
+            rule(
+                kind="stuck", field=("heartbeat_at",), threshold=100, clear_threshold=30
+            )
+        ],
+    )
+    for step in range(2):
+        sample = source(BASE + step * 30)
+        sample["data"] = {
+            "rows": [
+                {"id": "tracked", "status": "running", "heartbeat_at": iso(BASE - 300)}
+            ]
+        }
+        observe(supervisor, BASE + step * 30, sample)
+    assert supervisor.incidents()["incidents"][0]["state"] == "open"
+    for step in (2, 3):
+        now = BASE + step * 30
+        row = (
+            {"id": "tracked", "status": "completed"}
+            if terminal
+            else {"id": "tracked", "status": "running", "heartbeat_at": iso(now)}
+        )
+        sample = source(now)
+        sample["data"] = {"rows": [row]}
+        observe(supervisor, now, sample)
+        if step == 2:
+            assert supervisor.incidents()["incidents"][0]["state"] == "open"
+            assert state.snapshot()["rules"]["lab/analysis/queue"]["stuck_ids"] == [
+                "tracked"
+            ]
+    assert supervisor.incidents()["incidents"][0]["state"] == "resolved"
+    assert state.snapshot()["rules"]["lab/analysis/queue"]["stuck_ids"] == []
+
+
+def test_accumulated_stuck_identity_overflow_cannot_resolve_from_partial_sample(state):
+    configured = rule(
+        kind="stuck",
+        field=("heartbeat_at",),
+        threshold=100,
+        clear_threshold=30,
+        trigger_samples=1,
+        recovery_samples=1,
+    )
+    supervisor = Supervisor(state, "lab", [configured])
+    sample = source(BASE)
+    sample["data"] = {
+        "rows": [
+            {
+                "id": f"tracked-{number}",
+                "status": "running",
+                "heartbeat_at": iso(BASE - 300),
+            }
+            for number in range(20)
+        ]
+    }
+    observe(supervisor, BASE, sample)
+    sample.update(
+        observed_at=iso(BASE + 30),
+        data={
+            "rows": [
+                {
+                    "id": "overflow-task",
+                    "status": "running",
+                    "heartbeat_at": iso(BASE - 300),
+                }
+            ]
+        },
+    )
+    observe(supervisor, BASE + 30, sample)
+    sample.update(
+        observed_at=iso(BASE + 60),
+        data={
+            "rows": [
+                {"id": f"tracked-{number}", "status": "completed"}
+                for number in range(20)
+            ]
+        },
+    )
+    observe(supervisor, BASE + 60, sample)
+    assert supervisor.incidents()["incidents"][0]["state"] == "open"
+    memory = state.snapshot()["rules"]["lab/analysis/queue"]
+    assert len(memory["stuck_ids"]) <= 20 and memory["stuck_tracking_overflow"]
+    evidence = supervisor.incidents()["incidents"][0]["evidence"][-1]
+    assert evidence["stuck_tracking_overflow"] and not evidence["valid"]
+    state.close()
+    reopened = State(state.directory)
+    try:
+        supervisor = Supervisor(reopened, "lab", [configured])
+        sample["observed_at"] = iso(BASE + 90)
+        observe(supervisor, BASE + 90, sample)
+        assert supervisor.incidents()["incidents"][0]["state"] == "open"
+    finally:
+        reopened.close()

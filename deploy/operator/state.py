@@ -18,8 +18,14 @@ class CapacityError(RuntimeError):
     """Admission stopped rather than silently deleting unresolved work."""
 
 
+class StateUnavailable(OSError):
+    """The writer failed a durability boundary and requires process restart."""
+
+
 class State:
     def __init__(self, directory):
+        self._failed = False
+        self._closed = False
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         self._lock = open(self.directory / "writer.lock", "a+b")  # noqa: SIM115 — held for process lifetime; close() releases it.
@@ -54,15 +60,24 @@ class State:
             raise
 
     def close(self):
-        self._lock.close()
+        with self.mutex:
+            self._closed = True
+            self._lock.close()
+
+    def ensure_available(self):
+        with self.mutex:
+            if self._failed or self._closed:
+                raise StateUnavailable("Operator state unavailable; restart required")
 
     def snapshot(self):
         with self.mutex:
+            self.ensure_available()
             return copy.deepcopy(self.data)
 
     @contextmanager
     def transaction(self):
         with self.mutex:
+            self.ensure_available()
             working = copy.deepcopy(self.data)
             yield working
             raw = json.dumps(
@@ -70,21 +85,27 @@ class State:
             ).encode()
             if len(raw) > MAX_BYTES:
                 raise CapacityError("Operator state exceeds byte bound")
-            temp = self.directory / "state.tmp"
-            fd = os.open(temp, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(raw)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temp, self.path)
-            # Publish after replace even if directory fsync fails: callers must treat
-            # fsync failures as fatal, never continue from an obsolete in-memory copy.
-            self.data = working
-            fd = os.open(self.directory, os.O_RDONLY | os.O_DIRECTORY)
             try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
+                temp = self.directory / "state.tmp"
+                fd = os.open(temp, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(raw)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temp, self.path)
+                fd = os.open(self.directory, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+            except OSError:
+                # Shared across polling and HTTP threads. No read may advertise an
+                # old heartbeat, and no later commit may cross uncertain durability.
+                self._failed = True
+                raise StateUnavailable(
+                    "Operator state durability failure; restart required"
+                ) from None
+            self.data = working
 
     def events(self, cursor=0, limit=50):
         if (

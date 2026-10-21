@@ -22,7 +22,7 @@ from .delivery import (
     request_json,
     validate_url,
 )
-from .state import CapacityError, State
+from .state import CapacityError, State, StateUnavailable
 from .supervisor import IDENTIFIER, TOOLS, Rule, Supervisor
 
 
@@ -140,6 +140,7 @@ class Poller:
         self.watch_offset = 0
 
     def tick(self, now=None):
+        self.supervisor.state.ensure_available()
         responses = {}
         for rule in self.supervisor.rules:
             if rule.request_key not in responses:
@@ -224,6 +225,10 @@ def make_http_server(supervisor, token, host="127.0.0.1", port=0, *, delivery=No
                     self._respond(404, {"error": "unknown_read"})
                     return
                 self._respond(200, value)
+            except StateUnavailable:
+                self._respond(
+                    503, {"error": "state_unavailable", "state": "unavailable"}
+                )
             except (ValueError, TypeError):
                 self._respond(400, {"error": "invalid_bounds"})
 
@@ -252,6 +257,10 @@ def make_http_server(supervisor, token, host="127.0.0.1", port=0, *, delivery=No
                 self._respond(400, {"error": "invalid_watch"})
             except CapacityError:
                 self._respond(409, {"error": "watch_capacity"})
+            except StateUnavailable:
+                self._respond(
+                    503, {"error": "state_unavailable", "state": "unavailable"}
+                )
 
     server = ThreadingHTTPServer((host, port), Handler)
     server.daemon_threads = True
@@ -313,7 +322,15 @@ def main(argv=None):
         while not stop.is_set():
             started = time.monotonic()
             poller.tick()
-            stop.wait(max(0, config["poll_seconds"] - (time.monotonic() - started)))
+            deadline = started + config["poll_seconds"]
+            while not stop.is_set():
+                # HTTP handlers share the fatal latch. Notice their disk failures
+                # during idle time as well as at the next polling transaction.
+                state.ensure_available()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                stop.wait(min(1, remaining))
     finally:
         if server:
             server.shutdown()

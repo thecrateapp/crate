@@ -71,7 +71,8 @@ def test_post_replace_state_is_durable_and_fsync_failure_is_fatal(
         patch.setattr(os, "fsync", fail_directory)
         with pytest.raises(OSError), state.transaction() as data:
             event(data, "replaced", {}, 2)
-    assert state.snapshot()["sequence"] == 1
+    with pytest.raises(OSError):
+        state.snapshot()
     state.close()
     reopened = State(tmp_path)
     assert reopened.snapshot()["sequence"] == 1
@@ -146,3 +147,47 @@ def test_event_pages_obey_byte_budget_and_future_cursor_rejected(tmp_path):
     with pytest.raises(ValueError):
         state.events(11)
     state.close()
+
+
+@pytest.mark.parametrize("failure_point", ["file_fsync", "replace", "directory_fsync"])
+def test_durability_fault_poisons_every_store_operation_until_restart(
+    tmp_path, monkeypatch, failure_point
+):
+    state = State(tmp_path)
+    with state.transaction() as data:
+        event(data, "before", {}, 1)
+    fsync = os.fsync
+    calls = []
+
+    def faulty_fsync(fd):
+        calls.append(fd)
+        if len(calls) == (1 if failure_point == "file_fsync" else 2):
+            raise OSError("private path /credentials must not leak")
+        fsync(fd)
+
+    with monkeypatch.context() as patch:
+        if failure_point == "replace":
+            patch.setattr(
+                os, "replace", lambda *_: (_ for _ in ()).throw(OSError("private path"))
+            )
+        else:
+            patch.setattr(os, "fsync", faulty_fsync)
+        with pytest.raises(OSError), state.transaction() as data:
+            event(data, "uncertain", {}, 2)
+    # Removing the fault does not make the old writer trustworthy again.
+    with pytest.raises(OSError):
+        state.snapshot()
+    with pytest.raises(OSError):
+        state.events()
+    with pytest.raises(OSError), state.transaction() as data:
+        pytest.fail("Poisoned transaction yielded mutable state")
+    state.close()
+    reopened = State(tmp_path)
+    try:
+        expected = 2 if failure_point == "directory_fsync" else 1
+        assert reopened.snapshot()["sequence"] == expected
+        with reopened.transaction() as data:
+            event(data, "after_restart", {}, 3)
+        assert reopened.snapshot()["sequence"] == expected + 1
+    finally:
+        reopened.close()
