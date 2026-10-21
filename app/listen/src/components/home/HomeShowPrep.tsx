@@ -1,14 +1,17 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardFooter,
+} from "@crate/ui/shadcn/card";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { Calendar, CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
 import {
-  Calendar,
-  CRATE_ICON_SIZE,
-  Play,
-  Sparkles,
-  Flame,
-} from "@crate/ui/icons";
-import { SectionHeader } from "@crate/ui/domain/lists";
+  SectionHeader,
+  SectionActionButton,
+} from "@crate/ui/domain/lists/SectionHeader";
 import { Button } from "@crate/ui/shadcn/button";
 
 import type { HomeUpcomingInsight } from "./home-model";
@@ -38,63 +41,59 @@ export function HomeShowPrepSection({
       <SectionHeader
         title={t("home.radar.showPrep.title")}
         subtitle={t("home.radar.showPrep.subtitle")}
-        actionLabel={t("home.radar.open")}
-        onAction={onOpenUpcoming}
+        action={
+          <SectionActionButton
+            aria-label={t("home.radar.open")}
+            onClick={onOpenUpcoming}
+          >
+            {t("common.viewAll")}
+          </SectionActionButton>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {insights.map((insight) => (
-          <div
-            key={`${insight.type}:${insight.show_id}`}
-            className="home-upcoming-show-prep-card rounded-panel p-5"
-          >
-            <div className="flex items-start justify-between gap-3">
+          <Card key={`${insight.type}:${insight.show_id}`}>
+            <CardHeader>
               <div>
-                <InfoBadge icon={Sparkles}>
+                <MonoLabel tone="accent">
                   {insightLabel(insight.type, t)}
-                </InfoBadge>
+                </MonoLabel>
                 <h3 className="mt-3 text-lg font-bold text-text-primary">
                   {insight.title}
                 </h3>
-                <p className="home-upcoming-show-prep-subtitle mt-1 text-sm">
+                <p className="mt-2 text-sm text-text-muted">
                   {insight.subtitle}
                 </p>
               </div>
               {insight.weight === "high" ? (
-                <InfoBadge icon={Flame}>
+                <MonoLabel tone="accent">
                   {t("home.radar.showPrep.heavyRotation")}
-                </InfoBadge>
+                </MonoLabel>
               ) : null}
-            </div>
-
-            <p className="mt-4 text-sm leading-6 text-text-muted">
-              {insight.message}
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm leading-6 text-text-muted">
+                {insight.message}
+              </p>
+            </CardContent>
+            <CardFooter>
               {insight.has_setlist ? (
-                <Button
-                  size="sm"
-                  shape="pill"
-                  onClick={() => onPlaySetlist(insight)}
-                  className="h-9 gap-2 px-4 shadow-none has-[>svg]:px-4 [&_svg:not([class*='size-'])]:size-3.5"
-                >
-                  <Play size={CRATE_ICON_SIZE.xs} fill="currentColor" />
+                <Button size="sm" onClick={() => onPlaySetlist(insight)}>
+                  <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
                   {t("radar.show.playSetlist")}
                 </Button>
               ) : null}
               <Button
                 variant="secondary"
                 size="sm"
-                shape="pill"
                 onClick={() => onSaveReminder(insight)}
-                className="home-upcoming-show-prep-reminder h-9 gap-2 px-4 font-normal has-[>svg]:px-4 [&_svg:not([class*='size-'])]:size-3.5"
               >
-                <Calendar size={CRATE_ICON_SIZE.xs} />
+                <Calendar size={CRATE_ICON_SIZE.sm} />
                 {t("home.radar.showPrep.saveForLater")}
               </Button>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
         ))}
       </div>
     </section>

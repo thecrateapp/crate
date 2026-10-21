@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 import { Loader2, Pause, Play } from "@crate/ui/icons";
@@ -21,10 +22,8 @@ const ICON_SIZE: Record<PlayButtonSize, number> = {
 const HOVER_REVEAL_CLASS_NAME =
   "pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100 focus-visible:opacity-100";
 
-export interface PlayButtonProps extends Omit<
-  ButtonHTMLAttributes<HTMLButtonElement>,
-  "children"
-> {
+export interface PlayButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   size?: PlayButtonSize;
   reveal?: PlayButtonReveal;
   playing?: boolean;
@@ -44,6 +43,7 @@ export const PlayButton = forwardRef<HTMLButtonElement, PlayButtonProps>(
       pauseLabel = "Pause",
       className,
       type = "button",
+      title,
       ...props
     },
     ref,
@@ -52,40 +52,44 @@ export const PlayButton = forwardRef<HTMLButtonElement, PlayButtonProps>(
     const accessibleLabel = playing ? pauseLabel : label;
 
     return (
-      <button
-        ref={ref}
-        type={type}
-        aria-label={accessibleLabel}
-        title={accessibleLabel}
-        aria-busy={loading || undefined}
-        data-size={size}
-        data-reveal={reveal}
-        data-state={loading ? "loading" : playing ? "playing" : "idle"}
-        className={cn(
-          "crate-play-button inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground transition-[opacity,background-color] hover:bg-accent-action-hover disabled:pointer-events-none disabled:opacity-50",
-          SIZE_CLASS_NAME[size],
-          reveal === "hover" && !playing && !loading && HOVER_REVEAL_CLASS_NAME,
-          className,
-        )}
-        {...props}
-      >
-        {loading ? (
-          <Loader2
-            aria-hidden="true"
-            size={iconSize}
-            className="animate-spin"
-          />
-        ) : playing ? (
-          <Pause aria-hidden="true" size={iconSize} fill="currentColor" />
-        ) : (
-          <Play
-            aria-hidden="true"
-            size={iconSize}
-            fill="currentColor"
-            className="ml-0.5"
-          />
-        )}
-      </button>
+      <TooltipHint content={title ?? accessibleLabel}>
+        <button
+          ref={ref}
+          type={type}
+          aria-label={accessibleLabel}
+          aria-busy={loading || undefined}
+          data-size={size}
+          data-reveal={reveal}
+          data-state={loading ? "loading" : playing ? "playing" : "idle"}
+          className={cn(
+            "crate-play-button inline-flex shrink-0 items-center justify-center rounded-full bg-accent-action text-accent-action-foreground transition-[opacity,background-color] hover:bg-accent-action-hover disabled:pointer-events-none disabled:opacity-50",
+            SIZE_CLASS_NAME[size],
+            reveal === "hover" &&
+              !playing &&
+              !loading &&
+              HOVER_REVEAL_CLASS_NAME,
+            className,
+          )}
+          {...props}
+        >
+          {loading ? (
+            <Loader2
+              aria-hidden="true"
+              size={iconSize}
+              className="animate-spin"
+            />
+          ) : playing ? (
+            <Pause aria-hidden="true" size={iconSize} fill="currentColor" />
+          ) : (
+            <Play
+              aria-hidden="true"
+              size={iconSize}
+              fill="currentColor"
+              className="ml-0.5"
+            />
+          )}
+        </button>
+      </TooltipHint>
     );
   },
 );

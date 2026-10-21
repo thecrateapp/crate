@@ -1,0 +1,20 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/PullIndicator.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">PullIndicator</DocHeading>
+<EntryDetails
+  id="primitives-pullindicator"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Existing pull-to-refresh visual consumes gesture distance and refreshing state. The application owns the gesture, network, threshold and completion. Zero distance without refresh renders nothing; refreshing uses the existing decorative spinner.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Refreshing} />

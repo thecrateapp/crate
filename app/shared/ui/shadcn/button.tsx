@@ -2,6 +2,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { Loader2 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
@@ -11,7 +12,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "rounded-md bg-accent-action text-accent-action-foreground shadow-action hover:bg-accent-action-hover",
+          "rounded-md border border-accent-action bg-transparent text-accent-action hover:border-accent-action-hi hover:text-accent-action-hi",
         destructive:
           "rounded-md bg-state-danger text-state-danger-foreground hover:bg-state-danger/90 dark:bg-state-danger/60 focus-visible:border-border-focus",
         "danger-soft":
@@ -79,6 +80,8 @@ function Button({
   asChild = false,
   loading = false,
   children,
+  title,
+  "aria-label": label,
   ...props
 }: ButtonProps) {
   const sharedProps = {
@@ -87,6 +90,7 @@ function Button({
     "data-size": size,
     "data-shape": shape,
     "aria-busy": loading || undefined,
+    "aria-label": label ?? (size?.startsWith("icon") ? title : undefined),
     className: cn(buttonVariants({ variant, size, shape, className })),
   };
 
@@ -116,33 +120,37 @@ function Button({
         ? React.cloneElement(children, blockedProps)
         : children;
     return (
-      <Slot.Root
-        {...sharedProps}
-        {...props}
-        {...blockedProps}
-        aria-disabled={unavailable || props["aria-disabled"] || undefined}
-      >
-        {child}
-      </Slot.Root>
+      <TooltipHint content={title}>
+        <Slot.Root
+          {...sharedProps}
+          {...props}
+          {...blockedProps}
+          aria-disabled={unavailable || props["aria-disabled"] || undefined}
+        >
+          {child}
+        </Slot.Root>
+      </TooltipHint>
     );
   }
 
   return (
-    <button
-      {...sharedProps}
-      {...props}
-      type={props.type ?? "button"}
-      disabled={props.disabled || loading}
-    >
-      {loading ? (
-        <Loader2
-          data-slot="button-spinner"
-          aria-hidden="true"
-          className="animate-spin"
-        />
-      ) : null}
-      {children}
-    </button>
+    <TooltipHint content={title}>
+      <button
+        {...sharedProps}
+        {...props}
+        type={props.type ?? "button"}
+        disabled={props.disabled || loading}
+      >
+        {loading ? (
+          <Loader2
+            data-slot="button-spinner"
+            aria-hidden="true"
+            className="animate-spin"
+          />
+        ) : null}
+        {children}
+      </button>
+    </TooltipHint>
   );
 }
 

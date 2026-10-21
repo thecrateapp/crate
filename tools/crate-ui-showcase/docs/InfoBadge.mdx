@@ -13,7 +13,7 @@ import { DocHeading } from "../components/DocHeading";
 
 - Static information with semantic tones, default/overlay surfaces and a counter variant. No toggle semantics.
 - 24 px height; JetBrains Mono 400 at 12/16 px; 1 px border, 3 × 8 px padding; counters use 6 px horizontal padding.
-- Long text retains a title; composed text can shrink without clipping child actions. OfflineBadge preserves states, icons, errors and compact presentation.
+- Long text retains a custom tooltip; composed text can shrink without clipping child actions. OfflineBadge preserves states, icons, errors and compact presentation.
 
 <DocHeading as="h2">Real component</DocHeading>
 
@@ -22,3 +22,7 @@ import { DocHeading } from "../components/DocHeading";
 <Controls />
 
 Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+Full metadata and explicit title detail use the shared custom Tooltip hint. They never emit a browser title or turn a static badge into a toggle. Visible values, icon colors and the 24px frame stay unchanged.

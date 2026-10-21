@@ -56,6 +56,46 @@ function sliderWithRect(container: HTMLElement, band: number) {
   return slider;
 }
 
+it("keeps compact rounded readings separate from exact focused-band values", () => {
+  const { container } = render(
+    <EqBands
+      gains={Array(10).fill(-11.5)}
+      onBandChange={vi.fn()}
+      animate={false}
+    />,
+  );
+  const slider = screen.getAllByRole("slider")[0]!;
+  expect(
+    container.querySelector('[data-slot="eq-band-compact-value"]'),
+  ).toHaveTextContent("−12");
+  expect(
+    slider.querySelector('[data-slot="eq-band-exact-value"]'),
+  ).toHaveTextContent("−11.5 dB");
+  fireEvent.keyDown(slider, { key: "ArrowUp" });
+  expect(slider).toHaveAttribute("aria-valuenow", "-11");
+  expect(
+    slider.querySelector('[data-slot="eq-band-exact-value"]'),
+  ).toHaveTextContent("−11 dB");
+});
+
+it("keeps band touches out of the containing player swipe gesture", () => {
+  const onPlayerSwipe = vi.fn();
+  render(
+    <div
+      onTouchStart={onPlayerSwipe}
+      onTouchMove={onPlayerSwipe}
+      onTouchEnd={onPlayerSwipe}
+    >
+      <EqBands gains={FLAT} onBandChange={vi.fn()} animate={false} />
+    </div>,
+  );
+  const band = screen.getAllByRole("slider")[0]!;
+  fireEvent.touchStart(band, { touches: [{ clientX: 20, clientY: 50 }] });
+  fireEvent.touchMove(band, { touches: [{ clientX: 20, clientY: 20 }] });
+  fireEvent.touchEnd(band, { changedTouches: [{ clientX: 20, clientY: 20 }] });
+  expect(onPlayerSwipe).not.toHaveBeenCalled();
+});
+
 describe("EqBands", () => {
   let frames: ReturnType<typeof fakeAnimationFrames>;
 
@@ -82,10 +122,15 @@ describe("EqBands", () => {
     ).toHaveAttribute("d", eqCurvePath([2, 3, 1, -1, 2, 4, 4, 3, 1, -1]));
     expect(container.querySelectorAll("rect")).toHaveLength(10);
     expect(screen.getByText("16K")).toHaveClass("font-mono");
-    expect(screen.getAllByText("+4")).toHaveLength(2);
+    expect(
+      Array.from(
+        container.querySelectorAll('[data-slot="eq-band-value"]'),
+        (n) => n.textContent,
+      ).filter((v) => v === "+4"),
+    ).toHaveLength(2);
     expect(screen.getAllByText("−1")[0]!).toHaveClass(
       "font-mono",
-      "text-sm",
+      "text-xs",
       "font-normal",
     );
     expect(screen.getByText("0 dB")).toBeInTheDocument();

@@ -109,6 +109,8 @@ export function applyEqualizerPreset(preset: EqPresetName): EqGains {
     localStorage.setItem(PRESET_KEY, preset);
     localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
     localStorage.setItem(SMART_KEY, "false");
+    localStorage.setItem(ADAPTIVE_KEY, "false");
+    localStorage.setItem(GENRE_ADAPTIVE_KEY, "false");
     dispatchPrefsEvent();
   } catch {
     /* ignore */

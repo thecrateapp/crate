@@ -29,7 +29,7 @@ describe("RadioFeedback", () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByTitle("Less like this"));
+    await user.click(screen.getByRole("button", { name: "Less like this" }));
 
     expect(mockSendRadioFeedback).toHaveBeenCalledWith("sess-1", 42, "dislike");
     expect(onDislike).toHaveBeenCalledTimes(1);
@@ -61,7 +61,7 @@ describe("RadioFeedback", () => {
     );
 
     const user = userEvent.setup();
-    await user.click(screen.getByTitle("More like this"));
+    await user.click(screen.getByRole("button", { name: "More like this" }));
 
     expect(mockSendRadioFeedback).toHaveBeenCalledWith(
       "sess-1",
@@ -70,7 +70,7 @@ describe("RadioFeedback", () => {
       "remote-track",
     );
 
-    await user.click(screen.getByTitle("Less like this"));
+    await user.click(screen.getByRole("button", { name: "Less like this" }));
 
     expect(mockSendRadioFeedback).toHaveBeenCalledWith(
       "sess-1",

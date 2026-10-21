@@ -201,6 +201,12 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1BEHomeSignals: fileURLToPath(
+          new URL("review-1be-home-signals.html", import.meta.url),
+        ),
+        review1BEWebClosure: fileURLToPath(
+          new URL("review-1be-web-closure.html", import.meta.url),
+        ),
         review1BEPlayerEq: fileURLToPath(
           new URL("review-1be-player-eq.html", import.meta.url),
         ),
@@ -273,6 +279,9 @@ export default defineConfig({
         ),
         review1ayShell: fileURLToPath(
           new URL("review-1ay-shell.html", import.meta.url),
+        ),
+        review1bePrimaryHints: fileURLToPath(
+          new URL("review-1be-primary-hints.html", import.meta.url),
         ),
         main: fileURLToPath(new URL("index.html", import.meta.url)),
         review1axLayers: fileURLToPath(

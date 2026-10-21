@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { eqCurvePath } from "../../app/shared/ui/lib/eq-curve";
 for (const host of ["storybook", "standalone"] as const)
   for (const width of [375, 1200])
     test(`${host} EQ ${width}`, async ({ page }) => {
@@ -41,29 +42,38 @@ for (const host of ["storybook", "standalone"] as const)
         weight: getComputedStyle(e).fontWeight,
       }));
       expect(type.font).toContain("JetBrains");
-      expect(type.size).toBe("14px");
+      expect(type.size).toBe("12px");
       expect(type.weight).toBe("400");
-      await expect(panel.getByRole("button", { name: "Shoegaze" })).toHaveCount(
-        0,
-      );
-      await expect(panel.locator("[data-source]")).toHaveCount(3);
+      await expect(
+        panel.getByRole("button", { name: "Shoegaze" }),
+      ).toBeVisible();
+      await expect(panel.locator("[data-source]")).toHaveCount(1);
       await expect(panel.locator('[aria-current="true"]')).toHaveAttribute(
         "data-source",
         "user_track_preset",
       );
-      const group = panel.getByRole("group", {
-        name: "Track curves",
-        exact: true,
-      });
-      const gap = await group.evaluate((e) => {
-        const label = document.getElementById(
-          e.getAttribute("aria-labelledby")!,
-        )!;
-        return (
-          e.getBoundingClientRect().top - label.getBoundingClientRect().bottom
+      const viewport = panel.locator('[data-slot="eq-bands-viewport"]');
+      expect(
+        await viewport.evaluate((e) => e.scrollWidth <= e.clientWidth),
+      ).toBe(true);
+      const bounds = await panel.boundingBox();
+      for (const slider of await panel.getByRole("slider").all()) {
+        const band = (await slider.boundingBox())!;
+        expect(band.x).toBeGreaterThanOrEqual(bounds!.x);
+        expect(band.x + band.width).toBeLessThanOrEqual(
+          bounds!.x + bounds!.width,
         );
-      });
-      expect(gap).toBeCloseTo(8, 0);
+      }
+      const power = (await panel
+        .getByRole("button", { name: "On", exact: true })
+        .boundingBox())!;
+      const close = (await panel
+        .getByRole("button", { name: "Close equalizer" })
+        .boundingBox())!;
+      expect(power.y + power.height / 2).toBeCloseTo(
+        close.y + close.height / 2,
+        0,
+      );
       const slider = panel.getByRole("slider").first();
       await slider.focus();
       await page.keyboard.press("ArrowUp");
@@ -83,12 +93,7 @@ for (const host of ["storybook", "standalone"] as const)
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
-      const presets = panel.getByRole("combobox", {
-        name: "Presets",
-        exact: true,
-      });
-      await presets.click();
-      await page.getByRole("option", { name: "Rock", exact: true }).click();
+      await panel.getByRole("button", { name: "Rock", exact: true }).click();
       await expect(slider).toHaveAttribute("aria-valuenow", "4");
       await panel.getByRole("button", { name: "On", exact: true }).click();
       await expect(
@@ -118,7 +123,7 @@ for (const host of ["storybook", "standalone"] as const)
       await page.getByRole("option", { name, exact: true }).click();
     };
     await choose("legacy");
-    await expect(panel).toContainText(
+    await expect(panel).not.toContainText(
       "Only the current curve is available from this server.",
     );
     await expect(panel.locator("[data-source]")).toHaveCount(1);
@@ -173,7 +178,7 @@ for (const host of ["storybook", "standalone"] as const)
       await page.keyboard.press("End");
       await page.keyboard.press("ArrowDown");
     }
-    const readings = panel.locator('[data-slot="eq-band-value"]');
+    const readings = panel.locator('[data-slot="eq-band-compact-value"]');
     const bounds = await readings.evaluateAll((nodes) =>
       nodes.map((n) => ({
         left: n.getBoundingClientRect().left,
@@ -182,11 +187,205 @@ for (const host of ["storybook", "standalone"] as const)
     );
     for (let i = 1; i < bounds.length; i++)
       expect(bounds[i]!.left).toBeGreaterThanOrEqual(bounds[i - 1]!.right);
-    for (let i = 0; i < 10; i++)
+    for (let i = 0; i < 10; i++) {
+      await sliders.nth(i).focus();
       await expect(sliders.nth(i)).toHaveAttribute("aria-valuenow", "11.5");
+      await expect(
+        sliders.nth(i).locator('[data-slot="eq-band-exact-value"]'),
+      ).toBeVisible();
+      await expect(
+        sliders.nth(i).locator('[data-slot="eq-band-exact-value"]'),
+      ).toHaveText("+11.5 dB");
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
   });
+
+for (const host of ["storybook", "standalone"] as const) {
+  test.describe(`${host} compact touch EQ`, () => {
+    test.use({
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 412, height: 915 },
+    });
+    test("ten bands, a stable header, exact readings and pill power without overflow", async ({
+      page,
+    }) => {
+      await page.goto(
+        host === "storybook"
+          ? "/iframe.html?id=reviews-1be-player-eq--complete&viewMode=story"
+          : "http://127.0.0.1:5186/review-1be-player-eq.html",
+      );
+      const panel = page.getByRole("dialog", {
+        name: "Equalizer",
+        exact: true,
+      });
+      await expect(panel).toBeVisible();
+      const modes = panel.locator('[data-slot="eq-mode-controls"] button');
+      const positions = await modes.evaluateAll((nodes) =>
+        nodes.map((n) => n.getBoundingClientRect().y),
+      );
+      expect(new Set(positions).size).toBe(1);
+      const power = panel.getByRole("button", { name: "On", exact: true });
+      const close = panel.getByRole("button", { name: "Close equalizer" });
+      await expect
+        .poll(async () => {
+          const a = (await power.boundingBox())!,
+            b = (await close.boundingBox())!;
+          return Math.abs(a.y + a.height / 2 - b.y - b.height / 2);
+        })
+        .toBeLessThan(1);
+      await expect
+        .poll(async () => (await power.boundingBox())!.height)
+        .toBeGreaterThanOrEqual(44);
+      const plot = panel.locator('[data-slot="eq-bands-viewport"]');
+      expect(await plot.evaluate((e) => e.scrollWidth <= e.clientWidth)).toBe(
+        true,
+      );
+      const sliders = panel.getByRole("slider");
+      await expect(sliders).toHaveCount(10);
+      await expect(sliders.last()).toHaveCSS("touch-action", "none");
+      await sliders.last().tap();
+      await expect(
+        sliders.last().locator('[data-slot="eq-band-exact-value"]'),
+      ).toBeVisible();
+      await expect(
+        panel.getByRole("button", { name: "Smart", exact: true }),
+      ).toHaveAttribute("aria-pressed", "false");
+      await panel.getByRole("button", { name: "Rock", exact: true }).tap();
+      await expect(sliders.first()).toHaveAttribute("aria-valuenow", "4");
+      await power.tap();
+      await expect(
+        panel.getByRole("button", { name: "Off", exact: true }),
+      ).toBeEnabled();
+      await expect(sliders.first()).toHaveAttribute("aria-valuenow", "0");
+      await panel.getByRole("button", { name: "Off", exact: true }).tap();
+      await expect(sliders.first()).toHaveAttribute("aria-valuenow", "4");
+      const values = panel.locator('[data-slot="eq-band-compact-value"]');
+      await expect(values.first()).toHaveCSS("font-size", "12px");
+      const rows = await values.evaluateAll((nodes) =>
+        nodes.map((n) => n.getBoundingClientRect().y),
+      );
+      expect(new Set(rows).size).toBe(1);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `.artifacts/crate-v3/1be-eq-compact-${host}-412.png`,
+        fullPage: true,
+      });
+      await panel.getByRole("button", { name: "Adaptive", exact: true }).tap();
+      const information = panel.locator('[data-slot="eq-curve-readout"]');
+      await expect(information).toContainText("42%");
+      await expect(information).not.toContainText(/audio analysis/i);
+      const displayedGains = await sliders.evaluateAll((nodes) =>
+        nodes.map((n) => Number(n.getAttribute("aria-valuenow"))),
+      );
+      await expect(
+        panel.locator("path.stroke-accent-action-hi"),
+      ).toHaveAttribute("d", eqCurvePath(displayedGains));
+      await page.screenshot({
+        path: `.artifacts/crate-v3/1be-eq-adaptive-${host}-412.png`,
+        fullPage: true,
+      });
+    });
+  });
+}
+
+for (const host of ["storybook", "standalone"] as const) {
+  test(`${host} Smart genre and Genre use one information slot before presets`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.goto(
+      host === "storybook"
+        ? "/iframe.html?id=reviews-1be-player-eq--complete&viewMode=story"
+        : "http://127.0.0.1:5186/review-1be-player-eq.html",
+    );
+    await page.getByRole("combobox", { name: "Scenario", exact: true }).click();
+    await page
+      .getByRole("option", { name: "smart-genre", exact: true })
+      .click();
+    const panel = page.getByRole("dialog", { name: "Equalizer", exact: true });
+    const info = panel.locator('[data-slot="eq-curve-readout"]');
+    await expect(info.getByText("Grindcore", { exact: true })).toBeVisible();
+    await expect(info).toHaveText("Genre taxonomy: Grindcore");
+    await expect(info).toHaveAttribute("aria-current", "true");
+    await expect(info).toHaveAttribute("data-source", "genre_taxonomy_preset");
+    await expect(info).toHaveCSS("font-family", /JetBrains/);
+    await expect(info).toHaveCSS("text-transform", "uppercase");
+    const bandStyle = () =>
+      info.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return {
+          background: s.backgroundColor,
+          border: s.borderTopColor,
+          font: s.fontFamily,
+          size: s.fontSize,
+          weight: s.fontWeight,
+        };
+      });
+    const smartStyle = await bandStyle();
+    const iconOffset = () =>
+      info.evaluate((el) => {
+        const icon = el.querySelector("svg")!.getBoundingClientRect();
+        const text = el.lastElementChild!;
+        return Math.abs(
+          icon.top +
+            icon.height / 2 -
+            (text.getBoundingClientRect().top +
+              parseFloat(getComputedStyle(text).lineHeight) / 2),
+        );
+      });
+    expect(await iconOffset()).toBeLessThan(0.5);
+
+    const original = await panel
+      .getByRole("slider")
+      .evaluateAll((nodes) =>
+        nodes.map((n) => n.getAttribute("aria-valuenow")),
+      );
+    await panel.getByRole("button", { name: "Genre", exact: true }).click();
+    await expect(info.getByText("Grindcore", { exact: true })).toBeVisible();
+    await expect(info).toHaveText("Genre taxonomy: Grindcore");
+    await expect(panel).not.toContainText("Smart EQ is waiting");
+    await expect(info).toHaveCount(1);
+    expect(
+      await panel
+        .getByRole("slider")
+        .evaluateAll((nodes) =>
+          nodes.map((n) => n.getAttribute("aria-valuenow")),
+        ),
+    ).toEqual(original);
+    const plot = panel.locator('[data-slot="eq-bands-viewport"]');
+    const presets = panel.getByRole("group", { name: "Presets", exact: true });
+    expect((await info.boundingBox())!.y).toBeGreaterThan(
+      (await plot.boundingBox())!.y,
+    );
+    await expect(info).toHaveCSS("font-family", /JetBrains/);
+    await expect(info).toHaveCSS("text-transform", "uppercase");
+    expect((await info.boundingBox())!.y).toBeLessThan(
+      (await presets.boundingBox())!.y,
+    );
+    await panel.getByRole("button", { name: "Adaptive", exact: true }).click();
+    await expect(info).toContainText("42%");
+    expect(await bandStyle()).toEqual(smartStyle);
+    await expect(info).toContainText("Dynamic Range");
+    const reset = panel.getByRole("button", { name: "Reset", exact: true });
+    await reset.scrollIntoViewIfNeeded();
+    expect((await reset.boundingBox())!.y).toBeGreaterThan(
+      (await presets.boundingBox())!.y,
+    );
+    await panel.getByRole("button", { name: "Genre", exact: true }).click();
+    await page.screenshot({
+      path: `.artifacts/crate-v3/1be-eq-genre-${host}-412.png`,
+      fullPage: true,
+    });
+    await panel.getByRole("button", { name: "Jazz", exact: true }).click();
+    await expect(info).toHaveText("Preset: Jazz");
+  });
+}

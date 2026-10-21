@@ -32,7 +32,16 @@ export type TrackGenreState =
 const cache = new Map<string, TrackGenreState>();
 
 function endpointFor(track: Track): string | null {
-  return trackGenreApiPath(track) || null;
+  // Library EQ uses the instance's tag/taxonomy data. Catalog identity can
+  // coexist with that local identity while its separate genre surface is empty.
+  return (
+    trackGenreApiPath({
+      entityUid: track.entityUid,
+      libraryTrackId: track.libraryTrackId,
+    }) ||
+    trackGenreApiPath(track) ||
+    null
+  );
 }
 
 /**

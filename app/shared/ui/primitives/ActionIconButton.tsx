@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@crate/ui/lib/cn";
 import {
   iconButtonToneClassName,
@@ -44,26 +45,30 @@ export const ActionIconButton = forwardRef<
     type = "button",
     variant = "row",
     children,
+    title,
     ...props
   },
   ref,
 ) {
   return (
-    <button
-      ref={ref}
-      type={type}
-      disabled={disabled}
-      className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
-        actionVariantClassName(variant),
-        actionToneClassName(active ? "primary" : tone, disabled),
-        active && "animate-crate-icon-active-pulse",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </button>
+    <TooltipHint content={title}>
+      <button
+        ref={ref}
+        type={type}
+        disabled={disabled}
+        className={cn(
+          "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+          actionVariantClassName(variant),
+          actionToneClassName(active ? "primary" : tone, disabled),
+          active && "animate-crate-icon-active-pulse",
+          className,
+        )}
+        {...props}
+        aria-label={props["aria-label"] ?? title}
+      >
+        {children}
+      </button>
+    </TooltipHint>
   );
 });
 
@@ -88,48 +93,52 @@ export function ActionIconLink({
   onKeyDown,
   onKeyDownCapture,
   tabIndex,
+  title,
   ...props
 }: ActionIconLinkProps) {
   const unavailable = disabled || !href;
   return (
-    <a
-      href={href || "#"}
-      aria-disabled={unavailable}
-      className={cn(
-        "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
-        actionVariantClassName(variant),
-        actionToneClassName(active ? "primary" : tone, disabled || !href),
-        active && "animate-crate-icon-active-pulse",
-        className,
-      )}
-      {...props}
-      tabIndex={unavailable ? -1 : tabIndex}
-      onClickCapture={(event) => {
-        if (unavailable) {
-          event.preventDefault();
-          event.stopPropagation();
-        } else onClickCapture?.(event);
-      }}
-      onKeyDownCapture={(event) => {
-        if (unavailable && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          event.stopPropagation();
-        } else onKeyDownCapture?.(event);
-      }}
-      onClick={(event) => {
-        if (unavailable) {
-          event.preventDefault();
-          event.stopPropagation();
-        } else onClick?.(event);
-      }}
-      onKeyDown={(event) => {
-        if (unavailable && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          event.stopPropagation();
-        } else onKeyDown?.(event);
-      }}
-    >
-      {children}
-    </a>
+    <TooltipHint content={title}>
+      <a
+        href={href || "#"}
+        aria-disabled={unavailable}
+        className={cn(
+          "flex items-center justify-center rounded-full transition-[color,filter,transform,box-shadow] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
+          actionVariantClassName(variant),
+          actionToneClassName(active ? "primary" : tone, disabled || !href),
+          active && "animate-crate-icon-active-pulse",
+          className,
+        )}
+        {...props}
+        aria-label={props["aria-label"] ?? title}
+        tabIndex={unavailable ? -1 : tabIndex}
+        onClickCapture={(event) => {
+          if (unavailable) {
+            event.preventDefault();
+            event.stopPropagation();
+          } else onClickCapture?.(event);
+        }}
+        onKeyDownCapture={(event) => {
+          if (unavailable && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            event.stopPropagation();
+          } else onKeyDownCapture?.(event);
+        }}
+        onClick={(event) => {
+          if (unavailable) {
+            event.preventDefault();
+            event.stopPropagation();
+          } else onClick?.(event);
+        }}
+        onKeyDown={(event) => {
+          if (unavailable && (event.key === "Enter" || event.key === " ")) {
+            event.preventDefault();
+            event.stopPropagation();
+          } else onKeyDown?.(event);
+        }}
+      >
+        {children}
+      </a>
+    </TooltipHint>
   );
 }

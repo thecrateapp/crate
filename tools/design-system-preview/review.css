@@ -115,3 +115,7 @@ body {
 @source "../../app/listen/src/components/player/EqualizerSmartReadout.tsx";
 @source "../../app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx";
 @source "../../app/listen/src/components/player/EqualizerPanelSurface.tsx";
+
+@source "../../app/listen/src/components/home";
+@source "../../app/listen/src/components/stats/StatsSignalTapeView.tsx";
+@source "../../app/listen/src/components/upcoming";

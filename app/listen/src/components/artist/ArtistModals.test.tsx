@@ -229,7 +229,7 @@ describe("artist mobile modals", () => {
     expect(hardcore).not.toHaveClass("bg-white/8");
     expect(header).toHaveClass("bg-surface-popover");
     expect(header).not.toHaveClass("backdrop-blur-xl");
-    expect(close).toHaveClass("hover:text-text-primary");
+    expect(close).toHaveClass("hover:text-accent-action-hi");
     expect(close.className).not.toContain("bg-white/5");
     expect(close.className).not.toContain("border-white/10");
   });

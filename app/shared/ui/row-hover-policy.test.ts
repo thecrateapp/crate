@@ -37,6 +37,22 @@ describe("shared row interaction contract", () => {
         );
     }
   });
+  it("keeps migrated Paths, setlist and Home rows on their governed owners", () => {
+    for (const [path, component] of [
+      ["app/listen/src/pages/PathsParts.tsx", "PathEndpointPanelView"],
+      ["app/listen/src/pages/PathEndpointPanelView.tsx", "CatalogSearchView"],
+      [
+        "app/listen/src/components/artist/ArtistSetlistSection.tsx",
+        "ArtistSetlistView",
+      ],
+      ["app/listen/src/components/artist/ArtistSetlistView.tsx", "HairlineRow"],
+      ["app/listen/src/components/home/HomeSectionCards.tsx", "HairlineRow"],
+    ]) {
+      const source = readFileSync(resolve(root, path!), "utf8");
+      expect(source).toContain(`<${component}`);
+      expect(source).not.toMatch(/hover:bg-|group-hover:opacity-/);
+    }
+  });
   it("keeps non-track row recipes without pointer illumination", () => {
     for (const [path, selector] of [
       ["tokens/interactive.css", ".interactive-row:hover"],

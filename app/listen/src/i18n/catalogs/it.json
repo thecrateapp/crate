@@ -1274,7 +1274,7 @@
   "player.equalizer.manualHelpers": "Aiuti manuali",
   "player.equalizer.smart.label": "Intelligente",
   "player.equalizer.smart.resolving": "Risoluzione EQ intelligente…",
-  "player.equalizer.smart.waiting": "L'EQ intelligente attende un brano risolvibile della libreria.",
+  "player.equalizer.smart.waiting": "Non è disponibile una curva EQ per questa traccia.",
   "player.equalizer.adaptive.label": "Adattivo",
   "player.equalizer.adaptive.loading": "Caricamento analisi…",
   "player.equalizer.adaptive.unavailable": "Nessuna analisi per questo brano — l'adattivo resta piatto.",
@@ -2004,5 +2004,6 @@
   "player.visualizer.valuePair": "Salvato {base}; adattato {effective}",
   "player.equalizer.trackCurves": "Curve della traccia",
   "player.equalizer.currentCurveOnly": "Questo server fornisce solo la curva attuale.",
-  "player.equalizer.presetPicker": "Preimpostazioni"
+  "player.equalizer.presetPicker": "Preimpostazioni",
+  "player.equalizer.preset": "Preimpostazione"
 }

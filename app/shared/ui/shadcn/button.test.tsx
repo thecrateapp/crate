@@ -35,9 +35,22 @@ describe("Button", () => {
   it("uses semantic tokens for the default action", () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole("button")).toHaveClass(
-      "bg-accent-action",
-      "text-accent-action-foreground",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
+      "text-accent-action",
     );
+  });
+
+  it("uses a custom hint without a native browser tooltip", async () => {
+    render(<Button title="Save this playlist">Save</Button>);
+    const button = screen.getByRole("button", { name: "Save" });
+    expect(button).not.toHaveAttribute("title");
+    await userEvent.tab();
+    expect(
+      await screen.findByRole("tooltip", { name: "Save this playlist" }),
+    ).toBeVisible();
+    expect(button).toHaveAccessibleName("Save");
   });
 
   it("uses the global focus outline on non-filled variants", () => {
@@ -188,4 +201,15 @@ describe("icon-only hover", () => {
     render(<Button variant="ghost">More actions</Button>);
     expect(screen.getByRole("button")).toHaveClass("hover:bg-surface-control");
   });
+});
+
+it("preserves an icon-only legacy title as its accessible name", () => {
+  render(
+    <Button size="icon" title="Previous month">
+      <svg aria-hidden="true" />
+    </Button>,
+  );
+  expect(
+    screen.getByRole("button", { name: "Previous month" }),
+  ).not.toHaveAttribute("title");
 });

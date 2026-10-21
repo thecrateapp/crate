@@ -5,6 +5,12 @@ import { TrackRowView } from "./TrackRowView";
 import { TrackRowContent } from "./TrackRowContent";
 
 describe("actual local Listen track presentation", () => {
+  it("keeps the approved horizontal inset when density becomes compact", () => {
+    const view = render(<TrackRowView aria-label="Reference" />);
+    expect(screen.getByRole("row", { name: "Reference" })).toHaveClass("px-3");
+    view.rerender(<TrackRowView density="compact" aria-label="Reference" />);
+    expect(screen.getByRole("row", { name: "Reference" })).toHaveClass("px-3");
+  });
   it("uses the Hairline selection surface without claiming current playback", () => {
     render(<TrackRowView selected aria-selected aria-label="Selected track" />);
     const row = screen.getByRole("row", { name: "Selected track" });

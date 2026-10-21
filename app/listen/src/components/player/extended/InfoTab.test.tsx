@@ -101,7 +101,10 @@ describe("InfoTab", () => {
       screen.getByRole("heading", { name: "Track One" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByTitle("Focused · 80%").closest(".genre-pill"),
+      screen
+        .getByText("focused")
+        .closest(".genre-pill")!
+        .closest(".genre-pill"),
     ).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("border-white");

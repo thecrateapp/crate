@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { computeAdaptiveGains } from "../../../app/listen/src/lib/adaptive-eq";
 import { EQ_PRESETS } from "../../../app/listen/src/lib/equalizer";
 import { useTranslation } from "react-i18next";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
@@ -20,13 +21,20 @@ import { SettingsFixtureProvider } from "./SettingsFixtureProvider";
 import {
   EQ_SCENARIOS,
   TRACK_CURVES,
+  GENRE_GAINS,
+  EQ_FEATURES,
+  TRACK_GENRE,
   effectiveCurve,
   type EqScenario,
 } from "../fixtures/player-eq";
 export function PlayerEqExample({
   initialScenario = "smart",
+  controlledEnabled,
+  onEnabledChange,
 }: {
   initialScenario?: EqScenario;
+  controlledEnabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
 }) {
   const { t } = useTranslation();
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -41,10 +49,21 @@ export function PlayerEqExample({
   const [smart, setSmart] = useState(
     !["manual", "adaptive", "genre"].includes(initialScenario),
   );
-  const [enabled, setEnabled] = useState(initialScenario !== "off");
+  const [localEnabled, setLocalEnabled] = useState(initialScenario !== "off");
+  const enabled = controlledEnabled ?? localEnabled;
+  const setEnabled = (value: boolean) => {
+    setLocalEnabled(value);
+    onEnabledChange?.(value);
+  };
   const [adaptive, setAdaptive] = useState(initialScenario === "adaptive");
   const [genre, setGenre] = useState(initialScenario === "genre");
-  const [gains, setGains] = useState([...TRACK_CURVES[0]!.gains]);
+  const initialGains = (value: EqScenario) =>
+    value === "genre" || value === "smart-genre"
+      ? [...GENRE_GAINS]
+      : value === "adaptive"
+        ? [...computeAdaptiveGains(EQ_FEATURES)]
+        : [...TRACK_CURVES[0]!.gains];
+  const [gains, setGains] = useState(initialGains(initialScenario));
   const [preset, setPreset] = useState("custom");
   const [notice, setNotice] = useState("");
   const choose = (value: EqScenario) => {
@@ -54,11 +73,13 @@ export function PlayerEqExample({
     setEnabled(value !== "off");
     setAdaptive(value === "adaptive");
     setGenre(value === "genre");
-    setGains([...TRACK_CURVES[0]!.gains]);
+    setGains(initialGains(value));
     setPreset("custom");
     setNotice("");
   };
   const missing = scenario === "loading" || scenario === "unavailable";
+  const eqStatus = () =>
+    scenario === "loading" ? ("loading" as const) : ("unavailable" as const);
   const eq: EqualizerPanelState = {
     enabled,
     preset,
@@ -70,7 +91,16 @@ export function PlayerEqExample({
       missing || !smart
         ? null
         : {
-            ...effectiveCurve(TRACK_CURVES[0]!),
+            ...effectiveCurve(
+              scenario === "smart-genre"
+                ? {
+                    ...TRACK_CURVES[1]!,
+                    gains: GENRE_GAINS,
+                    genre: TRACK_GENRE.primary,
+                    label: "Genre: Grindcore",
+                  }
+                : TRACK_CURVES[0]!,
+            ),
             reasoning:
               scenario === "long"
                 ? "A saved personal equalization curve for this recording, preserving its low-end balance and the detail of its high frequencies. This description wraps naturally inside the same production panel."
@@ -82,25 +112,28 @@ export function PlayerEqExample({
         : scenario === "unavailable"
           ? "unavailable"
           : "ready",
-    adaptiveStatus: "unavailable",
-    adaptiveFeatures: null,
-    genreAdaptiveStatus: "unavailable",
-    trackGenre: null,
+    adaptiveStatus: adaptive ? (missing ? eqStatus() : "ready") : "idle",
+    adaptiveFeatures: missing ? null : EQ_FEATURES,
+    genreAdaptiveStatus: genre ? (missing ? eqStatus() : "ready") : "idle",
+    trackGenre: missing ? null : TRACK_GENRE,
     toggleEnabled: setEnabled,
     toggleSmart: (value) => {
       setSmart(value);
       setAdaptive(false);
       setGenre(false);
+      if (value) setGains(initialGains(scenario));
     },
     toggleAdaptive: (value) => {
       setAdaptive(value);
       setGenre(false);
       setSmart(false);
+      if (value) setGains([...computeAdaptiveGains(EQ_FEATURES)]);
     },
     toggleGenreAdaptive: (value) => {
       setGenre(value);
       setAdaptive(false);
       setSmart(false);
+      if (value) setGains([...GENRE_GAINS]);
     },
     applyPreset: (value) => {
       setPreset(value);
@@ -120,6 +153,9 @@ export function PlayerEqExample({
     resetToFlat: () => {
       setGains(Array(10).fill(0));
       setPreset("flat");
+      setSmart(false);
+      setAdaptive(false);
+      setGenre(false);
     },
   };
   const curves = missing || scenario === "legacy" ? null : TRACK_CURVES;
@@ -163,7 +199,7 @@ export function PlayerEqExample({
         className={
           scenario === "short"
             ? "relative h-80 min-w-0"
-            : "relative h-[44rem] min-w-0"
+            : "relative h-[52rem] min-w-0 sm:h-[44rem]"
         }
       >
         {panelOpen ? (
@@ -197,8 +233,10 @@ export function PlayerEqExample({
 export function PlayerEqReview() {
   return (
     <SettingsFixtureProvider>
-      <main className="mx-auto grid max-w-6xl gap-8 p-4 sm:p-8">
-        <PageHeader eyebrow="1BE · Review" title="Equalizer refinement" />
+      <main className="mx-auto grid max-w-6xl gap-8 sm:p-8">
+        <div className="px-4 pt-4 sm:p-0">
+          <PageHeader eyebrow="1BE · Review" title="Equalizer refinement" />
+        </div>
         <PlayerEqExample />
       </main>
     </SettingsFixtureProvider>

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import type { ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -50,23 +51,24 @@ export function StatusDot({
   );
 
   return (
-    <span
-      data-tone={tone}
-      title={title}
-      role={dotOnly ? "img" : undefined}
-      aria-label={dotOnly ? title : undefined}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-2 font-mono text-label uppercase tracking-caps",
-        TONE_TEXT[tone],
-        className,
-      )}
-    >
-      {pulse ? (
-        <PulsingDot className={dotClassName} />
-      ) : (
-        <span aria-hidden="true" className={dotClassName} />
-      )}
-      {label}
-    </span>
+    <TooltipHint content={title}>
+      <span
+        data-tone={tone}
+        role={dotOnly ? "img" : undefined}
+        aria-label={dotOnly ? title : undefined}
+        className={cn(
+          "inline-flex shrink-0 items-center gap-2 font-mono text-label uppercase tracking-caps",
+          TONE_TEXT[tone],
+          className,
+        )}
+      >
+        {pulse ? (
+          <PulsingDot className={dotClassName} />
+        ) : (
+          <span aria-hidden="true" className={dotClassName} />
+        )}
+        {label}
+      </span>
+    </TooltipHint>
   );
 }

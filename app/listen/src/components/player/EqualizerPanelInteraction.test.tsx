@@ -30,23 +30,15 @@ vi.mock("@/hooks/use-equalizer", () => ({
     clearCurrentTrackPreset: vi.fn(),
   }),
 }));
-it("selects a portalled preset without dismissing the production floating panel", async () => {
+it("selects a preset pill without dismissing the production floating panel", async () => {
   function Harness() {
     const [open, setOpen] = useState(true);
     return <EqualizerPopover open={open} onClose={() => setOpen(false)} />;
   }
   renderWithListenProviders(<Harness />);
-  await userEvent.click(screen.getByRole("combobox", { name: "Presets" }));
-  await userEvent.click(screen.getByRole("option", { name: "Rock" }));
+  await userEvent.click(screen.getByRole("button", { name: "Rock" }));
   expect(applyPreset).toHaveBeenCalledWith("rock");
   expect(screen.getByRole("dialog", { name: "Equalizer" })).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("combobox", { name: "Presets" }));
-  await userEvent.keyboard("{Escape}");
-  expect(screen.getByRole("dialog", { name: "Equalizer" })).toBeInTheDocument();
-  expect(screen.getByRole("combobox", { name: "Presets" })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
   await userEvent.keyboard("{Escape}");
   expect(
     screen.queryByRole("dialog", { name: "Equalizer" }),

@@ -1274,7 +1274,7 @@
   "player.equalizer.manualHelpers": "Eskuzko laguntzak",
   "player.equalizer.smart.label": "Adimenduna",
   "player.equalizer.smart.resolving": "EQ adimenduna ebazten…",
-  "player.equalizer.smart.waiting": "EQ adimenduna liburutegiko pista ebatzi baten zain dago.",
+  "player.equalizer.smart.waiting": "Ez dago EQ kurbarik eskuragarri pista honetarako.",
   "player.equalizer.adaptive.label": "Moldagarria",
   "player.equalizer.adaptive.loading": "Analisia kargatzen…",
   "player.equalizer.adaptive.unavailable": "Ez dago analisirik pista honentzat — moldagarria lau mantentzen da.",
@@ -2004,5 +2004,6 @@
   "player.visualizer.valuePair": "Gordeta {base}; egokituta {effective}",
   "player.equalizer.trackCurves": "Pistaren kurbak",
   "player.equalizer.currentCurveOnly": "Zerbitzari honek uneko kurba soilik eskaintzen du.",
-  "player.equalizer.presetPicker": "Aurrezarpenak"
+  "player.equalizer.presetPicker": "Aurrezarpenak",
+  "player.equalizer.preset": "Aurrezarpena"
 }

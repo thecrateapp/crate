@@ -1,144 +1,102 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { CRATE_ICON_SIZE, Sun, Tag } from "@crate/ui/icons";
+import { Activity, Tag } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-
 import { getAdaptiveFeatureChipData } from "./equalizer-adaptive-feature-data";
 import type { EqFeatures, TrackGenre } from "../../lib/equalizer-types";
+import { EqualizerInformationBand } from "./EqualizerInformationBand";
 
-function FeatureChip({
-  icon: Icon,
-  label,
-  value,
-  zone,
-}: {
-  icon: typeof Sun;
-  label: string;
-  value: string;
-  zone: "neutral" | "active";
-}) {
-  return (
-    <InfoBadge active={zone === "active"} icon={Icon} className="tabular-nums">
-      <span title={label}>{value}</span>
-    </InfoBadge>
-  );
-}
-
+const FEATURE_LABELS: Record<string, string> = {
+  brightness: "stats.soundProfile.brightness",
+  loudness: "player.info.metric.loudness",
+  dynamic: "player.info.metric.dynamicRange",
+  energy: "player.info.metric.energy",
+};
 export function AdaptiveFeatureChips({
   features,
   status,
+  enabled = true,
 }: {
   features: EqFeatures | null;
   status: "idle" | "loading" | "ready" | "unavailable";
+  enabled?: boolean;
 }) {
   const { t } = useTranslation();
-  if (status === "loading") {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-muted">
-        {t("player.equalizer.adaptive.loading")}
-      </div>
-    );
-  }
-  if (status === "unavailable" || !features) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-muted">
-        {t("player.equalizer.adaptive.unavailable")}
-      </div>
-    );
-  }
-
-  const chips = getAdaptiveFeatureChipData(features);
-  if (chips.length === 0) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-muted">
-        {t("player.equalizer.adaptive.empty")}
-      </div>
-    );
-  }
-
+  const chips =
+    status === "ready" && features ? getAdaptiveFeatureChipData(features) : [];
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs uppercase tracking-wider text-text-subtle">
-        {t("player.equalizer.track")}
-      </span>
-      {chips.map(({ key, ...chip }) => (
-        <FeatureChip key={key} {...chip} />
-      ))}
-    </div>
+    <EqualizerInformationBand
+      icon={Activity}
+      source={chips.length ? "audio_analysis_preset" : undefined}
+      current={enabled && chips.length > 0}
+    >
+      {chips.length ? (
+        <>
+          {chips.map((chip, index) => (
+            <span key={chip.key}>
+              {index > 0 ? " · " : null}
+              <span>
+                {t(FEATURE_LABELS[chip.key]!)} <span>{chip.value}</span>
+              </span>
+            </span>
+          ))}
+        </>
+      ) : (
+        t(
+          status === "loading"
+            ? "player.equalizer.adaptive.loading"
+            : status === "ready" && features
+              ? "player.equalizer.adaptive.empty"
+              : "player.equalizer.adaptive.unavailable",
+        )
+      )}
+    </EqualizerInformationBand>
   );
 }
 
 export function GenreResolutionChip({
   genre,
   status,
+  enabled = true,
 }: {
   genre: TrackGenre | null;
   status: "idle" | "loading" | "ready" | "unavailable";
+  enabled?: boolean;
 }) {
   const { t } = useTranslation();
-  if (status === "loading") {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-muted">
-        {t("player.equalizer.genre.loading")}
-      </div>
-    );
-  }
-  if (status === "unavailable" || !genre?.primary) {
-    return (
-      <div className="rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-muted">
-        {t("player.equalizer.genre.unavailable")}
-      </div>
-    );
-  }
-
-  const primaryName = genre.primary.name;
-  const canonical = genre.primary.canonical;
-  const preset = genre.preset;
-
-  if (!canonical) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary">
-        <Tag size={CRATE_ICON_SIZE.nano} className="opacity-70" />
-        <span className="font-medium capitalize text-text-primary/80">
-          {primaryName}
-        </span>
-        <span className="opacity-50">
-          {t("player.equalizer.genre.unmapped")}
-        </span>
-      </div>
-    );
-  }
-
-  if (!preset) {
-    return (
-      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary">
-        <Tag size={CRATE_ICON_SIZE.nano} className="opacity-70" />
-        <span className="font-medium capitalize text-text-primary/80">
-          {primaryName}
-        </span>
-        <span className="opacity-50">
-          {t("player.equalizer.genre.noPreset")}
-        </span>
-      </div>
-    );
-  }
-
-  const isInherited = preset.source === "inherited";
+  const ready = status === "ready" && !!genre?.primary;
+  const preset = ready ? genre.preset : null;
+  const usable = preset?.gains.length === 10;
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-accent-action/30 bg-accent-action/10 px-2.5 py-1.5 text-xs text-accent-action">
-      <Tag size={CRATE_ICON_SIZE.nano} />
-      <span className="font-medium capitalize">{primaryName}</span>
-      <span className="opacity-70">
-        {isInherited
-          ? t("player.equalizer.genre.inherited")
-          : t("player.equalizer.genre.preset")}
-      </span>
-      {isInherited && preset.inheritedFrom ? (
-        <span className="font-medium capitalize opacity-80">
-          {t("player.equalizer.genre.from", {
-            name: preset.inheritedFrom.name,
-          })}
-        </span>
-      ) : null}
-    </div>
+    <EqualizerInformationBand
+      icon={Tag}
+      source={usable ? "genre_taxonomy_preset" : undefined}
+      current={enabled && usable}
+      label={usable ? t("player.equalizer.sources.genreTaxonomy") : undefined}
+      title={
+        usable && preset?.inheritedFrom
+          ? t("player.equalizer.genre.from", {
+              name: preset.inheritedFrom.name,
+            })
+          : undefined
+      }
+    >
+      {ready ? (
+        <>
+          <span>{genre.primary!.name}</span>
+          {!usable
+            ? ` ${t(
+                !genre.primary!.canonical
+                  ? "player.equalizer.genre.unmapped"
+                  : "player.equalizer.genre.noPreset",
+              )}`
+            : null}
+        </>
+      ) : (
+        t(
+          status === "loading"
+            ? "player.equalizer.genre.loading"
+            : "player.equalizer.genre.unavailable",
+        )
+      )}
+    </EqualizerInformationBand>
   );
 }

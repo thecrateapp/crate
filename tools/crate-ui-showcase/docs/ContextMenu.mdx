@@ -25,7 +25,7 @@ Fixed solid overlay chrome, canonical AppMenuButton typography/focus and StatusD
 Action options and disclosure/submenu options now render the actual uppercase MonoLabel,
 at its existing 11px/15.4px role. Their foreground inherits the menu state, preserving normal,
 active, danger and disabled treatments. Media/user headings, names, details and group headings
-retain their existing roles. Two-line wrapping, measured full-label titles, original localized
+retain their existing roles. Two-line wrapping, measured full-label custom tooltips, original localized
 accessible names, pointer targets and keyboard navigation remain intact in desktop menus and
 mobile action sheets. Diego approved this typography on 2026-10-20; menu authority is unchanged.
 
@@ -38,3 +38,7 @@ are preserved; disabled options do not acquire an accent hover. This applies to 
 and touch sheets through the shared recipe, with no per-caller state selectors.
 
 <Controls of={Stories.Base} />
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+Clamped labels retain their full accessible name and use a custom Tooltip for overflow detail. Resize/pointer measurements never assign an imperative native title; unclamped labels add no tooltip text.

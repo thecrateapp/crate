@@ -1,27 +1,11 @@
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { useEffect, useRef, useState } from "react";
-import {
-  Brain,
-  CRATE_ICON_SIZE,
-  RotateCcw,
-  Save,
-  Sparkles,
-  Tag,
-  Trash2,
-  X,
-} from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, RotateCcw, Save, Trash2, X } from "@crate/ui/icons";
 import type { TFunction } from "i18next";
 
 import type { EqualizerPanelState } from "./equalizer-panel-state";
 import type { EqCurve, EqDataStatus } from "../../lib/equalizer-types";
 import { FormField } from "@crate/ui/primitives/FormField";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { type EqPresetName } from "../../lib/equalizer";
 import {
   EQ_PRESET_LABEL_KEYS,
@@ -34,11 +18,7 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Readout } from "@crate/ui/primitives/Readout";
 import { Button } from "@crate/ui/shadcn/button";
-import { EqualizerSmartReadout } from "./EqualizerSmartReadout";
-import {
-  AdaptiveFeatureChips,
-  GenreResolutionChip,
-} from "./EqualizerAdaptiveReadouts";
+import { EqualizerCurveReadout } from "./EqualizerCurveReadout";
 
 type EqualizerState = EqualizerPanelState;
 
@@ -66,24 +46,14 @@ function EqualizerHeader({
   t: TFunction;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <MonoLabel as="h2" accent={t("player.equalizer")} className="min-w-0">
-        <Readout announcement={announcement}>
+    <div className="flex items-start justify-between gap-3">
+      <MonoLabel as="h2" tone="accent" className="grid min-w-0 gap-1">
+        <span>{t("player.equalizer")}</span>
+        <Readout announcement={announcement} minWidthCh={0}>
           {equalizerModeLabel(eq, t)}
         </Readout>
       </MonoLabel>
-      <div className="flex items-center gap-2">
-        <FilterChip
-          active={eq.smart}
-          disabled={!eq.enabled}
-          onClick={() => eq.toggleSmart(!eq.smart)}
-          icon={Brain}
-        >
-          {t("player.equalizer.smart.label")}
-          {eq.smart && eq.smartStatus === "loading" ? (
-            <span className="ml-1 text-xs opacity-60">…</span>
-          ) : null}
-        </FilterChip>
+      <div className="flex shrink-0 items-center gap-2">
         <FilterChip
           active={eq.enabled}
           onClick={() => eq.toggleEnabled(!eq.enabled)}
@@ -100,19 +70,23 @@ function EqualizerHeader({
   );
 }
 
-function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
-  if (eq.smart) return null;
-
+function EqualizerModeChips({ eq, t }: { eq: EqualizerState; t: TFunction }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <MonoLabel as="span" className="mr-1">
-        {t("player.equalizer.manualHelpers")}
-      </MonoLabel>
+    <div data-slot="eq-mode-controls" className="grid grid-cols-3 gap-2">
       <FilterChip
+        className="min-w-0 wrap-anywhere"
+        active={eq.smart}
+        disabled={!eq.enabled}
+        onClick={() => eq.toggleSmart(!eq.smart)}
+      >
+        {t("player.equalizer.smart.label")}
+        {eq.smart && eq.smartStatus === "loading" ? "…" : null}
+      </FilterChip>
+      <FilterChip
+        className="min-w-0 wrap-anywhere"
         active={eq.genreAdaptive}
         disabled={!eq.enabled}
         onClick={() => eq.toggleGenreAdaptive(!eq.genreAdaptive)}
-        icon={Tag}
       >
         {t("player.equalizer.genre.label")}
         {eq.genreAdaptive && eq.genreAdaptiveStatus === "loading" ? (
@@ -120,10 +94,10 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
         ) : null}
       </FilterChip>
       <FilterChip
+        className="min-w-0 wrap-anywhere"
         active={eq.adaptive}
         disabled={!eq.enabled}
         onClick={() => eq.toggleAdaptive(!eq.adaptive)}
-        icon={Sparkles}
       >
         {t("player.equalizer.adaptive.label")}
         {eq.adaptive && eq.adaptiveStatus === "loading" ? (
@@ -237,14 +211,15 @@ export function EqualizerPanelView({
   ]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex min-w-0 flex-col gap-4">
       <EqualizerHeader
         eq={eq}
         announcement={announcement}
         onClose={onClose}
         t={t}
       />
-      <div className="border-t border-border-quiet pt-6">
+      <EqualizerModeChips eq={eq} t={t} />
+      <div className="border-t border-border-quiet pt-4">
         <EqBands
           gains={eq.enabled ? eq.gains : FLAT_DISPLAY_GAINS}
           onBandInput={
@@ -269,62 +244,36 @@ export function EqualizerPanelView({
           trackClassName="h-40"
         />
       </div>
-      <EqualizerSmartReadout
-        eq={eq.effectiveEq}
-        status={curvesStatus === "idle" ? eq.smartStatus : curvesStatus}
+      <EqualizerCurveReadout
+        eq={eq}
         curves={curves}
-        activeSource={
-          !eq.enabled
-            ? null
-            : eq.smart
-              ? (eq.effectiveEq?.source ?? null)
-              : eq.adaptive
-                ? eq.adaptiveStatus === "ready" && eq.adaptiveFeatures
-                  ? "audio_analysis_preset"
-                  : null
-                : eq.genreAdaptive
-                  ? eq.genreAdaptiveStatus === "ready" &&
-                    eq.trackGenre?.preset?.gains.length === 10
-                    ? "genre_taxonomy_preset"
-                    : null
-                  : eq.preset === "flat"
-                    ? "flat"
-                    : null
-        }
+        curvesStatus={curvesStatus}
       />
-      <div className="flex flex-wrap items-end gap-4">
-        <FormField label={t("player.equalizer.presetPicker")}>
-          {(control) => (
-            <Select
-              value={
-                eq.smart || eq.adaptive || eq.genreAdaptive ? "" : eq.preset
-              }
-              disabled={!eq.enabled}
-              onValueChange={(value) => eq.applyPreset(value as EqPresetName)}
-            >
-              <SelectTrigger {...control}>
-                <SelectValue placeholder={t("player.equalizer.presetPicker")} />
-              </SelectTrigger>
-              <SelectContent
-                data-dismissible-layer-boundary
-                onEscapeKeyDown={(event) => event.stopPropagation()}
+      <FormField kind="group" label={t("player.equalizer.presetPicker")}>
+        {(control) => (
+          <div
+            {...control}
+            role="group"
+            className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none"
+          >
+            {EQ_PRESET_LABEL_ENTRIES.map(([name, key]) => (
+              <FilterChip
+                key={name}
+                active={
+                  !eq.smart &&
+                  !eq.adaptive &&
+                  !eq.genreAdaptive &&
+                  eq.preset === name
+                }
+                disabled={!eq.enabled}
+                onClick={() => eq.applyPreset(name)}
               >
-                {eq.preset === "custom" ? (
-                  <SelectItem value="custom" disabled>
-                    {t("player.equalizer.custom")}
-                  </SelectItem>
-                ) : null}
-                {EQ_PRESET_LABEL_ENTRIES.map(([name, key]) => (
-                  <SelectItem key={name} value={name}>
-                    {t(key)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </FormField>
-        <EqualizerModePicker eq={eq} t={t} />
-      </div>
+                {t(key)}
+              </FilterChip>
+            ))}
+          </div>
+        )}
+      </FormField>
       <div className="flex items-center justify-end">
         <EqualizerTrackPresetActions
           eq={eq}
@@ -336,18 +285,6 @@ export function EqualizerPanelView({
           t={t}
         />
       </div>
-      {eq.adaptive ? (
-        <AdaptiveFeatureChips
-          features={eq.adaptiveFeatures}
-          status={eq.adaptiveStatus}
-        />
-      ) : null}
-      {eq.genreAdaptive ? (
-        <GenreResolutionChip
-          genre={eq.trackGenre}
-          status={eq.genreAdaptiveStatus}
-        />
-      ) : null}
     </div>
   );
 }

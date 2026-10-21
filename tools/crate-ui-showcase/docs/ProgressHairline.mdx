@@ -1,0 +1,21 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ProgressHairline.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ProgressHairline</DocHeading>
+<EntryDetails
+  id="primitives-progresshairline"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Thin progress uses a ratio from0to1, clamps valid values and distinguishes confirmed zero/complete from unknown total. Indeterminate motion requires visible intersection and allowed motion; the parent provides contextual labels and real progress. No timer invents progress.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Indeterminate} />
+<Canvas of={Stories.Complete} />

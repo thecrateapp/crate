@@ -149,6 +149,26 @@ describe("useEqualizer drag writes", () => {
     },
   );
 
+  it.each([setEqualizerAdaptive, setEqualizerGenreAdaptive])(
+    "persists a generic preset as manual after an automatic helper",
+    (enable) => {
+      enable(true);
+      const { result, unmount } = renderHook(() => useEqualizer());
+      act(() => result.current.applyPreset("rock"));
+      expect(getEqualizerSnapshot()).toMatchObject({
+        preset: "rock",
+        smart: false,
+        adaptive: false,
+        genreAdaptive: false,
+      });
+      unmount();
+      const restored = renderHook(() => useEqualizer());
+      expect(restored.result.current.smart).toBe(false);
+      expect(restored.result.current.adaptive).toBe(false);
+      expect(restored.result.current.genreAdaptive).toBe(false);
+    },
+  );
+
   it("throttles native setEq to the 15-20 Hz live rate during a drag", () => {
     engine.android = true;
     const { result } = renderHook(() => useEqualizer());

@@ -4,6 +4,7 @@ import type {
 } from "../../../app/listen/src/lib/equalizer-types";
 export const EQ_SCENARIOS = [
   "smart",
+  "smart-genre",
   "manual",
   "adaptive",
   "genre",
@@ -52,3 +53,25 @@ export function effectiveCurve(curve: EqCurve): EffectiveEq {
     inheritedFrom: null,
   };
 }
+
+export const GENRE_GAINS = [2, 5, 6, 4, -3, -2, 4, 5, 2, 0];
+export const EQ_FEATURES = {
+  brightness: 0.42,
+  loudness: -12,
+  dynamicRange: 8,
+  energy: 0.7,
+  danceability: null,
+  valence: null,
+  acousticness: null,
+  instrumentalness: null,
+};
+export const TRACK_GENRE = {
+  primary: { slug: "grindcore", name: "Grindcore", canonical: true },
+  topLevel: null,
+  source: "album" as const,
+  preset: {
+    gains: GENRE_GAINS,
+    source: "direct" as const,
+    inheritedFrom: null,
+  },
+};

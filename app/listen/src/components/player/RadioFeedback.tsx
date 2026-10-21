@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useEffect, useState } from "react";
 import { CRATE_ICON_SIZE, ThumbsDown, ThumbsUp } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
@@ -58,38 +59,40 @@ export function RadioFeedback({
   return (
     <div className="flex items-center gap-1">
       {trackId || globalTrackUid ? (
+        <TooltipHint content={t("player.radio.moreLikeThis")}>
+          <button
+            type="button"
+            aria-pressed={liked}
+            onClick={handleLike}
+            className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
+              liked
+                ? "bg-accent-action/15 text-accent-action"
+                : "text-text-primary/30 hover:bg-text-primary/5 hover:text-text-primary/60"
+            }`}
+            aria-label={t("player.radio.moreLikeThis")}
+          >
+            <ThumbsUp size={iconSize} className={liked ? "fill-current" : ""} />
+          </button>
+        </TooltipHint>
+      ) : null}
+      <TooltipHint content={t("player.radio.lessLikeThis")}>
         <button
           type="button"
-          aria-pressed={liked}
-          onClick={handleLike}
+          aria-pressed={disliked}
+          onClick={handleDislike}
           className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
-            liked
-              ? "bg-accent-action/15 text-accent-action"
+            disliked
+              ? "bg-state-danger/15 text-state-danger"
               : "text-text-primary/30 hover:bg-text-primary/5 hover:text-text-primary/60"
           }`}
-          title={t("player.radio.moreLikeThis")}
-          aria-label={t("player.radio.moreLikeThis")}
+          aria-label={t("player.radio.lessLikeThis")}
         >
-          <ThumbsUp size={iconSize} className={liked ? "fill-current" : ""} />
+          <ThumbsDown
+            size={iconSize}
+            className={disliked ? "fill-current" : ""}
+          />
         </button>
-      ) : null}
-      <button
-        type="button"
-        aria-pressed={disliked}
-        onClick={handleDislike}
-        className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
-          disliked
-            ? "bg-state-danger/15 text-state-danger"
-            : "text-text-primary/30 hover:bg-text-primary/5 hover:text-text-primary/60"
-        }`}
-        title={t("player.radio.lessLikeThis")}
-        aria-label={t("player.radio.lessLikeThis")}
-      >
-        <ThumbsDown
-          size={iconSize}
-          className={disliked ? "fill-current" : ""}
-        />
-      </button>
+      </TooltipHint>
     </div>
   );
 }

@@ -20,11 +20,9 @@ for (const host of ["storybook", "standalone"] as const)
       await expect(
         page.getByRole("heading", { name: "Radar", exact: true }),
       ).toBeVisible({ timeout: 30000 });
-      await expect(
-        page.getByTitle("post-punk · 83% · enrichment"),
-      ).toBeVisible();
-      await expect(page.getByTitle("drone · 0%")).toBeVisible();
-      await expect(page.getByTitle("ambient", { exact: true })).toBeVisible();
+      await expect(page.getByText("post-punk", { exact: true })).toBeVisible();
+      await expect(page.getByText("drone", { exact: true })).toBeVisible();
+      await expect(page.getByText("ambient", { exact: true })).toBeVisible();
       const ticket = page.locator("article").filter({
         has: page.getByRole("link", {
           name: "Nocturnal Ensemble",

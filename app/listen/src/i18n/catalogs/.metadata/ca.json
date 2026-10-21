@@ -3855,6 +3855,10 @@
     "sourceHash": "sha256:625968baeda2c53e90184b6500f1f8e33e40ad6a50da3107fffde085817311be",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "player.equalizer.preset": {
+    "sourceHash": "sha256:dbc6e405faf45f79fdba885e4416a329a1b518c4ac071c66062d1a267fd72fb6",
+    "reviewedAt": "2026-10-21T10:20:11.140Z"
+  },
   "player.equalizer.presetPicker": {
     "sourceHash": "sha256:a5811669c43c15b6679e493f7dbf2a0282ee4cb25c3f69e98201031d27104d8a",
     "reviewedAt": "2026-10-21T08:02:46.694Z"
@@ -3960,8 +3964,8 @@
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
   "player.equalizer.smart.waiting": {
-    "sourceHash": "sha256:7beab329980a07d58b4f8e3e60c7fdcd0595b571bf5947105fb8ddd16e5b42bb",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
+    "sourceHash": "sha256:7d785c28b68dcdf3f1d4475286a56047555a6334b1dfd76cb2bc02d5e2aa4d9a",
+    "reviewedAt": "2026-10-21T10:03:47.843090Z"
   },
   "player.equalizer.smartCurve": {
     "sourceHash": "sha256:6dafc64647812a1a24b4515ac7e17711dba055b00f7d09967c25dc7ce0baf073",

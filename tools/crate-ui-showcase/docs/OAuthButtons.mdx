@@ -1,0 +1,25 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/OAuthButtons.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">OAuthButtons</DocHeading>
+<EntryDetails
+  id="domain-auth-oauthbuttons"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Injected provider fetch and navigation keep auth transport in each app. Enabled/configured/unavailable/empty states preserve accessible provider names and official brand glyphs. Local callbacks never sign in or open external URLs. Forty-pixel fine-pointer geometry retains the coarse minimum from the canonical Button.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Unavailable} />
+<Canvas of={Stories.Empty} />
+
+<DocHeading as="h2">Tooltip amendment</DocHeading>
+
+Provider availability detail uses Button’s custom Tooltip hint without a native title. Localized accessible provider names and disabled/loading behavior stay intact; the neutral outline provider style retains its own role.

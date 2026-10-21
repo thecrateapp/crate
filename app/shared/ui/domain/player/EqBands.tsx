@@ -106,6 +106,8 @@ export const EqBands = memo(function EqBands({
   const handleRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const sliderRefs = useRef<(HTMLDivElement | null)[]>([]);
   const numeralRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const compactNumeralRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const exactNumeralRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   const draggedBandRef = useRef<number | null>(null);
   const dragBoundsRef = useRef<{ top: number; height: number } | null>(null);
@@ -147,6 +149,13 @@ export const EqBands = memo(function EqBands({
   const writeReadout = useCallback((band: number, gain: number) => {
     const numeral = numeralRefs.current[band];
     if (numeral) numeral.textContent = formatGain(gain);
+    const compact = compactNumeralRefs.current[band];
+    if (compact)
+      compact.textContent = formatGain(
+        Math.sign(gain) * Math.round(Math.abs(gain)),
+      );
+    const exact = exactNumeralRefs.current[band];
+    if (exact) exact.textContent = `${formatGain(gain)} dB`;
     const slider = sliderRefs.current[band];
     if (slider) {
       slider.setAttribute("aria-valuenow", String(gain));
@@ -226,6 +235,7 @@ export const EqBands = memo(function EqBands({
 
   const onPointerDown = (band: number, event: PointerEvent<HTMLDivElement>) => {
     if (!interactive) return;
+    event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     draggedBandRef.current = band;
     // The panel may reflow when the first edit leaves an automatic mode.
@@ -277,11 +287,11 @@ export const EqBands = memo(function EqBands({
     <div
       data-slot="eq-bands-viewport"
       className={cn(
-        "max-w-full overflow-x-auto",
+        "@container/eq min-w-0 max-w-full",
         disabled && "pointer-events-none opacity-40",
       )}
     >
-      <div className="grid min-w-[30rem] grid-cols-[2.5rem_minmax(0,1fr)]">
+      <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)]">
         <ol
           aria-hidden="true"
           className={cn(
@@ -400,9 +410,18 @@ export const EqBands = memo(function EqBands({
                 aria-valuemax={EQ_CHART_GAIN_MAX}
                 aria-disabled={interactive ? undefined : true}
                 className={cn(
-                  "relative h-full rounded-sm",
-                  interactive && "cursor-ns-resize",
+                  "group/eq-band relative h-full rounded-sm",
+                  interactive && "touch-none cursor-ns-resize",
                 )}
+                onTouchStart={(event) => {
+                  if (interactive) event.stopPropagation();
+                }}
+                onTouchMove={(event) => {
+                  if (interactive) event.stopPropagation();
+                }}
+                onTouchEnd={(event) => {
+                  if (interactive) event.stopPropagation();
+                }}
                 onPointerDown={(event) => onPointerDown(index, event)}
                 onPointerMove={(event) => onPointerMove(index, event)}
                 onPointerUp={() => onPointerEnd(index)}
@@ -411,6 +430,21 @@ export const EqBands = memo(function EqBands({
                 onKeyDown={(event) => onKeyDown(index, event)}
                 onBlur={onBlur}
               >
+                <span
+                  aria-hidden="true"
+                  data-slot="eq-band-exact-value"
+                  ref={(node) => {
+                    exactNumeralRefs.current[index] = node;
+                  }}
+                  className={cn(
+                    "pointer-events-none absolute bottom-full mb-2 hidden whitespace-nowrap rounded-sm border border-border-quiet bg-surface-overlay px-1.5 py-1 font-mono text-xs font-normal text-text-primary tabular-nums group-focus/eq-band:block group-hover/eq-band:block",
+                    index === 0
+                      ? "left-0"
+                      : index === 9
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2",
+                  )}
+                />
                 <span
                   ref={(node) => {
                     handleRefs.current[index] = node;
@@ -424,17 +458,24 @@ export const EqBands = memo(function EqBands({
         </div>
         <ol
           aria-hidden="true"
-          className="col-start-2 m-0 mt-4 grid list-none grid-cols-10 p-0"
+          className="col-start-2 m-0 mt-3 grid list-none grid-cols-10 p-0"
         >
           {EQ_CHART_BANDS.map((band, index) => (
             <li key={band.freq} className="flex justify-center">
-              <span className="flex min-w-0 flex-col items-center gap-2 text-center">
+              <span className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <span
                   ref={(node) => {
                     numeralRefs.current[index] = node;
                   }}
                   data-slot="eq-band-value"
-                  className="font-mono text-sm font-normal text-text-primary tabular-nums"
+                  className="hidden font-mono text-xs font-normal text-text-primary tabular-nums @min-[30rem]/eq:inline"
+                />
+                <span
+                  ref={(node) => {
+                    compactNumeralRefs.current[index] = node;
+                  }}
+                  data-slot="eq-band-compact-value"
+                  className="font-mono text-xs font-normal text-text-primary tabular-nums @min-[30rem]/eq:hidden"
                 />
                 <MonoLabel as="span">{band.label}</MonoLabel>
               </span>

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import {
   Children,
   Fragment,
@@ -144,33 +145,34 @@ export const InfoBadge = memo(function InfoBadge({
   ...props
 }: InfoBadgeProps) {
   return (
-    <span
-      {...props}
-      title={title ?? (infoBadgeText(children) || undefined)}
-      data-slot="info-badge"
-      data-variant={variant}
-      data-tone={tone}
-      data-surface={surface}
-      className={cn(
-        INFO_BADGE_CLASS,
-        active
-          ? "border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] text-[var(--active-text)]"
-          : BADGE_TONE_CLASS[tone],
-        className,
-      )}
-    >
-      {Icon ? (
-        <Icon
-          size={CRATE_ICON_SIZE.micro}
-          className={cn(
-            "shrink-0",
-            active ? "text-current" : ICON_TONE_CLASS[tone],
-            iconClassName,
-          )}
-          aria-hidden="true"
-        />
-      ) : null}
-      {infoBadgeContent(children, Boolean(Icon))}
-    </span>
+    <TooltipHint content={title ?? (infoBadgeText(children) || undefined)}>
+      <span
+        {...props}
+        data-slot="info-badge"
+        data-variant={variant}
+        data-tone={tone}
+        data-surface={surface}
+        className={cn(
+          INFO_BADGE_CLASS,
+          active
+            ? "border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] text-[var(--active-text)]"
+            : BADGE_TONE_CLASS[tone],
+          className,
+        )}
+      >
+        {Icon ? (
+          <Icon
+            size={CRATE_ICON_SIZE.micro}
+            className={cn(
+              "shrink-0",
+              active ? "text-current" : ICON_TONE_CLASS[tone],
+              iconClassName,
+            )}
+            aria-hidden="true"
+          />
+        ) : null}
+        {infoBadgeContent(children, Boolean(Icon))}
+      </span>
+    </TooltipHint>
   );
 });

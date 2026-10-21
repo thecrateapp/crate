@@ -35,7 +35,7 @@ describe("OverlayCloseButton", () => {
       name: "Cerrar biblioteca",
     });
     expect(ref.current).toBe(button);
-    expect(button).toHaveAttribute("title", "Cerrar");
+    expect(button).not.toHaveAttribute("title");
     expect(button).toHaveAttribute("data-slot", "dialog-close");
     expect(button).toHaveAttribute("type", "submit");
     expect(button).toHaveClass("consumer-position");

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import {
   forwardRef,
   useEffect,
@@ -135,15 +136,16 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           {...props}
         />
         {showClear ? (
-          <button
-            type="button"
-            aria-label={clearLabel}
-            title={clearLabel}
-            onClick={handleClear}
-            className="crate-form-search-clear absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 items-center justify-center rounded-full text-text-subtle transition-colors hover:text-text-primary"
-          >
-            <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
-          </button>
+          <TooltipHint content={clearLabel}>
+            <button
+              type="button"
+              aria-label={clearLabel}
+              onClick={handleClear}
+              className="crate-form-search-clear absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 items-center justify-center rounded-full text-text-subtle transition-colors hover:text-text-primary"
+            >
+              <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
+            </button>
+          </TooltipHint>
         ) : null}
       </div>
     );

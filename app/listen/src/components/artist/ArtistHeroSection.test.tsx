@@ -177,8 +177,10 @@ describe("ArtistHeroSection", () => {
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
       "rounded-full",
-      "shadow-action-solid",
-      "hover:shadow-action-solid-hover",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
+      "text-accent-action",
     );
     const shuffleButton = within(primary).getByRole("button", {
       name: "Shuffle",

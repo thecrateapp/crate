@@ -12,13 +12,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "./select";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
 
 describe("semantic surface shadows", () => {
-  it("uses the card shadow token", () => {
+  it("keeps approved cards flat with their solid surface and hairline border", () => {
     render(<Card>Card content</Card>);
 
-    expect(screen.getByText("Card content")).toHaveClass("shadow-card");
+    expect(screen.getByText("Card content")).toHaveClass(
+      "border",
+      "border-border-quiet",
+      "bg-surface-object",
+    );
+    expect(screen.getByText("Card content")).not.toHaveClass("shadow-card");
   });
 
-  it("uses the popover shadow token for select content", () => {
+  it("uses the shared overlay recipe for select content", () => {
     render(
       <Select open defaultValue="one">
         <SelectTrigger aria-label="Select value" />
@@ -29,7 +34,7 @@ describe("semantic surface shadows", () => {
     );
 
     expect(document.querySelector('[data-slot="select-content"]')).toHaveClass(
-      "shadow-popover",
+      "crate-overlay-surface",
     );
   });
 

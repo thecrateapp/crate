@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   CRATE_ICON_SIZE,
@@ -186,8 +187,8 @@ function JamGuestPlaybackStatus({
   syncStatus,
 }: Pick<JamPlaybackControlsProps, "t" | "syncStatus">) {
   return (
-    <div
-      title={
+    <TooltipHint
+      content={
         syncStatus === "synced"
           ? t("jam.room.syncedWithHost")
           : syncStatus === "drifting"
@@ -195,12 +196,14 @@ function JamGuestPlaybackStatus({
             : t("jam.room.waitingForHost")
       }
     >
-      <InfoBadge icon={Zap}>
-        {syncStatus === "synced"
-          ? t("jam.room.synced")
-          : t("jam.room.waitingForHost")}
-      </InfoBadge>
-    </div>
+      <div>
+        <InfoBadge icon={Zap}>
+          {syncStatus === "synced"
+            ? t("jam.room.synced")
+            : t("jam.room.waitingForHost")}
+        </InfoBadge>
+      </div>
+    </TooltipHint>
   );
 }
 

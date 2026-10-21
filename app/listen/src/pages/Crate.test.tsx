@@ -408,8 +408,12 @@ describe("Crate page", () => {
     };
     renderCrate();
 
-    expect(screen.getByTitle("Post-Punk · 100%")).toBeInTheDocument();
-    expect(screen.getByTitle("Noise Rock · 33%")).toBeInTheDocument();
+    expect(
+      screen.getByText("post-punk").closest(".genre-pill")!,
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("noise rock").closest(".genre-pill")!,
+    ).toBeInTheDocument();
   });
 
   it("mirrors every Crate action in the More menu like the album page", async () => {

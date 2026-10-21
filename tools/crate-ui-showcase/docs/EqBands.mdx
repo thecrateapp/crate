@@ -7,11 +7,11 @@ import * as Stories from "../stories/EqBands.stories";
 
 The shared EQ instrument used by Listen and Admin. The curve, handles and numeric readings show actual gains; the fixture does not run audio.
 
-Gain values use compact 14px regular monospace. Frequency captions use uppercase MonoLabel. These are instrument readings, not large statistical headlines. At narrow widths the instrument scrolls horizontally, retaining at least44px per band and enough space for signed fractional values such as+11.5. The chart, values and frequency captions scroll together. The Listen panel supplies the available space; the component does not impose a card or change the audio chain.
+Gain values use compact 12px regular monospace. Frequency captions use uppercase MonoLabel. All ten bands fit the available width, with no horizontal scrolling. Below30rem of component width, the single numeric row rounds gains to whole dB; touching or focusing a band reveals its exact signed value above the curve. The curve, audio gains and accessible slider values retain their full0.5dB precision. Wider instruments show exact values in the numeric row. These are instrument readings, not statistical headlines. The component does not impose a card or change the audio chain. This compact layout supersedes the earlier14px horizontally scrolling mobile trial (Diego,2026-10-21).
 
 <Canvas of={Stories.Manual} />
 
-Each band is a vertical slider from −12 to +12 dB. Arrow keys move 0.5 dB, Page Up/Down move 3 dB and Home/End reach the limits. Continuous input is separate from persistence: release, blur or 150ms of keyboard inactivity commits once. A caller may omit edit callbacks for a read-only curve. Listen lets an enabled automatic curve become Custom on the first band edit, retaining its other gains. Disabled EQ dims the instrument and prevents changes.
+Each band is a vertical slider from −12 to +12 dB. Arrow keys move 0.5 dB, Page Up/Down move 3 dB and Home/End reach the limits. Continuous input is separate from persistence: release, blur or 150ms of keyboard inactivity commits once. Touch gestures stay with the active band rather than starting a containing player swipe; other panel areas retain normal scrolling. A caller may omit edit callbacks for a read-only curve. Listen lets an enabled automatic curve become Custom on the first band edit, retaining its other gains. Disabled EQ dims the instrument and prevents changes.
 
 <Canvas of={Stories.ReadOnly} />
 <Canvas of={Stories.Disabled} />

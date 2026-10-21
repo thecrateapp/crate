@@ -2,6 +2,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@crate/ui/lib/cn";
 import {
   INFO_BADGE_CLASS,
@@ -45,15 +46,16 @@ function Badge({
   const Comp = asChild ? Slot.Root : "span";
 
   return (
-    <Comp
-      data-slot="badge"
-      data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-      title={title ?? (infoBadgeText(children) || undefined)}
-    >
-      {asChild ? children : infoBadgeContent(children, true)}
-    </Comp>
+    <TooltipHint content={title ?? (infoBadgeText(children) || undefined)}>
+      <Comp
+        data-slot="badge"
+        data-variant={variant}
+        className={cn(badgeVariants({ variant }), className)}
+        {...props}
+      >
+        {asChild ? children : infoBadgeContent(children, true)}
+      </Comp>
+    </TooltipHint>
   );
 }
 

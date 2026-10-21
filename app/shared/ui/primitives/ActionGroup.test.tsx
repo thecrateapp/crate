@@ -78,7 +78,8 @@ describe("ActionGroup", () => {
     const button = screen.getByRole("button", { name: "Edit Costa de noche" });
     expect(button).toHaveAttribute("data-size", "icon-lg");
     expect(button).toHaveAttribute("data-variant", "ghost");
-    expect(button).toHaveAttribute("title", "Edit");
+    expect(button).not.toHaveAttribute("title");
+    expect(button.closest("[title]")).toBeNull();
     const user = userEvent.setup();
     await user.tab();
     const tip = await screen.findByRole("tooltip", { name: "Edit" });

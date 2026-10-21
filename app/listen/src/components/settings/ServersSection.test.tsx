@@ -75,7 +75,7 @@ describe("ServersSection", () => {
       </MemoryRouter>,
     );
     const action = screen.getByRole("button", { name: "Remove Server A" });
-    expect(action).toHaveAttribute("title", "Remove");
+    expect(action).not.toHaveAttribute("title");
     expect(action).toHaveAttribute("data-size", "icon-lg");
     expect(action).toHaveAttribute("data-variant", "ghost");
     action.focus();

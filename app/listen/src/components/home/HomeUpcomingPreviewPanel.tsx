@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Calendar } from "@crate/ui/icons";
-
+import { Card, CardHeader, CardContent } from "@crate/ui/shadcn/card";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { HairlineList } from "@crate/ui/primitives/HairlineList";
 import type { HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
-import { UpcomingPreviewRow } from "./HomeSections";
-
+import { UpcomingPreviewRow } from "./HomeSectionCards";
 export function HomeUpcomingPreviewPanel({
   previewItems,
   summary,
@@ -14,30 +14,30 @@ export function HomeUpcomingPreviewPanel({
   onOpenUpcoming: () => void;
 }) {
   const { t } = useTranslation();
-
   return (
-    <div className="home-upcoming-panel overflow-hidden rounded-panel p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="home-upcoming-panel-kicker flex items-center gap-2 text-xs uppercase tracking-wider">
-          <Calendar size={CRATE_ICON_SIZE.micro} />
-          {t("home.radar.nextUp")}
-        </div>
-        <div className="home-upcoming-summary text-xs uppercase tracking-kicker">
-          {t("home.radar.summary", {
-            shows: summary?.show_count ?? 0,
-            releases: summary?.release_count ?? 0,
-          })}
-        </div>
-      </div>
-      <div className="space-y-1">
-        {previewItems.slice(1).map((item) => (
-          <UpcomingPreviewRow
-            key={`${item.type}-${item.artist}-${item.title}-${item.date}`}
-            item={item}
-            onClick={onOpenUpcoming}
-          />
-        ))}
-      </div>
-    </div>
+    <Card data-home-slot="radar-list">
+      <CardHeader>
+        <MonoLabel as="h3">{t("home.radar.nextUp")}</MonoLabel>
+        {summary ? (
+          <MonoLabel tone="accent">
+            {t("home.radar.summary", {
+              shows: summary.show_count,
+              releases: summary.release_count,
+            })}
+          </MonoLabel>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        <HairlineList label={t("home.radar.nextUp")}>
+          {previewItems.slice(1).map((item) => (
+            <UpcomingPreviewRow
+              key={`${item.type}-${item.artist}-${item.title}-${item.date}`}
+              item={item}
+              onClick={onOpenUpcoming}
+            />
+          ))}
+        </HairlineList>
+      </CardContent>
+    </Card>
   );
 }

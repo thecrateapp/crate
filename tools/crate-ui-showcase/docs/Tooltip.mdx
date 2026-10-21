@@ -1,0 +1,20 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Tooltip.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Tooltip</DocHeading>
+<EntryDetails id="shadcn-tooltip" review="Web closure · awaiting review" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Actual Radix tooltip provider/trigger/content with a governed portal, named trigger, focus/hover, side offset and Escape. Tooltip describes an existing control; it never replaces its accessible name or becomes a mobile-only source of required information.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+TooltipHint adapts legacy title metadata to the existing Tooltip recipe without adding a layout wrapper or changing the native control. It preserves refs and handlers. An outer Tooltip owns nested descriptions, preventing duplicate custom tooltips; no DOM title is emitted. Empty hint content adds no text, tab stop or dangling description. Escape closes the hint even when an active drag has already consumed that key, so the next Escape can close the containing editor.

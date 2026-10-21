@@ -275,7 +275,11 @@ describe("I18nReview", () => {
     expect(
       screen
         .getAllByText("Needs review")
-        .some((node) => node.className.includes("text-state-warning-text")),
+        .some((node) =>
+          node
+            .closest('[data-slot="badge"]')
+            ?.className.includes("text-state-warning-text"),
+        ),
     ).toBe(true);
 
     await user.click(screen.getByRole("button", { name: /Review es/i }));

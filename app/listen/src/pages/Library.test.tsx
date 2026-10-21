@@ -224,10 +224,14 @@ describe("Library", () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
     expect(screen.getByRole("tab", { name: "Albums" })).toHaveFocus();
     await userEvent.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Liked" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    // Radix schedules roving focus/automatic activation after the key event.
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Liked" })).toHaveFocus();
+      expect(screen.getByRole("tab", { name: "Liked" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
   });
   it.each([
     [

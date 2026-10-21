@@ -4,7 +4,7 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { AdaptiveFeatureChips } from "./EqualizerAdaptiveReadouts";
 
 describe("adaptive readout shared tags", () => {
-  it("keeps all feature values and icons with the shared Mono 400 recipe", () => {
+  it("uses one accent mono band with named feature values", () => {
     renderWithListenProviders(
       <div className="font-semibold leading-loose">
         <AdaptiveFeatureChips
@@ -22,15 +22,23 @@ describe("adaptive readout shared tags", () => {
         />
       </div>,
     );
+    expect(
+      screen.getByRole("group", { name: "Track curves" }),
+    ).not.toHaveTextContent("Audio analysis");
     for (const value of ["20%", "-25.0 LUFS", "16.0 dB", "80%"] as const) {
       const text = screen.getByText(value, { exact: true });
-      expect(text).toHaveAttribute("title");
-      expect(text.parentElement).toHaveClass(
+      expect(text.parentElement).not.toHaveAttribute("title");
+      expect(text.closest('[data-slot="eq-curve-readout"]')).toHaveClass(
         "font-mono",
         "font-normal",
-        "text-info-badge",
+        "uppercase",
+        "bg-accent-action/10",
       );
-      expect(text.parentElement?.querySelector("svg")).not.toBeNull();
+      expect(
+        screen
+          .getByRole("group", { name: "Track curves" })
+          .querySelector("svg"),
+      ).not.toBeNull();
     }
   });
 });
