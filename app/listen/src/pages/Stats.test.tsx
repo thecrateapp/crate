@@ -1,5 +1,11 @@
 import { useReducer } from "react";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -410,6 +416,75 @@ describe("Stats page", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("Top tracks")).toBeInTheDocument();
   });
+
+  it.each([
+    ["personal", "/stats", ["Hero", "Top Two", "Top Three"]],
+    ["global", "/stats/global", []],
+  ] as const)(
+    "wires movement exclusions and scope on the %s page",
+    (scope, route, _unused) => {
+      void _unused;
+      const dashboard = signalDashboard();
+      const artist = (name: string) => ({
+        artist_name: name,
+        play_count: 5,
+        minutes_listened: 20,
+        complete_play_count: 5,
+      });
+      dashboard.artist_of_period = {
+        ...dashboard.artist_of_period!,
+        artist_name: "Hero",
+      };
+      dashboard.top_artists = {
+        window: "30d",
+        items: [
+          artist("Top One"),
+          artist("Top Two"),
+          artist("Top Three"),
+          artist("Top Four"),
+        ],
+      } as StatsDashboard["top_artists"];
+      const signal = (name: string, delta?: number) => ({
+        artist_name: name,
+        play_count: 9,
+        minutes_listened: 30,
+        delta_play_count: delta,
+      });
+      dashboard.story = {
+        ...dashboard.story!,
+        movers: [
+          signal("Hero", 9),
+          signal("Top One", 8),
+          signal("Top Three", 7),
+          signal("Top Four", 6),
+          signal("Fresh Riser", 5),
+        ],
+        discoveries: [signal("Fresh Face")],
+        comebacks: [signal("Fresh Return")],
+      };
+      mockApis(dashboard);
+      const { container } = renderWithListenProviders(<Stats />, {
+        route,
+        path: route,
+        locale: "en",
+      });
+      const movement = container.querySelector("#movement") as HTMLElement;
+      expect(movement).not.toBeNull();
+      const inside = within(movement);
+      for (const name of ["Hero", "Top One", "Top Three"]) {
+        expect(inside.queryByText(name)).toBeNull();
+      }
+      expect(inside.getByText("Top Four")).toBeInTheDocument();
+      expect(inside.getByText("Fresh Riser")).toBeInTheDocument();
+      if (scope === "global") {
+        expect(inside.queryByText("Fresh Face")).toBeNull();
+        expect(inside.queryByText("Fresh Return")).toBeNull();
+      } else {
+        expect(inside.getByText("Fresh Face")).toBeInTheDocument();
+        expect(inside.getByText("Fresh Return")).toBeInTheDocument();
+      }
+    },
+  );
 
   it("offers the rolling year instead of the calendar year for Crate Pulse", () => {
     mockApis(signalDashboard());

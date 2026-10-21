@@ -15,11 +15,16 @@ const COLUMN_LIMIT = 5;
 export function statsMovementVisible(
   signals: StatsStoryArtistSignal[],
   exclude: ReadonlySet<string>,
+  keep: (artist: StatsStoryArtistSignal) => boolean = () => true,
 ) {
   return signals
-    .filter((artist) => !exclude.has(artist.artist_name.trim()))
+    .filter((artist) => !exclude.has(artist.artist_name.trim()) && keep(artist))
     .slice(0, COLUMN_LIMIT);
 }
+
+/** Rising lists real gains only; flat, negative or missing deltas are noise. */
+const isRealGain = (artist: StatsStoryArtistSignal) =>
+  (artist.delta_play_count ?? 0) > 0;
 
 export function StatsMovementView({
   story,
@@ -37,7 +42,7 @@ export function StatsMovementView({
 }) {
   const { t } = useTranslation();
   const skip = new Set(exclude.map((name) => name.trim()));
-  const rising = statsMovementVisible(story.movers, skip);
+  const rising = statsMovementVisible(story.movers, skip, isRealGain);
   const columns = [
     <MovementColumn
       key="rising"
@@ -46,7 +51,7 @@ export function StatsMovementView({
       emptyBody={t("stats.story.risingFallback")}
       items={rising}
       body={(artist) =>
-        t("stats.story.risingBody", { count: artist.delta_play_count ?? 0 })
+        `+${t("stats.explorer.plays", { count: artist.delta_play_count ?? 0 })}`
       }
       renderArtist={renderArtist}
       getArtistHref={getArtistHref}
@@ -61,7 +66,7 @@ export function StatsMovementView({
         emptyBody={t("stats.story.discoveryFallback")}
         items={statsMovementVisible(story.discoveries, skip)}
         body={(artist) =>
-          t("stats.story.discoveryBody", { count: artist.play_count })
+          t("stats.explorer.plays", { count: artist.play_count })
         }
         renderArtist={renderArtist}
         getArtistHref={getArtistHref}
@@ -73,7 +78,7 @@ export function StatsMovementView({
         emptyBody={t("stats.story.comebackFallback")}
         items={statsMovementVisible(story.comebacks, skip)}
         body={(artist) =>
-          t("stats.story.comebackBody", { count: artist.play_count })
+          t("stats.explorer.plays", { count: artist.play_count })
         }
         renderArtist={renderArtist}
         getArtistHref={getArtistHref}

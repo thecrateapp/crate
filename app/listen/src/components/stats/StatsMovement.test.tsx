@@ -55,9 +55,7 @@ describe("StatsMovement", () => {
     // Comparison is case-sensitive: "top two" is a different artist.
     expect(screen.getByText("top two")).toBeInTheDocument();
     expect(screen.getByText("Returner")).toBeInTheDocument();
-    expect(
-      screen.getByText("+6 plays versus the previous window."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("+6 plays")).toBeInTheDocument();
   });
 
   it("shows only rising on global", () => {
@@ -105,5 +103,45 @@ describe("StatsMovement", () => {
       "href",
       expect.stringContaining("riser"),
     );
+  });
+
+  it("keeps only real gains in rising", () => {
+    renderWithListenProviders(
+      <StatsMovement
+        scope="personal"
+        exclude={[]}
+        story={story({
+          movers: [
+            signal("Zero", { delta_play_count: 0 }),
+            signal("Negative", { delta_play_count: -3 }),
+            signal("Missing"),
+            signal("Gain", { delta_play_count: 1 }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByText("Zero")).toBeNull();
+    expect(screen.queryByText("Negative")).toBeNull();
+    expect(screen.queryByText("Missing")).toBeNull();
+    expect(screen.getByText("Gain")).toBeInTheDocument();
+    expect(screen.getByText("+1 play")).toBeInTheDocument();
+  });
+
+  it("shows the empty copy when no mover gained plays", () => {
+    renderWithListenProviders(
+      <StatsMovement
+        scope="global"
+        exclude={[]}
+        story={story({
+          movers: [
+            signal("Zero", { delta_play_count: 0 }),
+            signal("Negative", { delta_play_count: -3 }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByText("Zero")).toBeNull();
+    expect(screen.queryByText("Negative")).toBeNull();
+    expect(screen.getByText("No surge yet")).toBeInTheDocument();
   });
 });

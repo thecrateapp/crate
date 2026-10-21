@@ -7463,17 +7463,9 @@
     "sourceHash": "sha256:5c6bca02b5182ed6a89d8614e40cf6597061f315b2e9417c4fa0251be03135e6",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "stats.story.comebackBody": {
-    "sourceHash": "sha256:7abd7bf6d35d67f0d8798d59f3d785920d20d41fbc665bce2bc14954dcaf45e3",
-    "reviewedAt": "2026-10-03T11:52:01.770Z"
-  },
   "stats.story.comebackFallback": {
     "sourceHash": "sha256:15304f5456899118d581872a4f290d0340f2d1aa383e0ed6583db24799e4dc21",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "stats.story.discoveryBody": {
-    "sourceHash": "sha256:76c9317290722ac8db572e0536f441bb6e3d0e843ddd66e7d3766c5524139fd1",
-    "reviewedAt": "2026-10-03T11:52:01.770Z"
   },
   "stats.story.discoveryFallback": {
     "sourceHash": "sha256:7c3f6fdd0a28d82e074a9edf34f1b8a70114ade72881c2beeeeed7047eccd915",
@@ -7518,10 +7510,6 @@
   "stats.story.rising": {
     "sourceHash": "sha256:249b3e2236cea17fdfe4170c8a4b6c0e87247036c03e12baf58d232984736995",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "stats.story.risingBody": {
-    "sourceHash": "sha256:1e610bd885883083842a0ffa81ec25884fc3f53bafe6387bd800816bb509c4b9",
-    "reviewedAt": "2026-10-03T11:52:01.770Z"
   },
   "stats.story.risingFallback": {
     "sourceHash": "sha256:5a95fca9908e9f0e9faf27da92f5bd86c362abc292a4fda5ea6a538afe2684a6",

@@ -24,3 +24,9 @@ Status: DONE (with concerns below).
 - Row meta uses the long sentence copy, which may wrap on 375px; no visual browser check was done (no servers started).
 - `stats.story.*` copy for "New blood"/"Comeback" are headings reused as column titles as instructed.
 - Global scope: relies on the instance payload carrying `story.movers`; not verified server-side.
+
+## Fix round 1
+- Rising now keeps only `delta_play_count > 0` (null/zero/negative dropped); none left shows the column empty copy.
+- Row captions are short: Rising `+` + `stats.explorer.plays`, New/Back `stats.explorer.plays` (play_count). Removed `stats.story.{rising,discovery,comeback}Body` from all 7 catalogs (no other refs) and from `plural-counts.test.ts`; metadata regenerated.
+- Tests: unit tests for zero/negative/null deltas and all-non-positive empty copy; `Stats.test.tsx` page-level wiring test (personal + global): hero + top-3 excluded inside `#movement`, global renders Rising only.
+- Verified: vitest stats + Stats page + i18n (179 tests), listen/desktop typecheck, eslint, i18n:check, showcase:check, storybook typecheck all green.
