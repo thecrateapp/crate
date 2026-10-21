@@ -445,3 +445,7 @@ class ConfirmationInput(ClosedInput):
     plan_id: Identifier
     plan_version: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
     apply_after_approval: Annotated[bool, Field(strict=True)] = False
+
+
+class ConfirmationStatusInput(ClosedInput):
+    confirmation_id: Annotated[str, Field(pattern=r"^[a-f0-9]{32}$")]

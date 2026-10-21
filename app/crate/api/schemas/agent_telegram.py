@@ -51,7 +51,23 @@ class NativeOutcomeDelivery(BaseModel):
     message_id: Annotated[int, Field(strict=True, gt=0)]
 
 
+class NativeWatchReceipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["watch_enrolled", "watch_unavailable"]
+    instance_id: Annotated[str, Field(min_length=1, max_length=128)]
+    confirmation_id: Annotated[str, Field(pattern=r"^[a-f0-9]{32}$")]
+    chat_id: Annotated[int, Field(strict=True, gt=0)]
+    job_id: Annotated[str, Field(pattern=r"^[a-zA-Z0-9_-]{1,128}$")]
+    watch_expires_at: (
+        Annotated[float, Field(strict=True, allow_inf_nan=False)] | None
+    ) = None
+
+
 NativeEvent = Annotated[
-    NativePoll | NativeDelivery | NativeCallback | NativeOutcomeDelivery,
+    NativePoll
+    | NativeDelivery
+    | NativeCallback
+    | NativeOutcomeDelivery
+    | NativeWatchReceipt,
     Field(discriminator="kind"),
 ]

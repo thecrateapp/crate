@@ -3,6 +3,7 @@
 import asyncio
 import importlib.util
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -364,7 +365,19 @@ def test_profile_validates_current_approval_and_retains_bounded_reconnect_adapte
             runtime.validate_operator_profile(tools, {**policy, field: value}, config)
     with pytest.raises(ValueError, match="separate"):
         runtime.operator_preflight("http://loopback", "same", "same", config)
+    monkeypatch.setenv("HOME", "/root")
+    monkeypatch.setenv("XDG_STATE_HOME", "/root/.local/state")
+    monkeypatch.setenv("CRATE_MCP_URL", "http://crate-api:8585/mcp")
+    monkeypatch.setenv("CRATE_MCP_HOST", "api.test.invalid")
     runtime.configure_operator(tmp_path, ROOT / "deploy/hermes", domain_available=False)
+    assert os.environ["HOME"] == str(tmp_path)
+    assert os.environ["XDG_STATE_HOME"] == str(tmp_path / "xdg-state")
+    assert json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]["crate"][
+        "env"
+    ] == {
+        "CRATE_MCP_URL": "http://crate-api:8585/mcp",
+        "CRATE_MCP_HOST": "api.test.invalid",
+    }
     assert json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]["crate"][
         "args"
     ] == ["/opt/crate-hermes/domain_mcp.py"]

@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -502,3 +503,150 @@ def test_public_mutation_gate_stays_closed_through_context_link_and_hash_switch(
             (parent / "active/context-manifest.json").read_bytes()
         ).hexdigest()
     )
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason="Disposable root container only")
+def test_packaged_private_umask_activation_is_readable_by_nonroot_consumers():
+    import sys
+    import tarfile
+    import tempfile
+    import time
+
+    # /tmp is traversable by the configured nonroot identity; pytest's private
+    # ancestor directories deliberately are not part of the installed context.
+    with tempfile.TemporaryDirectory(
+        prefix="crate-context-mode-", dir="/tmp"
+    ) as directory:
+        lab = Path(directory)
+        lab.chmod(0o755)
+        source = lab / "source"
+        (source / "docs").mkdir(parents=True)
+        data = b"Read-only public operator context.\n"
+        (source / "docs/guide.md").write_bytes(data)
+        sha = "a" * 40
+        manifest = {
+            "release_sha": sha,
+            "deployment": {"release_sha": sha, "images": {}},
+            "files": {
+                "docs/guide.md": {
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "bytes": len(data),
+                }
+            },
+        }
+        (source / "context-manifest.json").write_text(json.dumps(manifest))
+        for path in source.rglob("*"):
+            path.chmod(0o700 if path.is_dir() else 0o600)
+        archive = lab / "bundle.tar.gz"
+        with tarfile.open(archive, "w:gz") as handle:
+            handle.add(source, arcname=".")
+        unit = (ROOT / "deploy/operator/crate-infra.service").read_text()
+        umask = int(
+            next(
+                line.split("=")[1]
+                for line in unit.splitlines()
+                if line.startswith("UMask=")
+            ),
+            8,
+        )
+        assert umask == 0o077
+        context = lab / "context"
+        private = lab / "host-secret"
+        previous = os.umask(umask)
+        try:
+            private.write_text("private-host-key")
+            (lab / "private-state").mkdir()
+            (lab / "private-state/state.json").write_text("{}")
+        finally:
+            os.umask(previous)
+        for _ in range(2):  # Atomic replacements must retain modes on every activation.
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(ROOT / "deploy/hermes/activate_context.py"),
+                    "--root",
+                    str(context),
+                    "--archive",
+                    str(archive),
+                    "--revision",
+                    sha,
+                ],
+                check=True,
+                umask=umask,
+                capture_output=True,
+            )
+        identity = {
+            "instance_id": "mode-lab",
+            "release_sha": sha,
+            "context_sha256": hashlib.sha256(
+                (context / "active/context-manifest.json").read_bytes()
+            ).hexdigest(),
+            "images": {
+                "crate-api": {
+                    "reference": "ghcr.io/thecrateapp/crate-api@sha256:" + "b" * 64,
+                    "source_sha": sha,
+                    "image_id": "sha256:" + "c" * 64,
+                }
+            },
+        }
+        # Exercise the actual publisher's atomic output under the same restrictive
+        # umask, without calling Docker or inventing actual image verification.
+        sys.path.insert(0, str(ROOT))
+        from deploy.operator.provenance import atomic
+
+        previous = os.umask(umask)
+        try:
+            atomic(context / "public/target.json", identity)
+            atomic(
+                context / "public/observation.json",
+                {"state": "verified", "observed_at": time.time(), "identity": identity},
+            )
+        finally:
+            os.umask(previous)
+        reader = """
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1] + '/app')
+sys.path.insert(0, sys.argv[1] + '/deploy/hermes')
+from crate import operator_provenance
+from context_server import ContextStore
+root = Path(sys.argv[2])
+os.environ['CRATE_AGENT_INSTANCE_ID'] = 'mode-lab'
+operator_provenance.ROOT = root / 'public'
+assert operator_provenance.current_identity()['release_sha'] == 'a' * 40
+store = ContextStore(root / 'active')
+assert store.summary()['availability'] == 'available'
+assert store.read('docs/guide.md')['text'] == 'Read-only public operator context.'
+try:
+    Path(sys.argv[3]).read_text()
+except PermissionError:
+    pass
+else:
+    raise AssertionError('private host secret became readable')
+try:
+    list((root.parent / 'private-state').iterdir())
+except PermissionError:
+    pass
+else:
+    raise AssertionError('private host state became readable')
+print(json.dumps({'uid': os.geteuid(), 'public_identity': 'available', 'context': 'available', 'private_secret': 'denied'}))
+"""
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", reader, str(ROOT), str(context), str(private)],
+            user=10000,
+            group=10000,
+            extra_groups=[],
+            cwd="/tmp",
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert json.loads(result.stdout)["uid"] == 10000
+        assert private.stat().st_mode & 0o777 == 0o600
+        assert (lab / "private-state").stat().st_mode & 0o777 == 0o700
+        for path in [
+            context / "deployment.json",
+            *list((context / "public").iterdir()),
+        ]:
+            assert path.stat().st_mode & 0o777 == 0o644

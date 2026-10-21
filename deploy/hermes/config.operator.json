@@ -96,6 +96,7 @@
           "get_acquisition_readiness",
           "get_analysis_status",
           "get_confirmation_policy",
+          "get_confirmation_status",
           "get_instance_inventory",
           "get_instance_status",
           "get_job",

@@ -14,6 +14,7 @@ services:
       HERMES_UID: ${PUID:-1000}
       HERMES_GID: ${PGID:-1000}
       HERMES_HOME: /opt/data
+      HOME: /opt/data
       XDG_STATE_HOME: /opt/data/xdg-state
       CRATE_HERMES_PROFILE: operator
       CRATE_MCP_URL: http://crate-api:8585/mcp

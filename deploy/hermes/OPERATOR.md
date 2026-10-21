@@ -14,8 +14,13 @@ workers vuelven a comprobar la identidad revisada. Una observación reciente de 
 misma identidad no cambia el plan; despliegue, rollback, cambio o evidencia caducada
 cierran los efectos. Las lecturas siguen disponibles.
 
-Los resultados nativos admitidos registran automáticamente un watch duradero del
-job con el supervisor. La verificación y la proyección pueden llegar después de
+El presentador intenta registrar automáticamente el job admitido con el supervisor,
+con reintentos duraderos y acotados. Consulta `get_confirmation_status` con el ID de
+confirmación: muestra el resultado admitido, intentos/agotamiento de entrega y
+evidencia de inscripción. Solo `monitoring.state: confirmed` con recibo nativo
+vigente confirma la inscripción; no prueba observación en vivo. Ausencia de recibo
+es `unverified`; fallo o caducidad es `unavailable`. El último intento informa en
+Telegram si no pudo inscribirlo; no vuelvas a admitir el job para iniciar vigilancia. La verificación y la proyección pueden llegar después de
 la tarea; no declares éxito completo a partir de la admisión. Usa las herramientas
 `crate_supervisor` para incidentes, eventos y entrega; `crate_infra` permite solo
 inspección/preparación/admisión/reconciliación y necesita su propia aprobación

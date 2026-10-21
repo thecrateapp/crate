@@ -43,6 +43,7 @@ ACTION_NAMES = {case[0] for case in ACTION_CASES}
 ACTION_GRANTS = frozenset(case[1] for case in ACTION_CASES)
 READ_NAMES = {
     "get_confirmation_policy",
+    "get_confirmation_status",
     "get_operation_catalog",
     "get_plan",
     "get_library_quality",
@@ -173,7 +174,11 @@ def test_actions_are_disabled_by_default_even_with_action_grants(
 @pytest.mark.parametrize(
     "grants,expected",
     [
-        (PILOT_GRANTS, READ_NAMES - {"get_plan", "get_confirmation_policy"}),
+        (
+            PILOT_GRANTS,
+            READ_NAMES
+            - {"get_plan", "get_confirmation_policy", "get_confirmation_status"},
+        ),
         (frozenset(), set()),
         (
             frozenset({"library.health.run"}),
@@ -204,7 +209,11 @@ def test_discovery_and_direct_calls_respect_independent_action_grants(
 ):
     app, token, principal, credentials, admission = action_transport
     if "get_plan" in expected:
-        expected = expected | {"get_confirmation_policy", "request_plan_confirmation"}
+        expected = expected | {
+            "get_confirmation_policy",
+            "get_confirmation_status",
+            "request_plan_confirmation",
+        }
     credentials[token] = AgentPrincipal(
         principal.id, principal.credential_id, principal.name, grants
     )

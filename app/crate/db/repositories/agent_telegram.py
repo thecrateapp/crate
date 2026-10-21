@@ -2,7 +2,9 @@
 
 import json
 import os
+import re
 import secrets
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -17,7 +19,7 @@ from crate.db.repositories.agent_human_sessions import (
     TelegramHuman,
     require_agent_human_capabilities,
 )
-from crate.db.tx import optional_scope
+from crate.db.tx import optional_scope, read_scope
 
 
 def _instance():
@@ -133,6 +135,95 @@ def approval_policy(principal, *, session=None):
             "actions_enabled": actions_enabled(),
             "instance_id": os.environ.get("CRATE_AGENT_INSTANCE_ID"),
         }
+
+
+def get_confirmation_status(principal, confirmation_id, *, session=None):
+    """Bounded originating-integration read; never changes delivery or authority."""
+    if not isinstance(confirmation_id, str) or not re.fullmatch(
+        r"[a-f0-9]{32}", confirmation_id
+    ):
+        raise DiagnosticError(
+            "INVALID_ARGUMENT", "An exact confirmation ID is required"
+        )
+
+    def read(current):
+        row = (
+            current.execute(
+                text("""
+            SELECT c.*, p.required_grants, b.revoked_at AS binding_revoked,
+                   b.instance_id, b.principal_id::text AS principal_id
+            FROM agent_telegram_confirmations c
+            JOIN agent_telegram_bindings b ON b.id=c.binding_id
+            JOIN agent_repair_plans p ON p.id=c.plan_id AND p.principal_id=b.principal_id
+            WHERE c.id=:id AND b.principal_id=:principal AND b.instance_id=:instance
+        """),
+                {
+                    "id": confirmation_id,
+                    "principal": principal.id,
+                    "instance": _instance(),
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if (
+            not row
+            or row["binding_revoked"] is not None
+            or str(row["credential_id"]) != principal.credential_id
+            or row["origin"].get("principal_id") != principal.id
+            or row["origin"].get("credential_id") != principal.credential_id
+            or row["origin"].get("authorization_context")
+            != authorization_context(principal)
+        ):
+            raise DiagnosticError("NOT_FOUND", "Owned confirmation is unavailable")
+        requests._authorize(current, principal, row["required_grants"])
+        result = row["result"]
+        monitoring = dict(
+            (result or {}).get("monitoring")
+            or {
+                "state": "unverified"
+                if (result or {}).get("job")
+                else "not_applicable",
+                "reason": "No native supervisor enrollment receipt",
+            }
+        )
+        exhausted = row["delivery_attempts"] >= 20
+        if (
+            monitoring["state"] == "confirmed"
+            and monitoring["expires_at"] <= datetime.now(UTC).timestamp()
+        ):
+            monitoring.update(state="unavailable", reason="Enrollment receipt expired")
+        if exhausted and monitoring["state"] == "unverified":
+            monitoring.update(
+                state="unavailable",
+                reason="Native enrollment/delivery retries exhausted",
+            )
+        return {
+            "confirmation_id": confirmation_id,
+            "plan_id": str(row["plan_id"]),
+            "state": row["state"],
+            "result": {
+                key: value for key, value in result.items() if key != "monitoring"
+            }
+            if result
+            else None,
+            "delivery": {
+                "state": "delivered"
+                if row["outcome_message_id"]
+                else "exhausted"
+                if exhausted
+                else "pending",
+                "attempts": row["delivery_attempts"],
+                "max_attempts": 20,
+                "retry_exhausted": exhausted,
+            },
+            "monitoring": monitoring,
+        }
+
+    if session is not None:
+        return read(session)
+    with read_scope() as current:
+        return read(current)
 
 
 def request_confirmation(
@@ -319,6 +410,8 @@ def native_event(event, transport_nonce, *, session=None):
                     "confirmation_id": row["id"],
                     "chat_id": binding["chat_id"],
                     "result": row["result"],
+                    "delivery_attempts": row["delivery_attempts"] + 1,
+                    "max_delivery_attempts": 20,
                 }
             return {"state": "page", **_presentation(row, binding)}
         row = (
@@ -343,6 +436,40 @@ def native_event(event, transport_nonce, *, session=None):
         binding = _binding(current, row["binding_id"])
         if event["chat_id"] != binding["chat_id"]:
             raise DiagnosticError("FORBIDDEN", "Wrong private chat")
+        if event["kind"] in {"watch_enrolled", "watch_unavailable"}:
+            result = row["result"]
+            if not result or (result.get("job") or {}).get("job_id") != event["job_id"]:
+                raise DiagnosticError(
+                    "STATE_CONFLICT", "Watch receipt must match the admitted job"
+                )
+            now = datetime.now(UTC).timestamp()
+            expires = event.get("watch_expires_at")
+            confirmed = event["kind"] == "watch_enrolled"
+            if confirmed and (
+                type(expires) not in (int, float)
+                or not now < expires <= now + 72 * 3600
+            ):
+                raise DiagnosticError(
+                    "INVALID_ARGUMENT", "Current bounded watch expiry required"
+                )
+            monitoring = {
+                "state": "confirmed" if confirmed else "unavailable",
+                "source": "native_supervisor_enrollment_receipt",
+                "job_id": event["job_id"],
+                "observed_at": datetime.now(UTC).isoformat(),
+                "expires_at": expires if confirmed else None,
+                "reason": "Enrollment acknowledged; live execution/verification remain separate"
+                if confirmed
+                else "Supervisor watch enrollment unavailable",
+            }
+            result = {**result, "monitoring": monitoring}
+            current.execute(
+                text(
+                    "UPDATE agent_telegram_confirmations SET result=CAST(:result AS jsonb) WHERE id=:id"
+                ),
+                {"id": row["id"], "result": json.dumps(result)},
+            )
+            return {"state": "watch_recorded", "monitoring": monitoring}
         if event["kind"] == "outcome_delivered":
             if row["result"] is None:
                 raise DiagnosticError(
@@ -457,4 +584,10 @@ def native_event(event, transport_nonce, *, session=None):
         return result
 
 
-__all__ = ["approval_policy", "bind_human", "native_event", "request_confirmation"]
+__all__ = [
+    "approval_policy",
+    "bind_human",
+    "get_confirmation_status",
+    "native_event",
+    "request_confirmation",
+]

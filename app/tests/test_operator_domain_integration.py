@@ -248,6 +248,9 @@ def test_native_admission_enrolls_real_supervisor_then_delivers_actual_verified_
         native, "WATCH_URL", f"http://127.0.0.1:{server.server_port}/v1/watch-job"
     )
     provider = object.__new__(native.DomainProvider)
+    provider._post = lambda value: event(
+        value["kind"], **{k: v for k, v in value.items() if k != "kind"}
+    )
     provider.opener = urllib.request.build_opener(
         native.NoRedirect(), urllib.request.ProxyHandler({})
     )

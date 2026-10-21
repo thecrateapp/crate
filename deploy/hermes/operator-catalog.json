@@ -3707,5 +3707,27 @@
       "destructiveHint": false,
       "openWorldHint": false
     }
+  },
+  {
+    "name": "get_confirmation_status",
+    "description": "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation_id": {
+          "pattern": "^[a-f0-9]{32}$",
+          "title": "Confirmation Id",
+          "type": "string"
+        }
+      },
+      "required": ["confirmation_id"],
+      "title": "ConfirmationStatusInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
   }
 ]

@@ -6,11 +6,7 @@
     "additionalProperties": false,
     "properties": {
       "availability": {
-        "enum": [
-          "available",
-          "stale",
-          "unavailable"
-        ],
+        "enum": ["available", "stale", "unavailable"],
         "title": "Availability",
         "type": "string"
       },
@@ -184,10 +180,7 @@
         "title": "Window"
       }
     },
-    "required": [
-      "schema_version",
-      "availability"
-    ],
+    "required": ["schema_version", "availability"],
     "title": "DiagnosticOutput",
     "type": "object"
   },
@@ -257,11 +250,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -292,11 +281,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -327,11 +312,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "JobControlApply",
         "type": "object"
       },
@@ -362,11 +343,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "JobControlApply",
         "type": "object"
       },
@@ -397,11 +374,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -432,11 +405,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -467,11 +436,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "JobControlApply",
         "type": "object"
       },
@@ -502,11 +467,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "JobControlApply",
         "type": "object"
       },
@@ -537,11 +498,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_version",
-          "idempotency_key",
-          "plan_id"
-        ],
+        "required": ["plan_version", "idempotency_key", "plan_id"],
         "title": "ShowsApply",
         "type": "object"
       },
@@ -563,9 +520,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "job_id"
-        ],
+        "required": ["job_id"],
         "title": "JobInput",
         "type": "object"
       },
@@ -594,9 +549,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "query"
-        ],
+        "required": ["query"],
         "title": "EditorialCandidates",
         "type": "object"
       },
@@ -668,11 +621,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "EditorialPlanApply",
         "type": "object"
       },
@@ -707,9 +656,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id"
-        ],
+        "required": ["plan_id"],
         "title": "EditorialPlanRead",
         "type": "object"
       },
@@ -769,10 +716,7 @@
           "generation_mode": {
             "anyOf": [
               {
-                "enum": [
-                  "static",
-                  "smart"
-                ],
+                "enum": ["static", "smart"],
                 "type": "string"
               },
               {
@@ -857,10 +801,7 @@
             "title": "Track Uids"
           }
         },
-        "required": [
-          "kind",
-          "idempotency_key"
-        ],
+        "required": ["kind", "idempotency_key"],
         "title": "EditorialPrepare",
         "type": "object"
       },
@@ -895,9 +836,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id"
-        ],
+        "required": ["plan_id"],
         "title": "EditorialPlanRead",
         "type": "object"
       },
@@ -933,18 +872,12 @@
           },
           "section": {
             "default": "tracks",
-            "enum": [
-              "tracks",
-              "exclusions",
-              "history"
-            ],
+            "enum": ["tracks", "exclusions", "history"],
             "title": "Section",
             "type": "string"
           }
         },
-        "required": [
-          "playlist_id"
-        ],
+        "required": ["playlist_id"],
         "title": "EditorialGet",
         "type": "object"
       },
@@ -1058,9 +991,7 @@
             "title": "Playlist Id"
           }
         },
-        "required": [
-          "idempotency_key"
-        ],
+        "required": ["idempotency_key"],
         "title": "EditorialPublication",
         "type": "object"
       },
@@ -1076,18 +1007,12 @@
         "additionalProperties": false,
         "properties": {
           "provider": {
-            "enum": [
-              "soulseek",
-              "tidal",
-              "bandcamp"
-            ],
+            "enum": ["soulseek", "tidal", "bandcamp"],
             "title": "Provider",
             "type": "string"
           }
         },
-        "required": [
-          "provider"
-        ],
+        "required": ["provider"],
         "title": "AcquisitionReadiness",
         "type": "object"
       },
@@ -1176,6 +1101,27 @@
       "read_only": true
     },
     {
+      "base_grant": null,
+      "contract_version": "1.2.0",
+      "description": "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_id": {
+            "pattern": "^[a-f0-9]{32}$",
+            "title": "Confirmation Id",
+            "type": "string"
+          }
+        },
+        "required": ["confirmation_id"],
+        "title": "ConfirmationStatusInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "3b6278fc7ba9326d68e6912a599600c2d2b9bc1b324992b62f55fe403237473e",
+      "name": "get_confirmation_status",
+      "read_only": true
+    },
+    {
       "base_grant": "ops.status.read",
       "contract_version": "1.2.0",
       "description": "Read bounded persisted service image references and schema/MCP versions. Release/context provenance and live image IDs remain explicitly unknown when unavailable.",
@@ -1217,9 +1163,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "job_id"
-        ],
+        "required": ["job_id"],
         "title": "JobInput",
         "type": "object"
       },
@@ -1330,9 +1274,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "pipeline"
-        ],
+        "required": ["pipeline"],
         "title": "PipelineInput",
         "type": "object"
       },
@@ -1373,9 +1315,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id"
-        ],
+        "required": ["plan_id"],
         "title": "PlanInput",
         "type": "object"
       },
@@ -1615,12 +1555,7 @@
           "severity": {
             "anyOf": [
               {
-                "enum": [
-                  "low",
-                  "medium",
-                  "high",
-                  "critical"
-                ],
+                "enum": ["low", "medium", "high", "critical"],
                 "type": "string"
               },
               {
@@ -1666,23 +1601,14 @@
           },
           "mode": {
             "default": "pending",
-            "enum": [
-              "pending",
-              "refresh"
-            ],
+            "enum": ["pending", "refresh"],
             "title": "Mode",
             "type": "string"
           },
           "pipelines": {
-            "default": [
-              "analysis",
-              "bliss"
-            ],
+            "default": ["analysis", "bliss"],
             "items": {
-              "enum": [
-                "analysis",
-                "bliss"
-              ],
+              "enum": ["analysis", "bliss"],
               "type": "string"
             },
             "maxItems": 2,
@@ -1701,10 +1627,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "track_uids",
-          "idempotency_key"
-        ],
+        "required": ["track_uids", "idempotency_key"],
         "title": "AnalysisPlanInput",
         "type": "object"
       },
@@ -1756,10 +1679,7 @@
           },
           "mode": {
             "default": "missing",
-            "enum": [
-              "missing",
-              "refresh"
-            ],
+            "enum": ["missing", "refresh"],
             "title": "Mode",
             "type": "string"
           },
@@ -1780,12 +1700,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "artist_uids",
-          "providers",
-          "facets",
-          "idempotency_key"
-        ],
+        "required": ["artist_uids", "providers", "facets", "idempotency_key"],
         "title": "EnrichmentPlanInput",
         "type": "object"
       },
@@ -1826,19 +1741,12 @@
             "type": "integer"
           },
           "scope": {
-            "enum": [
-              "album",
-              "artist",
-              "global"
-            ],
+            "enum": ["album", "artist", "global"],
             "title": "Scope",
             "type": "string"
           }
         },
-        "required": [
-          "scope",
-          "idempotency_key"
-        ],
+        "required": ["scope", "idempotency_key"],
         "title": "LibrarySyncPlanInput",
         "type": "object"
       },
@@ -1874,11 +1782,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "album_uids",
-          "destination_preset",
-          "idempotency_key"
-        ],
+        "required": ["album_uids", "destination_preset", "idempotency_key"],
         "title": "MetadataExportPlanInput",
         "type": "object"
       },
@@ -1905,10 +1809,7 @@
           },
           "conflict_policy": {
             "default": "fill_missing",
-            "enum": [
-              "fill_missing",
-              "replace_unlocked"
-            ],
+            "enum": ["fill_missing", "replace_unlocked"],
             "title": "Conflict Policy",
             "type": "string"
           },
@@ -1923,11 +1824,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "album_uids",
-          "source_preset",
-          "idempotency_key"
-        ],
+        "required": ["album_uids", "source_preset", "idempotency_key"],
         "title": "MetadataRehydratePlanInput",
         "type": "object"
       },
@@ -2015,10 +1912,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "source_job_id",
-          "idempotency_key"
-        ],
+        "required": ["source_job_id", "idempotency_key"],
         "title": "AcquisitionPublication",
         "type": "object"
       },
@@ -2046,18 +1940,12 @@
           },
           "scope": {
             "default": "own",
-            "enum": [
-              "own",
-              "instance"
-            ],
+            "enum": ["own", "instance"],
             "title": "Scope",
             "type": "string"
           }
         },
-        "required": [
-          "job_id",
-          "idempotency_key"
-        ],
+        "required": ["job_id", "idempotency_key"],
         "title": "JobControlPreview",
         "type": "object"
       },
@@ -2085,18 +1973,12 @@
           },
           "scope": {
             "default": "own",
-            "enum": [
-              "own",
-              "instance"
-            ],
+            "enum": ["own", "instance"],
             "title": "Scope",
             "type": "string"
           }
         },
-        "required": [
-          "job_id",
-          "idempotency_key"
-        ],
+        "required": ["job_id", "idempotency_key"],
         "title": "JobControlPreview",
         "type": "object"
       },
@@ -2382,11 +2264,7 @@
         "additionalProperties": false,
         "properties": {
           "entity_type": {
-            "enum": [
-              "artist",
-              "album",
-              "track"
-            ],
+            "enum": ["artist", "album", "track"],
             "title": "Entity Type",
             "type": "string"
           },
@@ -2404,12 +2282,7 @@
             "$ref": "#/$defs/MetadataPatch"
           }
         },
-        "required": [
-          "entity_type",
-          "entity_uid",
-          "patch",
-          "idempotency_key"
-        ],
+        "required": ["entity_type", "entity_uid", "patch", "idempotency_key"],
         "title": "MetadataPreviewInput",
         "type": "object"
       },
@@ -2651,10 +2524,7 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "max_active_users",
-              "max_active_streams"
-            ],
+            "required": ["max_active_users", "max_active_streams"],
             "title": "_Downloads",
             "type": "object"
           },
@@ -2755,12 +2625,7 @@
                 "type": "string"
               }
             },
-            "required": [
-              "enabled",
-              "start",
-              "end",
-              "timezone"
-            ],
+            "required": ["enabled", "start", "end", "timezone"],
             "title": "_Window",
             "type": "object"
           }
@@ -2781,11 +2646,7 @@
             "$ref": "#/$defs/RuntimePatch"
           }
         },
-        "required": [
-          "expected_revision",
-          "patch",
-          "idempotency_key"
-        ],
+        "required": ["expected_revision", "patch", "idempotency_key"],
         "title": "RuntimeUpdatePreview",
         "type": "object"
       },
@@ -3267,9 +3128,7 @@
                 "title": "Venue"
               }
             },
-            "required": [
-              "item_id"
-            ],
+            "required": ["item_id"],
             "title": "ShowCandidate",
             "type": "object"
           },
@@ -3337,9 +3196,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "idempotency_key"
-        ],
+        "required": ["idempotency_key"],
         "title": "ShowsPrepare",
         "type": "object"
       },
@@ -3526,9 +3383,7 @@
             "title": "Until"
           }
         },
-        "required": [
-          "source"
-        ],
+        "required": ["source"],
         "title": "DiagnosticsInput",
         "type": "object"
       },
@@ -3560,10 +3415,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version"
-        ],
+        "required": ["plan_id", "plan_version"],
         "title": "ConfirmationInput",
         "type": "object"
       },
@@ -3590,10 +3442,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "job_id",
-          "idempotency_key"
-        ],
+        "required": ["job_id", "idempotency_key"],
         "title": "JobRetryInput",
         "type": "object"
       },
@@ -3624,11 +3473,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -3659,11 +3504,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -3748,10 +3589,7 @@
           "scope": {
             "anyOf": [
               {
-                "enum": [
-                  "artist",
-                  "global"
-                ],
+                "enum": ["artist", "global"],
                 "type": "string"
               },
               {
@@ -3762,9 +3600,7 @@
             "title": "Scope"
           }
         },
-        "required": [
-          "idempotency_key"
-        ],
+        "required": ["idempotency_key"],
         "title": "HealthCheckInput",
         "type": "object"
       },
@@ -3795,11 +3631,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -3830,11 +3662,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -3865,11 +3693,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "plan_id",
-          "plan_version",
-          "idempotency_key"
-        ],
+        "required": ["plan_id", "plan_version", "idempotency_key"],
         "title": "RepairApplyInput",
         "type": "object"
       },
@@ -3929,9 +3753,7 @@
             "title": "Scope"
           }
         },
-        "required": [
-          "idempotency_key"
-        ],
+        "required": ["idempotency_key"],
         "title": "QualityRunInput",
         "type": "object"
       },
@@ -4008,9 +3830,7 @@
             "title": "Schedule"
           }
         },
-        "required": [
-          "idempotency_key"
-        ],
+        "required": ["idempotency_key"],
         "title": "ScheduleRun",
         "type": "object"
       },
@@ -4033,11 +3853,7 @@
             "type": "integer"
           },
           "provider": {
-            "enum": [
-              "soulseek",
-              "tidal",
-              "bandcamp"
-            ],
+            "enum": ["soulseek", "tidal", "bandcamp"],
             "title": "Provider",
             "type": "string"
           },
@@ -4049,10 +3865,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "provider",
-          "query"
-        ],
+        "required": ["provider", "query"],
         "title": "AcquisitionSearch",
         "type": "object"
       },

@@ -18,6 +18,7 @@ def atomic(path, value):
     temporary = path.with_suffix(".tmp")
     with temporary.open("w") as output:
         json.dump(value, output, sort_keys=True)
+        os.fchmod(output.fileno(), 0o644)
         output.flush()
         os.fsync(output.fileno())
     temporary.replace(path)
@@ -25,6 +26,7 @@ def atomic(path, value):
 
 def publish(executor, context_root, public_root, *, now=None):
     public_root.mkdir(parents=True, exist_ok=True)
+    public_root.chmod(0o755)
     observed = time.time() if now is None else now
     try:
         marker = json.loads((context_root / "deployment.json").read_bytes())

@@ -27,8 +27,12 @@ def dispatch(message):
         raise ValueError("Unsupported method")
     name = params["name"]
     tool = next((item for item in catalog if item["name"] == name), None)
-    if tool is None or set(params) - {"name", "arguments"}:
+    if tool is None or set(params) - {"name", "arguments", "_meta"}:
         raise ValueError("Unsupported tool")
+    # Standard MCP client metadata is transport-only, never domain authority.
+    if "_meta" in params and not isinstance(params["_meta"], dict):
+        raise ValueError("Invalid transport metadata")
+    params = {"name": name, "arguments": params.get("arguments", {})}
     url = os.environ.get("CRATE_MCP_URL", "http://crate-api:8585/mcp")
     token = Path("/run/crate-hermes-secrets/mcp-token").read_text().strip()
     if not tool["annotations"]["readOnlyHint"]:
@@ -62,22 +66,40 @@ def main():
         line = sys.stdin.buffer.readline(65537)
         if not line or len(line) > 65536 or not line.endswith(b"\n"):
             return
-        identity = None
+        identity, message = None, {}
         try:
             message = json.loads(line)
             identity = message.get("id")
             if identity is None:
                 continue
             response = {"jsonrpc": "2.0", "id": identity, "result": dispatch(message)}
-        except Exception:  # noqa: BLE001 — no upstream secrets/error bodies
-            response = {
-                "jsonrpc": "2.0",
-                "id": identity,
-                "error": {
-                    "code": -32603,
-                    "message": "Current domain authority or evidence unavailable",
-                },
-            }
+        except Exception:  # noqa: BLE001 — never forward upstream secrets/error bodies
+            if isinstance(message, dict) and message.get("method") == "tools/call":
+                # Domain unavailability is an observed result, not a broken local
+                # MCP transport. Pinned Hermes also strikes its server breaker on
+                # isError results. Preserve uncertainty if a forwarded write lost
+                # its response: never imply it did not execute or replay it here.
+                payload = {
+                    "availability": "unavailable",
+                    "outcome": "unverified",
+                    "reason": "Current domain authority or evidence unavailable",
+                    "next_step": "Read current plan/job state before retrying a mutation",
+                }
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": identity,
+                    "result": {
+                        "isError": False,
+                        "structuredContent": payload,
+                        "content": [{"type": "text", "text": json.dumps(payload)}],
+                    },
+                }
+            else:
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": identity,
+                    "error": {"code": -32603, "message": "Unsupported MCP request"},
+                }
         print(json.dumps(response, separators=(",", ":")), flush=True)
 
 

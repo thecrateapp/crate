@@ -15,16 +15,22 @@ def record_deployment(root: Path, deployment: dict, state: str) -> None:
     if state not in {"deploying", "verified", "unverified", "rollback"}:
         raise ValueError("Unknown deployment state")
     root.mkdir(parents=True, exist_ok=True)
+    # Context is an intentional read-only public export, including the internal
+    # marker consumed by ContextStore. Never relax the host unit's private umask.
+    root.chmod(0o755)
     marker = root / (".deployment-" + uuid4().hex)
     marker.write_text(json.dumps({**deployment, "state": state}) + "\n")
+    marker.chmod(0o644)
     os.replace(marker, root / "deployment.json")
     public = root / "public"
     public.mkdir(exist_ok=True)
+    public.chmod(0o755)
     marker = public / (".deployment-" + uuid4().hex)
     marker.write_text(
         json.dumps({"release_sha": deployment.get("release_sha"), "state": state})
         + "\n"
     )
+    marker.chmod(0o644)
     os.replace(marker, public / "deployment.json")
 
 
@@ -36,6 +42,7 @@ def activate_context(root: Path, archive: Path | None, revision: str) -> None:
     record_deployment(root, {"release_sha": revision}, "deploying")
     releases = root / "releases"
     releases.mkdir(parents=True, exist_ok=True)
+    releases.chmod(0o755)
     target = None
     if archive is not None:
         with tempfile.TemporaryDirectory(
@@ -96,6 +103,13 @@ def activate_context(root: Path, archive: Path | None, revision: str) -> None:
     manifest = json.loads((target / "context-manifest.json").read_text())
     if manifest["release_sha"] != revision:
         raise ValueError("Stored context belongs to another release")
+    # Archive modes and a root bridge UMask=0077 must not make the exported
+    # source tree unreadable to its configured nonroot context consumer.
+    exported = [target, *target.rglob("*")]
+    if any(path.is_symlink() for path in exported):
+        raise ValueError("Symlink in exported context")
+    for path in exported:
+        path.chmod(0o755 if path.is_dir() else 0o644)
     link = root / (".active-" + uuid4().hex)
     link.symlink_to("releases/" + target.name)
     os.replace(link, root / "active")
@@ -110,6 +124,7 @@ def activate_context(root: Path, archive: Path | None, revision: str) -> None:
         )
         + "\n"
     )
+    marker.chmod(0o644)
     os.replace(marker, root / "public/context.json")
     record_deployment(root, manifest["deployment"], "verified")
 

@@ -53,6 +53,7 @@ from crate.mcp.schemas import (
     AnalysisStatusInput,
     ArtistInput,
     ConfirmationInput,
+    ConfirmationStatusInput,
     DiagnosticOutput,
     DiagnosticsInput,
     EnrichmentPlanInput,
@@ -100,6 +101,11 @@ OBSERVATION_TOOLS = {
 }
 
 CATALOG = {
+    "get_confirmation_status": (
+        ConfirmationStatusInput,
+        None,
+        "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+    ),
     "get_confirmation_policy": (
         InstanceInput,
         None,
@@ -451,7 +457,12 @@ def _allowed(principal, name, arguments=None):
         return bool(principal.grants)
     if name == "read_diagnostics" and arguments is None:
         return bool(principal.grants & {"ops.status.read", "ops.logs.read"})
-    if name in {"get_plan", "get_confirmation_policy", "request_plan_confirmation"}:
+    if name in {
+        "get_plan",
+        "get_confirmation_policy",
+        "get_confirmation_status",
+        "request_plan_confirmation",
+    }:
         from crate.agent_operation_catalog import OPERATIONS
 
         return bool(
@@ -527,6 +538,15 @@ def _execute(principal, name, arguments, trace_id):
                 )
                 action_finished = True
                 return result
+            if name == "get_confirmation_status":
+                from crate.db.repositories.agent_telegram import get_confirmation_status
+
+                return {
+                    "schema_version": "1",
+                    "availability": "available",
+                    "source": "durable_native_confirmation",
+                    "data": get_confirmation_status(principal, **arguments),
+                }
             if name == "get_confirmation_policy":
                 from crate.db.repositories.agent_telegram import approval_policy
 

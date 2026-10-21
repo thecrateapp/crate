@@ -83,25 +83,58 @@ class DomainProvider:
         if result.get("state") != "outcome" or not result.get("result", {}).get("job"):
             return
         job_id = result["result"]["job"]["job_id"]
-        token = WATCH_TOKEN_FILE.read_text().strip()
-        request = urllib.request.Request(
-            WATCH_URL,
-            data=json.dumps({"job_id": job_id, "ttl": 86400}).encode(),
-            method="POST",
-            headers={
-                "Authorization": "Bearer " + token,
-                "Content-Type": "application/json",
-            },
+        previous = result["result"].get("monitoring", {})
+        if (
+            previous.get("state") == "confirmed"
+            and previous.get("expires_at", 0) > time.time()
+        ):
+            return
+        receipt = {
+            "confirmation_id": result["confirmation_id"],
+            "chat_id": result["chat_id"],
+            "job_id": job_id,
+        }
+        try:
+            token = WATCH_TOKEN_FILE.read_text().strip()
+            request = urllib.request.Request(
+                WATCH_URL,
+                data=json.dumps({"job_id": job_id, "ttl": 86400}).encode(),
+                method="POST",
+                headers={
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json",
+                },
+            )
+            with self.opener.open(request, timeout=5) as response:
+                raw = response.read(16385)
+            registered = json.loads(raw)
+            expires = registered.get("expires_at")
+            if (
+                len(raw) > 16384
+                or registered.get("job_id") != job_id
+                or type(expires) not in (int, float)
+                or not time.time() < expires <= time.time() + 72 * 3600
+            ):
+                raise ValueError("Durable job watch unavailable")
+        except Exception:  # noqa: BLE001 — persist only a fixed sanitized failure, never transport bodies
+            recorded = self._post({"kind": "watch_unavailable", **receipt})
+            result["result"]["monitoring"] = recorded["monitoring"]
+            if result.get("delivery_attempts", 0) < result.get(
+                "max_delivery_attempts", 20
+            ):
+                raise ValueError("Supervisor watch enrollment unavailable") from None
+            # Final bounded outcome explicitly reports unavailable monitoring;
+            # recording/sending it never retries domain admission or effects.
+            return
+        recorded = self._post(
+            {"kind": "watch_enrolled", "watch_expires_at": expires, **receipt}
         )
-        with self.opener.open(request, timeout=5) as response:
-            raw = response.read(16385)
-        if len(raw) > 16384 or json.loads(raw).get("job_id") != job_id:
-            raise ValueError("Durable job watch unavailable")
+        result["result"]["monitoring"] = recorded["monitoring"]
 
     async def event(self, event):
         result = await asyncio.to_thread(self._post, event)
-        # The persisted native outcome retries until this independent read-only
-        # watch is durable, before acknowledging outcome delivery. No model turn.
+        # Retry enrollment before delivery; the final bounded attempt explicitly
+        # reports unavailable coverage if it still cannot enroll. No model turn.
         await asyncio.to_thread(self._watch_outcome, result)
         return result
 
@@ -208,6 +241,13 @@ class NativePresenter:
                             message_text += "\nJob: " + value["job"]["job_id"]
                         if value.get("reason"):
                             message_text += "\nApply unavailable: " + value["reason"]
+                        if value.get("job"):
+                            monitoring = value.get("monitoring", {})
+                            message_text += (
+                                "\nMonitoring: supervisor watch enrolled; effect verification pending."
+                                if monitoring.get("state") == "confirmed"
+                                else "\nMonitoring unavailable: watch enrollment not confirmed. Read get_confirmation_status for this confirmation."
+                            )
                         markup = None
                     else:
                         message_text = result["text"]

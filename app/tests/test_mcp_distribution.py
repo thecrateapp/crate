@@ -71,12 +71,13 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
     artifact = export_contract()
     definitions = {row["name"]: row for row in artifact["tools"]}
-    assert len(definitions) == 64
+    assert len(definitions) == 65
     assert (
         definitions["editorial_plan_prepare"]["input_schema"]["additionalProperties"]
         is False
     )
     assert definitions["get_instance_status"]["read_only"] is True
+    assert definitions["get_confirmation_status"]["read_only"] is True
     assert artifact["output_schema"]["additionalProperties"] is False
     assert "private_key" not in json.dumps(artifact)
     published = json.loads(

@@ -144,6 +144,7 @@ def test_domain_adapter_discovers_offline_then_uses_live_policy_after_recovery(
     online = [False]
 
     def rpc(url, token, method, params, request_id):
+        assert "_meta" not in params
         calls.append((method, params))
         if not online[0]:
             raise OSError("API down")
@@ -169,7 +170,11 @@ def test_domain_adapter_discovers_offline_then_uses_live_policy_after_recovery(
     monkeypatch.setattr(domain_mcp, "_mcp_request", rpc)
     write = {
         "method": "tools/call",
-        "params": {"name": "request_plan_confirmation", "arguments": {}},
+        "params": {
+            "name": "request_plan_confirmation",
+            "arguments": {},
+            "_meta": {"progressToken": 7, "human_approval": True},
+        },
     }
     with pytest.raises(OSError):
         domain_mcp.dispatch(write)
@@ -287,20 +292,38 @@ def test_domain_native_outcome_automatically_registers_watch_before_receipt(
             return False
 
         def read(self, _):
-            return b'{"job_id":"job-native"}'
+            return json.dumps(
+                {"job_id": "job-native", "expires_at": time.time() + 86400}
+            ).encode()
 
     def opened(request, timeout):
         calls.append((request, timeout))
         return Response()
 
     provider = object.__new__(module.DomainProvider)
+    receipts = []
+    provider._post = lambda value: (
+        receipts.append(value)
+        or {
+            "monitoring": {
+                "state": "confirmed",
+                "expires_at": value["watch_expires_at"],
+            }
+        }
+    )
     provider.opener = SimpleNamespace(open=opened)
     provider._watch_outcome(
-        {"state": "outcome", "result": {"job": {"job_id": "job-native"}}}
+        {
+            "state": "outcome",
+            "confirmation_id": "a" * 32,
+            "chat_id": 123,
+            "result": {"job": {"job_id": "job-native"}},
+        }
     )
     assert calls[0][0].full_url == "http://crate-operator-supervisor:8791/v1/watch-job"
     assert json.loads(calls[0][0].data) == {"job_id": "job-native", "ttl": 86400}
     assert calls[0][0].headers["Authorization"] == "Bearer separate-supervisor-read"
+    assert receipts[0]["kind"] == "watch_enrolled"
     state = State(tmp_path / "state")
     try:
         supervisor = Supervisor(
@@ -505,3 +528,58 @@ def test_native_incident_commands_and_read_watch_adapter_use_separate_http_autho
         server.shutdown()
         server.server_close()
         state.close()
+
+
+def test_domain_stdio_unavailability_is_bounded_transport_success_not_effect_success(
+    monkeypatch, capsys
+):
+    import io
+
+    import domain_mcp
+
+    calls = []
+    original = Path.read_text
+    monkeypatch.setattr(
+        domain_mcp.Path,
+        "read_text",
+        lambda self: "synthetic-domain" if self.name == "mcp-token" else original(self),
+    )
+
+    def rpc(url, token, method, params, request_id):
+        calls.append(params)
+        if len(calls) <= 4:
+            raise OSError("private upstream body must not escape")
+        return {"isError": False, "content": [{"type": "text", "text": "recovered"}]}
+
+    monkeypatch.setattr(domain_mcp, "_mcp_request", rpc)
+    requests = [
+        {
+            "jsonrpc": "2.0",
+            "id": i,
+            "method": "tools/call",
+            "params": {
+                "name": "get_instance_inventory",
+                "arguments": {},
+                "_meta": {"progressToken": i},
+            },
+        }
+        for i in range(5)
+    ]
+    requests.append({"jsonrpc": "2.0", "id": 6, "method": "unknown"})
+    monkeypatch.setattr(
+        domain_mcp.sys,
+        "stdin",
+        SimpleNamespace(
+            buffer=io.BytesIO("".join(json.dumps(r) + "\n" for r in requests).encode())
+        ),
+    )
+    domain_mcp.main()
+    replies = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    for value in replies[:4]:
+        assert "error" not in value and not value["result"]["isError"]
+        data = value["result"]["structuredContent"]
+        assert data["availability"] == "unavailable" and data["outcome"] == "unverified"
+        assert "private" not in json.dumps(value)
+    assert replies[4]["result"]["content"][0]["text"] == "recovered"
+    assert replies[5]["error"]["code"] == -32603
+    assert all("_meta" not in call for call in calls)

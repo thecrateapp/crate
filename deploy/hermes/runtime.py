@@ -199,7 +199,16 @@ def operator_preflight(url, token, supervisor_token, config):
 
 
 def configure_operator(home: Path, assets: Path, *, domain_available: bool) -> None:
+    # The pinned MCP launcher resolves default cwd through HOME independently
+    # of HERMES_HOME. Never inherit root's HOME after dropping the runtime UID.
+    os.environ["HOME"] = str(home)
+    os.environ["XDG_STATE_HOME"] = str(home / "xdg-state")
     config = json.loads((assets / "config.operator.json").read_text())
+    # Pinned Hermes strips non-allowlisted parent variables from MCP children.
+    config["mcp_servers"]["crate"]["env"] = {
+        "CRATE_MCP_URL": os.environ.get("CRATE_MCP_URL", "http://crate-api:8585/mcp"),
+        "CRATE_MCP_HOST": os.environ.get("CRATE_MCP_HOST", "api.lespedants.org"),
+    }
     (home / "SOUL.md").write_text(
         (assets / "SOUL.operator.md").read_text()
         + "\n\n"

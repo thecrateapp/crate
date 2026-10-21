@@ -30,6 +30,8 @@ sources:
   - app/crate/projector_daemon.py
   - scripts/operator_candidate.py
   - scripts/operator_gateway_smoke.py
+  - scripts/operator_gateway_probe.py
+  - app/tests/test_operator_confirmation_status.py
   - scripts/hermes_context.py
   - app/tests/test_operator_domain_integration.py
   - app/tests/test_operator_integration.py
@@ -91,7 +93,11 @@ live discovery, current approval policy and server authority. Failed API/context
 reads do not remove independent native providers. When the API returns, the same
 adapter and gateway can use current domain reads and mutation preparation without
 a restart. No cached grant authorizes an effect. The original pilot startup policy
-is unchanged.
+is unchanged. Standard MCP `_meta` is discarded before domain dispatch; it supplies
+no authority. Expected API/policy unavailability returns a normal MCP availability
+report with an unverified outcome, preserving the healthy local connection. It is
+never evidence that a failed forwarded mutation did not execute; inspect its
+existing plan/job before retrying.
 
 After native approval admits a domain job, the persisted native outcome registers
 `/v1/watch-job` using the separate supervisor read/watch bearer before acknowledging
@@ -100,8 +106,21 @@ native retries. No Admin per-plan step, second human command or model turn start
 monitoring. The independent supervisor sends terminal/cancellation and subsequent
 verification/projection changes through its durable signed delivery route. A task
 completion, applied effect, verification, and projection remain separate fields.
-A full watch queue (30) or exhausted native retry remains inspectable; there is no
-unbounded retry or claim of successful observation.
+The same durable confirmation row stores a native enrollment receipt only after
+the supervisor returns the exact job and a bounded expiry. Enrollment confirms
+registration, not current polling, transport delivery or effect verification.
+`get_confirmation_status(confirmation_id)` reads the exact admitted result,
+delivery state/attempts (maximum 20), and enrollment state. It requires the
+originating principal/credential, unchanged authorization context, current binding,
+instance and grants; it remains usable during provenance drift or disabled writes.
+It neither approves nor changes state and exposes no arbitrary query.
+
+A full watch queue (30) or network failure retries through that existing native
+outbox, surviving presenter restarts without replaying admission. On the final
+attempt the presenter explicitly reports unavailable monitoring in the same
+Telegram outcome. If that delivery also fails, the read contract reports exhausted
+delivery; there is no unbounded retry. Missing receipts are unverified, failed or
+expired enrollment is unavailable. Message delivery alone never confirms a watch.
 
 For incident decisions, the private authenticated human sends:
 
@@ -146,8 +165,11 @@ One consolidated rollout must provision:
 2. Root-owned assets under `/opt/crate-operator/assets`, context under
    `/opt/crate-operator/context`, and the reviewed overlay installed at
    `/opt/crate-host/.deploy/hermes.compose.yaml`. Only the dedicated gateway home and
-   supervisor state are owned by their runtime UID. `XDG_STATE_HOME` and working
-   directory are inside the dedicated gateway home. Secret directories use distinct
+   supervisor state are owned by their runtime UID. `HOME`, `XDG_STATE_HOME` and
+   working directory are inside the dedicated gateway home. Explicit child MCP
+   environment carries the internal URL and required Crate Host header. Public
+   context directories are 0755 and exported content/markers are 0644 at each atomic
+   replacement, including activation under the bridge’s private 0077 umask. Secret directories use distinct
    files with permissions granting only their actual consumers access.
 3. Domain write credential with mandatory approval and current least-privilege
    grants, separate read-only supervisor credential, current Crate human binding,
@@ -258,9 +280,14 @@ docker run --rm --network none \
 
 The harness uses the public pinned Telegram `base_url` support, synthetic secrets,
 real native plugin lifecycle, signed direct delivery, API-off cold start, a native
-approved synthetic restart and the same persistent domain adapter after API
-recovery. It runs UID10000 with dedicated cwd/XDG paths, no personal OAuth and no
-model input. The fake recovered API proves reconnection; separate real-PostgreSQL
+approved synthetic restart and calls through the gateway’s already discovered
+registry/standard dispatcher and its own persistent MCP child after API recovery.
+The acceptance-only native plugin neither discovers/registers tools nor creates
+a client. Six API-off calls exceed the pinned client’s breaker threshold, then
+reads and mutation preparation recover without a reset/restart. Revoking current
+server policy blocks preparation while reads continue; handler and adapter PID
+remain the same. It asserts actual UID10000 and dedicated HOME/cwd/XDG paths,
+no personal OAuth and no model input. The fake recovered API proves reconnection; separate real-PostgreSQL
 SDK/native/worker tests prove domain authority and effects. Neither substitutes
 for real target acceptance.
 

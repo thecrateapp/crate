@@ -37,10 +37,19 @@ config["platforms"]["telegram"]["extra"].update(
 # Keep the actual bounded adapters; their code is mounted from this candidate.
 for key in ("crate_infra", "crate_supervisor"):
     config["mcp_servers"][key]["env"]["PYTHONPATH"] = "/workspace"
+config["plugins"]["enabled"].append("crate-acceptance-probe")
 (ASSETS / "config.operator.json").write_text(json.dumps(config))
 (LAB_HOME / "plugins").mkdir()
 shutil.copytree(
     ASSETS / "plugins/crate_confirmation", LAB_HOME / "plugins/crate-confirmation"
+)
+probe_plugin = LAB_HOME / "plugins/crate-acceptance-probe"
+probe_plugin.mkdir()
+shutil.copyfile(
+    REPO / "scripts/operator_gateway_probe.py", probe_plugin / "__init__.py"
+)
+(probe_plugin / "plugin.yaml").write_text(
+    "name: crate-acceptance-probe\nversion: 1.0.0\ndescription: Disposable registry acceptance\nprovides_tools: []\nprovides_hooks: []\n"
 )
 secrets = Path("/run/crate-hermes-secrets")
 secrets.mkdir()
@@ -186,7 +195,7 @@ class Bot(http.server.BaseHTTPRequestHandler):
                     (
                         time.time() + 1,
                         {
-                            "update_id": 1000 + mid,
+                            "update_id": 10000 + len(updates),
                             "callback_query": {
                                 "id": "query-" + str(mid),
                                 "from": {
@@ -246,36 +255,68 @@ gateway = subprocess.Popen(
     user=10000,
     group=10000,
 )
-gate = subprocess.Popen(
-    [sys.executable, str(ASSETS / "domain_mcp.py")],
-    env=env,
-    stdin=subprocess.PIPE,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.DEVNULL,
-    text=True,
-    cwd=LAB_HOME,
-    user=10000,
-    group=10000,
-)
 api = None
+policy_allowed = True
+api_calls = []
 
 
-def domain(method, params=None):
-    gate.stdin.write(
-        json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}
+def probe(phase):
+    # This is consumed by the real native PTB plugin in the gateway process;
+    # it invokes only existing registered tools, never another adapter/client.
+    uid = 10000 + len(updates)
+    text = "/crate_probe " + phase
+    updates.append(
+        (
+            time.time(),
+            {
+                "update_id": uid,
+                "message": {
+                    "message_id": uid,
+                    "date": int(time.time()),
+                    "chat": {"id": 123, "type": "private"},
+                    "from": {"id": 123, "is_bot": False, "first_name": "Human"},
+                    "text": text,
+                    "entities": [{"type": "bot_command", "offset": 0, "length": 12}],
+                },
+            },
         )
-        + "\n"
     )
-    gate.stdin.flush()
-    return json.loads(gate.stdout.readline())
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        for item in messages:
+            if item["text"].startswith("CRATE_PROBE "):
+                result = json.loads(item["text"].removeprefix("CRATE_PROBE "))
+                if result["phase"] == phase:
+                    assert all(result["registered"].values()), result
+                    assert result["registered_domain_tools"] > 50, result
+                    assert result["pid"] == gateway.pid, result
+                    assert result["home"] == result["cwd"] == str(LAB_HOME), result
+                    assert result["uid"] == 10000, result
+                    assert result["xdg_state_home"] == str(LAB_HOME / "xdg-state"), (
+                        result
+                    )
+                    return result
+        time.sleep(0.2)
+    raise AssertionError(
+        "Gateway probe missing: " + (LAB_HOME / "gateway.log").read_text()[-8000:]
+    )
 
 
-assert "result" in domain("initialize")
-assert len(domain("tools/list")["result"]["tools"]) > 50
-assert "error" in domain(
-    "tools/call", {"name": "get_instance_inventory", "arguments": {}}
-)
+def owned_domain_adapter():
+    found = []
+    for process in Path("/proc").glob("[0-9]*"):
+        try:
+            command = (process / "cmdline").read_bytes().split(b"\0")
+            parent = int((process / "stat").read_text().split()[3])
+            if (
+                str(ASSETS / "domain_mcp.py").encode() in command
+                and parent == gateway.pid
+            ):
+                found.append(int(process.name))
+        except (OSError, ValueError):
+            pass
+    assert len(found) == 1, found
+    return found[0]
 
 
 class API(http.server.BaseHTTPRequestHandler):
@@ -285,6 +326,7 @@ class API(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         method, params = request["method"], request.get("params", {})
+        api_calls.append((method, params.get("name")))
         if method == "tools/list":
             result = {
                 "tools": json.loads((ASSETS / "operator-catalog.json").read_text())
@@ -293,7 +335,7 @@ class API(http.server.BaseHTTPRequestHandler):
             result = {
                 "structuredContent": {
                     "data": {
-                        "operator_provenance_required": True,
+                        "operator_provenance_required": policy_allowed,
                         "require_approval": True,
                         "actions_enabled": True,
                         "instance_id": "lab",
@@ -305,8 +347,10 @@ class API(http.server.BaseHTTPRequestHandler):
                 }
             }
         else:
+            payload = {"data": {"recovered": True, "tool": params.get("name")}}
             result = {
-                "structuredContent": {"data": {"recovered": True}},
+                "structuredContent": payload,
+                "content": [{"type": "text", "text": json.dumps(payload)}],
                 "isError": False,
             }
         raw = json.dumps(
@@ -341,6 +385,21 @@ try:
         raise AssertionError(
             "Gateway did not connect: " + (LAB_HOME / "gateway.log").read_text()[-5000:]
         )
+    # Discovery has already run inside this gateway before Telegram connects.
+    cold = probe("cold")
+    assert all(
+        "recovered" not in value and "unavailable" in value.lower()
+        for value in cold["results"].values()
+    ), cold
+    cold_repeat = probe("cold-repeat")
+    cold_third = probe("cold-third")
+    assert cold_repeat["handlers"] == cold_third["handlers"] == cold["handlers"]
+    assert all(
+        "unavailable" in value.lower()
+        for result in (cold_repeat, cold_third)
+        for value in result["results"].values()
+    )
+    adapter_pid = owned_domain_adapter()
     # Direct signed delivery exercises the real pinned webhook implementation.
     transport = HermesTransport(
         "http://127.0.0.1:8644/webhooks/crate-operator",
@@ -374,25 +433,32 @@ try:
     assert outcome["state"] == "succeeded", outcome
     assert any("Deterministic incident smoke" in item["text"] for item in messages)
     assert callbacks and callbacks[-1].endswith(":approve")
-    # Same gateway and already initialized adapter survive API recovery. Fresh
-    # server policy is consulted on the write; backend PG tests cover its actual
-    # provenance/approval/effect enforcement, rather than pretending this fake API
-    # is a real domain mutation.
-    gateway_pid, adapter_pid = gateway.pid, gate.pid
+    # Use the actual gateway registry/dispatch and its already connected child.
+    # This harness never invokes discovery or starts a standalone domain adapter.
     api = http.server.ThreadingHTTPServer(("127.0.0.1", 8585), API)
     threading.Thread(target=api.serve_forever, daemon=True).start()
-    assert domain("tools/call", {"name": "get_instance_inventory", "arguments": {}})[
-        "result"
-    ]["structuredContent"]["data"]["recovered"]
-    assert domain("tools/call", {"name": "request_plan_confirmation", "arguments": {}})[
-        "result"
-    ]["structuredContent"]["data"]["recovered"]
-    assert (
-        gateway.poll() is None
-        and gateway.pid == gateway_pid
-        and gate.pid == adapter_pid
+    recovered = probe("recovered")
+
+    def recovered_payload(value):
+        wrapper = json.loads(value)
+        payload = wrapper.get("structuredContent") or json.loads(wrapper["result"])
+        return payload["data"]["recovered"] is True
+
+    assert all(recovered_payload(value) for value in recovered["results"].values()), (
+        recovered
     )
-    # Never send text updates to the model. Network namespace has only loopback.
+    assert recovered["handlers"] == cold["handlers"], (cold, recovered)
+    assert ("tools/call", "get_confirmation_policy") in api_calls
+    assert ("tools/call", "preview_job_retry") in api_calls
+    writes = api_calls.count(("tools/call", "preview_job_retry"))
+    policy_allowed = False
+    revoked = probe("revoked")
+    assert recovered_payload(revoked["results"]["read"]), revoked
+    assert "unavailable" in revoked["results"]["prepare"].lower(), revoked
+    assert api_calls.count(("tools/call", "preview_job_retry")) == writes
+    assert revoked["handlers"] == cold["handlers"]
+    assert gateway.poll() is None and owned_domain_adapter() == adapter_pid
+    # Native test commands are handled without a model turn. Only loopback exists.
     evidence = {
         "gateway": "pinned-v0.22.2",
         "api_at_cold_start": "unavailable",
@@ -402,16 +468,26 @@ try:
         "infra_outcome": outcome["state"],
         "signed_delivery": True,
         "model_requests": 0,
-        "same_process_domain_reconnect": True,
-        "uid": 10000,
-        "cwd": str(LAB_HOME),
-        "xdg_state_home": str(LAB_HOME / "xdg-state"),
+        "gateway_owned_domain_reconnect": True,
+        "gateway_pid": gateway.pid,
+        "gateway_adapter_pid": adapter_pid,
+        "gateway_registered_domain_tools": cold["registered_domain_tools"],
+        "gateway_current_policy_revocation": True,
+        "gateway_handler_identity_stable": True,
+        "cold_unavailable_calls": 6,
+        "automatic_recovery_without_circuit_reset": True,
+        "uid": cold["uid"],
+        "home": cold["home"],
+        "cwd": cold["cwd"],
+        "xdg_state_home": cold["xdg_state_home"],
         "telegram": "loopback-fake",
     }
     print(json.dumps(evidence))
+except BaseException:
+    print(json.dumps({"api_calls": api_calls}), file=sys.stderr)
+    print((LAB_HOME / "gateway.log").read_text()[-20000:], file=sys.stderr)
+    raise
 finally:
-    gate.terminate()
-    gate.wait(timeout=5)
     if api:
         api.shutdown()
         api.server_close()

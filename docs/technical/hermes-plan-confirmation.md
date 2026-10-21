@@ -19,6 +19,7 @@ sources:
   - deploy/hermes/runtime.py
   - app/tests/test_agent_telegram.py
   - app/tests/test_hermes_confirmation.py
+  - app/tests/test_operator_confirmation_status.py
 ---
 
 # Native Telegram plan confirmation
@@ -48,11 +49,24 @@ The Admin plan detail/approve/reject pages remain available as a fallback.
    and admits the exact operation with `telegram:<confirmation-id>` as its stable
    idempotency key. The originating integration and credential cannot be replaced.
    No further free-text message or model invocation is needed.
-5. The bot reports the decision and admitted job ID in the same chat. Use `get_job`
-   and `get_plan` to inspect execution, verification and downstream completion.
+5. The native presenter enrolls the admitted job with the independent supervisor
+   using its read/watch bearer and reports the outcome in the same chat. Existing
+   durable retries survive restarts; no additional human/model command starts
+   monitoring. `get_confirmation_status(confirmation_id)` reports the exact admitted
+   result, bounded delivery attempts and enrollment evidence. Only a native receipt
+   for the exact job and unexpired supervisor registration confirms enrollment.
+   Missing evidence is unverified; failure or expiry is unavailable. On the final
+   enrollment attempt the Telegram outcome explicitly reports unavailable monitoring.
+   Delivery can itself exhaust; inspect the read status without replaying admission.
+   Use `get_job` and `get_plan` to inspect execution, verification and downstream completion.
    A queued job is not evidence of an applied or verified effect. Reconcile uncertain
    results; never create a new key to replay a possibly completed effect. Request
    cancellation through `preview_job_cancel`, review it, and apply that exact plan.
+
+The status read is limited to the originating integration/credential, current
+binding, instance, authorization context and grants. It neither supplies human
+authority nor mutates the row, and stays available during provenance drift.
+Confirmed enrollment does not prove live polling or a verified effect.
 
 When `apply_after_approval` is false the human decision only authorizes the plan;
 apply its exact version using the normal operation tool and a stable key. If the
