@@ -1,0 +1,109 @@
+import { screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+
+import { StatsMovement } from "./StatsMovement";
+import type { StatsStory, StatsStoryArtistSignal } from "./stats-types";
+
+function signal(
+  name: string,
+  extra: Partial<StatsStoryArtistSignal> = {},
+): StatsStoryArtistSignal {
+  return {
+    artist_name: name,
+    artist_slug: name.toLowerCase().replace(/\s+/g, "-"),
+    play_count: 10,
+    minutes_listened: 30,
+    ...extra,
+  };
+}
+
+function story(parts: Partial<StatsStory> = {}): StatsStory {
+  return {
+    window: "30d",
+    movers: [],
+    discoveries: [],
+    comebacks: [],
+    ...parts,
+  } as StatsStory;
+}
+
+describe("StatsMovement", () => {
+  it("excludes the hero and top three artists", () => {
+    renderWithListenProviders(
+      <StatsMovement
+        scope="personal"
+        exclude={["Hero", "Top Two", " Top Three "]}
+        story={story({
+          movers: [
+            signal("Hero", { delta_play_count: 9 }),
+            signal("Top Two", { delta_play_count: 8 }),
+            signal("Top Three", { delta_play_count: 7 }),
+            signal("Riser", { delta_play_count: 6 }),
+          ],
+          discoveries: [signal("Hero"), signal("Newcomer")],
+          comebacks: [signal("top two"), signal("Returner")],
+        })}
+      />,
+    );
+    expect(screen.queryByText("Hero")).toBeNull();
+    expect(screen.queryByText("Top Two")).toBeNull();
+    expect(screen.queryByText("Top Three")).toBeNull();
+    expect(screen.getByText("Riser")).toBeInTheDocument();
+    expect(screen.getByText("Newcomer")).toBeInTheDocument();
+    // Comparison is case-sensitive: "top two" is a different artist.
+    expect(screen.getByText("top two")).toBeInTheDocument();
+    expect(screen.getByText("Returner")).toBeInTheDocument();
+    expect(
+      screen.getByText("+6 plays versus the previous window."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows only rising on global", () => {
+    const { container } = renderWithListenProviders(
+      <StatsMovement
+        scope="global"
+        exclude={[]}
+        story={story({
+          movers: [signal("Riser", { delta_play_count: 2 })],
+          discoveries: [signal("Newcomer")],
+          comebacks: [signal("Returner")],
+        })}
+      />,
+    );
+    expect(container.querySelector("#movement")).not.toBeNull();
+    expect(screen.getByText("Riser")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Rising" })).toBeInTheDocument();
+    expect(screen.queryByText("Newcomer")).toBeNull();
+    expect(screen.queryByText("Returner")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "New blood" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Comeback" })).toBeNull();
+  });
+
+  it("shows empty copy per column", () => {
+    renderWithListenProviders(
+      <StatsMovement scope="personal" exclude={[]} story={story()} />,
+    );
+    expect(screen.getByText("No surge yet")).toBeInTheDocument();
+    expect(screen.getByText("No new obsession yet")).toBeInTheDocument();
+    expect(screen.getByText("No comeback yet")).toBeInTheDocument();
+  });
+
+  it("links each artist from its column", () => {
+    renderWithListenProviders(
+      <StatsMovement
+        scope="personal"
+        exclude={[]}
+        story={story({ movers: [signal("Riser", { delta_play_count: 2 })] })}
+      />,
+    );
+    const rising = screen
+      .getByRole("heading", { name: "Rising" })
+      .closest("section") as HTMLElement;
+    expect(within(rising).getByRole("link", { name: /Riser/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("riser"),
+    );
+  });
+});

@@ -36,7 +36,6 @@ const EMPTY_TOP_ARTISTS: StatsDashboard["top_artists"]["items"] = [];
 const EMPTY_TOP_ALBUMS: StatsDashboard["top_albums"]["items"] = [];
 const EMPTY_TOP_GENRES: StatsDashboard["top_genres"]["items"] = [];
 const EMPTY_REPLAY_ITEMS: ReplayMix["items"] = [];
-const EMPTY_DISCOVERIES: StatsStory["discoveries"] = [];
 
 export interface StatsPageController {
   changeSelection: (selection: StatsSelection) => void;
@@ -44,7 +43,6 @@ export interface StatsPageController {
   dashboardLoading: boolean;
   dashboardError: string | null;
   retryDashboard: () => void;
-  discoveries: StatsStory["discoveries"];
   hasStats: boolean;
   isGlobalStats: boolean;
   isUserStats: boolean;
@@ -217,7 +215,6 @@ export function useStatsPageController(): StatsPageController {
     dashboardLoading,
     dashboardError,
     retryDashboard: refetchDashboard,
-    discoveries: story?.discoveries ?? EMPTY_DISCOVERIES,
     hasStats:
       Boolean(overview?.play_count) || dashboard?.snapshot?.pending === true,
     isGlobalStats,

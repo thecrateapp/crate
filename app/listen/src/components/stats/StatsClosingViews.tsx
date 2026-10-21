@@ -5,23 +5,7 @@ import type { ReactNode } from "react";
 import { Card } from "@crate/ui/shadcn/card";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
-import { EmptyState } from "@crate/ui/domain/states";
-import type {
-  StatsDecadeAlbum,
-  StatsMusicAge,
-  StatsStoryArtistSignal,
-} from "./stats-types";
-
-function formatDay(value: string | null | undefined, locale: string) {
-  if (!value) return "";
-  const date =
-    value.length > 10 ? new Date(value) : new Date(`${value}T00:00:00Z`);
-  return date.toLocaleDateString(locale, {
-    day: "numeric",
-    month: "short",
-    ...(value.length > 10 ? {} : { timeZone: "UTC" }),
-  });
-}
+import type { StatsDecadeAlbum, StatsMusicAge } from "./stats-types";
 
 export function StatsDecadeColumnsView({
   musicAge,
@@ -114,56 +98,6 @@ export function StatsMusicAgeCardView({
           })}
         </p>
       ) : null}
-    </Card>
-  );
-}
-
-export function StatsDiscoveriesCardView({
-  discoveries,
-  renderArtist,
-  getArtistHref,
-}: {
-  discoveries: StatsStoryArtistSignal[];
-  renderArtist: (artist: StatsStoryArtistSignal) => ReactNode;
-  getArtistHref: (artist: StatsStoryArtistSignal) => string;
-}) {
-  const { t, i18n } = useTranslation();
-  return (
-    <Card className="gap-4 p-5">
-      <MonoLabel as="h3" tone="accent">
-        {t("stats.discoveries.title")}
-      </MonoLabel>
-      {discoveries.length ? (
-        <ul className="mt-3 divide-y divide-border-quiet">
-          {discoveries.slice(0, 4).map((artist) => {
-            return (
-              <li key={artist.artist_name}>
-                <Link
-                  to={getArtistHref(artist)}
-                  className="flex items-center gap-3 py-2.5"
-                >
-                  {renderArtist(artist)}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-text-primary">
-                      {artist.artist_name}
-                    </div>
-                    <MonoLabel>
-                      {t("stats.discoveries.since", {
-                        date: formatDay(artist.first_played_at, i18n.language),
-                      })}
-                    </MonoLabel>
-                  </div>
-                  <MonoLabel as="span" tone="accent">
-                    {t("common.playCount", { count: artist.play_count })}
-                  </MonoLabel>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <EmptyState message={t("stats.discoveries.empty")} />
-      )}
     </Card>
   );
 }

@@ -1,30 +1,15 @@
 import { CrateImage } from "@/components/artwork/CrateImage";
-import {
-  albumCoverApiUrl,
-  albumPagePath,
-  artistPagePath,
-  artistPhotoApiUrl,
-} from "@/lib/library-routes";
-import type {
-  StatsDecadeAlbum,
-  StatsMusicAge,
-  StatsStoryArtistSignal,
-} from "./stats-types";
+import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
+import type { StatsDecadeAlbum, StatsMusicAge } from "./stats-types";
 import {
   StatsDecadeColumnsView,
   StatsMusicAgeCardView,
-  StatsDiscoveriesCardView,
 } from "./StatsClosingViews";
 const albumRoute = (album: StatsDecadeAlbum) => ({
   albumId: album.album_id ?? undefined,
   albumSlug: album.album_slug ?? undefined,
   artistName: album.artist ?? undefined,
   albumName: album.album,
-});
-const artistRoute = (artist: StatsStoryArtistSignal) => ({
-  artistId: artist.artist_id,
-  artistSlug: artist.artist_slug,
-  artistName: artist.artist_name,
 });
 export function StatsDecadeColumns(props: {
   musicAge: StatsMusicAge;
@@ -51,26 +36,6 @@ export function StatsMusicAgeCard({ musicAge }: { musicAge: StatsMusicAge }) {
     <StatsMusicAgeCardView
       musicAge={musicAge}
       decades={<StatsDecadeColumns musicAge={musicAge} linked />}
-    />
-  );
-}
-export function StatsDiscoveriesCard({
-  discoveries,
-}: {
-  discoveries: StatsStoryArtistSignal[];
-}) {
-  return (
-    <StatsDiscoveriesCardView
-      discoveries={discoveries}
-      getArtistHref={(artist) => artistPagePath(artistRoute(artist))}
-      renderArtist={(artist) => (
-        <CrateImage
-          src={artistPhotoApiUrl(artistRoute(artist), { size: 128 })}
-          alt=""
-          className="crate-media-thumbnail size-12 shrink-0 rounded-full object-cover"
-          loading="lazy"
-        />
-      )}
     />
   );
 }

@@ -6863,18 +6863,6 @@
     "sourceHash": "sha256:df3e72efb3071fc4b6c6373e868a0713605f296b1fb210f94d6045ebf7ae5cce",
     "reviewedAt": "2026-10-08T14:46:50.978Z"
   },
-  "stats.discoveries.empty": {
-    "sourceHash": "sha256:abc05770067adcd5559b5f476f338232c87694eedc76f2446d560bf755538019",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.discoveries.since": {
-    "sourceHash": "sha256:baccaa6b0a8e6c79c73b4a907d08090ca423880fba8d9fccf6d385cc3270c4e0",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
-  "stats.discoveries.title": {
-    "sourceHash": "sha256:57e57117a93640ed5822729127c90b46907aca951bb9f65c0c7a3def694b07cf",
-    "reviewedAt": "2026-10-08T00:23:45.012Z"
-  },
   "stats.empty.body": {
     "sourceHash": "sha256:225d7a581b76e9463429d0f30d2f320292e3dcdce315a13a36fd6771b080aa1d",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -7122,6 +7110,10 @@
   "stats.metrics.plays": {
     "sourceHash": "sha256:e3490e4a0184030e450421887d6c4fb0b37154aca95cb639ae434c2551f8c206",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "stats.movement.title": {
+    "sourceHash": "sha256:2dc1ce44d5f4826dfd0001807997855bfcd197e7952c95a12802c3f0b0f4ef58",
+    "reviewedAt": "2026-10-21T01:49:15.119Z"
   },
   "stats.musicAge.decadeTop": {
     "sourceHash": "sha256:9c43275fc503e020daaaa67a9d5910c436ebacc7c45d527ff02fdb8a031ae05a",

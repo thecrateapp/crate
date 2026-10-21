@@ -17,10 +17,8 @@ import { CrateImage } from "@/components/artwork/CrateImage";
 import type { StatsTrack } from "@/components/stats/stats-types";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { StatsArtistOfPeriod } from "@/components/stats/StatsArtistOfPeriod";
-import {
-  StatsDiscoveriesCard,
-  StatsMusicAgeCard,
-} from "@/components/stats/StatsClosingCards";
+import { StatsMusicAgeCard } from "@/components/stats/StatsClosingCards";
+import { StatsMovement } from "@/components/stats/StatsMovement";
 import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
 import { StatsFreshness } from "@/components/stats/StatsFreshness";
@@ -95,6 +93,13 @@ function statsComparison(page: StatsPageController) {
   return { previous: page.overview?.previous ?? null, caption };
 }
 
+/** Artists already featured above Movement: the hero and the top three. */
+function movementExclusions(page: StatsPageController): string[] {
+  const names = page.topArtistItems.slice(0, 3).map((a) => a.artist_name);
+  const hero = page.dashboard?.artist_of_period?.artist_name;
+  return hero ? [hero, ...names] : names;
+}
+
 function StatsPageContent({ page }: { page: StatsPageController }) {
   const { dashboard, dashboardLoading, hasStats } = page;
   const tape = dashboard?.tape;
@@ -157,6 +162,21 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
             ) : null
           }
         />
+        {dashboard?.story ? (
+          <StatsReveal>
+            <StatsMovement
+              story={dashboard.story}
+              exclude={movementExclusions(page)}
+              scope={
+                page.isUserStats
+                  ? "user"
+                  : page.isGlobalStats
+                    ? "global"
+                    : "personal"
+              }
+            />
+          </StatsReveal>
+        ) : null}
         {page.isGlobalStats && dashboard?.top_listeners?.length ? (
           <StatsReveal>
             <TopListenersPanel listeners={dashboard.top_listeners} />
@@ -183,12 +203,11 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           />
         </StatsReveal>
         <StatsListeningSection page={page} />
-        <StatsReveal className="grid gap-5 lg:grid-cols-2">
-          {dashboard?.music_age ? (
+        {dashboard?.music_age ? (
+          <StatsReveal>
             <StatsMusicAgeCard musicAge={dashboard.music_age} />
-          ) : null}
-          <StatsDiscoveriesCard discoveries={page.discoveries} />
-        </StatsReveal>
+          </StatsReveal>
+        ) : null}
         <AffinityCard
           affinity={dashboard?.viewer_affinity}
           subject={page.subjectName}

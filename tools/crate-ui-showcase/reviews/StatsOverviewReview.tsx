@@ -36,9 +36,9 @@ import { StatsHeatmapCard } from "../../../app/listen/src/components/stats/Stats
 import { StatsGenreTrendView } from "../../../app/listen/src/components/stats/StatsGenreTrendView";
 import {
   StatsDecadeColumnsView,
-  StatsDiscoveriesCardView,
   StatsMusicAgeCardView,
 } from "../../../app/listen/src/components/stats/StatsClosingViews";
+import { StatsMovementView } from "../../../app/listen/src/components/stats/StatsMovementView";
 import { StatsArtistRankView } from "../../../app/listen/src/pages/StatsArtistRankView";
 import { StatsPeriodPicker } from "../../../app/listen/src/components/stats/StatsPeriodPicker";
 import { StatsPlayMeta } from "../../../app/listen/src/components/stats/StatsPlayMeta";
@@ -69,6 +69,30 @@ dashboard.top_tracks.items = [
     play_count: 22,
     complete_play_count: 20,
     minutes_listened: 132,
+  },
+];
+dashboard.story!.movers = [
+  {
+    artist_name: "Gorguts",
+    play_count: 36,
+    minutes_listened: 140,
+    previous_play_count: 12,
+    delta_play_count: 24,
+  },
+  {
+    artist_name: "Ulcerate",
+    play_count: 21,
+    minutes_listened: 98,
+    previous_play_count: 9,
+    delta_play_count: 12,
+  },
+];
+dashboard.story!.comebacks = [
+  {
+    artist_name: "Deathspell Omega",
+    play_count: 17,
+    minutes_listened: 80,
+    last_seen_at: "2026-02-11T20:00:00+00:00",
   },
 ];
 dashboard.top_albums.items = [
@@ -319,6 +343,22 @@ export function StatsOverviewReview({
             }
           />
         ) : null}
+        {!legacy ? (
+          <StatsMovementView
+            story={dashboard.story!}
+            exclude={[artist.artist_name]}
+            scope={scope}
+            getArtistHref={() => "/fixture/artist"}
+            renderArtist={() => (
+              <MediaCover
+                src={IMAGE_SAMPLES[2]}
+                alt=""
+                shape="circle"
+                className="size-12 shrink-0"
+              />
+            )}
+          />
+        ) : null}
         <div className="grid min-w-0 gap-5 xl:grid-cols-2">
           <StatsPanel
             title={t("stats.topTracks.title")}
@@ -403,7 +443,7 @@ export function StatsOverviewReview({
           ) : null}
         </StatsListeningView>
         {!legacy ? (
-          <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-5">
             <StatsMusicAgeCardView
               musicAge={dashboard.music_age!}
               decades={
@@ -414,18 +454,6 @@ export function StatsOverviewReview({
                   renderAlbum={() => photo("stats-decade-cover")}
                 />
               }
-            />
-            <StatsDiscoveriesCardView
-              discoveries={dashboard.story!.discoveries}
-              renderArtist={() => (
-                <MediaCover
-                  src={IMAGE_SAMPLES[2]}
-                  alt=""
-                  shape="circle"
-                  className="size-12 shrink-0"
-                />
-              )}
-              getArtistHref={() => "/fixture/artist"}
             />
           </div>
         ) : null}
