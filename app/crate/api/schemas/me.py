@@ -575,9 +575,9 @@ class StatsRhythmResponse(BaseModel):
 
 
 class StatsAudioProfileResponse(BaseModel):
-    energy: float | int = 0
-    danceability: float | int = 0
-    valence: float | int = 0
+    energy: float | int | None = None
+    danceability: float | int | None = None
+    valence: float | int | None = None
     bpm: float | int | None = None
 
 
@@ -794,6 +794,7 @@ class StatsGenreTrendResponse(BaseModel):
     slug: str | None = None
     share: float
     delta_vs_previous: float | None = None
+    faller: bool = False
 
 
 class StatsTopListenerResponse(BaseModel):

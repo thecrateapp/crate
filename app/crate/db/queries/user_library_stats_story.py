@@ -209,6 +209,10 @@ def _rhythm_payload(session, user_id: int, period: StatsPeriod) -> dict:
     }
 
 
+def _optional_float(row, key: str) -> float | None:
+    return float(row[key]) if row and row[key] is not None else None
+
+
 def _audio_profile_payload(session, user_id: int, period: StatsPeriod) -> dict:
     row = (
         session.execute(
@@ -233,9 +237,10 @@ def _audio_profile_payload(session, user_id: int, period: StatsPeriod) -> dict:
         .first()
     )
     return {
-        "energy": float(row["energy"] or 0) if row else 0,
-        "danceability": float(row["danceability"] or 0) if row else 0,
-        "valence": float(row["valence"] or 0) if row else 0,
+        # Unknown analysis is null, not a confirmed zero.
+        "energy": _optional_float(row, "energy"),
+        "danceability": _optional_float(row, "danceability"),
+        "valence": _optional_float(row, "valence"),
         "bpm": round(float(row["bpm"]), 1) if row and row["bpm"] is not None else None,
     }
 

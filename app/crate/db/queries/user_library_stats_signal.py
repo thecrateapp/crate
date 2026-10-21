@@ -820,30 +820,53 @@ def _genre_shares(
 def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict]:
     params = period_params(period)
     current = _genre_shares(session, user_id, period_day_filter(period), params)
-    previous: dict[str, float] = {}
+    previous_rows: list[dict] = []
     if period.previous_start is not None and period.start is not None:
-        previous = {
-            item["genre_name"].lower(): item["share"]
-            for item in _genre_shares(
-                session,
-                user_id,
-                "day >= :previous_start AND day < :period_start",
-                params,
-            )
-        }
-    return [
-        {
+        previous_rows = _genre_shares(
+            session,
+            user_id,
+            "day >= :previous_start AND day < :period_start",
+            params,
+        )
+    previous = {item["genre_name"].lower(): item["share"] for item in previous_rows}
+
+    def entry(item: dict, share: float) -> dict:
+        return {
             "genre_name": item["genre_name"],
             "slug": item["slug"],
-            "share": round(item["share"], 4),
+            "share": round(share, 4),
             "delta_vs_previous": None
             if not previous
-            else round(
-                item["share"] - previous.get(item["genre_name"].lower(), 0.0), 4
-            ),
+            else round(share - previous.get(item["genre_name"].lower(), 0.0), 4),
         }
-        for item in current[:6]
+
+    trend = [entry(item, item["share"]) for item in current[:6]]
+    if not previous:
+        return trend
+    # The top six rarely hold the biggest faller: consider the remaining
+    # current genres and those that only appeared in the previous window.
+    shown = {item["genre_name"].lower() for item in trend}
+    candidates = [entry(item, item["share"]) for item in current[6:]]
+    present = {item["genre_name"].lower() for item in current}
+    candidates += [
+        entry(item, 0.0)
+        for item in previous_rows
+        if item["genre_name"].lower() not in present
     ]
+    candidates = [
+        item
+        for item in candidates
+        if item["genre_name"].lower() not in shown
+        and (item["delta_vs_previous"] or 0) < 0
+    ]
+    if candidates:
+        trend.append(
+            {
+                **min(candidates, key=lambda item: item["delta_vs_previous"]),
+                "faller": True,
+            }
+        )
+    return trend
 
 
 def _computed_until(session, user_id: int | None) -> str | None:

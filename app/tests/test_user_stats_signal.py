@@ -366,3 +366,96 @@ def test_audio_profile_previous_uses_previous_window(history):
     assert set(previous) == set(payload["story"]["audio_profile"])
 
     assert _dashboard("all_time")["story"]["audio_profile_previous"] is None
+
+
+def _share(name: str, share: float) -> dict:
+    return {"genre_name": name, "slug": name.lower(), "share": share}
+
+
+def _period():
+    from datetime import date
+
+    from crate.db.queries.user_stats_periods import StatsPeriod
+
+    return StatsPeriod(
+        key="30d",
+        start=date(2026, 9, 21),
+        end=date(2026, 10, 21),
+        previous_start=date(2026, 8, 22),
+        timezone="UTC",
+        today=date(2026, 10, 20),
+    )
+
+
+def _trend(monkeypatch, current: list[dict], previous: list[dict]):
+    from crate.db.queries import user_library_stats_signal as signal
+
+    calls = iter([current, previous])
+    monkeypatch.setattr(signal, "_genre_shares", lambda *args, **kwargs: next(calls))
+    return signal._genre_trend(None, 1, _period())
+
+
+def test_genre_trend_appends_the_biggest_faller_beyond_the_top_six(monkeypatch):
+    current = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.03),
+        _share("Eighth", 0.02),
+    ]
+    previous = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.10),
+        _share("Eighth", 0.02),
+        _share("Gone", 0.12),
+    ]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert len(trend) == 7
+    assert not any(item.get("faller") for item in trend[:6])
+    faller = trend[-1]
+    assert faller["faller"] is True
+    assert faller["genre_name"] == "Gone"
+    assert faller["slug"] == "gone"
+    assert faller["share"] == 0.0
+    assert faller["delta_vs_previous"] == -0.12
+
+
+def test_genre_trend_picks_a_remaining_current_genre_as_faller(monkeypatch):
+    current = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.03)
+    ]
+    previous = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.10)
+    ]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert trend[-1]["genre_name"] == "Seventh"
+    assert trend[-1]["faller"] is True
+    assert trend[-1]["delta_vs_previous"] == -0.07
+
+
+def test_genre_trend_skips_the_faller_without_previous_or_a_drop(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(7)]
+
+    assert len(_trend(monkeypatch, current, [])) == 6
+    assert len(_trend(monkeypatch, current, current)) == 6
+
+
+def test_audio_profile_reports_unknown_analysis_as_null():
+    from crate.db.queries.user_library_stats_story import _audio_profile_payload
+
+    class _Result:
+        def mappings(self):
+            return self
+
+        def first(self):
+            return {"energy": None, "danceability": 0, "valence": None, "bpm": None}
+
+    class _Session:
+        def execute(self, *args, **kwargs):
+            return _Result()
+
+    payload = _audio_profile_payload(_Session(), 1, _period())
+
+    assert payload["energy"] is None
+    assert payload["valence"] is None
+    assert payload["danceability"] == 0.0
