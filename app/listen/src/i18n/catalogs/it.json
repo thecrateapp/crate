@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Curve della traccia",
   "player.equalizer.currentCurveOnly": "Questo server fornisce solo la curva attuale.",
   "player.equalizer.presetPicker": "Preimpostazioni",
-  "player.equalizer.preset": "Preimpostazione"
+  "player.equalizer.preset": "Preimpostazione",
+  "stats.explorer.detailUnsupported": "La cronologia dettagliata non è ancora disponibile su questo server."
 }

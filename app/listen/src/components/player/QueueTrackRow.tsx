@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { X, Sparkles } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
-import { trackToMenuData } from "@/components/actions/shared";
+import { toTrackRowData } from "@/lib/track-row-data";
 import { TrackRow } from "@/components/cards/TrackRow";
 import type { Track } from "@/contexts/PlayerContext";
 import { triggerHaptic } from "@/lib/haptics";
@@ -32,7 +32,7 @@ export const QueueTrackRow = memo(function QueueTrackRow({
   isCurrent?: boolean;
 }) {
   const { t } = useTranslation();
-  const rowTrack = useMemo(() => trackToMenuData(track), [track]);
+  const rowTrack = useMemo(() => toTrackRowData(track), [track]);
   const handleJump = useCallback(() => {
     if (haptic) triggerHaptic("selection");
     onJump(queueIndex);
@@ -78,7 +78,6 @@ export const QueueTrackRow = memo(function QueueTrackRow({
         showCoverThumb
         showArtist
         showLike={false}
-        showDuration={false}
         onPlayOverride={handleJump}
         isActiveOverride={isCurrent}
         extraActions={extraActions}

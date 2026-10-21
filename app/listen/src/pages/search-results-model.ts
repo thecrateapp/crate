@@ -1,3 +1,4 @@
+import type { TrackMediaMetadata } from "@/lib/track-media-metadata";
 import type { Track } from "@/contexts/player-types";
 import { ApiError } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -38,7 +39,7 @@ export interface SearchAlbum {
   remote_entity_uid?: string;
 }
 
-export interface SearchTrack {
+export interface SearchTrack extends TrackMediaMetadata {
   id?: number;
   entity_uid?: string;
   global_uid?: string;

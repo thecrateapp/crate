@@ -20,6 +20,7 @@ import {
 import {
   StatsHeaderView,
   StatsPageView,
+  StatsRankings,
   StatsPanel,
   StatsActionBandView,
   StatsEditorialStack,
@@ -55,8 +56,7 @@ import type {
   ReplayMix,
   StatsSelection,
 } from "../../../app/listen/src/components/stats/stats-types";
-import { TrackRowView } from "../../../app/listen/src/components/cards/TrackRowView";
-import { TrackRowContent } from "../../../app/listen/src/components/cards/TrackRowContent";
+import { StatsRangeTrackView } from "../../../app/listen/src/components/stats/explorer/StatsRangeTrackView";
 import { DiggingStory } from "../../../app/listen/src/components/stats/digging/DiggingStory";
 import {
   buildDiggingChapters,
@@ -390,52 +390,61 @@ export function StatsOverviewReview({
             )}
           />
         ) : null}
-        <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+        <StatsRankings>
           <StatsPanel
             title={t("stats.topTracks.title")}
             subtitle={t("stats.topTracks.subtitle")}
           >
-            <div role="table" aria-label="Ranked tracks">
-              <TrackRowView>
-                <TrackRowContent
-                  rank={1}
-                  leading={
-                    <MediaCover
-                      src={IMAGE_SAMPLES[0]}
-                      alt=""
-                      className="size-12"
-                    />
-                  }
-                  title="Darkness"
-                  details={<MonoLabel>The Lovecraft Sextet</MonoLabel>}
-                  meta={<StatsPlayMeta playCount={22} minutes={132} isNew />}
-                  actions={null}
-                />
-              </TrackRowView>
+            <div role="group" aria-label="Ranked tracks">
+              <StatsRangeTrackView
+                track={{
+                  track_id: 1,
+                  title: "Darkness",
+                  artist: "The Lovecraft Sextet",
+                  album: "Nights of Lust",
+                  plays: 22,
+                  minutes: 132,
+                  format: "flac",
+                  sample_rate: 44100,
+                  bit_depth: 16,
+                  duration: 364,
+                  bpm: 76,
+                  audio_key: "D",
+                  audio_scale: "minor",
+                }}
+                cover={IMAGE_SAMPLES[0]!}
+                withAlbum
+                onPlay={() => setAction("Darkness played")}
+              />
             </div>
           </StatsPanel>
           <StatsPanel
             title={t("stats.topArtists.title")}
             subtitle={t("stats.topArtists.subtitle")}
           >
-            <StatsArtistRankView
-              item={{
-                artist_id: 8,
-                artist_name: "Converge",
-                play_count: 204,
-                complete_play_count: 200,
-                minutes_listened: 720,
-                is_new: true,
-              }}
-              index={1}
-              share={0.18}
-              href="/fixture/artist"
-              artwork={photo(
-                "absolute inset-0 size-full object-cover grayscale opacity-55",
-              )}
-            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {["Converge", "Low"].map((name, index) => (
+                <StatsArtistRankView
+                  key={name}
+                  item={{
+                    artist_id: 8 + index,
+                    artist_name: name,
+                    play_count: index ? 91 : 204,
+                    complete_play_count: index ? 90 : 200,
+                    minutes_listened: index ? 310 : 720,
+                    is_new: true,
+                  }}
+                  index={index}
+                  share={index ? 0.18 : 0.42}
+                  href="/fixture/artist"
+                  artwork={photo(
+                    "absolute inset-0 size-full object-cover grayscale opacity-55",
+                  )}
+                />
+              ))}
+            </div>
           </StatsPanel>
-        </div>
+        </StatsRankings>
         <StatsPanel
           title={t("stats.topAlbums.title")}
           subtitle={t("stats.topAlbums.subtitle")}

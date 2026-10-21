@@ -75,6 +75,7 @@ interface TrackRowPlaylistOption {
 }
 
 export interface TrackRowProps {
+  role?: "row" | "group";
   track: TrackRowData;
   index?: number;
   showArtist?: boolean;
@@ -157,9 +158,9 @@ function resolveTrackRowState(
 
   const hasLinkActions = Boolean(
     track.artist_id != null ||
-    track.global_artist_uid ||
-    track.album_id != null ||
-    track.global_album_uid,
+      track.global_artist_uid ||
+      track.album_id != null ||
+      track.global_album_uid,
   );
 
   return {

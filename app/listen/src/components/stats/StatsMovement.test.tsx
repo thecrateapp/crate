@@ -55,7 +55,10 @@ describe("StatsMovement", () => {
     // Comparison is case-sensitive: "top two" is a different artist.
     expect(screen.getByText("top two")).toBeInTheDocument();
     expect(screen.getByText("Returner")).toBeInTheDocument();
-    expect(screen.getByText("+6 plays")).toBeInTheDocument();
+    expect(screen.getByText("+6 plays")).toHaveClass(
+      "crate-mono-label",
+      "uppercase",
+    );
   });
 
   it("shows only rising on global", () => {

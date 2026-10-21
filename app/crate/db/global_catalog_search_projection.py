@@ -377,6 +377,13 @@ _UPSERT_TRACK_DOCUMENT_SQL = text(
           )
     ), canonical AS (
         SELECT track.*,
+               COALESCE(NULLIF(LOWER(lt.format), ''), preferred_quality.source_payload_json->>'format') AS format,
+               COALESCE(lt.bitrate, NULLIF(preferred_quality.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+               COALESCE(lt.sample_rate, NULLIF(preferred_quality.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+               COALESCE(lt.bit_depth, NULLIF(preferred_quality.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+               COALESCE(lt.bpm, NULLIF(preferred_quality.source_payload_json->>'bpm', '')::double precision) AS bpm,
+               COALESCE(lt.audio_key, preferred_quality.source_payload_json->>'audio_key') AS audio_key,
+               COALESCE(lt.audio_scale, preferred_quality.source_payload_json->>'audio_scale') AS audio_scale,
                EXISTS (
                    SELECT 1 FROM global_catalog_sources source
                    WHERE source.entity_type = 'track'
@@ -384,6 +391,15 @@ _UPSERT_TRACK_DOCUMENT_SQL = text(
                      AND NOT source.source_stale AND source.source_deleted_at IS NULL
                ) AS has_healthy_source
         FROM global_catalog_tracks track
+        LEFT JOIN library_tracks lt ON lt.id = track.local_track_id
+        LEFT JOIN LATERAL (
+            SELECT source_payload_json FROM global_catalog_sources source
+            WHERE source.entity_type = 'track' AND source.global_entity_uid = track.global_track_uid
+              AND NOT source.source_stale AND source.source_deleted_at IS NULL
+            ORDER BY (source.source_kind = 'local') DESC, source.preferred_for_playback DESC,
+                     source.preferred_for_display DESC, source.updated_at DESC
+            LIMIT 1
+        ) preferred_quality ON true
         WHERE track.global_track_uid = ANY(CAST(:global_entity_uids AS uuid[]))
     )
     INSERT INTO global_catalog_search_documents (
@@ -407,6 +423,9 @@ _UPSERT_TRACK_DOCUMENT_SQL = text(
                'artist', artist_name,
                'album', album_name,
                'duration', duration_seconds,
+               'format', format, 'bitrate', bitrate,
+               'sample_rate', sample_rate, 'bit_depth', bit_depth,
+               'bpm', bpm, 'audio_key', audio_key, 'audio_scale', audio_scale,
                'path', NULL,
                'availability', COALESCE(availability_json, '{}'::jsonb) ||
                    jsonb_build_object('local', has_local, 'remote', has_remote,

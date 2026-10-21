@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Corbes de la pista",
   "player.equalizer.currentCurveOnly": "Aquest servidor només proporciona la corba actual.",
   "player.equalizer.presetPicker": "Preajustos",
-  "player.equalizer.preset": "Preajust"
+  "player.equalizer.preset": "Preajust",
+  "stats.explorer.detailUnsupported": "L’historial detallat encara no està disponible en aquest servidor."
 }

@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from crate.api.schemas.browse import GenreProfileResponse
@@ -105,7 +107,7 @@ class CrateDetailResponse(CrateSummaryResponse):
     genre_profile: list[GenreProfileResponse] = Field(default_factory=list)
 
 
-class CratePlaybackTrackResponse(BaseModel):
+class CratePlaybackTrackResponse(TrackMediaFieldsMixin):
     global_track_uid: str
     global_album_uid: str
     global_artist_uid: str

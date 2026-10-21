@@ -110,6 +110,48 @@ function renderPanel(initial: PanelProps) {
 }
 
 describe("StatsExplorerPanel", () => {
+  it("explains unavailable server capability without claiming an empty or failed stretch", () => {
+    renderPanel({ unsupported: true });
+    expect(
+      screen.getByText("Detailed history isn't available on this server yet."),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("This stretch could not be loaded."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Nothing played that day."),
+    ).not.toBeInTheDocument();
+  });
+  it("uses canonical track presentation with stable metadata slots", () => {
+    const { container } = renderPanel({
+      data: {
+        ...LOADED,
+        top_tracks: [
+          {
+            ...LOADED.top_tracks[0]!,
+            format: "flac",
+            bit_depth: 24,
+            sample_rate: 96000,
+            bpm: 99,
+            audio_key: "C",
+            audio_scale: "minor",
+            duration: 191,
+          },
+        ],
+      },
+    });
+    const row = container.querySelector(".track-row");
+    expect(row).not.toBeNull();
+    expect(row?.querySelector('[data-track-slot="quality"]')).toHaveTextContent(
+      "Hi-Res 24/96",
+    );
+    expect(
+      row?.querySelector('[data-track-slot="analysis"]'),
+    ).toHaveTextContent("99");
+    expect(
+      row?.querySelector('[data-track-slot="duration"]'),
+    ).toHaveTextContent("3:11");
+  });
   it("shows client numbers instantly and server blocks after loading", () => {
     const { container, rerender } = renderPanel({ loading: true });
     const aside = container.querySelector("aside")!;
@@ -257,9 +299,11 @@ describe("StatsExplorerPanel", () => {
     expect(within(items[0]!).getByText("Sunflower")).toBeInTheDocument();
     expect(within(items[0]!).getByText("3 plays")).toBeInTheDocument();
 
-    const play = screen.getAllByRole("button", { name: "Play now" });
-    expect(play).toHaveLength(1);
-    fireEvent.click(play[0]!);
+    const play = screen.getByRole("button", { name: "Play Sunflower" });
+    expect(
+      screen.getByRole("button", { name: "Play Unknown Song" }),
+    ).toBeDisabled();
+    fireEvent.click(play);
     expect(onPlayTrack).toHaveBeenCalledWith(tracks[0]);
 
     fireEvent.click(

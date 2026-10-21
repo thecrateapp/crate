@@ -226,3 +226,13 @@ export function StatsListeningView({
     </section>
   );
 }
+
+/** Rankings stack at the page width: fixed track metadata must not compete
+ * with artist posters for a half-width card. Used by the live page and review. */
+export function StatsRankings({ children }: { children: ReactNode }) {
+  return (
+    <div data-slot="stats-rankings" className="grid min-w-0 gap-5">
+      {children}
+    </div>
+  );
+}

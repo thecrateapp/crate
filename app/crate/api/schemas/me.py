@@ -3,6 +3,8 @@
 from datetime import date as date_type, datetime
 from typing import Any, Literal
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -341,7 +343,7 @@ class SaveAlbumResponse(OkResponse):
     added: bool
 
 
-class LikedTrackResponse(IdentityFieldsMixin):
+class LikedTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
@@ -450,13 +452,18 @@ class StatsTrendsResponse(BaseModel):
     points: list[TrendPointResponse] = Field(default_factory=list)
 
 
-class StatsTrackResponse(IdentityFieldsMixin):
+class StatsTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
     global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
+    format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration: float | None = None
     title: str | None = None
     artist: str | None = None
     album: str | None = None
@@ -837,6 +844,16 @@ class StatsRangeAlbumResponse(StatsAlbumRefResponse):
 
 
 class StatsRangeTrackResponse(StatsTrackRefResponse):
+    track_path: str | None = None
+    track_entity_uid: str | None = None
+    bpm: float | None = None
+    audio_key: str | None = None
+    audio_scale: str | None = None
+    format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration: float | None = None
     plays: int
     minutes: float
 
@@ -899,7 +916,7 @@ class HomeArtworkRefResponse(IdentityFieldsMixin):
     artist_name: str | None = None
 
 
-class HomeTrackResponse(IdentityFieldsMixin):
+class HomeTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None

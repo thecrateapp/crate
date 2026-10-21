@@ -1,3 +1,4 @@
+import { normalizeTrackBitrate } from "@/lib/track-media-metadata";
 import { offlineTrackArtworkPath } from "@/lib/offline-artwork-identity";
 import type { Track } from "@/contexts/player-types";
 import type { OfflineItemRecord, OfflineManifestTrack } from "@/lib/offline";
@@ -33,9 +34,12 @@ export function toOfflinePlayerTrack(track: OfflineManifestTrack): Track {
     albumSlug: track.album_slug || undefined,
     duration: track.duration ?? undefined,
     format: track.format || undefined,
-    bitrate: track.bitrate ?? null,
+    bitrate: normalizeTrackBitrate(track.bitrate),
     sampleRate: track.sample_rate ?? null,
     bitDepth: track.bit_depth ?? null,
+    bpm: track.bpm ?? null,
+    audioKey: track.audio_key ?? null,
+    audioScale: track.audio_scale ?? null,
     origin: "local",
     offlineOnly: true,
   };

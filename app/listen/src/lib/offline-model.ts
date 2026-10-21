@@ -1,3 +1,4 @@
+import type { TrackMediaMetadata } from "./track-media-metadata";
 export type OfflineItemKind = "track" | "album" | "playlist" | "crate";
 
 export type OfflineItemState =
@@ -8,7 +9,7 @@ export type OfflineItemState =
   | "ready"
   | "error";
 
-export interface OfflineManifestTrack {
+export interface OfflineManifestTrack extends TrackMediaMetadata {
   entity_uid?: string | null;
   storage_id?: string | null;
   track_id?: number | null;

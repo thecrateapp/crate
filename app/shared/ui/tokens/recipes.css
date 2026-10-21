@@ -4512,8 +4512,9 @@ label
   }
 }
 
-/* Metadata follows the row's actual container, including narrow desktop queue/recommendation rows. */
-@container crate-track (min-width: 480px) {
+/* Metadata follows the row's actual container, including narrow desktop queue/recommendation rows.
+   Reserve room for rank, 48px cover and readable identity before revealing fixed columns. */
+@container crate-track (min-width: 640px) {
   .crate-track-metadata {
     grid-template-columns: 9.5rem 3.5rem 44px 44px;
   }
@@ -4521,7 +4522,7 @@ label
     display: block;
   }
 }
-@container crate-track (min-width: 620px) {
+@container crate-track (min-width: 800px) {
   .crate-track-metadata {
     grid-template-columns: 9.5rem 10ch 3.5rem 44px 44px;
   }

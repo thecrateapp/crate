@@ -298,6 +298,8 @@ func TestGlobalSearchPayloadsMatchCanonicalAPIShape(t *testing.T) {
 		"artist":            "High Vis",
 		"album":             "Guided Tour",
 		"duration":          int64(201),
+		"bpm":               nil, "audio_key": nil, "audio_scale": nil,
+		"energy": nil, "danceability": nil, "valence": nil,
 		"availability": map[string]any{
 			"stream":  true,
 			"local":   false,
@@ -314,4 +316,21 @@ func TestGlobalSearchPayloadsMatchCanonicalAPIShape(t *testing.T) {
 	})
 	_, hasGlobalAlbumUID := trackWithoutAlbum["global_album_uid"]
 	assert.False(t, hasGlobalAlbumUID)
+}
+
+func TestSearchDocumentsPreserveTrackMetadata(t *testing.T) {
+	cases := []struct {
+		name     string
+		metadata map[string]any
+	}{
+		{name: "complete", metadata: map[string]any{"format": "flac", "bitrate": 1200000, "sample_rate": 96000, "bit_depth": 24, "duration": 143, "bpm": 99, "audio_key": "D", "audio_scale": "minor"}},
+		{name: "unknown", metadata: map[string]any{"format": nil, "duration": nil, "bpm": nil}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload, ready := partitionGlobalSearchDocumentRows([]map[string]any{{"entity_type": "track", "payload_json": tc.metadata, "projection_ready": true}, {"entity_type": "__projection__", "projection_ready": true}})
+			assert.True(t, ready)
+			assert.Equal(t, []map[string]any{tc.metadata}, payload["tracks"])
+		})
+	}
 }

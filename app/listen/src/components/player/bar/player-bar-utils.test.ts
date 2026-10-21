@@ -92,3 +92,14 @@ describe("player quality badge mapping", () => {
     );
   });
 });
+
+it.each([320, 320000])(
+  "renders the same quality for %s source bitrate units",
+  (bitrate) => {
+    expect(getQualityBadge({ format: "mp3", bitrate })).toEqual({
+      label: "MP3 320",
+      detail: "320 kbps",
+      tier: "high",
+    });
+  },
+);

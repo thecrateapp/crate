@@ -12,6 +12,10 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   api: apiMock,
 }));
 
+vi.mock("@/contexts/LikedTracksContext", () => ({
+  useLikedTracks: () => ({ isLiked: () => false, toggleTrackLike: vi.fn() }),
+}));
+
 import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { __resetStatsRangeCache } from "@/components/stats/explorer/use-stats-range";
 
@@ -122,7 +126,9 @@ describe("StatsExplorer", () => {
       ),
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "Play now" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Play Sunflower" }),
+    );
     expect(play).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Sunflower", libraryTrackId: 7 }),
       { type: "track", name: "Sunflower" },

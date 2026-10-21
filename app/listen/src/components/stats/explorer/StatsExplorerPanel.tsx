@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { EntityRow } from "@crate/ui/domain/entity/EntityRow";
 import type { MediaCoverProps } from "@crate/ui/domain/media/MediaCover";
-import { ArrowLeft, CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
-import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { ArrowLeft, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -28,6 +27,8 @@ import {
 import type { StretchSummary } from "./stats-explorer-model";
 
 type RenderImage = MediaCoverProps["renderImage"];
+type TrackRenderer = (track: StatsRangeTrack, withAlbum: boolean) => ReactNode;
+import { StatsRangeTrackView } from "./StatsRangeTrackView";
 
 /** What played in one bucket: a day, or a week on weekly tapes. */
 export interface ExplorerDayDetail {
@@ -42,6 +43,7 @@ export interface ExplorerDayDetail {
   /** The request failed: never shown as "nothing played". */
   error: boolean;
   available: boolean;
+  unsupported?: boolean;
 }
 
 /** Artwork and page links, supplied by the adapter so this view stays pure. */
@@ -77,6 +79,8 @@ export interface StatsExplorerPanelProps {
   onBack: () => void;
   onPlayTrack: (track: StatsRangeTrack) => void;
   renderImage?: RenderImage;
+  renderTrack?: TrackRenderer;
+  unsupported?: boolean;
 }
 
 const DAY_MS = 86_400_000;
@@ -101,11 +105,13 @@ export function StatsExplorerPanel({
   data,
   loading,
   error = false,
+  unsupported = false,
   stale = false,
   available,
   day,
   onBack,
   onPlayTrack,
+  renderTrack,
   renderImage,
   links,
 }: StatsExplorerPanelProps) {
@@ -125,6 +131,7 @@ export function StatsExplorerPanel({
           day={day}
           onBack={onBack}
           onPlayTrack={onPlayTrack}
+          renderTrack={renderTrack}
           renderImage={renderImage}
           links={links}
         />
@@ -137,9 +144,11 @@ export function StatsExplorerPanel({
           data={data}
           loading={loading}
           error={error}
+          unsupported={unsupported}
           stale={stale}
           available={available}
           onPlayTrack={onPlayTrack}
+          renderTrack={renderTrack}
           renderImage={renderImage}
           links={links}
         />
@@ -165,9 +174,11 @@ function StretchSummaryView({
   data,
   loading,
   error,
+  unsupported,
   stale,
   available,
   onPlayTrack,
+  renderTrack,
   renderImage,
   links,
 }: Omit<StatsExplorerPanelProps, "day" | "onBack"> & { headingId: string }) {
@@ -208,7 +219,11 @@ function StretchSummaryView({
         ) : null}
       </p>
       <MoodBlock energy={summary.energy} valence={summary.valence} />
-      {data && !available ? (
+      {unsupported ? (
+        <p className="stats-explorer-block m-0 text-sm text-text-muted">
+          {t("stats.explorer.detailUnsupported")}
+        </p>
+      ) : data && !available ? (
         <p className="stats-explorer-block m-0 text-sm text-text-muted">
           {t("stats.explorer.unavailable")}
         </p>
@@ -232,8 +247,9 @@ function StretchSummaryView({
           ) : null}
           {track ? (
             <PanelBlock label={t("stats.explorer.topTrack")}>
-              <TrackRow
+              <ExplorerTrack
                 track={track}
+                renderTrack={renderTrack}
                 onPlayTrack={onPlayTrack}
                 renderImage={renderImage}
                 links={links}
@@ -281,6 +297,7 @@ function DayDetail({
   day,
   onBack,
   onPlayTrack,
+  renderTrack,
   renderImage,
   links,
 }: {
@@ -290,6 +307,7 @@ function DayDetail({
   onBack: () => void;
   onPlayTrack: (track: StatsRangeTrack) => void;
   renderImage?: RenderImage;
+  renderTrack?: TrackRenderer;
   links: ExplorerLinks;
 }) {
   const { t, i18n } = useTranslation();
@@ -310,6 +328,12 @@ function DayDetail({
     );
   } else if (day.loading) {
     body = <span className="stats-explorer-placeholder" />;
+  } else if (day.unsupported) {
+    body = (
+      <p className="m-0 text-sm text-text-muted">
+        {t("stats.explorer.detailUnsupported")}
+      </p>
+    );
   } else if (day.error) {
     body = <ErrorLine />;
   } else if (!day.available) {
@@ -329,8 +353,9 @@ function DayDetail({
       <ol className="stats-explorer-tracks">
         {day.tracks.map((track, index) => (
           <li key={`${track.track_id ?? track.title}:${index}`}>
-            <TrackRow
+            <ExplorerTrack
               track={track}
+              renderTrack={renderTrack}
               onPlayTrack={onPlayTrack}
               renderImage={renderImage}
               links={links}
@@ -493,41 +518,32 @@ function AlbumRow({
   );
 }
 
-function TrackRow({
+function ExplorerTrack({
   track,
+  renderTrack,
   onPlayTrack,
   renderImage,
   links,
   withAlbum = false,
 }: {
   track: StatsRangeTrack;
+  renderTrack?: TrackRenderer;
   onPlayTrack: (track: StatsRangeTrack) => void;
   renderImage?: RenderImage;
   links: ExplorerLinks;
   withAlbum?: boolean;
 }) {
-  const { t } = useTranslation();
-  const subtitle = [track.artist, withAlbum ? track.album : null]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <EntityRow
-      title={track.title ?? ""}
-      subtitle={subtitle || undefined}
-      meta={t("stats.explorer.plays", { count: track.plays })}
-      cover={{ src: links.albumCover(track), alt: "", renderImage }}
-      trailing={
-        track.track_id != null ? (
-          <ActionButton
-            label={t("actions.track.playNow")}
-            onClick={() => onPlayTrack(track)}
-          >
-            <Play aria-hidden="true" />
-          </ActionButton>
-        ) : undefined
-      }
-      menuButton="none"
-      density="compact"
+  return renderTrack ? (
+    renderTrack(track, withAlbum)
+  ) : (
+    <StatsRangeTrackView
+      track={track}
+      cover={links.albumCover(track)}
+      renderImage={renderImage}
+      withAlbum={withAlbum}
+      onPlay={() => {
+        if (track.track_id != null) onPlayTrack(track);
+      }}
     />
   );
 }

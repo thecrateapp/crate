@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import {
   StatsHeaderView,
   StatsPageView,
+  StatsRankings,
   StatsActionBandView,
   StatsEditorialStack,
   StatsListeningView,
@@ -204,19 +205,20 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
             <TopListenersPanel listeners={dashboard.top_listeners} />
           </StatsReveal>
         ) : null}
-        <StatsReveal className="grid gap-5 xl:grid-cols-2">
-          <TopTracksPanel
-            items={page.topTrackItems}
-            rows={page.topTrackRows}
-            loading={dashboardLoading && !dashboard}
-            playSource={page.topTrackSource}
-          />
-          <TopArtistsPanel
-            items={page.topArtistItems}
-            loading={dashboardLoading && !dashboard}
-            heroArtistName={dashboard?.artist_of_period?.artist_name}
-            totalMinutes={page.overview?.minutes_listened ?? 0}
-          />
+        <StatsReveal>
+          <StatsRankings>
+            <TopTracksPanel
+              items={page.topTrackItems}
+              rows={page.topTrackRows}
+              loading={dashboardLoading && !dashboard}
+              playSource={page.topTrackSource}
+            />
+            <TopArtistsPanel
+              items={page.topArtistItems}
+              loading={dashboardLoading && !dashboard}
+              totalMinutes={page.overview?.minutes_listened ?? 0}
+            />
+          </StatsRankings>
         </StatsReveal>
         <StatsReveal>
           <TopAlbumsPanel

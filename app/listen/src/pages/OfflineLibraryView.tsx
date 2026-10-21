@@ -1,3 +1,7 @@
+import {
+  formatTrackAnalysis,
+  formatMusicalKey,
+} from "@crate/ui/lib/track-meta";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -39,6 +43,9 @@ export interface OfflineGroupView {
     bitrate?: number | null;
     sampleRate?: number | null;
     bitDepth?: number | null;
+    bpm?: number | null;
+    audioKey?: string | null;
+    audioScale?: string | null;
   }[];
 }
 export function OfflineLibraryView({
@@ -134,6 +141,11 @@ export function OfflineLibraryView({
                         ...track,
                         id: String(track.id),
                       })}
+                      tempo={formatTrackAnalysis(track.bpm)}
+                      musicalKey={formatMusicalKey(
+                        track.audioKey,
+                        track.audioScale,
+                      )}
                       duration={
                         track.duration != null &&
                         Number.isFinite(track.duration) &&

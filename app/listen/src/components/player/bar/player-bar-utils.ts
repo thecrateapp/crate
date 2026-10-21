@@ -1,3 +1,4 @@
+import { normalizeTrackBitrate } from "../../../lib/track-media-metadata";
 import type { Track } from "../../../contexts/player-types";
 
 export function formatPlayerTime(seconds: number): string {
@@ -104,7 +105,7 @@ export function getQualityBadge(input: QualityBadgeInput): QualityBadge | null {
 
   const sr = positiveSourceNumber(input.sampleRate);
   const bd = positiveSourceNumber(input.bitDepth);
-  const br = positiveSourceNumber(input.bitrate);
+  const br = positiveSourceNumber(normalizeTrackBitrate(input.bitrate));
   const tier = classifyTier(fmt, bd, sr, br);
 
   const lossless = isLosslessFormat(fmt);

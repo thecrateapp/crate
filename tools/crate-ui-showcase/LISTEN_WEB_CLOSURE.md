@@ -74,3 +74,10 @@ Final full suites: Listen 3394 passed / 4 skipped (455 files), shared UI 998 pas
 All five TypeScript checks pass, as do scoped ESLint, catalogue validation and the
 six-locale translation check. Storybook and preview production builds pass. Browser
 review: 18 cases at 375/640/1200 px across both hosts, plus the final 6 coverage/hover cases.
+
+## Post-merge Stats and TrackRow correction
+
+Claude's subsequent Stats merge received a separate review before native work. The active
+checkpoint, complete source inventory, review URLs, regression evidence and production API
+boundary are documented in [Listen track data](LISTEN_TRACK_DATA.md). This amendment does
+not mark that checkpoint approved or deployed.

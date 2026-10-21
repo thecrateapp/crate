@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import Any
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from crate.api.schemas.common import IdentityFieldsMixin, OkResponse
@@ -91,7 +93,7 @@ class PlaylistArtworkTrackResponse(IdentityFieldsMixin):
     bliss_vector: list[float] | None = None
 
 
-class PlaylistTrackResponse(IdentityFieldsMixin):
+class PlaylistTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     id: int | None = None

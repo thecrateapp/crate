@@ -1,11 +1,13 @@
 """Schema models for radio and recommendation endpoints."""
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import BaseModel, ConfigDict
 
 from crate.api.schemas.common import IdentityFieldsMixin
 
 
-class RadioTrack(IdentityFieldsMixin):
+class RadioTrack(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None

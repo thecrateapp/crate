@@ -63,6 +63,71 @@ def test_range_tops_are_ordered_and_shares_are_minute_shares(history):
     assert payload["top_albums"][0]["album_id"]
 
 
+def test_range_preserves_live_source_quality_and_analysis(history):
+    from crate.api.schemas.me import StatsRangeResponse
+
+    first, last = _daily_bounds()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE library_tracks SET format='flac', bit_depth=24, sample_rate=96000, bitrate=1200, duration=191"
+            )
+        )
+    payload = _range(first, last)
+    track = StatsRangeResponse.model_validate(payload).top_tracks[0]
+    assert track.format == "flac"
+    assert (track.bit_depth, track.sample_rate, track.bitrate, track.duration) == (
+        24,
+        96000,
+        1200,
+        191,
+    )
+    assert track.bpm is not None
+    assert track.track_path and track.track_entity_uid
+
+
+@pytest.mark.parametrize(
+    "kind", ["user", "month", "global", "global_month", "global_365d", "replay"]
+)
+def test_ranked_tracks_preserve_source_quality_in_each_period(history, kind):
+    from crate.db.queries.user_library_stats_tops import get_top_tracks
+    from crate.db.queries.user_library_stats_month import get_month_top_tracks
+    from crate.db.queries.user_library_stats_global import get_global_top_tracks
+    from crate.api.schemas.me import StatsTrackResponse
+
+    _, last = _daily_bounds()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE library_tracks SET format='flac', bit_depth=24, sample_rate=96000, bitrate=1200, duration=191"
+            )
+        )
+    if kind == "replay":
+        from crate.db.queries.user_library_stats_tops import get_replay_mix
+
+        tracks = get_replay_mix(1, window="all_time")["items"]
+    elif kind == "user":
+        tracks = get_top_tracks(1, window="all_time")
+    elif kind == "month":
+        tracks = get_month_top_tracks(1, last.strftime("%Y-%m"))
+    elif kind == "global_month":
+        tracks = get_global_top_tracks(month=last.strftime("%Y-%m"))
+    elif kind == "global_365d":
+        tracks = get_global_top_tracks(window="365d")
+    else:
+        tracks = get_global_top_tracks(window="all_time")
+    assert tracks
+    for row in tracks:
+        track = StatsTrackResponse.model_validate(row)
+        assert track.format == "flac"
+        assert (track.bit_depth, track.sample_rate, track.bitrate, track.duration) == (
+            24,
+            96000,
+            1200,
+            191,
+        )
+
+
 def test_day_detail_only_contains_that_day(history):
     with read_scope() as session:
         day = session.execute(
@@ -280,3 +345,28 @@ def test_instance_range_validates_against_the_utc_day(pg_db, monkeypatch):
         mod.get_instance_stats_range(date(2025, 9, 15), date(2026, 10, 21))
     payload = mod.get_instance_stats_range(date(2025, 9, 16), date(2026, 10, 21))
     assert payload["start"] == "2025-09-16"
+
+
+def test_range_does_not_offer_deleted_local_track_as_playable(pg_db):
+    from crate.db.queries.user_library_stats_range import get_user_stats_range
+
+    seed_listening_history(user_id=1, events=100, days=30)
+    recompute_user_listening_aggregates(1)
+    with read_scope() as session:
+        first, last = session.execute(
+            text("SELECT MIN(day),MAX(day) FROM user_track_daily WHERE user_id=1")
+        ).one()
+    before = get_user_stats_range(1, first, last, limit=20)
+    removed = before["top_tracks"][0]
+    track_id = removed["track_id"]
+    with transaction_scope() as session:
+        session.execute(
+            text("DELETE FROM library_tracks WHERE id=:id"), {"id": track_id}
+        )
+    after = get_user_stats_range(1, first, last, limit=20)
+    historical = next(
+        row for row in after["top_tracks"] if row["title"] == removed["title"]
+    )
+    assert historical["track_id"] is None, (
+        "The range still offers a deleted local id to its Play button"
+    )

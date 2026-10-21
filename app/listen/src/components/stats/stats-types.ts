@@ -44,7 +44,15 @@ export interface StatsTrends {
   points: StatsTrendPoint[];
 }
 
-export interface StatsTrack {
+interface StatsTrackMedia {
+  format?: string | null;
+  bitrate?: number | null;
+  sample_rate?: number | null;
+  bit_depth?: number | null;
+  duration?: number | null;
+}
+
+export interface StatsTrack extends StatsTrackMedia {
   track_id: number | null;
   global_track_uid?: string | null;
   global_artist_uid?: string | null;
@@ -416,7 +424,12 @@ export interface StatsRangeAlbum extends StatsAlbumRef {
   minutes: number;
 }
 
-export interface StatsRangeTrack extends StatsTrackRef {
+export interface StatsRangeTrack extends StatsTrackRef, StatsTrackMedia {
+  track_path?: string | null;
+  track_entity_uid?: string | null;
+  bpm?: number | null;
+  audio_key?: string | null;
+  audio_scale?: string | null;
   plays: number;
   minutes: number;
 }

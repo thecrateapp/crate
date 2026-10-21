@@ -60,6 +60,11 @@ const track: StatsTrack = {
   play_count: 6,
   complete_play_count: 5,
   minutes_listened: 18,
+  format: "flac",
+  sample_rate: 96000,
+  bit_depth: 24,
+  bitrate: 1200,
+  duration: 191,
 };
 
 const secondTrack: StatsTrack = {
@@ -90,6 +95,23 @@ function renderTopTracks(
     options,
   );
 }
+
+it("preserves source quality and duration in canonical Stats rows", () => {
+  expect(statsTrackRowData(track)).toMatchObject({
+    format: "flac",
+    sample_rate: 96000,
+    bit_depth: 24,
+    bitrate: 1200,
+    duration: 191,
+  });
+  const { container } = renderTopTracks();
+  expect(
+    container.querySelector('[data-track-slot="quality"]'),
+  ).toHaveTextContent("Hi-Res 24/96");
+  expect(
+    container.querySelector('[data-track-slot="duration"]'),
+  ).toHaveTextContent("3:11");
+});
 
 const album: StatsAlbum = {
   album_id: 2,
@@ -354,7 +376,7 @@ describe("Stats collection panels", () => {
     ).toBeInTheDocument();
   });
 
-  it("starts top artists at #2 when the hero is #1", () => {
+  it("keeps the complete ranking from #1 even when that artist also has a hero", () => {
     const items = ["Fugazi", "Slint", "Shellac"].map((name, i) => ({
       ...artist,
       artist_id: 10 + i,
@@ -363,29 +385,19 @@ describe("Stats collection panels", () => {
       minutes_listened: 30 - i,
     }));
     renderWithListenProviders(
-      <TopArtistsPanel
-        items={items}
-        loading={false}
-        heroArtistName="Fugazi"
-        totalMinutes={100}
-      />,
+      <TopArtistsPanel items={items} loading={false} totalMinutes={100} />,
     );
 
-    expect(screen.queryByText("Fugazi")).toBeNull();
+    expect(screen.getByText("Fugazi")).toBeInTheDocument();
     expect(screen.getByText("Rank #2")).toBeInTheDocument();
     expect(screen.getByText("Rank #3")).toBeInTheDocument();
-    expect(screen.queryByText("Rank #1")).toBeNull();
+    expect(screen.getByText("Rank #1")).toBeInTheDocument();
     expect(screen.getByText("Slint")).toBeInTheDocument();
   });
 
-  it("keeps the first artist when the hero is somebody else", () => {
+  it("shows rank #1 for a single artist", () => {
     renderWithListenProviders(
-      <TopArtistsPanel
-        items={[artist]}
-        loading={false}
-        heroArtistName="Slint"
-        totalMinutes={100}
-      />,
+      <TopArtistsPanel items={[artist]} loading={false} totalMinutes={100} />,
     );
     expect(screen.getByText("Rank #1")).toBeInTheDocument();
   });
@@ -403,6 +415,8 @@ describe("Stats collection panels", () => {
     );
 
     expect(screen.getAllByText(/^Artist \d+$/)).toHaveLength(10);
+    expect(screen.getByText("Rank #1")).toBeInTheDocument();
+    expect(screen.getByText("Rank #10")).toBeInTheDocument();
     const bars = screen.getAllByRole("progressbar");
     expect(bars).toHaveLength(10);
     expect(bars[0]).toHaveAttribute("aria-valuenow", "25");

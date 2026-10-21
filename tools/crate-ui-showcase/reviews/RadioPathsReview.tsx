@@ -399,6 +399,14 @@ function Scene() {
                   <TrackRowContent
                     rank={index + 1}
                     title={step.title}
+                    quality={{
+                      label: "FLAC 16/44.1",
+                      detail: "16-bit / 44.1 kHz",
+                      tier: "lossless",
+                    }}
+                    tempo={String(90 + index)}
+                    musicalKey="7A"
+                    duration="3:30"
                     leading={
                       <MediaCover
                         src={step.coverUrl}

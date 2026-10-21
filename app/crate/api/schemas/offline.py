@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import Any, Literal
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from crate.api.schemas.common import IdentityFieldsMixin
@@ -12,7 +14,7 @@ class OfflineArtworkResponse(BaseModel):
     cover_url: str | None = None
 
 
-class OfflineManifestTrackResponse(IdentityFieldsMixin):
+class OfflineManifestTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     entity_uid: str | None = None

@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Curvas de la pista",
   "player.equalizer.currentCurveOnly": "Este servidor solo proporciona la curva actual.",
   "player.equalizer.presetPicker": "Preajustes",
-  "player.equalizer.preset": "Preajuste"
+  "player.equalizer.preset": "Preajuste",
+  "stats.explorer.detailUnsupported": "El historial detallado aún no está disponible en este servidor."
 }

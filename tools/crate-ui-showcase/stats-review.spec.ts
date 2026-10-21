@@ -59,6 +59,30 @@ for (const host of ["storybook", "standalone"] as const)
       expect(readings[1]!.left - readings[0]!.left).toBeGreaterThanOrEqual(
         readings[0]!.width + 35,
       );
+      const rankings = review.locator('[data-slot="stats-rankings"]');
+      const panels = await rankings
+        .locator(":scope > section")
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
+      expect(panels.length).toBe(2);
+      expect(Math.abs(panels[0]! - panels[1]!)).toBeLessThan(1);
+      await expect(
+        rankings.getByText("Rank #1", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        rankings.getByText("Rank #2", { exact: true }),
+      ).toBeVisible();
+      const frame = (await rankings.boundingBox())!;
+      expect(Math.abs(panels[0]! - frame.width)).toBeLessThan(1);
+      if (width === 1200) {
+        expect(
+          await rankings
+            .locator(".crate-track-title")
+            .evaluate(
+              (e) =>
+                e.parentElement!.parentElement!.getBoundingClientRect().width,
+            ),
+        ).toBeGreaterThan(250);
+      }
       const chart = review.getByRole("group", {
         name: "Listening in the selected stretch",
       });
@@ -82,8 +106,10 @@ for (const host of ["storybook", "standalone"] as const)
       });
       await expect(heatmap.getByRole("gridcell")).toHaveCount(168);
       await expect(heatmap.locator("[data-now]")).toHaveCount(1);
-      await heatmap.locator("[tabindex='0']").focus();
-      await heatmap.press("ArrowLeft");
+      // Scrolling focus into view must not leave the previous mouse position
+      // hovering another cell while this check exercises keyboard input.
+      await page.mouse.move(0, 0);
+      await heatmap.locator("[tabindex='0']").press("ArrowLeft");
       await expect(review.locator("[data-slot='heatmap-readout']")).toHaveText(
         "Sunday 21:00 · 5m",
       );

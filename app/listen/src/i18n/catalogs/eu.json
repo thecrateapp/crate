@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Pistaren kurbak",
   "player.equalizer.currentCurveOnly": "Zerbitzari honek uneko kurba soilik eskaintzen du.",
   "player.equalizer.presetPicker": "Aurrezarpenak",
-  "player.equalizer.preset": "Aurrezarpena"
+  "player.equalizer.preset": "Aurrezarpena",
+  "stats.explorer.detailUnsupported": "Historia xehatua ez dago oraindik erabilgarri zerbitzari honetan."
 }

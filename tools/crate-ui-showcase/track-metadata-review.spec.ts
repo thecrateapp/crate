@@ -11,7 +11,7 @@ const hosts = [
   },
 ];
 for (const host of hosts) {
-  for (const width of [1200, 640, 375]) {
+  for (const width of [1200, 900, 760, 640, 375]) {
     test(`${host.name} metadata at ${width}px retains columns without clipping`, async ({
       page,
     }) => {
@@ -81,9 +81,9 @@ for (const host of hosts) {
           expect(cell.width).toBeCloseTo(first.width, 1);
           expect(cell.right).toBeLessThanOrEqual(row.right);
           if (cell.slot === "quality")
-            expect(cell.visible).toBe(row.width - 24 >= 480);
+            expect(cell.visible).toBe(row.width - 24 >= 640);
           if (cell.slot === "analysis")
-            expect(cell.visible).toBe(row.width - 24 >= 620);
+            expect(cell.visible).toBe(row.width - 24 >= 800);
         }
         if (row.badge && row.cells[0]!.visible) {
           expect(row.badge.icon).toBe(true);

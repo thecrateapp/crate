@@ -58,7 +58,6 @@ export function HomeReplaySection({
           albumCover={replayCoverUrl(item)}
           showCoverThumb
           showArtist
-          showDuration={false}
           meta={`${item.play_count}×`}
           onPlayOverride={() => onPlayTrack(item)}
         />

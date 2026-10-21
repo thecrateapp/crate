@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Courbes du titre",
   "player.equalizer.currentCurveOnly": "Ce serveur fournit uniquement la courbe actuelle.",
   "player.equalizer.presetPicker": "Préréglages",
-  "player.equalizer.preset": "Préréglage"
+  "player.equalizer.preset": "Préréglage",
+  "stats.explorer.detailUnsupported": "L’historique détaillé n’est pas encore disponible sur ce serveur."
 }

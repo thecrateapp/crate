@@ -7,6 +7,8 @@ import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 
+import { toTrackRowData } from "@/lib/track-row-data";
+
 import type { SearchResults } from "./explore-model";
 
 export function SearchResultsView({ results }: { results: SearchResults }) {
@@ -15,13 +17,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
   const hasAlbums = results.albums.length > 0;
   const hasTracks = results.tracks.length > 0;
   const trackRows = useMemo<TrackRowData[]>(
-    () =>
-      results.tracks.slice(0, 10).map((track) => ({
-        ...track,
-        path: track.path || "",
-        duration: track.duration || 0,
-        library_track_id: track.id,
-      })),
+    () => results.tracks.slice(0, 10).map(toTrackRowData),
     [results.tracks],
   );
 

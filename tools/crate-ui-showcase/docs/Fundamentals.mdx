@@ -189,3 +189,11 @@ section's reveal, and later payloads transition the level's opacity. Reduced mot
 final state. The actual view is Listen's `ListeningHeatmap`. The Listen/Stats review shows it with
 the now hour (personal), with its grid hidden below three Crate Pulse listeners (D30), and with
 a flat zero-minute grid.
+
+Track metadata follows the row's own container, rather than the viewport. Quality appears at
+640px of content width and BPM/key at800px, reserving space for the rank,48px cover and readable
+title. Quality, analysis, duration, like and menu keep their fixed slots; missing values do not
+collapse a column. Narrow rows retain their standard duration/actions layout. Stats rankings
+use the full page width instead of sharing a two-column layout with artist posters. The
+Stats row consistency review and the track metadata review exercise the same production pieces
+at375/640/760/900/1200px; they do not repair the row with scene CSS.

@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Track curves",
   "player.equalizer.currentCurveOnly": "Only the current curve is available from this server.",
   "player.equalizer.presetPicker": "Presets",
-  "player.equalizer.preset": "Preset"
+  "player.equalizer.preset": "Preset",
+  "stats.explorer.detailUnsupported": "Detailed history isn't available on this server yet."
 }

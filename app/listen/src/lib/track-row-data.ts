@@ -25,7 +25,7 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
     album_id: track.albumId,
     album_entity_uid: track.albumEntityUid,
     album_slug: track.albumSlug,
-    duration: input.duration ?? undefined,
+    duration: track.duration,
     path: track.path,
     track_number: input.track_number ?? undefined,
     format: track.format,

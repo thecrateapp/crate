@@ -46,6 +46,7 @@ export interface UseStatsRangeResult {
   data: StatsRange | null;
   loading: boolean;
   error: boolean;
+  unsupported: boolean;
 }
 
 export function useStatsRange(
@@ -56,6 +57,10 @@ export function useStatsRange(
   const url = base && range ? buildUrl(base, range, limit) : null;
   // Entries are scoped to the current server and user so accounts never mix.
   const key = url ? cacheScopedKey(url) : null;
+  const endpointScope = base ? cacheScopedKey(base) : null;
+  const [unsupportedScope, setUnsupportedScope] = useState<string | null>(null);
+  const unsupported =
+    endpointScope !== null && unsupportedScope === endpointScope;
   const [errorKey, setErrorKey] = useState<string | null>(null);
   // "Still being prepared" (available=false) answers are shown but never
   // cached, so the next visit asks again once the instance backfill finishes.
@@ -75,7 +80,7 @@ export function useStatsRange(
   const seenGeneration = generation;
 
   useEffect(() => {
-    if (!key || rangeCache.has(key)) return;
+    if (!key || unsupported || rangeCache.has(key)) return;
     const controller = new AbortController();
     let cancelled = false;
     // A history clear can land while the request is in flight, before React
@@ -99,6 +104,14 @@ export function useStatsRange(
         })
         .catch((e: unknown) => {
           if (cancelled || controller.signal.aborted || isAbort(e)) return;
+          const status =
+            typeof e === "object" && e !== null && "status" in e
+              ? e.status
+              : null;
+          if (status === 404 || status === 405 || status === 501) {
+            setUnsupportedScope(endpointScope);
+            return;
+          }
           setErrorKey(key);
         });
     }, DEBOUNCE_MS);
@@ -107,13 +120,18 @@ export function useStatsRange(
       clearTimeout(timer);
       controller.abort();
     };
-  }, [key, seenGeneration]);
+  }, [key, seenGeneration, unsupported, endpointScope]);
 
   const data = key
     ? (rangeCache.get(key) ?? (uncached?.key === key ? uncached.data : null))
     : null;
   const error = key !== null && data === null && errorKey === key;
-  return { data, loading: key !== null && data === null && !error, error };
+  return {
+    data,
+    loading: key !== null && data === null && !error && !unsupported,
+    error,
+    unsupported,
+  };
 }
 
 function buildUrl(

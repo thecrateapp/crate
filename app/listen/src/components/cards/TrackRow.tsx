@@ -34,6 +34,7 @@ import { Clock } from "@crate/ui/icons";
 
 export const TrackRow = memo(function TrackRow({
   track,
+  role = "row",
   index,
   showArtist = false,
   showAlbum = false,
@@ -97,6 +98,7 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <TrackRowView
+      role={role}
       active={isActive}
       selected={selected}
       disabled={model.disabled}

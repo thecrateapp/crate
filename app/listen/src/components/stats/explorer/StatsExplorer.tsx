@@ -4,7 +4,14 @@ import { useNavigate } from "react-router";
 import type { MediaCoverProps } from "@crate/ui/domain/media/MediaCover";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { toPlayerTrack } from "@/components/stats/stats-model";
+import { TrackRow } from "@/components/cards/TrackRow";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useTranslation } from "react-i18next";
+import { StatsRangeTrackView } from "./StatsRangeTrackView";
+import {
+  statsTrackRowData,
+  toPlayerTrack,
+} from "@/components/stats/stats-model";
 import type {
   StatsPeriodKey,
   StatsRange,
@@ -141,6 +148,7 @@ function ExplorerSession({
   selection,
   rangeEndpoint,
 }: StatsExplorerProps) {
+  const { t } = useTranslation();
   const count = tape.points.length;
   const mode = useMemo(() => explorerMode(selection, tape), [selection, tape]);
   const [requested, setRequested] = useState<ExplorerWindow>(() =>
@@ -208,6 +216,7 @@ function ExplorerSession({
           tracks: dayResult.data?.top_tracks ?? [],
           loading: dayResult.loading,
           error: dayResult.error,
+          unsupported: dayResult.unsupported,
           available: dayResult.data?.available ?? true,
         }
       : null;
@@ -258,11 +267,38 @@ function ExplorerSession({
           data={shownStretch}
           loading={stretchResult.loading}
           error={stretchResult.error}
+          unsupported={stretchResult.unsupported}
           stale={carried !== null}
           available={shownStretch?.available ?? true}
           day={day}
           onBack={backToStretch}
           onPlayTrack={playTrack}
+          renderTrack={(track, withAlbum) =>
+            track.track_id != null ? (
+              <TrackRow
+                track={statsTrackRowData(track)}
+                role="group"
+                density="compact"
+                showCoverThumb
+                showArtist
+                showAlbum={withAlbum}
+                onPlayOverride={() => playTrack(track)}
+                meta={
+                  <MonoLabel>
+                    {t("stats.explorer.plays", { count: track.plays })}
+                  </MonoLabel>
+                }
+              />
+            ) : (
+              <StatsRangeTrackView
+                track={track}
+                withAlbum={withAlbum}
+                cover={EXPLORER_LINKS.albumCover(track)}
+                renderImage={renderCover}
+                onPlay={() => {}}
+              />
+            )
+          }
           renderImage={renderCover}
           links={EXPLORER_LINKS}
         />

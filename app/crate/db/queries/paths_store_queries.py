@@ -15,7 +15,17 @@ def get_music_path_row(path_id: int, user_id: int) -> dict | None:
                     """
                 SELECT id, name, origin_type, origin_value, origin_label,
                        dest_type, dest_value, dest_label, waypoints, step_count,
-                       tracks, created_at, updated_at
+                       COALESCE((
+                           SELECT jsonb_agg(entry.value || jsonb_build_object(
+                               'format', lt.format, 'bitrate', lt.bitrate,
+                               'sample_rate', lt.sample_rate, 'bit_depth', lt.bit_depth,
+                               'duration', lt.duration, 'path', lt.path,
+                               'bpm', lt.bpm, 'audio_key', lt.audio_key,
+                               'audio_scale', lt.audio_scale
+                           ) ORDER BY entry.ordinality)
+                           FROM jsonb_array_elements(music_paths.tracks) WITH ORDINALITY AS entry(value, ordinality)
+                           LEFT JOIN library_tracks lt ON lt.id = (entry.value->>'track_id')::integer
+                       ), '[]'::jsonb) AS tracks, created_at, updated_at
                 FROM music_paths
                 WHERE id = :id AND user_id = :user_id
                 """

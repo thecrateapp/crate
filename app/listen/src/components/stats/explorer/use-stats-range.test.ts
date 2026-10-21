@@ -49,6 +49,40 @@ const A = { start: "2026-01-01", end: "2026-01-10" };
 const B = { start: "2026-02-01", end: "2026-02-10" };
 
 describe("useStatsRange", () => {
+  it("distinguishes an older server from request failures and stops probing each stretch", async () => {
+    apiMock.mockRejectedValue({ status: 404 });
+    const { result, rerender } = renderHook(
+      ({ range }) => useStatsRange(BASE, range, 5),
+      { initialProps: { range: A } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(result.current).toMatchObject({
+      loading: false,
+      error: false,
+      unsupported: true,
+      data: null,
+    });
+    rerender({ range: B });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps authorization failures as errors", async () => {
+    apiMock.mockRejectedValue({ status: 403 });
+    const { result } = renderHook(() => useStatsRange(BASE, A, 5));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(result.current).toMatchObject({
+      loading: false,
+      error: true,
+      unsupported: false,
+    });
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     apiMock.mockReset();
@@ -163,6 +197,7 @@ describe("useStatsRange", () => {
       data: null,
       loading: false,
       error: false,
+      unsupported: false,
     });
     const idle2 = renderHook(() => useStatsRange(BASE, null, 5));
     expect(idle2.result.current.loading).toBe(false);

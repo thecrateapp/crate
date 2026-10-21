@@ -54,6 +54,9 @@ it("keeps saved per-track quality and duration in canonical slots without invent
               format: "flac",
               sampleRate: 44100,
               bitDepth: 16,
+              bpm: 99,
+              audioKey: "D",
+              audioScale: "minor",
             },
             {
               id: "lossy",
@@ -96,6 +99,12 @@ it("keeps saved per-track quality and duration in canonical slots without invent
   expect(
     rows[0]!.querySelector('[data-track-slot="duration"]'),
   ).toHaveTextContent("1:15");
+  expect(
+    rows[0]!.querySelector('[data-track-slot="analysis"]'),
+  ).toHaveTextContent("99");
+  expect(
+    rows[0]!.querySelector('[data-track-slot="analysis"]'),
+  ).toHaveTextContent("7A");
   expect(within(rows[1]!).getByText("MP3 320")).toBeInTheDocument();
   expect(
     rows[1]!.querySelector('[data-track-slot="duration"]'),

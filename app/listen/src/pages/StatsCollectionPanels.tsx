@@ -112,7 +112,6 @@ function TopTrackRow({
       showCoverThumb
       showArtist
       showAlbum
-      showDuration={false}
       queueTracks={queueTracks}
       playSource={playSource}
       meta={meta}
@@ -122,47 +121,31 @@ function TopTrackRow({
 
 const TOP_ARTISTS_LIMIT = 10;
 
-/** Top artists after dropping the hero; each keeps its true rank index. */
-function visibleTopArtists(
-  items: StatsArtist[],
-  heroArtistName?: string | null,
-) {
-  const skip =
-    heroArtistName != null &&
-    items[0] != null &&
-    items[0].artist_name.trim() === heroArtistName.trim()
-      ? 1
-      : 0;
+/** Keep the ranking complete even when #1 also appears in the hero. */
+function visibleTopArtists(items: StatsArtist[]) {
   return items
     .slice(0, TOP_ARTISTS_LIMIT)
-    .map((item, index) => ({ item, index }))
-    .slice(skip);
+    .map((item, index) => ({ item, index }));
 }
 
 export function TopArtistsPanel({
   items,
   loading,
-  heroArtistName,
   totalMinutes = 0,
 }: {
   items: StatsArtist[];
   loading: boolean;
-  /** Artist already shown by the hero; skipped when it is the #1 entry. */
-  heroArtistName?: string | null;
   /** Period total (overview.minutes_listened) the share bars divide by. */
   totalMinutes?: number;
 }) {
   const { t } = useTranslation();
-  const visible = useMemo(
-    () => visibleTopArtists(items, heroArtistName),
-    [items, heroArtistName],
-  );
+  const visible = useMemo(() => visibleTopArtists(items), [items]);
   return (
     <StatsPanel
       title={t("stats.topArtists.title")}
       subtitle={t("stats.topArtists.subtitle")}
     >
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+      <div className="grid gap-3 sm:grid-cols-2">
         {loading ? (
           <PanelLoading />
         ) : visible.length ? (

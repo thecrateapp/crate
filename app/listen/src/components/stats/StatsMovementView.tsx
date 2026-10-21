@@ -155,7 +155,7 @@ function MovementColumn({
                   <div className="truncate text-sm font-semibold text-text-primary">
                     {artist.artist_name}
                   </div>
-                  <p className="text-xs text-text-muted">{body(artist)}</p>
+                  <MonoLabel>{body(artist)}</MonoLabel>
                 </div>
               </Link>
             </li>

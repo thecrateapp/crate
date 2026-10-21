@@ -151,6 +151,22 @@ def _track_payload(row: Mapping[Any, Any]) -> dict:
         "album": item["album"],
         "path": item["path"],
         "duration": item["duration"],
+        **{
+            key: item.get(key)
+            for key in (
+                "format",
+                "bitrate",
+                "sample_rate",
+                "bit_depth",
+                "bpm",
+                "audio_key",
+                "audio_scale",
+                "energy",
+                "danceability",
+                "valence",
+                "bliss_vector",
+            )
+        },
     }
 
 
@@ -271,7 +287,7 @@ _HYBRID_TRACKS_SQL = text(
                ar.id AS artist_id,
                ar.entity_uid::text AS artist_entity_uid,
                ar.slug AS artist_slug,
-               t.path, t.duration, t.genre, t.format, t.bitrate, t.year,
+               t.path, t.duration, t.genre, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
                t.bpm, t.audio_key, t.audio_scale, t.energy,
                t.danceability, t.valence, t.bliss_vector,
                COALESCE(ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0) AS fts_rank,

@@ -82,6 +82,7 @@ export function Crates({ onCrateChange }: CratesProps) {
     return playback.map((track) =>
       toPlayableTrack(
         {
+          ...track,
           id: track.local_track_id ?? track.global_track_uid,
           globalTrackUid: track.global_track_uid,
           globalAlbumUid: track.global_album_uid,

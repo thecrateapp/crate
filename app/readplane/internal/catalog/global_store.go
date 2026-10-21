@@ -245,10 +245,26 @@ func (s *Store) globalSearchLegacy(ctx context.Context, q string, cappedLimit in
 			       t.global_album_uid::text AS global_album_uid,
 			       t.global_artist_uid::text AS global_artist_uid,
 			       t.canonical_title, t.artist_name, t.album_name, t.duration_seconds,
+                   COALESCE(NULLIF(LOWER(lt.format), ''), preferred_quality.source_payload_json->>'format') AS format,
+                   COALESCE(lt.bitrate, NULLIF(preferred_quality.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+                   COALESCE(lt.sample_rate, NULLIF(preferred_quality.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+                   COALESCE(lt.bit_depth, NULLIF(preferred_quality.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+                   COALESCE(lt.bpm, NULLIF(preferred_quality.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                   COALESCE(lt.audio_key, preferred_quality.source_payload_json->>'audio_key') AS audio_key,
+                   COALESCE(lt.audio_scale, preferred_quality.source_payload_json->>'audio_scale') AS audio_scale,
 			       t.local_track_id, t.local_track_entity_uid::text AS local_track_entity_uid,
 			       t.availability_json, t.source_count, t.has_local, t.has_remote,
 			       COALESCE(sh.has_healthy_source, false) AS has_healthy_source
 			FROM global_catalog_tracks t
+            LEFT JOIN library_tracks lt ON lt.id = t.local_track_id
+            LEFT JOIN LATERAL (
+                SELECT source_payload_json FROM global_catalog_sources source
+                WHERE source.entity_type = 'track' AND source.global_entity_uid = t.global_track_uid
+                  AND NOT source.source_stale AND source.source_deleted_at IS NULL
+                ORDER BY (source.source_kind = 'local') DESC, source.preferred_for_playback DESC,
+                         source.preferred_for_display DESC, source.updated_at DESC
+                LIMIT 1
+            ) preferred_quality ON true
 			LEFT JOIN source_health sh ON sh.global_entity_uid = t.global_track_uid
 			WHERE t.search_vector @@ plainto_tsquery('simple', $1)
 			   OR t.canonical_title ILIKE $2 ESCAPE '\' OR t.artist_name ILIKE $2 ESCAPE '\' OR t.album_name ILIKE $2 ESCAPE '\'
@@ -416,6 +432,17 @@ func globalTrackSearchPayload(row map[string]any) map[string]any {
 		"album":             row["album_name"],
 		"duration":          row["duration_seconds"],
 		"availability":      globalSearchAvailability(row),
+	}
+	for _, key := range []string{"bpm", "audio_key", "audio_scale", "energy", "danceability", "valence"} {
+		payload[key] = row[key]
+	}
+	if format := strings.ToLower(strings.TrimSpace(stringValue(row["format"]))); format != "" {
+		payload["format"] = format
+	}
+	for _, key := range []string{"bitrate", "sample_rate", "bit_depth"} {
+		if row[key] != nil {
+			payload[key] = row[key]
+		}
 	}
 	if row["global_album_uid"] != nil {
 		payload["global_album_uid"] = row["global_album_uid"]

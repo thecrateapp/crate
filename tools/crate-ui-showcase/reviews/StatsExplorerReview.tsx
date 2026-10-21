@@ -24,6 +24,13 @@ import { IMAGE_SAMPLES } from "../fixtures/image-identity";
 const TRACKS: StatsRangeTrack[] = [
   {
     track_id: 1,
+    format: "flac",
+    bit_depth: 24,
+    sample_rate: 96000,
+    duration: 364,
+    bpm: 76,
+    audio_key: "D",
+    audio_scale: "minor",
     title: "Darkness",
     artist: "The Lovecraft Sextet",
     album: "Nights of Lust",
@@ -33,6 +40,12 @@ const TRACKS: StatsRangeTrack[] = [
   },
   {
     track_id: 2,
+    format: "mp3",
+    bitrate: 320,
+    duration: 181,
+    bpm: 145,
+    audio_key: "C",
+    audio_scale: "major",
     title: "Wait",
     artist: "Converge",
     album: "Jane Doe",

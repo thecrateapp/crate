@@ -2050,5 +2050,6 @@
   "player.equalizer.trackCurves": "Titelkurven",
   "player.equalizer.currentCurveOnly": "Dieser Server stellt nur die aktuelle Kurve bereit.",
   "player.equalizer.presetPicker": "Voreinstellungen",
-  "player.equalizer.preset": "Voreinstellung"
+  "player.equalizer.preset": "Voreinstellung",
+  "stats.explorer.detailUnsupported": "Der detaillierte Verlauf ist auf diesem Server noch nicht verfügbar."
 }

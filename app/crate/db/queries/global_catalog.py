@@ -237,6 +237,13 @@ _SEARCH_TRACKS_SQL = text(
         t.artist_name,
         t.album_name,
         t.duration_seconds,
+        COALESCE(NULLIF(LOWER(lt.format), ''), preferred_quality.source_payload_json->>'format') AS format,
+        COALESCE(lt.bitrate, NULLIF(preferred_quality.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+        COALESCE(lt.sample_rate, NULLIF(preferred_quality.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+        COALESCE(lt.bit_depth, NULLIF(preferred_quality.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+        COALESCE(lt.bpm, NULLIF(preferred_quality.source_payload_json->>'bpm', '')::double precision) AS bpm,
+        COALESCE(lt.audio_key, preferred_quality.source_payload_json->>'audio_key') AS audio_key,
+        COALESCE(lt.audio_scale, preferred_quality.source_payload_json->>'audio_scale') AS audio_scale,
         t.local_track_id,
         t.local_track_entity_uid::text AS local_track_entity_uid,
         t.availability_json,
@@ -245,6 +252,15 @@ _SEARCH_TRACKS_SQL = text(
         t.has_remote,
         COALESCE(sh.has_healthy_source, false) AS has_healthy_source
     FROM global_catalog_tracks t
+    LEFT JOIN library_tracks lt ON lt.id = t.local_track_id
+    LEFT JOIN LATERAL (
+        SELECT source_payload_json FROM global_catalog_sources source
+        WHERE source.entity_type = 'track' AND source.global_entity_uid = t.global_track_uid
+          AND NOT source.source_stale AND source.source_deleted_at IS NULL
+        ORDER BY (source.source_kind = 'local') DESC, source.preferred_for_playback DESC,
+                 source.preferred_for_display DESC, source.updated_at DESC
+        LIMIT 1
+    ) preferred_quality ON true
     LEFT JOIN source_health sh ON sh.global_entity_uid = t.global_track_uid
     WHERE t.search_vector @@ plainto_tsquery('simple', :query)
        OR t.canonical_title ILIKE :pattern ESCAPE '\\'
@@ -1220,12 +1236,32 @@ def get_global_artist_page(
                         local_track_id,
                         local_track_entity_uid::text AS local_track_entity_uid,
                         NULL::integer AS local_album_id,
+                        format, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
                         availability_json,
                         source_count,
                         has_local,
                         has_remote,
                         true AS has_healthy_source
-                    FROM global_catalog_tracks
+                    FROM (
+                        SELECT t.*,
+                               COALESCE(NULLIF(LOWER(lt.format), ''), preferred_quality.source_payload_json->>'format') AS format,
+                               COALESCE(lt.bitrate, NULLIF(preferred_quality.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+                               COALESCE(lt.sample_rate, NULLIF(preferred_quality.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+                               COALESCE(lt.bit_depth, NULLIF(preferred_quality.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+                               COALESCE(lt.bpm, NULLIF(preferred_quality.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                               COALESCE(lt.audio_key, preferred_quality.source_payload_json->>'audio_key') AS audio_key,
+                               COALESCE(lt.audio_scale, preferred_quality.source_payload_json->>'audio_scale') AS audio_scale
+                        FROM global_catalog_tracks t
+                        LEFT JOIN library_tracks lt ON lt.id = t.local_track_id
+                        LEFT JOIN LATERAL (
+                            SELECT source_payload_json FROM global_catalog_sources source
+                            WHERE source.entity_type = 'track' AND source.global_entity_uid = t.global_track_uid
+                              AND NOT source.source_stale AND source.source_deleted_at IS NULL
+                            ORDER BY (source.source_kind = 'local') DESC, source.preferred_for_playback DESC,
+                                     source.preferred_for_display DESC, source.updated_at DESC
+                            LIMIT 1
+                        ) preferred_quality ON true
+                    ) source_tracks
                     WHERE global_artist_uid = :global_artist_uid
                     ORDER BY has_local DESC, source_count DESC, canonical_title ASC
                     LIMIT :top_tracks_limit
@@ -1330,6 +1366,9 @@ def get_global_album_detail(global_album_uid: str) -> dict | None:
                         t.source_count,
                         t.has_local,
                         t.has_remote,
+                        COALESCE(lt.bpm, NULLIF(qs.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                        COALESCE(lt.audio_key, qs.source_payload_json->>'audio_key') AS audio_key,
+                        COALESCE(lt.audio_scale, qs.source_payload_json->>'audio_scale') AS audio_scale,
                         COALESCE(NULLIF(LOWER(lt.format), ''), qs.source_payload_json->>'format') AS format,
                         COALESCE(
                             CASE
@@ -1584,6 +1623,10 @@ def _global_radio_tracks_sql(seed_type: str):
             t.artist_name,
             t.album_name,
             t.duration_seconds,
+            COALESCE(NULLIF(LOWER(lt.format), ''), preferred_source.source_payload_json->>'format') AS format,
+            COALESCE(lt.bitrate, NULLIF(preferred_source.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+            COALESCE(lt.sample_rate, NULLIF(preferred_source.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+            COALESCE(lt.bit_depth, NULLIF(preferred_source.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
             t.local_track_id,
             t.local_track_entity_uid::text AS local_track_entity_uid,
             t.disc_number,
@@ -1596,8 +1639,8 @@ def _global_radio_tracks_sql(seed_type: str):
                 lt.bpm,
                 NULLIF(preferred_source.source_payload_json->>'bpm', '')::double precision
             ) AS bpm,
-            COALESCE(taf.audio_key, lt.audio_key) AS audio_key,
-            COALESCE(taf.audio_scale, lt.audio_scale) AS audio_scale,
+            COALESCE(taf.audio_key, lt.audio_key, preferred_source.source_payload_json->>'audio_key') AS audio_key,
+            COALESCE(taf.audio_scale, lt.audio_scale, preferred_source.source_payload_json->>'audio_scale') AS audio_scale,
             COALESCE(
                 taf.energy,
                 lt.energy,
@@ -1689,6 +1732,10 @@ def _global_radio_track_payload(row) -> dict:
         "album_id": data["local_album_id"],
         "album_entity_uid": data["local_album_entity_uid"],
         "duration": data["duration_seconds"],
+        **{
+            key: data.get(key)
+            for key in ("format", "bitrate", "sample_rate", "bit_depth")
+        },
         "year": data.get("year"),
         "bpm": data.get("bpm"),
         "audio_key": data.get("audio_key"),
@@ -1882,6 +1929,8 @@ def _track_payload(row, *, include_sources: bool) -> dict:
         "path": None,
         "availability": _availability(row),
     }
+    for key in ("bpm", "audio_key", "audio_scale", "energy", "danceability", "valence"):
+        payload[key] = row.get(key)
     quality = _track_quality(row)
     if quality["format"]:
         payload["format"] = quality["format"]

@@ -127,7 +127,10 @@ SELECT 'album', to_jsonb(x) FROM (
 ) x
 UNION ALL
 SELECT 'track', to_jsonb(x) FROM (
-    SELECT COALESCE(lt.id, td.track_id) AS track_id,
+    SELECT lt.id AS track_id,
+           lt.path AS track_path, lt.entity_uid::text AS track_entity_uid,
+           lt.format, lt.bitrate, lt.sample_rate, lt.bit_depth, lt.duration,
+           lt.bpm, lt.audio_key, lt.audio_scale,
            COALESCE(lt.title, td.title) AS title,
            COALESCE(lt.artist, NULLIF(td.artist, '')) AS artist,
            COALESCE(lt.album, NULLIF(td.album, '')) AS album,

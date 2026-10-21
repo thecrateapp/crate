@@ -1,3 +1,4 @@
+import type { TrackMediaMetadata } from "../../lib/track-media-metadata";
 import type { PlaylistArtworkTrack } from "@crate/ui/domain/playlists/PlaylistArtwork";
 import type { ArtistHeroArtworkBounds } from "@crate/ui/domain/ArtistHeroFrame";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
@@ -127,7 +128,7 @@ export interface ReplayMix {
   items: ReplayTrack[];
 }
 
-export interface PlaylistDetailTrack {
+export interface PlaylistDetailTrack extends TrackMediaMetadata {
   id?: number;
   track_id?: number;
   track_entity_uid?: string;

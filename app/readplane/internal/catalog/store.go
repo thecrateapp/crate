@@ -314,6 +314,8 @@ const localTrackSearchSQL = `
 		       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
 		       a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
 		       a.name AS album, t.path, t.duration,
+               t.format, t.bitrate, t.sample_rate, t.bit_depth,
+               t.bpm, t.audio_key, t.audio_scale, t.energy, t.danceability, t.valence, t.bliss_vector,
 		       COALESCE(ts_rank(t.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
 		       CASE WHEN t.title ILIKE $3 ESCAPE '\' THEN 0.3
 		            WHEN t.artist ILIKE $3 ESCAPE '\' THEN 0.2
@@ -330,7 +332,9 @@ const localTrackSearchSQL = `
 	)
 	SELECT id, entity_uid, slug, title, artist,
 	       artist_id, artist_entity_uid, artist_slug,
-	       album_id, album_entity_uid, album_slug, album, path, duration
+	       album_id, album_entity_uid, album_slug, album, path, duration,
+           format, bitrate, sample_rate, bit_depth,
+           bpm, audio_key, audio_scale, energy, danceability, valence, bliss_vector
 	FROM ranked
 	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, title ASC
 	LIMIT $5
@@ -424,14 +428,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 		if err != nil {
 			return err
 		}
+
 		for _, track := range tracks {
-			track["bpm"] = nil
-			track["audio_key"] = nil
-			track["audio_scale"] = nil
-			track["energy"] = nil
-			track["danceability"] = nil
-			track["valence"] = nil
-			track["bliss_vector"] = nil
+			track["bliss_vector"] = normalizeFloatSlice(track["bliss_vector"])
 		}
 		return nil
 	})
