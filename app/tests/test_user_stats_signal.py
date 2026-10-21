@@ -481,6 +481,64 @@ def test_genre_trend_keeps_the_real_share_of_a_genre_ranked_below_twelve(
     assert faller["delta_vs_previous"] == -0.08
 
 
+def _seed_genre_days(rows: list[tuple[str, str, int]]) -> None:
+    """Insert ``(day, genre, plays)`` projection rows for user 1."""
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        for index, (day, genre, plays) in enumerate(rows):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_daily (
+                        user_id, day, entity_key, artist, album, genre,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        1, CAST(:day AS date), :key, :artist, '', :genre,
+                        :plays, :plays, :plays * 3.0,
+                        CAST(:day AS timestamptz), CAST(:day AS timestamptz)
+                    )
+                    """
+                ),
+                {
+                    "day": day,
+                    "key": f"genre-seed-{index}",
+                    "artist": f"Artist {index}",
+                    "genre": genre,
+                    "plays": plays,
+                },
+            )
+
+
+def test_genre_trend_reads_the_previous_share_of_a_genre_ranked_below_twelve(
+    pg_db,
+):
+    """A current top-six genre that ranked 13th before is compared to its real share."""
+    from crate.db.queries import user_library_stats_signal as signal
+    from crate.db.tx import read_scope
+
+    current_day, previous_day = "2026-10-01", "2026-09-01"
+    _seed_genre_days(
+        [(current_day, "Deep", 100)]
+        + [(current_day, f"Now{i}", 50) for i in range(5)]
+        + [(previous_day, f"Then{i}", 100) for i in range(12)]
+        + [(previous_day, "Deep", 10)]
+    )
+
+    with read_scope() as session:
+        trend = signal._genre_trend(session, 1, _period())
+
+    deep = next(item for item in trend if item["genre_name"] == "Deep")
+    current_share = 100 / (100 + 5 * 50)
+    previous_share = 10 / (12 * 100 + 10)
+    assert deep["share"] == round(current_share, 4)
+    assert deep["delta_vs_previous"] == round(current_share - previous_share, 4)
+
+
 def test_genre_trend_matches_names_that_differ_only_in_case(monkeypatch):
     current = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Shoegaze", 0.05)]
     previous = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("shoegaze", 0.05)]

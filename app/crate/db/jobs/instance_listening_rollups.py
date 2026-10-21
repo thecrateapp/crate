@@ -17,6 +17,9 @@ from datetime import date
 
 from sqlalchemy import text
 
+from crate.db.queries.instance_listening_status import (
+    instance_listening_rollups_incomplete,
+)
 from crate.db.repositories.tasks import create_task_dedup, release_task_dedup_key
 from crate.db.tx import read_scope, transaction_scope
 
@@ -207,27 +210,6 @@ def queue_instance_listening_backfill_for_removed_user(
     return queue_instance_listening_rebuild({"full": True}, session=session)
 
 
-def instance_listening_rollups_incomplete(session) -> bool:
-    """True while listening exists but the rollups miss its earliest day.
-
-    Incremental tasks only fill recent days, so "has any row" would hide a
-    missing backfill. No listening at all leaves nothing to backfill. Both
-    lookups are index probes.
-    """
-    return bool(
-        session.execute(
-            text(
-                """
-                SELECT earliest.day IS NOT NULL AND NOT EXISTS (
-                    SELECT 1 FROM instance_track_daily WHERE day = earliest.day
-                )
-                FROM (SELECT MIN(day) AS day FROM user_track_daily) earliest
-                """
-            )
-        ).scalar()
-    )
-
-
 def queue_instance_listening_backfill_if_needed() -> str | None:
     with read_scope() as session:
         needed = instance_listening_rollups_incomplete(session)
@@ -241,7 +223,6 @@ __all__ = [
     "BACKFILL_TASK_TYPE",
     "DAYS_TASK_TYPE",
     "instance_listening_days_dedup_key",
-    "instance_listening_rollups_incomplete",
     "queue_instance_listening_backfill_for_removed_user",
     "queue_instance_listening_backfill_if_needed",
     "queue_instance_listening_rebuild",

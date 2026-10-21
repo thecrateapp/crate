@@ -22,9 +22,8 @@ from crate.api.schemas.analytics import (
 )
 from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
 from crate.db.queries.user_library_stats_range import (
+    StatsRangeError,
     get_instance_stats_range,
-    instance_stats_today,
-    validate_stats_range,
 )
 from crate.missing import find_missing_albums
 from crate.quality import quality_report
@@ -147,10 +146,9 @@ def api_instance_listening_stats_range(
 ):
     _require_auth(request)
     try:
-        validate_stats_range(start, end, today=instance_stats_today())
-    except ValueError as exc:
+        return get_instance_stats_range(start, end, limit=limit)
+    except StatsRangeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return get_instance_stats_range(start, end, limit=limit)
 
 
 @router.get(

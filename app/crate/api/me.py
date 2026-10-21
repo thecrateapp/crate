@@ -118,9 +118,8 @@ from crate.db.home import (
 )
 from crate.db.home_section_surface import get_cached_home_section
 from crate.db.queries.user_library_stats_range import (
+    StatsRangeError,
     get_user_stats_range,
-    user_stats_today,
-    validate_stats_range,
 )
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
@@ -1134,10 +1133,9 @@ def stats_range(
 ):
     user = _require_auth(request)
     try:
-        validate_stats_range(start, end, today=user_stats_today(user["id"]))
-    except ValueError as exc:
+        return get_user_stats_range(user["id"], start, end, limit=limit)
+    except StatsRangeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return get_user_stats_range(user["id"], start, end, limit=limit)
 
 
 @router.get(

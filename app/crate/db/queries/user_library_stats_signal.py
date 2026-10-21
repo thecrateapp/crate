@@ -825,6 +825,8 @@ def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict
     params = period_params(period)
     # Shares are relative to the whole window, so a wide read keeps the top six
     # intact and lets a genre that fell below rank 12 keep its real current share.
+    # The previous window reads just as wide: a current top-six genre that ranked
+    # below 12 before must be compared with its real share, not with 0.
     current = _genre_shares(
         session, user_id, period_day_filter(period), params, limit=_FULL_GENRE_READ
     )
@@ -835,6 +837,7 @@ def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict
             user_id,
             "day >= :previous_start AND day < :period_start",
             params,
+            limit=_FULL_GENRE_READ,
         )
     previous = {item["genre_name"].lower(): item["share"] for item in previous_rows}
 

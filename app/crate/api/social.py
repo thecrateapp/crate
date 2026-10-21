@@ -32,9 +32,8 @@ from crate.db.queries.social import (
     search_users,
 )
 from crate.db.queries.user_library_stats_range import (
-    get_user_stats_range,
-    user_stats_today,
-    validate_stats_range,
+    StatsRangeError,
+    get_public_user_stats_range,
 )
 from crate.db.queries.crates import get_public_crates_for_user
 from crate.db.repositories.social import (
@@ -272,14 +271,13 @@ def social_profile_stats_range(
     limit: int = Query(3, ge=1, le=20),
 ):
     _require_auth(request)
-    profile = get_public_user_profile_by_username(username)
-    if not profile:
-        raise HTTPException(status_code=404, detail="User not found")
     try:
-        validate_stats_range(start, end, today=user_stats_today(profile["id"]))
-    except ValueError as exc:
+        payload = get_public_user_stats_range(username, start, end, limit=limit)
+    except StatsRangeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return get_user_stats_range(profile["id"], start, end, limit=limit)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return payload
 
 
 @router.get(

@@ -10,12 +10,14 @@ import pytest
 from sqlalchemy import text
 
 from crate.db.jobs.instance_listening_rollups import (
-    instance_listening_rollups_incomplete,
     queue_instance_listening_backfill_if_needed,
     rebuild_instance_entity_firsts,
     rebuild_instance_listening_days,
 )
 from crate.db.jobs.user_listening_projections import mark_listening_day_dirty
+from crate.db.queries.instance_listening_status import (
+    instance_listening_rollups_incomplete,
+)
 from crate.db.repositories.user_library_aggregate_runner import (
     recompute_user_listening_aggregates,
     refresh_user_listening_aggregates,
@@ -576,7 +578,9 @@ def test_instance_range_sums_listeners(pg_db):
 
     _seed_two_listeners()
     _rebuild_all()
-    start, end = date(2020, 1, 1), date(2030, 1, 1)
+    # The seeded listening sits in 2026-05..10; the range functions validate
+    # bounds against today, so stay inside a past 400-day stretch.
+    start, end = date(2026, 1, 1), date(2026, 10, 10)
 
     both = get_instance_stats_range(start, end, limit=5)
     mine = get_user_stats_range(1, start, end, limit=5)
@@ -620,7 +624,7 @@ def test_instance_range_unavailable_before_backfill(pg_db):
 
     _seed_two_listeners()
     # Listening exists but the rollups were never built.
-    result = get_instance_stats_range(date(2020, 1, 1), date(2030, 1, 1))
+    result = get_instance_stats_range(date(2026, 1, 1), date(2026, 10, 10))
     assert result["available"] is False
     assert result["top_artists"] == result["top_albums"] == []
     assert result["top_tracks"] == result["discoveries"] == []

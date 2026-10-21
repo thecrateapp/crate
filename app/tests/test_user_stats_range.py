@@ -177,3 +177,106 @@ def test_range_days_follow_user_timezone(pg_db):
 
     assert utc_day["top_tracks"] == []
     assert [item["track_id"] for item in local_day["top_tracks"]] == [track_id]
+
+
+@pytest.fixture
+def opened_scopes(monkeypatch):
+    """Count every read or write scope opened through ``crate.db.tx``."""
+    from crate.db import tx
+
+    real_factory = tx.get_session_factory
+    opened: list[int] = []
+
+    def counting_factory():
+        opened.append(1)
+        return real_factory()
+
+    monkeypatch.setattr(tx, "get_session_factory", counting_factory)
+    return opened
+
+
+def _username(user_id: int) -> str:
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT username FROM users WHERE id = :id"), {"id": user_id}
+        ).scalar_one()
+
+
+@pytest.mark.parametrize(
+    "route",
+    ["/api/me/stats/range", "/api/users/{username}/stats/range", "/api/stats/range"],
+)
+def test_range_routes_open_one_read_scope(history, test_app, opened_scopes, route):
+    path = route.format(username=_username(1))
+    opened_scopes.clear()
+
+    response = test_app.get(f"{path}?start=2026-09-01&end=2026-10-06&limit=5")
+
+    assert response.status_code == 200, response.text[:300]
+    assert len(opened_scopes) == 1
+
+
+def test_user_range_validates_against_the_listeners_today(pg_db, monkeypatch):
+    from crate.db.queries import user_library_stats_range as mod
+
+    seen: list[int] = []
+
+    def today_for(user_id, *, session=None):
+        assert session is not None, "today must reuse the range scope"
+        seen.append(user_id)
+        return date(2026, 10, 21)
+
+    monkeypatch.setattr(mod, "user_stats_today", today_for)
+    ran: list[int] = []
+    monkeypatch.setattr(mod, "_run_range", lambda *a, **kw: ran.append(1) or {})
+
+    with pytest.raises(mod.StatsRangeError):
+        mod.get_user_stats_range(1, date(2026, 10, 10), date(2026, 10, 22))
+    with pytest.raises(mod.StatsRangeError):
+        mod.get_user_stats_range(1, date(2025, 9, 15), date(2026, 10, 21))
+    assert ran == []
+    mod.get_user_stats_range(1, date(2025, 9, 16), date(2026, 10, 21))
+    assert ran == [1]
+    assert seen == [1, 1, 1]
+
+
+def test_public_user_range_resolves_the_profile_in_the_same_scope(pg_db, monkeypatch):
+    from crate.db.queries import user_library_stats_range as mod
+
+    seen: list[int] = []
+
+    def today_for(user_id, *, session=None):
+        seen.append(user_id)
+        return date(2026, 10, 21)
+
+    monkeypatch.setattr(mod, "user_stats_today", today_for)
+
+    assert (
+        mod.get_public_user_stats_range(
+            "nobody-here", date(2026, 10, 1), date(2026, 10, 21)
+        )
+        is None
+    )
+    assert seen == []
+    payload = mod.get_public_user_stats_range(
+        _username(1), date(2026, 10, 1), date(2026, 10, 21), limit=4
+    )
+    assert payload["available"] is True
+    assert seen == [1]
+    with pytest.raises(mod.StatsRangeError):
+        mod.get_public_user_stats_range(
+            _username(1), date(2026, 10, 10), date(2026, 10, 1)
+        )
+
+
+def test_instance_range_validates_against_the_utc_day(pg_db, monkeypatch):
+    from crate.db.queries import user_library_stats_range as mod
+
+    monkeypatch.setattr(mod, "instance_stats_today", lambda: date(2026, 10, 21))
+
+    with pytest.raises(mod.StatsRangeError):
+        mod.get_instance_stats_range(date(2026, 10, 10), date(2026, 10, 22))
+    with pytest.raises(mod.StatsRangeError):
+        mod.get_instance_stats_range(date(2025, 9, 15), date(2026, 10, 21))
+    payload = mod.get_instance_stats_range(date(2025, 9, 16), date(2026, 10, 21))
+    assert payload["start"] == "2025-09-16"

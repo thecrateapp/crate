@@ -13,16 +13,19 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
-from crate.db.jobs.instance_listening_rollups import (
+from crate.db.queries.instance_listening_status import (
     instance_listening_rollups_incomplete,
 )
+from crate.db.queries.social_profiles import get_public_user_profile_by_username
 from crate.db.queries.user_library_stats_signal import _TRACK_REF_JOINS
 from crate.db.queries.user_stats_periods import user_stats_timezone
 from crate.db.tx import read_scope
 
 __all__ = [
     "MAX_RANGE_DAYS",
+    "StatsRangeError",
     "get_instance_stats_range",
+    "get_public_user_stats_range",
     "get_user_stats_range",
     "instance_stats_today",
     "user_stats_today",
@@ -165,14 +168,18 @@ _SECTIONS = {
 }
 
 
+class StatsRangeError(ValueError):
+    """The requested stretch is inverted, in the future or too long."""
+
+
 def validate_stats_range(start: date, end: date, *, today: date) -> None:
-    """Raise ``ValueError`` for an inverted, future or over-long stretch."""
+    """Raise ``StatsRangeError`` for an inverted, future or over-long stretch."""
     if end < start:
-        raise ValueError("end must not be before start")
+        raise StatsRangeError("end must not be before start")
     if end > today:
-        raise ValueError("end must not be in the future")
+        raise StatsRangeError("end must not be in the future")
     if (end - start).days > MAX_RANGE_DAYS:
-        raise ValueError(f"range must not exceed {MAX_RANGE_DAYS} days")
+        raise StatsRangeError(f"range must not exceed {MAX_RANGE_DAYS} days")
 
 
 def user_stats_today(user_id: int, *, session=None) -> date:
@@ -211,13 +218,56 @@ def get_user_stats_range(
     limit: int = 3,
     session=None,
 ) -> dict:
-    return _run_range(
-        _USER_RANGE_SQL,
-        {"user_id": user_id, "limit": limit},
-        start,
-        end,
-        session=session,
-    )
+    """Range summary for one listener, bounded by today in their timezone.
+
+    Raises ``StatsRangeError`` before running the range query; the timezone
+    lookup and the query share one read scope.
+    """
+
+    def _impl(current) -> dict:
+        validate_stats_range(
+            start, end, today=user_stats_today(user_id, session=current)
+        )
+        return _run_range(
+            _USER_RANGE_SQL,
+            {"user_id": user_id, "limit": limit},
+            start,
+            end,
+            session=current,
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def get_public_user_stats_range(
+    username: str,
+    start: date,
+    end: date,
+    *,
+    limit: int = 3,
+    session=None,
+) -> dict | None:
+    """``get_user_stats_range`` for a public profile; ``None`` for an unknown user.
+
+    The profile lookup uses the same visibility as the profile dashboard and
+    runs in the range's read scope.
+    """
+
+    def _impl(current) -> dict | None:
+        profile = get_public_user_profile_by_username(username, session=current)
+        if not profile:
+            return None
+        return get_user_stats_range(
+            int(profile["id"]), start, end, limit=limit, session=current
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
 
 
 def instance_stats_today() -> date:
@@ -232,7 +282,12 @@ def get_instance_stats_range(
     limit: int = 3,
     session=None,
 ) -> dict:
-    """Same summary over every listener; empty until the rollups are complete."""
+    """Same summary over every listener; empty until the rollups are complete.
+
+    Bounded by today in UTC, the instance tape's day boundary; raises
+    ``StatsRangeError`` before opening a scope.
+    """
+    validate_stats_range(start, end, today=instance_stats_today())
 
     def _impl(current) -> dict:
         if instance_listening_rollups_incomplete(current):

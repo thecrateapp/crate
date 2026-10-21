@@ -3,6 +3,8 @@
 from datetime import date
 from unittest.mock import patch
 
+from crate.db.queries.user_library_stats_range import validate_stats_range
+
 TODAY = date(2026, 10, 21)
 
 _PAYLOAD = {
@@ -56,37 +58,36 @@ _PAYLOAD = {
     ],
 }
 
-_PROFILE = {"id": 42, "username": "ana", "display_name": "Ana", "avatar": None}
 
+def _reader(*, known: bool = True):
+    """Stand-in for the range readers: validate the bounds as they do, then answer.
 
-def _today_for(user_id):
-    # The viewer (id 1) is far behind the profile owner (id 42): only the
-    # owner's "today" lets the 2026-10 ranges through.
-    return TODAY if user_id == 42 else date(2026, 1, 1)
+    The readers resolve the subject's "today" inside their read scope and raise
+    ``StatsRangeError`` before querying (``tests/test_user_stats_range.py``); the
+    routes only map that error to 422 and an unknown profile to 404.
+    """
+
+    def _read(*args, limit):
+        start, end = args[-2:]
+        if not known:
+            return None
+        validate_stats_range(start, end, today=TODAY)
+        return dict(_PAYLOAD)
+
+    return _read
 
 
 def _me(test_app, qs):
-    with (
-        patch("crate.api.me.user_stats_today", return_value=TODAY),
-        patch("crate.api.me.get_user_stats_range", return_value=dict(_PAYLOAD)) as q,
-    ):
+    with patch("crate.api.me.get_user_stats_range", side_effect=_reader()) as q:
         return test_app.get(f"/api/me/stats/range?{qs}"), q
 
 
-def _user(test_app, qs, profile=_PROFILE):
-    with (
-        patch(
-            "crate.api.social.get_public_user_profile_by_username",
-            return_value=profile,
-        ),
-        patch("crate.api.social.user_stats_today", side_effect=_today_for) as today,
-        patch(
-            "crate.api.social.get_user_stats_range", return_value=dict(_PAYLOAD)
-        ) as q,
-    ):
-        resp = test_app.get(f"/api/users/ana/stats/range?{qs}")
-    q.today_mock = today
-    return resp, q
+def _user(test_app, qs, *, known=True):
+    with patch(
+        "crate.api.social.get_public_user_stats_range",
+        side_effect=_reader(known=known),
+    ) as q:
+        return test_app.get(f"/api/users/ana/stats/range?{qs}"), q
 
 
 def _assert_shape(data):
@@ -110,7 +111,9 @@ def test_user_range_returns_the_summary(test_app):
     resp, q = _user(test_app, "start=2026-10-01&end=2026-10-21")
     assert resp.status_code == 200
     _assert_shape(resp.json())
-    assert q.call_args.args[0] == 42
+    # The profile owner, never the viewer, bounds the range: the route hands
+    # the username to the reader, which resolves the owner in its own scope.
+    assert q.call_args.args == ("ana", date(2026, 10, 1), date(2026, 10, 21))
     assert q.call_args.kwargs["limit"] == 3
 
 
@@ -118,9 +121,9 @@ def test_range_accepts_400_days_and_rejects_401(test_app):
     assert (date(2026, 10, 21) - date(2025, 9, 16)).days == 400
     ok, _ = _me(test_app, "start=2025-09-16&end=2026-10-21")
     assert ok.status_code == 200
-    too_long, q = _me(test_app, "start=2025-09-15&end=2026-10-21")
+    too_long, _ = _me(test_app, "start=2025-09-15&end=2026-10-21")
     assert too_long.status_code == 422
-    q.assert_not_called()
+    assert "400 days" in too_long.json()["detail"]
 
 
 def test_range_rejects_inverted_and_future_ranges(test_app):
@@ -136,18 +139,8 @@ def test_range_rejects_out_of_bounds_limit(test_app):
 
 
 def test_user_range_404s_for_unknown_username(test_app):
-    resp, q = _user(test_app, "start=2026-10-01&end=2026-10-21", profile=None)
+    resp, _ = _user(test_app, "start=2026-10-01&end=2026-10-21", known=False)
     assert resp.status_code == 404
-    q.assert_not_called()
-
-
-def test_user_range_uses_the_profile_owners_today(test_app):
-    resp, q = _user(test_app, "start=2026-10-01&end=2026-10-21")
-    assert resp.status_code == 200
-    q.today_mock.assert_called_once_with(42)
-    # Same range is future for the viewer's timezone, so the check must follow
-    # the profile owner and nobody else.
-    assert _today_for(1) < date(2026, 10, 21)
 
 
 def test_user_stats_today_follows_the_listener_timezone():
@@ -161,13 +154,9 @@ def test_user_stats_today_follows_the_listener_timezone():
 
 
 def _instance(test_app, qs):
-    with (
-        patch("crate.api.analytics.instance_stats_today", return_value=TODAY),
-        patch(
-            "crate.api.analytics.get_instance_stats_range",
-            return_value=dict(_PAYLOAD),
-        ) as q,
-    ):
+    with patch(
+        "crate.api.analytics.get_instance_stats_range", side_effect=_reader()
+    ) as q:
         return test_app.get(f"/api/stats/range?{qs}"), q
 
 
@@ -181,11 +170,12 @@ def test_instance_range_route_returns_the_summary_and_validates(test_app):
         "start=2026-10-10&end=2026-10-01",
         "start=2026-10-10&end=2026-10-22",
         "start=2025-09-15&end=2026-10-21",
-        "start=2026-10-01&end=2026-10-21&limit=21",
     ):
-        bad, q = _instance(test_app, qs)
+        bad, _ = _instance(test_app, qs)
         assert bad.status_code == 422
-        q.assert_not_called()
+    bad, q = _instance(test_app, "start=2026-10-01&end=2026-10-21&limit=21")
+    assert bad.status_code == 422
+    q.assert_not_called()
 
 
 def test_instance_stats_today_is_the_utc_day():
