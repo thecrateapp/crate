@@ -278,6 +278,56 @@ def test_uncertainty_is_reconciled_without_redownload(world, human_actor, mode):
     assert world["state"]["posts"] == 1
 
 
+@pytest.mark.parametrize("mode", ["pending", "uncertain"])
+@pytest.mark.parametrize("cancel", [True, False])
+def test_publication_reconciliation_checks_cancellation_between_files(
+    world, human_actor, monkeypatch, mode, cancel
+):
+    from crate import agent_acquisition_publish as publication
+
+    files = world["state"]["raw"][0]["files"]
+    files.append({**files[0], "filename": "Echo\\New\\Two.flac"})
+    plan = _preview(world, max_items=2)["plan"]
+    world["state"][mode] = True
+    accepted, result = _execute(world, human_actor, plan)
+    assert result["execution"]["status"] == "partial", result
+    transfer = store.owned_transfer(world["principal"], accepted["job_id"])
+    assert transfer["state"] != "staged"
+    directory = (
+        Path(world["config"]["downloads_path"])
+        / transfer["evidence"]["staging_relative"]
+    )
+    (directory / "Two.flac").write_bytes(world["sample"].read_bytes())
+    world["state"].update(pending=False, uncertain=False)
+    verified = []
+    original = publication._file_manifest
+
+    def verify(path, expected, source):
+        manifest = original(path, expected, source)
+        verified.append(path.name)
+        return manifest
+
+    monkeypatch.setattr(publication, "_file_manifest", verify)
+    monkeypatch.setattr(
+        "crate.worker_handlers.is_cancelled", lambda _: cancel and bool(verified)
+    )
+    plans_before = scalar("SELECT count(*) FROM agent_repair_plans")
+    prepared = _publication(world, accepted["job_id"])
+    if cancel:
+        assert prepared["execution"]["error_code"] == "CANCELLED", prepared
+        assert "plan" not in prepared
+        assert verified == ["One.flac"]
+        assert scalar("SELECT count(*) FROM agent_repair_plans") == plans_before
+        assert store.owned_transfer(world["principal"], accepted["job_id"])[
+            "state"
+        ] == transfer["state"]
+    else:
+        assert prepared["execution"]["status"] == "prepared", prepared
+        assert verified == ["One.flac", "Two.flac"]
+    assert world["state"]["posts"] == 1
+    assert scalar("SELECT count(*) FROM library_albums") == 0
+
+
 def test_changed_staged_content_and_occupied_destination_rejected(world, human_actor):
     accepted, _ = _execute(world, human_actor, _preview(world)["plan"])
     publication = _publication(world, accepted["job_id"])

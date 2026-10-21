@@ -154,16 +154,22 @@ def compile_publication(parameters, config, *, principal, task_id=None):
     evidence = transfer["evidence"]
     if str(staging_root(config)) != evidence["download_root"]:
         raise DiagnosticError("EVIDENCE_STALE", "Provider staging root changed")
+    manifest = None
     if transfer["state"] != "staged":
         from crate.agent_acquisition import reconcile_transfer
 
-        evidence = reconcile_transfer(parameters["source_job_id"], evidence, config)
+        evidence = reconcile_transfer(
+            parameters["source_job_id"], evidence, config, check=check
+        )
+        manifest = evidence["manifest"]
     source, target = evidence["source"], evidence["target"]
     if store.target_state(target["artist_uid"], source["release"]) != target:
         raise DiagnosticError("EVIDENCE_STALE", "Target artist changed")
-    manifest = staged_manifest(
-        source, config, evidence["staging_relative"], check=check
-    )
+    if manifest is None:
+        manifest = staged_manifest(
+            source, config, evidence["staging_relative"], check=check
+        )
+    check()
     if manifest != evidence["manifest"]:
         raise DiagnosticError("EVIDENCE_STALE", "Staged acquisition content changed")
     uid = str(
