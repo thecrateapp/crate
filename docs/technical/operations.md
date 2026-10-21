@@ -17,6 +17,7 @@ sources:
     deploy/hermes/context_server.py,
     deploy/hermes/activate_context.py,
     scripts/hermes_context.py,
+    app/crate/api/smart_mix_admin.py,
   ]
 ---
 
@@ -166,3 +167,38 @@ explicitly or use an updated deployment checkout; the old checkout cannot mainta
 Validate the actual Luna tool calls, Telegram polling and private-user policy after setup.
 A running gateway alone does not prove MCP access or model authentication. Also confirm that
 any personal Hermes container retains its original ID, start time and restart count.
+
+### Maintaining the technical context
+
+A context bundle can contain source code while its overview or runbook remains behind the
+implementation. Review documentation coverage when a feature, contract or operating procedure
+changes. Compare the target release's sources and tests with each canonical page's `sources`
+and `verified` metadata, then update the owning page and its links in the same change. Keep
+coverage gaps and completion status in the development PR; this guide owns the maintenance
+procedure. Inclusion in the corpus does not by itself prove documentation completeness.
+
+Smart Mix already has a [unified design](smart-mix-design.md) and a
+[continuation plan](smart-mix-implementation-plan.md). Review those pages and the audio, worker and playback chapters against the target implementation
+before using them as an operational explanation.
+The review must cover profile/analyzer/planner versions and provenance, cue-beat eligibility
+and fallbacks, source invalidation and cache generations, backfill lifecycle, consumer/platform
+support and physical acceptance gates. Keep implemented behavior, deployment flags and future
+work explicit. For every diagnosis, identify the read evidence available through today's MCP
+and record any missing observation. An HTTP GET is not sufficient evidence of a pure read:
+`app/crate/api/smart_mix_admin.py` can enqueue coverage refresh from its status route.
+
+After updating a page, validate `docs/manifest.json`, its source links and the release bundle:
+
+```bash
+npm run check:docs --prefix app/docs
+```
+
+Use `search_crate_context` and `read_crate_context` to check that Hermes can retrieve the
+explanation. Acceptance questions should cover the feature's data flow, job/status semantics,
+version invalidation, fallback behavior and a case where current evidence is unavailable.
+Answers must identify source paths and the context release SHA, and use current MCP evidence
+for live claims. Refreshing documentation does not grant access to additional endpoints or tools.
+
+Publish the revised documentation with its release, then activate that release's context after
+deployment verification. Do not patch an older immutable bundle with newer branch or `main`
+content; source SHA, image provenance and documentation must remain traceable together.
