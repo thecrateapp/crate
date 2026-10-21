@@ -34,6 +34,9 @@ SERVICES = (
     "crate-redis",
     "redis-durable",
 )
+SERVICE_CONTAINER_NAMES = {"redis-durable": "crate-redis-durable"}
+OBSERVATION_RESPONSE_BYTES = 55000
+
 RUNTIME_FIELDS = {
     "worker_live": ("engine", "running_count", "pending_count"),
     "analysis_status": tuple(
@@ -166,11 +169,29 @@ def _runtime(records, name, failure=None):
         if isinstance(payload, dict)
         and k in payload
         and (
-            not isinstance(payload[k], (dict, list))
+            name in {"worker_live", "analysis_status", "imports_pending"}
+            or not isinstance(payload[k], (dict, list))
             or k in {"quality", "current_quality", "processing", "versions"}
         )
     }
+    invalid = []
+    if name in {"worker_live", "analysis_status", "imports_pending"}:
+        for key, value in list(selected.items()):
+            valid = (
+                isinstance(value, str) and len(value) <= 128
+                if key == "engine"
+                else type(value) is int and 0 <= value <= 2**63 - 1
+            )
+            if not valid:
+                invalid.append(key)
+                del selected[key]
     result = _source(name, record, selected, failure)
+    if invalid:
+        result["invalid_fields"] = invalid
+        result["reason"] = "Stored runtime fields have invalid producer types or bounds"
+        if result["availability"] == "available":
+            result["availability"] = "stale"
+
     result["version"] = _bounded(
         {
             k: selected[k]
@@ -219,10 +240,11 @@ def get_instance_inventory():
     containers = containers if isinstance(containers, list) else []
     services = {}
     for service in SERVICES:
+        container_name = SERVICE_CONTAINER_NAMES.get(service, service)
         rows = [
             r
             for r in (containers or [])[:32]
-            if isinstance(r, dict) and r.get("name") == service
+            if isinstance(r, dict) and r.get("name") == container_name
         ]
         row = rows[0] if len(rows) == 1 else None
         image = (row or {}).get("image")
@@ -259,7 +281,12 @@ def get_instance_inventory():
             )
         elif item["data"] is not None:
             item["data"]["image_reference"] = image
-        item.update(image_id=None, image_source_sha=None, live_image_verified=False)
+        item.update(
+            container_name=container_name,
+            image_id=None,
+            image_source_sha=None,
+            live_image_verified=False,
+        )
         services[service] = item
     schema = evidence.get("database_schema_version")
     sources = {
@@ -364,7 +391,7 @@ def get_observability_summary():
         name: _runtime(records, name, failure)
         for name in ("worker_live", "analysis_status", "imports_pending")
     }
-    return _result(
+    result = _result(
         "observability_summary",
         sources,
         queried_at=evidence.get("queried_at"),
@@ -380,6 +407,47 @@ def get_observability_summary():
             "event_cursor_reason": "No global UI-event journal; supervisor owns its operational event cursor",
         },
     )
+
+    # Repeated envelopes retain independent provenance. Bound the assembled UTF-8
+    # response as well as each source; never replace all evidence with transport error.
+    omitted = []
+    result["data"]["omitted_source_data"] = omitted
+    candidates = [(f"sources.{name}", source) for name, source in sources.items()]
+    candidates.extend(
+        (f"subsystems.{name}.sources.{key}", source)
+        for name, subsystem in data.items()
+        for key, source in subsystem["sources"].items()
+    )
+    while (
+        len(json.dumps(result, default=str, ensure_ascii=False).encode())
+        > OBSERVATION_RESPONSE_BYTES
+    ):
+        remaining = [
+            (path, source) for path, source in candidates if source["data"] is not None
+        ]
+        if not remaining:
+            break  # Fixed envelope metadata alone is below the byte budget.
+        path, source = max(
+            remaining,
+            key=lambda item: len(
+                json.dumps(item[1]["data"], ensure_ascii=False).encode()
+            ),
+        )
+        source.update(
+            data=None,
+            availability="unavailable",
+            coverage="unavailable",
+            returned_count=0,
+            truncated=True,
+            reason="Source data omitted to fit whole-response byte budget",
+        )
+        omitted.append(path)
+        result.update(
+            truncated=True,
+            availability="stale",
+            reason="Some source data omitted to fit whole-response byte budget",
+        )
+    return result
 
 
 def get_pipeline_status(pipeline):
@@ -523,7 +591,8 @@ def get_smart_mix_status(track_uids=None):
     omitted = []
     result["data"]["omitted_track_uids"] = omitted
     while (
-        len(json.dumps(result, default=str, ensure_ascii=False).encode()) > 55000
+        len(json.dumps(result, default=str, ensure_ascii=False).encode())
+        > OBSERVATION_RESPONSE_BYTES
         and tracks
     ):
         omitted.insert(0, tracks.pop()["track_uid"])

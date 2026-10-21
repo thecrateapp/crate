@@ -99,6 +99,7 @@ def test_discovery_and_export_have_consistent_limits_and_authority(monkeypatch):
             assert definitions[name]["input_schema"] == model.model_json_schema()
             assert entries[name]["contract_version"] == "1.2.0"
     assert entries["get_smart_mix_status"]["limits"]["tracks"] == 50
+    assert entries["get_observability_summary"]["limits"]["response_bytes"] == 55000
 
 
 @pytest.mark.parametrize(
@@ -160,3 +161,197 @@ def test_sdk_exact_track_maximum(
 
     asyncio.run(run())
     assert reader.call_count == int(allowed)
+
+
+def test_sdk_summary_rejects_oversized_unicode_producer_fields_and_preserves_other_sources(
+    monkeypatch, transport_app, diagnostic_boundary
+):
+    import json
+
+    from tests.test_agent_observability import record
+
+    app, tokens, _ = transport_app
+    evidence = fixture_evidence()
+    evidence["runtime"][0] = record(
+        "worker_live",
+        dict.fromkeys(("engine", "pending_count", "running_count"), "\U0001f600" * 512),
+    )
+    monkeypatch.setattr(
+        observations.evidence_store, "read_observation_evidence", lambda **kw: evidence
+    )
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["ops"]) as client,
+        ):
+            response = await client.call_tool("get_observability_summary", {})
+            assert not response.is_error
+            result = response.structured_content
+            assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
+            worker = result["data"]["sources"]["worker_live"]
+            assert worker["availability"] == "unavailable" and worker["data"] is None
+            assert set(worker["invalid_fields"]) == {
+                "engine",
+                "pending_count",
+                "running_count",
+            }
+            assert worker["observed_at"] == evidence["runtime"][0]["observed_at"]
+            assert (
+                result["data"]["sources"]["analysis_status"]["data"]["analysis_done"]
+                == 17
+            )
+            assert set(result["data"]["subsystems"]) == set(
+                observations.evidence_store.PIPELINES
+            )
+
+    asyncio.run(run())
+
+
+def test_sdk_summary_whole_response_budget_retains_provenance_and_unaffected_sources(
+    monkeypatch, transport_app, diagnostic_boundary
+):
+    import json
+
+    app, tokens, _ = transport_app
+    evidence = fixture_evidence()
+    monkeypatch.setattr(
+        observations.evidence_store, "read_observation_evidence", lambda **kw: evidence
+    )
+    original = observations._runtime
+
+    def legacy_source(records, name, failure=None):
+        source = original(records, name, failure)
+        if name == "worker_live":
+            # Exercise the final assembly budget independently of typed-field
+            # validation: a future projection must not reintroduce the transport bug.
+            source["data"] = dict.fromkeys(
+                ("engine", "pending_count", "running_count"), "\U0001f600" * 512
+            )
+        return source
+
+    monkeypatch.setattr(observations, "_runtime", legacy_source)
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["ops"]) as client,
+        ):
+            response = await client.call_tool("get_observability_summary", {})
+            assert not response.is_error
+            result = response.structured_content
+            assert result["truncated"]
+            assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
+            assert (
+                result["data"]["sources"]["analysis_status"]["data"]["analysis_done"]
+                == 17
+            )
+            assert result["data"]["sources"]["imports_pending"]["data"]["count"] == 2
+            for path in result["data"]["omitted_source_data"]:
+                source = result["data"]
+                for key in path.split("."):
+                    source = source[key]
+                assert source["availability"] == source["coverage"] == "unavailable"
+                assert source["data"] is None and source["truncated"]
+                assert source["source"] == "worker_live"
+                assert source["observed_at"] == evidence["runtime"][0]["observed_at"]
+                assert source["freshness"]["fresh_seconds"] == 180
+
+    asyncio.run(run())
+
+
+def test_sdk_inventory_durable_redis_and_bounded_service_strings(
+    monkeypatch, transport_app, diagnostic_boundary
+):
+    import json
+
+    from tests.test_agent_observability import record
+
+    app, tokens, _ = transport_app
+    evidence = fixture_evidence()
+    evidence["snapshots"] = [
+        record(
+            "ops:stack",
+            {
+                "available": True,
+                "containers": [
+                    {
+                        "name": observations.SERVICE_CONTAINER_NAMES.get(name, name),
+                        "image": "registry.example/" + "a" * 100 + ":" + "x" * 100,
+                        "state": "\U0001f600" * 512,
+                    }
+                    for name in observations.SERVICES
+                ],
+            },
+        )
+    ]
+    monkeypatch.setattr(
+        observations.evidence_store, "read_observation_evidence", lambda **kw: evidence
+    )
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["ops"]) as client,
+        ):
+            response = await client.call_tool("get_instance_inventory", {})
+            assert not response.is_error
+            result = response.structured_content
+            assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
+            durable = result["data"]["services"]["redis-durable"]
+            assert durable["container_name"] == "crate-redis-durable"
+            assert durable["availability"] == "available"
+            assert durable["data"]["image_reference"]
+            assert durable["observed_at"] == evidence["snapshots"][0]["observed_at"]
+
+    asyncio.run(run())
+
+
+def test_sdk_smart_mix_worst_case_profile_budget_still_returns_exact_omissions(
+    monkeypatch, transport_app, diagnostic_boundary
+):
+    import json
+
+    from tests.test_agent_observability import NOW, UIDS
+
+    app, tokens, _ = transport_app
+    evidence = fixture_evidence()
+    evidence["profiles"] = [
+        {
+            "track_uid": uid,
+            "profile_version": 1,
+            "analyzer_version": "v" * 128,
+            "profile_revision": "r" * 128,
+            "source_revision": "s" * 128,
+            "quality": "full",
+            "analyzed_at": str(NOW),
+            "source_stale_at": None,
+            "processing_state": "pending",
+            "attempts": 3,
+            "target_generation": "t" * 128,
+            "completed_at": str(NOW),
+            "processing_updated_at": str(NOW),
+        }
+        for uid in UIDS[:50]
+    ]
+    monkeypatch.setattr(
+        observations.evidence_store, "read_observation_evidence", lambda **kw: evidence
+    )
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["library"]) as client,
+        ):
+            response = await client.call_tool(
+                "get_smart_mix_status", {"track_uids": UIDS[:50]}
+            )
+            assert not response.is_error
+            result = response.structured_content
+            assert result["truncated"]
+            assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
+            assert [item["track_uid"] for item in result["data"]["tracks"]] + result[
+                "data"
+            ]["omitted_track_uids"] == UIDS[:50]
+
+    asyncio.run(run())

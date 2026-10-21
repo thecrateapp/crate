@@ -327,10 +327,21 @@ source data over 12,000 bytes is explicitly unavailable. Smart Mix limits the wh
 to a 55,000-byte budget before the transport cap: `truncated`, `returned_count` and
 `data.omitted_track_uids` identify exact track results to request again in smaller batches. Inventory
 keeps validated image references separate, considers at most 32 stored containers and
-reports truncation. Unknown/missing service images remain explicit; no Docker socket,
+reports truncation. The inventory's `redis-durable` key maps explicitly to the actual
+Docker container name `crate-redis-durable`, recorded as `container_name` in its envelope.
+Unknown/missing service images remain explicit; no Docker socket,
 shell, arbitrary SQL, filesystem or new HTTP observer is exposed.
 
 See [Smart Mix operation](smart-mix-operations.md) for profile/campaign interpretation.
 Unit, PostgreSQL read-only and actual SDK authorization/no-refresh tests are in
 `test_agent_observability.py`, `test_agent_observability_db.py`, and
 `test_mcp_observability.py`. Local tests do not establish real-host rollout acceptance.
+
+
+The assembled summary also has a 55,000-byte UTF-8 budget. If needed, it omits the largest
+source data blocks while retaining source names, timestamps, freshness and versions. Those
+source envelopes become explicitly unavailable and truncated; top-level `truncated` and
+`data.omitted_source_data` list their paths. Unaffected sources remain readable. Worker,
+analysis and import counters must be nonnegative integers within signed 64-bit bounds;
+worker engine must be a string of at most 128 characters. Invalid fields are omitted and
+reported in `invalid_fields`, never turned into healthy zero counters.

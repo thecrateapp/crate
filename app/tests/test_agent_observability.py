@@ -381,3 +381,55 @@ def test_inventory_rejects_credential_like_image_references(stored, image):
     source = observations.get_instance_inventory()["data"]["services"]["crate-api"]
     assert source["availability"] == "unavailable"
     assert "private-password" not in json.dumps(source)
+
+
+@pytest.mark.parametrize("compose", ["docker-compose.yaml", "docker-compose.home.yaml"])
+def test_inventory_maps_durable_redis_to_compose_container_name(stored, compose):
+    from pathlib import Path
+
+    assert (
+        "container_name: crate-redis-durable"
+        in (Path(__file__).resolve().parents[2] / compose).read_text()
+    )
+    stored["snapshots"] = [
+        record(
+            "ops:stack",
+            {
+                "available": True,
+                "containers": [
+                    {
+                        "name": "crate-redis-durable",
+                        "image": "redis:7-alpine",
+                        "state": "running",
+                    }
+                ],
+            },
+        )
+    ]
+    source = observations.get_instance_inventory()["data"]["services"]["redis-durable"]
+    assert source["container_name"] == "crate-redis-durable"
+    assert source["availability"] == "available"
+    assert source["data"]["image_reference"] == "redis:7-alpine"
+    assert source["observed_at"] == stored["snapshots"][0]["observed_at"]
+    assert source["image_id"] is None and not source["live_image_verified"]
+
+
+@pytest.mark.parametrize(
+    "bad", ["\U0001f600" * 512, True, -1, 2**63, None, 1.5, {}, []]
+)
+def test_summary_invalid_runtime_counters_remain_unknown_preserving_other_sources(
+    stored, bad
+):
+    stored["runtime"][0]["payload"] = {
+        "engine": "dramatiq",
+        "pending_count": bad,
+        "running_count": bad,
+    }
+    result = observations.get_observability_summary()
+    worker = result["data"]["sources"]["worker_live"]
+    assert worker["availability"] == "stale"
+    assert set(worker["invalid_fields"]) == {"pending_count", "running_count"}
+    assert worker["data"] == {"engine": "dramatiq"}
+    assert worker["observed_at"] == stored["runtime"][0]["observed_at"]
+    assert result["data"]["sources"]["analysis_status"]["data"]["analysis_done"] == 17
+    assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000

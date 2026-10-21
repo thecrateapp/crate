@@ -11,7 +11,11 @@ from crate.health_check import ARTIST_SCOPED_CHECKS
 
 _LIMITS = {
     "get_instance_inventory": {"services": 32, "live_image_ids": False},
-    "get_observability_summary": {"pipelines": 8, "refresh": False},
+    "get_observability_summary": {
+        "pipelines": 8,
+        "refresh": False,
+        "response_bytes": 55000,
+    },
     "get_pipeline_status": {"pipelines": 1, "task_sample": 20, "lookback_hours": 24},
     "get_smart_mix_status": {
         "response_bytes": 55000,
