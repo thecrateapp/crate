@@ -22,6 +22,10 @@ TOOL_NAMES = {
     "get_library_quality",
     "get_analysis_status",
     "get_instance_status",
+    "get_instance_inventory",
+    "get_observability_summary",
+    "get_pipeline_status",
+    "get_smart_mix_status",
     "list_library_issues",
     "inspect_artist",
     "list_jobs",
@@ -123,6 +127,7 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
                     "get_operation_catalog",
                     "get_library_quality",
                     "get_analysis_status",
+                    "get_smart_mix_status",
                     "list_library_issues",
                     "inspect_artist",
                 }
@@ -134,6 +139,9 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
                 assert {tool.name for tool in listed.tools} == {
                     "get_operation_catalog",
                     "get_instance_status",
+                    "get_instance_inventory",
+                    "get_observability_summary",
+                    "get_pipeline_status",
                     "read_diagnostics",
                 }
                 result = await client.call_tool(

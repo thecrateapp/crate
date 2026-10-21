@@ -25,6 +25,9 @@ sources:
   - app/crate/db/repositories/smart_mix.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
+  - app/crate/agent_observability.py
+  - app/crate/db/queries/agent_observability.py
+  - app/tests/test_mcp_observability.py
   - app/crate/agent_analysis.py
   - app/crate/agent_diagnostics.py
   - app/listen/src/lib/smart-mix.ts
@@ -47,6 +50,8 @@ sources:
 
 Referencia del comportamiento contrastado con el código de la release
 `d3e6ef6b94ab233680f3d1a8d0c2c43b5a7d917c`, revisado el 21 de octubre de 2026.
+Las observaciones MCP descritas corresponden al candidato aditivo 1.2.0; comprobar
+`get_operation_catalog` antes de asumir que la instancia ya lo despliega.
 No es una medición de cobertura, flags o salud de una instancia. Para continuar el desarrollo,
 consultar el [diseño](smart-mix-design.md) y el [plan de continuación](smart-mix-implementation-plan.md),
 que también describen objetivos y gates todavía pendientes.
@@ -252,27 +257,33 @@ documental no cierra ese gate ni los de plataformas futuras.
    `read_diagnostics` dentro de sus grants, límites y antigüedad. `list_jobs` permite filtrar
    los tipos Smart Mix registrados. Una lista paginada no representa toda la campaña;
    respetar cursor y truncamiento.
-3. El contrato MCP 1.1.0 no tiene herramientas dedicadas a cobertura/campaña, perfiles,
-   candidatos o planes Smart Mix. `get_analysis_status` cubre los pipelines `analysis` y
-   `bliss`; no demuestra cobertura Smart Mix. Una métrica general tampoco la sustituye.
-4. Cuando falte esa evidencia, declarar el dato no disponible y proponer al operador la
+3. El contrato candidato MCP 1.2.0 añade `get_smart_mix_status` con el grant
+   `library.health.read`: lee cobertura y campaña almacenadas y, opcionalmente,
+   `track_uids` con un máximo de 50 UUIDs exactos. Devuelve timestamps independientes,
+   disponibilidad, antigüedad, versiones implementadas y estado de cada perfil; conserva
+   cobertura de analizadores antiguos como evidencia stale en vez de inventar ceros.
+   No calcula perfiles, candidatos ni planes, no refresca cobertura y no encola trabajo.
+   `get_analysis_status` sigue cubriendo solo `analysis` y `bliss`; no sustituye esta lectura.
+4. Cuando falte esa evidencia o el grant, declarar el dato no disponible y proponer al operador la
    comprobación Admin apropiada. El GET de estado Admin puede encolar trabajo: no usarlo
    como sustituto transparente de una observación MCP. Hermes no cambia flags, pausa,
    reanaliza ni inicia campañas en esta fase.
 
 | Síntoma                              | Evidencia y siguiente comprobación                                                                                                                                    |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cobertura cero o parada              | Fecha/versión del snapshot, campaña y tareas por cola; distinguir snapshot ausente de cero real. Solicitar al operador la cobertura Admin si no está expuesta por MCP |
+| Cobertura cero o parada              | Fecha/versión del snapshot, campaña y tareas por cola; distinguir snapshot ausente de cero real. Consultar `get_smart_mix_status`; si falta evidencia o grant, solicitar al operador la comprobación Admin |
 | Mucho `missing_profiles`             | Separar ausencia real, generación antigua, fuente cambiada y calidad `unavailable`; comprobar filtros por pista y `current_quality`                                   |
 | Campaña running sin avance           | Presión/ventana de recursos, heavy worker, claims y tareas hijos; consultar errores/agotados antes de reiniciar                                                       |
 | Task terminado pero sin perfil nuevo | Leer `outcome`, fuente/revisión y claim: `superseded`/`unchanged` no equivalen a publicación por ese task                                                             |
 | Crossfade sin beatmatch              | Capability, preferencia, calidad/beat de cue, confianza/estabilidad, compás, ventana y `fallbackReason`                                                               |
 | Mezcla antigua tras reanálisis       | Verificar `profileRevision`, reglas y plan instalado por el cliente; no confundir plan nuevo con adopción en el reproductor                                           |
 
-La observación que falta para un monitor completo es una herramienta MCP acotada de lectura
-de cobertura/campaña y provenance de perfiles, sin refresco implícito ni nueva consulta de
-biblioteca completa por request. Su diseño e implementación quedan fuera de esta actualización
-documental. Mantener desconocido lo que no está expuesto evita inventar salud o reparaciones.
+La lectura almacenada tiene cobertura parcial. No expone probes funcionales del host en vivo,
+aceptación física por plataforma, adopción del plan en cada reproductor ni una nueva validación
+del audio. Esas señales siguen no disponibles. Un enqueue no acredita finalización; un perfil
+`current` solo acredita versiones almacenadas compatibles con el código de la API, sin eliminar
+la antigüedad que declara su envelope. El contexto de release y sus `source_sha` siguen en el
+MCP de contexto, no se deducen de un tag de imagen ni de `get_smart_mix_status`.
 
 ## Evidencia de regresión y preguntas de aceptación
 

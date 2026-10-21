@@ -2,12 +2,12 @@
 
 import hashlib
 import json
-from importlib.metadata import version
 from functools import lru_cache
+from importlib.metadata import version
 
 from mcp_types.version import HANDSHAKE_PROTOCOL_VERSIONS, MODERN_PROTOCOL_VERSIONS
 
-CONTRACT_VERSION = "1.1.0"
+CONTRACT_VERSION = "1.2.0"
 
 
 def contract_metadata() -> dict:
@@ -31,9 +31,9 @@ def schema_fingerprint(model) -> str:
 
 
 def export_contract() -> dict:
-    from crate.mcp.tools import ACTION_CATALOG, CATALOG
-    from crate.mcp.schemas import DiagnosticOutput
     from crate.agent_access import SCOPE_CAPABILITIES
+    from crate.mcp.schemas import DiagnosticOutput
+    from crate.mcp.tools import ACTION_CATALOG, CATALOG
 
     return {
         **contract_metadata(),

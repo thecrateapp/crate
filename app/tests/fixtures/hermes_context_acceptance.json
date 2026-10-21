@@ -181,12 +181,14 @@
         "Hermes"
       ],
       "required_evidence": [
-        "MCP",
+        "get_smart_mix_status",
+        "50 UUIDs exactos",
         "enqueue"
       ],
-      "unavailability_expectation_es": "El MCP actual no expone observación dedicada de cobertura/campaña; no afirmar finalización del DSP a partir del enqueue.",
+      "unavailability_expectation_es": "El candidato MCP 1.2 expone cobertura/campaña almacenadas con timestamps y versiones; no acredita probes funcionales del host en vivo ni aceptación física por plataforma, y enqueue no demuestra finalización.",
       "required_limit_evidence": [
-        "MCP"
+        "No expone probes funcionales del host en vivo",
+        "aceptación física por plataforma"
       ]
     }
   ]

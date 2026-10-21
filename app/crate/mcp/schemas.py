@@ -88,6 +88,34 @@ EntityUID = Annotated[
 IdempotencyKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")]
 
 
+PipelineName = Literal[
+    "import",
+    "enrichment",
+    "analysis",
+    "bliss",
+    "playback",
+    "projector",
+    "federation",
+    "acquisition",
+]
+
+
+class PipelineInput(ClosedInput):
+    pipeline: PipelineName
+
+
+class SmartMixStatusInput(ClosedInput):
+    track_uids: Annotated[list[EntityUID], Field(max_length=50)] | None = None
+
+    @model_validator(mode="after")
+    def unique_tracks(self):
+        if self.track_uids is not None and len(
+            {uid.lower() for uid in self.track_uids}
+        ) != len(self.track_uids):
+            raise ValueError("Duplicate track UUIDs")
+        return self
+
+
 class PlanInput(ClosedInput):
     plan_id: EntityUID
     limit: Limit = 50

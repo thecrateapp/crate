@@ -7,12 +7,12 @@ from threading import Event
 from types import SimpleNamespace
 
 import anyio
-import mcp.types as types
 import pytest
-
 from crate.agent_access import AgentPrincipal
 from crate.agent_discovery import get_operation_catalog
 from crate.mcp import tools
+from mcp import types
+
 from tests.test_mcp_actions import action_transport as action_transport  # noqa: PLC0414
 
 
@@ -60,7 +60,7 @@ def test_protocol_negotiation_preserves_contract_version_and_rejects_unknown_rev
                 },
             )
             assert accepted.status_code == 200, accepted.text
-            assert accepted.json()["result"]["serverInfo"]["version"] == "1.1.0"
+            assert accepted.json()["result"]["serverInfo"]["version"] == "1.2.0"
             assert accepted.json()["result"]["protocolVersion"] == "2025-11-25"
 
     asyncio.run(run())
@@ -71,7 +71,7 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
     artifact = export_contract()
     definitions = {row["name"]: row for row in artifact["tools"]}
-    assert len(definitions) == 52
+    assert len(definitions) == 56
     assert (
         definitions["editorial_plan_prepare"]["input_schema"]["additionalProperties"]
         is False
@@ -88,8 +88,9 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
 
 def test_auth_denial_metric_does_not_include_bearer_or_identity(monkeypatch):
-    from fastapi.testclient import TestClient
     from crate.mcp.auth import AgentAuth
+    from fastapi.testclient import TestClient
+
     from tests.test_mcp_auth import _identity
 
     samples = []
@@ -109,14 +110,14 @@ def test_catalog_versions_schemas_and_explains_missing_worker(monkeypatch):
     )
     principal = AgentPrincipal("a", "c", "Agent", frozenset({"library.health.run"}))
     catalog = get_operation_catalog(principal)["data"]
-    assert catalog["contract"]["version"] == "1.1.0"
+    assert catalog["contract"]["version"] == "1.2.0"
     assert catalog["contract"]["protocol_versions"]
     operations = {row["name"]: row for row in catalog["operations"]}
     health = operations["run_health_check"]
     assert health["status"] == "unavailable"
     assert health["readiness"]["missing"] == ["fresh_worker_evidence"]
     assert len(health["input_schema_sha256"]) == 64
-    assert health["contract_version"] == "1.1.0"
+    assert health["contract_version"] == "1.2.0"
     assert operations["get_instance_status"]["status"] == "denied"
 
 

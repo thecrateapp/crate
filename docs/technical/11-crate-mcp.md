@@ -10,6 +10,10 @@ sources:
   - app/crate/mcp/server.py
   - app/crate/mcp/tools.py
   - app/crate/mcp/contract.py
+  - app/crate/agent_observability.py
+  - app/crate/db/queries/agent_observability.py
+  - app/tests/test_agent_observability_db.py
+  - app/tests/test_mcp_observability.py
   - app/crate/agent_access.py
   - app/crate/agent_operations.py
   - app/crate/agent_editorial.py
@@ -271,3 +275,62 @@ and fresh correction preview; `app/tests/test_agent_plan_approvals.py` covers ex
 binding. Current instance show/job state requires authorized MCP evidence. If the pilot's
 read grants lack that surface, report it unavailable instead of invoking an import or
 assuming publication from these source contracts.
+
+
+## Bounded observation coverage (contract 1.2 candidate)
+
+Contract 1.2.0 adds four read tools with the existing envelope schema `1`.
+`get_instance_inventory`, `get_observability_summary` and `get_pipeline_status` require
+`ops.status.read`; `get_smart_mix_status` requires `library.health.read`. Actions remain
+explicit opt-in. Listing or discovering a tool grants no authority.
+
+Every source envelope declares `source`, `observed_at`, `availability`, `reason`,
+`freshness` (age, fresh threshold and expiry), `version` and `coverage`. Source envelopes
+are under `data.sources`; summary pipelines are under `data.subsystems[NAME].sources`.
+`queried_at` is read time, not the time a producer last measured its subsystem. Task rows
+retain their own creation/update/heartbeat timestamps. No tool invokes an HTTP handler,
+rebuilds a snapshot, refreshes coverage, probes Docker/Redis or enqueues domain work.
+The usual bounded MCP admission and diagnostic audit still apply.
+
+| Surface / subsystem | Persisted source and implementation | Coverage | Explicitly missing evidence |
+| --- | --- | --- | --- |
+| Instance inventory | `agent_observability.read_observation_evidence`: `alembic_version`; fixed service allowlist from stored `ui_snapshots` `ops:stack/global`; current MCP contract constant | Partial | Release/context manifests are not mounted in the API; image IDs and source commits are unknown. A stored image reference or container state is not current functional health. Use the separate `get_release_context` for release versus reused image source provenance. |
+| Worker and import | Stored `ops_runtime_state.worker_live` counters and `imports_pending.count`, produced by worker/import queue updates | Partial | Live worker/dependency probes, complete pipeline progress and fresh storage validation |
+| Analysis / Bliss | Worker-produced `ops_runtime_state.analysis_status` counters; the two pipelines remain distinct | Partial | Live daemon probes, exact complete backlog from counters, Smart Mix profile coverage |
+| Enrichment / playback / federation / acquisition | At most 20 matching newest task rows created in the last 24 hours (21st row is a truncation sentinel); task categories come from `task_registry` | Partial | Complete backlog, older long-running tasks, provider connectivity, end-to-end playback/federation success |
+| Projector | Stored `ops/dashboard.eventing.outbox` allowlisted counters with snapshot build time/version/source sequence | Partial | Live relay/Redis probes, complete consumer lag, per-event delivery; producer `unavailable` survives and is never a healthy zero |
+| Smart Mix coverage / campaign | Stored `smart_mix:coverage` and `smart_mix:backfill_campaign` with independent DB timestamps and stored versions | Implemented stored read, partial operational coverage | No coverage recompute, campaign control or proof of DSP completion from enqueue. Missing coverage is null, not an empty zero-count default. |
+| Smart Mix exact profiles | One UUID-batched lookup of `track_mix_profiles` and `track_processing_state` for at most 50 unique exact track UUIDs | Implemented bounded read, partial library coverage | No library scan, new acoustic validation, candidate ranking, transition plan or physical/platform acceptance |
+| Provider / storage / streaming / Redis health | No functional probe is called by these tools | Unavailable | Current functional health; HTTP 200 or a running process cannot establish it |
+| Operational event cursor | No global UI-event journal is synthesized | Unavailable in these tools | A supervisor supplies its own durable operational event cursor |
+
+`get_pipeline_status.pipeline` is the closed enum `import`, `enrichment`, `analysis`,
+`bliss`, `playback`, `projector`, `federation`, `acquisition`. The returned exact task type
+list defines the sample; it is not a claim to cover every domain effect or daemon.
+Empty samples do not mean zero backlog. `complete` is false. Projector is an event
+consumer rather than a task category, so its task type sample is empty.
+
+Runtime and pipeline evidence is fresh for 180 seconds, stack evidence for 30 seconds;
+older evidence is stale until 86,400 seconds, then unavailable. Invalidated snapshots
+remain stale. Missing/future timestamps are unavailable. Current profile versions and
+freshness are independent: `profile_status=current` means stored analyzer/schema versions
+match this API, while its source envelope can still be stale or expired. Stored outdated
+coverage and campaign targets remain visible with an explicit stale version reason.
+These constants define evidence freshness, not subsystem health or a universal alert SLA.
+
+SQL uses a five-second statement timeout and one rollback-only read scope, fixed persisted
+keys, and `ANY` for exact track UUIDs. Selected JSON records over 32,768 bytes are reported
+unavailable; unrelated worker task payloads are excluded before applying that bound.
+Only allowlisted fields leave the service; nested evidence is capped at depth five,
+20 entries and 512 characters per string with credential/location redaction. Sanitized
+source data over 12,000 bytes is explicitly unavailable. Smart Mix limits the whole response
+to a 55,000-byte budget before the transport cap: `truncated`, `returned_count` and
+`data.omitted_track_uids` identify exact track results to request again in smaller batches. Inventory
+keeps validated image references separate, considers at most 32 stored containers and
+reports truncation. Unknown/missing service images remain explicit; no Docker socket,
+shell, arbitrary SQL, filesystem or new HTTP observer is exposed.
+
+See [Smart Mix operation](smart-mix-operations.md) for profile/campaign interpretation.
+Unit, PostgreSQL read-only and actual SDK authorization/no-refresh tests are in
+`test_agent_observability.py`, `test_agent_observability_db.py`, and
+`test_mcp_observability.py`. Local tests do not establish real-host rollout acceptance.

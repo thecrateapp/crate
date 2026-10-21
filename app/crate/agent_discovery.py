@@ -10,6 +10,15 @@ from crate.db.repositories.agent_plans import get_owned_plan
 from crate.health_check import ARTIST_SCOPED_CHECKS
 
 _LIMITS = {
+    "get_instance_inventory": {"services": 32, "live_image_ids": False},
+    "get_observability_summary": {"pipelines": 8, "refresh": False},
+    "get_pipeline_status": {"pipelines": 1, "task_sample": 20, "lookback_hours": 24},
+    "get_smart_mix_status": {
+        "response_bytes": 55000,
+        "tracks": 50,
+        "refresh": False,
+        "stored_evidence_only": True,
+    },
     "search_shows": {"rows": 50, "offset": 10000},
     "preview_shows_import": {
         "shows": 50,
@@ -108,13 +117,13 @@ _LIMITS = {
 
 def get_operation_catalog(principal: AgentPrincipal) -> dict:
     from crate.agent_operation_catalog import OPERATIONS
-    from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
     from crate.mcp.contract import (
         CONTRACT_VERSION,
         contract_metadata,
         schema_fingerprint,
         worker_readiness,
     )
+    from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
 
     operations = []
     readiness = (
@@ -353,8 +362,8 @@ def get_analysis_status(
     principal: AgentPrincipal, *, track_uids=None, plan_id=None, limit=50, cursor=None
 ) -> dict:
     from crate.agent_analysis import get_analysis_status as read_status
-    from crate.db.repositories.agent_plans import get_owned_analysis_references
     from crate.agent_diagnostics import _cursor, _decode, _fingerprint, _rows
+    from crate.db.repositories.agent_plans import get_owned_analysis_references
 
     if type(limit) is not int or not 1 <= limit <= 100:
         raise DiagnosticError("INVALID_ARGUMENT", "Analysis page size must be 1 to 100")
@@ -435,8 +444,8 @@ def get_library_quality(*, category=None, limit=50, cursor=None) -> dict:
 
 
 __all__ = [
+    "get_analysis_status",
     "get_library_quality",
     "get_operation_catalog",
     "get_plan",
-    "get_analysis_status",
 ]

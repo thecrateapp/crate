@@ -2,71 +2,96 @@
 
 import json
 from functools import partial
-from uuid import UUID
 from time import perf_counter
+from uuid import UUID
 
 import anyio
-import mcp.types as types
+from mcp import types
 from pydantic import ValidationError
 
 from crate import (
     agent_diagnostics,
     agent_discovery,
-    agent_maintenance,
     agent_editorial,
+    agent_maintenance,
+    agent_observability,
+    agent_operations,
     agent_shows,
 )
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
+from crate.mcp.editorial_schemas import (
+    EditorialCandidates,
+    EditorialGet,
+    EditorialList,
+    EditorialOptions,
+    EditorialPlanApply,
+    EditorialPlanRead,
+    EditorialPrepare,
+    EditorialPublication,
+)
 from crate.mcp.limits import admission
+from crate.mcp.operation_schemas import (
+    AuditInput,
+    JobControlApply,
+    JobControlPreview,
+    RuntimeUpdatePreview,
+    ScheduleRun,
+    ScheduleUpdatePreview,
+)
 from crate.mcp.schemas import (
+    AnalysisPlanInput,
+    AnalysisStatusInput,
     ArtistInput,
     DiagnosticOutput,
     DiagnosticsInput,
+    EnrichmentPlanInput,
     HealthCheckInput,
     InstanceInput,
     IssuesInput,
     JobInput,
     JobRetryInput,
     JobsInput,
-    PlanInput,
-    QualityInput,
-    RepairApplyInput,
-    RepairPreviewInput,
-    AnalysisPlanInput,
-    AnalysisStatusInput,
-    EnrichmentPlanInput,
     LibrarySyncPlanInput,
     MetadataExportPlanInput,
-    MetadataRehydratePlanInput,
     MetadataPreviewInput,
+    MetadataRehydratePlanInput,
+    PipelineInput,
+    PlanInput,
+    QualityInput,
     QualityRunInput,
+    RepairApplyInput,
+    RepairPreviewInput,
+    SmartMixStatusInput,
 )
+from crate.mcp.show_schemas import ShowsApply, ShowsPrepare, ShowsSearch
 
-from crate import agent_operations
-from crate.mcp.operation_schemas import (
-    JobControlPreview,
-    JobControlApply,
-    ScheduleRun,
-    ScheduleUpdatePreview,
-    RuntimeUpdatePreview,
-    AuditInput,
-)
-from crate.mcp.editorial_schemas import (
-    EditorialList,
-    EditorialGet,
-    EditorialOptions,
-    EditorialCandidates,
-    EditorialPrepare,
-    EditorialPlanRead,
-    EditorialPlanApply,
-    EditorialPublication,
-)
-
-from crate.mcp.show_schemas import ShowsSearch, ShowsPrepare, ShowsApply
+OBSERVATION_TOOLS = {
+    "get_instance_inventory": (
+        InstanceInput,
+        "ops.status.read",
+        "Read bounded persisted service image references and schema/MCP versions. Release/context provenance and live image IDs remain explicitly unknown when unavailable.",
+    ),
+    "get_observability_summary": (
+        InstanceInput,
+        "ops.status.read",
+        "Read per-subsystem persisted source coverage, independent timestamps and unavailable signals. No refresh or live probes.",
+    ),
+    "get_pipeline_status": (
+        PipelineInput,
+        "ops.status.read",
+        "Read a closed pipeline's persisted counters and newest 20 matching tasks created within 24 hours. Partial evidence is not a complete backlog or functional health.",
+    ),
+    "get_smart_mix_status": (
+        SmartMixStatusInput,
+        "library.health.read",
+        "Read stored Smart Mix coverage, campaign and version evidence for up to 50 exact track UUIDs. No scan, profile calculation or coverage refresh.",
+    ),
+}
 
 CATALOG = {
+    **OBSERVATION_TOOLS,
     "search_shows": (
         ShowsSearch,
         "curation.shows.read",
@@ -472,6 +497,8 @@ def _execute(principal, name, arguments, trace_id):
                     **({"artist_uid": artist_uid} if artist_uid else {}),
                 },
             )
+            if name in OBSERVATION_TOOLS:
+                return getattr(agent_observability, name)(**arguments)
             if name in {"get_operation_catalog", "get_plan", "get_analysis_status"}:
                 return getattr(agent_discovery, name)(principal, **arguments)
             if name.startswith("editorial_"):
