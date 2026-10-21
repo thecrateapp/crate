@@ -6739,6 +6739,14 @@
     "sourceHash": "sha256:ef4849168114e27f19cd4c66c3420ef97136025de538475f5a51f2aaf2c83b12",
     "reviewedAt": "2026-10-08T00:47:13.880Z"
   },
+  "stats.compare.noPrevious": {
+    "sourceHash": "sha256:f5aa747ea0a50d8700e9912eb1477bea5900ab5511697518b4970bf5898c8cf0",
+    "reviewedAt": "2026-10-21T01:22:07.185Z"
+  },
+  "stats.compare.vsPrevious": {
+    "sourceHash": "sha256:a89f64535f82d905fce959771a6c59f7a0ec9ee6818ee49be5768c91264991da",
+    "reviewedAt": "2026-10-21T01:22:07.185Z"
+  },
   "stats.digging.age.body": {
     "sourceHash": "sha256:6d6bfebabbaa48d70df0f8eed987e83cf21bcc5313810f7f892468b305c30979",
     "reviewedAt": "2026-10-08T14:46:50.978Z"
@@ -6958,6 +6966,14 @@
   "stats.explorer.windowValue": {
     "sourceHash": "sha256:e28b2a8d6b2f0f95560ea3fa7a6ae0fd707ac9359e336e38c7265482bbae7289",
     "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.freshness.counting": {
+    "sourceHash": "sha256:9d7c21b3c430af8f1ecaf2a399219f0f39d0c78e221022d0e1f7f24086a048c0",
+    "reviewedAt": "2026-10-21T01:22:07.185Z"
+  },
+  "stats.freshness.updated": {
+    "sourceHash": "sha256:5189da143bbd15a43d0c3746aa2ad9f717cad0784c5c238519010b59301035c6",
+    "reviewedAt": "2026-10-21T01:22:07.185Z"
   },
   "stats.genreTrend.rising": {
     "sourceHash": "sha256:9c71132813055b5aeff946398ad7771cdd97337bf13a5877dcdc96c07e215eb1",

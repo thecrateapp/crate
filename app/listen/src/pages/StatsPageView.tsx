@@ -15,65 +15,70 @@ export function StatsHeaderView({
   kicker,
   profileHref,
   period,
+  freshness,
 }: {
   title: ReactNode;
   scope: "personal" | "global" | "user";
   kicker: string;
   profileHref?: string;
   period: ReactNode;
+  freshness?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    <PageHeader
-      title={title}
-      eyebrow={
-        <nav
-          aria-label={t("stats.window.label")}
-          className="flex flex-wrap items-center gap-4"
-        >
-          {scope === "user" ? (
-            <>
-              <MonoLabel as="span" tone="accent">
-                {kicker}
-              </MonoLabel>
-              {profileHref ? (
-                <Link to={profileHref}>
-                  <MonoLabel as="span">
-                    {t("stats.scope.backToProfile")}
+    <div className="grid min-w-0 gap-3">
+      <PageHeader
+        title={title}
+        eyebrow={
+          <nav
+            aria-label={t("stats.window.label")}
+            className="flex flex-wrap items-center gap-4"
+          >
+            {scope === "user" ? (
+              <>
+                <MonoLabel as="span" tone="accent">
+                  {kicker}
+                </MonoLabel>
+                {profileHref ? (
+                  <Link to={profileHref}>
+                    <MonoLabel as="span">
+                      {t("stats.scope.backToProfile")}
+                    </MonoLabel>
+                  </Link>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/stats"
+                  aria-current={scope === "personal" ? "page" : undefined}
+                >
+                  <MonoLabel
+                    as="span"
+                    tone={scope === "personal" ? "accent" : "subtle"}
+                  >
+                    {t("stats.scope.yourDna")}
                   </MonoLabel>
                 </Link>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <Link
-                to="/stats"
-                aria-current={scope === "personal" ? "page" : undefined}
-              >
-                <MonoLabel
-                  as="span"
-                  tone={scope === "personal" ? "accent" : "subtle"}
+                <Link
+                  to="/stats/global"
+                  aria-current={scope === "global" ? "page" : undefined}
                 >
-                  {t("stats.scope.yourDna")}
-                </MonoLabel>
-              </Link>
-              <Link
-                to="/stats/global"
-                aria-current={scope === "global" ? "page" : undefined}
-              >
-                <MonoLabel
-                  as="span"
-                  tone={scope === "global" ? "accent" : "subtle"}
-                >
-                  {t("stats.scope.cratePulse")}
-                </MonoLabel>
-              </Link>
-            </>
-          )}
-        </nav>
-      }
-      actions={period}
-    />
+                  <MonoLabel
+                    as="span"
+                    tone={scope === "global" ? "accent" : "subtle"}
+                  >
+                    {t("stats.scope.cratePulse")}
+                  </MonoLabel>
+                </Link>
+              </>
+            )}
+          </nav>
+        }
+        actions={period}
+      />
+      {freshness}
+    </div>
   );
 }
 

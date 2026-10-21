@@ -58,6 +58,33 @@ function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
 }
 
 describe("Stats page", () => {
+  it("shows freshness and the previous-period comparison from the dashboard", () => {
+    const dashboard = signalDashboard();
+    dashboard.snapshot = {
+      built_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+    };
+    dashboard.provisional = true;
+    dashboard.overview.previous = {
+      start: "2026-08-22",
+      end: "2026-09-20",
+      minutes_listened: 1710,
+      play_count: 406,
+      active_days: 27,
+      artist_count: 10,
+    };
+    mockApis(dashboard);
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(
+      screen.getByText("Updated 5 minutes ago · today still counting"),
+    ).toBeVisible();
+    expect(screen.getByText("vs previous 30 days")).toBeVisible();
+    expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
+  });
+
   it("reserves loading geometry without claiming zero activity or an empty library", () => {
     mockUseApi.mockImplementation(() => ({
       data: null,

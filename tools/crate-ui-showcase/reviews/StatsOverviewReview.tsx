@@ -25,6 +25,7 @@ import {
   StatsEditorialStack,
   StatsListeningView,
 } from "../../../app/listen/src/pages/StatsPageView";
+import { StatsFreshness } from "../../../app/listen/src/components/stats/StatsFreshness";
 import { StatsHeadlineNumbers } from "../../../app/listen/src/components/stats/StatsHeadlineNumbers";
 import { StatsExplorerReview } from "./StatsExplorerReview";
 import { StatsArtistOfPeriodView } from "../../../app/listen/src/components/stats/StatsArtistOfPeriodView";
@@ -188,6 +189,14 @@ export function StatsOverviewReview({
             kicker="Listener signal"
             scope={scope}
             profileHref="/fixture/profile"
+            freshness={
+              <StatsFreshness
+                snapshot={{
+                  built_at: new Date(Date.now() - 4 * 60_000).toISOString(),
+                }}
+                provisional
+              />
+            }
             period={
               <StatsPeriodPicker
                 value={period}
@@ -216,6 +225,21 @@ export function StatsOverviewReview({
           plays={dashboard.overview.play_count}
           activeDays={27}
           artists={legacy ? null : 64}
+          comparison={
+            period === "all_time"
+              ? null
+              : {
+                  previous: {
+                    start: "2026-08-22",
+                    end: "2026-09-20",
+                    minutes_listened: long ? 0 : 3050,
+                    play_count: 840,
+                    active_days: 0,
+                    artist_count: 64,
+                  },
+                  periodLabel: "30 days",
+                }
+          }
           today={{
             day: "2026-10-20",
             timezone: "Europe/Madrid",

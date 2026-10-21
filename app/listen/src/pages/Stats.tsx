@@ -18,6 +18,7 @@ import {
 } from "@/components/stats/StatsClosingCards";
 import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
+import { StatsFreshness } from "@/components/stats/StatsFreshness";
 import { StatsHeadlineNumbers } from "@/components/stats/StatsHeadlineNumbers";
 import { StatsHeatmapCard } from "@/components/stats/StatsHeatmapCard";
 import { StatsHighlights } from "@/components/stats/StatsHighlights";
@@ -42,10 +43,25 @@ export function Stats() {
   return <StatsPageContent page={page} />;
 }
 
+function statsComparison(page: StatsPageController) {
+  if (page.selectedMonth || page.selection === "all_time") return null;
+  const option = page.selectionOptions.find(
+    (candidate) => candidate.value === page.selection,
+  );
+  if (!option) return null;
+  return {
+    previous: page.overview?.previous ?? null,
+    periodLabel: /^\d{4}$/.test(option.label)
+      ? option.label
+      : page.t(option.label),
+  };
+}
+
 function StatsPageContent({ page }: { page: StatsPageController }) {
   const { dashboard, dashboardLoading, hasStats } = page;
   const tape = dashboard?.tape;
   const highlights = dashboard?.highlights;
+  const comparison = statsComparison(page);
   return (
     <StatsPageView
       header={<StatsHeader page={page} />}
@@ -64,6 +80,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           activeDays={page.overview?.active_days ?? 0}
           artists={highlights?.artist_count ?? null}
           today={page.today}
+          comparison={comparison}
         />
         {tape?.points.length ? (
           <StatsExplorer
@@ -171,6 +188,13 @@ function StatsHeader({ page }: { page: StatsPageController }) {
         page.isUserStats ? "user" : page.isGlobalStats ? "global" : "personal"
       }
       kicker={page.kicker}
+      freshness={
+        <StatsFreshness
+          snapshot={page.dashboard?.snapshot}
+          computedUntil={page.dashboard?.computed_until}
+          provisional={page.dashboard?.provisional}
+        />
+      }
       profileHref={page.username ? `/users/${page.username}` : undefined}
       period={
         <StatsPeriodPicker

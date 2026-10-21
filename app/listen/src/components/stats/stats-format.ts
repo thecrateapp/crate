@@ -63,3 +63,37 @@ export function formatStatsMinutes(minutes: number): string {
 export function formatStatsPercent(value: number): string {
   return `${Math.round((value || 0) * 100)}%`;
 }
+
+/** Signed integer percent change, "+12%" / "−3%" (U+2212). Null when there is nothing to compare. */
+export function formatStatsDelta(
+  current: number,
+  previous: number | null | undefined,
+  locale: string,
+): string | null {
+  if (!previous || !Number.isFinite(previous) || !Number.isFinite(current))
+    return null;
+  const percent = Math.round(((current - previous) / previous) * 100);
+  const magnitude = new Intl.NumberFormat(locale, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  }).format(Math.abs(percent) / 100);
+  if (percent === 0) return magnitude;
+  return `${percent > 0 ? "+" : "−"}${magnitude}`;
+}
+
+/** Minute-granularity relative time ("4 minutes ago"). Null for a missing/invalid timestamp. */
+export function formatStatsRelativeTime(
+  iso: string | null | undefined,
+  now: number,
+  locale: string,
+): string | null {
+  if (!iso) return null;
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return null;
+  const minutes = Math.min(0, Math.round((then - now) / 60_000));
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (minutes > -60) return formatter.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (hours > -24) return formatter.format(hours, "hour");
+  return formatter.format(Math.round(hours / 24), "day");
+}
