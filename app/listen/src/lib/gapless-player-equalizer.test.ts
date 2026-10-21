@@ -88,4 +88,17 @@ describe("gapless player equalizer", () => {
     expect(host.setOutputChain).toHaveBeenLastCalledWith(null, null);
     expect(getEqualizerState()).toEqual({ enabled: false, gains: [] });
   });
+  it("powers down the active chain while retaining the saved gains", () => {
+    const host = createHost();
+    const chain = createChain();
+    createEqChain.mockReturnValue(chain);
+    setEqualizerHost(host);
+    setEqualizer(true, [3, 0, -2]);
+    setEqualizer(false, [3, 0, -2]);
+    expect(host.setOutputChain).toHaveBeenLastCalledWith(null, null);
+    expect(chain.dispose).toHaveBeenCalledTimes(1);
+    expect(getEqualizerState()).toEqual({ enabled: false, gains: [3, 0, -2] });
+    setEqualizer(true, [3, 0, -2]);
+    expect(createEqChain).toHaveBeenCalledTimes(2);
+  });
 });

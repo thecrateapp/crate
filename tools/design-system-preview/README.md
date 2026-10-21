@@ -747,3 +747,20 @@ The production VisualizerSettingsPopover is also mounted inside a short clipped 
 its actual scrolling bounds preserve access to the final slider. Adapted values have localized
 saved/effective aria-valuetext. Static frames repaint changed settings/reset/track/palette once,
 settle without interpolation, and ignore unchanged/stopped/running invalidations.
+
+### 1BE · Equalizer refinement
+
+`http://127.0.0.1:5186/review-1be-player-eq.html` shares `PlayerEqReview` with
+Storybook `Reviews/1BE/Equalizer` and imports the actual panel/anchored surface.
+Wider bounds, compact14pxMono band values, confirmed track curves and a fixed-width
+Select preserve access to all generic presets. On/Off is a chip beside Smart; OFF
+bypasses audio, displays flat and preserves settings for ON. Local callbacks only.
+Scenarios cover manual/Smart/off/loading/missing/older-server/long/short parent.
+The production API needs the additive read-only curve endpoint deployed to disclose
+all candidates; older servers expose only the confirmed effective curve, explicitly.
+
+EQ mobile amendment: the complete instrument scrolls horizontally, keeping14pxMono signed
+fractional readings aligned with their44px band columns. Portalled menus retain the real
+dismissal boundary; nested Escape closes the Select first. The scene exercises that owner.
+
+EQ amendments: enabled bands can be edited directly from Smart/Adaptive/Genre, using the displayed curve as the starting point and retaining the other gains. The first edit becomes Custom and persists manual mode. Pointer gestures retain their initial scale through panel reflow. OFF bypasses audio while keeping the player-bar access and panel available for ON; capability gates remain separate.

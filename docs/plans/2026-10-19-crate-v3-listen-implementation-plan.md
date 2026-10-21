@@ -737,3 +737,43 @@ pista, con interpolación asentada y sin nuevo loop.115testsListen,48Desktop,8br
 3builds,lint,i18n0/0,catálogo y presupuesto inicial204903/307200gzipbytes correctos.
 Tres instancias activas; Diego aprueba Visualizer y autoriza commit/push.
 Siguiente lote interno de1BE: chrome de escritorio Tauri, conservando las operaciones nativas.
+
+### 1BE · EQ presentation refinement (2026-10-21)
+
+Visualizer aprobado/publicado como`2f305904`. Diego prioriza EQ antes de Tauri. Mantener el
+approach actual: panel hasta720px acotado por columna/viewport y altura con scroll; ganancias
+por banda14pxMono400 en EqBands compartido, captions MonoLabel. Sin cambios al motor/resolver.
+Curvas propias de la pista separadas de presets genéricos: lectura de inventario autenticada
+con una CTE y filtros de usuario, género/análisis reales, orden de prioridad conservado. Las
+curvas son informativas; solo la fuente aplicada se resalta. El servidor antiguo muestra solo
+la curva efectiva confirmada y explica el límite; no se inventan alternativas ni se despliega.
+Rock/Pop y todos los presets genéricos siguen accesibles en Select compacto de ancho fijo.
+On/Off es FilterChip junto a Smart. OFF retira la cadena de procesamiento, presenta curva plana
+sin fuente activa y conserva los ajustes para ON; runtime/engine sin cambio funcional.
+Storybook documenta por primera vez EqBands completo y Listen/Player/Equalizer; misma escena
+real en Reviews/1BE/Equalizer y review-1be-player-eq.html. Parada sin commit para revisión.
+
+Amendments de revisión EQ: presets portalled conservan frontera de dismissal y Escape anidado;
+modo automático separado del valor Select para re-aplicar cualquier preset. Inventario caducado
+se retira ante fallo de refresh y solo helpers resueltos se marcan activos. Diego confirma scroll
+horizontal del instrumento en móvil:14pxMono y44px por banda, sin solapamiento de±11.5.
+
+EQ review amendments: direct band editing exits automatic modes into Custom without replacing unedited gains; the drag scale remains stable through panel reflow. The persisted manual curve clears automatic helpers. OFF retains the player-bar entry and open panel: availability is based on runtime capability, independently of audio bypass. Regression coverage uses the actual PlayerBar controller and EqualizerPopover. Approved by Diego for commit and push on 2026-10-21.
+
+### 1BE · EQ aprobado; comprobación previa al salto nativo
+
+Diego aprueba el corte de EQ y autoriza commit/push el 2026-10-21. La validación del lote
+cubre inventario privado, presets, edición directa de curvas automáticas, bypass sin perder
+acceso al panel y desplazamiento móvil con lecturas alineadas. Storybook y preview comparten
+los componentes reales; las tres instancias permanecen activas.
+
+Antes de declarar cerrada la app web queda el cierre transversal de H4: reconciliar R01–R25,
+estados, foco/teclado, móvil, offline y reduced motion, y clasificar las fichas todavía pendientes
+del catálogo frente a sus consumidores reales. Dos residuos concretos observados en fuente son
+la sincronización del switch EQ de PlaybackSection con cambios externos del panel (lee el estado
+solo al montar) y el editor de Translation Mode, que mantiene controles/labels/superficie propios
+y es una herramienta de desarrollo. No se modifican en este commit aprobado.
+
+La API de producción todavía requiere el nuevo endpoint de inventario para mostrar todas las
+curvas disponibles; hasta su despliegue se conserva la curva efectiva confirmada. Los instrumentos
+H3 no quedan certificados por el restyle; Tauri/Capacitor y QA física permanecen separados.

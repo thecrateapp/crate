@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
-import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import {
   EQ_CHART_BANDS,
@@ -108,6 +108,7 @@ export const EqBands = memo(function EqBands({
   const numeralRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   const draggedBandRef = useRef<number | null>(null);
+  const dragBoundsRef = useRef<{ top: number; height: number } | null>(null);
   const editedRef = useRef<{ band: number; gain: number } | null>(null);
   const pendingInputRef = useRef<{ band: number; gain: number } | null>(null);
   const inputFrameRef = useRef<number | null>(null);
@@ -199,6 +200,7 @@ export const EqBands = memo(function EqBands({
     const edited = editedRef.current;
     editedRef.current = null;
     draggedBandRef.current = null;
+    dragBoundsRef.current = null;
     if (edited) callbacksRef.current.onBandChange?.(edited.band, edited.gain);
   }, [flushInput]);
 
@@ -213,7 +215,9 @@ export const EqBands = memo(function EqBands({
   );
 
   const gainFromPointer = (band: number, clientY: number): number | null => {
-    const rect = sliderRefs.current[band]?.getBoundingClientRect();
+    const rect =
+      dragBoundsRef.current ??
+      sliderRefs.current[band]?.getBoundingClientRect();
     if (!rect || rect.height === 0) return null;
     const ratio =
       1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
@@ -224,6 +228,10 @@ export const EqBands = memo(function EqBands({
     if (!interactive) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     draggedBandRef.current = band;
+    // The panel may reflow when the first edit leaves an automatic mode.
+    // Keep this gesture on its original scale until release.
+    const { top, height } = event.currentTarget.getBoundingClientRect();
+    dragBoundsRef.current = { top, height };
     const gain = gainFromPointer(band, event.clientY);
     if (gain !== null) edit(band, gain);
   };
@@ -247,7 +255,7 @@ export const EqBands = memo(function EqBands({
     const current =
       editedRef.current?.band === band
         ? editedRef.current.gain
-        : gains[band] ?? 0;
+        : (gains[band] ?? 0);
     const next =
       delta === "min"
         ? EQ_CHART_GAIN_MIN
@@ -267,172 +275,173 @@ export const EqBands = memo(function EqBands({
 
   return (
     <div
+      data-slot="eq-bands-viewport"
       className={cn(
-        "grid grid-cols-[2.5rem_minmax(0,1fr)]",
+        "max-w-full overflow-x-auto",
         disabled && "pointer-events-none opacity-40",
       )}
     >
-      <ol
-        aria-hidden="true"
-        className={cn(
-          "relative m-0 list-none p-0 font-mono text-micro text-text-subtle tabular-nums",
-          trackClassName,
-        )}
-      >
-        {SCALE_ROWS.map((row) => (
-          <li
-            key={row.db}
-            className={cn(
-              "absolute left-0 -translate-y-1/2 whitespace-nowrap",
-              row.className,
-            )}
-          >
-            {row.label}
-          </li>
-        ))}
-      </ol>
-      <div className={cn("relative", trackClassName)}>
-        <svg
+      <div className="grid min-w-[30rem] grid-cols-[2.5rem_minmax(0,1fr)]">
+        <ol
           aria-hidden="true"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          className="absolute inset-0 size-full overflow-visible"
+          className={cn(
+            "relative m-0 list-none p-0 font-mono text-micro text-text-subtle tabular-nums",
+            trackClassName,
+          )}
         >
-          <defs>
-            <linearGradient
-              id={gradientId}
-              x1="0"
-              x2="0"
-              y1="0"
-              y2="1"
-              className="text-accent-action-hi"
-            >
-              <stop offset="0" stopColor="currentColor" stopOpacity="0.55" />
-              <stop offset="1" stopColor="currentColor" stopOpacity="0.08" />
-            </linearGradient>
-          </defs>
-          <g className="stroke-border-quiet">
-            {SCALE_ROWS.filter((row) => row.db !== 0).map((row) => (
-              <line
-                key={row.db}
-                x1="0"
-                x2="100"
-                y1={gainToY(row.db)}
-                y2={gainToY(row.db)}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-          </g>
-          <g className="stroke-border-quiet-subtle">
-            {EQ_CHART_BANDS.slice(1).map((band, index) => (
-              <line
-                key={band.freq}
-                x1={(index + 1) * 10}
-                x2={(index + 1) * 10}
-                y1="0"
-                y2="100"
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
-          </g>
-          <line
-            x1="0"
-            x2="100"
-            y1="50"
-            y2="50"
-            strokeDasharray="2 4"
-            className="stroke-text-faint"
-            vectorEffect="non-scaling-stroke"
-          />
-          <g>
-            {EQ_CHART_BANDS.map((band, index) => (
-              <rect
-                key={band.freq}
-                ref={(node) => {
-                  barRefs.current[index] = node;
-                }}
-                x={bandX(index) - BAR_WIDTH / 2}
-                width={BAR_WIDTH}
-                fill={`url(#${gradientId})`}
-              />
-            ))}
-          </g>
-          <path
-            ref={glowRef}
-            fill="none"
-            strokeWidth="14"
-            strokeLinecap="round"
-            className="stroke-accent-action opacity-15"
-            vectorEffect="non-scaling-stroke"
-          />
-          <path
-            ref={curveRef}
-            fill="none"
-            strokeWidth="2.25"
-            strokeLinecap="round"
-            className="stroke-accent-action-hi"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-        <div className="absolute inset-0 grid grid-cols-10">
-          {EQ_CHART_BANDS.map((band, index) => (
-            <div
-              key={band.freq}
-              ref={(node) => {
-                sliderRefs.current[index] = node;
-              }}
-              role="slider"
-              data-band={index}
-              tabIndex={interactive ? 0 : -1}
-              aria-orientation="vertical"
-              aria-label={bandLabel(index)}
-              aria-valuemin={EQ_CHART_GAIN_MIN}
-              aria-valuemax={EQ_CHART_GAIN_MAX}
-              aria-disabled={interactive ? undefined : true}
+          {SCALE_ROWS.map((row) => (
+            <li
+              key={row.db}
               className={cn(
-                "relative h-full rounded-sm",
-                interactive && "cursor-ns-resize",
+                "absolute left-0 -translate-y-1/2 whitespace-nowrap",
+                row.className,
               )}
-              onPointerDown={(event) => onPointerDown(index, event)}
-              onPointerMove={(event) => onPointerMove(index, event)}
-              onPointerUp={() => onPointerEnd(index)}
-              onPointerCancel={() => onPointerEnd(index)}
-              onLostPointerCapture={() => onPointerEnd(index)}
-              onKeyDown={(event) => onKeyDown(index, event)}
-              onBlur={onBlur}
             >
-              <span
-                ref={(node) => {
-                  handleRefs.current[index] = node;
-                }}
-                data-eq-handle={index}
-                className="absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-accent-action-hi bg-surface-canvas"
-              />
-            </div>
+              {row.label}
+            </li>
           ))}
+        </ol>
+        <div className={cn("relative", trackClassName)}>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="absolute inset-0 size-full overflow-visible"
+          >
+            <defs>
+              <linearGradient
+                id={gradientId}
+                x1="0"
+                x2="0"
+                y1="0"
+                y2="1"
+                className="text-accent-action-hi"
+              >
+                <stop offset="0" stopColor="currentColor" stopOpacity="0.55" />
+                <stop offset="1" stopColor="currentColor" stopOpacity="0.08" />
+              </linearGradient>
+            </defs>
+            <g className="stroke-border-quiet">
+              {SCALE_ROWS.filter((row) => row.db !== 0).map((row) => (
+                <line
+                  key={row.db}
+                  x1="0"
+                  x2="100"
+                  y1={gainToY(row.db)}
+                  y2={gainToY(row.db)}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+            <g className="stroke-border-quiet-subtle">
+              {EQ_CHART_BANDS.slice(1).map((band, index) => (
+                <line
+                  key={band.freq}
+                  x1={(index + 1) * 10}
+                  x2={(index + 1) * 10}
+                  y1="0"
+                  y2="100"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+            <line
+              x1="0"
+              x2="100"
+              y1="50"
+              y2="50"
+              strokeDasharray="2 4"
+              className="stroke-text-faint"
+              vectorEffect="non-scaling-stroke"
+            />
+            <g>
+              {EQ_CHART_BANDS.map((band, index) => (
+                <rect
+                  key={band.freq}
+                  ref={(node) => {
+                    barRefs.current[index] = node;
+                  }}
+                  x={bandX(index) - BAR_WIDTH / 2}
+                  width={BAR_WIDTH}
+                  fill={`url(#${gradientId})`}
+                />
+              ))}
+            </g>
+            <path
+              ref={glowRef}
+              fill="none"
+              strokeWidth="14"
+              strokeLinecap="round"
+              className="stroke-accent-action opacity-15"
+              vectorEffect="non-scaling-stroke"
+            />
+            <path
+              ref={curveRef}
+              fill="none"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              className="stroke-accent-action-hi"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+          <div className="absolute inset-0 grid grid-cols-10">
+            {EQ_CHART_BANDS.map((band, index) => (
+              <div
+                key={band.freq}
+                ref={(node) => {
+                  sliderRefs.current[index] = node;
+                }}
+                role="slider"
+                data-band={index}
+                tabIndex={interactive ? 0 : -1}
+                aria-orientation="vertical"
+                aria-label={bandLabel(index)}
+                aria-valuemin={EQ_CHART_GAIN_MIN}
+                aria-valuemax={EQ_CHART_GAIN_MAX}
+                aria-disabled={interactive ? undefined : true}
+                className={cn(
+                  "relative h-full rounded-sm",
+                  interactive && "cursor-ns-resize",
+                )}
+                onPointerDown={(event) => onPointerDown(index, event)}
+                onPointerMove={(event) => onPointerMove(index, event)}
+                onPointerUp={() => onPointerEnd(index)}
+                onPointerCancel={() => onPointerEnd(index)}
+                onLostPointerCapture={() => onPointerEnd(index)}
+                onKeyDown={(event) => onKeyDown(index, event)}
+                onBlur={onBlur}
+              >
+                <span
+                  ref={(node) => {
+                    handleRefs.current[index] = node;
+                  }}
+                  data-eq-handle={index}
+                  className="absolute left-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-accent-action-hi bg-surface-canvas"
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <ol
-        aria-hidden="true"
-        className="col-start-2 m-0 mt-4 grid list-none grid-cols-10 p-0"
-      >
-        {EQ_CHART_BANDS.map((band, index) => (
-          <li key={band.freq} className="flex justify-center">
-            <StatNumber
-              value={
+        <ol
+          aria-hidden="true"
+          className="col-start-2 m-0 mt-4 grid list-none grid-cols-10 p-0"
+        >
+          {EQ_CHART_BANDS.map((band, index) => (
+            <li key={band.freq} className="flex justify-center">
+              <span className="flex min-w-0 flex-col items-center gap-2 text-center">
                 <span
                   ref={(node) => {
                     numeralRefs.current[index] = node;
                   }}
+                  data-slot="eq-band-value"
+                  className="font-mono text-sm font-normal text-text-primary tabular-nums"
                 />
-              }
-              label={band.label}
-              size="sm"
-              align="center"
-            />
-          </li>
-        ))}
-      </ol>
+                <MonoLabel as="span">{band.label}</MonoLabel>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   );
 });

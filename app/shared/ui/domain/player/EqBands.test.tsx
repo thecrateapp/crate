@@ -83,8 +83,10 @@ describe("EqBands", () => {
     expect(container.querySelectorAll("rect")).toHaveLength(10);
     expect(screen.getByText("16K")).toHaveClass("font-mono");
     expect(screen.getAllByText("+4")).toHaveLength(2);
-    expect(screen.getAllByText("−1")[0]!.parentElement).toHaveClass(
-      "font-display",
+    expect(screen.getAllByText("−1")[0]!).toHaveClass(
+      "font-mono",
+      "text-sm",
+      "font-normal",
     );
     expect(screen.getByText("0 dB")).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("var(--idle-");
@@ -238,6 +240,22 @@ describe("EqBands", () => {
     expect(onBandChange).toHaveBeenCalledTimes(1);
     expect(onBandChange).toHaveBeenCalledWith(5, 6);
     expect(handleTops(container)[5]).toBe(gainToY(6));
+  });
+
+  it("keeps a drag stable when its panel changes height after leaving an automatic mode", () => {
+    const onBandChange = vi.fn();
+    const { container } = render(
+      <EqBands gains={FLAT} onBandChange={onBandChange} />,
+    );
+    const slider = sliderWithRect(container, 0);
+    fireEvent.pointerDown(slider, { clientY: 25, pointerId: 1 });
+    slider.getBoundingClientRect = () => ({ top: 40, height: 100 }) as DOMRect;
+    fireEvent.pointerMove(slider, { clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(slider, { pointerId: 1 });
+    expect(onBandChange).toHaveBeenLastCalledWith(0, 7);
+    fireEvent.pointerDown(slider, { clientY: 65, pointerId: 2 });
+    fireEvent.pointerUp(slider, { pointerId: 2 });
+    expect(onBandChange).toHaveBeenLastCalledWith(0, 6);
   });
 
   it("maps a pointer press on a band column to a snapped gain", () => {

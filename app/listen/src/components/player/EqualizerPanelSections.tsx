@@ -12,34 +12,40 @@ import {
 } from "@crate/ui/icons";
 import type { TFunction } from "i18next";
 
-import { useEqualizer } from "@/hooks/use-equalizer";
-import { type EqPresetName } from "@/lib/equalizer";
+import type { EqualizerPanelState } from "./equalizer-panel-state";
+import type { EqCurve, EqDataStatus } from "../../lib/equalizer-types";
+import { FormField } from "@crate/ui/primitives/FormField";
 import {
-  EQ_PRESET_LABEL_ENTRIES,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crate/ui/shadcn/select";
+import { type EqPresetName } from "../../lib/equalizer";
+import {
   EQ_PRESET_LABEL_KEYS,
-} from "@/lib/equalizer-labels";
+  EQ_PRESET_LABEL_ENTRIES,
+} from "../../lib/equalizer-labels";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
-import { Checkbox } from "@crate/ui/primitives/Checkbox";
 
 import { IconButton } from "@crate/ui/primitives/IconButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Readout } from "@crate/ui/primitives/Readout";
 import { Button } from "@crate/ui/shadcn/button";
-import { EqualizerSmartReadout } from "@/components/player/EqualizerSmartReadout";
+import { EqualizerSmartReadout } from "./EqualizerSmartReadout";
 import {
   AdaptiveFeatureChips,
   GenreResolutionChip,
-} from "@/components/player/EqualizerAdaptiveReadouts";
+} from "./EqualizerAdaptiveReadouts";
 
-const PANEL_CLOSE_BUTTON_CLASS_NAME =
-  "size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none";
-const TRACK_PRESET_ACTION_CLASS_NAME =
-  "h-auto gap-1 border px-2.5 py-0.5 font-normal has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-3";
+type EqualizerState = EqualizerPanelState;
 
-type EqualizerState = ReturnType<typeof useEqualizer>;
+const FLAT_DISPLAY_GAINS = Array.from({ length: 10 }, () => 0);
 
 function equalizerModeLabel(eq: EqualizerState, t: TFunction): string {
+  if (!eq.enabled) return t("common.off");
   if (eq.smart) return t("player.equalizer.smartCurve");
   if (eq.adaptive) return t("player.equalizer.adaptiveActive");
   if (eq.genreAdaptive) return t("player.equalizer.genreActive");
@@ -78,19 +84,14 @@ function EqualizerHeader({
             <span className="ml-1 text-xs opacity-60">…</span>
           ) : null}
         </FilterChip>
-        <label className="flex items-center gap-1.5 text-xs font-medium text-text-primary">
-          <Checkbox
-            checked={eq.enabled}
-            onCheckedChange={(checked) => eq.toggleEnabled(checked === true)}
-          />
-          {t("common.on")}
-        </label>
+        <FilterChip
+          active={eq.enabled}
+          onClick={() => eq.toggleEnabled(!eq.enabled)}
+        >
+          {t(eq.enabled ? "common.on" : "common.off")}
+        </FilterChip>
         {onClose ? (
-          <IconButton
-            onClick={onClose}
-            label={t("player.equalizer.close")}
-            className={PANEL_CLOSE_BUTTON_CLASS_NAME}
-          >
+          <IconButton onClick={onClose} label={t("player.equalizer.close")}>
             <X size={CRATE_ICON_SIZE.lg} className="size-5" />
           </IconButton>
         ) : null}
@@ -100,11 +101,7 @@ function EqualizerHeader({
 }
 
 function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
-  if (eq.smart) {
-    return (
-      <EqualizerSmartReadout eq={eq.effectiveEq} status={eq.smartStatus} />
-    );
-  }
+  if (eq.smart) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -137,33 +134,6 @@ function EqualizerModePicker({ eq, t }: { eq: EqualizerState; t: TFunction }) {
   );
 }
 
-function EqualizerPresetPicker({
-  eq,
-  manualControlsEnabled,
-  t,
-}: {
-  eq: EqualizerState;
-  manualControlsEnabled: boolean;
-  t: TFunction;
-}) {
-  return (
-    <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none">
-      {EQ_PRESET_LABEL_ENTRIES.map(([name, labelKey]) => (
-        <FilterChip
-          key={name}
-          active={
-            eq.preset === name && !eq.smart && !eq.adaptive && !eq.genreAdaptive
-          }
-          disabled={!manualControlsEnabled}
-          onClick={() => eq.applyPreset(name)}
-        >
-          {t(labelKey)}
-        </FilterChip>
-      ))}
-    </div>
-  );
-}
-
 function EqualizerTrackPresetActions({
   eq,
   hasUserTrackPreset,
@@ -182,15 +152,14 @@ function EqualizerTrackPresetActions({
   t: TFunction;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-2">
       {hasUserTrackPreset ? (
         <Button
           variant="danger-soft"
           shape="pill"
-          size="xs"
+          size="sm"
           disabled={saving}
           onClick={onClear}
-          className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-state-danger/20 bg-state-danger/[0.06] text-state-danger/80 hover:border-state-danger/35 hover:bg-state-danger/[0.06] hover:text-state-danger disabled:cursor-wait`}
         >
           <Trash2 size={CRATE_ICON_SIZE.micro} />
           {t("player.equalizer.clearTrackPreset")}
@@ -199,10 +168,9 @@ function EqualizerTrackPresetActions({
         <Button
           variant="ghost"
           shape="pill"
-          size="xs"
+          size="sm"
           disabled={!eq.enabled || saving}
           onClick={onSave}
-          className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-accent-action/20 bg-accent-action/[0.06] text-accent-action/80 hover:border-accent-action/35 hover:bg-accent-action/[0.06] hover:text-accent-action disabled:opacity-40`}
         >
           <Save size={CRATE_ICON_SIZE.micro} />
           {t("player.equalizer.saveForTrack")}
@@ -211,10 +179,9 @@ function EqualizerTrackPresetActions({
       <Button
         variant="ghost"
         shape="pill"
-        size="xs"
+        size="sm"
         disabled={!manualControlsEnabled}
         onClick={eq.resetToFlat}
-        className={`${TRACK_PRESET_ACTION_CLASS_NAME} border-border-quiet bg-surface-control text-text-secondary hover:border-border-interactive hover:bg-surface-control hover:text-text-primary disabled:opacity-40`}
       >
         <RotateCcw size={CRATE_ICON_SIZE.micro} />
         {t("player.equalizer.reset")}
@@ -230,7 +197,11 @@ export function EqualizerPanelView({
   onSave,
   saving,
   t,
+  curves,
+  curvesStatus = "idle",
 }: {
+  curves?: EqCurve[] | null;
+  curvesStatus?: EqDataStatus;
   eq: EqualizerState;
   onClose?: () => void;
   onClear: () => void;
@@ -239,19 +210,31 @@ export function EqualizerPanelView({
   t: TFunction;
 }) {
   const motionAllowed = useMotionAllowed();
-  const manualControlsEnabled =
-    eq.enabled && !eq.smart && !eq.adaptive && !eq.genreAdaptive;
+  const manualControlsEnabled = eq.enabled;
   const hasUserTrackPreset = eq.effectiveEq?.source === "user_track_preset";
   const mode = equalizerModeLabel(eq, t);
   const [announcement, setAnnouncement] = useState(mode);
   const previewing = useRef(false);
 
   useEffect(() => {
-    if (!manualControlsEnabled || eq.preset !== "custom") {
+    if (
+      !manualControlsEnabled ||
+      eq.smart ||
+      eq.adaptive ||
+      eq.genreAdaptive ||
+      eq.preset !== "custom"
+    ) {
       previewing.current = false;
     }
     if (!previewing.current) setAnnouncement(mode);
-  }, [mode, manualControlsEnabled, eq.preset]);
+  }, [
+    mode,
+    manualControlsEnabled,
+    eq.preset,
+    eq.smart,
+    eq.adaptive,
+    eq.genreAdaptive,
+  ]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -263,7 +246,7 @@ export function EqualizerPanelView({
       />
       <div className="border-t border-border-quiet pt-6">
         <EqBands
-          gains={eq.gains}
+          gains={eq.enabled ? eq.gains : FLAT_DISPLAY_GAINS}
           onBandInput={
             manualControlsEnabled
               ? (band, gain) => {
@@ -286,14 +269,62 @@ export function EqualizerPanelView({
           trackClassName="h-40"
         />
       </div>
-      <div className="border-t border-border-quiet pt-4">
-        <EqualizerPresetPicker
-          eq={eq}
-          manualControlsEnabled={manualControlsEnabled}
-          t={t}
-        />
+      <EqualizerSmartReadout
+        eq={eq.effectiveEq}
+        status={curvesStatus === "idle" ? eq.smartStatus : curvesStatus}
+        curves={curves}
+        activeSource={
+          !eq.enabled
+            ? null
+            : eq.smart
+              ? (eq.effectiveEq?.source ?? null)
+              : eq.adaptive
+                ? eq.adaptiveStatus === "ready" && eq.adaptiveFeatures
+                  ? "audio_analysis_preset"
+                  : null
+                : eq.genreAdaptive
+                  ? eq.genreAdaptiveStatus === "ready" &&
+                    eq.trackGenre?.preset?.gains.length === 10
+                    ? "genre_taxonomy_preset"
+                    : null
+                  : eq.preset === "flat"
+                    ? "flat"
+                    : null
+        }
+      />
+      <div className="flex flex-wrap items-end gap-4">
+        <FormField label={t("player.equalizer.presetPicker")}>
+          {(control) => (
+            <Select
+              value={
+                eq.smart || eq.adaptive || eq.genreAdaptive ? "" : eq.preset
+              }
+              disabled={!eq.enabled}
+              onValueChange={(value) => eq.applyPreset(value as EqPresetName)}
+            >
+              <SelectTrigger {...control}>
+                <SelectValue placeholder={t("player.equalizer.presetPicker")} />
+              </SelectTrigger>
+              <SelectContent
+                data-dismissible-layer-boundary
+                onEscapeKeyDown={(event) => event.stopPropagation()}
+              >
+                {eq.preset === "custom" ? (
+                  <SelectItem value="custom" disabled>
+                    {t("player.equalizer.custom")}
+                  </SelectItem>
+                ) : null}
+                {EQ_PRESET_LABEL_ENTRIES.map(([name, key]) => (
+                  <SelectItem key={name} value={name}>
+                    {t(key)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </FormField>
+        <EqualizerModePicker eq={eq} t={t} />
       </div>
-      <EqualizerModePicker eq={eq} t={t} />
       <div className="flex items-center justify-end">
         <EqualizerTrackPresetActions
           eq={eq}

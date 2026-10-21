@@ -1,7 +1,7 @@
 """OpenAPI helpers for Crate."""
 
-from copy import deepcopy
 import os
+from copy import deepcopy
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -394,6 +394,8 @@ _AUTH_REQUIRED_EXACT = frozenset({"/api/scan", "/api/issues", "/api/fix"})
 
 def _should_attach_auth(path: str, operation: dict) -> bool:
     tags = set(operation.get("tags") or [])
+    if path.startswith("/api/catalog/tracks/") and path.endswith("/eq/curves"):
+        return True
     # Public paths are checked first (explicit opt-out overrides prefix match)
     if path in _PUBLIC_SCANNER_PATHS:
         return False

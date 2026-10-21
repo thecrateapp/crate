@@ -7,10 +7,7 @@ import deCatalog from "@/i18n/catalogs/de.json";
 import enCatalog from "@/i18n/catalogs/en.json";
 import esCatalog from "@/i18n/catalogs/es.json";
 import euCatalog from "@/i18n/catalogs/eu.json";
-import {
-  SMART_EQ_CHAIN,
-  SMART_EQ_SOURCE_LABEL_KEYS,
-} from "@/lib/equalizer-labels";
+import { SMART_EQ_SOURCE_LABEL_KEYS } from "@/lib/equalizer-labels";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const CATALOGS = {
@@ -36,7 +33,7 @@ function smartEq(overrides: Partial<EffectiveEq> = {}): EffectiveEq {
 
 describe("EqualizerSmartReadout", () => {
   it.each(["en", "es", "de", "eu"] as const)(
-    "renders every Smart EQ source with its %s label",
+    "renders only the confirmed Smart EQ source with its %s label",
     (locale) => {
       const { container } = renderWithListenProviders(
         <EqualizerSmartReadout eq={smartEq()} status="ready" />,
@@ -47,11 +44,9 @@ describe("EqualizerSmartReadout", () => {
         container.querySelectorAll("[data-source]"),
         (node) => node.textContent?.trim(),
       );
-      expect(labels).toEqual(
-        SMART_EQ_CHAIN.map(
-          (source) => CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS[source]],
-        ),
-      );
+      expect(labels).toEqual([
+        CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS.genre_taxonomy_preset],
+      ]);
     },
   );
 
@@ -65,7 +60,10 @@ describe("EqualizerSmartReadout", () => {
 
       const sources = container.querySelectorAll<HTMLElement>("[data-source]");
       sources.forEach((node) => {
-        expect(node.className).not.toMatch(OVERFLOW_CLASS);
+        expect(node).toHaveAttribute("title");
+        expect(node).toHaveTextContent(
+          CATALOGS[locale][SMART_EQ_SOURCE_LABEL_KEYS.genre_taxonomy_preset]!,
+        );
       });
       for (
         let node: HTMLElement | null = sources[0]!.parentElement;

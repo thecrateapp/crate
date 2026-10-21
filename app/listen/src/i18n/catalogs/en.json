@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Connecting...",
   "player.output.cast.session": "Cast session",
   "player.volume.mute": "Mute",
-  "player.visualizer.valuePair": "Saved {base}; adapted {effective}"
+  "player.visualizer.valuePair": "Saved {base}; adapted {effective}",
+  "player.equalizer.trackCurves": "Track curves",
+  "player.equalizer.currentCurveOnly": "Only the current curve is available from this server.",
+  "player.equalizer.presetPicker": "Presets"
 }

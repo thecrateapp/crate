@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Conectando...",
   "player.output.cast.session": "Sesión de Cast",
   "player.volume.mute": "Silenciar",
-  "player.visualizer.valuePair": "Guardado {base}; adaptado {effective}"
+  "player.visualizer.valuePair": "Guardado {base}; adaptado {effective}",
+  "player.equalizer.trackCurves": "Curvas de la pista",
+  "player.equalizer.currentCurveOnly": "Este servidor solo proporciona la curva actual.",
+  "player.equalizer.presetPicker": "Preajustes"
 }

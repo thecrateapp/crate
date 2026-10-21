@@ -8,28 +8,8 @@ import {
   trackEqPresetApiPath,
 } from "@/lib/library-routes";
 
-export interface EffectiveEq {
-  trackId: number;
-  trackEntityUid: string | null;
-  albumId: number | null;
-  albumEntityUid: string | null;
-  gains: number[];
-  source:
-    | "user_track_preset"
-    | "instance_track_preset"
-    | "instance_album_preset"
-    | "genre_taxonomy_preset"
-    | "audio_analysis_preset"
-    | "flat";
-  label: string;
-  reasoning: string;
-  scope: "user" | "instance" | null;
-  targetType: "track" | "album" | null;
-  targetEntityUid: string | null;
-  userId: number | null;
-  genre: { slug: string; name: string; canonical?: boolean } | null;
-  inheritedFrom: { slug: string; name: string } | null;
-}
+import type { EffectiveEq } from "@/lib/equalizer-types";
+export type { EffectiveEq } from "@/lib/equalizer-types";
 
 export type EffectiveEqState =
   | { status: "idle"; refetch?: () => void }

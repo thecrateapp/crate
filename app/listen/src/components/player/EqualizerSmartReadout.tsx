@@ -1,76 +1,84 @@
-import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
-
-import type { EffectiveEq } from "@/hooks/use-effective-eq";
-import {
-  SMART_EQ_CHAIN,
-  SMART_EQ_SOURCE_LABEL_KEYS,
-} from "@/lib/equalizer-labels";
+import type {
+  EffectiveEq,
+  EqCurve,
+  EqSource,
+  EqDataStatus,
+} from "../../lib/equalizer-types";
+import { SMART_EQ_SOURCE_LABEL_KEYS } from "../../lib/equalizer-labels";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FormField } from "@crate/ui/primitives/FormField";
 
 interface EqualizerSmartReadoutProps {
   eq: EffectiveEq | null;
-  status: "idle" | "loading" | "ready" | "unavailable";
+  status: EqDataStatus;
+  curves?: EqCurve[] | null;
+  activeSource?: EqSource | null;
 }
-
+/** Availability is data, not a new source-selection command or a guessed chain. */
 export function EqualizerSmartReadout({
   eq,
   status,
+  curves,
+  activeSource,
 }: EqualizerSmartReadoutProps) {
   const { t } = useTranslation();
-  if (status === "loading") {
-    return (
-      <MonoLabel accent={t("player.equalizer.smart.label")}>
-        {t("player.equalizer.smart.resolving")}
-      </MonoLabel>
-    );
-  }
-
-  if (status === "unavailable" || !eq) {
-    return (
-      <p className="text-xs text-text-muted">
-        {t("player.equalizer.smart.waiting")}
-      </p>
-    );
-  }
-
+  const available = (curves ?? (eq ? [eq] : [])).filter((curve) =>
+    Object.prototype.hasOwnProperty.call(
+      SMART_EQ_SOURCE_LABEL_KEYS,
+      curve.source,
+    ),
+  );
+  const active = activeSource === undefined ? eq?.source : activeSource;
   const detail =
-    eq.source === "genre_taxonomy_preset" && eq.genre
+    eq?.source === "genre_taxonomy_preset" && eq.genre
       ? eq.inheritedFrom
         ? t("player.equalizer.genre.from", { name: eq.inheritedFrom.name })
         : eq.genre.name
-      : eq.reasoning || eq.label;
-
+      : eq?.reasoning || eq?.label;
   return (
-    <div className="space-y-2">
-      <MonoLabel>
-        <span className="mr-3 text-text-muted">
-          {t("player.equalizer.smart.label")}
-        </span>
-        {SMART_EQ_CHAIN.map((source, index) => (
-          <Fragment key={source}>
-            {index > 0 ? (
-              <span aria-hidden="true" className="px-1.5 opacity-50">
-                →
-              </span>
-            ) : null}
-            <span
-              data-source={source}
-              aria-current={source === eq.source ? "true" : undefined}
-              className={
-                source === eq.source ? "text-accent-action-hi" : undefined
-              }
-            >
-              {t(SMART_EQ_SOURCE_LABEL_KEYS[source])}
-            </span>{" "}
-          </Fragment>
-        ))}
-      </MonoLabel>
-      {detail ? (
-        <p className="line-clamp-2 text-xs leading-relaxed text-text-muted">
-          {detail}
-        </p>
-      ) : null}
-    </div>
+    <FormField kind="group" label={t("player.equalizer.trackCurves")}>
+      {(control) => (
+        <div {...control} role="group" className="grid gap-2">
+          {available.length ? (
+            <div role="list" className="flex min-w-0 flex-wrap gap-2">
+              {available.map((curve) => (
+                <InfoBadge
+                  key={curve.source}
+                  role="listitem"
+                  data-source={curve.source}
+                  aria-current={active === curve.source ? "true" : undefined}
+                  active={active === curve.source}
+                  title={
+                    curve.label || t(SMART_EQ_SOURCE_LABEL_KEYS[curve.source])
+                  }
+                >
+                  {t(SMART_EQ_SOURCE_LABEL_KEYS[curve.source])}
+                </InfoBadge>
+              ))}
+            </div>
+          ) : (
+            <MonoLabel>
+              {t(
+                status === "loading"
+                  ? "player.equalizer.smart.resolving"
+                  : "player.equalizer.smart.waiting",
+              )}
+            </MonoLabel>
+          )}
+          {curves == null && available.length > 0 ? (
+            <p className="m-0 text-xs text-text-muted">
+              {t("player.equalizer.currentCurveOnly")}
+            </p>
+          ) : null}
+          {detail ? (
+            <p className="m-0 text-xs leading-relaxed text-text-muted">
+              {detail}
+            </p>
+          ) : null}
+        </div>
+      )}
+    </FormField>
   );
 }

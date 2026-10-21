@@ -458,3 +458,12 @@ Listen/Player/Visualizer and Analysis y preview pequeño. Aprobado por Diego par
 Cierre Visualizer:115Listen/48Desktop/8browser,3tipos/3builds correctos. Popover padre/scroll
 compartido, lecturas efectivas accesibles, static invalidado ante cambios y sin interpolación
 pendiente. Diego aprueba el lote y autoriza commit/push; sigue chrome Tauri de1BE.
+
+1BE EQ refinement: curva compartida con lecturas14pxMono, paneles acotados hasta720px y scroll.
+Select compacto conserva todos los presets genéricos; curva disponible por pista es inventario
+separado e informativo, solo fuente activa iluminada. ON/OFF chip conserva bypass/restauración,
+OFF dibuja plano sin borrar ganancias. Nueva lectura privada/unaCTE sin alterar resolver/audio;
+servidor antiguo limita a curva efectiva confirmada con aviso. EqBands deja cobertura pendiente
+y tiene contrato/estados/stories interactivos en inglés. Tauri sigue pendiente por decisión de Diego.
+
+EQ aprobado por Diego el 2026-10-21 para commit/push. Antes del cierre web: auditoría transversal R01–R25, clasificación del catálogo pendiente, sincronización del switch de Settings con el panel EQ y revisión del editor de Translation Mode (herramienta de desarrollo). Inventario completo de curvas pendiente de desplegar su endpoint; el fallback de producción es explícito. Tauri/Capacitor y los instrumentos H3 conservan su alcance separado.

@@ -1,0 +1,20 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EqBands.stories";
+
+<Meta of={Stories} />
+
+# EqBands
+
+The shared EQ instrument used by Listen and Admin. The curve, handles and numeric readings show actual gains; the fixture does not run audio.
+
+Gain values use compact 14px regular monospace. Frequency captions use uppercase MonoLabel. These are instrument readings, not large statistical headlines. At narrow widths the instrument scrolls horizontally, retaining at least44px per band and enough space for signed fractional values such as+11.5. The chart, values and frequency captions scroll together. The Listen panel supplies the available space; the component does not impose a card or change the audio chain.
+
+<Canvas of={Stories.Manual} />
+
+Each band is a vertical slider from −12 to +12 dB. Arrow keys move 0.5 dB, Page Up/Down move 3 dB and Home/End reach the limits. Continuous input is separate from persistence: release, blur or 150ms of keyboard inactivity commits once. A caller may omit edit callbacks for a read-only curve. Listen lets an enabled automatic curve become Custom on the first band edit, retaining its other gains. Disabled EQ dims the instrument and prevents changes.
+
+<Canvas of={Stories.ReadOnly} />
+<Canvas of={Stories.Disabled} />
+<Canvas of={Stories.ReducedMotion} />
+
+Handles and curve update together. Pointer drags keep their initial vertical scale until release, even if a consumer panel reflows when an automatic mode becomes manual. First paint and reduced-motion updates do not animate; ordinary target changes reuse the existing spring and stop on settle. No synthetic analyser, automatic cycling or additional audio engine is introduced.

@@ -11,22 +11,25 @@ from starlette.background import BackgroundTask
 
 from crate.api._deps import (
     enrich_radio_tracks as _enrich_radio_tracks,
+)
+from crate.api._deps import (
     library_path,
     safe_path,
 )
 from crate.api.auth import _require_auth
-from crate.api.permissions import require_permission
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.media import (
     AlbumEqualizerPresetMutationResponse,
     DiscoverCompletenessRefreshResponse,
     DiscoverCompletenessResponse,
     EffectiveEqResponse,
+    EqCurveResponse,
     EqFeaturesResponse,
     EqualizerPresetMutationRequest,
     EqualizerPresetMutationResponse,
@@ -44,15 +47,7 @@ from crate.api.schemas.media import (
     TrackRatingRequest,
     TrackRatingResponse,
 )
-from crate.equalizer import (
-    clear_instance_album_eq_preset,
-    clear_instance_track_eq_preset,
-    clear_user_track_eq_preset,
-    resolve_effective_track_eq,
-    save_instance_album_eq_preset,
-    save_instance_track_eq_preset,
-    save_user_track_eq_preset,
-)
+from crate.audio import read_audio_quality
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.queries.browse_media import (
     count_mood_presets,
@@ -69,13 +64,27 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
 )
 from crate.db.queries.browse_media_favorites import list_favorites
-from crate.subsonic.services import preferences
-from crate.local_search import search_local_library
-from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
+from crate.db.repositories.streaming import (
+    get_track_delivery_row_by_entity_uid,
+    get_track_delivery_row_by_id,
+    get_track_delivery_row_by_path,
+    get_variant_by_id,
+    mark_variant_missing,
+)
 from crate.db.repositories.tasks import (
     create_task_dedup,
     find_active_task_by_type_params,
+)
+from crate.equalizer import (
+    available_track_eq_curves,
+    clear_instance_album_eq_preset,
+    clear_instance_track_eq_preset,
+    clear_user_track_eq_preset,
+    resolve_effective_track_eq,
+    save_instance_album_eq_preset,
+    save_instance_track_eq_preset,
+    save_user_track_eq_preset,
 )
 from crate.federation.global_playback import (
     GlobalTrackNotFound,
@@ -83,15 +92,9 @@ from crate.federation.global_playback import (
     resolve_global_track_playback,
 )
 from crate.federation.playback_prepare import prepare_remote_playback_variants
-from crate.audio import read_audio_quality
+from crate.local_search import search_local_library
+from crate.metrics import record_later
 from crate.streaming.paths import resolve_data_file
-from crate.db.repositories.streaming import (
-    get_variant_by_id,
-    get_track_delivery_row_by_entity_uid,
-    get_track_delivery_row_by_id,
-    get_track_delivery_row_by_path,
-    mark_variant_missing,
-)
 from crate.streaming.policy import normalize_policy
 from crate.streaming.service import (
     media_type_for_path,
@@ -99,6 +102,7 @@ from crate.streaming.service import (
     resolution_to_payload,
     resolve_playback,
 )
+from crate.subsonic.services import preferences
 
 log = logging.getLogger(__name__)
 
@@ -643,6 +647,32 @@ def api_track_effective_eq_by_entity_uid(request: Request, entity_uid: str):
     return _eq_response(resolve_effective_track_eq(tid, user_id=int(user["id"])))
 
 
+@router.get(
+    "/api/tracks/{track_id}/eq/curves",
+    response_model=list[EqCurveResponse],
+    responses=_BROWSE_MEDIA_RESPONSES,
+)
+def api_track_eq_curves_by_id(request: Request, track_id: int):
+    user = _require_auth(request)
+    curves = available_track_eq_curves(track_id, user_id=int(user["id"]))
+    if curves is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return curves
+
+
+@router.get(
+    "/api/tracks/by-entity/{entity_uid}/eq/curves",
+    response_model=list[EqCurveResponse],
+    responses=_BROWSE_MEDIA_RESPONSES,
+)
+def api_track_eq_curves_by_entity_uid(request: Request, entity_uid: str):
+    _require_auth(request)
+    track_id = get_track_id_by_entity_uid(entity_uid)
+    if track_id is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return api_track_eq_curves_by_id(request, track_id)
+
+
 @router.put(
     "/api/tracks/{track_id}/eq-preset",
     response_model=EqualizerPresetMutationResponse,
@@ -1003,6 +1033,7 @@ def _stream_resolved_file(
             raise HTTPException(status_code=401, detail="Not authenticated")
         _require_auth(request)
     from fastapi.responses import FileResponse
+
     from crate.metrics import record, record_counter
 
     if not file_path or not file_path.is_file():
@@ -1447,8 +1478,8 @@ def _download_track(request: Request, filepath: str):
         )
         from crate.download_cache import (
             cached_download_artifact_path,
-            download_cache_lock,
             download_cache_enabled,
+            download_cache_lock,
             get_cached_download,
             safe_download_filename,
             store_cached_download,

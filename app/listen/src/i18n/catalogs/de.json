@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Verbindung wird hergestellt...",
   "player.output.cast.session": "Cast-Sitzung",
   "player.volume.mute": "Stummschalten",
-  "player.visualizer.valuePair": "Gespeichert {base}; angepasst {effective}"
+  "player.visualizer.valuePair": "Gespeichert {base}; angepasst {effective}",
+  "player.equalizer.trackCurves": "Titelkurven",
+  "player.equalizer.currentCurveOnly": "Dieser Server stellt nur die aktuelle Kurve bereit.",
+  "player.equalizer.presetPicker": "Voreinstellungen"
 }

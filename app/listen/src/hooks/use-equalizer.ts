@@ -76,7 +76,7 @@ export function useEqualizer() {
   );
 
   const latestRef = useRef({
-    gains: snapshot.gains,
+    gains: effectiveGains,
     enabled: snapshot.enabled,
   });
   const liveGainsRef = useRef<number[] | null>(null);
@@ -87,7 +87,7 @@ export function useEqualizer() {
   }>({ lastSentAt: -Infinity, timer: null, pending: null });
 
   useLayoutEffect(() => {
-    latestRef.current = { gains: snapshot.gains, enabled: snapshot.enabled };
+    latestRef.current = { gains: effectiveGains, enabled: snapshot.enabled };
   });
 
   const cancelNativeLive = useCallback(() => {

@@ -2,6 +2,8 @@ import { useReducer } from "react";
 import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { EqualizerPanelView } from "./EqualizerPanelSections";
+import type { EqualizerPanelState } from "./equalizer-panel-state";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -102,29 +104,34 @@ describe("EqualizerPanel", () => {
 
     const active = container.querySelector("[aria-current='true']");
     expect(active).toHaveAttribute("data-source", "user_track_preset");
-    expect(active).toHaveClass("text-accent-action-hi");
-    expect(container.querySelectorAll("[data-source]")).toHaveLength(6);
+    expect(active).toHaveClass("text-[var(--active-text)]");
+    expect(container.querySelectorAll("[data-source]")).toHaveLength(1);
     expect(screen.getByText("Personal curve")).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("cyan-");
     expect(container.innerHTML).not.toContain("red-");
   });
 
-  it("marks the active preset chip and applies presets from the chips", async () => {
-    const state = makeEqualizerState({ preset: "punk" });
-    equalizerMock.useEqualizer.mockReturnValue(state);
-
-    renderWithListenProviders(<EqualizerPanel />);
-
-    const punk = screen.getByRole("button", { name: "Punk" });
-    expect(punk).toHaveAttribute("aria-pressed", "true");
-    expect(punk).toHaveAttribute("data-state", "active");
-    expect(punk).toHaveClass("font-mono");
+  it("shows only confirmed track curves instead of the generic preset wall", () => {
+    equalizerMock.useEqualizer.mockReturnValue(
+      makeEqualizerState({
+        smart: true,
+        smartStatus: "ready",
+        effectiveEq: {
+          source: "instance_album_preset",
+          label: "Album curve",
+          reasoning: "",
+          genre: null,
+        },
+      }),
+    );
+    const { container } = renderWithListenProviders(<EqualizerPanel />);
     expect(
-      screen.getByRole("heading", { name: /Equalizer/ }),
-    ).toHaveTextContent(/Equalizer.*Punk/);
-
-    screen.getByRole("button", { name: "Shoegaze" }).click();
-    expect(state.applyPreset).toHaveBeenCalledWith("shoegaze");
+      screen.queryByRole("button", { name: "Shoegaze" }),
+    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll("[data-source]")).toHaveLength(1);
+    expect(
+      container.querySelector('[data-source="instance_album_preset"]'),
+    ).toHaveAttribute("aria-current", "true");
   });
 
   it("shows the active mode once, in the header", () => {
@@ -145,22 +152,158 @@ describe("EqualizerPanel", () => {
     expect(live).toHaveTextContent(/^Custom$/);
   });
 
-  it("translates the preset chips and the header preset name", () => {
+  it("uses a power chip beside Smart and a translated current mode", () => {
     equalizerMock.useEqualizer.mockReturnValue(
       makeEqualizerState({ preset: "bass_boost" }),
     );
-
     renderWithListenProviders(<EqualizerPanel />, { locale: "es" });
-
-    expect(
-      screen.getByRole("button", { name: "Realce de graves" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Clásica" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activo" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       /Realce de graves/,
     );
-    expect(screen.getByRole("status")).toHaveTextContent(/^Realce de graves$/);
   });
+
+  it("preserves generic presets in a compact selector and applies Rock", () => {
+    const state = makeEqualizerState();
+    equalizerMock.useEqualizer.mockReturnValue(state);
+    renderWithListenProviders(<EqualizerPanel />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Presets" }));
+    fireEvent.click(screen.getByRole("option", { name: "Rock" }));
+    expect(state.applyPreset).toHaveBeenCalledWith("rock");
+  });
+
+  it("can select the remembered preset while Smart is active", () => {
+    const state = makeEqualizerState({ preset: "rock", smart: true });
+    equalizerMock.useEqualizer.mockReturnValue(state);
+    renderWithListenProviders(<EqualizerPanel />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Presets" }));
+    fireEvent.click(screen.getByRole("option", { name: "Rock" }));
+    expect(state.applyPreset).toHaveBeenCalledWith("rock");
+  });
+
+  it.each([
+    { mode: "adaptive", status: "loading" },
+    { mode: "adaptive", status: "unavailable" },
+    { mode: "genre", status: "loading" },
+    { mode: "genre", status: "unavailable" },
+  ] as const)(
+    "does not mark a $mode helper active while $status",
+    ({ mode, status }) => {
+      const state = makeEqualizerState({
+        adaptive: mode === "adaptive",
+        adaptiveStatus: status,
+        genreAdaptive: mode === "genre",
+        genreAdaptiveStatus: status,
+      }) as unknown as EqualizerPanelState;
+      const { container } = renderWithListenProviders(
+        <EqualizerPanelView
+          eq={state}
+          curves={[
+            {
+              source:
+                mode === "adaptive"
+                  ? "audio_analysis_preset"
+                  : "genre_taxonomy_preset",
+              gains: Array(10).fill(1),
+              label: "Curve",
+              reasoning: "",
+              genre: null,
+            },
+          ]}
+          curvesStatus="ready"
+          saving={false}
+          onClear={() => {}}
+          onSave={() => {}}
+          t={((key: string) => key) as never}
+        />,
+      );
+      expect(container.querySelector('[aria-current="true"]')).toBeNull();
+    },
+  );
+
+  it("marks a resolved genre curve current only when usable gains are present", () => {
+    const state = makeEqualizerState({
+      genreAdaptive: true,
+      genreAdaptiveStatus: "ready",
+      trackGenre: {
+        primary: { slug: "rock", name: "Rock", canonical: true },
+        topLevel: null,
+        source: "album",
+        preset: {
+          gains: Array(10).fill(1),
+          source: "direct",
+          inheritedFrom: null,
+        },
+      },
+    }) as unknown as EqualizerPanelState;
+    const { container } = renderWithListenProviders(
+      <EqualizerPanelView
+        eq={state}
+        curves={[
+          {
+            source: "genre_taxonomy_preset",
+            gains: Array(10).fill(1),
+            label: "Rock",
+            reasoning: "",
+            genre: null,
+          },
+        ]}
+        curvesStatus="ready"
+        saving={false}
+        onClear={() => {}}
+        onSave={() => {}}
+        t={((key: string) => key) as never}
+      />,
+    );
+    expect(container.querySelector('[aria-current="true"]')).toHaveAttribute(
+      "data-source",
+      "genre_taxonomy_preset",
+    );
+  });
+
+  it("powers off without destroying the saved curve and can power on again", () => {
+    const state = makeEqualizerState({
+      enabled: false,
+      gains: Array(10).fill(4),
+    });
+    equalizerMock.useEqualizer.mockReturnValue(state);
+    const { refresh } = renderRefreshablePanel();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(/Off/);
+    screen
+      .getAllByRole("slider")
+      .forEach((slider) =>
+        expect(slider).toHaveAttribute("aria-valuenow", "0"),
+      );
+    const power = screen.getByRole("button", { name: "Off" });
+    expect(power).not.toBeDisabled();
+    fireEvent.click(power);
+    expect(state.toggleEnabled).toHaveBeenCalledWith(true);
+    expect(state.gains).toEqual(Array(10).fill(4));
+    equalizerMock.useEqualizer.mockReturnValue({ ...state, enabled: true });
+    refresh();
+    screen
+      .getAllByRole("slider")
+      .forEach((slider) =>
+        expect(slider).toHaveAttribute("aria-valuenow", "4"),
+      );
+  });
+
+  it.each(["smart", "adaptive", "genreAdaptive"] as const)(
+    "allows editing the displayed %s curve without an extra mode switch",
+    (mode) => {
+      const state = makeEqualizerState({
+        [mode]: true,
+        gains: Array(10).fill(3),
+      });
+      equalizerMock.useEqualizer.mockReturnValue(state);
+      renderWithListenProviders(<EqualizerPanel />);
+      const slider = screen.getAllByRole("slider")[0]!;
+      expect(slider).not.toHaveAttribute("aria-disabled", "true");
+      fireEvent.keyDown(slider, { key: "ArrowUp" });
+      fireEvent.blur(slider);
+      expect(state.commitBand).toHaveBeenCalledWith(0, 3.5);
+    },
+  );
 
   it("previews a manual edit without announcing it until the band commits", () => {
     document.documentElement.dataset.crateMotion = "reduced";
@@ -208,8 +351,6 @@ describe("EqualizerPanel", () => {
     const { refresh } = renderRefreshablePanel();
     const live = screen.getByRole("status");
 
-    fireEvent.click(screen.getByRole("button", { name: "Punk" }));
-    expect(state.applyPreset).toHaveBeenCalledWith("punk");
     equalizerMock.useEqualizer.mockReturnValue({ ...state, preset: "punk" });
     refresh();
     expect(live).toHaveTextContent(/^Punk$/);

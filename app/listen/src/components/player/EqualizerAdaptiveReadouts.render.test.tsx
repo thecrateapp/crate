@@ -28,7 +28,7 @@ describe("adaptive readout shared tags", () => {
       expect(text.parentElement).toHaveClass(
         "font-mono",
         "font-normal",
-        "leading-none",
+        "text-info-badge",
       );
       expect(text.parentElement?.querySelector("svg")).not.toBeNull();
     }

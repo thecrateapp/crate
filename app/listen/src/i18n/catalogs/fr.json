@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Connexion...",
   "player.output.cast.session": "Session Cast",
   "player.volume.mute": "Couper le son",
-  "player.visualizer.valuePair": "Enregistré {base} ; adapté {effective}"
+  "player.visualizer.valuePair": "Enregistré {base} ; adapté {effective}",
+  "player.equalizer.trackCurves": "Courbes du titre",
+  "player.equalizer.currentCurveOnly": "Ce serveur fournit uniquement la courbe actuelle.",
+  "player.equalizer.presetPicker": "Préréglages"
 }

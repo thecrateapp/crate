@@ -3,8 +3,7 @@ import { CRATE_ICON_SIZE, Sun, Tag } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
 
 import { getAdaptiveFeatureChipData } from "./equalizer-adaptive-feature-data";
-import type { EqFeatures } from "@/hooks/use-eq-features";
-import type { TrackGenre } from "@/hooks/use-track-genre";
+import type { EqFeatures, TrackGenre } from "../../lib/equalizer-types";
 
 function FeatureChip({
   icon: Icon,

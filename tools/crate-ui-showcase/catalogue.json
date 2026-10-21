@@ -901,18 +901,20 @@
     {
       "id": "domain-player-eqbands",
       "name": "EqBands",
-      "purpose": "Existing component: contract and adoption pending reconciliation.",
-      "coverage": "pending",
-      "adoption": "Pending audit",
-      "storyId": null,
-      "story": null,
-      "docs": null,
+      "purpose": "Shared ten-band EQ instrument with compact mono gains, synchronized curve/handles and separate input/commit callbacks.",
+      "coverage": "documented",
+      "adoption": "Listen EQ and existing Admin GenreEqEditor; presentation reconciled in1BE.",
+      "storyId": "components-eqbands",
+      "story": "tools/crate-ui-showcase/stories/EqBands.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EqBands.mdx",
       "sources": [
         "app/shared/ui/domain/player/EqBands.tsx"
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/player/EqBands.tsx": "d3775585b841297d257ceca798b45af7b38cead38f6a9a1f259cbe0b9bab2c7a"
+        "app/shared/ui/domain/player/EqBands.tsx": "0c315fdf2667bb2ed7d5bd324cd738dbb98648cfedeaac9d36eacad447e3c515",
+        "tools/crate-ui-showcase/stories/EqBands.stories.tsx": "8a09f4c83ebecb77ca8a82c3d81d2462bcd0b30b970dfc7265e370b1af1bea6b",
+        "tools/crate-ui-showcase/docs/EqBands.mdx": "a2fc3f2ebce442b9f1e8827f87ccbc9f28ce915db493982baef57a4d5c88d477"
       },
       "category": "Media"
     },

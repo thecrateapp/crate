@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Konektatzen...",
   "player.output.cast.session": "Cast saioa",
   "player.volume.mute": "Mututu",
-  "player.visualizer.valuePair": "Gordeta {base}; egokituta {effective}"
+  "player.visualizer.valuePair": "Gordeta {base}; egokituta {effective}",
+  "player.equalizer.trackCurves": "Pistaren kurbak",
+  "player.equalizer.currentCurveOnly": "Zerbitzari honek uneko kurba soilik eskaintzen du.",
+  "player.equalizer.presetPicker": "Aurrezarpenak"
 }

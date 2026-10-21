@@ -2001,5 +2001,8 @@
   "player.output.connecting": "Connectant...",
   "player.output.cast.session": "Sessió de Cast",
   "player.volume.mute": "Silenciar",
-  "player.visualizer.valuePair": "Desat {base}; adaptat {effective}"
+  "player.visualizer.valuePair": "Desat {base}; adaptat {effective}",
+  "player.equalizer.trackCurves": "Corbes de la pista",
+  "player.equalizer.currentCurveOnly": "Aquest servidor només proporciona la corba actual.",
+  "player.equalizer.presetPicker": "Preajustos"
 }
