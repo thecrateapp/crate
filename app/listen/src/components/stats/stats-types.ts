@@ -397,3 +397,39 @@ export interface StatsDashboard {
   top_listeners?: StatsTopListener[];
   genre_trend?: StatsGenreTrend[];
 }
+
+export interface StatsRangeArtist {
+  artist_name: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  minutes: number;
+  plays: number;
+  share: number;
+}
+
+export interface StatsRangeAlbum extends StatsAlbumRef {
+  minutes: number;
+}
+
+export interface StatsRangeTrack extends StatsTrackRef {
+  plays: number;
+  minutes: number;
+}
+
+export interface StatsRangeDiscovery {
+  artist_name: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  first_day: string;
+  minutes: number;
+}
+
+export interface StatsRange {
+  start: string;
+  end: string;
+  available: boolean;
+  top_artists: StatsRangeArtist[];
+  top_albums: StatsRangeAlbum[];
+  top_tracks: StatsRangeTrack[];
+  discoveries: StatsRangeDiscovery[];
+}
