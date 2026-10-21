@@ -100,8 +100,8 @@ the 12/10/14/10/36 limits.
 
 - `snapshot`: `scope`, `subject_key`, `version`, `built_at`, `source_seq`, `stale_after`,
   `stale`, `pending` and `generation_ms`.
-  - A cold payload has `version: 0` and `pending: true`. Listen keeps polling until a versioned
-    reading arrives.
+  - A cold payload has `version: 0` and `pending: true`. Listen refetches every 1.5 s, up to 40
+    times (about a minute), until a versioned reading arrives.
   - `built_at` and `stale_after` are ISO 8601 timestamps with a timezone. FastAPI emits
     microseconds and `Z`. The read plane emits RFC 3339 with trailing zeros trimmed, and omits
     `pending`.
