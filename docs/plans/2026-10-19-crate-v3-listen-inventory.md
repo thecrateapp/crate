@@ -448,3 +448,13 @@ Hover/mute/touch/foco y glow aprobados implementados; wheel consume scroll solo 
 superficies de volumen y conserva Shift1%/paso3%.170testsListen,48Desktop y16browser locales;
 tipos/builds correctos. Output/Volume aprobado por Diego; siguiente lote: visualizador y estados
 de análisis, conservando gates de analyser/motion y límites lazy.
+
+1BE Visualizer: VisualizerSettingsPanel adopta formas y lecturas canónicas, mantiene análisis
+pendiente/0/completo, rangos/modos/preferencias. MusicVisualizer/useMusicVisualizer conservan
+capability y analyser real, congelan con motion/Effects y paran ocultos. SpectrumRibbonCanvas
+sin importadores runtime y su drawer retirados(PD47); waveform vivo conservado. Escena real
+Listen/Player/Visualizer and Analysis y preview pequeño. Aprobado por Diego para publicación.
+
+Cierre Visualizer:115Listen/48Desktop/8browser,3tipos/3builds correctos. Popover padre/scroll
+compartido, lecturas efectivas accesibles, static invalidado ante cambios y sin interpolación
+pendiente. Diego aprueba el lote y autoriza commit/push; sigue chrome Tauri de1BE.

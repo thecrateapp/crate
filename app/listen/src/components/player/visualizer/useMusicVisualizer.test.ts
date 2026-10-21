@@ -16,6 +16,7 @@ const {
     start: vi.fn(),
     stop: vi.fn(),
     destroy: vi.fn(),
+    renderStaticFrame: vi.fn(),
   };
 
   return {
@@ -90,6 +91,8 @@ describe("useMusicVisualizer", () => {
   });
 
   afterEach(() => {
+    delete document.documentElement.dataset.crateMotion;
+    delete document.documentElement.dataset.crateEffects;
     vi.useRealTimers();
     vi.clearAllMocks();
     if (visibilityDescriptor) {
@@ -115,6 +118,44 @@ describe("useMusicVisualizer", () => {
 
     unmount();
 
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(["crateMotion", "crateEffects"])(
+    "keeps %s disabled on a static frame then resumes without rebuilding",
+    async (attribute) => {
+      document.documentElement.dataset[attribute] =
+        attribute === "crateMotion" ? "reduced" : "off";
+      const { unmount } = render(createElement(VisualizerHarness));
+      const canvas = document.querySelector("canvas")!;
+      Object.defineProperties(canvas, {
+        clientWidth: { configurable: true, value: 320 },
+        clientHeight: { configurable: true, value: 180 },
+      });
+      vi.advanceTimersByTime(50);
+      expect(visualizer.start).not.toHaveBeenCalled();
+      expect(visualizer.renderStaticFrame).toHaveBeenCalled();
+      delete document.documentElement.dataset[attribute];
+      await Promise.resolve();
+      expect(visualizer.start).toHaveBeenCalled();
+      expect(musicVisualizerMock).toHaveBeenCalledTimes(1);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("does not create a renderer without an analyser and cancels all retries", () => {
+    createAnalyserNodeMock.mockReturnValue(null);
+    getAnalyserNodeMock.mockReturnValue(null);
+    const { unmount } = render(createElement(VisualizerHarness));
+    const canvas = document.querySelector("canvas")!;
+    Object.defineProperties(canvas, {
+      clientWidth: { configurable: true, value: 320 },
+      clientHeight: { configurable: true, value: 180 },
+    });
+    vi.advanceTimersByTime(1000);
+    expect(musicVisualizerMock).not.toHaveBeenCalled();
+    unmount();
     expect(vi.getTimerCount()).toBe(0);
   });
 

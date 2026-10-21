@@ -732,3 +732,18 @@ Touch has separate mute inside the slider. Arrow keys open it. Centering avoids 
 transforms; head/trail/fill share one edge; glyph glow follows level and respects Effects.
 Wheel over the icon or popover adjusts volume without scrolling the page, including at endpoints.
 Normal steps are3%, Shift steps1%; scrolling outside the volume surfaces remains unchanged.
+
+### 1BE · Visualizer and analysis
+
+`review-1be-player-visualizer.html` shares PlayerVisualizerReview with Storybook
+`Listen/Player/Visualizer and Analysis` and `Reviews/1BE/Visualizer and Analysis`.
+The actual settings panel/mode switch cover saved/adaptive/waiting/zero/long/CD/cover/capability
+states. Config callbacks use the same effective-settings calculation as production, without
+persisting preferences or creating audio. Canonical FormField8px/MonoLabel/Slider/Switch/Readout
+replace local labels/ranges. Renderer lifecycle tests cover static motion/Effects, hidden, resume,
+no analyser and cleanup; real audio/WebGL rendering remains in Listen. The unused ribbon is retired.
+
+The production VisualizerSettingsPopover is also mounted inside a short clipped player region;
+its actual scrolling bounds preserve access to the final slider. Adapted values have localized
+saved/effective aria-valuetext. Static frames repaint changed settings/reset/track/palette once,
+settle without interpolation, and ignore unchanged/stopped/running invalidations.

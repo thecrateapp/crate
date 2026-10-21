@@ -4563,6 +4563,10 @@
     "sourceHash": "sha256:619a2812f9491f6ba5128e234eec24c421d8a52184e2163967e6d2352ae9b1da",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "player.visualizer.valuePair": {
+    "sourceHash": "sha256:71748085e60fcd0d55cba42bd1120ac5c67eeaa15df9382e4bae82b571d5afd8",
+    "reviewedAt": "2026-10-21T06:47:52.105Z"
+  },
   "player.visualizer.waitingForAnalysis": {
     "sourceHash": "sha256:e3cafd513cdfe4792ab9ca9f44813be39fa24f7d53359183c6b7a71231094b9f",
     "reviewedAt": "2026-10-07T13:21:25.887Z"

@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { ExtendedPlayerHeaderBar } from "./ExtendedPlayerHeaderBar";
-import { VisualizerSettingsPanel } from "@/components/player/visualizer/VisualizerSettingsPanel";
+import { VisualizerSettingsPopover } from "./visualizer/VisualizerSettingsPopover";
 import type {
   ExtendedPlayerViewActions,
   ExtendedPlayerViewRefs,
@@ -36,12 +36,10 @@ export function ExtendedPlayerHeader({
         t={t}
       />
       {showVizSettings ? (
-        <AppPopover
+        <VisualizerSettingsPopover
           ref={refs.vizSettingsRef}
-          className="absolute top-14 right-4 z-30 w-56 p-4"
-        >
-          <VisualizerSettingsPanel config={state.vizCfg} />
-        </AppPopover>
+          config={state.vizCfg}
+        />
       ) : null}
       {showEqualizer ? (
         <AppPopover

@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Certaines sorties sont indisponibles. Réessayez.",
   "player.output.connecting": "Connexion...",
   "player.output.cast.session": "Session Cast",
-  "player.volume.mute": "Couper le son"
+  "player.volume.mute": "Couper le son",
+  "player.visualizer.valuePair": "Enregistré {base} ; adapté {effective}"
 }

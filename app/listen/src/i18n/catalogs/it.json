@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Alcune uscite non sono disponibili. Riprova.",
   "player.output.connecting": "Connessione...",
   "player.output.cast.session": "Sessione Cast",
-  "player.volume.mute": "Disattiva l’audio"
+  "player.volume.mute": "Disattiva l’audio",
+  "player.visualizer.valuePair": "Salvato {base}; adattato {effective}"
 }

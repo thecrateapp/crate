@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Some outputs are unavailable. Try again.",
   "player.output.connecting": "Connecting...",
   "player.output.cast.session": "Cast session",
-  "player.volume.mute": "Mute"
+  "player.volume.mute": "Mute",
+  "player.visualizer.valuePair": "Saved {base}; adapted {effective}"
 }

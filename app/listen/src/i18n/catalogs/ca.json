@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Algunes sortides no estan disponibles. Torna-ho a provar.",
   "player.output.connecting": "Connectant...",
   "player.output.cast.session": "Sessió de Cast",
-  "player.volume.mute": "Silenciar"
+  "player.volume.mute": "Silenciar",
+  "player.visualizer.valuePair": "Desat {base}; adaptat {effective}"
 }

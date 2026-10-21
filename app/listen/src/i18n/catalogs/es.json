@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Algunas salidas no están disponibles. Inténtalo de nuevo.",
   "player.output.connecting": "Conectando...",
   "player.output.cast.session": "Sesión de Cast",
-  "player.volume.mute": "Silenciar"
+  "player.volume.mute": "Silenciar",
+  "player.visualizer.valuePair": "Guardado {base}; adaptado {effective}"
 }

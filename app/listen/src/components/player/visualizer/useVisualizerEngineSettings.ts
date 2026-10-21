@@ -79,6 +79,7 @@ export function useVisualizerEngineSettings({
         vizRef.current.highBandWeight = trackAdaptiveViz
           ? trackVizProfile.motion.highBandWeight
           : 1;
+        vizRef.current.invalidateFrame();
         return;
       }
       if (attempt < 8) {
@@ -109,6 +110,7 @@ export function useVisualizerEngineSettings({
       attempts += 1;
       if (vizRef.current) {
         vizRef.current.accentTrackChange(trackAdaptiveViz ? 1 : 0.75);
+        vizRef.current.invalidateFrame(true);
         return;
       }
       if (attempts < 8) timer = window.setTimeout(applyAccent, 80);

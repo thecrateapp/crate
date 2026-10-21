@@ -2000,5 +2000,6 @@
   "player.output.providerFailed": "Irteera batzuk ez daude erabilgarri. Saiatu berriro.",
   "player.output.connecting": "Konektatzen...",
   "player.output.cast.session": "Cast saioa",
-  "player.volume.mute": "Mututu"
+  "player.volume.mute": "Mututu",
+  "player.visualizer.valuePair": "Gordeta {base}; egokituta {effective}"
 }

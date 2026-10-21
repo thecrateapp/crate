@@ -715,3 +715,25 @@ Validación de cierre:170testsListen,48Desktop y16casos browser; tipos Listen/De
 tres builds, presupuesto inicial204902/307200gzipbytes, lint, i18n0/0 y catálogo correctos.
 Servicios5174(APIprod),5186y6006activos. Diego aprueba Output/Volume y autoriza commit/push;
 la siguiente entrega interna de1BE es Visualizador y estados de análisis.
+
+### 1BE · Visualizador y estados de análisis (2026-10-21)
+
+Output/Volume aprobado y publicado como`91b011a8`. Siguiente lote interno: ajustes del visualizador
+con InstrumentPanel/MonoLabel accent, FormField/Switch/Slider/Readout, manteniendo rangos, valores
+base/efectivos y callback de preferencias. Separación conserva precisión0.01;0 real y análisis
+pendiente siguen separados. El cálculo efectivo se extrae a un módulo puro Listen reutilizado
+por runtime y fixture. El header Extended deja espacio al panel y conserva sus gates.
+MusicVisualizer permite un fotograma estático; su propietario usa motion/Effects/visibilidad
+para static/start/stop con un único renderer y limpieza. Sin analyser no se construye uno ficticio.
+PD47: retirados SpectrumRibbonCanvas y drawer privado tras demostrar0consumidores runtime;
+WaveformCanvas y sus tokens siguen activos. Sin cambio de shader, paleta, artwork ni audio authority.
+Escena inglesa compartida en6006y5186/review-1be-player-visualizer.html con callbacks locales.
+Stats/Tauri chrome/DevicesH3 fuera de este lote. Se para para revisión antes de commit.
+
+Cierre local: revisión fresca con3hallazgos importantes, corregidos en una pasada TDD.
+Popover real compartido por Extended/review con altura acotada al padre y scroll; lectura
+base/efectiva accesible y traducida; invalidación one-shot de static para ajustes/reset/paleta/
+pista, con interpolación asentada y sin nuevo loop.115testsListen,48Desktop,8browser;3tipos,
+3builds,lint,i18n0/0,catálogo y presupuesto inicial204903/307200gzipbytes correctos.
+Tres instancias activas; Diego aprueba Visualizer y autoriza commit/push.
+Siguiente lote interno de1BE: chrome de escritorio Tauri, conservando las operaciones nativas.

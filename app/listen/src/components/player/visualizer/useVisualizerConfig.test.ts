@@ -55,6 +55,7 @@ function createVisualizerRef() {
     current: {
       setMode: vi.fn(),
       accentTrackChange: vi.fn(),
+      invalidateFrame: vi.fn(),
       color1: [0, 0, 0],
       color2: [0, 0, 0],
       color3: [0, 0, 0],
@@ -125,4 +126,35 @@ describe("useVisualizerConfig", () => {
       ]),
     );
   });
+});
+
+it("invalidates static output for settings/reset, delayed palette and track changes", async () => {
+  vi.useFakeTimers();
+  localStorage.clear();
+  localStorage.setItem("listen-player-surface-mode", "visualizer");
+  useTrackVisualizerProfileMock.mockReturnValue(profile);
+  const vizRef = createVisualizerRef();
+  const track = { id: "first" } as never;
+  const { result, rerender, unmount } = renderHook(
+    ({ currentTrack }) => useVisualizerConfig(vizRef, currentTrack, true),
+    { initialProps: { currentTrack: track } },
+  );
+  const invalidate = vi.mocked(vizRef.current!.invalidateFrame);
+  expect(invalidate).toHaveBeenCalled();
+  invalidate.mockClear();
+  act(() =>
+    result.current.updateConfig({ ...result.current.vizConfig, glow: 0 }),
+  );
+  expect(invalidate).toHaveBeenCalled();
+  invalidate.mockClear();
+  act(() => result.current.resetConfig());
+  expect(invalidate).toHaveBeenCalled();
+  invalidate.mockClear();
+  act(() => vi.advanceTimersByTime(1000));
+  expect(invalidate).toHaveBeenCalled();
+  invalidate.mockClear();
+  rerender({ currentTrack: { id: "second" } as never });
+  expect(invalidate).toHaveBeenCalledWith(true);
+  unmount();
+  vi.useRealTimers();
 });
