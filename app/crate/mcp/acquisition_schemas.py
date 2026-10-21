@@ -21,6 +21,31 @@ class AcquisitionSearch(ClosedInput):
     limit: Annotated[int, Field(strict=True, ge=1, le=5)] = 5
 
 
+class TidalMissingSearch(ClosedInput):
+    artist: Annotated[
+        str, Field(min_length=2, max_length=160, pattern=r"^[^\x00-\x1f\x7f]+$")
+    ]
+    limit: Annotated[int, Field(strict=True, ge=1, le=50)] = 10
+
+
+class TidalArtistMissingSearch(ClosedInput):
+    artist: Annotated[
+        str, Field(min_length=2, max_length=160, pattern=r"^[^\x00-\x1f\x7f]+$")
+    ]
+
+
+class TidalAcquisitionPreview(ClosedInput):
+    receipt_id: EntityUID
+    quality: Literal["max", "high", "normal"] = "max"
+    idempotency_key: IdempotencyKey
+
+
+class TidalArtistAcquisitionPreview(ClosedInput):
+    receipt_id: EntityUID
+    quality: Literal["max", "high", "normal"] = "max"
+    idempotency_key: IdempotencyKey
+
+
 class AcquisitionPreview(ClosedInput):
     receipt_id: EntityUID
     artist_uid: EntityUID

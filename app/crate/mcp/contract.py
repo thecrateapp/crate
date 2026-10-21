@@ -71,7 +71,13 @@ def worker_readiness() -> dict:
     }
     missing = [] if ready else ["fresh_worker_evidence"]
     if (
-        not {"agent_maintenance", "agent_control", "health_check", "repair"}
+        not {
+            "agent_maintenance",
+            "agent_control",
+            "agent_tidal_download",
+            "health_check",
+            "repair",
+        }
         <= registered
     ):
         missing.append("worker_handler_registration")

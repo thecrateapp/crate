@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Mapping
 from urllib.parse import urlparse
 
+from crate.agent_diagnostics import DiagnosticError
 from crate.acquisition_tasks import (
     build_tidal_download_params,
     tidal_download_dedup_key,
@@ -490,7 +491,9 @@ def _finalize_upgrade_quarantine(
         )
 
 
-def _tidal_download_inner(task_id, params, config, url, quality, download_id, lib):
+def _tidal_download_inner(
+    task_id, params, config, url, quality, download_id, lib, *, authorize=None
+):
     from crate.library_sync import LibrarySync
     from crate.m4a_fix import repair_tidal_artifacts
     from crate.tidal import (
@@ -502,6 +505,13 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     )
 
     from crate.tidal import ensure_auth
+
+    def _checkpoint(effect=None):
+        if authorize:
+            return authorize(effect)
+        if effect:
+            return effect()
+        return None
 
     if not ensure_auth():
         if download_id:
@@ -559,11 +569,28 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
             emit_item_event(task_id, message=f"Downloaded: {track}", title=track)
         emit_progress(task_id, p)
 
+    processing_id = params.get("agent_tidal_processing_id") or task_id
+
+    def _processing_id(suffix=""):
+        return f"{processing_id}{suffix}"
+
+    def _download_task_id(suffix):
+        return (
+            task_id if params.get("agent_tidal_processing_id") else f"{task_id}{suffix}"
+        )
+
+    _checkpoint()
     result = download(
         url,
         quality=quality,
         task_id=task_id,
         progress_callback=_dl_progress,
+        checkpoint=_checkpoint if authorize else None,
+        **(
+            {"processing_id": processing_id}
+            if params.get("agent_tidal_processing_id")
+            else {}
+        ),
     )
 
     if not result.get("success"):
@@ -588,6 +615,7 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         return merged
 
     def _repair_result(current_result: dict) -> tuple[dict, dict]:
+        _checkpoint()
         repair = repair_tidal_artifacts(
             Path(current_result["path"]),
             allow_lossy_rename=True,
@@ -605,8 +633,14 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         fallback = download(
             url,
             quality="normal",
-            task_id=f"{task_id}_normal",
+            task_id=_download_task_id("_normal"),
             progress_callback=_dl_progress,
+            checkpoint=_checkpoint if authorize else None,
+            **(
+                {"processing_id": _processing_id("_normal")}
+                if params.get("agent_tidal_processing_id")
+                else {}
+            ),
         )
         if not fallback.get("success"):
             return {
@@ -698,8 +732,14 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
             retry_result = download(
                 url,
                 quality=quality,
-                task_id=f"{task_id}_retry",
+                task_id=_download_task_id("_retry"),
                 progress_callback=_dl_progress,
+                checkpoint=_checkpoint if authorize else None,
+                **(
+                    {"processing_id": _processing_id("_retry")}
+                    if params.get("agent_tidal_processing_id")
+                    else {}
+                ),
             )
             if retry_result.get("success"):
                 retry_result, retry_repair = _repair_result(retry_result)
@@ -798,6 +838,51 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         result["path"], lib, preferred_artist_name
     )
 
+    selection = params.get("agent_tidal_selection")
+    if selection:
+        from crate.agent_acquisition import _local_album_present, _normalized_release
+        from crate.storage_import import (
+            iter_audio_files_recursive,
+            resolve_import_album_target,
+        )
+
+        processing_root = Path(result["path"])
+        album_dirs = [
+            album_dir
+            for artist_dir in processing_root.iterdir()
+            if artist_dir.is_dir()
+            for album_dir in artist_dir.iterdir()
+            if album_dir.is_dir() and iter_audio_files_recursive(album_dir)
+        ]
+        expected_identity = (
+            _normalized_release(selection["artist"]),
+            _normalized_release(selection["title"]),
+        )
+        staged_identities = [
+            tuple(
+                _normalized_release(part)
+                for part in infer_album_identity(
+                    album_dir, fallback_artist=album_dir.parent.name
+                )
+            )
+            for album_dir in album_dirs
+        ]
+        if len(album_dirs) != 1 or staged_identities != [expected_identity]:
+            raise DiagnosticError(
+                "SOURCE_CONFLICT",
+                "Tidal staged release does not match the approved album",
+            )
+        _checkpoint()
+        if _local_album_present(selection["artist"], selection["title"]):
+            raise DiagnosticError("ALREADY_EXISTS", "Release is already in Crate")
+        _, target_dir, _ = resolve_import_album_target(
+            lib, selection["artist"], selection["title"]
+        )
+        if target_dir.exists():
+            raise DiagnosticError(
+                "ALREADY_EXISTS", "Album destination already exists on disk"
+            )
+
     emit_task_event(
         task_id,
         "info",
@@ -827,10 +912,12 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         set_cache(f"processing:{staged.lower()}", True, ttl=3600)
 
     try:
+        _checkpoint()
         moved_albums = move_to_library_detailed(
             result["path"],
             str(lib),
             replace_existing_audio=bool(upgrade_album_id),
+            authorize=authorize if selection else None,
         )
         modified_artists = sorted(
             {
@@ -900,14 +987,17 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
             current_album_name = str(moved_album.get("album") or "")
             album_dir = Path(str(moved_album.get("path") or ""))
             try:
+                _checkpoint()
                 if album_dir.is_dir():
                     p.done = index
                     p.item = entity_label(
                         artist=current_artist, album=current_album_name
                     )
                     emit_progress(task_id, p)
-                    sync.sync_album(album_dir, current_artist)
-            except Exception:
+                    _checkpoint(lambda: sync.sync_album(album_dir, current_artist))
+            except Exception as exc:
+                if authorize and isinstance(exc, DiagnosticError):
+                    raise
                 # Sync failures here must not trigger a Dramatiq retry —
                 # the files are already on disk, re-downloading large
                 # albums would be pointless. A later artist-level
@@ -924,10 +1014,15 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         for name in set(staged_artists) | set(modified_artists):
             delete_cache(f"processing:{name.lower()}")
 
-    try:
-        start_scan()
-    except Exception:
-        log.debug("Failed to start library scan after Tidal download", exc_info=True)
+    if not params.get("agent_tidal_defer_scan"):
+        try:
+            _checkpoint(start_scan)
+        except Exception as exc:
+            if authorize and isinstance(exc, DiagnosticError):
+                raise
+            log.debug(
+                "Failed to start library scan after Tidal download", exc_info=True
+            )
 
     emit_task_event(
         task_id,
@@ -971,10 +1066,20 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         "requested_quality": quality,
         "files": result.get("file_count", 0),
         "artists": modified_artists,
+        "albums": [
+            {
+                "artist": str(item.get("artist") or ""),
+                "album": str(item.get("album") or ""),
+                "moved": int(item.get("moved") or 0),
+            }
+            for item in moved_albums
+        ],
     }
 
 
-def _handle_tidal_download(task_id: str, params: dict, config: dict) -> dict:
+def _handle_tidal_download(
+    task_id: str, params: dict, config: dict, *, authorize=None
+) -> dict:
     url = params.get("url", "")
     quality = params.get("quality", "max")
     download_id = params.get("download_id")
@@ -990,7 +1095,14 @@ def _handle_tidal_download(task_id: str, params: dict, config: dict) -> dict:
 
     try:
         result = _tidal_download_inner(
-            task_id, params, config, url, quality, download_id, lib
+            task_id,
+            params,
+            config,
+            url,
+            quality,
+            download_id,
+            lib,
+            authorize=authorize,
         )
         if isinstance(result, dict) and result.get("error"):
             error_message = str(result.get("error") or "Tidal download failed")

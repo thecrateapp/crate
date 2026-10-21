@@ -21,7 +21,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -53,7 +57,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -85,7 +93,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "JobControlApply",
       "type": "object"
     },
@@ -117,7 +129,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "JobControlApply",
       "type": "object"
     },
@@ -149,7 +165,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -181,7 +201,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -213,7 +237,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "JobControlApply",
       "type": "object"
     },
@@ -245,7 +273,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "JobControlApply",
       "type": "object"
     },
@@ -277,8 +309,84 @@
           "type": "string"
         }
       },
-      "required": ["plan_version", "idempotency_key", "plan_id"],
+      "required": [
+        "plan_version",
+        "idempotency_key",
+        "plan_id"
+      ],
       "title": "ShowsApply",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "apply_tidal_acquisition",
+    "description": "Download and import the exact approved Tidal album through Crate's worker. Revalidates source, authority and absent destination; never overwrites or upgrades.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "plan_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Plan Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
+      "title": "RepairApplyInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "apply_tidal_artist_acquisition",
+    "description": "Download and import the exact approved missing Tidal discography through Crate workers, sequentially. Stops at the first failed release, reports partial progress and never overwrites existing albums.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "plan_version": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Plan Version",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
+      "title": "RepairApplyInput",
       "type": "object"
     },
     "annotations": {
@@ -307,7 +415,9 @@
           "type": "string"
         }
       },
-      "required": ["query"],
+      "required": [
+        "query"
+      ],
       "title": "EditorialCandidates",
       "type": "object"
     },
@@ -381,7 +491,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "EditorialPlanApply",
       "type": "object"
     },
@@ -417,7 +531,9 @@
           "type": "string"
         }
       },
-      "required": ["plan_id"],
+      "required": [
+        "plan_id"
+      ],
       "title": "EditorialPlanRead",
       "type": "object"
     },
@@ -478,7 +594,10 @@
         "generation_mode": {
           "anyOf": [
             {
-              "enum": ["static", "smart"],
+              "enum": [
+                "static",
+                "smart"
+              ],
               "type": "string"
             },
             {
@@ -563,7 +682,10 @@
           "title": "Track Uids"
         }
       },
-      "required": ["kind", "idempotency_key"],
+      "required": [
+        "kind",
+        "idempotency_key"
+      ],
       "title": "EditorialPrepare",
       "type": "object"
     },
@@ -599,7 +721,9 @@
           "type": "string"
         }
       },
-      "required": ["plan_id"],
+      "required": [
+        "plan_id"
+      ],
       "title": "EditorialPlanRead",
       "type": "object"
     },
@@ -636,12 +760,18 @@
         },
         "section": {
           "default": "tracks",
-          "enum": ["tracks", "exclusions", "history"],
+          "enum": [
+            "tracks",
+            "exclusions",
+            "history"
+          ],
           "title": "Section",
           "type": "string"
         }
       },
-      "required": ["playlist_id"],
+      "required": [
+        "playlist_id"
+      ],
       "title": "EditorialGet",
       "type": "object"
     },
@@ -757,7 +887,9 @@
           "title": "Playlist Id"
         }
       },
-      "required": ["idempotency_key"],
+      "required": [
+        "idempotency_key"
+      ],
       "title": "EditorialPublication",
       "type": "object"
     },
@@ -774,12 +906,18 @@
       "additionalProperties": false,
       "properties": {
         "provider": {
-          "enum": ["soulseek", "tidal", "bandcamp"],
+          "enum": [
+            "soulseek",
+            "tidal",
+            "bandcamp"
+          ],
           "title": "Provider",
           "type": "string"
         }
       },
-      "required": ["provider"],
+      "required": [
+        "provider"
+      ],
       "title": "AcquisitionReadiness",
       "type": "object"
     },
@@ -872,6 +1010,30 @@
     }
   },
   {
+    "name": "get_confirmation_status",
+    "description": "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmation_id": {
+          "pattern": "^[a-f0-9]{32}$",
+          "title": "Confirmation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirmation_id"
+      ],
+      "title": "ConfirmationStatusInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "get_instance_inventory",
     "description": "Read bounded persisted service image references and schema/MCP versions. Release/context provenance and live image IDs remain explicitly unknown when unavailable.",
     "inputSchema": {
@@ -914,7 +1076,9 @@
           "type": "string"
         }
       },
-      "required": ["job_id"],
+      "required": [
+        "job_id"
+      ],
       "title": "JobInput",
       "type": "object"
     },
@@ -1029,7 +1193,9 @@
           "type": "string"
         }
       },
-      "required": ["pipeline"],
+      "required": [
+        "pipeline"
+      ],
       "title": "PipelineInput",
       "type": "object"
     },
@@ -1071,7 +1237,9 @@
           "type": "string"
         }
       },
-      "required": ["plan_id"],
+      "required": [
+        "plan_id"
+      ],
       "title": "PlanInput",
       "type": "object"
     },
@@ -1316,7 +1484,12 @@
         "severity": {
           "anyOf": [
             {
-              "enum": ["low", "medium", "high", "critical"],
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
               "type": "string"
             },
             {
@@ -1364,14 +1537,23 @@
         },
         "mode": {
           "default": "pending",
-          "enum": ["pending", "refresh"],
+          "enum": [
+            "pending",
+            "refresh"
+          ],
           "title": "Mode",
           "type": "string"
         },
         "pipelines": {
-          "default": ["analysis", "bliss"],
+          "default": [
+            "analysis",
+            "bliss"
+          ],
           "items": {
-            "enum": ["analysis", "bliss"],
+            "enum": [
+              "analysis",
+              "bliss"
+            ],
             "type": "string"
           },
           "maxItems": 2,
@@ -1390,7 +1572,10 @@
           "type": "array"
         }
       },
-      "required": ["track_uids", "idempotency_key"],
+      "required": [
+        "track_uids",
+        "idempotency_key"
+      ],
       "title": "AnalysisPlanInput",
       "type": "object"
     },
@@ -1443,13 +1628,22 @@
         },
         "mode": {
           "default": "missing",
-          "enum": ["missing", "refresh"],
+          "enum": [
+            "missing",
+            "refresh"
+          ],
           "title": "Mode",
           "type": "string"
         },
         "providers": {
           "items": {
-            "enum": ["lastfm", "spotify", "musicbrainz", "discogs", "setlist"],
+            "enum": [
+              "lastfm",
+              "spotify",
+              "musicbrainz",
+              "discogs",
+              "setlist"
+            ],
             "type": "string"
           },
           "maxItems": 5,
@@ -1458,7 +1652,12 @@
           "type": "array"
         }
       },
-      "required": ["artist_uids", "providers", "facets", "idempotency_key"],
+      "required": [
+        "artist_uids",
+        "providers",
+        "facets",
+        "idempotency_key"
+      ],
       "title": "EnrichmentPlanInput",
       "type": "object"
     },
@@ -1500,12 +1699,19 @@
           "type": "integer"
         },
         "scope": {
-          "enum": ["album", "artist", "global"],
+          "enum": [
+            "album",
+            "artist",
+            "global"
+          ],
           "title": "Scope",
           "type": "string"
         }
       },
-      "required": ["scope", "idempotency_key"],
+      "required": [
+        "scope",
+        "idempotency_key"
+      ],
       "title": "LibrarySyncPlanInput",
       "type": "object"
     },
@@ -1542,7 +1748,11 @@
           "type": "string"
         }
       },
-      "required": ["album_uids", "destination_preset", "idempotency_key"],
+      "required": [
+        "album_uids",
+        "destination_preset",
+        "idempotency_key"
+      ],
       "title": "MetadataExportPlanInput",
       "type": "object"
     },
@@ -1570,7 +1780,10 @@
         },
         "conflict_policy": {
           "default": "fill_missing",
-          "enum": ["fill_missing", "replace_unlocked"],
+          "enum": [
+            "fill_missing",
+            "replace_unlocked"
+          ],
           "title": "Conflict Policy",
           "type": "string"
         },
@@ -1585,7 +1798,11 @@
           "type": "string"
         }
       },
-      "required": ["album_uids", "source_preset", "idempotency_key"],
+      "required": [
+        "album_uids",
+        "source_preset",
+        "idempotency_key"
+      ],
       "title": "MetadataRehydratePlanInput",
       "type": "object"
     },
@@ -1675,7 +1892,10 @@
           "type": "string"
         }
       },
-      "required": ["source_job_id", "idempotency_key"],
+      "required": [
+        "source_job_id",
+        "idempotency_key"
+      ],
       "title": "AcquisitionPublication",
       "type": "object"
     },
@@ -1704,12 +1924,18 @@
         },
         "scope": {
           "default": "own",
-          "enum": ["own", "instance"],
+          "enum": [
+            "own",
+            "instance"
+          ],
           "title": "Scope",
           "type": "string"
         }
       },
-      "required": ["job_id", "idempotency_key"],
+      "required": [
+        "job_id",
+        "idempotency_key"
+      ],
       "title": "JobControlPreview",
       "type": "object"
     },
@@ -1738,12 +1964,18 @@
         },
         "scope": {
           "default": "own",
-          "enum": ["own", "instance"],
+          "enum": [
+            "own",
+            "instance"
+          ],
           "title": "Scope",
           "type": "string"
         }
       },
-      "required": ["job_id", "idempotency_key"],
+      "required": [
+        "job_id",
+        "idempotency_key"
+      ],
       "title": "JobControlPreview",
       "type": "object"
     },
@@ -2030,7 +2262,11 @@
       "additionalProperties": false,
       "properties": {
         "entity_type": {
-          "enum": ["artist", "album", "track"],
+          "enum": [
+            "artist",
+            "album",
+            "track"
+          ],
           "title": "Entity Type",
           "type": "string"
         },
@@ -2048,7 +2284,12 @@
           "$ref": "#/$defs/MetadataPatch"
         }
       },
-      "required": ["entity_type", "entity_uid", "patch", "idempotency_key"],
+      "required": [
+        "entity_type",
+        "entity_uid",
+        "patch",
+        "idempotency_key"
+      ],
       "title": "MetadataPreviewInput",
       "type": "object"
     },
@@ -2292,7 +2533,10 @@
               "type": "integer"
             }
           },
-          "required": ["max_active_users", "max_active_streams"],
+          "required": [
+            "max_active_users",
+            "max_active_streams"
+          ],
           "title": "_Downloads",
           "type": "object"
         },
@@ -2393,7 +2637,12 @@
               "type": "string"
             }
           },
-          "required": ["enabled", "start", "end", "timezone"],
+          "required": [
+            "enabled",
+            "start",
+            "end",
+            "timezone"
+          ],
           "title": "_Window",
           "type": "object"
         }
@@ -2414,7 +2663,11 @@
           "$ref": "#/$defs/RuntimePatch"
         }
       },
-      "required": ["expected_revision", "patch", "idempotency_key"],
+      "required": [
+        "expected_revision",
+        "patch",
+        "idempotency_key"
+      ],
       "title": "RuntimeUpdatePreview",
       "type": "object"
     },
@@ -2806,7 +3059,13 @@
             },
             "source_provider": {
               "default": "manual",
-              "enum": ["manual", "mcp", "ticketmaster", "setlistfm", "lastfm"],
+              "enum": [
+                "manual",
+                "mcp",
+                "ticketmaster",
+                "setlistfm",
+                "lastfm"
+              ],
               "title": "Source Provider",
               "type": "string"
             },
@@ -2892,7 +3151,9 @@
               "title": "Venue"
             }
           },
-          "required": ["item_id"],
+          "required": [
+            "item_id"
+          ],
           "title": "ShowCandidate",
           "type": "object"
         },
@@ -2923,7 +3184,11 @@
               "type": "object"
             }
           },
-          "required": ["canonical_show_id", "duplicate_show_ids", "revisions"],
+          "required": [
+            "canonical_show_id",
+            "duplicate_show_ids",
+            "revisions"
+          ],
           "title": "ShowConsolidationInput",
           "type": "object"
         }
@@ -2956,13 +3221,95 @@
           "type": "string"
         }
       },
-      "required": ["idempotency_key"],
+      "required": [
+        "idempotency_key"
+      ],
       "title": "ShowsPrepare",
       "type": "object"
     },
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "preview_tidal_acquisition",
+    "description": "Prepare one exact Tidal release for a mandatory Telegram approval. The plan binds album identity, quality and new-album-only import; no download starts.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "quality": {
+          "default": "max",
+          "enum": [
+            "max",
+            "high",
+            "normal"
+          ],
+          "title": "Quality",
+          "type": "string"
+        },
+        "receipt_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Receipt Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "receipt_id",
+        "idempotency_key"
+      ],
+      "title": "TidalAcquisitionPreview",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "preview_tidal_artist_acquisition",
+    "description": "Prepare one high-risk plan listing every missing release in a complete Tidal artist discography; one Telegram approval covers only that exact list. No download starts.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "title": "Receipt Id",
+          "type": "string"
+        },
+        "quality": {
+          "default": "max",
+          "enum": [
+            "max",
+            "high",
+            "normal"
+          ],
+          "title": "Quality",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "receipt_id",
+        "idempotency_key"
+      ],
+      "title": "TidalArtistAcquisitionPreview",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
       "openWorldHint": false
     }
   },
@@ -3145,7 +3492,9 @@
           "title": "Until"
         }
       },
-      "required": ["source"],
+      "required": [
+        "source"
+      ],
       "title": "DiagnosticsInput",
       "type": "object"
     },
@@ -3178,7 +3527,10 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version"],
+      "required": [
+        "plan_id",
+        "plan_version"
+      ],
       "title": "ConfirmationInput",
       "type": "object"
     },
@@ -3210,7 +3562,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -3242,7 +3598,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -3328,7 +3688,10 @@
         "scope": {
           "anyOf": [
             {
-              "enum": ["artist", "global"],
+              "enum": [
+                "artist",
+                "global"
+              ],
               "type": "string"
             },
             {
@@ -3339,7 +3702,9 @@
           "title": "Scope"
         }
       },
-      "required": ["idempotency_key"],
+      "required": [
+        "idempotency_key"
+      ],
       "title": "HealthCheckInput",
       "type": "object"
     },
@@ -3371,7 +3736,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -3403,7 +3772,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -3435,7 +3808,11 @@
           "type": "string"
         }
       },
-      "required": ["plan_id", "plan_version", "idempotency_key"],
+      "required": [
+        "plan_id",
+        "plan_version",
+        "idempotency_key"
+      ],
       "title": "RepairApplyInput",
       "type": "object"
     },
@@ -3496,7 +3873,9 @@
           "title": "Scope"
         }
       },
-      "required": ["idempotency_key"],
+      "required": [
+        "idempotency_key"
+      ],
       "title": "QualityRunInput",
       "type": "object"
     },
@@ -3574,7 +3953,9 @@
           "title": "Schedule"
         }
       },
-      "required": ["idempotency_key"],
+      "required": [
+        "idempotency_key"
+      ],
       "title": "ScheduleRun",
       "type": "object"
     },
@@ -3598,7 +3979,11 @@
           "type": "integer"
         },
         "provider": {
-          "enum": ["soulseek", "tidal", "bandcamp"],
+          "enum": [
+            "soulseek",
+            "tidal",
+            "bandcamp"
+          ],
           "title": "Provider",
           "type": "string"
         },
@@ -3610,7 +3995,10 @@
           "type": "string"
         }
       },
-      "required": ["provider", "query"],
+      "required": [
+        "provider",
+        "query"
+      ],
       "title": "AcquisitionSearch",
       "type": "object"
     },
@@ -3709,23 +4097,60 @@
     }
   },
   {
-    "name": "get_confirmation_status",
-    "description": "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+    "name": "search_tidal_missing_albums",
+    "description": "Compare one exact local artist's bounded Tidal discography with Crate and mint receipts for missing releases. Search and receipt creation never download.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
-        "confirmation_id": {
-          "pattern": "^[a-f0-9]{32}$",
-          "title": "Confirmation Id",
+        "artist": {
+          "maxLength": 160,
+          "minLength": 2,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "title": "Artist",
           "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
         }
       },
-      "required": ["confirmation_id"],
-      "title": "ConfirmationStatusInput",
+      "required": [
+        "artist"
+      ],
+      "title": "TidalMissingSearch",
       "type": "object"
     },
     "annotations": {
-      "readOnlyHint": true,
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "search_tidal_missing_artist",
+    "description": "Read the complete paginated Tidal discography for one exact local artist. If every missing release fits the bounded batch, mint one exact receipt; otherwise report the limit without starting downloads.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "artist": {
+          "maxLength": 160,
+          "minLength": 2,
+          "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+          "title": "Artist",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artist"
+      ],
+      "title": "TidalArtistMissingSearch",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false,
       "openWorldHint": false
     }

@@ -259,12 +259,25 @@ def get_album_track_count(album_id: str) -> int | None:
 
 
 def get_artist_albums(
-    artist_id: str, limit: int = 50, _retried: bool = False
-) -> list[dict]:
+    artist_id: str,
+    limit: int = 50,
+    _retried: bool = False,
+    offset: int = 0,
+    strict: bool = False,
+) -> list[dict] | None:
     """Get albums for a Tidal artist by ID (uses v1 API)."""
+    if (
+        not isinstance(artist_id, str)
+        or not re.fullmatch(r"[0-9]{1,24}", artist_id)
+        or type(limit) is not int
+        or not 1 <= limit <= 50
+        or type(offset) is not int
+        or not 0 <= offset <= 500
+    ):
+        return None if strict else []
     token = get_auth_token()
     if not token:
-        return []
+        return None if strict else []
     try:
         resp = requests.get(
             f"https://api.tidal.com/v1/artists/{artist_id}/albums",
@@ -272,16 +285,22 @@ def get_artist_albums(
             params={
                 "countryCode": _configured_country_code(),
                 "limit": limit,
-                "offset": 0,
+                "offset": offset,
             },
             timeout=10,
         )
         if resp.status_code == 401:
             if not _retried and refresh_token():
-                return get_artist_albums(artist_id, limit, _retried=True)
-            return []
+                return get_artist_albums(
+                    artist_id,
+                    limit,
+                    _retried=True,
+                    offset=offset,
+                    strict=strict,
+                )
+            return None if strict else []
         if resp.status_code != 200:
-            return []
+            return None if strict else []
         data = resp.json()
         items = (
             data.get("items", [])
@@ -300,6 +319,8 @@ def get_artist_albums(
                 return artists[0].get("name", "")
             return ""
 
+        if not isinstance(items, list):
+            return None if strict else []
         return [
             {
                 "id": str(a.get("id", "")),
@@ -314,11 +335,12 @@ def get_artist_albums(
                 "release_date": a.get("releaseDate", ""),
                 "type": a.get("type", "ALBUM"),
             }
-            for a in items
+            | {"catalog_offset": offset + index}
+            for index, a in enumerate(items)
         ]
     except Exception as e:
         log.warning("Failed to fetch artist albums: %s", e)
-        return []
+        return None if strict else []
 
 
 def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
@@ -668,13 +690,18 @@ def inspect_download_tree(processing_dir: str | Path) -> dict:
 
 
 def download(
-    url: str, quality: str = "max", task_id: str = "", progress_callback=None
+    url: str,
+    quality: str = "max",
+    task_id: str = "",
+    progress_callback=None,
+    checkpoint=None,
+    processing_id: str | None = None,
 ) -> dict:
     """Download a Tidal URL (album, track, playlist) via tiddl.
 
     Returns {success, path, files, error}
     """
-    processing_dir = Path(PROCESSING_DIR) / task_id
+    processing_dir = Path(PROCESSING_DIR) / (processing_id or task_id)
     processing_dir.mkdir(parents=True, exist_ok=True)
 
     quality_map = {
@@ -705,6 +732,8 @@ def download(
 
     try:
         _sync_tiddl_country_code()
+        if checkpoint:
+            checkpoint()
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -724,6 +753,8 @@ def download(
         tracks_downloaded = 0
         total_tracks = 0
         for line in proc.stdout:
+            if checkpoint:
+                checkpoint()
             line = line.rstrip()
             output_lines.append(line)
             if progress_callback:
@@ -770,6 +801,8 @@ def download(
                         progress_callback({"phase": "downloading", "line": line})
 
         proc.wait(timeout=3600)
+        if checkpoint:
+            checkpoint()
 
         inspection = inspect_download_tree(processing_dir)
         error_lines = [line for line in output_lines if line.startswith("Error:")]
@@ -831,12 +864,18 @@ def download(
 
     except subprocess.TimeoutExpired:
         proc.kill()
+        proc.wait(timeout=10)
         return {
             "success": False,
             "error": "Download timed out (1h)",
             "path": str(processing_dir),
         }
     except Exception as e:
+        if "proc" in locals() and proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=10)
+        if checkpoint:
+            raise
         return {"success": False, "error": str(e), "path": str(processing_dir)}
 
 
@@ -845,6 +884,7 @@ def move_to_library_detailed(
     library_path: str,
     *,
     replace_existing_audio: bool = False,
+    authorize=None,
 ) -> list[dict[str, object]]:
     """Move downloaded files from processing dir to library.
 
@@ -866,6 +906,12 @@ def move_to_library_detailed(
     src = Path(processing_path)
     dst = Path(library_path)
     imported_targets: dict[tuple[str, str, str], dict[str, object]] = {}
+
+    def apply(effect):
+        if authorize:
+            authorize(effect)
+        else:
+            effect()
 
     if not src.exists():
         return []
@@ -899,12 +945,24 @@ def move_to_library_detailed(
             else:
                 placement = None
             try:
+                if authorize:
+                    authorize()
                 if placement is None:
-                    move_file(file_path, target_album_dir / file_path.name)
+                    apply(
+                        lambda: move_file(file_path, target_album_dir / file_path.name)
+                    )
                 else:
-                    install_managed_track(file_path, placement, library_root=dst)
+                    apply(
+                        lambda: install_managed_track(
+                            file_path, placement, library_root=dst
+                        )
+                    )
                 moved += 1
-            except Exception:
+            except Exception as exc:
+                from crate.agent_diagnostics import DiagnosticError
+
+                if isinstance(exc, DiagnosticError):
+                    raise
                 log.warning(
                     "move_to_library: failed to move root file %s into %s",
                     file_path,
@@ -941,6 +999,7 @@ def move_to_library_detailed(
                         album_name=album_name,
                         replace_existing_audio=replace_existing_audio,
                         library_root=dst,
+                        authorize=authorize,
                     )
                     key = (artist_name, album_name, str(target_album_dir))
                     imported_targets[key] = {
@@ -949,7 +1008,11 @@ def move_to_library_detailed(
                         "path": str(target_album_dir),
                         "moved": int(moved),
                     }
-                except Exception:
+                except Exception as exc:
+                    from crate.agent_diagnostics import DiagnosticError
+
+                    if isinstance(exc, DiagnosticError):
+                        raise
                     log.warning(
                         "move_to_library: failed to import %s for %s / %s",
                         album_item,
@@ -964,7 +1027,7 @@ def move_to_library_detailed(
                 _, target_album_dir, managed_track_names = resolve_import_album_target(
                     dst, artist_name, album_name
                 )
-                target_album_dir.mkdir(parents=True, exist_ok=True)
+                apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))
                 is_managed_audio = (
                     managed_track_names
                     and album_item.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
@@ -985,10 +1048,20 @@ def move_to_library_detailed(
                     album_item.unlink(missing_ok=True)
                     continue
                 try:
+                    if authorize:
+                        authorize()
                     if placement is None:
-                        move_file(album_item, target_album_dir / album_item.name)
+                        apply(
+                            lambda: move_file(
+                                album_item, target_album_dir / album_item.name
+                            )
+                        )
                     else:
-                        install_managed_track(album_item, placement, library_root=dst)
+                        apply(
+                            lambda: install_managed_track(
+                                album_item, placement, library_root=dst
+                            )
+                        )
                     key = (artist_name, album_name, str(target_album_dir))
                     existing = imported_targets.get(key)
                     moved_count = (
@@ -1001,7 +1074,11 @@ def move_to_library_detailed(
                         "moved": (moved_count if isinstance(moved_count, int) else 0)
                         + 1,
                     }
-                except Exception:
+                except Exception as exc:
+                    from crate.agent_diagnostics import DiagnosticError
+
+                    if isinstance(exc, DiagnosticError):
+                        raise
                     log.warning(
                         "move_to_library: failed to move file %s into %s",
                         album_item,

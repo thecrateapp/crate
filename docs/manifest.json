@@ -256,7 +256,7 @@
     "route": "/operations/crate-mcp-acquisition",
     "section": "operations",
     "title": "Reviewed MCP acquisition and schedule boundaries",
-    "summary": "Exact provider receipts, independent publication approval and bounded schedule contracts.",
+    "summary": "Exact Soulseek and Tidal receipts, independent Telegram approval and bounded schedule contracts.",
     "keywords": ["mcp", "acquisition", "soulseek", "approval", "schedules"],
     "order": 172
   },

@@ -374,7 +374,10 @@ def _accept(
             retry_after=5,
         )
     task_type = (
-        "soulseek_download"
+        "agent_tidal_download"
+        if payload.get("domain_operation")
+        in {"tidal_acquisition", "tidal_artist_acquisition"}
+        else "soulseek_download"
         if payload.get("domain_operation") in {"acquisition", "acquisition_publish"}
         else "show_extract"
         if operation == "extract_shows"
@@ -715,7 +718,10 @@ def _execution_job(current, task_id):
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
     expected = (
-        "soulseek_download"
+        "agent_tidal_download"
+        if job["payload"].get("domain_operation")
+        in {"tidal_acquisition", "tidal_artist_acquisition"}
+        else "soulseek_download"
         if job["payload"].get("domain_operation")
         in {"acquisition", "acquisition_publish"}
         else "show_extract"

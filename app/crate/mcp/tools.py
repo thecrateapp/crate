@@ -28,6 +28,10 @@ from crate.mcp.acquisition_schemas import (
     AcquisitionPublication,
     AcquisitionReadiness,
     AcquisitionSearch,
+    TidalAcquisitionPreview,
+    TidalArtistAcquisitionPreview,
+    TidalArtistMissingSearch,
+    TidalMissingSearch,
 )
 from crate.mcp.editorial_schemas import (
     EditorialCandidates,
@@ -229,6 +233,36 @@ ACTION_CATALOG = {
         AcquisitionSearch,
         "library.acquisition.search",
         "Search up to five exact zero-cost FLAC selections and mint owned source receipts. Never download automatically.",
+    ),
+    "search_tidal_missing_albums": (
+        TidalMissingSearch,
+        "library.acquisition.search",
+        "Compare one exact local artist's bounded Tidal discography with Crate and mint receipts for missing releases. Search and receipt creation never download.",
+    ),
+    "search_tidal_missing_artist": (
+        TidalArtistMissingSearch,
+        "library.acquisition.search",
+        "Read the complete paginated Tidal discography for one exact local artist. If every missing release fits the bounded batch, mint one exact receipt; otherwise report the limit without starting downloads.",
+    ),
+    "preview_tidal_acquisition": (
+        TidalAcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare one exact Tidal release for a mandatory Telegram approval. The plan binds album identity, quality and new-album-only import; no download starts.",
+    ),
+    "apply_tidal_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Download and import the exact approved Tidal album through Crate's worker. Revalidates source, authority and absent destination; never overwrites or upgrades.",
+    ),
+    "preview_tidal_artist_acquisition": (
+        TidalArtistAcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare one high-risk plan listing every missing release in a complete Tidal artist discography; one Telegram approval covers only that exact list. No download starts.",
+    ),
+    "apply_tidal_artist_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Download and import the exact approved missing Tidal discography through Crate workers, sequentially. Stops at the first failed release, reports partial progress and never overwrites existing albums.",
     ),
     "preview_acquisition": (
         AcquisitionPreview,
@@ -503,11 +537,20 @@ async def list_tools(context, params):
                         in {
                             "apply_repairs",
                             "apply_shows_import",
+                            "apply_tidal_acquisition",
+                            "apply_tidal_artist_acquisition",
                             "run_library_sync",
                             "run_metadata_rehydrate",
                         },
                         idempotent_hint=name
-                        not in {"preview_repairs", "search_acquisition"},
+                        not in {
+                            "preview_repairs",
+                            "search_acquisition",
+                            "search_tidal_missing_albums",
+                            "search_tidal_missing_artist",
+                            "preview_tidal_acquisition",
+                            "preview_tidal_artist_acquisition",
+                        },
                         open_world_hint=False,
                     ),
                 )

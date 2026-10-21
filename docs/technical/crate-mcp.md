@@ -1938,4 +1938,4 @@ document integrity checked 45 canonical documents and the docs build passed.
 
 ## Reviewed acquisition and schedule writes
 
-The unreleased 1.2.0 contract adds six acquisition tools and two least-privilege scopes (62 tools, 32 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact transfer, independent publication approval, slskd 0.26.1 prerequisite, cancellation/reconciliation semantics and schedule audit.
+The unreleased 1.2.0 contract adds twelve acquisition tools and two least-privilege scopes (71 tools, 32 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact Soulseek transfer/publication and Tidal single-album/full-artist flows, human approval, worker/cancellation checks, reconciliation semantics, slskd 0.26.1 prerequisite and schedule audit.

@@ -31,6 +31,11 @@ TASK_CONTROLS = {
         "retry": False,
         "cancel": True,
     },
+    "agent_tidal_download": {
+        "grant": "library.acquisition.write",
+        "retry": False,
+        "cancel": True,
+    },
     "agent_maintenance": {"grant": None, "retry": False, "cancel": True},
 }
 
@@ -79,6 +84,21 @@ def _grants(row, principal, operation, scope, current):
             raise DiagnosticError(
                 "NOT_EXECUTABLE",
                 "Only owned admitted agent acquisition jobs support cancellation",
+            )
+    if row["type"] == "agent_tidal_download":
+        job = requests._job(current, row["id"])
+        if (
+            row["origin"] != "agent"
+            or not (row.get("params_json") or {}).get("agent_command")
+            or not job
+            or job["principal_id"] != principal.id
+            or job["operation"] != "apply_operation"
+            or job["payload"].get("domain_operation")
+            not in {"tidal_acquisition", "tidal_artist_acquisition"}
+        ):
+            raise DiagnosticError(
+                "NOT_EXECUTABLE",
+                "Only owned approved Hermes Tidal imports support cancellation",
             )
     context = row.get("origin_context") or {}
     grants = set(row.get("required_grants") or [])

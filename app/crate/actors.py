@@ -141,6 +141,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
     "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
     "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "agent_tidal_download": TaskPoolConfig("default", 0, 14400, 0),
     "agent_control": TaskPoolConfig("fast", 0, 60, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
     "prepare_library_repairs": TaskPoolConfig("maintenance", 0, 1800, 0),
@@ -337,7 +338,12 @@ def _release_db_heavy_lock(task_id: str):
 # workers via a Redis-based counting semaphore.
 
 DOWNLOAD_TASK_TYPES = frozenset(
-    {"tidal_download", "soulseek_download", "bandcamp_import_purchase"}
+    {
+        "tidal_download",
+        "agent_tidal_download",
+        "soulseek_download",
+        "bandcamp_import_purchase",
+    }
 )
 
 
@@ -588,7 +594,7 @@ def _execute_task(task_type: str, task_id: str):
 
     resource_decision = should_defer_task(
         "agent_maintenance"
-        if task_type == "soulseek_download"
+        if task_type in {"soulseek_download", "agent_tidal_download"}
         and task.get("params", {}).get("agent_command")
         else task_type,
         task.get("params", {}),

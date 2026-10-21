@@ -31,7 +31,7 @@ guide covers provisioning, OAuth endpoints and exact Admin review.
 The Crate tool contract is **1.2.0** (unreleased additive candidate), independent of the MCP wire protocol and migration version.
 The server reports this version; `get_operation_catalog` returns SDK/protocol versions, schema
 fingerprints, grants, limits and readiness. The output envelope remains `schema_version="1"`.
-The [distributable JSON contract](crate-mcp-v1.json) contains all **62 tools**, all **32 scopes**
+The [distributable JSON contract](crate-mcp-v1.json) contains all **71 tools**, all **32 scopes**
 and human capability ceilings, closed input schemas and the output schema, without instance
 configuration or credentials. Regenerate from `app/` using repository dependencies:
 

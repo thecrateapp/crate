@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import time
+import unicodedata
 from urllib.parse import quote
 from uuid import UUID
 
@@ -22,6 +23,8 @@ from crate.db.repositories import agent_acquisition as store
 
 MAX_BYTES = 2147483648
 MAX_FILES = 50
+MAX_TIDAL_RESULTS = 50
+MAX_TIDAL_DISCOVERY = 500
 
 
 def _digest(value):
@@ -112,11 +115,17 @@ def get_acquisition_readiness(principal, *, provider):
     store.authorize_search(principal)
     from crate import soulseek
 
-    executable = (
-        provider == "soulseek" and bool(soulseek._api_key()) and actions_enabled()
+    tidal_configured = False
+    if provider == "tidal":
+        from crate import tidal
+
+        tidal_configured = bool(tidal.is_authenticated())
+    executable = actions_enabled() and (
+        (provider == "soulseek" and bool(soulseek._api_key()))
+        or (provider == "tidal" and tidal_configured)
     )
     missing = None
-    if executable:
+    if executable and provider == "soulseek":
         try:
             _supported_provider()
         except DiagnosticError as error:
@@ -127,14 +136,27 @@ def get_acquisition_readiness(principal, *, provider):
             "executable": executable,
             "reason": missing
             or (
+                "bounded_missing_album_search_and_telegram_approved_import"
+                if executable and provider == "tidal"
+                else None
+            )
+            or (
                 "exact_zero_cost_flac_only"
                 if executable
                 else "missing_configuration_or_actions_disabled"
                 if provider == "soulseek"
                 else "provider_has_no_trustworthy_bounded_selection_and_cost_contract"
             ),
-            "live_connectivity": "connected" if executable else "unavailable",
-            "destination": "staging_then_separately_approved_new_album",
+            "live_connectivity": "not_configured"
+            if provider == "tidal" and not tidal_configured
+            else "not_probed"
+            if provider == "tidal"
+            else "connected"
+            if executable
+            else "unavailable",
+            "destination": "one_approved_new_album_import"
+            if provider == "tidal"
+            else "staging_then_separately_approved_new_album",
             "max_files": MAX_FILES,
             "max_bytes": MAX_BYTES,
         }
@@ -248,6 +270,533 @@ def search_acquisition(principal, *, provider, query, limit=5, trace_id=None):
     )
 
 
+def _normalized_release(value):
+    decomposed = unicodedata.normalize("NFKD", str(value or "").casefold())
+    return "".join(char for char in decomposed if char.isalnum())
+
+
+def _tidal_album_source(artist, album, tidal_artist_id):
+    tidal_id = str(album.get("id") or "")
+    title = str(album.get("title") or "").strip()
+    source_artist = str(album.get("artist") or "").strip()
+    tracks = album.get("tracks")
+    if (
+        not re.fullmatch(r"[0-9]{1,24}", tidal_id)
+        or not 1 <= len(title) <= 512
+        or len(title.encode("utf-8")) > 512
+        or _normalized_release(source_artist) != _normalized_release(artist["name"])
+        or type(tracks) is not int
+        or not 1 <= tracks <= 500
+    ):
+        return None
+    quality = album.get("quality", [])
+    if isinstance(quality, str):
+        quality = [quality]
+    return {
+        "provider": "tidal",
+        "tidal_artist_id": str(tidal_artist_id),
+        "tidal_album_id": tidal_id,
+        "artist_uid": str(artist["entity_uid"]),
+        "artist": artist["name"],
+        "title": title,
+        "year": str(album.get("year") or "")[:4],
+        "release_date": str(album.get("release_date") or "")[:10],
+        "release_type": str(album.get("type") or "ALBUM")[:32],
+        "catalog_offset": max(0, int(album.get("catalog_offset") or 0)),
+        "tracks": tracks,
+        "quality": sorted(
+            item[:64] for item in quality[:8] if isinstance(item, str) and item
+        ),
+        # The URL is constructed from the bounded numeric Tidal ID, never caller input.
+        "url": f"https://tidal.com/album/{tidal_id}",
+    }
+
+
+def search_tidal_missing_albums(principal, *, artist, limit=10, trace_id=None):
+    """Search one unambiguous local artist's Tidal releases and mint exact receipts."""
+    store.authorize_search(principal)
+    if (
+        not isinstance(artist, str)
+        or not 2 <= len(artist.strip()) <= 160
+        or re.search(r"[\x00-\x1f\x7f]", artist)
+        or type(limit) is not int
+        or not 1 <= limit <= MAX_TIDAL_RESULTS
+    ):
+        raise ValueError("Invalid bounded Tidal artist search")
+
+    from crate.db.queries import agent_library
+    from crate.db.queries.subsonic_artist_album_queries import (
+        get_albums_by_artist_name,
+    )
+
+    evidence = agent_library.read_artist_evidence(name=artist.strip(), limit=20)
+    artists = evidence.get("artists") or []
+    if len(artists) != 1:
+        return _envelope(
+            {
+                "resolution": "ambiguous" if artists else "not_found",
+                "local_artists": [
+                    {
+                        "artist_uid": str(row["entity_uid"]),
+                        "artist": row["name"],
+                    }
+                    for row in artists[:20]
+                ],
+                "results": [],
+                "search_started": False,
+            }
+        )
+    local_artist = dict(artists[0])
+
+    from crate import tidal
+
+    if not tidal.is_authenticated():
+        raise DiagnosticError("NOT_EXECUTABLE", "Crate Tidal authentication is missing")
+    artist_search = tidal.search(local_artist["name"], content_type="artists", limit=5)
+    if artist_search.get("error"):
+        raise DiagnosticError("PROVIDER_UNAVAILABLE", "Tidal artist search failed")
+    normalized_name = _normalized_release(local_artist["name"])
+    matches = [
+        row
+        for row in artist_search.get("artists", [])
+        if _normalized_release(row.get("name")) == normalized_name
+        and re.fullmatch(r"[0-9]{1,24}", str(row.get("id") or ""))
+    ]
+    if len(matches) != 1:
+        return _envelope(
+            {
+                "resolution": "ambiguous" if matches else "provider_artist_not_found",
+                "local_artists": [
+                    {
+                        "artist_uid": str(local_artist["entity_uid"]),
+                        "artist": local_artist["name"],
+                    }
+                ],
+                "provider_artists": [
+                    {
+                        "tidal_artist_id": str(row["id"]),
+                        "artist": row.get("name", ""),
+                    }
+                    for row in matches[:5]
+                ],
+                "results": [],
+                "search_started": False,
+            }
+        )
+    tidal_artist = matches[0]
+    albums = tidal.get_artist_albums(str(tidal_artist["id"]), limit=MAX_TIDAL_RESULTS)
+    if not albums:
+        raise DiagnosticError(
+            "PROVIDER_UNAVAILABLE", "Tidal discography is unavailable"
+        )
+
+    local_names = {
+        _normalized_release(row.get("name"))
+        for row in get_albums_by_artist_name(local_artist["name"])
+    }
+    sources = []
+    seen_ids = set()
+    for album in albums[:MAX_TIDAL_RESULTS]:
+        source = _tidal_album_source(local_artist, album, tidal_artist["id"])
+        if (
+            source is None
+            or source["tidal_album_id"] in seen_ids
+            or _normalized_release(source["title"]) in local_names
+        ):
+            continue
+        seen_ids.add(source["tidal_album_id"])
+        sources.append(source)
+    sources.sort(
+        key=lambda row: (row["release_date"], row["year"], row["title"].casefold()),
+        reverse=True,
+    )
+    receipts = store.save_receipts(principal, sources[:limit])
+    return _envelope(
+        {
+            "resolution": "resolved",
+            "artist_uid": str(local_artist["entity_uid"]),
+            "artist": local_artist["name"],
+            "provider": "tidal",
+            "results": receipts,
+            "coverage": "bounded_artist_discography_50",
+            "selection": "human_required",
+            "download_started": False,
+        }
+    )
+
+
+def _resolve_local_tidal_artist(artist_name):
+    from crate.db.queries import agent_library
+
+    evidence = agent_library.read_artist_evidence(name=artist_name, limit=20)
+    artists = evidence.get("artists") or []
+    if len(artists) != 1:
+        return None, {
+            "resolution": "ambiguous" if artists else "not_found",
+            "local_artists": [
+                {"artist_uid": str(row["entity_uid"]), "artist": row["name"]}
+                for row in artists[:20]
+            ],
+            "provider_artists": [],
+        }
+    local_artist = dict(artists[0])
+    from crate import tidal
+
+    if not tidal.is_authenticated():
+        raise DiagnosticError("NOT_EXECUTABLE", "Crate Tidal authentication is missing")
+    artist_search = tidal.search(local_artist["name"], content_type="artists", limit=5)
+    if artist_search.get("error"):
+        raise DiagnosticError("PROVIDER_UNAVAILABLE", "Tidal artist search failed")
+    normalized_name = _normalized_release(local_artist["name"])
+    matches = [
+        row
+        for row in artist_search.get("artists", [])
+        if _normalized_release(row.get("name")) == normalized_name
+        and re.fullmatch(r"[0-9]{1,24}", str(row.get("id") or ""))
+    ]
+    if len(matches) != 1:
+        return None, {
+            "resolution": "ambiguous" if matches else "provider_artist_not_found",
+            "local_artists": [
+                {
+                    "artist_uid": str(local_artist["entity_uid"]),
+                    "artist": local_artist["name"],
+                }
+            ],
+            "provider_artists": [
+                {
+                    "tidal_artist_id": str(row["id"]),
+                    "artist": row.get("name", ""),
+                }
+                for row in matches[:5]
+            ],
+        }
+    return (local_artist, matches[0]), []
+
+
+def _tidal_discography(artist_id):
+    """Read a bounded paginated catalog and report when its end was not observed."""
+    from crate import tidal
+
+    albums = []
+    for offset in range(0, MAX_TIDAL_DISCOVERY + MAX_TIDAL_RESULTS, MAX_TIDAL_RESULTS):
+        page = tidal.get_artist_albums(
+            str(artist_id),
+            limit=MAX_TIDAL_RESULTS,
+            offset=offset,
+            strict=True,
+        )
+        if page is None:
+            raise DiagnosticError(
+                "PROVIDER_UNAVAILABLE", "Tidal discography is unavailable"
+            )
+        if not page:
+            return albums, True
+        albums.extend(page)
+        if len(albums) > MAX_TIDAL_DISCOVERY:
+            return albums, False
+        if len(page) < MAX_TIDAL_RESULTS:
+            return albums, True
+    return albums, False
+
+
+def search_tidal_missing_artist(principal, *, artist, trace_id=None):
+    """Mint one exact receipt for the complete, bounded missing Tidal discography."""
+    store.authorize_search(principal)
+    if (
+        not isinstance(artist, str)
+        or not 2 <= len(artist.strip()) <= 160
+        or re.search(r"[\x00-\x1f\x7f]", artist)
+    ):
+        raise ValueError("Invalid bounded Tidal artist search")
+    resolved, ambiguous = _resolve_local_tidal_artist(artist.strip())
+    if resolved is None:
+        return _envelope(
+            {
+                **ambiguous,
+                "releases": [],
+                "search_started": False,
+                "download_started": False,
+            }
+        )
+    local_artist, tidal_artist = resolved
+    albums, complete = _tidal_discography(tidal_artist["id"])
+    if not complete:
+        return _envelope(
+            {
+                "resolution": "catalog_limit_exceeded",
+                "artist_uid": str(local_artist["entity_uid"]),
+                "artist": local_artist["name"],
+                "coverage": "incomplete_over_500_releases",
+                "catalog_entries_seen": len(albums),
+                "download_started": False,
+                "receipt_created": False,
+            }
+        )
+    from crate.db.queries.subsonic_artist_album_queries import (
+        get_albums_by_artist_name,
+    )
+
+    local_names = {
+        _normalized_release(row.get("name"))
+        for row in get_albums_by_artist_name(local_artist["name"])
+    }
+    sources = []
+    seen_ids = set()
+    omitted = 0
+    for album in albums:
+        source = _tidal_album_source(local_artist, album, tidal_artist["id"])
+        if source is None:
+            omitted += 1
+            continue
+        if source["tidal_album_id"] in seen_ids:
+            continue
+        seen_ids.add(source["tidal_album_id"])
+        if _normalized_release(source["title"]) not in local_names:
+            sources.append(source)
+    if omitted:
+        return _envelope(
+            {
+                "resolution": "catalog_contains_unimportable_releases",
+                "artist_uid": str(local_artist["entity_uid"]),
+                "artist": local_artist["name"],
+                "coverage": "incomplete_unrepresentable_entries",
+                "catalog_entries_seen": len(albums),
+                "unimportable_entries": omitted,
+                "download_started": False,
+                "receipt_created": False,
+            }
+        )
+    sources.sort(
+        key=lambda row: (row["release_date"], row["year"], row["title"].casefold()),
+        reverse=True,
+    )
+    if len(sources) > MAX_TIDAL_RESULTS:
+        return _envelope(
+            {
+                "resolution": "missing_release_limit_exceeded",
+                "artist_uid": str(local_artist["entity_uid"]),
+                "artist": local_artist["name"],
+                "coverage": "complete_catalog_more_than_50_missing",
+                "missing_count": len(sources),
+                "max_releases_per_approval": MAX_TIDAL_RESULTS,
+                "download_started": False,
+                "receipt_created": False,
+            }
+        )
+    if not sources:
+        return _envelope(
+            {
+                "resolution": "already_complete",
+                "artist_uid": str(local_artist["entity_uid"]),
+                "artist": local_artist["name"],
+                "coverage": "complete",
+                "catalog_entries_seen": len(albums),
+                "missing_count": 0,
+                "releases": [],
+                "download_started": False,
+            }
+        )
+    batch = {
+        "provider": "tidal_artist_batch",
+        "tidal_artist_id": str(tidal_artist["id"]),
+        "artist_uid": str(local_artist["entity_uid"]),
+        "artist": local_artist["name"],
+        "catalog_entries_seen": len(albums),
+        "releases": sources,
+    }
+    receipt = store.save_receipts(principal, [batch])[0]
+    return _envelope(
+        {
+            "resolution": "resolved",
+            "artist_uid": str(local_artist["entity_uid"]),
+            "artist": local_artist["name"],
+            "coverage": "complete",
+            "catalog_entries_seen": len(albums),
+            "missing_count": len(sources),
+            "receipt_id": receipt["receipt_id"],
+            "releases": [
+                {
+                    "tidal_album_id": row["tidal_album_id"],
+                    "title": row["title"],
+                    "year": row["year"],
+                    "release_date": row["release_date"],
+                    "release_type": row["release_type"],
+                    "tracks": row["tracks"],
+                }
+                for row in sources
+            ],
+            "selection": "human_required",
+            "download_started": False,
+        }
+    )
+
+
+def preview_tidal_acquisition(
+    principal, *, receipt_id, quality="max", idempotency_key, trace_id=None
+):
+    return prepare_operation(
+        principal,
+        "tidal_acquisition",
+        {"receipt_id": receipt_id, "quality": quality},
+        idempotency_key,
+        trace_id=trace_id,
+    )
+
+
+def apply_tidal_acquisition(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal,
+        "tidal_acquisition",
+        plan_id,
+        plan_version,
+        idempotency_key,
+        trace_id=trace_id,
+    )
+
+
+def preview_tidal_artist_acquisition(
+    principal, *, receipt_id, quality="max", idempotency_key, trace_id=None
+):
+    return prepare_operation(
+        principal,
+        "tidal_artist_acquisition",
+        {"receipt_id": receipt_id, "quality": quality},
+        idempotency_key,
+        trace_id=trace_id,
+    )
+
+
+def apply_tidal_artist_acquisition(
+    principal, *, plan_id, plan_version, idempotency_key, trace_id=None
+):
+    return _apply(
+        principal,
+        "tidal_artist_acquisition",
+        plan_id,
+        plan_version,
+        idempotency_key,
+        trace_id=trace_id,
+    )
+
+
+def _validate_tidal_source(source):
+    from crate import tidal
+
+    if not tidal.is_authenticated():
+        raise DiagnosticError("NOT_EXECUTABLE", "Crate Tidal authentication is missing")
+    artist_search = tidal.search(source["artist"], content_type="artists", limit=5)
+    if artist_search.get("error"):
+        raise DiagnosticError("PROVIDER_UNAVAILABLE", "Tidal artist validation failed")
+    matches = [
+        row
+        for row in artist_search.get("artists", [])
+        if str(row.get("id") or "") == source["tidal_artist_id"]
+        and _normalized_release(row.get("name"))
+        == _normalized_release(source["artist"])
+    ]
+    if len(matches) != 1:
+        raise DiagnosticError("EVIDENCE_STALE", "Exact Tidal artist identity changed")
+    offset = (
+        int(source.get("catalog_offset") or 0) // MAX_TIDAL_RESULTS
+    ) * MAX_TIDAL_RESULTS
+    albums = tidal.get_artist_albums(
+        source["tidal_artist_id"], limit=MAX_TIDAL_RESULTS, offset=offset
+    )
+    current = [
+        _tidal_album_source(
+            {"entity_uid": source["artist_uid"], "name": source["artist"]},
+            album,
+            source["tidal_artist_id"],
+        )
+        for album in (albums or [])
+        if str(album.get("id") or "") == source["tidal_album_id"]
+    ]
+    if len(current) != 1 or current[0] != source:
+        raise DiagnosticError("EVIDENCE_STALE", "Exact Tidal album evidence changed")
+
+
+def _validate_tidal_artist_batch(source):
+    if (
+        not isinstance(source, dict)
+        or source.get("provider") != "tidal_artist_batch"
+        or not 1 <= len(source.get("releases", [])) <= MAX_TIDAL_RESULTS
+    ):
+        raise DiagnosticError(
+            "SOURCE_CONFLICT", "Receipt is not a bounded Tidal artist batch"
+        )
+    from crate import tidal
+
+    if not tidal.is_authenticated():
+        raise DiagnosticError("NOT_EXECUTABLE", "Crate Tidal authentication is missing")
+    artist_search = tidal.search(source["artist"], content_type="artists", limit=5)
+    if artist_search.get("error"):
+        raise DiagnosticError("PROVIDER_UNAVAILABLE", "Tidal artist validation failed")
+    exact_artists = [
+        row
+        for row in artist_search.get("artists", [])
+        if str(row.get("id") or "") == source["tidal_artist_id"]
+        and _normalized_release(row.get("name"))
+        == _normalized_release(source["artist"])
+    ]
+    if len(exact_artists) != 1:
+        raise DiagnosticError("EVIDENCE_STALE", "Exact Tidal artist identity changed")
+    albums, complete = _tidal_discography(source["tidal_artist_id"])
+    if not complete:
+        raise DiagnosticError(
+            "EVIDENCE_STALE", "Tidal discography is no longer fully observable"
+        )
+    current = []
+    ineligible_entries = 0
+    for album in albums:
+        item = _tidal_album_source(
+            {"entity_uid": source["artist_uid"], "name": source["artist"]},
+            album,
+            source["tidal_artist_id"],
+        )
+        if item is not None:
+            current.append(item)
+        else:
+            ineligible_entries += 1
+    if ineligible_entries or len(albums) != source.get("catalog_entries_seen"):
+        raise DiagnosticError("EVIDENCE_STALE", "Tidal catalog coverage changed")
+    if len({item["tidal_album_id"] for item in current}) != len(current):
+        current = list({item["tidal_album_id"]: item for item in current}.values())
+    from crate.db.queries.subsonic_artist_album_queries import (
+        get_albums_by_artist_name,
+    )
+
+    local_names = {
+        _normalized_release(row.get("name"))
+        for row in get_albums_by_artist_name(source["artist"])
+    }
+    missing = [
+        item
+        for item in current
+        if _normalized_release(item["title"]) not in local_names
+    ]
+    missing.sort(
+        key=lambda row: (row["release_date"], row["year"], row["title"].casefold()),
+        reverse=True,
+    )
+    if missing != source["releases"]:
+        raise DiagnosticError("EVIDENCE_STALE", "Tidal missing-release set changed")
+
+
+def _local_album_present(artist_name, title):
+    from crate.db.queries.subsonic_artist_album_queries import (
+        get_albums_by_artist_name,
+    )
+
+    wanted = _normalized_release(title)
+    return any(
+        _normalized_release(row.get("name")) == wanted
+        for row in get_albums_by_artist_name(artist_name)
+    )
+
+
 def preview_acquisition(principal, *, idempotency_key, trace_id=None, **parameters):
     return prepare_operation(
         principal, "acquisition", parameters, idempotency_key, trace_id=trace_id
@@ -288,6 +837,140 @@ def compile_operation(operation, parameters, config, *, principal, task_id=None)
         return compile_publication(
             parameters, config, principal=principal, task_id=task_id
         )
+    if operation == "tidal_acquisition":
+        if set(parameters) != {"receipt_id", "quality"} or parameters[
+            "quality"
+        ] not in {
+            "max",
+            "high",
+            "normal",
+        }:
+            raise ValueError("Invalid Tidal acquisition parameters")
+        receipt = store.read_receipt(principal, parameters["receipt_id"])
+        source = receipt["source"]
+        if source.get("provider") != "tidal":
+            raise DiagnosticError("SOURCE_CONFLICT", "Receipt is not a Tidal release")
+        _validate_tidal_source(source)
+        target = store.target_state(source["artist_uid"], source["title"])
+        if target["name"] != source["artist"] or _local_album_present(
+            source["artist"], source["title"]
+        ):
+            raise DiagnosticError("ALREADY_EXISTS", "Release is already in Crate")
+        return {
+            "document": {
+                "operation": operation,
+                "risk": "high",
+                "targets": [
+                    {"entity_type": "artist", "entity_uid": source["artist_uid"]}
+                ],
+                "changes": [
+                    {
+                        "provider": "tidal",
+                        "tidal_album_id": source["tidal_album_id"],
+                        "artist": source["artist"],
+                        "album": source["title"],
+                        "year": source["year"],
+                        "release_date": source["release_date"],
+                        "tracks": source["tracks"],
+                        "quality": parameters["quality"],
+                        "quality_fallback": "normal only if Crate detects incomplete or unrecoverable lossless output",
+                        "destination": "new album only; no overwrite or upgrade",
+                    }
+                ],
+                "impact": {
+                    "scope": "one_exact_album",
+                    "download_and_library_import": "single_approved_operation",
+                },
+                "preconditions": {
+                    "source_hash": _digest(source),
+                    "source_valid_until": receipt["expires_at"].isoformat(),
+                    "target": target,
+                },
+                "verification": {
+                    "status": "exact_release_downloaded_imported_and_indexed"
+                },
+            },
+            "execution": {
+                "receipt_id": parameters["receipt_id"],
+                "source": source,
+                "target": target,
+                "quality": parameters["quality"],
+            },
+        }
+    if operation == "tidal_artist_acquisition":
+        if set(parameters) != {"receipt_id", "quality"} or parameters[
+            "quality"
+        ] not in {
+            "max",
+            "high",
+            "normal",
+        }:
+            raise ValueError("Invalid Tidal artist acquisition parameters")
+        receipt = store.read_receipt(principal, parameters["receipt_id"])
+        source = receipt["source"]
+        _validate_tidal_artist_batch(source)
+        target = store.target_state(
+            source["artist_uid"], source["releases"][0]["title"]
+        )
+        if target["name"] != source["artist"]:
+            raise DiagnosticError("SOURCE_CONFLICT", "Local artist identity changed")
+        for release in source["releases"]:
+            store.target_state(source["artist_uid"], release["title"])
+            if _local_album_present(source["artist"], release["title"]):
+                raise DiagnosticError(
+                    "ALREADY_EXISTS", "A Tidal release is already present in Crate"
+                )
+        return {
+            "document": {
+                "operation": operation,
+                "risk": "high",
+                "targets": [
+                    {"entity_type": "artist", "entity_uid": source["artist_uid"]}
+                ],
+                "changes": [
+                    {
+                        "provider": "tidal",
+                        "tidal_artist_id": source["tidal_artist_id"],
+                        "artist": source["artist"],
+                        "release_count": len(source["releases"]),
+                        "releases": [
+                            {
+                                "tidal_album_id": item["tidal_album_id"],
+                                "album": item["title"],
+                                "year": item["year"],
+                                "release_date": item["release_date"],
+                                "release_type": item["release_type"],
+                                "tracks": item["tracks"],
+                                "quality": parameters["quality"],
+                            }
+                            for item in source["releases"]
+                        ],
+                        "quality_fallback": "normal only if Crate detects incomplete or unrecoverable lossless output",
+                        "destination": "new albums only; no overwrite or upgrade",
+                    }
+                ],
+                "impact": {
+                    "scope": "complete_missing_tidal_discography",
+                    "catalog_entries_seen": source["catalog_entries_seen"],
+                    "download_and_library_import": "single_approved_operation",
+                },
+                "preconditions": {
+                    "source_hash": _digest(source),
+                    "source_valid_until": receipt["expires_at"].isoformat(),
+                    "target": target,
+                    "all_releases_absent": True,
+                },
+                "verification": {
+                    "status": "all_approved_releases_downloaded_imported_and_indexed"
+                },
+            },
+            "execution": {
+                "receipt_id": parameters["receipt_id"],
+                "source": source,
+                "target": target,
+                "quality": parameters["quality"],
+            },
+        }
     if operation != "acquisition" or set(parameters) != {
         "receipt_id",
         "artist_uid",
@@ -387,6 +1070,167 @@ def apply_operation(operation, execution, config, *, task_id, authorize):
         return apply_publication(
             execution, config, task_id=task_id, authorize=authorize
         )
+    if operation == "tidal_acquisition":
+        source = execution["source"]
+        authorize()
+        receipt = store.execution_receipt(task_id, execution["receipt_id"])
+        if receipt["source"] != source:
+            raise DiagnosticError("EVIDENCE_STALE", "Persisted Tidal receipt changed")
+        _validate_tidal_source(source)
+        current_target = store.target_state(source["artist_uid"], source["title"])
+        if current_target != execution["target"] or _local_album_present(
+            source["artist"], source["title"]
+        ):
+            raise DiagnosticError("EVIDENCE_STALE", "Release is no longer absent")
+        # Persist the fact that this exact approval crossed its effect boundary. The
+        # download itself is long-running, so authority is rechecked at checkpoints.
+        authorize(lambda: None)
+        from crate.worker_handlers.acquisition import _handle_tidal_download
+
+        result = _handle_tidal_download(
+            task_id,
+            {
+                "url": source["url"],
+                "quality": execution["quality"],
+                "artist": source["artist"],
+                "album": source["title"],
+                "entity_type": "album",
+                "agent_tidal_selection": source,
+            },
+            config,
+            authorize=authorize,
+        )
+        if not result.get("success"):
+            raise DiagnosticError(
+                "RECONCILIATION_REQUIRED",
+                "Tidal import did not complete; inspect the operation result before retrying",
+            )
+        if not _local_album_present(source["artist"], source["title"]):
+            raise DiagnosticError(
+                "RECONCILIATION_REQUIRED",
+                "Files may have moved but the exact album is not indexed yet",
+            )
+        return {
+            "execution": {
+                "status": "completed",
+                "items": [
+                    {
+                        "provider": "tidal",
+                        "artist_uid": source["artist_uid"],
+                        "status": "imported",
+                        "tracks": source["tracks"],
+                    }
+                ],
+                "quality": result.get("quality", execution["quality"]),
+            },
+            "verification": {"status": "passed"},
+            "projection": {"status": "library_sync_completed"},
+        }
+    if operation == "tidal_artist_acquisition":
+        source = execution["source"]
+        receipt = store.execution_receipt(task_id, execution["receipt_id"])
+        if receipt["source"] != source:
+            raise DiagnosticError("EVIDENCE_STALE", "Persisted Tidal receipt changed")
+        _validate_tidal_artist_batch(source)
+        current_target = store.target_state(
+            source["artist_uid"], source["releases"][0]["title"]
+        )
+        if current_target != execution["target"]:
+            raise DiagnosticError("EVIDENCE_STALE", "Local artist target changed")
+        for release in source["releases"]:
+            store.target_state(source["artist_uid"], release["title"])
+            if _local_album_present(source["artist"], release["title"]):
+                raise DiagnosticError(
+                    "EVIDENCE_STALE", "An approved release is no longer absent"
+                )
+        # One durable effect boundary covers this exact release list and cannot replay.
+        authorize(lambda: None)
+        from crate.worker_handlers.acquisition import _handle_tidal_download
+
+        completed = []
+        failed = None
+        for index, release in enumerate(source["releases"], start=1):
+            try:
+                authorize()
+                _validate_tidal_source(release)
+                if _local_album_present(source["artist"], release["title"]):
+                    raise DiagnosticError(
+                        "ALREADY_EXISTS", "An approved release is already present"
+                    )
+                result = _handle_tidal_download(
+                    task_id,
+                    {
+                        "url": release["url"],
+                        "quality": execution["quality"],
+                        "artist": release["artist"],
+                        "album": release["title"],
+                        "entity_type": "album",
+                        "agent_tidal_selection": release,
+                        "agent_tidal_defer_scan": True,
+                        "agent_tidal_processing_id": f"{task_id}_release_{index:02d}",
+                    },
+                    config,
+                    authorize=authorize,
+                )
+                if not result.get("success") or not _local_album_present(
+                    source["artist"], release["title"]
+                ):
+                    raise DiagnosticError(
+                        "RECONCILIATION_REQUIRED",
+                        "A Tidal release did not verify after import",
+                    )
+                completed.append(
+                    {
+                        "tidal_album_id": release["tidal_album_id"],
+                        "album": release["title"],
+                        "status": "verified",
+                    }
+                )
+            except Exception as error:
+                if not completed:
+                    if isinstance(error, DiagnosticError):
+                        raise
+                    raise DiagnosticError(
+                        "RECONCILIATION_REQUIRED",
+                        "The first Tidal release could not be verified; inspect the job before retrying",
+                    ) from error
+                failed = {
+                    "tidal_album_id": release["tidal_album_id"],
+                    "album": release["title"],
+                    "error_code": error.code
+                    if isinstance(error, DiagnosticError)
+                    else "RECONCILIATION_REQUIRED",
+                }
+                break
+        if completed:
+            from crate.worker_handlers import start_scan
+
+            try:
+                authorize(start_scan)
+            except DiagnosticError:
+                failed = failed or {
+                    "album": "library_scan",
+                    "error_code": "RECONCILIATION_REQUIRED",
+                    "status": "failed",
+                }
+        success = len(completed) == len(source["releases"]) and failed is None
+        items = list(completed)
+        if failed:
+            items.append({**failed, "status": "failed"})
+        return {
+            "execution": {
+                "status": "verified" if success else "partial",
+                "items": items,
+                "completed_count": len(completed),
+                "requested_count": len(source["releases"]),
+            },
+            "verification": {
+                "status": "all_releases_indexed"
+                if success
+                else "partial_artist_discography_requires_reconciliation"
+            },
+            "projection": {"status": "library_pending"},
+        }
     from crate.agent_acquisition_publish import (
         _safe_path,
         staged_manifest,
@@ -594,8 +1438,14 @@ __all__ = [
     "apply_operation",
     "compile_operation",
     "get_acquisition_readiness",
+    "apply_tidal_acquisition",
+    "apply_tidal_artist_acquisition",
     "preview_acquisition",
     "preview_acquisition_publication",
+    "preview_tidal_acquisition",
+    "preview_tidal_artist_acquisition",
     "reconcile_transfer",
     "search_acquisition",
+    "search_tidal_missing_albums",
+    "search_tidal_missing_artist",
 ]
