@@ -20,7 +20,7 @@ describe("fixed Crate v3 token contract", () => {
       "--color-input": "#111218",
       "--text-subtle": "#7e8084",
       "--text-muted": "#999ca0",
-      "--font-brand": '"IBM Plex Sans"',
+      "--font-brand": '"Roboto"',
       "--radius-md": "0.25rem",
       "--state-danger-foreground": "#0a0a0f",
     });

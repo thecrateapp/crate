@@ -1,9 +1,10 @@
 # Listen V3 — estado previo al despliegue
 
-Fecha: 21 de octubre de 2026. Rama: `feat/crate_v3`, base del lote `85a05ac8`.
-Diego aprueba Bricolage Grotesque para títulos, IBM Plex Sans para cuerpo y JetBrains Mono
+Fecha: 21 de octubre de 2026. Rama: `feat/crate_v3`, integración previa `390ab456`.
+Diego aprueba Bricolage Grotesque para títulos, Roboto para cuerpo y JetBrains Mono
 para labels y datos técnicos, y autoriza commit/push de todos los cambios pendientes.
-Este documento no acredita merge, CI remoto ni despliegue.
+Roboto sustituye la elección anterior de IBM Plex Sans. El despliegue está expresamente pendiente
+de autorización; la validación del cierre se registra a continuación.
 
 ## Lote aprobado
 

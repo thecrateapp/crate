@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const expected = [
+  ["bricolage-roboto", "Bricolage Grotesque", "Roboto"],
   ["bricolage-plex", "Bricolage Grotesque", "Review IBM Plex Sans"],
   ["tektur-golos", "Review Tektur", "Review Golos Text"],
   ["chakra-plex", "Review Chakra Petch", "Review IBM Plex Sans"],
@@ -121,6 +122,7 @@ for (const [host, url] of [
       monoMetrics.forEach((metric) => expect(metric).toEqual(monoMetrics[0]));
       const loaded = await page.evaluate(() =>
         [
+          "Roboto",
           "Review Hubot Sans",
           "Review Mona Sans",
           "Review Saira",
@@ -142,13 +144,12 @@ for (const [host, url] of [
       await page.evaluate(() => document.fonts.ready);
       expect(
         await page.evaluate(() =>
-          ["Bricolage Grotesque", "IBM Plex Sans", "JetBrains Mono"].every(
-            (family) =>
-              [...document.fonts].some(
-                (face) =>
-                  face.family.replaceAll('"', "") === family &&
-                  face.status === "loaded",
-              ),
+          ["Bricolage Grotesque", "Roboto", "JetBrains Mono"].every((family) =>
+            [...document.fonts].some(
+              (face) =>
+                face.family.replaceAll('"', "") === family &&
+                face.status === "loaded",
+            ),
           ),
         ),
       ).toBe(true);
@@ -159,7 +160,7 @@ for (const [host, url] of [
             .trim()
             .replaceAll('"', ""),
         ),
-      ).toBe("IBM Plex Sans");
+      ).toBe("Roboto");
       expect(
         await page
           .getByRole("heading", {
@@ -240,5 +241,5 @@ test("shows a clear load failure instead of presenting a fallback as a candidate
         .trim()
         .replaceAll('"', ""),
     ),
-  ).toBe("IBM Plex Sans");
+  ).toBe("Roboto");
 });

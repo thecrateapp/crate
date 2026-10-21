@@ -36,7 +36,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("button", { name: "Refresh", exact: true })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("IBM Plex Sans");
+    ).toContain("Roboto");
     expect(
       await root
         .getByText("sample-run-20261018", { exact: true })

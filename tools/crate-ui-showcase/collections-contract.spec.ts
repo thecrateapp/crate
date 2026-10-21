@@ -135,7 +135,7 @@ for (const host of ["preview", "storybook"]) {
         );
         await expect(active.locator(".crate-entity-title")).toHaveCSS(
           "font-family",
-          /IBM Plex Sans/,
+          /Roboto/,
         );
         await expect(
           page.getByRole("link", { name: /Selected album/ }),

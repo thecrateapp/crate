@@ -252,7 +252,7 @@ async function loadInstagramStoryFonts(): Promise<void> {
   storyFontsPromise ??= Promise.all(
     [600, 700, 800].map((weight) =>
       document.fonts.load(
-        `${weight} 16px "IBM Plex Sans"`,
+        `${weight} 16px "Roboto"`,
         "Crate · Música Björk L’été œ ẞ",
       ),
     ),

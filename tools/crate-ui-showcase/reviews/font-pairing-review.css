@@ -1,4 +1,5 @@
 @import "../../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../../app/shared/fonts/roboto.css";
 @import "../../../app/shared/fonts/poppins.css";
 @import "../assets/font-pairing/fonts.css";
 
@@ -45,4 +46,9 @@
   --font-brand: "Review IBM Plex Sans";
   --font-display-stack: "Bricolage Grotesque", "Review IBM Plex Sans", system-ui,
     sans-serif;
+}
+
+.font-pairing-sample[data-font-pairing="bricolage-roboto"] {
+  --font-brand: "Roboto";
+  --font-display-stack: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
 }

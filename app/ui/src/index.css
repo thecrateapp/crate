@@ -1,5 +1,5 @@
 @import "../../shared/fonts/bricolage-grotesque.css";
-@import "../../shared/fonts/ibm-plex-sans.css";
+@import "../../shared/fonts/roboto.css";
 @import "../../shared/fonts/jetbrains-mono.css";
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";

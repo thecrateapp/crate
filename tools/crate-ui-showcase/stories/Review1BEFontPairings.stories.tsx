@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Review-only font comparison using actual PageHeader, SectionHeader, EntityCard, EntityRow, TrackRow views, StatNumber and form/action primitives. Two rounds: Tektur/Golos, Chakra/Plex, Oxanium/Hanken and Unbounded/Onest, alongside previous Bricolage/Poppins, Hubot/Mona, Saira and Anybody/Spline. New alternatives are review-only; the app uses the approved Bricolage/IBM Plex pairing. JetBrains Mono, component geometry, weights and tracking stay unchanged. Candidate WOFF2 latin/latin-ext files are self-hosted alongside their OFL notices and provenance; CSS aliases and variables are limited to the sample container. Bricolage Grotesque (display) and IBM Plex Sans (body) are the approved shared production faces; the previous pairing and other candidates stay scoped to this comparison. Local fixture actions and shared editable text keep comparisons consistent.",
+          "Review-only font comparison using actual PageHeader, SectionHeader, EntityCard, EntityRow, TrackRow views, StatNumber and form/action primitives. Two rounds: Tektur/Golos, Chakra/Plex, Oxanium/Hanken and Unbounded/Onest, alongside previous Bricolage/Poppins, Hubot/Mona, Saira and Anybody/Spline. New alternatives are review-only; the app uses approved Bricolage Grotesque/Roboto with JetBrains Mono; the previous IBM Plex pairing retains its sample. JetBrains Mono, component geometry, weights and tracking stay unchanged. Candidate WOFF2 latin/latin-ext files are self-hosted alongside their OFL notices and provenance; CSS aliases and variables are limited to the sample container. Bricolage Grotesque (display) and Roboto (body) are the approved shared production faces; the previous pairing and other candidates stay scoped to this comparison. Local fixture actions and shared editable text keep comparisons consistent.",
       },
     },
   },
@@ -35,4 +35,8 @@ export const HubotMona: Story = { args: { initialPairing: "hubot-mona" } };
 export const Saira: Story = { args: { initialPairing: "saira" } };
 export const AnybodySpline: Story = {
   args: { initialPairing: "anybody-spline" },
+};
+
+export const BricolageRoboto: Story = {
+  args: { initialPairing: "bricolage-roboto" },
 };

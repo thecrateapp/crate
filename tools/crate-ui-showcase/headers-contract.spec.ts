@@ -40,7 +40,7 @@ for (const host of ["preview", "storybook"]) {
             pageGroup.getByText(
               "A playlist keeps its identity alongside compact actions.",
             ),
-          ).toHaveCSS("font-family", /IBM Plex Sans/);
+          ).toHaveCSS("font-family", /Roboto/);
           await expect(pageGroup.getByText("smart", { exact: true })).toHaveCSS(
             "text-transform",
             "none",

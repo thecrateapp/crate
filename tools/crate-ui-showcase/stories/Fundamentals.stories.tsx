@@ -86,7 +86,7 @@ export const Typography: Story = {
       <p className="font-display text-4xl">
         Bricolage Grotesque · headings and numerals
       </p>
-      <p className="text-base">IBM Plex Sans · body and controls</p>
+      <p className="text-base">Roboto · body and controls</p>
       <MonoLabel>JetBrains Mono · labels and metadata</MonoLabel>
       <p>
         The same packaged faces serve web and native. Each component contract

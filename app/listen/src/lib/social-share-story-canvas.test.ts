@@ -97,7 +97,7 @@ describe("crate story styles", () => {
       );
       expect(texts).toContain("Best of 2026");
       expect(
-        recorded.texts.every(({ font }) => font.includes('"IBM Plex Sans"')),
+        recorded.texts.every(({ font }) => font.includes('"Roboto"')),
       ).toBe(true);
       expect(
         recorded.texts

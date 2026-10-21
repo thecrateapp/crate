@@ -410,7 +410,7 @@ test("1AP uses display face only at the specified title size", async ({
     }));
     if (style.size < 20)
       expect(style.family.split(",")[0]!.replace(/"/g, "").trim()).toBe(
-        "IBM Plex Sans",
+        "Roboto",
       );
     else expect(style.family).toContain("Bricolage Grotesque");
   }

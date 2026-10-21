@@ -62,7 +62,7 @@ importa la misma vista y refleja el cambio automáticamente.
 
 ## Antes de desplegar
 
-**Web:** la combinación Bricolage Grotesque + IBM Plex Sans + JetBrains Mono está
+**Web:** la combinación Bricolage Grotesque + Roboto + JetBrains Mono está
 aprobada. Se integra `origin/main` (`d3e6ef6b`); la migración de Stats pasa a `132`,
 con padre `131`, conservando intacta la cadena publicada de main. Quedan CI/cierre de fase,
 merge revisado a main y preflight. La rama no se despliega directamente como main.

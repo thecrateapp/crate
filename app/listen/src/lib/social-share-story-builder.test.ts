@@ -190,9 +190,9 @@ describe("share card typography", () => {
         buildSquarePostCard({ kind: "album", title: "Björk", url: "/album/1" }),
       ).rejects.toThrow("Canvas is not available");
       expect(load.mock.calls.map(([font]) => font)).toEqual([
-        '600 16px "IBM Plex Sans"',
-        '700 16px "IBM Plex Sans"',
-        '800 16px "IBM Plex Sans"',
+        '600 16px "Roboto"',
+        '700 16px "Roboto"',
+        '800 16px "Roboto"',
       ]);
       expect(
         load.mock.calls.every(

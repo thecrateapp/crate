@@ -64,7 +64,7 @@ test("the catalogue is English and its chrome uses the Crate identity", async ({
   ).toBeVisible();
   await expect(page.locator("#storybook-sidebar-region")).toHaveCSS(
     "font-family",
-    /IBM Plex Sans/,
+    /Roboto/,
   );
   await expect(
     content.getByRole("heading", {
@@ -116,8 +116,8 @@ test("foundation typography samples load the declared Crate font faces", async (
     "/iframe.html?id=system-foundations--typography&viewMode=story",
   );
   await expect(
-    page.getByText("IBM Plex Sans · body and controls", { exact: true }),
-  ).toHaveCSS("font-family", /IBM Plex Sans/);
+    page.getByText("Roboto · body and controls", { exact: true }),
+  ).toHaveCSS("font-family", /Roboto/);
   await expect(
     page.getByText("Bricolage Grotesque · headings and numerals", {
       exact: true,

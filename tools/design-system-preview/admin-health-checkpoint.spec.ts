@@ -149,7 +149,7 @@ for (const width of [1440, 768, 390])
       ).toHaveCSS("font-family", /Bricolage Grotesque/);
       await expect(
         real.getByRole("button", { name: "Run scan", exact: true }),
-      ).toHaveCSS("font-family", /^"IBM Plex Sans"/);
+      ).toHaveCSS("font-family", /^"?Roboto"?/);
       await real.getByRole("button", { name: "Run scan", exact: true }).click();
       await page
         .getByRole("button", {

@@ -3310,7 +3310,7 @@ button.genre-pill:hover,
   border-radius: var(--radius-panel);
   background: var(--surface-object);
   color: var(--text-primary);
-  font-family: var(--font-brand, "IBM Plex Sans"), system-ui, sans-serif;
+  font-family: var(--font-brand, "Roboto"), system-ui, sans-serif;
   box-shadow: none;
 }
 

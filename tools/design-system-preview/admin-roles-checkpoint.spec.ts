@@ -41,7 +41,7 @@ for (const width of [1440, 768, 390])
           { exact: true },
         )
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("IBM Plex Sans");
+    ).toContain("Roboto");
     await expect(
       root.getByText("3 capabilities", { exact: true }),
     ).toBeVisible();

@@ -10,7 +10,7 @@ const config: StorybookConfig = {
   staticDirs: [{ from: "../../../app/shared/fonts", to: "/crate-fonts" }],
   managerHead: (head) => `${head}
     <link rel="stylesheet" href="./crate-fonts/bricolage-grotesque.css">
-    <link rel="stylesheet" href="./crate-fonts/ibm-plex-sans.css">
+    <link rel="stylesheet" href="./crate-fonts/roboto.css">
     <link rel="stylesheet" href="./crate-fonts/jetbrains-mono.css">`,
   async viteFinal(config) {
     config.plugins = [...(config.plugins ?? []), tailwindcss()];

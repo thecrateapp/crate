@@ -85,7 +85,7 @@ for (const host of ["preview", "storybook"]) {
         }
         await expect(
           page.getByRole("button", { name: "Submit form" }),
-        ).toHaveCSS("font-family", /IBM Plex Sans/);
+        ).toHaveCSS("font-family", /Roboto/);
         await expect(
           page.getByRole("button", { name: "Submit form" }),
         ).toHaveCSS("font-size", "14px");

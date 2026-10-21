@@ -1,6 +1,6 @@
-/* Bricolage Grotesque and IBM Plex Sans carry display and body roles on web, Tauri and Capacitor. */
+/* Bricolage Grotesque and Roboto carry display and body roles on web, Tauri and Capacitor. */
 @import "../../shared/fonts/bricolage-grotesque.css";
-@import "../../shared/fonts/ibm-plex-sans.css";
+@import "../../shared/fonts/roboto.css";
 @import "../../shared/fonts/jetbrains-mono.css";
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";

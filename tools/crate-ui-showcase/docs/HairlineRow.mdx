@@ -16,7 +16,7 @@ import { DocHeading } from "../components/DocHeading";
 - The component owns 12 px horizontal padding and left text alignment for plain rows and native link/button children. Vertical padding stays 10 px, the gap stays 14 px, and minimum height stays 32 px / 44 px on coarse pointers.
 - The active bar stays at the outer left edge. Content begins after the inset, with an optional index column; no hover background illumination.
 - The8%-accent-to-transparent surface is owned by the shared crate-row-highlight recipe. Listen track rows use this same selection surface and2px marker while keeping their media-row geometry. Track rows alone regain fine-pointer hover illumination in1BA; text-only HairlineRow stays unchanged on hover.
-- Titles truncate by default. With `truncate={false}`, text wraps, including long unbroken titles. Row text owns IBM Plex Sans 400 at 12/18 px on desktop and mobile. Diego confirmed keeping 12/18 on mobile instead of the historical mockup's 11 px reduction. Indices retain their Mono label role; surrounding font, weight or size must not alter row defaults.
+- Titles truncate by default. With `truncate={false}`, text wraps, including long unbroken titles. Row text owns Roboto 400 at 12/18 px on desktop and mobile. Diego confirmed keeping 12/18 on mobile instead of the historical mockup's 11 px reduction. Indices retain their Mono label role; surrounding font, weight or size must not alter row defaults.
 - `asChild` preserves the native element, its ref, destination, handlers and accessible state. Callers supply the correct semantics and context; they do not repair row padding or text alignment.
 
 <DocHeading as="h2">Real component</DocHeading>

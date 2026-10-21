@@ -1,3 +1,6 @@
+> Aprobado por Diego el 21 de octubre de 2026: Bricolage Grotesque para títulos, Roboto
+> para cuerpo y JetBrains Mono para labels y datos. Sustituye la elección previa de IBM Plex Sans.
+
 > **Combinación aprobada por Diego, 21 de octubre de 2026:** Bricolage Grotesque
 > para títulos e IBM Plex Sans para cuerpo, conservando JetBrains Mono.
 > Aplicada a la identidad compartida de Listen y Admin y autorizada para commit/push.

@@ -7,11 +7,11 @@ const fonts = resolve(process.cwd(), "../fonts");
 const read = (path: string) => readFileSync(resolve(fonts, path), "utf8");
 
 describe("shared brand font packaging", () => {
-  it.each(["ibm-plex-sans"])(
+  it.each(["ibm-plex-sans", "roboto"])(
     "%s ships verified Latin and extended Latin with its license",
     (family) => {
       const source = JSON.parse(read(`${family}/sources.json`));
-      const css = read("ibm-plex-sans.css");
+      const css = read(`${family}.css`);
       expect(read(`${family}/OFL.txt`)).toContain("SIL OPEN FONT LICENSE");
       expect(source.files).toHaveLength(2);
       for (const file of source.files) {
@@ -23,7 +23,7 @@ describe("shared brand font packaging", () => {
         );
         expect(css).toContain(`url(${family}/${file.file})`);
       }
-      expect(css).toContain("font-weight: 100 700");
+      expect(css).toContain(`font-weight: ${source.files[0].weight}`);
       expect(css).not.toMatch(/url\(https?:/);
     },
   );
@@ -34,7 +34,7 @@ describe("shared brand font packaging", () => {
         resolve(fonts, `../../${app}/src/index.css`),
         "utf8",
       );
-      expect(css).toContain('fonts/ibm-plex-sans.css"');
+      expect(css).toContain('fonts/roboto.css"');
       expect(css).toContain('fonts/bricolage-grotesque.css"');
       expect(css).toContain('fonts/jetbrains-mono.css"');
       expect(css).not.toMatch(/fonts\/(?:poppins|hubot-mona|saira)\.css/);

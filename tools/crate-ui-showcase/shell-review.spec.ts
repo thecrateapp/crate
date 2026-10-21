@@ -52,7 +52,7 @@ for (const host of hosts) {
     ).toBe(before);
     expect(
       await music.evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("IBM Plex Sans");
+    ).toContain("Roboto");
     const gaps = await page
       .locator('[data-slot="form-field"][data-layout="stacked"]')
       .evaluateAll((fields) =>

@@ -27,7 +27,7 @@ for (const width of [1440, 768, 390]) {
       ).toHaveCSS("font-family", /Bricolage Grotesque/);
       await expect(
         real.getByRole("button", { name: "Refresh", exact: true }),
-      ).toHaveCSS("font-family", /^"IBM Plex Sans"/);
+      ).toHaveCSS("font-family", /^"?Roboto"?/);
       await expect(
         real.locator(
           "svg:not(.lucide-loader-circle):not([data-admin-ux=header-refresh]):not([data-admin-ux=header-empty-trash])",

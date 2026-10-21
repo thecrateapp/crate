@@ -53,7 +53,7 @@ for (const width of [1440, 768, 390]) {
         await page
           .locator("body")
           .evaluate((element) => getComputedStyle(element).fontFamily),
-      ).toContain("IBM Plex Sans");
+      ).toContain("Roboto");
       await expect(real.locator("svg:not([data-admin-ux])")).toHaveCount(0);
       for (const button of await real.getByRole("button").all())
         expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);

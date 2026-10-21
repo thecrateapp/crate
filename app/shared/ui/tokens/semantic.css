@@ -152,9 +152,8 @@
   --brand-bandcamp-foreground: #7ee7ff;
   --motion-duration-fast: 150ms;
   --motion-duration-normal: 250ms;
-  --font-brand: "IBM Plex Sans";
-  --font-display-stack: "Bricolage Grotesque", "IBM Plex Sans", system-ui,
-    sans-serif;
+  --font-brand: "Roboto";
+  --font-display-stack: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
   --font-mono-stack: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);

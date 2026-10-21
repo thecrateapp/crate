@@ -15,7 +15,7 @@ for (const width of [390, 1440]) {
     ).toHaveCSS("font-family", /Bricolage Grotesque/);
     await expect(
       admin.getByRole("button", { name: "Refresh", exact: true }),
-    ).toHaveCSS("font-family", /IBM Plex Sans/);
+    ).toHaveCSS("font-family", /Roboto/);
     await expect(admin.getByText("Current report", { exact: true })).toHaveCSS(
       "font-family",
       /JetBrains Mono/,
@@ -23,13 +23,12 @@ for (const width of [390, 1440]) {
     await page.evaluate(() => document.fonts.ready);
     expect(
       await page.evaluate(() =>
-        ["Bricolage Grotesque", "IBM Plex Sans", "JetBrains Mono"].every(
-          (family) =>
-            [...document.fonts].some(
-              (face) =>
-                face.family.replaceAll('"', "") === family &&
-                face.status === "loaded",
-            ),
+        ["Bricolage Grotesque", "Roboto", "JetBrains Mono"].every((family) =>
+          [...document.fonts].some(
+            (face) =>
+              face.family.replaceAll('"', "") === family &&
+              face.status === "loaded",
+          ),
         ),
       ),
     ).toBe(true);

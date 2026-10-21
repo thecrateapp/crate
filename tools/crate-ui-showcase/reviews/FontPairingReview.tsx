@@ -35,12 +35,20 @@ import "./font-pairing-review.css";
 
 export const FONT_PAIRINGS = [
   {
+    id: "bricolage-roboto",
+    label: "Grotesque + Roboto",
+    display: "Bricolage Grotesque",
+    body: "Roboto",
+    round: 3,
+    direction: "Aprobada · en la app",
+  },
+  {
     id: "bricolage-plex",
     label: "Grotesque + Plex",
     display: "Bricolage Grotesque",
     body: "IBM Plex Sans",
     round: 2,
-    direction: "Aprobada · en la app",
+    direction: "Aprobada anterior",
   },
   {
     id: "tektur-golos",
@@ -111,6 +119,7 @@ export type FontPairingId = (typeof FONT_PAIRINGS)[number]["id"];
 export type FontPairingSelection = "new" | "all" | FontPairingId;
 
 const FONT_NAMES = [
+  "Roboto",
   "Review Hubot Sans",
   "Review Mona Sans",
   "Review Saira",
@@ -317,7 +326,7 @@ export function FontPairingReview({
         <PageHeader
           eyebrow="1BE · Typography review"
           title="Comparativa tipográfica"
-          subtitle="Mismos componentes, tamaños, pesos y contenido. JetBrains Mono se conserva en todas las opciones. Combinación aprobada en Listen y Admin: Bricolage Grotesque para títulos e IBM Plex Sans para texto."
+          subtitle="Mismos componentes, tamaños, pesos y contenido. JetBrains Mono se conserva en todas las opciones. Combinación aprobada en Listen y Admin: Bricolage Grotesque para títulos y Roboto para texto; IBM Plex Sans conserva su muestra anterior."
         />
         <FormField label="Combinación" kind="group">
           <SegmentedControl

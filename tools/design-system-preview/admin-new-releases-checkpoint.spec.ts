@@ -33,7 +33,7 @@ for (const width of [1440, 768, 390]) {
       await root
         .getByRole("textbox", { name: "Search releases" })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("IBM Plex Sans");
+    ).toContain("Roboto");
     expect(
       await root
         .getByText("Release type", { exact: true })

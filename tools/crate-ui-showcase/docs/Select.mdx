@@ -12,7 +12,7 @@ import { DocHeading } from "../components/DocHeading";
 <DocHeading as="h2">Contract</DocHeading>
 
 - Categorical single choice, including short form lists. Use SelectTrigger as the actual FormField control through the render prop.
-- Same 40/44 px height and IBM Plex Sans 400 15/21 px as Input. Options use the shared overlay surface, dropdown layer, portal, focus and scroll/collision behavior.
+- Same 40/44 px height and Roboto 400 15/21 px as Input. Options use the shared overlay surface, dropdown layer, portal, focus and scroll/collision behavior.
 - Default trigger width is a stable12rem, capped by its container. A caller may allocate a different fixed width or use w-full in a defined form column; selected option text must not size the trigger. Long values remain contained. Diego confirmed this rule during1AY.
 - Arrow keys, Home/End, typeahead, Enter/Space and Escape follow Radix selection. Disabled options cannot be selected. Empty values show the placeholder; unknown persisted values remain unselected without inventing a replacement.
 - The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.

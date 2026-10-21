@@ -12,6 +12,7 @@
       "story": "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Fundamentals.mdx",
       "sources": [
+        "app/shared/fonts/roboto.css",
         "app/shared/fonts/ibm-plex-sans.css",
         "app/shared/fonts/jetbrains-mono.css",
         "app/shared/ui/icons/actions.tsx",
@@ -42,6 +43,7 @@
       ],
       "knownIssues": [],
       "fingerprints": {
+        "app/shared/fonts/roboto.css": "35db9bdbbf44ff112136713f55314e5792d707f7abf3bc4de1f13b8ff241e991",
         "app/shared/fonts/ibm-plex-sans.css": "d83c31dc3db48bac0f17dd3c44d78404e15656345bbc88e46ee80f813447af52",
         "app/shared/fonts/jetbrains-mono.css": "03d8e43bde9a8a9fc21310d2f6a1676a236c0cd6b2402b856d9527a42fa0c0af",
         "app/shared/ui/icons/actions.tsx": "0486b01b222c7fee9c0b3f7e0987b6d079a972b98f689e95c2cc071da643554a",
@@ -61,16 +63,16 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "e54563c3063742999f3badeb7be7e1967bf329e861b036c47233a6478bc0521a",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "803ac1a8499206d61e50451ced98f1bed21d4c29355cb5bdfa889ba15c421525",
-        "app/shared/ui/tokens/semantic.css": "ebb90f36dce11c3e588f270cbe558ec38de17beeb0bc1498bdb6b954eadd788a",
+        "app/shared/ui/tokens/recipes.css": "c46dd6c87503949120a7bd12c33d876dc1ba25e56328b55c69083fb3c9b19911",
+        "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
-        "app/shared/ui/tokens/themes.css": "d3b20b2828ce1e366dc6620cca2e632d052554099a9e6847f508df11242e969d",
+        "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
         "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
         "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
-        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "1cc0bb5bad4df48caf547971668ef64651f99f5717643500e1dd7c3f234c3277",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "969bb0281d5bcc66bbd01f1f2d34b28a9cd10f2242c7c34c52cf252bd6c43afe"
+        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "f5fb48d67e74c46f427346e55a8755cc2decc9010f3080e904f9131fa5c77170",
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "e6628078e29e82c5e1801635c41dd415865f389c789fddc1a23e8847a06d2648"
       },
       "category": "Foundations"
     },
@@ -142,7 +144,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/HairlineList.tsx": "33baf1cff73ec18212bc6e3f118c9e74ae88eebcee815d5432453b3ce182b97d",
         "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx": "7ebe8d2733d438172cc31afef048565a0b8c7c569a1c8e85e107cc26f3653cea",
-        "tools/crate-ui-showcase/docs/HairlineRow.mdx": "3e36ce03d441aa5e5740d7e329467f9abc336bf991bea988916c075bed524fca"
+        "tools/crate-ui-showcase/docs/HairlineRow.mdx": "fa5ba2a00582aec163c403edee2cf95d627bdc38909dc4ea3943505198788be8"
       },
       "category": "Data Display"
     },
@@ -1134,7 +1136,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/InstrumentPanel.tsx": "005183206ff20fdceea32d5399203fe2901ea96d1bc4148a24b701cfbf9e5e09",
         "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx": "36a17d80daaa2948fe2fed7838ef9cafeecf57c0db15d06d96bbb69a839105be",
-        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "1194bc4589071759fe6d2c4ef509a9355e85ce769ba7b81af5f0b60153be7d7b"
+        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "77571727a0b3cf83ef12e806dbb89f6a7a6cf058131c14b56ec79c6f7f7ca934"
       },
       "category": "Layout"
     },
@@ -1378,7 +1380,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/button.tsx": "88d84480c1d35e271d578359f35a9b856978aab3b14e2c52bd8303a53bdcd776",
         "tools/crate-ui-showcase/stories/Button.stories.tsx": "ee5f574a9acb915b8cf05153c7e4e3ea526464f359b6393fe5411f828b20a5ac",
-        "tools/crate-ui-showcase/docs/Button.mdx": "d778365380248de28f9aa6c34095720f190cb1ff3f15b3a3c18d185ef0ebf613"
+        "tools/crate-ui-showcase/docs/Button.mdx": "20c76aa5eb1559fea73b9aa196d89ea63f91c107aa199e9f6118df938d767c6b"
       },
       "category": "Actions"
     },
@@ -1462,7 +1464,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda",
         "tools/crate-ui-showcase/stories/Input.stories.tsx": "cd1f45b1440a588c2fe953ee4ea018c48fc3cd4f97c53e8097756d9c0a759c81",
-        "tools/crate-ui-showcase/docs/Input.mdx": "64bdc19c0a48e4dd88c2ee4958266d7cc82765575ebc8fa7c9edc7d4bc307229"
+        "tools/crate-ui-showcase/docs/Input.mdx": "cf2767cabc9bbdc3c46ffba063e26f7ff2876a107ea75f052be3197dea53bff7"
       },
       "category": "Forms"
     },
@@ -1546,7 +1548,7 @@
       "fingerprints": {
         "app/shared/ui/shadcn/select.tsx": "ceed0ae676420f8b4000f71b7b43c9a43799339dd0cc4e3d8ebe4559bc0b58f0",
         "tools/crate-ui-showcase/stories/Select.stories.tsx": "5004dc42f52345f342a701de3cf57efc0ab83a929fb8e3d47748fc2ffdc3f38a",
-        "tools/crate-ui-showcase/docs/Select.mdx": "9f367d76213917acd2dc9ee4e345012b64ec5100d76f1e214a96aa440ae9db0f"
+        "tools/crate-ui-showcase/docs/Select.mdx": "b6fad9a3e4b67f37b676572dd1f7c13268d903339dd849949d9594a1993ef310"
       },
       "category": "Forms"
     },

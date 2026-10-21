@@ -53,7 +53,7 @@ for (const width of [1440, 768, 390]) {
         await page
           .locator("body")
           .evaluate((el) => getComputedStyle(el).fontFamily),
-      ).toContain("IBM Plex Sans");
+      ).toContain("Roboto");
       for (const field of await real.locator(".crate-form-field").all())
         expect(
           await field.evaluate((el) => {

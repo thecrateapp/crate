@@ -66,7 +66,7 @@ for (const width of [1440, 768, 390])
         .locator("p")
         .first()
         .evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("IBM Plex Sans");
+    ).toContain("Roboto");
     await root
       .getByRole("tab", { name: "Bundles", exact: true })
       .press("Enter");
