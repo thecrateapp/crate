@@ -18,6 +18,8 @@ sources:
     deploy/hermes/activate_context.py,
     scripts/hermes_context.py,
     app/crate/api/smart_mix_admin.py,
+    app/tests/test_hermes_context.py,
+    app/tests/fixtures/hermes_context_acceptance.json,
   ]
 ---
 
@@ -203,3 +205,32 @@ for live claims. Refreshing documentation does not grant access to additional en
 Publish the revised documentation with its release, then activate that release's context after
 deployment verification. Do not patch an older immutable bundle with newer branch or `main`
 content; source SHA, image provenance and documentation must remain traceable together.
+
+### Isolated retrieval acceptance
+
+Verified on 2026-10-21. The committed Spanish question corpus at
+`app/tests/fixtures/hermes_context_acceptance.json` names the required canonical owner,
+lexical follow-up queries, evidence fragments and the unavailable-evidence expectation for
+Crates, shared shows/plans, stats/projector/fallback, workers and Smart Mix. Run it with the
+context suite from `app/`:
+
+```bash
+../.venv/bin/python -m pytest tests/test_hermes_context.py -q
+```
+
+The fixture commits the current canonical pages to a disposable Git repository, exports
+that exact revision with `scripts/hermes_context.py` and calls the actual
+`ContextStore.summary/search/read` interface. It checks bounded paginated retrieval,
+page hashes, release versus reused image provenance, dirty-checkout exclusion, missing
+unindexed observations and deployment drift. Existing context tests cover activation,
+rollback markers, integrity failures, path boundaries and the SDK transport. No production,
+Telegram or model service is involved. Existing manifest entries and explicit Markdown
+loaders continue to publish the owning pages; no proposal becomes canonical by inclusion
+in a context fixture.
+
+This is retrieval acceptance, not an LLM answer evaluation. `ContextStore.search` matches
+literal terms on one line or a path; a Spanish question can require a follow-up query with
+an exact source symbol/heading. The final rollout check must ask these questions through
+the real operator model, confirm its source paths and release SHA, and verify that it
+states unavailable/stale evidence instead of claiming live health or effects. That check
+requires the real conversational transport and remains deferred from local acceptance.

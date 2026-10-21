@@ -348,3 +348,117 @@ def test_build_includes_runbooks_native_clients_and_site_sources(repo, tmp_path)
     ).strip()
     result = _build((root, sha), tmp_path / "bundle")
     assert set(included) <= set(result["files"])
+
+
+ACCEPTANCE_CORPUS = json.loads(
+    (ROOT / "app/tests/fixtures/hermes_context_acceptance.json").read_text()
+)
+
+
+@pytest.fixture(scope="module")
+def operational_context(tmp_path_factory):
+    """Commit the real canonical pages in a disposable repo, never a live release."""
+    import hashlib
+
+    root = tmp_path_factory.mktemp("operator-acceptance") / "repo"
+    root.mkdir()
+    canonical = json.loads((ROOT / "docs/manifest.json").read_text())
+    paths = {case["source_path"] for case in ACCEPTANCE_CORPUS["cases"]}
+    assert paths <= {entry["sourcePath"] for entry in canonical}
+    selected = [entry for entry in canonical if entry["sourcePath"] in paths]
+    for path in paths:
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / path).read_bytes())
+    (root / "docs/manifest.json").write_text(json.dumps(selected))
+    (root / ".env").write_text("SYNTHETIC_SECRET=excluded-from-context\n")
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.test",
+            "commit",
+            "-qm",
+            "isolated canonical operator corpus",
+        ],
+        check=True,
+    )
+    sha = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
+    hashes = {
+        path: hashlib.sha256((root / path).read_bytes()).hexdigest() for path in paths
+    }
+    # A dirty checkout must not leak newer text into the immutable release bundle.
+    (root / min(paths)).write_text("uncommitted future behavior\n")
+    destination = root.parent / "contexts" / "active"
+    image_sha = "b" * 40
+    builder = _module(ROOT / "scripts/hermes_context.py")
+    manifest = builder.build_context(
+        root,
+        sha,
+        destination,
+        {"release_sha": sha, "images": {"api": {"source_sha": image_sha}}},
+    )
+    assert set(manifest["entrypoints"]) == paths
+    assert ".env" not in manifest["files"]
+    store = _module(ROOT / "deploy/hermes/context_server.py").ContextStore(destination)
+    return store, sha, hashes, image_sha
+
+
+@pytest.mark.parametrize(
+    "case", ACCEPTANCE_CORPUS["cases"], ids=lambda case: case["id"]
+)
+def test_spanish_operational_questions_retrieve_canonical_evidence(
+    operational_context, case
+):
+    """Validate retrieval and provenance, not a model's Spanish answer quality."""
+    store, sha, hashes, image_sha = operational_context
+    assert case["question_es"].startswith("¿")
+    assert case["unavailability_expectation_es"]
+    summary = store.summary()
+    assert summary["availability"] == "available"
+    assert summary["release_sha"] == sha
+    assert summary["deployment"]["images"]["api"]["source_sha"] == image_sha != sha
+    for query in case["search_queries"]:
+        result = store.search(query, limit=10)
+        assert result["release_sha"] == sha
+        assert case["source_path"] in {match["path"] for match in result["matches"]}
+    pages = []
+    next_line = 1
+    while next_line is not None:
+        page = store.read(case["source_path"], start_line=next_line, line_count=40)
+        assert page["release_sha"] == sha
+        assert page["sha256"] == hashes[case["source_path"]]
+        pages.append(page["text"])
+        assert page["next_line"] is None or page["next_line"] > next_line
+        next_line = page["next_line"]
+    text = "\n".join(pages)
+    for evidence in case["required_evidence"] + case["required_limit_evidence"]:
+        assert evidence.casefold() in text.casefold(), (case["id"], evidence)
+    assert "uncommitted future behavior" not in text
+
+
+def test_operational_corpus_marks_drift_and_missing_evidence(operational_context):
+    store, sha, _, _ = operational_context
+    marker = store.root.parent / "deployment.json"
+    try:
+        marker.write_text(json.dumps({"release_sha": "a" * 40, "state": "verified"}))
+        summary = store.summary()
+        assert summary["availability"] == "stale"
+        assert summary["observed_release_sha"] != summary["release_sha"] == sha
+        assert "current operational evidence" in summary["interpretation"]
+        # Historical source remains readable, carrying its original provenance.
+        page = store.read(ACCEPTANCE_CORPUS["cases"][0]["source_path"])
+        assert page["release_sha"] == sha
+        assert store.search("SYNTHETIC_SECRET")["matches"] == []
+        with pytest.raises(ValueError, match="outside the context index"):
+            store.read("instance/current-status.json")
+    finally:
+        marker.unlink(missing_ok=True)

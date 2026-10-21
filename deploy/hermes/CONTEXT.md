@@ -18,3 +18,26 @@ Rutas de entrada:
 - Clientes: `app/listen/src/`, `app/ui/src/`, `app/shared/`, desktop, Cast, clientes nativos Android/iOS, plugin VirtualDJ, sitio público, renderer de docs y scripts de despliegue.
 
 Busca por conceptos o rutas con `search_crate_context`. Lee los fragmentos necesarios con `read_crate_context`, siguiendo `next_line`. Consulta después estado y evidencias actuales en el MCP de Crate: las fuentes explican el comportamiento, pero no prueban que un servicio esté sano o que una tarea haya terminado.
+
+Para preguntas concretas, usa los propietarios canónicos y después la evidencia de la instancia:
+
+- Crates: `docs/technical/08-frontends-admin-and-listen.md`, sección Listen Crates:
+  acceso, colaboración, enlace público, descarga ZIP y seguimiento SSE/polling.
+- Shows y planes compartidos: `docs/technical/11-crate-mcp.md`, sección Exact structured
+  show review and publication: selección estructurada, revisión exacta, atomicidad y replay.
+- Estadísticas precalculadas: `docs/technical/02-backend-api-and-data.md`, sección
+  Precalculated listening statistics and snapshot fallback: placeholders, antigüedad,
+  projector/outbox y fallback; un GET de dashboard puede encolar un refresco.
+- Workers: `docs/technical/03-worker-tasks-and-background-services.md`, sección
+  Deferral, cancellation acknowledgement and replay: colas, aplazamiento, acuse de
+  cancelación y efectos inciertos.
+
+La búsqueda actual es léxica: combina conceptos con nombres exactos de sección, símbolo o
+ruta; no presupongas traducción semántica de una pregunta en español. Si no hay coincidencia,
+busca la ruta canónica y lee sus páginas. El corpus reproducible
+`app/tests/fixtures/hermes_context_acceptance.json`, ejecutado por
+`app/tests/test_hermes_context.py`, valida recuperación y procedencia en Git aislado.
+No certifica respuestas del modelo ni estado real; la conversación con el modelo sigue
+siendo una comprobación final del rollout. Si falta una observación autorizada, declárala
+no disponible; no sustituyas evidencia actual por una fuente histórica o una llamada que
+encole trabajo.

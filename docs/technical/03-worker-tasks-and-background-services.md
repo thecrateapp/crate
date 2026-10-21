@@ -5,14 +5,21 @@ section: architecture
 audience: [developer, operator]
 status: canonical
 order: 70
-verified: 2026-07-21
+verified: 2026-10-21
 sources:
-  [
-    app/crate/actors.py,
-    app/crate/worker_handlers,
-    app/crate/db/jobs/smart_mix_backfill.py,
-    docker-compose.yaml,
-  ]
+  - app/crate/actors.py
+  - app/crate/worker_handlers
+  - app/crate/db/jobs/smart_mix_backfill.py
+  - docker-compose.yaml
+  - app/crate/resource_governor.py
+  - app/crate/db/repositories/tasks_claims.py
+  - app/crate/db/repositories/task_control.py
+  - app/crate/db/repositories/agent_task_control.py
+  - app/crate/db/repositories/tasks_creation.py
+  - app/tests/test_task_control_actor.py
+  - app/tests/test_task_runtime_contract.py
+  - app/tests/test_resource_governor.py
+  - app/tests/test_actors.py
 ---
 
 # Worker, Tasks, and Background Services
@@ -313,3 +320,48 @@ already accepted child analyses. A completed coordinator or campaign does not pr
 coverage: exhausted failures and missing/outdated profiles remain separate observations.
 See [Smart Mix operation](smart-mix-operations.md) for backfill priority, generations,
 publication outcomes and the diagnostic sequence.
+
+
+## Deferral, cancellation acknowledgement and replay
+
+Verified against implementation and tests on 2026-10-21. Queue assignment is defined by
+`actors.py` task policy and the deployed Compose commands, not by a task's display label.
+`crate-fast-worker` adds `fast` capacity; `crate-worker` consumes `fast,default`, the
+maintenance/analysis/playback workers consume their named queue, and projector and Rust
+media worker have separate loops. A running container alone does not prove that the
+required queue is consumed or that a particular handler is progressing.
+
+Before claiming a task, the actor evaluates the resource governor, DB-heavy coordination,
+download windows/listener limits and transfer slots where applicable. Deferral requeues
+the same task with a delay and progress/reason evidence; it is not completion or a new
+user operation. Runtime policy revision/hash are rechecked at the pending-to-running claim;
+a concurrent policy change causes requeue without handler execution. Atomic claim prevents
+duplicate broker messages from running the same task concurrently. Inspect persisted
+status, progress, heartbeat, queue and reason before diagnosing a pending job as stuck.
+
+Cancellation has two durable moments: `cancellation_requested_at` and
+`cancellation_acknowledged_at`. Pending work can become cancelled immediately with
+`effects=not_started`; running or delegated work must reach cooperative checkpoints and
+wait for active descendants before acknowledgement. Checkpoint results can contain partial
+effects. `completing` rejects cancellation; terminal responses do not imply rollback.
+An interruption after a request must not be described as an acknowledged stop. The actor
+emits the cancelled terminal event after acknowledgement, not merely after a request.
+
+Broker redelivery and idempotent operation admission are different contracts. A stable
+idempotency key plus the same payload recovers the admitted operation/job after a lost
+response. It does not authorize a different selection or blindly rerun uncertain effects.
+Agent retry/cancel is a closed catalog in `db/repositories/agent_task_control.py`; retry
+requires a supported failed task, no cancellation uncertainty, depth/budget checks and
+current grants for the underlying work. It creates a provenance-linked retry, rather than
+resetting arbitrary work. Agent-origin handlers recheck authority before effects. Inspect
+execution, verification and projection in the durable result separately and reconcile
+uncertain outcomes before preparing another plan. The default Hermes pilot has read grants
+only and cannot perform these controls.
+
+Sources: `app/crate/actors.py`, `app/crate/resource_governor.py`,
+`app/crate/db/repositories/tasks_claims.py`, `task_control.py`, `agent_task_control.py`
+and `tasks_creation.py` in the same repository package. Regression coverage lives in
+`app/tests/test_task_control_actor.py` (partial effects, interruption, descendants,
+policy change before claim), `test_task_runtime_contract.py`, `test_resource_governor.py`
+and `test_actors.py`. See [Agents and MCP](11-crate-mcp.md) for exact plan review;
+these are implemented contracts, not general shell/restart/replay capabilities.

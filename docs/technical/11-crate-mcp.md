@@ -5,7 +5,7 @@ section: architecture
 audience: [developer, operator]
 status: canonical
 order: 100
-verified: 2026-10-19
+verified: 2026-10-21
 sources:
   - app/crate/mcp/server.py
   - app/crate/mcp/tools.py
@@ -14,12 +14,17 @@ sources:
   - app/crate/agent_operations.py
   - app/crate/agent_editorial.py
   - app/crate/agent_shows.py
+  - app/crate/mcp/show_schemas.py
   - app/crate/db/repositories/agent_operation_jobs.py
   - app/crate/db/repositories/agent_plans.py
   - app/crate/db/repositories/show_identities.py
+  - app/crate/db/repositories/show_import_selection.py
   - app/crate/show_extraction.py
   - app/ui/src/pages/agents/AgentPlanDetail.tsx
   - .agents/skills/crate-editorial-playlists/SKILL.md
+  - app/tests/test_show_import_plans.py
+  - app/tests/test_show_import_api.py
+  - app/tests/test_agent_plan_approvals.py
 ---
 
 # Agents and MCP
@@ -222,3 +227,47 @@ rollout budget remain explicit release gates.
 For the surrounding runtime read [Workers and tasks](03-worker-tasks-and-background-services.md),
 [Auth and sessions](07-auth-users-social-and-sessions.md) and
 [Frontend architecture](08-frontends-admin-and-listen.md).
+
+
+## Exact structured show review and publication
+
+Verified against implementation and tests on 2026-10-21. Admin manual/structured import
+and remote `preview_shows_import` / `apply_shows_import` reuse the shared immutable
+operation engine. A selection contains 1–50 explicit candidate rows, each with an
+`item_id`; the input schema also bounds payload bytes. A tour exceeding a selection must
+be tracked as several reviewed batches. The server does not infer unselected dates,
+perform OCR through MCP, buy tickets or send show notifications as a side effect.
+
+Preparation records each row's full candidate, before state, expected canonical show ID
+and revision, source provenance and per-row issues. Invalid or ambiguous drafts remain
+reviewable but `executable=false`; neither an approval nor a successful extraction makes
+them executable. Review the complete plan, not its task summary: exact lineup, date,
+place, session/time, field corrections, unresolved identities, source versions and public
+impact. Unknown time/coordinates remain unknown. An empty search is not proof that a show
+does not exist. Private extraction drafts are bound to their owning human editor; corrected
+fields cannot replace the original evidence.
+
+`agent_plans.py` binds an approval to plan ID/version, content hash, authorization context,
+policy revision and expiry, and reserves it for one admitted job. Approval is required
+when current policy demands it; consolidation always requires human approval. Admin's
+human cookie/origin/capability checks and MCP's integration/delegation checks feed the same
+plan engine. The agent cannot approve its own plan or expand authority through a document.
+
+At apply, one transaction locks authority, task and canonical identities, validates the
+exact stored execution and expected revisions, applies the selected rows, invalidates
+views and stores the durable result. Conflicting revisions or write failures roll back
+the selected batch; per-item `BATCH_NOT_APPLIED` is not partial publication. A concurrently
+created identical show can resolve to the same identity; different fields require review.
+Shows and durable completion commit together, so replay after outer-worker interruption
+recovers the result without another write. Success can report `verification=passed` with
+`projection=pending`: database publication does not establish that every consumer already
+shows the new event. A changed proposal needs a fresh preview; a lost response uses the
+same key/payload or durable job inspection.
+
+Regression evidence: `app/tests/test_show_import_plans.py` covers changed-show atomicity,
+concurrent identity, durable completion replay, fifty-date batching and mandatory
+consolidation approval; `app/tests/test_show_import_api.py` covers human capability/origin
+and fresh correction preview; `app/tests/test_agent_plan_approvals.py` covers exact approval
+binding. Current instance show/job state requires authorized MCP evidence. If the pilot's
+read grants lack that surface, report it unavailable instead of invoking an import or
+assuming publication from these source contracts.
