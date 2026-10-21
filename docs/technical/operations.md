@@ -5,13 +5,18 @@ section: operations
 audience: [operator]
 status: canonical
 order: 120
-verified: 2026-07-21
+verified: 2026-10-21
 sources:
   [
     docker-compose.yaml,
     docker-compose.home.yaml,
     scripts/deploy-remote.sh,
     app/crate/projector.py,
+    deploy/hermes/config.json,
+    deploy/hermes/runtime.py,
+    deploy/hermes/context_server.py,
+    deploy/hermes/activate_context.py,
+    scripts/hermes_context.py,
   ]
 ---
 
@@ -82,3 +87,82 @@ families, projector and media worker. Restore only after recording the current
 state, then restart in controlled order and verify migrations, cache/eventing,
 projector catch-up, queues, SSE and federation state. The detailed procedure is
 in [Backup and recovery](ops-runbook.md).
+
+## Hermes operator (phase one)
+
+The optional `hermes` profile adds `crate-hermes-agent` to the Crate Compose project.
+It uses the upstream Hermes v0.22.2 image pinned by digest, its own ChatGPT subscription
+session (`openai-codex`, `gpt-6-luna`) and a dedicated Telegram bot. This phase provides
+on-demand diagnosis and read access; autonomous alert schedules and mutations are not enabled.
+The agent has no Docker socket, SSH keys, music mount or access to another Hermes home.
+
+All instance state lives under `${DATA_DIR}/hermes-agent/`:
+
+| Path                                        | Purpose                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `home/`                                     | Independent OAuth session, conversations and memory           |
+| `secrets/telegram-token`                    | New BotFather token, mode 600                                 |
+| `secrets/mcp-token`                         | Dedicated expiring Crate service credential, mode 600         |
+| `secrets/allowed-users`                     | Explicit private Telegram user IDs, comma-separated, mode 600 |
+| `secrets/managed.env`                       | Generated private environment for supervised gateway children |
+| `runtime/<revision>/` and `runtime/current` | Immutable operator assets and selected revision               |
+| `context/releases/` and `context/active`    | Immutable context bundles and atomic active link              |
+| `context/deployment.json`                   | Release and deployment-state marker used to detect drift      |
+
+Provision a separate service integration using the [MCP connection guide](crate-mcp.md),
+with only `library.health.read`, `ops.status.read`, `ops.jobs.read`, `ops.logs.read`,
+`ops.audit.read`, `ops.schedules.read` and `ops.runtime.read`. These grants expose twelve
+read tools. The runtime rejects discovery containing any tool without a read-only annotation.
+Terminal, file, code execution, connection management, delegation, cron and messaging tools
+are excluded. Telegram permits only the configured private users/chats, with bot senders denied.
+
+Before first start, install the files from `deploy/hermes/` into a new immutable runtime
+directory and atomically select it with `runtime/current`. Create the dedicated secret files
+without logging their values. Generate the supervisor environment on the host:
+
+```bash
+umask 077
+python3 - "$DATA_DIR/hermes-agent" <<'PYTHON'
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "runtime/current"))
+from runtime import managed_environment
+(root / "secrets/managed.env").write_text(managed_environment(root / "secrets"))
+PYTHON
+```
+
+Keep the private directory mode 700 and its files readable by the configured `PUID`/`PGID`.
+Authorize ChatGPT inside this agent's own `home/`; do not share or copy rotating OAuth refresh
+tokens from a personal assistant. Build the first context from the deployed release's full
+Git SHA and immutable release manifest using `scripts/hermes_context.py`, then validate and
+activate its archive with `deploy/hermes/activate_context.py`. Start only the new service:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.project.yaml \
+  --profile hermes up -d --no-deps crate-hermes-agent
+```
+
+For bootstrapping against a release whose Compose predates this service, an operator can
+install its declaration in `.deploy/hermes.compose.yaml`; the deployment helper includes
+that overlay when present. Keep it consistent with the selected runtime's mounts and policy.
+Updating operator assets requires a new immutable runtime directory, switching `current` and
+recreating only `crate-hermes-agent`. Deploying Crate does not overwrite its live runtime.
+
+`SOUL.md` defines the Spanish operator identity, evidence rules and read-only boundaries;
+`CONTEXT.md` supplies the knowledge map. The context MCP exposes `get_release_context`,
+`search_crate_context` and `read_crate_context`. The indexed corpus includes canonical docs,
+scoped architecture instructions, backend, database and workers, Go/Rust services, frontend
+clients, desktop, Cast, public site, documentation renderer and deployment scripts. Reads
+are paginated, bounded and checked against their recorded hashes. Secrets, instance data,
+untracked files and music are excluded; source text never grants execution authority.
+
+Normal image-first deployment exports context from the exact release commit and activates it
+only after verification. It records deployment/rollback transitions so Hermes reports stale
+context during a transition or after version drift. Release SHA and reused image `source_sha`
+remain distinct. When deploying from an older checkout without these hooks, synchronize context
+explicitly or use an updated deployment checkout; the old checkout cannot maintain the marker.
+
+Validate the actual Luna tool calls, Telegram polling and private-user policy after setup.
+A running gateway alone does not prove MCP access or model authentication. Also confirm that
+any personal Hermes container retains its original ID, start time and restart count.

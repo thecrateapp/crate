@@ -188,22 +188,33 @@ resolve_remote_release_settings() {
 
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
-  mkdir -p "$TMP_DIR/deploy/traefik"
+  mkdir -p "$TMP_DIR/deploy/traefik" "$TMP_DIR/deploy/hermes"
 
   if [[ "${DEPLOY_USE_WORKTREE:-0}" == "1" ]]; then
     cp "$ROOT_DIR/docker-compose.yaml" "$TMP_DIR/docker-compose.yaml"
     cp "$ROOT_DIR/docker-compose.project.yaml" "$TMP_DIR/docker-compose.project.yaml"
     cp "$ROOT_DIR/deploy/traefik/federation-readplane.yml" \
       "$TMP_DIR/deploy/traefik/federation-readplane.yml"
+    if [[ -d "$ROOT_DIR/deploy/hermes" ]]; then
+      cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
+    fi
   else
     git -C "$ROOT_DIR" archive "$DEPLOY_REF" docker-compose.yaml docker-compose.project.yaml \
       deploy/traefik/federation-readplane.yml \
       | tar -x -C "$TMP_DIR"
+    if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:deploy/hermes" 2>/dev/null; then
+      git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
+    fi
   fi
 
   scp "$REMOTE:$SERVER_PATH/.env" "$TMP_DIR/.env"
   chmod 600 "$TMP_DIR/.env"
   fetch_release_manifest
+  python3 "$ROOT_DIR/scripts/hermes_context.py" \
+    --repo "$ROOT_DIR" --revision "$DEPLOY_IMAGE_SHA" \
+    --destination "$TMP_DIR/hermes-context" \
+    --deployment-manifest "$TMP_DIR/release-manifest.json"
+  tar -czf "$TMP_DIR/hermes-context.tar.gz" -C "$TMP_DIR/hermes-context" .
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_TAG "$DEPLOY_IMAGE_TAG"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
@@ -303,6 +314,11 @@ sync_config() {
     "$REMOTE:$SERVER_PATH/.deploy/release-manifest.json.candidate"
   scp "$TMP_DIR/deploy/traefik/federation-readplane.yml" \
     "$REMOTE:$SERVER_PATH/deploy/traefik/federation-readplane.yml"
+  ssh_remote "mkdir -p '$SERVER_PATH/deploy/hermes'"
+  if [[ -f "$TMP_DIR/deploy/hermes/activate_context.py" ]]; then
+    scp "$TMP_DIR/deploy/hermes/"* "$REMOTE:$SERVER_PATH/deploy/hermes/"
+  fi
+  scp "$TMP_DIR/hermes-context.tar.gz" "$REMOTE:$SERVER_PATH/.deploy/hermes-context.candidate.tar.gz"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
 
   scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
@@ -348,6 +364,10 @@ run_preflight() {
   log "Deploy preflight completed successfully"
 }
 
+activate_hermes_context() {
+  remote_deploy hermes-context
+}
+
 run_deploy() {
   DEPLOY_ID="${DEPLOY_ID:-$(date -u +%Y%m%d-%H%M%S)}"
   require_deploy_id
@@ -368,6 +388,7 @@ run_deploy() {
   remote_deploy up
   ROLLBACK_ENABLED=0
   remote_deploy verify
+  activate_hermes_context
   remote_deploy cleanup
 
   trap - EXIT

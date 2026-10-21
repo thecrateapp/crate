@@ -24,6 +24,10 @@ IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 cd "$SERVER_PATH"
 
 COMPOSE=(docker compose -f docker-compose.yaml -f docker-compose.project.yaml)
+# A bootstrap overlay keeps the independent operator declared on older releases too.
+if [[ -f .deploy/hermes.compose.yaml ]]; then
+  COMPOSE+=(-f .deploy/hermes.compose.yaml)
+fi
 PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
 RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
@@ -777,6 +781,7 @@ cmd_config() {
   set_env_value CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
   apply_release_env "$candidate_env"
   cp -a .deploy/release-manifest.json.candidate .deploy/release-manifest.json
+  record_hermes_deployment deploying
   dc config -q
   assert_compose_redis_auth
   assert_music_mount_ready
@@ -871,6 +876,40 @@ cmd_verify() {
     wait_for_public_url "https://cratemusic.app"
     wait_for_public_url "https://docs.cratemusic.app"
   fi
+  record_hermes_deployment verified
+}
+
+cmd_hermes_context() {
+  local data_dir context_root revision
+  data_dir="$(env_value DATA_DIR)"
+  context_root="${data_dir}/hermes-agent/context"
+  [[ -d "${data_dir}/hermes-agent" ]] || return 0
+  revision="$(env_value CRATE_RELEASE_SHA)"
+  record_hermes_deployment verified
+  if compgen -G "${context_root}/releases/${revision}*/context-manifest.json" >/dev/null; then
+    python3 deploy/hermes/activate_context.py --root "$context_root" --revision "$revision"
+  else
+    python3 deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
+      --archive .deploy/hermes-context.candidate.tar.gz
+  fi
+}
+
+record_hermes_deployment() {
+  local data_dir
+  data_dir="$(env_value DATA_DIR)"
+  [[ -d "${data_dir}/hermes-agent" && -f deploy/hermes/activate_context.py ]] || return 0
+  if [[ ! -f .deploy/release-manifest.json ]]; then
+    python3 - "${data_dir}/hermes-agent/context/deployment.json" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps({"release_sha": None, "state": "unverified"}) + "\n")
+PY
+    return 0
+  fi
+  python3 deploy/hermes/activate_context.py --root "${data_dir}/hermes-agent/context" \
+    --revision "$(env_value CRATE_RELEASE_SHA)" \
+    --record-deployment .deploy/release-manifest.json --state "$1"
 }
 
 cmd_rollback() {
@@ -911,6 +950,7 @@ cmd_rollback() {
   else
     rm -f .deploy/release-manifest.json
   fi
+  record_hermes_deployment rollback
   dc config -q
 
   if (( ${#rollback_services[@]} == 0 )); then
@@ -982,6 +1022,8 @@ cmd_state_rollback() {
   else
     rm -f .deploy/release-manifest.json
   fi
+
+  record_hermes_deployment rollback
 
   pg_user="$(env_value CRATE_POSTGRES_USER)"
   pg_password="$(env_value CRATE_POSTGRES_PASSWORD)"
@@ -1138,13 +1180,14 @@ case "${1:-}" in
   pull) cmd_pull ;;
   up) cmd_up ;;
   verify) cmd_verify ;;
+  hermes-context) cmd_hermes_context ;;
   rollback) cmd_rollback ;;
   state-rollback) cmd_state_rollback ;;
   cleanup) cmd_cleanup ;;
   ps) cmd_ps ;;
   diagnose) cmd_diagnose ;;
   *)
-    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
+    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|hermes-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
     exit 2
     ;;
 esac
