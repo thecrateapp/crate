@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1BEContextMenus: fileURLToPath(
+          new URL("review-1be-context-menus.html", import.meta.url),
+        ),
         review1BEFontPairings: fileURLToPath(
           new URL("review-1be-font-pairings.html", import.meta.url),
         ),

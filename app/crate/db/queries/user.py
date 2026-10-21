@@ -255,6 +255,9 @@ def get_upcoming_shows(
     user_lon: float | None,
     user_radius: int,
     limit: int,
+    *,
+    user_city: str | None = None,
+    user_country: str | None = None,
 ) -> list[dict]:
     params: dict = {
         "followed_names": [" ".join(name.lower().split()) for name in followed_names],
@@ -262,6 +265,13 @@ def get_upcoming_shows(
         "limit": limit * 3,
     }
     geo_clause = ""
+    city_clause = ""
+    if user_city:
+        params["user_city"] = user_city.strip()
+        city_clause = "lower(btrim(s.city)) = lower(:user_city)"
+        if user_country:
+            params["user_country"] = user_country.strip()
+            city_clause += " AND lower(s.country_code) = lower(:user_country)"
     if user_lat is not None and user_lon is not None:
         lon_scale = max(1.0, 111.320 * abs(cos(radians(user_lat))))
         distance_sql = """
@@ -273,13 +283,16 @@ def get_upcoming_shows(
                 ))
             )
         """
-        geo_clause = f"""
-                  AND s.latitude IS NOT NULL
+        geo_predicate = f"""
+                  s.latitude IS NOT NULL
                   AND s.longitude IS NOT NULL
                   AND s.latitude BETWEEN :lat_min AND :lat_max
                   AND s.longitude BETWEEN :lon_min AND :lon_max
                   AND ({distance_sql}) <= :radius
         """
+        if city_clause:
+            geo_predicate = f"({geo_predicate}) OR ((s.latitude IS NULL OR s.longitude IS NULL) AND ({city_clause}))"
+        geo_clause = f" AND ({geo_predicate})"
         params["lat"] = user_lat
         params["lon"] = user_lon
         params["radius"] = user_radius
@@ -287,6 +300,8 @@ def get_upcoming_shows(
         params["lat_max"] = user_lat + user_radius / 111.0
         params["lon_min"] = user_lon - user_radius / lon_scale
         params["lon_max"] = user_lon + user_radius / lon_scale
+    elif city_clause:
+        geo_clause = f" AND ({city_clause})"
     with read_scope() as session:
         # geo_clause is a hardcoded SQL fragment built internally above;
         # it contains no user input — only parameter placeholders.

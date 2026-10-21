@@ -30,6 +30,7 @@ from crate.api._deps import (
     library_path,
 )
 from crate.api.auth import _require_auth
+from crate.api.show_location import ShowLocation, resolve_show_location
 from crate.api.browse_shared import (
     ARTIST_PHOTO_NAMES,
     build_genre_profile,
@@ -74,6 +75,7 @@ from crate.external_artist_artwork import (
     queue_external_artist_artwork,
 )
 from crate.db.queries.user_library import get_top_artists
+from crate.db.queries.user import get_upcoming_shows as get_user_upcoming_shows
 from crate.db.repositories.library import (
     get_album_quality_map,
     get_library_albums,
@@ -313,9 +315,11 @@ def _build_artist_page_payload(
     stats_window: str,
     stats_limit: int,
 ) -> dict | JSONResponse:
+    show_location = resolve_show_location(request, user_id)
     cache_key = (
         f"listen:artist_page:v6:{user_id}:{artist_id}:"
-        f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
+        f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}:"
+        f"{json.dumps(show_location, sort_keys=True)}"
     )
     cached = get_cache(cache_key, max_age_seconds=300)
     if cached is not None:
@@ -338,6 +342,7 @@ def _build_artist_page_payload(
         name=artist_name,
         limit=shows_limit,
         country="",
+        location=show_location,
     )
     appears_on_payload = get_public_system_playlists_for_artist(
         artist_id=artist_id,
@@ -567,8 +572,14 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
 
 
 def _get_artist_page_shows(
-    *, user_id: int | None, name: str, limit: int, country: str
+    *,
+    user_id: int | None,
+    name: str,
+    limit: int,
+    country: str,
+    location: ShowLocation | None = None,
 ) -> dict:
+    from datetime import datetime, timezone
     from crate import setlistfm
     from crate.ticketmaster import is_configured
 
@@ -581,7 +592,14 @@ def _get_artist_page_shows(
         probable_setlist = []
 
     cached = dedupe_show_rows(
-        db_get_shows(artist_name=name, country=country or None, limit=limit),
+        get_user_upcoming_shows(
+            followed_names=[name],
+            today=datetime.now(timezone.utc).date(),
+            limit=limit,
+            **location,
+        )
+        if location
+        else db_get_shows(artist_name=name, country=country or None, limit=limit),
     )
     if cached:
         attending_show_ids = (

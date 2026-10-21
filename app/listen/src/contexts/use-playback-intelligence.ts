@@ -14,6 +14,7 @@ export function usePlaybackIntelligence({
   isPlaying,
   playSource,
   shuffle,
+  repeat,
   infinitePlaybackEnabled,
   smartPlaylistSuggestionsEnabled,
   smartPlaylistSuggestionsCadence,
@@ -55,6 +56,7 @@ export function usePlaybackIntelligence({
   });
   const { continueInfinitePlayback, reset: resetContinuation } =
     usePlaybackContinuation({
+      repeat,
       currentIndex,
       infinitePlaybackEnabled,
       playSource,

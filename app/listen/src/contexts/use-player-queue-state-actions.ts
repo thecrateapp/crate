@@ -264,21 +264,46 @@ export function usePlayerQueueStateActions({
     unshuffledQueueRef,
   ]);
 
-  const cycleRepeat = useCallback(() => {
-    if (jamQueueLockedRef.current) return;
-    setRepeatState((previousMode) => {
-      const nextMode =
-        previousMode === "off" ? "all" : previousMode === "all" ? "one" : "off";
+  const setRepeatMode = useCallback(
+    (nextMode: RepeatMode) => {
+      if (jamQueueLockedRef.current || repeatRef.current === nextMode) return;
+      repeatRef.current = nextMode;
+      const previousQueue = queueRef.current;
+      const nextQueue =
+        nextMode === "off"
+          ? previousQueue
+          : previousQueue.filter(
+              (track, index) =>
+                index <= currentIndexRef.current ||
+                !track.isAutoplayContinuation,
+            );
+      if (nextQueue.length !== previousQueue.length) {
+        if (unshuffledQueueRef.current) {
+          const kept = new Set(nextQueue.map(getTrackCacheKey));
+          unshuffledQueueRef.current = unshuffledQueueRef.current.filter(
+            (track) => kept.has(getTrackCacheKey(track)),
+          );
+        }
+        if (isCustomCastSessionActive()) {
+          commitQueue(nextQueue);
+        } else {
+          pushToEngine(nextQueue, currentIndexRef.current, {
+            autoplay: isPlayingRef.current,
+            positionMs: playbackPositionMs(currentTimeRef.current),
+            preservePlayback: true,
+          });
+        }
+      }
+      setRepeatState(nextMode);
       if (isCustomCastSessionActive()) {
         void syncCustomCastQueue({
-          queue: queueRef.current,
+          queue: nextQueue,
           currentIndex: currentIndexRef.current,
           repeatMode: nextMode,
           shuffle: shuffleRef.current,
         }).then((result) => {
-          if (!result.ok) {
+          if (!result.ok)
             console.error("[cast] failed to set repeat:", result.message);
-          }
         });
       } else if (shouldUseAndroidNativePlayer()) {
         void nativeEngine
@@ -287,44 +312,28 @@ export function usePlayerQueueStateActions({
             console.error("[native-player] failed to set repeat:", error);
           });
       }
-      return nextMode;
-    });
-  }, [
-    currentIndexRef,
-    jamQueueLockedRef,
-    queueRef,
-    setRepeatState,
-    shuffleRef,
-  ]);
-
-  const setRepeatMode = useCallback(
-    (nextMode: RepeatMode) => {
-      if (jamQueueLockedRef.current) return;
-      setRepeatState((previousMode) => {
-        if (previousMode === nextMode) return previousMode;
-        if (isCustomCastSessionActive()) {
-          void syncCustomCastQueue({
-            queue: queueRef.current,
-            currentIndex: currentIndexRef.current,
-            repeatMode: nextMode,
-            shuffle: shuffleRef.current,
-          }).then((result) => {
-            if (!result.ok) {
-              console.error("[cast] failed to set repeat:", result.message);
-            }
-          });
-        } else if (shouldUseAndroidNativePlayer()) {
-          void nativeEngine
-            .setRepeat(toEngineRepeatMode(nextMode))
-            .catch((error) => {
-              console.error("[native-player] failed to set repeat:", error);
-            });
-        }
-        return nextMode;
-      });
     },
-    [currentIndexRef, jamQueueLockedRef, queueRef, setRepeatState, shuffleRef],
+    [
+      commitQueue,
+      currentIndexRef,
+      currentTimeRef,
+      isPlayingRef,
+      jamQueueLockedRef,
+      pushToEngine,
+      queueRef,
+      repeatRef,
+      setRepeatState,
+      shuffleRef,
+      unshuffledQueueRef,
+    ],
   );
+
+  const cycleRepeat = useCallback(() => {
+    const previous = repeatRef.current;
+    setRepeatMode(
+      previous === "off" ? "all" : previous === "all" ? "one" : "off",
+    );
+  }, [repeatRef, setRepeatMode]);
 
   return { clearQueue, toggleShuffle, cycleRepeat, setRepeatMode };
 }

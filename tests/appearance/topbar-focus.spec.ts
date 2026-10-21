@@ -80,24 +80,26 @@ for (const viewport of ["desktop", "mobile"] as const) {
         const trigger = page.getByRole("button", {
           name: "Search",
           exact: true,
+          includeHidden: true,
         });
         const input = page.getByPlaceholder(
           "Search artists, albums, tracks...",
         );
         await expect(trigger).toHaveAttribute("aria-expanded", String(open));
-        await expect(input).toHaveAttribute("tabindex", open ? "0" : "-1");
+        if (open) {
+          await expect(trigger).toBeHidden();
+          await expect(input).toBeVisible();
+        } else {
+          await expect(trigger).toBeVisible();
+          await expect(input).toBeHidden();
+        }
 
         await page.getByTestId("before-search").focus();
         await page.keyboard.press(nextControl);
-        await expect(trigger).toBeFocused();
-        await expectUnclippedInsetOutline(trigger);
-
+        const activeControl = open ? input : trigger;
+        await expect(activeControl).toBeFocused();
+        await expectUnclippedInsetOutline(activeControl);
         await page.keyboard.press(nextControl);
-        if (open) {
-          await expect(input).toBeFocused();
-          await expectUnclippedInsetOutline(input);
-          await page.keyboard.press(nextControl);
-        }
         await expect(page.getByTestId("after-search")).toBeFocused();
       });
     }

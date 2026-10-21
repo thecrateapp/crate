@@ -30,8 +30,8 @@
     "kind": "row"
   },
   {
-    "path": "app/ui/src/pages/Shows.tsx",
-    "prefix": "flex items-center gap-4 p-3 bg-card border border-border rounded-md",
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "relative w-full overflow-hidden rounded-md border",
     "kind": "row"
   },
   {

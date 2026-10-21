@@ -85,9 +85,9 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
     <section data-testid="playlist-hero">
       <h1>{title}</h1>
       {subtitle ? <p>{subtitle}</p> : null}
-      {metaItems?.filter(Boolean).map((item) => (
-        <span key={String(item)}>{item}</span>
-      ))}
+      {metaItems
+        ?.filter(Boolean)
+        .map((item) => <span key={String(item)}>{item}</span>)}
       <div role="group" aria-label="Secondary playlist actions">
         {secondaryActions?.map((action) => (
           <button
@@ -102,9 +102,7 @@ vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
       <div>
         {menuItems
           ?.filter((item) => item.type !== "divider" && item.label)
-          .map((item) => (
-            <span key={item.label}>{item.label}</span>
-          ))}
+          .map((item) => <span key={item.label}>{item.label}</span>)}
       </div>
       {artwork("hero-artwork")}
     </section>
@@ -250,6 +248,60 @@ describe("playlist pages", () => {
       "data-show-cover-thumb",
       "true",
     );
+  });
+
+  it("passes complete global-track metadata from a curated playlist response to the canonical row", () => {
+    const media = {
+      format: "flac",
+      bitrate: 1200000,
+      sample_rate: 96000,
+      bit_depth: 24,
+      bpm: 99,
+      audio_key: "D",
+      audio_scale: "minor",
+      duration: 143,
+    };
+    mockUseApi.mockReturnValue({
+      data: {
+        ...basePlaylist,
+        is_curated: true,
+        follower_count: 0,
+        is_followed: false,
+        tracks: [
+          {
+            ...playlistTrack,
+            ...media,
+            id: 501,
+            track_id: null,
+            global_track_uid: "global-song",
+            global_artist_uid: "global-artist",
+            global_album_uid: "global-album",
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<CuratedPlaylist />, {
+      route: "/curation/playlist/42",
+      path: "/curation/playlist/:id",
+    });
+    const row = trackRowProps[trackRowProps.length - 1]!;
+    expect(row.track).toMatchObject({
+      ...media,
+      bitrate: 1200,
+      id: "global-song",
+      global_track_uid: "global-song",
+      global_artist_uid: "global-artist",
+      global_album_uid: "global-album",
+    });
+    expect(row.track).toHaveProperty("library_track_id", undefined);
+    expect(row).toMatchObject({
+      showCoverThumb: true,
+      showArtist: true,
+      showAlbum: true,
+    });
   });
 
   it("renders a retryable error state when a curated playlist fails to load", () => {

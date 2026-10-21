@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { usePendingApprovals } from "@/hooks/use-pending-approvals";
@@ -219,8 +220,8 @@ function emitSidebarExpanded(expanded: boolean) {
 
 function navClass(isActive: boolean): string {
   return isActive
-    ? "text-text-primary before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:bg-accent-action-hi before:content-['']"
-    : "text-white/42 hover:bg-white/5 hover:text-white";
+    ? "text-text-primary hover:text-accent-action-hi before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:bg-accent-action-hi before:content-['']"
+    : "text-white/42 hover:text-accent-action-hi";
 }
 
 export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
@@ -333,12 +334,14 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
         {visibleNavItems.map((item) => {
           if ("section" in item)
             return (
-              <div
+              <MonoLabel
+                as="div"
+                tone="accent"
                 key={`section-${item.section}`}
-                className="px-4 pb-2 pt-5 font-mono text-label uppercase tracking-label text-text-subtle"
+                className="px-4 pb-2 pt-5"
               >
                 {item.section}
-              </div>
+              </MonoLabel>
             );
           const badgeValue =
             "badgeKey" in item ? stats[item.badgeKey] : undefined;
@@ -355,14 +358,12 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                   )
                 }
               >
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 break-words font-medium",
-                    expanded ? "text-sm" : "text-xs",
-                  )}
+                <MonoLabel
+                  as="span"
+                  className="min-w-0 flex-1 break-words text-inherit"
                 >
                   {item.label}
-                </span>
+                </MonoLabel>
                 {badgeValue != null && badgeValue > 0 ? (
                   <InfoBadge
                     variant="counter"
@@ -390,16 +391,16 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
-                      Preview as
-                    </span>
+                    <MonoLabel as="span">Preview as</MonoLabel>
                     {previewRole ? (
                       <button
                         type="button"
                         onClick={clearPreview}
-                        className="min-h-11 min-w-11 text-xs font-medium text-accent-action-hi/75 hover:text-accent-action-hi"
+                        className="min-h-11 min-w-11 text-accent-action-hi/75 hover:text-accent-action-hi"
                       >
-                        Clear
+                        <MonoLabel as="span" className="text-inherit">
+                          Clear
+                        </MonoLabel>
                       </button>
                     ) : null}
                   </div>
@@ -441,9 +442,9 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-white">
+                    <MonoLabel as="div" className="truncate text-text-primary">
                       {user.name}
-                    </div>
+                    </MonoLabel>
                     <div className="mt-1">
                       <Badge variant="secondary">{user.role}</Badge>
                     </div>
@@ -452,10 +453,11 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                 <button
                   type="button"
                   onClick={logout}
-                  title="Logout"
-                  className="min-h-11 min-w-11 shrink-0 px-2 text-xs text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
+                  className="min-h-11 min-w-11 shrink-0 px-2 text-text-muted transition-colors hover:text-accent-action-hi"
                 >
-                  Logout
+                  <MonoLabel as="span" className="text-inherit">
+                    Logout
+                  </MonoLabel>
                 </button>
               </div>
             </div>
@@ -465,7 +467,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                 to={profileHref}
                 aria-label={`${user.name} profile`}
                 onClick={onNavigate}
-                className="flex min-h-11 w-full min-w-0 items-center gap-2 px-2 text-xs text-text-primary"
+                className="flex min-h-11 w-full min-w-0 items-center gap-2 px-2 text-text-primary hover:text-accent-action-hi"
               >
                 {user.avatar ? (
                   <img
@@ -478,15 +480,21 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
                     {(user.name || user.email).slice(0, 1).toUpperCase()}
                   </span>
                 )}
-                <span className="min-w-0 break-words">{user.name}</span>
+                <MonoLabel
+                  as="span"
+                  className="min-w-0 break-words text-inherit"
+                >
+                  {user.name}
+                </MonoLabel>
               </Link>
               <button
                 type="button"
                 onClick={logout}
-                title="Logout"
-                className="min-h-11 min-w-11 shrink-0 px-2 text-xs text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
+                className="min-h-11 min-w-11 shrink-0 px-2 text-text-muted transition-colors hover:text-accent-action-hi"
               >
-                Logout
+                <MonoLabel as="span" className="text-inherit">
+                  Logout
+                </MonoLabel>
               </button>
             </div>
           )}

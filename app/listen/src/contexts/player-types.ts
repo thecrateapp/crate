@@ -51,6 +51,8 @@ export interface Track {
   valence?: number | null;
   blissVector?: number[] | null;
   isSuggested?: boolean;
+  /** Automatically appended album/playlist radio; explicit queue additions stay unmarked. */
+  isAutoplayContinuation?: boolean;
   suggestionSource?: "playlist";
   origin?: TrackOrigin;
   offlineOnly?: boolean;

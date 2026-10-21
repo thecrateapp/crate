@@ -577,7 +577,7 @@ class TestArtistDetailAPI:
         mock_artist.assert_called_once()
         mock_info.assert_called_once_with("Tool")
         mock_top_tracks.assert_called_once_with("Tool", count=12)
-        mock_shows.assert_called_once_with(user_id=1, name="Tool", limit=12, country="")
+        mock_shows.assert_called_once_with(user_id=1, name="Tool", limit=12, country="", location=None)
         mock_top_artists.assert_called_once_with(1, window="30d", limit=12)
         mock_enrichment.assert_called_once_with("Tool")
         mock_set_cache.assert_called_once()

@@ -363,6 +363,7 @@ describe("ArtistHeroSection", () => {
       "w-72",
       "z-app-context-menu",
     );
+    expect(menu).not.toHaveClass("listen-glass-panel");
 
     const menuItem = await screen.findByRole("menuitem", {
       name: "Play top tracks",

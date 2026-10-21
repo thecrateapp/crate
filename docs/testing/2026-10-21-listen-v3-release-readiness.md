@@ -45,6 +45,60 @@ CI del futuro merge, QA de accesibilidad manual ni pruebas en dispositivos físi
 
 ## Pendientes antes del despliegue web
 
+### Comprobaciones del 21 de octubre, posteriores a la aprobación de Roboto
+
+- Tipografía publicada en `775a5fb2`; el bucle de Admin se corrige y publica en `83d2c902`.
+  Un 401 del contador de planes no implica que la sesión general haya caducado: se comprueba
+  `/api/auth/me` antes de redirigir. Pasan 23 pruebas focalizadas de API, login y contador,
+  más typecheck. No se relajan los permisos del endpoint de planes.
+- Backend Stats/EQ/readplane e imágenes: 115 contratos pasan. Go readplane pasa tests y vet
+  mediante la imagen oficial fijada por el Makefile. No se modifica el stack de producción.
+- La ejecución completa de frontend detecta fallos de integración: rutas retiradas en políticas
+  de filas, análisis de CSS anidado, controles de AI/shows sin registrar, expectativas antiguas
+  de tooltip/Select y focus de búsqueda, además del preview de Maintenance. El CI de `775a5fb2`
+  falla en shared UI y appearance: [ejecución 39662814140](https://github.com/thecrateapp/crate/actions/runs/39662814140).
+  Los cambios de Admin y los nuevos tests posteriores impiden considerar esa ejecución como
+  certificación del estado final; falta cerrar los fallos y validar el SHA que se apruebe.
+- El sidebar de Admin queda en revisión con MonoLabel en todos sus tamaños, secciones accent
+  y hover accent. Pasan sus 10 tests y typecheck; Storybook documenta la adopción.
+- Playlist 27 contra producción: los primeros tracks llegan sin formato/calidad ni BPM/key.
+  La imagen API desplegada declara revisión `d3e6ef6b`, que no contiene `85a05ac8` de esta rama.
+  La corrección preparada en el servidor conserva metadata en referencias locales y globales:
+  pasan 17 contratos de metadata y 2 pruebas HTTP nuevas del endpoint de curation; pasan
+  también 40 tests frontend de páginas de playlist, adaptación y TrackRow. La ausencia visible
+  contra el backend anterior sigue pendiente del release integrado; no se añaden peticiones
+  individuales por fila ni se inventan valores para cubrirla.
+- Menús unificados: retiradas las tres inyecciones `listen-glass-panel` de los heroes y el
+  CSS sin consumidores. Filas, playlists, álbumes, artistas, géneros y crates reales comparten
+  fondo `rgb(17,18,24)`, borde y radio14px, sin imagen de fondo ni blur. Política de fuente y
+  pruebas de adaptadores evitan reintroducir excepciones. Los dos hosts pasan4 pruebas de
+  desktop/sheet, teclado, submenús y acciones locales. Evidencia en
+  `.artifacts/listen-context-menus-20261021/real-screen-surfaces.json` y capturas; review
+  `review-1be-context-menus.html` / `reviews-1be-context-menus--complete`.
+- Repeat de álbum: la reproducción infinita añadía recomendaciones sin consultar Repeat.
+  Ahora Repeat bloquea nuevas continuaciones, cancela las peticiones pendientes y retira las
+  recomendaciones automáticas futuras ya añadidas, conservando posición y añadidos manuales.
+  La prueba del motor real verifica el salto de la última pista a la primera con loop activo.
+- Shows por ubicación: la página del artista ignoraba la ubicación y limitaba a12 shows antes
+  de filtrarlos. Samiam tiene13 shows futuros; Madrid/Sala Nazca es el último (2027-02-25) y
+  ninguno tiene coordenadas. Artist page y Upcoming comparten ubicación y radio; el query
+  filtra antes de limitar y conserva ciudad+país como alternativa para shows sin coordenadas.
+  La clave de caché incluye ubicación; el frontend invalida las páginas de artista con shows.
+- Los nuevos borradores de flyer/OCR/IA se enriquecen en el worker con el geocodificador real
+  existente, deduplicando ciudades y con presupuesto temporal/cancelación. Se preservan
+  coordenadas conocidas; las nuevas se identifican como aproximaciones de ciudad en el borrador
+  y se revisan antes de publicar. No se alteran los13 shows de producción ni planes aprobados.
+  La regresión de worker valida que el enriquecimiento no publica shows por su cuenta.
+- Verificación focalizada:167 tests de Listen,18 del motor,56 Desktop; typechecks Listen y
+  Desktop y catálogo pasan. Backend:60 tests de ubicación/enriquecimiento/jobs/queries/boundaries
+  y11 de artist page/ubicación/Upcoming pasan (con solapamiento). La prueba OCR real de jobs
+  no puede pasar en este host sin Tesseract; no se cuenta como validada. No se renuevan baselines.
+  Listen se reinicia conservando `API_URL=https://api.lespedants.org`; los cuatro servicios siguen
+  activos. La corrección de metadatos de Loma Prieta y la de ubicación requieren el backend
+  integrado del futuro release; la instancia de revisión sigue usando producción anterior.
+
+El gate web continúa abierto. Listen, Admin, Storybook y preview siguen activos y no se ha desplegado.
+
 1. **Integración local con main resuelta.** Se integra `origin/main` en `d3e6ef6b`
    (326 commits de main), conservando la identidad y componentes V3 y los nuevos contratos
    de Smart Mix, shows y agentes. La revisión publicada `109` de Smart Mix y la cadena

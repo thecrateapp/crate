@@ -110,6 +110,41 @@ describe("Gapless5.replaceTrack", () => {
   });
 });
 
+describe("Gapless5 album boundary", () => {
+  it.each([true, false])(
+    "wraps the final album track only with repeat-all (loop: %s)",
+    async (loop) => {
+      vi.useFakeTimers();
+      const play = vi
+        .spyOn(HTMLMediaElement.prototype, "play")
+        .mockResolvedValue();
+      const pause = vi
+        .spyOn(HTMLMediaElement.prototype, "pause")
+        .mockImplementation(() => {});
+      const load = vi
+        .spyOn(HTMLMediaElement.prototype, "load")
+        .mockImplementation(() => {});
+      const player = new Gapless5({
+        tracks: ["album-one", "album-two"],
+        startingTrack: 1,
+        loop,
+        useHTML5Audio: false,
+        useWebAudio: false,
+      });
+      const finished = vi.fn();
+      player.onfinishedall = finished;
+      (player as Gapless5 & { onEndedCallback: () => void }).onEndedCallback();
+      expect(player.getIndex()).toBe(loop ? 0 : 1);
+      expect(finished).toHaveBeenCalledTimes(loop ? 0 : 1);
+      player.removeAllTracks();
+      await Promise.resolve();
+      play.mockRestore();
+      pause.mockRestore();
+      load.mockRestore();
+    },
+  );
+});
+
 describe("Gapless5 mobile background auto-advance", () => {
   it("reuses one persistent media element across track transitions", async () => {
     vi.useFakeTimers();

@@ -90,7 +90,7 @@
       "fingerprints": {
         "app/shared/ui/primitives/MonoLabel.tsx": "ce043985f3e2687183f9f511e8833e3f104ba8df4cf0eeb90d8cf88859176248",
         "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "1c28cb1dd0a869737446fddab0c99c4a7348f305680dbabe0f34de8ecd34615b",
-        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "c7b13970dace0aca8de56f07b69571ab9444dce7fc6efeb695f68daaeb567c5f"
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "9780ffe838d86653362876621267082b02760e6107208d1f7e3a42bd8a82cc75"
       },
       "category": "Data Display"
     },
@@ -413,7 +413,7 @@
       "name": "ContextMenu",
       "purpose": "Controlled desktop context menu and touch action sheet with shared headers, keyboard navigation and input-capability detection.",
       "coverage": "documented",
-      "adoption": "Listen entity/track/action menus; existing shared module, Admin domain-menu adoption pending. Native/AT phase QA pending.",
+      "adoption": "Listen entity/track and all artist/album/playlist/crate/genre hero menus use the canonical solid surface (1BE). Adapter regressions and both review hosts covered. Admin domain-menu adoption and native/AT phase QA pending.",
       "storyId": "components-contextmenu",
       "story": "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ContextMenu.mdx",
@@ -422,7 +422,7 @@
       "fingerprints": {
         "app/shared/ui/domain/actions/ContextMenu.tsx": "b29de2c516acdd8ad6ee4a3f14d86b45df9ea564f1c6e4ce19caa9d0b1aef9f5",
         "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "070e1c69d1e0ff827748ef30f93c9a58d8546b8e5c0a4ee5ef6cb36997fd3379",
-        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "ffe9eade9eec7d08d6e67c5a85bd9699a994687dfdc913982a2a0a71c56bfebf"
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "8d3f4f487550104db271812ab60eae0ef57ca18c049910785b25a3c40b4f0c46"
       },
       "category": "Actions"
     },

@@ -46,7 +46,6 @@ export function AlbumActions({
       menu={{
         actions: menuItems,
         sheetLabel: t("actions.menu.sheetLabel"),
-        surfaceClassName: "listen-glass-panel",
         renderMediaImage,
         onOpenChange: (open) => {
           if (!open) actions.onMenuClose();

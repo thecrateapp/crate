@@ -624,6 +624,7 @@ describe("shared short select policy", () => {
         ),
       ),
     );
-    expect(violations(controls, DYNAMIC_SELECTS, FORM_SELECTS)).toEqual([]);
+    const found = violations(controls, DYNAMIC_SELECTS, FORM_SELECTS);
+    expect(found, found.join("\n")).toEqual([]);
   }, 15_000);
 });

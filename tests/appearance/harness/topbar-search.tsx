@@ -19,6 +19,7 @@ function TopBarSearchFixture() {
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="space-y-6 p-8">
@@ -42,13 +43,14 @@ function TopBarSearchFixture() {
             canHover: false,
             isDesktop: matchMedia("(min-width: 768px)").matches,
           }}
-          refs={{ containerRef, dropdownRef, inputRef, dropdownStyle: null }}
+          refs={{ containerRef, dropdownRef, inputRef, triggerRef, dropdownStyle: null }}
           actions={{
             openSearch: noop,
             focusInputSoon: noop,
             scheduleCollapseIfIdle: noop,
             collapseOnFocusExit: noop,
             setQuery: noop,
+            setComposing: noop,
             setResults: noop,
             setCompletedQuery: noop,
             setSearchError: noop,

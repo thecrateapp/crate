@@ -8,7 +8,7 @@ vi.mock("@/lib/radio", () => ({
 
 import * as radio from "@/lib/radio";
 import { usePlaybackIntelligence } from "./use-playback-intelligence";
-import type { PlaySource, Track } from "./player-types";
+import type { PlaySource, RepeatMode, Track } from "./player-types";
 
 const mockRadioCont = vi.mocked(radio.fetchRadioContinuation);
 const mockInfiniteCont = vi.mocked(radio.fetchInfiniteContinuation);
@@ -48,6 +48,7 @@ function baseOptions(
   };
   return {
     opts: {
+      repeat: "off" as RepeatMode,
       queue: [TRACK_A, ...PAD],
       currentIndex: 0,
       isPlaying: false,
@@ -74,6 +75,50 @@ afterEach(() => {
 });
 
 describe("continueInfinitePlayback", () => {
+  it.each(["all", "one"] as const)(
+    "does not refill an album while repeat is %s",
+    async (repeat) => {
+      const { opts, actions } = baseOptions({
+        queue: [TRACK_A],
+        currentIndex: 0,
+      });
+      mockInfiniteCont.mockResolvedValue([TRACK_B]);
+      const options = { ...opts, repeat };
+      const { result } = renderHook(() => usePlaybackIntelligence(options));
+      expect(result.current.continueInfinitePlayback()).toBe(false);
+      await act(async () => {});
+      expect(mockInfiniteCont).not.toHaveBeenCalled();
+      expect(actions.appendTracks).not.toHaveBeenCalled();
+    },
+  );
+
+  it("cancels a pending album refill when repeat-all is enabled", async () => {
+    const { opts, actions } = baseOptions({
+      queue: [TRACK_A],
+      currentIndex: 0,
+    });
+    let complete!: (tracks: Track[]) => void;
+    mockInfiniteCont.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        }),
+    );
+    const { rerender } = renderHook(
+      ({ repeat }: { repeat: RepeatMode }) =>
+        usePlaybackIntelligence({ ...opts, repeat }),
+      {
+        initialProps: { repeat: "off" as RepeatMode },
+      },
+    );
+    expect(mockInfiniteCont).toHaveBeenCalledOnce();
+    rerender({ repeat: "all" });
+    await act(async () => {
+      complete([TRACK_B]);
+    });
+    expect(actions.appendTracks).not.toHaveBeenCalled();
+  });
+
   it("returns false when infinite playback is disabled", () => {
     const { opts } = baseOptions({ infinitePlaybackEnabled: false });
     const { result } = renderHook(() => usePlaybackIntelligence(opts));
@@ -262,7 +307,9 @@ describe("album continuation prefetch", () => {
     });
 
     expect(mockInfiniteCont).toHaveBeenCalled();
-    expect(actions.appendTracks).toHaveBeenCalledWith([TRACK_B]);
+    expect(actions.appendTracks).toHaveBeenCalledWith([
+      { ...TRACK_B, isAutoplayContinuation: true },
+    ]);
     expect(actions.appendAndAdvance).not.toHaveBeenCalled();
   });
 });

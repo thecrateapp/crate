@@ -222,6 +222,7 @@ export function usePlayerPlaybackRuntime({
 
   const { continueInfinitePlayback, resetPlaybackIntelligence } =
     usePlaybackIntelligence({
+      repeat,
       queue,
       currentIndex,
       isPlaying,

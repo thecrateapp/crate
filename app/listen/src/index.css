@@ -173,25 +173,6 @@ textarea {
   background: color-mix(in srgb, var(--brand-bandcamp) 15%, transparent);
 }
 
-.listen-glass-panel {
-  background: radial-gradient(
-      circle at 16% 0%,
-      var(--surface-glass-accent),
-      transparent 42%
-    ),
-    linear-gradient(
-      180deg,
-      var(--surface-glass-top),
-      var(--surface-glass-bottom)
-    );
-  border: 1px solid var(--border-quiet);
-  box-shadow:
-    0 28px 90px var(--surface-glass-shadow),
-    inset 0 1px 0 var(--border-quiet-subtle);
-  backdrop-filter: blur(24px) saturate(1.18);
-  -webkit-backdrop-filter: blur(24px) saturate(1.18);
-}
-
 .jam-progress-fill-dynamic {
   width: 100%;
   transform: scaleX(var(--progress-scale));
@@ -349,34 +330,6 @@ textarea {
     backdrop-filter: blur(18px) saturate(1.18);
     -webkit-backdrop-filter: blur(18px) saturate(1.18);
   }
-}
-
-.listen-glass-panel--dock {
-  --surface-glass-accent: color-mix(
-    in srgb,
-    var(--accent-action) 16%,
-    transparent
-  );
-  --surface-glass-top: color-mix(
-    in srgb,
-    var(--surface-elevated) 90%,
-    transparent
-  );
-  --surface-glass-bottom: color-mix(
-    in srgb,
-    var(--surface-canvas) 82%,
-    transparent
-  );
-  background: radial-gradient(
-      circle at 12% 4%,
-      var(--surface-glass-accent),
-      transparent 38%
-    ),
-    linear-gradient(
-      180deg,
-      var(--surface-glass-top),
-      var(--surface-glass-bottom)
-    );
 }
 
 html[data-keyboard-open] {

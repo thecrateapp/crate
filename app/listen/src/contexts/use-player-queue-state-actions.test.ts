@@ -122,7 +122,7 @@ describe("usePlayerQueueStateActions", () => {
     ];
     params.currentIndexRef.current = 0;
     isCustomCastSessionActiveMock.mockReturnValue(true);
-    params.setRepeatState = vi.fn((updater) => updater("off"));
+    params.setRepeatState = vi.fn();
     const { result } = renderHook(() => usePlayerQueueStateActions(params));
 
     act(() => {
@@ -144,12 +144,43 @@ describe("usePlayerQueueStateActions", () => {
   it("sets an explicit repeat mode for Crate playback", () => {
     const { params } = createParams();
     params.jamQueueLockedRef.current = false;
-    const setRepeatState = vi.fn((updater) => updater("off"));
+    const setRepeatState = vi.fn();
     params.setRepeatState = setRepeatState;
     const { result } = renderHook(() => usePlayerQueueStateActions(params));
 
     act(() => result.current.setRepeatMode("all"));
 
     expect(setRepeatState).toHaveBeenCalledOnce();
+  });
+
+  it("removes already appended recommendations when repeat-all is enabled, preserving explicit additions and playback", () => {
+    const { params } = createParams();
+    params.jamQueueLockedRef.current = false;
+    const album = { id: "album", title: "Album track", artist: "Artist" };
+    const manual = {
+      id: "manual",
+      title: "Added by listener",
+      artist: "Artist",
+    };
+    params.queueRef.current = [
+      album,
+      {
+        id: "radio",
+        title: "Autoplay",
+        artist: "Other",
+        isAutoplayContinuation: true,
+      },
+      manual,
+    ];
+    params.currentIndexRef.current = 0;
+    const { result } = renderHook(() => usePlayerQueueStateActions(params));
+    act(() => result.current.setRepeatMode("all"));
+    expect(params.repeatRef.current).toBe("all");
+    expect(params.pushToEngine).toHaveBeenCalledWith(
+      [album, manual],
+      0,
+      expect.objectContaining({ preservePlayback: true }),
+    );
+    expect(params.setRepeatState).toHaveBeenCalledWith("all");
   });
 });

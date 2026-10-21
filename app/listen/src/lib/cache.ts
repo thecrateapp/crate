@@ -218,6 +218,13 @@ export function scopesForUrl(url: string): string[] {
   // Jam rooms
   else if (url.startsWith("/api/jam")) scopes.push("jam");
 
+  if (
+    /^\/api\/(?:catalog\/artists|artists|artists\/by-entity|artist-slugs)\/[^/]+\/page(?:\?|$)/.test(
+      url,
+    )
+  ) {
+    scopes.push("shows");
+  }
   return scopes;
 }
 

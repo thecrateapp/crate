@@ -11,6 +11,7 @@ export function installRadixElementPolyfills() {
     if (name in HTMLElement.prototype) continue;
     Object.defineProperty(HTMLElement.prototype, name, {
       configurable: true,
+      writable: true,
       value,
     });
     installed.push(name);

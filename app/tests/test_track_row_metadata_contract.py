@@ -68,6 +68,47 @@ def test_playlist_detail_preserves_source_quality(track, pg_db):
     _assert_media(get_playlist_tracks(playlist_id)[0])
 
 
+@pytest.mark.parametrize("global_reference", [False, True])
+def test_curated_playlist_http_response_keeps_complete_track_metadata(
+    track, pg_db, monkeypatch, global_reference
+):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from crate.api import curation
+
+    playlist_id = pg_db.create_playlist("Curated contract playlist", user_id=1)
+    reference = {"track_id": track["id"]}
+    if global_reference:
+        from crate.federation.global_reconciliation import reconcile_local_catalog
+
+        reconcile_local_catalog()
+        with read_scope() as session:
+            uid = session.execute(
+                text(
+                    "SELECT global_track_uid FROM global_catalog_tracks WHERE local_track_id=:id"
+                ),
+                {"id": track["id"]},
+            ).scalar_one()
+        reference = {"global_track_uid": str(uid)}
+    pg_db.add_playlist_tracks(playlist_id, [reference])
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE playlists SET scope='system', is_active=true, is_curated=true WHERE id=:id"
+            ),
+            {"id": playlist_id},
+        )
+    monkeypatch.setattr(curation, "_require_auth", lambda _request: {"id": 1})
+    app = FastAPI()
+    app.include_router(curation.router)
+    with TestClient(app) as client:
+        response = client.get(f"/api/curation/playlists/{playlist_id}")
+    assert response.status_code == 200
+    rows = response.json()["tracks"]
+    assert len(rows) == 1
+    _assert_media(rows[0])
+
+
 def test_liked_track_preserves_source_quality(track):
     from crate.db.queries.user_library_library import get_liked_tracks
 

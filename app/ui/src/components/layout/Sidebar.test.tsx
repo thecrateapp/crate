@@ -21,6 +21,35 @@ function Location() {
 }
 describe("Sidebar", () => {
   beforeEach(() => localStorage.removeItem(SIDEBAR_KEY));
+  it.each(["expanded", "compact", "drawer"] as const)(
+    "uses shared MonoLabel navigation in the %s sidebar",
+    (mode) => {
+      if (mode === "compact") localStorage.setItem(SIDEBAR_KEY, "false");
+      renderWithAdminProviders(
+        <Sidebar presentation={mode === "drawer" ? "drawer" : "rail"} />,
+      );
+      const nav = screen.getByRole("navigation", { name: "Admin navigation" });
+      for (const link of within(nav).getAllByRole("link")) {
+        expect(link.querySelector(".crate-mono-label")).toHaveClass(
+          "font-mono",
+          "uppercase",
+          "font-normal",
+        );
+        expect(link).toHaveClass("hover:text-accent-action-hi");
+        expect(link.className).not.toMatch(/hover:bg-/);
+      }
+      expect(within(nav).getByText("Tools")).toHaveClass(
+        "crate-mono-label",
+        "uppercase",
+        "text-accent-action-hi",
+      );
+      expect(
+        screen
+          .getByRole("button", { name: "Logout" })
+          .querySelector(".crate-mono-label"),
+      ).toHaveClass("uppercase");
+    },
+  );
   it("keeps library destinations without the retired Timeline page", () => {
     renderWithAdminProviders(<Sidebar />, { auth: only("library.view") });
     expect(

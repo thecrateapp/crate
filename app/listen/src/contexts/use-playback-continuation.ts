@@ -9,9 +9,10 @@ import {
   RADIO_REFILL_THRESHOLD,
   type PlaybackIntelligenceRefs,
 } from "./playback-intelligence-model";
-import type { PlaySource, Track } from "./player-types";
+import type { PlaySource, RepeatMode, Track } from "./player-types";
 
 interface UsePlaybackContinuationOptions {
+  repeat: RepeatMode;
   currentIndex: number;
   infinitePlaybackEnabled: boolean;
   playSource: PlaySource | null;
@@ -21,6 +22,7 @@ interface UsePlaybackContinuationOptions {
 }
 
 export function usePlaybackContinuation({
+  repeat,
   currentIndex,
   infinitePlaybackEnabled,
   playSource,
@@ -43,9 +45,14 @@ export function usePlaybackContinuation({
   }, []);
 
   useEffect(() => {
+    if (repeat !== "off") reset();
+  }, [repeat, reset]);
+
+  useEffect(() => {
     const currentTrack = queue[currentIndex];
     const continuationSource = playSource;
     const supportsContinuation =
+      repeat === "off" &&
       infinitePlaybackEnabled &&
       !shuffle &&
       !!currentTrack &&
@@ -86,7 +93,9 @@ export function usePlaybackContinuation({
           sessionSignature
         )
           return;
-        refs.actionsRef.current.appendTracks(tracks);
+        refs.actionsRef.current.appendTracks(
+          tracks.map((track) => ({ ...track, isAutoplayContinuation: true })),
+        );
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
@@ -106,10 +115,19 @@ export function usePlaybackContinuation({
       }
       inFlightRef.current = false;
     };
-  }, [currentIndex, infinitePlaybackEnabled, playSource, queue, refs, shuffle]);
+  }, [
+    currentIndex,
+    infinitePlaybackEnabled,
+    playSource,
+    queue,
+    refs,
+    repeat,
+    shuffle,
+  ]);
 
   const continueInfinitePlayback = useCallback(() => {
     if (
+      repeat !== "off" ||
       !infinitePlaybackEnabled ||
       shuffle ||
       (playSource?.type !== "album" && playSource?.type !== "playlist") ||
@@ -185,7 +203,7 @@ export function usePlaybackContinuation({
       });
 
     return true;
-  }, [infinitePlaybackEnabled, playSource, refs, shuffle]);
+  }, [infinitePlaybackEnabled, playSource, refs, repeat, shuffle]);
 
   return { continueInfinitePlayback, reset };
 }

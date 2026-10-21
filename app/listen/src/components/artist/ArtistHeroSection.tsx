@@ -105,7 +105,6 @@ export function ArtistHeroSection({
           }
           menu={{
             sheetLabel: t("actions.menu.sheetLabel"),
-            surfaceClassName: "listen-glass-panel",
             renderMediaImage: ({ src, ...props }) => (
               <CrateImage {...props} source={src} />
             ),

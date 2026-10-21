@@ -19,7 +19,7 @@ src/hooks/                 use-api, use-sse, use-task-events, use-task-poll, use
 src/lib/                   api.ts (client instance), library-routes.ts / utils.ts (wrap app/shared/web), tasks, sentry
 src/test/                  render-with-admin-providers.tsx (MemoryRouter + mocked AuthContext)
 index.html                 Shared fixed V3 identity; no material selector
-src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source "../../shared/ui"
+src/index.css              Imports Roboto, @crate/ui tokens, Tailwind; @source "../../shared/ui"
 ```
 
 ## Hard rules
@@ -64,6 +64,9 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
   Preserve equal heights within form rows; do not force individual fields to 44px with local
   overrides. Basic action buttons keep their shared 44px target.
 - No emojis in UI text.
+- Sidebar destinations and section captions use the shared uppercase MonoLabel. Section captions
+  use its accent tone; destinations change foreground to accent on hover without a background fill.
+  Keep the active marker, counters, capability gates and 44px navigation targets in all presentations.
 
 ## Snapshot streams and SSE
 
