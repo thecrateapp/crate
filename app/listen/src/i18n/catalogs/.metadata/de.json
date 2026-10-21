@@ -7091,6 +7091,10 @@
     "sourceHash": "sha256:d7995a82925c21b5571c82c7e7550969634713f3dbe968a14047393bdb6d1bf1",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
+  "stats.highlights.playObsession": {
+    "sourceHash": "sha256:5781fd53757ad1cc14e2f568accb7729772e9d1941ce6c4f80779ddad493f8b6",
+    "reviewedAt": "2026-10-21T01:39:28.831Z"
+  },
   "stats.highlights.sessionDetail": {
     "sourceHash": "sha256:6f90329f7c1d0e014a87167ad219f4f851de86cca6437698cce1559de060dfc7",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
@@ -7098,6 +7102,10 @@
   "stats.highlights.streakDetail": {
     "sourceHash": "sha256:60aedc3a1546bb3cff59c5eb4766280fd69352a5df4fa86b586a72d49ab89f21",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.highlights.streakRange": {
+    "sourceHash": "sha256:1b33bfa270b023b7cf9789a95a0f001081d80e01b03377cb4e65500a79586815",
+    "reviewedAt": "2026-10-21T01:39:28.831Z"
   },
   "stats.listening.title": {
     "sourceHash": "sha256:b001f0fcca6be99ad95882c24ceff443b56b7ae7eed8d96f05e2e8dadf2f3013",
@@ -7218,6 +7226,10 @@
   "stats.replay.calendarYear.title": {
     "sourceHash": "sha256:c0f8133fdc33fe83ea59abb098759093eba2555f4be4cebbe460f6261f1af206",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
+  },
+  "stats.replay.card.meta": {
+    "sourceHash": "sha256:c563daf76135fb4e997410d8875f1ba1305bef3d8c199deb1fbfd5f50b27e09d",
+    "reviewedAt": "2026-10-21T01:39:28.831Z"
   },
   "stats.replay.defaultSubtitle": {
     "sourceHash": "sha256:8c64098a5c61c921bb4643210ca38582a2f17466a95a82c1a2c740b2d1281ac4",

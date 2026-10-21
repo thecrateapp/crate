@@ -16,6 +16,7 @@ import {
 import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { shuffleArray } from "@/lib/utils";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
   STATS_DASHBOARD_LIMITS,
@@ -50,7 +51,9 @@ export interface StatsPageController {
   kicker: string;
   overview: StatsDashboard["overview"] | undefined;
   playReplay: () => void;
+  shuffleReplay: () => void;
   rangeEndpoint: string;
+  replay: ReplayMix | undefined;
   replayItems: ReplayMix["items"];
   selectedMonth: string | null;
   selection: StatsSelection;
@@ -200,6 +203,14 @@ export function useStatsPageController(): StatsPageController {
     });
   }
 
+  function shuffleReplay() {
+    if (!replayItems.length) return;
+    playAll(shuffleArray(replayItems.map(toPlayerTrack)), 0, {
+      type: "playlist",
+      name: replayTitle,
+    });
+  }
+
   return {
     changeSelection,
     dashboard,
@@ -214,7 +225,9 @@ export function useStatsPageController(): StatsPageController {
     kicker: buildKicker(isGlobalStats, isUserStats, subjectName, t),
     overview,
     playReplay,
+    shuffleReplay,
     rangeEndpoint: buildRangeEndpoint(isGlobalStats, username),
+    replay,
     replayItems,
     selectedMonth,
     selection,

@@ -85,6 +85,7 @@ export function signalDashboard(): StatsDashboard {
         plays: 31,
         minutes: 120,
         track: {
+          track_id: 11,
           title: "Spectral Wound",
           artist: "Black Curse",
           album: "Burning",

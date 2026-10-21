@@ -29,6 +29,7 @@ import { StatsFreshness } from "../../../app/listen/src/components/stats/StatsFr
 import { StatsHeadlineNumbers } from "../../../app/listen/src/components/stats/StatsHeadlineNumbers";
 import { StatsExplorerReview } from "./StatsExplorerReview";
 import { StatsArtistOfPeriodView } from "../../../app/listen/src/components/stats/StatsArtistOfPeriodView";
+import { StatsReplayCard } from "../../../app/listen/src/components/stats/StatsReplayCard";
 import { StatsHighlightsView } from "../../../app/listen/src/components/stats/StatsHighlightsView";
 import { StatsSoundProfileView } from "../../../app/listen/src/pages/StatsSoundProfileView";
 import { StatsHeatmapCard } from "../../../app/listen/src/components/stats/StatsHeatmapCard";
@@ -45,7 +46,10 @@ import {
   statsDashboardReadState,
   statsSelectionOptions,
 } from "../../../app/listen/src/pages/stats-page-model";
-import type { StatsSelection } from "../../../app/listen/src/components/stats/stats-types";
+import type {
+  ReplayMix,
+  StatsSelection,
+} from "../../../app/listen/src/components/stats/stats-types";
 import { TrackRowView } from "../../../app/listen/src/components/cards/TrackRowView";
 import { TrackRowContent } from "../../../app/listen/src/components/cards/TrackRowContent";
 import { DiggingStory } from "../../../app/listen/src/components/stats/digging/DiggingStory";
@@ -76,6 +80,24 @@ dashboard.top_albums.items = [
     minutes_listened: 310,
   },
 ];
+const replayFixture: ReplayMix = {
+  window: "30d",
+  title: "Replay",
+  subtitle: "Snapshot",
+  title_key: "stats.replay.thisMonth.title",
+  track_count: 25,
+  minutes_listened: 95,
+  items: [1, 2, 3, 4].map((id) => ({
+    track_id: id,
+    track_path: null,
+    title: `Fixture track ${id}`,
+    artist: "Fixture artist",
+    album: `Fixture album ${id}`,
+    play_count: 5,
+    complete_play_count: 5,
+    minutes_listened: 15,
+  })),
+};
 const photo = (className: string) => (
   <img src={IMAGE_SAMPLES[1]} alt="" className={className} />
 );
@@ -264,12 +286,12 @@ export function StatsOverviewReview({
                   {t("stats.digging.open")}
                 </Button>
               ) : null}
-              <Button
-                variant="outline"
-                onClick={() => setAction("Replay prepared")}
-              >
-                {t("stats.signal.playReplay")}
-              </Button>
+              <StatsReplayCard
+                replay={replayFixture}
+                onPlay={() => setAction("Replay played")}
+                onShuffle={() => setAction("Replay shuffled")}
+                coverUrl={(item) => IMAGE_SAMPLES[(item.track_id ?? 0) % 2]!}
+              />
             </>
           }
         />
@@ -286,6 +308,7 @@ export function StatsOverviewReview({
             highlights={
               <StatsHighlightsView
                 highlights={dashboard.highlights!}
+                onPlayObsession={() => setAction("Obsession played")}
                 obsessionArtwork={
                   <MediaCover
                     src={IMAGE_SAMPLES[0]}

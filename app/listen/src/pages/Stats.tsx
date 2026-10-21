@@ -8,9 +8,14 @@ import {
   StatsListeningView,
 } from "./StatsPageView";
 
-import { CRATE_ICON_SIZE, Play, Sparkles } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Sparkles } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 
+import type { MediaCoverProps } from "@crate/ui/domain/media/MediaCover";
+
+import { CrateImage } from "@/components/artwork/CrateImage";
+import type { StatsTrack } from "@/components/stats/stats-types";
+import { albumCoverApiUrl } from "@/lib/library-routes";
 import { StatsArtistOfPeriod } from "@/components/stats/StatsArtistOfPeriod";
 import {
   StatsDiscoveriesCard,
@@ -22,6 +27,7 @@ import { StatsFreshness } from "@/components/stats/StatsFreshness";
 import { StatsHeadlineNumbers } from "@/components/stats/StatsHeadlineNumbers";
 import { StatsHeatmapCard } from "@/components/stats/StatsHeatmapCard";
 import { StatsHighlights } from "@/components/stats/StatsHighlights";
+import { StatsReplayCard } from "@/components/stats/StatsReplayCard";
 import { StatsPeriodPicker } from "@/components/stats/StatsPeriodPicker";
 import { StatsReveal } from "@/components/stats/StatsReveal";
 import {
@@ -37,6 +43,36 @@ import {
   TopTracksPanel,
 } from "./StatsCollectionPanels";
 import { AffinityCard } from "./StatsNarrativeSections";
+
+function replayCoverUrl(track: StatsTrack): string | null {
+  if (!track.album) return null;
+  return (
+    albumCoverApiUrl(
+      {
+        albumId: track.album_id,
+        globalAlbumUid: track.global_album_uid,
+        albumName: track.album,
+        artistName: track.artist,
+      },
+      { size: 128 },
+    ) || null
+  );
+}
+
+const renderReplayCover: MediaCoverProps["renderImage"] = ({
+  src,
+  alt,
+  className,
+  onError,
+}) => (
+  <CrateImage
+    src={src}
+    alt={alt}
+    className={className}
+    onError={onError}
+    loading="lazy"
+  />
+);
 
 export function Stats() {
   const page = useStatsPageController();
@@ -235,11 +271,14 @@ function StatsActionBand({ page }: { page: StatsPageController }) {
               </Link>
             </Button>
           ) : null}
-          {showReplay ? (
-            <Button type="button" variant="outline" onClick={page.playReplay}>
-              <Play size={CRATE_ICON_SIZE.sm} />
-              {t("stats.signal.playReplay")}
-            </Button>
+          {page.replay && showReplay ? (
+            <StatsReplayCard
+              replay={page.replay}
+              onPlay={page.playReplay}
+              onShuffle={page.shuffleReplay}
+              coverUrl={replayCoverUrl}
+              renderImage={renderReplayCover}
+            />
           ) : null}
         </>
       }

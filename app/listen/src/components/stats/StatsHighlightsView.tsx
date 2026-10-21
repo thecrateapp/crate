@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ReactNode } from "react";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { Card } from "@crate/ui/shadcn/card";
@@ -23,9 +25,12 @@ function formatDay(value: string | null | undefined, locale: string) {
 export function StatsHighlightsView({
   highlights,
   obsessionArtwork,
+  onPlayObsession,
 }: {
   highlights: Highlights;
   obsessionArtwork?: ReactNode;
+  /** Plays the obsession track; the adapter owns the player. */
+  onPlayObsession?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const formatInteger = useCallback(
@@ -45,6 +50,14 @@ export function StatsHighlightsView({
             size="md"
             value={<CountUpNumber value={streak.days} format={formatInteger} />}
           />
+          {streak.start && streak.end ? (
+            <p className="text-xs text-text-primary">
+              {t("stats.highlights.streakRange", {
+                start: formatDay(streak.start, i18n.language),
+                end: formatDay(streak.end, i18n.language),
+              })}
+            </p>
+          ) : null}
           <p className="text-xs text-text-muted">
             {t("stats.highlights.streakDetail", {
               count: highlights.current_streak?.days ?? 0,
@@ -53,7 +66,10 @@ export function StatsHighlightsView({
         </HighlightCard>
       ) : null}
       {newArtists ? (
-        <HighlightCard label={t("stats.highlights.newArtists")}>
+        <HighlightCard
+          label={t("stats.highlights.newArtists")}
+          href="#movement"
+        >
           <StatNumber
             size="md"
             value={
@@ -79,7 +95,11 @@ export function StatsHighlightsView({
         </HighlightCard>
       ) : null}
       {obsession ? (
-        <ObsessionCard obsession={obsession} artwork={obsessionArtwork} />
+        <ObsessionCard
+          obsession={obsession}
+          artwork={obsessionArtwork}
+          onPlay={onPlayObsession}
+        />
       ) : null}
     </div>
   );
@@ -87,15 +107,32 @@ export function StatsHighlightsView({
 
 function HighlightCard({
   label,
+  href,
   children,
 }: {
   label: string;
+  /** In-page anchor; the whole card becomes the link. */
+  href?: string;
   children: React.ReactNode;
 }) {
-  return (
-    <Card className="gap-2 p-5">
+  const content = (
+    <>
       <MonoLabel tone="accent">{label}</MonoLabel>
       <div className="space-y-1">{children}</div>
+    </>
+  );
+  return (
+    <Card className="gap-2 p-5">
+      {href ? (
+        <a
+          href={href}
+          className="flex flex-col gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-border-focus"
+        >
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </Card>
   );
 }
@@ -103,16 +140,18 @@ function HighlightCard({
 function ObsessionCard({
   obsession,
   artwork,
+  onPlay,
 }: {
   obsession: NonNullable<Highlights["obsession"]>;
   artwork?: ReactNode;
+  onPlay?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const track = obsession.track;
   return (
     <Card className="flex-row items-start gap-4 p-5">
       {artwork}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <MonoLabel tone="accent">{t("stats.highlights.obsession")}</MonoLabel>
         <div className="mt-1 truncate font-bold text-text-primary">
           {track.title}
@@ -125,6 +164,17 @@ function ObsessionCard({
           })}
         </div>
       </div>
+      {onPlay && track.track_id != null ? (
+        <ActionIconButton
+          variant="card"
+          aria-label={t("stats.highlights.playObsession", {
+            title: track.title ?? "",
+          })}
+          onClick={onPlay}
+        >
+          <Play size={CRATE_ICON_SIZE.sm} />
+        </ActionIconButton>
+      ) : null}
     </Card>
   );
 }
