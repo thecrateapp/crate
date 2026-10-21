@@ -2,7 +2,7 @@ import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import type { Track } from "@/contexts/PlayerContext";
 import { toPlayableTrack } from "@/lib/playable-track";
 
-import type { StatsTrack, ReplayMix } from "./stats-types";
+import type { StatsRangeTrack, StatsTrack, ReplayMix } from "./stats-types";
 export type * from "./stats-types";
 export {
   buildStatsGenreProfile,
@@ -10,10 +10,12 @@ export {
   formatStatsPercent,
 } from "./stats-format";
 
-export function toPlayerTrack(item: StatsTrack): Track {
+/** Dashboard tracks and stretch (range) tracks play the same way. */
+export function toPlayerTrack(item: StatsTrack | StatsRangeTrack): Track {
   return toPlayableTrack({
     ...item,
     id: item.track_id || `${item.artist}-${item.title}`,
+    artist: item.artist ?? "",
   });
 }
 

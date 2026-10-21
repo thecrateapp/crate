@@ -6891,6 +6891,10 @@
     "sourceHash": "sha256:930dd507e5a6ba8c4df11599f903330ad3fedc6ccf1167a5d4cb5ebe0400b31e",
     "reviewedAt": "2026-10-21T00:31:06.116Z"
   },
+  "stats.explorer.error": {
+    "sourceHash": "sha256:20472862e7747e35b539074a2096e21aabb8ce2e845235f2a41ec4377249c00c",
+    "reviewedAt": "2026-10-21T00:54:09.276Z"
+  },
   "stats.explorer.hint": {
     "sourceHash": "sha256:c953c082c25d49238fd7de31bbeffdc0c6b6bddfdabb56c803d0b292285342f4",
     "reviewedAt": "2026-10-21T00:31:06.116Z"

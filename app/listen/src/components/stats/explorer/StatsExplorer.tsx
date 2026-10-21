@@ -4,14 +4,15 @@ import { useNavigate } from "react-router";
 import type { MediaCoverProps } from "@crate/ui/domain/media/MediaCover";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
+import { toPlayerTrack } from "@/components/stats/stats-model";
 import type {
   StatsPeriodKey,
+  StatsRange,
   StatsRangeTrack,
   StatsTape,
 } from "@/components/stats/stats-types";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { albumCoverApiUrl } from "@/lib/library-routes";
-import { toPlayableTrack } from "@/lib/playable-track";
+import { cacheScopedKey } from "@/lib/cache";
 
 import {
   StatsExplorerPanel,
@@ -107,6 +108,26 @@ function ExplorerSession({
   );
   const stretchResult = useStatsRange(rangeEndpoint, stretch, STRETCH_LIMIT);
 
+  // Keep the last loaded stretch to show (dimmed) while the next one loads,
+  // so the stacked panel does not collapse. Scoped to the server, user and
+  // base: a different subject never inherits another subject's blocks.
+  const scope = cacheScopedKey(rangeEndpoint);
+  const [lastStretch, setLastStretch] = useState<{
+    scope: string;
+    data: StatsRange;
+  } | null>(null);
+  if (
+    stretchResult.data &&
+    (lastStretch?.data !== stretchResult.data || lastStretch.scope !== scope)
+  ) {
+    setLastStretch({ scope, data: stretchResult.data });
+  }
+  const carried =
+    !stretchResult.data && stretchResult.loading && lastStretch?.scope === scope
+      ? lastStretch.data
+      : null;
+  const shownStretch = stretchResult.data ?? carried;
+
   // Like the prototype, an opened bucket shows while it stays in the window.
   const opened =
     openIndex != null && openIndex >= from && openIndex < to ? openIndex : null;
@@ -131,37 +152,21 @@ function ExplorerSession({
           plays: openedPoint.plays,
           tracks: dayResult.data?.top_tracks ?? [],
           loading: dayResult.loading,
+          error: dayResult.error,
           available: dayResult.data?.available ?? true,
         }
       : null;
 
+  // Discovery days are facts about days, so carried-over ones stay valid.
   const discoveryDays = useMemo(
-    () => stretchResult.data?.discoveries.map((item) => item.first_day),
-    [stretchResult.data],
+    () => shownStretch?.discoveries.map((item) => item.first_day),
+    [shownStretch],
   );
 
   const playTrack = useCallback(
     (track: StatsRangeTrack) => {
       if (track.track_id == null) return;
-      const cover = track.album
-        ? albumCoverApiUrl(
-            {
-              albumId: track.album_id,
-              globalAlbumUid: track.global_album_uid,
-              albumName: track.album,
-              artistName: track.artist ?? undefined,
-            },
-            { size: 512 },
-          ) || undefined
-        : undefined;
-      const title = track.title ?? "";
-      play(
-        toPlayableTrack(
-          { ...track, id: track.track_id, title, artist: track.artist ?? "" },
-          { cover },
-        ),
-        { type: "track", name: title },
-      );
+      play(toPlayerTrack(track), { type: "track", name: track.title ?? "" });
     },
     [play],
   );
@@ -195,9 +200,11 @@ function ExplorerSession({
           granularity={tape.granularity}
           stretch={stretch}
           summary={summary}
-          data={stretchResult.data}
+          data={shownStretch}
           loading={stretchResult.loading}
-          available={stretchResult.data?.available ?? true}
+          error={stretchResult.error}
+          stale={carried !== null}
+          available={shownStretch?.available ?? true}
           day={day}
           onBack={backToStretch}
           onPlayTrack={playTrack}

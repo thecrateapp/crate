@@ -2135,6 +2135,12 @@ button.genre-pill:hover,
   user-select: none;
 }
 
+/* Out-ranks app-level coarse-pointer `[tabindex]` manipulation rules (0,2,0):
+   with `manipulation` the browser cancels the drag to pan the page. */
+.stats-explorer .stats-explorer-overview[tabindex] {
+  touch-action: none;
+}
+
 .stats-explorer-overview[data-dragging] {
   cursor: grabbing;
 }
@@ -2191,15 +2197,33 @@ button.genre-pill:hover,
   cursor: ew-resize;
 }
 
+/* Hit areas reach outward only (8px fine, 38px coarse: 44px with the handle),
+   so the window body stays draggable at any width; the press position picks
+   move or resize (dragPartAt). */
 .stats-explorer-handle::before {
   position: absolute;
-  inset: -0.625rem -0.5rem;
+  top: -0.625rem;
+  bottom: -0.625rem;
   content: "";
 }
 
+.stats-explorer-handle[data-part="start"]::before {
+  right: 0;
+  left: -0.3125rem;
+}
+
+.stats-explorer-handle[data-part="end"]::before {
+  right: -0.3125rem;
+  left: 0;
+}
+
 @media (pointer: coarse) {
-  .stats-explorer-handle::before {
-    inset: -0.625rem -1.1875rem;
+  .stats-explorer-handle[data-part="start"]::before {
+    left: -2.1875rem;
+  }
+
+  .stats-explorer-handle[data-part="end"]::before {
+    right: -2.1875rem;
   }
 }
 
@@ -2389,6 +2413,16 @@ button.genre-pill:hover,
   gap: 0.5rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border-quiet);
+}
+
+.stats-explorer-server {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* The previous stretch's blocks, kept in place while the next one loads. */
+.stats-explorer-server[data-stale] {
+  opacity: 0.5;
 }
 
 .stats-explorer-tracks {

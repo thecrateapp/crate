@@ -233,6 +233,7 @@ describe("StatsExplorerPanel", () => {
       plays: 21,
       tracks,
       loading: false,
+      error: false,
       available: true,
     };
     const onBack = vi.fn();
@@ -278,5 +279,68 @@ describe("StatsExplorerPanel", () => {
     });
     expect(screen.getByText("Week in detail")).toBeInTheDocument();
     expect(screen.getByText("Sep 7 – Sep 13")).toBeInTheDocument();
+  });
+
+  it("shows a failure line when the stretch cannot load", () => {
+    const { container } = renderWithListenProviders(panel({ error: true }), {
+      locale: "en",
+    });
+
+    expect(
+      screen.getByText("This stretch could not be loaded."),
+    ).toBeInTheDocument();
+    // Client numbers stay; server blocks never pretend to be empty.
+    expect(screen.getByText("25h")).toBeInTheDocument();
+    expect(screen.queryByText("None in this stretch")).not.toBeInTheDocument();
+    expect(container.querySelector("aside")).not.toHaveAttribute("aria-busy");
+  });
+
+  it("shows a failure line when the day cannot load", () => {
+    renderWithListenProviders(
+      panel({
+        day: {
+          bucket: "2026-09-12",
+          start: "2026-09-12",
+          end: "2026-09-12",
+          minutes: 95,
+          plays: 21,
+          tracks: [],
+          loading: false,
+          error: true,
+          available: true,
+        },
+      }),
+      { locale: "en" },
+    );
+
+    expect(
+      screen.getByText("This stretch could not be loaded."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Nothing played that day."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("21 plays")).toBeInTheDocument();
+  });
+
+  it("dims the previous stretch while the next one loads", () => {
+    const { container } = renderWithListenProviders(
+      panel({ data: LOADED, stale: true, loading: true }),
+      { locale: "en" },
+    );
+
+    const artist = screen.getByRole("region", {
+      name: "Artist of the stretch",
+    });
+    expect(within(artist).getByText("Low")).toBeInTheDocument();
+    expect(container.querySelector(".stats-explorer-server")).toHaveAttribute(
+      "data-stale",
+      "true",
+    );
+    expect(container.querySelector("aside")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    // Fresh numbers for the new stretch are not dimmed.
+    expect(screen.getByText("25h").closest("[data-stale]")).toBeNull();
   });
 });

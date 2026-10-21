@@ -1842,6 +1842,7 @@
   "stats.explorer.plays": "{count, plural, one {# écoute} other {# écoutes}}",
   "stats.explorer.unavailable": "Les incontournables de cette période sont encore en préparation.",
   "stats.explorer.openDay": "Sélectionne pour voir le jour",
+  "stats.explorer.error": "Impossible de charger cette période.",
   "stats.headline.minutes": "minutes",
   "stats.headline.plays": "écoutes",
   "stats.headline.activeDays": "jours actifs",

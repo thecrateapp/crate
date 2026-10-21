@@ -136,6 +136,33 @@ export function resizeWindow(
   return clampWindow({ from: window.from, to }, count, mode);
 }
 
+export type ExplorerDragPart = "start" | "end" | "window" | "outside";
+
+/** Hit areas reach this far outside the window edges (fine pointer, touch). */
+const EDGE_REACH_FINE_PX = 8;
+const EDGE_REACH_COARSE_PX = 38;
+/** At most this much of each edge inside the window resizes; never over a quarter. */
+const EDGE_INWARD_PX = 6;
+
+/**
+ * What a press at `x` grabs, from its position rather than the hit element:
+ * edges reach outward (44 px in total on touch) but only `min(6 px, width/4)`
+ * inward, so even a 16 px window keeps its middle for moving.
+ */
+export function dragPartAt(
+  x: number,
+  left: number,
+  right: number,
+  coarse: boolean,
+): ExplorerDragPart {
+  const reach = coarse ? EDGE_REACH_COARSE_PX : EDGE_REACH_FINE_PX;
+  const inward = Math.min(EDGE_INWARD_PX, Math.max(0, right - left) / 4);
+  if (x >= left - reach && x < left + inward) return "start";
+  if (x > right - inward && x <= right + reach) return "end";
+  if (x >= left && x <= right) return "window";
+  return "outside";
+}
+
 /** Tape bucket that holds `day` (the day itself, or its Monday). */
 export function bucketOfDay(tape: StatsTape, day: string): string {
   return tape.granularity === "week" ? mondayOf(day) : day;

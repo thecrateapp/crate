@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { StatsTape } from "@/components/stats/stats-types";
 import {
   bucketOfDay,
+  dragPartAt,
   explorerAxisLabels,
   explorerMonthLabels,
   minuteTicks,
@@ -144,6 +145,25 @@ describe("stats explorer chart", () => {
       0, 1, 2,
     ]);
     expect(explorerAxisLabels(3).some((label) => label.minor)).toBe(false);
+  });
+
+  it("picks the drag part from the press position and keeps narrow windows movable", () => {
+    // A 300 px window between x=100 and x=400; fine pointers reach 8 px out.
+    expect(dragPartAt(95, 100, 400, false)).toBe("start");
+    expect(dragPartAt(105, 100, 400, false)).toBe("start");
+    expect(dragPartAt(90, 100, 400, false)).toBe("outside");
+    expect(dragPartAt(110, 100, 400, false)).toBe("window");
+    expect(dragPartAt(396, 100, 400, false)).toBe("end");
+    expect(dragPartAt(407, 100, 400, false)).toBe("end");
+    expect(dragPartAt(409, 100, 400, false)).toBe("outside");
+    // Touch reaches 38 px outward, never further into the body.
+    expect(dragPartAt(64, 100, 400, true)).toBe("start");
+    expect(dragPartAt(437, 100, 400, true)).toBe("end");
+    expect(dragPartAt(110, 100, 400, true)).toBe("window");
+    // A 16 px window (12 weeks of an all-time strip at 375 px) moves from its middle.
+    expect(dragPartAt(108, 100, 116, true)).toBe("window");
+    expect(dragPartAt(103, 100, 116, true)).toBe("start");
+    expect(dragPartAt(113, 100, 116, true)).toBe("end");
   });
 
   it("maps a day to its tape bucket", () => {

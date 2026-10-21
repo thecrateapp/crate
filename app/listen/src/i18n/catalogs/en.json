@@ -1850,6 +1850,7 @@
   "stats.explorer.plays": "{count, plural, one {# play} other {# plays}}",
   "stats.explorer.unavailable": "Top items for this stretch are still being prepared.",
   "stats.explorer.openDay": "Select to see the day",
+  "stats.explorer.error": "This stretch could not be loaded.",
   "stats.headline.minutes": "minutes",
   "stats.headline.plays": "plays",
   "stats.headline.activeDays": "active days",

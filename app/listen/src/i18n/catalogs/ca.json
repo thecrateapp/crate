@@ -1842,6 +1842,7 @@
   "stats.explorer.plays": "{count, plural, one {# reproducció} other {# reproduccions}}",
   "stats.explorer.unavailable": "Els destacats d'aquest tram encara s'estan preparant.",
   "stats.explorer.openDay": "Selecciona per veure el dia",
+  "stats.explorer.error": "No s'ha pogut carregar aquest tram.",
   "stats.headline.minutes": "minuts",
   "stats.headline.plays": "escoltes",
   "stats.headline.activeDays": "dies actius",

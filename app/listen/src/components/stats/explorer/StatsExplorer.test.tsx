@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -99,9 +100,12 @@ describe("StatsExplorer", () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) }),
       ),
     );
-    expect(
-      await screen.findByRole("region", { name: "Artist of the stretch" }),
-    ).toHaveTextContent("Low");
+    // The loading placeholder shares the region name: wait for the artist.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("region", { name: "Artist of the stretch" }),
+      ).toHaveTextContent("Low"),
+    );
 
     const chart = screen.getByRole("group", {
       name: "Listening in the selected stretch",
@@ -157,5 +161,83 @@ describe("StatsExplorer", () => {
 
     fireEvent.click(screen.getByRole("link", { name: "August 2026" }));
     expect(screen.getByTestId("location")).toHaveTextContent("?month=2026-08");
+  });
+
+  it("says when a day cannot be loaded instead of claiming it was silent", async () => {
+    apiMock.mockImplementation(async (url: string) => {
+      if (url.includes("limit=20")) throw new Error("offline");
+      const params = new URL(url, "http://crate.test").searchParams;
+      return payload(params.get("start")!, params.get("end")!);
+    });
+    renderWithListenProviders(
+      <StatsExplorer tape={dailyTape()} selection="90d" rangeEndpoint={BASE} />,
+      { locale: "en" },
+    );
+    const chart = screen.getByRole("group", {
+      name: "Listening in the selected stretch",
+    });
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    fireEvent.keyDown(chart, { key: "Enter" });
+
+    expect(
+      await screen.findByText("This stretch could not be loaded."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Nothing played that day."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("dims the last stretch while the next loads, never across a base change", async () => {
+    const OTHER = "/api/users/ana/stats/range";
+    apiMock.mockImplementation((url: string) => {
+      const params = new URL(url, "http://crate.test").searchParams;
+      // Only the default stretch of the first base ever resolves.
+      if (url.startsWith(BASE) && params.get("start") === "2026-09-01") {
+        return Promise.resolve(
+          payload(params.get("start")!, params.get("end")!),
+        );
+      }
+      return new Promise(() => {});
+    });
+    let setEndpoint: (value: string) => void = () => {};
+    function Host() {
+      const [endpoint, setValue] = useState(BASE);
+      setEndpoint = setValue;
+      return (
+        <StatsExplorer
+          tape={dailyTape()}
+          selection="90d"
+          rangeEndpoint={endpoint}
+        />
+      );
+    }
+    const { container } = renderWithListenProviders(<Host />, {
+      locale: "en",
+    });
+    // The loading placeholder shares the region name: wait for the artist.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("region", { name: "Artist of the stretch" }),
+      ).toHaveTextContent("Low"),
+    );
+
+    fireEvent.keyDown(screen.getByRole("slider"), { key: "ArrowLeft" });
+    expect(
+      screen.getByRole("region", { name: "Artist of the stretch" }),
+    ).toHaveTextContent("Low");
+    expect(container.querySelector(".stats-explorer-server")).toHaveAttribute(
+      "data-stale",
+      "true",
+    );
+
+    act(() => setEndpoint(OTHER));
+    // Another subject: placeholders, never the previous subject's artist.
+    expect(
+      screen.getByRole("region", { name: "Artist of the stretch" }),
+    ).not.toHaveTextContent("Low");
+    expect(
+      container.querySelector(".stats-explorer-placeholder"),
+    ).not.toBeNull();
+    expect(container.querySelector("[data-stale]")).toBeNull();
   });
 });

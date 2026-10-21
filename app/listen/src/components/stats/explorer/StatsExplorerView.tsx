@@ -26,6 +26,7 @@ import { isMotionBlocked } from "@/lib/motion-availability";
 
 import {
   bucketOfDay,
+  dragPartAt,
   explorerAxisLabels,
   explorerMonthLabels,
   formatExplorerDay,
@@ -236,9 +237,16 @@ function ExplorerOverview({
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    const part = (event.target as Element)
-      .closest?.("[data-part]")
-      ?.getAttribute("data-part");
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    // Decide by press position, not by the hit element: touch hit areas
+    // reach outward only, so narrow windows stay movable from their middle.
+    const part = dragPartAt(
+      event.clientX - rect.left,
+      (range.from / count) * rect.width,
+      (range.to / count) * rect.width,
+      event.pointerType === "touch" || event.pointerType === "pen",
+    );
     const index = indexAt(event);
     if (part === "start" || part === "end") {
       dragRef.current = { kind: part };
@@ -292,7 +300,12 @@ function ExplorerOverview({
       onPointerMove={handlePointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      onLostPointerCapture={endDrag}
+      onLostPointerCapture={(event) => {
+        // Touch implicitly captures the pressed child (frame or handle); it
+        // reports losing that capture when the strip takes it. Only the strip
+        // losing capture ends the drag.
+        if (event.target === event.currentTarget) endDrag(event);
+      }}
     >
       <OverviewBars points={tape.points} />
       <span
@@ -621,7 +634,8 @@ function ExplorerChart({
             />
           ) : null,
         )}
-        <div className="stats-explorer-readout-host" aria-live="polite">
+        {/* Not a live region: hovering must not chatter; the panel announces. */}
+        <div className="stats-explorer-readout-host">
           {active != null ? (
             <ChartReadout
               tape={tape}

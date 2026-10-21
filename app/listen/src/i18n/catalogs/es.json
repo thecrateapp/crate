@@ -1850,6 +1850,7 @@
   "stats.explorer.plays": "{count, plural, one {# reproducción} other {# reproducciones}}",
   "stats.explorer.unavailable": "Los destacados de este tramo aún se están preparando.",
   "stats.explorer.openDay": "Selecciona para ver el día",
+  "stats.explorer.error": "No se pudo cargar este tramo.",
   "stats.headline.minutes": "minutos",
   "stats.headline.plays": "escuchas",
   "stats.headline.activeDays": "días activos",

@@ -27,6 +27,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { cn } from "@/lib/utils";
 
 import {
   formatExplorerDay,
@@ -47,6 +48,8 @@ export interface ExplorerDayDetail {
   plays: number;
   tracks: StatsRangeTrack[];
   loading: boolean;
+  /** The request failed: never shown as "nothing played". */
+  error: boolean;
   available: boolean;
 }
 
@@ -57,6 +60,10 @@ export interface StatsExplorerPanelProps {
   summary: StretchSummary;
   data: StatsRange | null;
   loading: boolean;
+  /** The stretch request failed and there is nothing to show for it. */
+  error?: boolean;
+  /** `data` belongs to the previous stretch; shown dimmed while this one loads. */
+  stale?: boolean;
   available: boolean;
   day: ExplorerDayDetail | null;
   onBack: () => void;
@@ -105,6 +112,8 @@ export function StatsExplorerPanel({
   summary,
   data,
   loading,
+  error = false,
+  stale = false,
   available,
   day,
   onBack,
@@ -112,7 +121,7 @@ export function StatsExplorerPanel({
   renderImage,
 }: StatsExplorerPanelProps) {
   const headingId = useId();
-  const busy = day ? day.loading : loading && !data;
+  const busy = day ? day.loading : loading && (!data || stale);
   return (
     <aside
       className="stats-explorer-panel"
@@ -137,12 +146,23 @@ export function StatsExplorerPanel({
           summary={summary}
           data={data}
           loading={loading}
+          error={error}
+          stale={stale}
           available={available}
           onPlayTrack={onPlayTrack}
           renderImage={renderImage}
         />
       )}
     </aside>
+  );
+}
+
+function ErrorLine({ className }: { className?: string }) {
+  const { t } = useTranslation();
+  return (
+    <p className={cn("m-0 text-sm text-text-muted", className)}>
+      {t("stats.explorer.error")}
+    </p>
   );
 }
 
@@ -153,6 +173,8 @@ function StretchSummaryView({
   summary,
   data,
   loading,
+  error,
+  stale,
   available,
   onPlayTrack,
   renderImage,
@@ -199,7 +221,9 @@ function StretchSummaryView({
           {t("stats.explorer.unavailable")}
         </p>
       ) : data ? (
-        <>
+        // While the next stretch loads, the previous blocks stay (dimmed) so
+        // the stacked panel does not jump; fresh client numbers sit above.
+        <div className="stats-explorer-server" data-stale={stale || undefined}>
           {artist ? (
             <PanelBlock label={t("stats.explorer.topArtist")}>
               <ArtistRow artist={artist} renderImage={renderImage} />
@@ -237,7 +261,9 @@ function StretchSummaryView({
               </p>
             )}
           </PanelBlock>
-        </>
+        </div>
+      ) : error ? (
+        <ErrorLine className="stats-explorer-block" />
       ) : loading ? (
         <>
           <PanelBlock label={t("stats.explorer.topArtist")}>
@@ -285,6 +311,8 @@ function DayDetail({
     );
   } else if (day.loading) {
     body = <span className="stats-explorer-placeholder" />;
+  } else if (day.error) {
+    body = <ErrorLine />;
   } else if (!day.available) {
     body = (
       <p className="m-0 text-sm text-text-muted">

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { fireEvent, screen, within } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -184,6 +187,76 @@ describe("StatsExplorerView", () => {
     expect(onWindowChange).toHaveBeenCalledTimes(calls);
   });
 
+  it("keeps a narrow window draggable by touch", () => {
+    const start = Date.UTC(2025, 9, 22);
+    const tape: StatsTape = {
+      ...dailyTape(),
+      start: iso(start),
+      end: iso(start + 365 * DAY),
+      points: Array.from({ length: 365 }, (_, index) => ({
+        bucket: iso(start + index * DAY),
+        minutes: 30,
+        plays: 3,
+      })),
+    };
+    const onWindowChange = vi.fn();
+    renderWithListenProviders(
+      <Harness
+        tape={tape}
+        mode={explorerMode("365d", tape)}
+        initial={{ from: 335, to: 365 }}
+        onWindowChange={onWindowChange}
+      />,
+      { locale: "en" },
+    );
+    const slider = screen.getByRole("slider", { name: "Selected stretch" });
+    // At 375 px the strip is about 343 px wide: 30 days are about 28 px.
+    stripRect(slider, 343);
+
+    // A touch in the middle of the window lands on the end handle's hit area,
+    // which the browser reports as the target; it must still move the window.
+    const end = slider.querySelector('[data-part="end"]')!;
+    fireEvent.pointerDown(end, {
+      pointerId: 3,
+      clientX: 329,
+      pointerType: "touch",
+    });
+    // Touch implicitly captures the pressed child; moving capture to the strip
+    // makes that child report a (bubbling) lost capture. The drag goes on.
+    fireEvent.lostPointerCapture(end, { pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerMove(slider, {
+      pointerId: 3,
+      clientX: 229,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(slider, { pointerId: 3 });
+
+    const moved = onWindowChange.mock.lastCall?.[0] as ExplorerWindow;
+    expect(moved.to - moved.from).toBe(30);
+    expect(moved.from).toBeLessThan(300);
+  });
+
+  it("keeps the strip's touch-action above the app-wide coarse rule", () => {
+    // TEST_GAP: jsdom does not compute the cascade. Listen's index.css gives
+    // focusable elements `touch-action: manipulation` on coarse pointers
+    // (specificity 0,2,0, later in the cascade); the strip must out-rank it
+    // or the browser cancels the drag to pan (seen in Chromium touch emulation).
+    const recipes = readFileSync(
+      resolve(process.cwd(), "../shared/ui/tokens/recipes.css"),
+      "utf8",
+    );
+    const listen = readFileSync(
+      resolve(process.cwd(), "src/index.css"),
+      "utf8",
+    );
+    expect(listen).toMatch(
+      /\[tabindex\]:not\(\[tabindex="-1"\]\)\s*\{\s*touch-action:\s*manipulation/,
+    );
+    expect(recipes).toMatch(
+      /\.stats-explorer \.stats-explorer-overview\[tabindex\]\s*\{\s*touch-action:\s*none;/,
+    );
+  });
+
   it("opens a bucket with Enter", () => {
     const tape = dailyTape();
     const onOpenBucket = vi.fn();
@@ -204,6 +277,8 @@ describe("StatsExplorerView", () => {
     expect(
       within(chart).getByText("Select to see the day"),
     ).toBeInTheDocument();
+    // Hover readouts are not announced; the panel's live region is enough.
+    expect(chart.querySelector("[aria-live]")).toBeNull();
     fireEvent.keyDown(chart, { key: "Enter" });
     expect(onOpenBucket).toHaveBeenLastCalledWith(58);
 
@@ -263,6 +338,11 @@ describe("StatsExplorerView", () => {
   });
 
   it("renders at 375px", () => {
+    // TEST_GAP: jsdom has no layout engine, so it cannot evaluate the
+    // `stats-explorer` container queries (panel below the chart, hidden minor
+    // labels) or pseudo-element hit-area geometry. This test pins the structure
+    // those rules rely on; the rendered 375 px layout and touch hit areas are
+    // checked in a real browser (Task 13 report, Task 14 Playwright review).
     const width = window.innerWidth;
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
