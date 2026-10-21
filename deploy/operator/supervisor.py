@@ -189,7 +189,7 @@ def _stuck_sample(rule, rows, memory, observed):
             if key not in ages or ages[key] > rule.clear_threshold:
                 return None
         # Retain identities through every affirmative sample in the configured
-        # recovery sequence; observe() clears them in the resolution transaction.
+        # recovery sequence; observe() clears them in the recovery transaction.
         return 0
     # Empty/partial samples cannot establish zero backlog or general health.
     return None
@@ -415,19 +415,18 @@ class Supervisor:
                             revision=incident["revision"] + 1,
                         )
                         self._notify(data, incident, "escalated", now)
-                elif (
-                    not result
-                    and memory["good"] >= rule.recovery_samples
-                    and incident
-                    and incident["state"] != "resolved"
-                ):
-                    incident.update(
-                        state="resolved",
-                        updated_at=now,
-                        revision=incident["revision"] + 1,
-                    )
-                    self._notify(data, incident, "resolved", now)
+                elif not result and memory["good"] >= rule.recovery_samples:
+                    if incident and incident["state"] != "resolved":
+                        incident.update(
+                            state="resolved",
+                            updated_at=now,
+                            revision=incident["revision"] + 1,
+                        )
+                        self._notify(data, incident, "resolved", now)
                     if rule.kind == "stuck":
+                        # A transient breach can recover before incident admission.
+                        # Clear its proven identities in the same atomic transaction,
+                        # whether or not an active incident needed resolution.
                         memory["stuck_ids"] = []
             active_keys = {
                 f"{self.instance}/{rule.subsystem}/{rule.id}" for rule in self.rules

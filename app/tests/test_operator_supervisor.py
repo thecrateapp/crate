@@ -694,3 +694,54 @@ def test_accumulated_stuck_identity_overflow_cannot_resolve_from_partial_sample(
         assert supervisor.incidents()["incidents"][0]["state"] == "open"
     finally:
         reopened.close()
+
+
+@pytest.mark.parametrize("previously_resolved", [False, True])
+def test_transient_pre_trigger_recovery_does_not_block_later_incident(
+    state, previously_resolved
+):
+    supervisor = Supervisor(
+        state,
+        "lab",
+        [
+            rule(
+                kind="stuck", field=("heartbeat_at",), threshold=100, clear_threshold=30
+            )
+        ],
+    )
+    step = 0
+
+    def sample_task(job_id, status):
+        nonlocal step
+        now = BASE + 30 * step
+        step += 1
+        sample = source(now)
+        sample["data"] = {
+            "rows": [{"id": job_id, "status": status, "heartbeat_at": iso(now - 300)}]
+        }
+        observe(supervisor, now, sample)
+
+    if previously_resolved:
+        for status in ("running", "running", "completed", "completed"):
+            sample_task("previous", status)
+        assert supervisor.incidents()["incidents"][0]["state"] == "resolved"
+
+    sample_task("transient", "running")
+    sample_task("transient", "completed")
+    assert state.snapshot()["rules"]["lab/analysis/queue"]["stuck_ids"] == ["transient"]
+    sample_task("transient", "completed")
+    assert all(
+        item["state"] == "resolved" for item in supervisor.incidents()["incidents"]
+    )
+    assert state.snapshot()["rules"]["lab/analysis/queue"]["stuck_ids"] == []
+
+    # The old task is now outside the bounded source sample. Its already proven
+    # recovery must not prevent a new task's independent incident from clearing.
+    sample_task("later", "running")
+    sample_task("later", "running")
+    assert supervisor.incidents()["incidents"][0]["state"] == "open"
+    sample_task("later", "completed")
+    assert supervisor.incidents()["incidents"][0]["state"] == "open"
+    sample_task("later", "completed")
+    assert supervisor.incidents()["incidents"][0]["state"] == "resolved"
+    assert state.snapshot()["rules"]["lab/analysis/queue"]["stuck_ids"] == []
