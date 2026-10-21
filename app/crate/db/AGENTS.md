@@ -136,5 +136,13 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
 - `optional_scope(None)` commits; it is not a read scope.
 - Expression indexes are ignored by the ORM unique-set contract; real unique constraints are not.
 - `CREATE INDEX CONCURRENTLY` fails inside a transaction; always wrap in `autocommit_block()`.
+- A failed or interrupted `CREATE INDEX CONCURRENTLY IF NOT EXISTS` leaves an INVALID index that
+  later runs skip, because the name already exists. After deploying migrations `080`
+  (`idx_global_tracks_lower_artist_title_album`) and `109` (`idx_user_track_daily_day`,
+  `idx_user_entity_firsts_key`), check them with
+  `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`. Rebuild any index it lists
+  with `REINDEX INDEX CONCURRENTLY <name>`; Alembic will not rerun a revision that is already
+  applied. Without a valid `idx_user_track_daily_day`, the range request's `MIN(day)` probe
+  becomes a sequential scan.
 - The facade (`__init__.py`) imports many modules at once; importing `crate.db` in tests is fine, in runtime code it is a test failure.
 - `conftest.py` comment says the fixture "drops the entire public schema"; it now clones/drops per-test databases instead.
