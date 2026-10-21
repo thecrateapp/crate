@@ -167,7 +167,23 @@ def test_legacy_user_data_survives_canonical_backfill_end_to_end(pg_db):
     result = backfill_legacy_user_library_refs()
     after = collect_federation_backfill_report()
 
-    assert before["legacy_invariants"] == after["legacy_invariants"]
+    # The backfill rebuilds listening stats, which queues one instance rollup
+    # backfill; the legacy task row itself must stay untouched.
+    legacy_before = dict(before["legacy_invariants"])
+    legacy_after = dict(after["legacy_invariants"])
+    assert legacy_after.pop("tasks")["count"] == legacy_before.pop("tasks")["count"] + 1
+    assert legacy_before == legacy_after
+    with read_scope() as session:
+        queued = (
+            session.execute(
+                text(
+                    "SELECT type FROM tasks WHERE id <> 'legacy-task' ORDER BY created_at"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert "backfill_instance_listening_rollups" in queued
     assert result["unresolved_artist_follows"] == 0
     assert result["unresolved_album_saves"] == 0
     assert result["unresolved_track_likes"] == 0
