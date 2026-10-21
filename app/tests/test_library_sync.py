@@ -68,6 +68,11 @@ def _fake_upsert_artist(payload: dict):
 
 
 class TestLibrarySyncFullSync:
+    @pytest.fixture(autouse=True)
+    def _no_indexed_album_paths(self):
+        with patch("crate.library_sync.get_all_album_paths", return_value=[]):
+            yield
+
     def test_full_sync_discovers_artists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = _create_test_library(Path(tmpdir))
@@ -1312,6 +1317,114 @@ class TestStaleArtistRemoval:
 
         assert removed == 0
         mock_album_scan.assert_called_once()
+
+
+class TestInternalLibraryPaths:
+    def _sync(self, lib: Path):
+        from crate.library_sync import LibrarySync
+
+        return LibrarySync({"library_path": str(lib), "audio_extensions": [".flac"]})
+
+    def _trash_album(self, lib: Path) -> Path:
+        album_dir = lib / ".crate-trash" / "tracks" / "artist-uid" / "album-uid"
+        album_dir.mkdir(parents=True)
+        (album_dir / "01.flac").write_bytes(b"\x00" * 1024)
+        return album_dir
+
+    def test_sync_album_skips_album_inside_trash(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+            ):
+                result = self._sync(lib).sync_album(album_dir, ".crate-trash")
+
+            assert result == {"skipped": "internal_path", "album_id": None}
+            mock_upsert.assert_not_called()
+            mock_upsert_artist.assert_not_called()
+
+    def test_prepare_album_sync_skips_album_inside_trash(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = self._trash_album(lib)
+
+            with patch("crate.library_sync.get_album_id_by_path") as mock_lookup:
+                result = self._sync(lib).prepare_album_sync(album_dir, ".crate-trash")
+
+            assert result == {"skipped": "internal_path", "album_id": None}
+            mock_lookup.assert_not_called()
+
+    def test_sync_artist_dirs_ignores_internal_dirs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.get_library_artist") as mock_lookup,
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+            ):
+                count = self._sync(lib).sync_artist_dirs(
+                    ".crate-trash", [lib / ".crate-trash"]
+                )
+
+            assert count == 0
+            mock_lookup.assert_not_called()
+            mock_upsert_artist.assert_not_called()
+
+    def test_remove_internal_rows_deletes_only_hidden_library_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            trash_album = str(lib / ".crate-trash" / "tracks")
+            albums = [
+                {"path": trash_album},
+                {"path": str(lib / "Artist" / "Album")},
+                {"path": "/elsewhere/.hidden/Album"},
+            ]
+            artists = [
+                {"name": ".crate-trash", "folder_name": ".crate-trash"},
+                {"name": "Artist", "folder_name": "Artist"},
+            ]
+
+            with (
+                patch("crate.library_sync.get_all_album_paths", return_value=albums),
+                patch(
+                    "crate.library_sync.get_library_artists",
+                    return_value=(artists, len(artists)),
+                ) as mock_artists,
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+                patch("crate.library_sync.delete_artist") as mock_delete_artist,
+            ):
+                removed = self._sync(lib).remove_internal_rows()
+
+            assert removed == 2
+            mock_delete_album.assert_called_once_with(trash_album)
+            mock_delete_artist.assert_called_once_with(".crate-trash")
+            assert mock_artists.call_args.kwargs["include_internal"] is True
+
+    def test_full_sync_reports_internal_rows_removed(self):
+        from crate.library_sync import LibrarySync
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.get_album_dir_mtimes", return_value={}),
+                patch("crate.library_sync.get_library_artists", return_value=([], 0)),
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+                patch.object(
+                    LibrarySync, "remove_internal_rows", return_value=2
+                ) as mock_cleanup,
+            ):
+                result = self._sync(lib).full_sync()
+
+            assert result["internal_removed"] == 2
+            assert result["artists_added"] == 0
+            mock_cleanup.assert_called_once_with()
+            mock_upsert_artist.assert_not_called()
 
 
 class TestParseInt:
