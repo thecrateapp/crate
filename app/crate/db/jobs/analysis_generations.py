@@ -72,10 +72,7 @@ def accepted_claim_ids(
 
     accepted = set()
     rows = lock_processing_rows(session, track_ids, [pipeline])
-    allowed = allowed_generation_ids(session, rows=rows, pipeline=pipeline)
     for row in rows:
-        if int(row["track_id"]) not in allowed:
-            continue
         track_id = int(row["track_id"])
         claim = claims.get(track_id) if claims is not None else None
         if claim is None:
@@ -109,22 +106,29 @@ def accepted_claim_ids(
             if "path" not in claims[track_id]
             or claims[track_id]["path"] == paths.get(track_id)
         }
-        if verify_source:
-            changed = set()
-            for track_id in accepted:
-                claim = claims[track_id]
-                # Older internal callers have no physical-source snapshot. Daemons
-                # supply one; check it after row locks, including any lock wait.
-                if "_source" not in claim:
+    # Authority rejection mutates processing state. Only the matching current
+    # claim may invalidate its generation; late/incompatible deliveries are inert.
+    accepted &= allowed_generation_ids(
+        session,
+        rows=[row for row in rows if int(row["track_id"]) in accepted],
+        pipeline=pipeline,
+    )
+    if claims is not None and verify_source and accepted:
+        changed = set()
+        for track_id in accepted:
+            claim = claims[track_id]
+            # Older internal callers have no physical-source snapshot. Daemons
+            # supply one; check it after row locks, including any lock wait.
+            if "_source" not in claim:
+                continue
+            try:
+                if source_identity(paths[track_id]) == claim["_source"]:
                     continue
-                try:
-                    if source_identity(paths[track_id]) == claim["_source"]:
-                        continue
-                except (OSError, ValueError):
-                    pass
-                changed.add(track_id)
-            _fail_changed_sources(session, changed, pipeline)
-            accepted -= changed
+            except (OSError, ValueError):
+                pass
+            changed.add(track_id)
+        _fail_changed_sources(session, changed, pipeline)
+        accepted -= changed
     return accepted
 
 

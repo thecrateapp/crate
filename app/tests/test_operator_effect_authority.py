@@ -638,3 +638,125 @@ def test_preupgrade_operator_raw_tasks_cannot_execute_without_parent(operator):
     )
     with pytest.raises(DiagnosticError, match="retained parent"):
         check_task_authority(task)
+
+
+@pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
+@pytest.mark.parametrize("state", ["analyzing", "done"])
+@pytest.mark.parametrize("withdrawal", ["expired", "binding", "source"])
+@pytest.mark.parametrize("entrypoint", ["result", "release"])
+def test_incompatible_claim_cannot_deny_newer_operator_generation(
+    operator, pg_db, pipeline, state, withdrawal, entrypoint
+):
+    from crate.db.jobs.analysis_claims import claim_track, release_claims
+
+    from tests.test_agent_analysis_sync import _payload
+
+    track = _seed_track(pg_db, "late", library_path=operator["config"]["library_path"])
+    path = Path(track["path"])
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"unchanged physical source")
+    if pipeline == "bliss":
+        change(
+            "UPDATE track_processing_state SET state='done' WHERE pipeline='analysis'"
+        )
+        change("UPDATE library_tracks SET analysis_state='done'")
+
+    def enqueue(*, native):
+        plan = prepare(
+            operator,
+            "analysis",
+            {
+                "track_uids": [track["entity_uid"]],
+                "pipelines": [pipeline],
+                "mode": "refresh",
+            },
+        )
+        assert (
+            run(operator, admit(operator, plan, native=native))["execution"]["status"]
+            == "requeued"
+        )
+        claim = claim_track(pipeline + "_state")
+        assert claim is not None
+        return plan, claim
+
+    _, old = enqueue(native=False)
+    plan, current = enqueue(native=True)
+    assert old["generation"] == 1 and current["generation"] == 2
+    if state == "done":
+        _store(track, pipeline, claim=current, value=222.0, signature="generation-two")
+    assert _processing(track["id"], pipeline)["state"] == state
+    if withdrawal == "expired":
+        change(
+            "UPDATE agent_repair_plans SET expires_at=NOW()-INTERVAL '1 second' WHERE id=:id",
+            {"id": plan["plan_id"]},
+        )
+    elif withdrawal == "source":
+        path.write_bytes(b"replaced physical source")
+    else:
+        mutate(operator, "binding")
+
+    def snapshot():
+        return {
+            "processing": _processing(track["id"], pipeline),
+            "result": _payload(track["id"], pipeline),
+            "events": scalar(
+                "SELECT COALESCE(jsonb_agg(to_jsonb(e) ORDER BY event_uid),'[]'::jsonb) FROM domain_event_outbox e WHERE scope=:scope AND subject_key=:id",
+                {"scope": "pipeline:" + pipeline, "id": str(track["id"])},
+            ),
+        }
+
+    before = snapshot()
+    incompatible = [
+        old,
+        {**current, "claim_token": str(uuid4())},
+        {**current, "path": str(path) + ".other"},
+        None,
+    ]
+    if state == "done":
+        incompatible.append(current)  # Already completed delivery is also obsolete.
+    for claim in incompatible:
+        if entrypoint == "result":
+            _store(track, pipeline, claim=claim, value=111.0, signature="late-result")
+        else:
+            assert (
+                release_claims(
+                    [track["id"]],
+                    pipeline + "_state",
+                    claims={track["id"]: claim} if claim is not None else None,
+                )
+                == 0
+            )
+        # Includes state, claim token, generation, full proof, timestamps/signature,
+        # library/shadow result and durable pipeline events, after transaction commit.
+        assert snapshot() == before
+    if state == "analyzing":
+        # The matching current claim must still invalidate expired/revoked work.
+        if entrypoint == "result":
+            _store(track, pipeline, claim=current)
+        else:
+            assert (
+                release_claims(
+                    [track["id"]], pipeline + "_state", claims={track["id"]: current}
+                )
+                == 0
+            )
+        after = snapshot()
+        assert after["processing"]["state"] == "failed"
+        assert after["processing"]["claim_token"] is None
+        assert after["processing"]["operator_authority"]["denied"] is True
+        assert after["result"]["shadow_value"] is None
+        assert len(after["events"]) == len(before["events"]) + 1
+
+
+@pytest.mark.parametrize("pipeline", ["analysis", "bliss"])
+def test_unbound_legacy_generation_zero_result_remains_supported(pg_db, pipeline):
+    from tests.test_agent_analysis_sync import _payload
+
+    track = _seed_track(pg_db, "legacy-zero")
+    before = _processing(track["id"], pipeline)
+    assert before["generation"] == 0 and before["operator_authority"] is None
+    _store(track, pipeline, claim=None, value=111.0)
+    assert _processing(track["id"], pipeline)["state"] == "done"
+    assert _payload(track["id"], pipeline)["shadow_value"] == (
+        111.0 if pipeline == "analysis" else [111.0] * 20
+    )
