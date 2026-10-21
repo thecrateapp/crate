@@ -100,3 +100,8 @@ def create_schema(cur):
     )
     create_ai_configuration_v120_schema(cur)
     create_ai_default_model_v121_schema(cur)
+    from crate.db.schema_sections.agent_acquisition_v132 import (
+        create_agent_acquisition_v132_schema,
+    )
+
+    create_agent_acquisition_v132_schema(cur)

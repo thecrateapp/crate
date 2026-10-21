@@ -18,6 +18,7 @@ from crate.db.repositories.agent_plans import (
 from crate.db.tx import optional_scope
 
 _MUTATES_QUALITY = {
+    "acquisition_publish",
     "repairs",
     "metadata_update",
     "enrichment",
@@ -369,11 +370,11 @@ def finish_operation(task_id: str, result: dict, *, session=None) -> dict:
 
 
 __all__ = [
+    "apply_operation",
+    "finish_operation",
+    "load_operation_job",
     "prepare_operation",
     "publish_plan",
-    "apply_operation",
-    "load_operation_job",
     "start_operation_effect",
     "with_operation_authority",
-    "finish_operation",
 ]

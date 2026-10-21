@@ -2043,6 +2043,10 @@ def _move_soulseek_completed_files(
 
 
 def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
+    if params.get("agent_command"):
+        from crate.worker_handlers.agent_library import _handle_agent_maintenance
+
+        return _handle_agent_maintenance(task_id, params, config)
     from crate import soulseek
 
     artist = params.get("artist", "")

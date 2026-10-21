@@ -71,7 +71,7 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
     artifact = export_contract()
     definitions = {row["name"]: row for row in artifact["tools"]}
-    assert len(definitions) == 56
+    assert len(definitions) == 62
     assert (
         definitions["editorial_plan_prepare"]["input_schema"]["additionalProperties"]
         is False

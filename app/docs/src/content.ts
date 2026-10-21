@@ -130,6 +130,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/crate-mcp-distribution.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/crate-mcp-acquisition.md": () =>
+    import("../../../docs/technical/crate-mcp-acquisition.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/tauri-desktop-support.md": () =>
     import("../../../docs/technical/tauri-desktop-support.md?raw").then(
       (module) => module.default,

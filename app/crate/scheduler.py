@@ -180,6 +180,7 @@ def guarded_run_schedule(
     actor_user_id=None,
     agent_context=None,
     required_grants=None,
+    expected_schedule_revision=None,
     session=None,
 ) -> dict:
     """One bounded enqueue path; manual calls cannot force resource gates."""
@@ -222,6 +223,7 @@ def guarded_run_schedule(
         agent_context=agent_context,
         required_grants=required_grants,
         decision=decision,
+        expected_schedule_revision=expected_schedule_revision,
         session=session,
     )
 

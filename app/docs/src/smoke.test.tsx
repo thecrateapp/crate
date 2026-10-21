@@ -12,6 +12,19 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes the exact acquisition and schedule operator flow", async () => {
+    window.history.pushState(null, "", "/operations/crate-mcp-acquisition");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Reviewed MCP acquisition and schedule boundaries",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Operator flow" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Schedule audit" })).toBeTruthy();
+  });
+
   it("publishes AI configuration with native controls and operational limits", async () => {
     window.history.pushState(null, "", "/operations/ai-agents");
     render(<App />);

@@ -10,6 +10,40 @@ from crate.db.repositories.agent_plans import get_owned_plan
 from crate.health_check import ARTIST_SCOPED_CHECKS
 
 _LIMITS = {
+    "get_acquisition_readiness": {
+        "providers": ["soulseek", "tidal", "bandcamp"],
+        "supported_slskd": "0.26.1",
+    },
+    "search_acquisition": {
+        "selections": 5,
+        "files_per_selection": 50,
+        "receipt_validity_seconds": 900,
+        "response_bytes": 55000,
+        "automatic_download": False,
+    },
+    "preview_acquisition": {
+        "files": 50,
+        "max_bytes": 2147483648,
+        "cost_minor": 0,
+        "approval": "mandatory",
+        "server_receipt_required": True,
+    },
+    "apply_acquisition": {
+        "plans": 1,
+        "destination": "provider_staging_only",
+        "library_publication": "separate_plan",
+    },
+    "preview_acquisition_publication": {
+        "source_jobs": 1,
+        "actual_audio_sha256": True,
+        "destination": "new_album_only",
+        "approval": "mandatory",
+    },
+    "apply_acquisition_publication": {
+        "plans": 1,
+        "overwrite": False,
+        "postverification": "files_and_index",
+    },
     "get_instance_inventory": {"services": 32, "live_image_ids": False},
     "get_observability_summary": {
         "pipelines": 8,
@@ -104,7 +138,8 @@ _LIMITS = {
         "dedup": True,
     },
     "preview_schedule_update": {
-        "schedules": 16,
+        "reviewed_schedules": ["compute_analytics"],
+        "minimum_nonzero_interval_seconds": 600,
         "maximum_interval_seconds": 2678400,
         "expected_revision": True,
     },

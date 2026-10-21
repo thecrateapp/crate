@@ -515,14 +515,17 @@ def _try_acquire_download_slot(redis_client, task_id: str) -> bool:
 
 
 def _acquire_download_slot(
-    task_id: str, timeout: int = DOWNLOAD_SLOT_TIMEOUT_SECONDS
+    task_id: str,
+    timeout: int = DOWNLOAD_SLOT_TIMEOUT_SECONDS,
+    *,
+    fail_closed: bool = False,
 ) -> bool:
     try:
         from crate.db.cache_runtime import get_redis
 
         r = get_redis()
         if not r:
-            return True
+            return not fail_closed
         deadline = time.time() + timeout
         while time.time() < deadline:
             if _try_acquire_download_slot(r, task_id):
@@ -530,8 +533,8 @@ def _acquire_download_slot(
             time.sleep(10)
         return False
     except Exception:
-        log.warning("Failed to acquire download slot, proceeding", exc_info=True)
-        return True
+        log.warning("Failed to acquire download slot", exc_info=True)
+        return not fail_closed
 
 
 def _release_download_slot(task_id: str):
@@ -583,7 +586,13 @@ def _execute_task(task_type: str, task_id: str):
         update_task(task_id, status="failed", error=f"Unknown task type: {task_type}")
         return
 
-    resource_decision = should_defer_task(task_type, task.get("params", {}))
+    resource_decision = should_defer_task(
+        "agent_maintenance"
+        if task_type == "soulseek_download"
+        and task.get("params", {}).get("agent_command")
+        else task_type,
+        task.get("params", {}),
+    )
     if not resource_decision.allowed:
         record_decision(resource_decision, task_type=task_type, source="task_start")
         log.info(
@@ -654,7 +663,11 @@ def _execute_task(task_type: str, task_id: str):
 
     # Download concurrency limiter
     if is_download:
-        if not _acquire_download_slot(task_id):
+        if not (
+            _acquire_download_slot(task_id, fail_closed=True)
+            if task.get("params", {}).get("agent_command")
+            else _acquire_download_slot(task_id)
+        ):
             log.info(
                 "Task %s (%s) waiting for download slot, re-enqueueing in 30s",
                 task_id,

@@ -1935,3 +1935,7 @@ modes and the persisted invocation actor; the historical audit rows were not
 rewritten and no further paid call was needed. The Task 6 focused gate passed
 21 backend/Compose cases without skips, plus eight documentation smoke cases;
 document integrity checked 45 canonical documents and the docs build passed.
+
+## Reviewed acquisition and schedule writes
+
+The unreleased 1.2.0 contract adds six acquisition tools and two least-privilege scopes (62 tools, 32 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact transfer, independent publication approval, slskd 0.26.1 prerequisite, cancellation/reconciliation semantics and schedule audit.

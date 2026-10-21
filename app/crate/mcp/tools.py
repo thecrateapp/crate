@@ -10,6 +10,7 @@ from mcp import types
 from pydantic import ValidationError
 
 from crate import (
+    agent_acquisition,
     agent_diagnostics,
     agent_discovery,
     agent_editorial,
@@ -21,6 +22,12 @@ from crate import (
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
+from crate.mcp.acquisition_schemas import (
+    AcquisitionPreview,
+    AcquisitionPublication,
+    AcquisitionReadiness,
+    AcquisitionSearch,
+)
 from crate.mcp.editorial_schemas import (
     EditorialCandidates,
     EditorialGet,
@@ -92,6 +99,11 @@ OBSERVATION_TOOLS = {
 
 CATALOG = {
     **OBSERVATION_TOOLS,
+    "get_acquisition_readiness": (
+        AcquisitionReadiness,
+        "library.acquisition.search",
+        "Check supported provider configuration and exact batch API readiness; no download.",
+    ),
     "search_shows": (
         ShowsSearch,
         "curation.shows.read",
@@ -195,6 +207,31 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "search_acquisition": (
+        AcquisitionSearch,
+        "library.acquisition.search",
+        "Search up to five exact zero-cost FLAC selections and mint owned source receipts. Never download automatically.",
+    ),
+    "preview_acquisition": (
+        AcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare a mandatory human-approved exact transfer plan from a server receipt and explicit caps.",
+    ),
+    "apply_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Apply an exact approved transfer plan through download admission; library publication needs a second plan.",
+    ),
+    "preview_acquisition_publication": (
+        AcquisitionPublication,
+        "library.acquisition.write",
+        "Prepare new-album publication from an owned transfer, binding actual staged audio hashes and destination.",
+    ),
+    "apply_acquisition_publication": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Publish only the exact approved staged audio to an absent album; never overwrite or upgrade.",
+    ),
     "preview_shows_import": (
         ShowsPrepare,
         "curation.shows.write",
@@ -446,7 +483,8 @@ async def list_tools(context, params):
                             "run_library_sync",
                             "run_metadata_rehydrate",
                         },
-                        idempotent_hint=name != "preview_repairs",
+                        idempotent_hint=name
+                        not in {"preview_repairs", "search_acquisition"},
                         open_world_hint=False,
                     ),
                 )
@@ -460,7 +498,9 @@ def _execute(principal, name, arguments, trace_id):
         with admission(principal.id):
             if name in ACTION_CATALOG:
                 module = (
-                    agent_shows
+                    agent_acquisition
+                    if hasattr(agent_acquisition, name)
+                    else agent_shows
                     if name in {"preview_shows_import", "apply_shows_import"}
                     else agent_editorial
                     if name.startswith("editorial_")
@@ -473,6 +513,10 @@ def _execute(principal, name, arguments, trace_id):
                 )
                 action_finished = True
                 return result
+            if name == "get_acquisition_readiness":
+                return agent_acquisition.get_acquisition_readiness(
+                    principal, **arguments
+                )
             if name == "search_shows":
                 return agent_shows.search_shows(principal, **arguments)
             artist_uid = arguments.get("artist_uid")

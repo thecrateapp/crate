@@ -234,6 +234,15 @@
     "order": 171
   },
   {
+    "sourcePath": "docs/technical/crate-mcp-acquisition.md",
+    "route": "/operations/crate-mcp-acquisition",
+    "section": "operations",
+    "title": "Reviewed MCP acquisition and schedule boundaries",
+    "summary": "Exact provider receipts, independent publication approval and bounded schedule contracts.",
+    "keywords": ["mcp", "acquisition", "soulseek", "approval", "schedules"],
+    "order": 172
+  },
+  {
     "sourcePath": "docs/technical/storage-retention.md",
     "route": "/operations/storage-retention",
     "section": "operations",

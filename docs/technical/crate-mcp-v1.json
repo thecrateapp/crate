@@ -205,6 +205,8 @@
     "editorial.publish": "curation.playlists.write",
     "editorial.read": "curation.playlists.write",
     "editorial.write": "curation.playlists.write",
+    "library.acquisition.search": "library.import.manage",
+    "library.acquisition.write": "library.import.manage",
     "library.analysis.run": "library.analysis.manage",
     "library.enrichment.run": "library.metadata.write",
     "library.health.read": "library.view",
@@ -232,6 +234,76 @@
   },
   "sdk_version": "2.3.0",
   "tools": [
+    {
+      "base_grant": "library.acquisition.write",
+      "contract_version": "1.2.0",
+      "description": "Apply an exact approved transfer plan through download admission; library publication needs a second plan.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "plan_version": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Plan Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "plan_version",
+          "idempotency_key"
+        ],
+        "title": "RepairApplyInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "ec0b927f8bd3519e5292e37b0e3fee2cc5d5fbec1fcf0f5be51a30a365428d26",
+      "name": "apply_acquisition",
+      "read_only": false
+    },
+    {
+      "base_grant": "library.acquisition.write",
+      "contract_version": "1.2.0",
+      "description": "Publish only the exact approved staged audio to an absent album; never overwrite or upgrade.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "plan_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "plan_version": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Plan Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "plan_version",
+          "idempotency_key"
+        ],
+        "title": "RepairApplyInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "ec0b927f8bd3519e5292e37b0e3fee2cc5d5fbec1fcf0f5be51a30a365428d26",
+      "name": "apply_acquisition_publication",
+      "read_only": false
+    },
     {
       "base_grant": "ops.jobs.cancel",
       "contract_version": "1.2.0",
@@ -995,6 +1067,33 @@
       "input_schema_sha256": "e6deca1fcd346b670b5fa4841b56f3a9466281477de63098a305d763601b0434",
       "name": "editorial_publication_set",
       "read_only": false
+    },
+    {
+      "base_grant": "library.acquisition.search",
+      "contract_version": "1.2.0",
+      "description": "Check supported provider configuration and exact batch API readiness; no download.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "enum": [
+              "soulseek",
+              "tidal",
+              "bandcamp"
+            ],
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "AcquisitionReadiness",
+        "type": "object"
+      },
+      "input_schema_sha256": "09671155d3c179514ccb06a9a725c86e1352c76632a6fd5b967db7bba33a4576",
+      "name": "get_acquisition_readiness",
+      "read_only": true
     },
     {
       "base_grant": "library.health.read",
@@ -1820,6 +1919,97 @@
       },
       "input_schema_sha256": "3a5e1f40c5a9e6518e0ac368699f6bd061c5d8c79ec25ac92f9ab4ed034e8ee6",
       "name": "plan_metadata_rehydrate",
+      "read_only": false
+    },
+    {
+      "base_grant": "library.acquisition.write",
+      "contract_version": "1.2.0",
+      "description": "Prepare a mandatory human-approved exact transfer plan from a server receipt and explicit caps.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "artist_uid": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Artist Uid",
+            "type": "string"
+          },
+          "destination_policy": {
+            "const": "provider_staging_only",
+            "title": "Destination Policy",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "max_bytes": {
+            "maximum": 2147483648,
+            "minimum": 1,
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "max_cost_minor": {
+            "const": 0,
+            "title": "Max Cost Minor",
+            "type": "integer"
+          },
+          "max_items": {
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "receipt_id": {
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Receipt Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "artist_uid",
+          "max_items",
+          "max_bytes",
+          "max_cost_minor",
+          "destination_policy",
+          "idempotency_key"
+        ],
+        "title": "AcquisitionPreview",
+        "type": "object"
+      },
+      "input_schema_sha256": "280b3a14bc7f4e2f646b9d10db1ce5a847a6f67f9b04738f0f34f781c4de4611",
+      "name": "preview_acquisition",
+      "read_only": false
+    },
+    {
+      "base_grant": "library.acquisition.write",
+      "contract_version": "1.2.0",
+      "description": "Prepare new-album publication from an owned transfer, binding actual staged audio hashes and destination.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "source_job_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_job_id",
+          "idempotency_key"
+        ],
+        "title": "AcquisitionPublication",
+        "type": "object"
+      },
+      "input_schema_sha256": "a2604bd007a9d39a8fd7b00575c734e789e678964c7a1701f09ac81d92637f0d",
+      "name": "preview_acquisition_publication",
       "read_only": false
     },
     {
@@ -3777,6 +3967,48 @@
       },
       "input_schema_sha256": "b71249e724b5081fae3c9701fc74b3071d43c290c1118c2b40e22f561046d053",
       "name": "run_schedule",
+      "read_only": false
+    },
+    {
+      "base_grant": "library.acquisition.search",
+      "contract_version": "1.2.0",
+      "description": "Search up to five exact zero-cost FLAC selections and mint owned source receipts. Never download automatically.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 5,
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "provider": {
+            "enum": [
+              "soulseek",
+              "tidal",
+              "bandcamp"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 160,
+            "minLength": 2,
+            "pattern": "^[^\\x00-\\x1f\\x7f]+$",
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "query"
+        ],
+        "title": "AcquisitionSearch",
+        "type": "object"
+      },
+      "input_schema_sha256": "02417daa699f96815cb247e57e42a81d3bfc62f476a0b28beff0e2b71df3be46",
+      "name": "search_acquisition",
       "read_only": false
     },
     {

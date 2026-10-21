@@ -361,7 +361,9 @@ def _accept(
             retry_after=5,
         )
     task_type = (
-        "show_extract"
+        "soulseek_download"
+        if payload.get("domain_operation") in {"acquisition", "acquisition_publish"}
+        else "show_extract"
         if operation == "extract_shows"
         else "agent_control"
         if payload.get("domain_operation") == "job_cancel"
@@ -695,7 +697,9 @@ def _execution_job(current, task_id):
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
     expected = (
-        "show_extract"
+        "soulseek_download"
+        if job["payload"].get("domain_operation") in {"acquisition", "acquisition_publish"}
+        else "show_extract"
         if job["operation"] == "extract_shows"
         else "agent_control"
         if job["payload"].get("domain_operation") == "job_cancel"
