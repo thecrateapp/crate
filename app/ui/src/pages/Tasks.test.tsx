@@ -107,14 +107,15 @@ describe("Tasks progress", () => {
         .getAllByText("Running", { exact: true })
         .some((node) => node.className.includes("text-accent-action-hi")),
     ).toBe(true);
-    act(() =>
-      taskStream.onmessage?.(
-        new MessageEvent("message", {
-          data: JSON.stringify(
-            taskSnapshot({ phase: "Scanning", done: 4, total: 8 }),
-          ),
-        }),
-      ),
+    act(
+      () =>
+        taskStream.onmessage?.(
+          new MessageEvent("message", {
+            data: JSON.stringify(
+              taskSnapshot({ phase: "Scanning", done: 4, total: 8 }),
+            ),
+          }),
+        ),
     );
     expect(bar).toHaveAttribute("aria-valuenow", "50");
     expect(streamCreated).toHaveBeenCalledExactlyOnceWith(

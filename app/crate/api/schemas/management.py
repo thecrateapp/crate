@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from crate.api.schemas.common import OkResponse, SnapshotMetadataResponse
 
@@ -123,16 +123,48 @@ class RepairRequest(BaseModel):
 
 
 class RepairIssuesRequest(BaseModel):
-    issues: list[dict[str, Any]] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    issues: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
+    preparation_task_id: str | None = Field(default=None, max_length=100)
     dry_run: bool = False
-    plan_version: str | None = None
-    plan_item_ids: list[str] = Field(default_factory=list)
+    plan_version: str | None = Field(default=None, max_length=100)
+    plan_item_ids: list[str] = Field(default_factory=list, max_length=20)
     confirm_risky: bool = False
+
+    @model_validator(mode="after")
+    def _validate_selection(self):
+        if not self.dry_run and not self.plan_version:
+            raise ValueError("A repair plan version is required for execution")
+        if not self.dry_run and not self.preparation_task_id:
+            raise ValueError("A completed repair preparation is required for execution")
+        if len(self.plan_item_ids) != len(set(self.plan_item_ids)):
+            raise ValueError("Duplicate repair item IDs")
+        identifiers = [issue.get("id") for issue in self.issues]
+        if any(type(value) is not int or value < 1 for value in identifiers):
+            raise ValueError("Canonical persisted issue IDs are required")
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("Duplicate repair issue IDs")
+        return self
 
 
 class RepairPreviewRequest(BaseModel):
-    issues: list[dict[str, Any]] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    issues: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
+    issue_ids: list[int] = Field(default_factory=list, max_length=20)
     auto_only: bool = False
+
+    @model_validator(mode="after")
+    def _canonical_ids(self):
+        if self.issue_ids and self.issues:
+            raise ValueError("Use issue_ids or the legacy issues field, not both")
+        ids = self.issue_ids or [issue.get("id") for issue in self.issues]
+        if any(type(value) is not int or value < 1 for value in ids) or len(
+            set(ids)
+        ) != len(ids):
+            raise ValueError("Canonical unique positive issue IDs are required")
+        return self
 
 
 class RepairCatalogEntryResponse(BaseModel):
@@ -181,6 +213,13 @@ class RepairPlanItemResponse(BaseModel):
 
 
 class RepairPreviewResponse(BaseModel):
+    artist: str | None = None
+    task_id: str | None = None
+    preparation_task_id: str | None = None
+    status: str = "ready"
+    error: str | None = None
+    document: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
     items: list[RepairPlanItemResponse] = Field(default_factory=list)
     total: int = 0
     executable: int = 0
@@ -190,7 +229,7 @@ class RepairPreviewResponse(BaseModel):
 
 
 class ArtistRepairPlanResponse(RepairPreviewResponse):
-    artist: str
+    artist: str = ""
 
 
 class MoveRequest(BaseModel):

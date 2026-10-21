@@ -12,7 +12,6 @@ from collections.abc import Mapping
 from typing import TypedDict
 
 from crate.db.home_taste_guardrails import track_version_penalty
-from crate.db.paths_llm_refinement import refine_music_path_with_llm
 from crate.db.queries.paths import load_artist_radio_graphs
 from crate.genre_taxonomy import get_genre_catalog, resolve_genre_slug, slugify_genre
 from crate.track_versions import track_song_identity
@@ -436,9 +435,31 @@ def compute_scene_path(
     step_count: int = 20,
     user_id: int | None = None,
 ) -> list[dict] | None:
-    """Compute a genre-driven path before falling back to acoustic interpolation."""
+    """Compatibility entry point for the service orchestration."""
+    from crate.music_paths import compute_scene_path as implementation
+
+    return implementation(
+        origin_type=origin_type,
+        origin_value=origin_value,
+        dest_type=dest_type,
+        dest_value=dest_value,
+        step_count=step_count,
+        user_id=user_id,
+    )
+
+
+def prepare_scene_path(
+    *,
+    origin_type: str,
+    origin_value: str,
+    dest_type: str,
+    dest_value: str,
+    step_count: int = 20,
+    user_id: int | None = None,
+) -> dict | None:
+    """Load and compute deterministic scene candidates without invoking AI."""
     if origin_type == "artist" and dest_type == "artist":
-        return _compute_artist_scene_path(
+        return _prepare_artist_scene_path(
             origin_value=origin_value,
             dest_value=dest_value,
             step_count=step_count,
@@ -473,7 +494,7 @@ def compute_scene_path(
     )
     if len(tracks) < 2:
         return None
-    tracks = refine_music_path_with_llm(
+    return dict(
         origin_label=origin_value,
         dest_label=dest_value,
         origin_type=origin_type,
@@ -482,19 +503,14 @@ def compute_scene_path(
         candidates_by_genre=candidates,
     )
 
-    return [
-        _make_path_entry(track, index, len(tracks), step_count)
-        for index, track in enumerate(tracks)
-    ]
 
-
-def _compute_artist_scene_path(
+def _prepare_artist_scene_path(
     *,
     origin_value: str,
     dest_value: str,
     step_count: int,
     user_id: int | None,
-) -> list[dict] | None:
+) -> dict | None:
     from crate.db.queries.paths_scene_queries import (
         get_artist_scene_profile,
         list_artist_scene_anchor_candidates,
@@ -549,7 +565,7 @@ def _compute_artist_scene_path(
     )
     if len(tracks) < 2:
         return None
-    tracks = refine_music_path_with_llm(
+    return dict(
         origin_label=str(origin_profile.get("name") or origin_value),
         dest_label=str(dest_profile.get("name") or dest_value),
         origin_type="artist",
@@ -557,11 +573,6 @@ def _compute_artist_scene_path(
         tracks=tracks,
         candidates_by_genre=candidates,
     )
-
-    return [
-        _make_path_entry(track, index, len(tracks), step_count)
-        for index, track in enumerate(tracks)
-    ]
 
 
 def _select_artist_scene_route(
@@ -1503,4 +1514,5 @@ __all__ = [
     "build_scene_genre_route",
     "build_scene_path_from_candidates",
     "compute_scene_path",
+    "prepare_scene_path",
 ]

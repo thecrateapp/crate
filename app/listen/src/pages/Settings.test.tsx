@@ -58,6 +58,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
       if (url === "/api/auth/subsonic-token") {
         return { configured: credentialState.configured };
       }
+      if (url === "/api/auth/access-tokens") {
+        return [];
+      }
       return {};
     }),
   };

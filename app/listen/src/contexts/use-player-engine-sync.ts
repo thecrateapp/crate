@@ -183,6 +183,8 @@ export function usePlayerEngineSync({
 
   const { pushToEngine } = usePlayerEngineQueueSync({
     repeatRef,
+    playSourceRef,
+    shuffleRef,
     isPlayingRef,
     effectiveCrossfadeMsRef,
     bufferingIntentRef,

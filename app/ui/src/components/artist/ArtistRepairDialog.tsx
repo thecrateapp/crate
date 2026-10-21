@@ -24,6 +24,7 @@ import {
 import { api } from "@/lib/api";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { artistManagementApiPath } from "@/lib/library-routes";
+import { waitForTask } from "@/lib/tasks";
 
 interface RepairIssuePayload {
   id?: number;
@@ -69,6 +70,9 @@ interface ArtistRepairPlanResponse {
   manual_only: number;
   plan_version?: string | null;
   generated_at?: string | null;
+  task_id?: string | null;
+  preparation_task_id?: string | null;
+  status?: string;
 }
 
 interface ArtistRepairDialogProps {
@@ -234,12 +238,32 @@ export function ArtistRepairDialog({
       if (!endpoint) return;
       setLoading(true);
       try {
-        const data = await api<ArtistRepairPlanResponse>(
+        const queued = await api<ArtistRepairPlanResponse>(
           endpoint,
-          "GET",
+          "POST",
           undefined,
           { signal },
         );
+        let data = queued;
+        if (queued.task_id) {
+          const completionPath = `/api/manage/repair-preparations/${encodeURIComponent(
+            queued.task_id,
+          )}`;
+          const completion = await waitForTask(
+            queued.task_id,
+            1800000,
+            signal,
+            completionPath,
+          );
+          if (completion.status !== "completed")
+            throw new Error("Repair preparation failed");
+          data = await api<ArtistRepairPlanResponse>(
+            completionPath,
+            "GET",
+            undefined,
+            { signal },
+          );
+        }
         if (signal?.aborted) return null;
         setPlan(data);
         const nextExecutableKeys = data.items.reduce<string[]>((keys, item) => {
@@ -256,6 +280,7 @@ export function ArtistRepairDialog({
         onIssueCountChange?.(data.total);
         return data;
       } catch {
+        if (signal?.aborted) return null;
         toast.error("Failed to load repair plan");
         return null;
       } finally {
@@ -379,12 +404,19 @@ export function ArtistRepairDialog({
           latestEventMessage,
         ),
     );
+    const resultIncomplete = [
+      "partial",
+      "failed",
+      "conflict",
+      "cancelled",
+    ].includes(String(done.result?.status ?? ""));
     const success =
-      doneStatus === "completed" ||
-      (!done.error &&
-        (Boolean(done.result) || latestMessageLooksSuccessful) &&
-        doneStatus !== "failed" &&
-        doneStatus !== "cancelled");
+      !resultIncomplete &&
+      (doneStatus === "completed" ||
+        (!done.error &&
+          (Boolean(done.result) || latestMessageLooksSuccessful) &&
+          doneStatus !== "failed" &&
+          doneStatus !== "cancelled"));
     const errorMessage = done.error || latestEventMessage || "Task failed";
     const revalidation = done.result?.revalidation as
       | Record<string, unknown>
@@ -505,7 +537,7 @@ export function ArtistRepairDialog({
         "POST",
         {
           dry_run: false,
-          issues,
+          preparation_task_id: plan?.preparation_task_id ?? null,
           plan_version: plan?.plan_version ?? null,
           plan_item_ids: items.map((item) => repairPlanItemId(item)),
           confirm_risky: items.some((item) => item.requires_confirmation),

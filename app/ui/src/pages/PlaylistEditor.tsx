@@ -49,7 +49,7 @@ import {
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
-import { useLLMStatus } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ApiError, api, apiSseUrl } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 
@@ -167,6 +167,8 @@ interface RefinementAction {
 }
 
 interface RefinementProposal {
+  proposal_id: string;
+  editorial_revision: number;
   summary: string;
   issues: RefinementIssue[];
   actions: RefinementAction[];
@@ -280,6 +282,10 @@ function getFieldType(field: string): "text" | "number" {
 
 function getOpsForField(field: string) {
   return getFieldType(field) === "text" ? TEXT_OPS : NUMBER_OPS;
+}
+
+function numericRuleInput(field: string, value: string): string | number {
+  return field === "year" ? value : Number(value);
 }
 
 function formatMinutes(totalSeconds: number): string {
@@ -419,10 +425,11 @@ export function PlaylistEditor() {
   const { data: filterOptions } = useApi<FilterOptions>(
     "/api/playlists/filter-options",
   );
-  const llmStatus = useLLMStatus();
+  const llmStatus = useActionLLMStatus("playlists.description.generate");
   const llmAvailable = llmStatus?.available ?? false;
   const llmUnavailableReason =
-    llmStatus?.error || "Configure an LLM provider before generating copy.";
+    llmStatus?.error_code ||
+    "Configure an LLM provider before generating copy.";
   const [liveSurface, setLiveSurface] = useState<PlaylistEditorSurface | null>(
     null,
   );
@@ -511,13 +518,31 @@ export function PlaylistEditor() {
   const isSmart = basePlaylist?.is_smart ?? false;
   const persistedSmartRules = basePlaylist?.smart_rules;
   const currentSmartRules = useMemo(
-    () => ({ match, rules, limit, sort }),
-    [limit, match, rules, sort],
+    () => ({
+      ...persistedSmartRules,
+      match,
+      rules: rules.map((rule) =>
+        rule.field === "year"
+          ? {
+              ...rule,
+              value: Array.isArray(rule.value)
+                ? rule.value.map(String)
+                : String(rule.value),
+            }
+          : rule,
+      ),
+      limit,
+      sort,
+    }),
+    [persistedSmartRules, limit, match, rules, sort],
   );
   const smartRulesChanged =
     isSmart &&
-    JSON.stringify(currentSmartRules) !==
-      JSON.stringify(persistedSmartRules ?? null);
+    (match !== (persistedSmartRules?.match || "all") ||
+      limit !== (persistedSmartRules?.limit || 50) ||
+      sort !== (persistedSmartRules?.sort || "random") ||
+      JSON.stringify(rules) !==
+        JSON.stringify(persistedSmartRules?.rules || []));
 
   useEffect(() => {
     if (!isSmart && trackSearchScope === "rules") {
@@ -573,7 +598,7 @@ export function PlaylistEditor() {
         is_curated: isCurated,
       };
       if (isSmart) {
-        body.smart_rules = currentSmartRules;
+        if (smartRulesChanged) body.smart_rules = currentSmartRules;
         body.auto_refresh_enabled = autoRefresh;
       }
       await api(`/api/admin/system-playlists/${id}`, "PUT", body);
@@ -593,6 +618,7 @@ export function PlaylistEditor() {
     isActive,
     isCurated,
     isSmart,
+    smartRulesChanged,
     name,
     currentSmartRules,
     refetch,
@@ -809,10 +835,6 @@ export function PlaylistEditor() {
   );
 
   const handleRefineTracklist = useCallback(async () => {
-    if (!llmAvailable) {
-      toast.error(llmUnavailableReason);
-      return;
-    }
     setRefining(true);
     try {
       const result = await api<RefinementProposal>(
@@ -820,20 +842,20 @@ export function PlaylistEditor() {
         "POST",
       );
       setRefineProposal(result);
-      toast.success("AI refinement staged for review");
+      toast.success("Refinement staged for review");
     } catch (error) {
       toast.error(apiErrorDetail(error, "Failed to refine tracklist"));
     } finally {
       setRefining(false);
     }
-  }, [id, llmAvailable, llmUnavailableReason]);
+  }, [id]);
 
   const handleApplyRefinement = useCallback(async () => {
     if (!refineProposal?.actions.length) return;
     setApplyingRefinement(true);
     try {
       await api(`/api/admin/system-playlists/${id}/refine/apply`, "POST", {
-        actions: refineProposal.actions,
+        proposal_id: refineProposal.proposal_id,
         action_ids: refineProposal.actions.map((action) => action.id),
       });
       toast.success("Refinement applied");
@@ -1087,6 +1109,7 @@ export function PlaylistEditor() {
                 />
                 <div className="flex justify-end">
                   <AIButton
+                    actionId="playlists.description.generate"
                     type="button"
                     onClick={handleGenerateDescription}
                     loading={describing}
@@ -1332,10 +1355,18 @@ export function PlaylistEditor() {
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
-                                        Number(event.target.value),
-                                        Array.isArray(rule.value)
-                                          ? Number(rule.value[1] ?? 0)
-                                          : 0,
+                                        numericRuleInput(
+                                          rule.field,
+                                          event.target.value,
+                                        ),
+                                        numericRuleInput(
+                                          rule.field,
+                                          String(
+                                            Array.isArray(rule.value)
+                                              ? (rule.value[1] ?? "")
+                                              : "",
+                                          ),
+                                        ),
                                       ],
                                     })
                                   }
@@ -1352,10 +1383,18 @@ export function PlaylistEditor() {
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
-                                        Array.isArray(rule.value)
-                                          ? Number(rule.value[0] ?? 0)
-                                          : 0,
-                                        Number(event.target.value),
+                                        numericRuleInput(
+                                          rule.field,
+                                          String(
+                                            Array.isArray(rule.value)
+                                              ? (rule.value[0] ?? "")
+                                              : "",
+                                          ),
+                                        ),
+                                        numericRuleInput(
+                                          rule.field,
+                                          event.target.value,
+                                        ),
                                       ],
                                     })
                                   }
@@ -1385,7 +1424,10 @@ export function PlaylistEditor() {
                                   updateRule(index, {
                                     value:
                                       getFieldType(rule.field) === "number"
-                                        ? Number(event.target.value)
+                                        ? numericRuleInput(
+                                            rule.field,
+                                            event.target.value,
+                                          )
                                         : event.target.value,
                                   })
                                 }
@@ -1557,19 +1599,15 @@ export function PlaylistEditor() {
                     are locked against future auto-refreshes.
                   </p>
                 </div>
-                <AIButton
+                <Button
                   type="button"
                   onClick={handleRefineTracklist}
-                  loading={refining}
-                  disabled={
-                    refining ||
-                    !llmAvailable ||
-                    (playlist.tracks?.length ?? 0) === 0
-                  }
-                  title={!llmAvailable ? llmUnavailableReason : undefined}
+                  disabled={refining || (playlist.tracks?.length ?? 0) === 0}
                 >
-                  Refine tracklist with AI
-                </AIButton>
+                  {refining
+                    ? "Preparing refinements..."
+                    : "Suggest refinements"}
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1687,7 +1725,7 @@ export function PlaylistEditor() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                        AI refinement proposal
+                        Editorial refinement proposal
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {refineProposal.summary}

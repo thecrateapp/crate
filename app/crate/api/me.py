@@ -12,6 +12,7 @@ from starlette.responses import StreamingResponse
 
 from crate.api import native_oauth_auth
 from crate.api.auth_dependencies import require_auth as _require_auth
+from crate.api.auth import _require_vdj_scope
 from crate.api._deps import (
     artist_name_from_id,
     coerce_date as _coerce_date,
@@ -1377,7 +1378,7 @@ def _context_playlist_id(body: RecordPlayEventRequest) -> int | None:
     summary="Record a rich play event",
 )
 def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
-    user = _require_auth(request)
+    user = _require_vdj_scope(request, "vdj.play_events.write")
     content_origin = "local"
     source_node_uid = None
     if body.playback_session:
@@ -2332,7 +2333,7 @@ def update_location(request: Request, body: UpdateLocationBody):
     responses=AUTH_ERROR_RESPONSES,
     summary="Search cities for show-location autocomplete",
 )
-def search_cities_endpoint(request: Request, q: str = Query("", min_length=2)):
+def search_cities_endpoint(request: Request, q: str = Query(..., min_length=2)):
     """Search cities for autocomplete."""
     _require_auth(request)
     from crate.geolocation import search_cities

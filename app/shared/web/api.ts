@@ -23,6 +23,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public retryAfterMs?: number,
+    public code?: string,
   ) {
     super(message);
   }
@@ -120,7 +121,12 @@ export function createApiClient(options: ApiClientOptions = {}) {
             onUnauthorized();
           }
           const text = await res.text().catch(() => "Request failed");
-          throw new ApiError(res.status, text, retryAfterMs(res));
+          throw new ApiError(
+            res.status,
+            text,
+            retryAfterMs(res),
+            res.headers?.get?.("X-Crate-Error") ?? undefined,
+          );
         }
         const text = await res.text();
         return text ? JSON.parse(text) : (null as T);

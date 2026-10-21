@@ -291,7 +291,9 @@ def load_candidate_content(
     return content, origin
 
 
-def analyze_candidate_image(content: bytes) -> ArtistHeroVisualAnalysis | None:
+def analyze_candidate_image(
+    content: bytes, *, actor_id=None
+) -> ArtistHeroVisualAnalysis | None:
     prompt = (
         "Evaluate this artist photo for a music app hero. Desktop is a 1480x600 "
         "canvas with text on the left; mobile is a 1080x1350 canvas with text near "
@@ -299,9 +301,14 @@ def analyze_candidate_image(content: bytes) -> ArtistHeroVisualAnalysis | None:
         "give a normalized focal point for each format, and explain briefly."
     )
     try:
+        from crate.ai.consumers import resolve_call
+
         return ask_image_structured(
             ArtistHeroVisualAnalysis,
             prompt,
+            action_id="artwork.hero.analyze",
+            **resolve_call("artwork.hero.analyze", actor_id=actor_id),
+            private_response=True,
             image=content,
             media_type="image/jpeg",
             system="You are an editorial art director. Do not propose generative edits.",

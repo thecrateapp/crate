@@ -36,6 +36,7 @@ type Server struct {
 	catalog         *catalog.Store
 	localMedia      localMediaCatalog
 	artworkCatalog  artworkCatalog
+	smartMixCatalog smartMixCatalog
 	artworkResolver *media.ArtworkResolver
 	mediaMetrics    *observability.MediaMetrics
 	snapshots       *snapshots.Store
@@ -65,6 +66,13 @@ type artworkCatalog interface {
 	GlobalAlbumArtworkKey(context.Context, string) (string, error)
 }
 
+type smartMixCatalog interface {
+	SmartMixProfileSummaryByEntityUID(
+		context.Context,
+		string,
+	) (snapshots.SmartMixProfileSummary, error)
+}
+
 // NewServer assembles a Server from its dependencies.
 func NewServer(
 	cfg config.Config,
@@ -91,6 +99,7 @@ func NewServer(
 	if catalogStore != nil {
 		server.localMedia = catalogStore
 		server.artworkCatalog = catalogStore
+		server.smartMixCatalog = catalogStore
 	}
 	server.artworkResolver = media.NewArtworkResolver(cfg.CacheRoot)
 	server.mediaMetrics = observability.NewMediaMetrics()

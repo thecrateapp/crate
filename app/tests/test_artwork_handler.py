@@ -28,6 +28,9 @@ def _mock_emit_silence(monkeypatch):
             f"crate.worker_handlers.artwork.{name}",
             lambda *args, **kwargs: None,
         )
+    monkeypatch.setattr(
+        "crate.worker_handlers.artwork.is_cancelled", lambda _task_id: False
+    )
 
 
 def _mock_caa(monkeypatch, return_value=None):
@@ -515,6 +518,9 @@ class TestHandleBatchCovers:
 
     def test_no_mbid_records_error(self, monkeypatch):
         _mock_emit_silence(monkeypatch)
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.is_cancelled", lambda _task_id: False
+        )
         result = _handle_batch_covers(
             "task-1",
             {"albums": [{"path": "some/path"}]},
@@ -1286,6 +1292,9 @@ class TestHandleFetchArtworkAll:
         assert fetch_called == []
 
     def test_marks_failed_when_caa_empty(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.is_cancelled", lambda _task_id: False
+        )
         lib = tmp_path / "library"
         lib.mkdir()
 
@@ -1385,6 +1394,9 @@ class TestHandleScanMissingCovers:
         assert result["not_found"] == 0
 
     def test_auto_apply_saves_cover(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.is_cancelled", lambda _task_id: False
+        )
         lib = tmp_path / "library"
         lib.mkdir()
 

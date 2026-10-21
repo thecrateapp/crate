@@ -64,7 +64,8 @@ def upsert_ui_snapshot(
                     built_at = EXCLUDED.built_at,
                     source_seq = COALESCE(EXCLUDED.source_seq, ui_snapshots.source_seq),
                     generation_ms = EXCLUDED.generation_ms,
-                    stale_after = EXCLUDED.stale_after
+                    stale_after = EXCLUDED.stale_after,
+                    invalidated_at = NULL
                 RETURNING scope, subject_key, version, payload_json, built_at, source_seq, generation_ms, stale_after
                 """
                 ),
@@ -116,7 +117,7 @@ def mark_ui_snapshots_stale(
 
     query = (
         "UPDATE ui_snapshots "
-        "SET stale_after = :stale_after "
+        "SET stale_after = :stale_after, invalidated_at = NOW() "
         f"WHERE {' AND '.join(clauses)}"
     )
 

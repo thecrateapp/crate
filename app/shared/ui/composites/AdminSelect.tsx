@@ -52,6 +52,7 @@ interface AdminSelectProps
   triggerClassName?: string;
   menuClassName?: string;
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 const DEFAULT_TRIGGER_CLASS = "min-w-[140px] max-w-[220px] px-4";
@@ -69,6 +70,7 @@ export function AdminSelect({
   menuClassName,
   disabled = false,
   id,
+  ariaLabel,
   ...triggerProps
 }: AdminSelectProps) {
   const [open, setOpen] = useState(false);
@@ -121,7 +123,7 @@ export function AdminSelect({
         <SelectTrigger
           {...triggerProps}
           id={triggerId}
-          aria-label={placeholder}
+          aria-label={ariaLabel ?? placeholder}
           className={cn(DEFAULT_TRIGGER_CLASS, triggerClassName)}
         >
           <SelectValue placeholder={placeholder}>
@@ -222,7 +224,7 @@ export function AdminSelect({
           id={triggerId}
           type="button"
           role="combobox"
-          aria-label={placeholder}
+          aria-label={ariaLabel ?? placeholder}
           aria-expanded={open && !disabled}
           aria-controls={listboxId}
           aria-haspopup="listbox"
@@ -299,7 +301,7 @@ export function AdminSelect({
         <div
           id={listboxId}
           role="listbox"
-          aria-label={placeholder}
+          aria-label={ariaLabel ?? placeholder}
           className="max-h-[220px] overflow-y-auto p-1"
         >
           {menuOptions.map((option, index) => (

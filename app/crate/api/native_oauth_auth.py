@@ -14,6 +14,11 @@ from crate.db.repositories.auth_shared import coerce_datetime
 
 NATIVE_OAUTH_CALLBACK_URL = "cratemusic://oauth/callback"
 NATIVE_OAUTH_LINK_CALLBACK_URL = "cratemusic://oauth/link-callback"
+NATIVE_OAUTH_DEBUG_CALLBACK_URL = "cratemusic-dbg://oauth/callback"
+NATIVE_OAUTH_CALLBACK_URLS = frozenset(
+    {NATIVE_OAUTH_CALLBACK_URL, NATIVE_OAUTH_DEBUG_CALLBACK_URL}
+)
+NATIVE_OAUTH_SCHEMES = ("cratemusic://", "cratemusic-dbg://")
 NATIVE_OAUTH_CHALLENGE_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 NATIVE_OAUTH_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 NATIVE_OAUTH_VERIFIER_RE = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
@@ -36,6 +41,10 @@ def is_native_listen_app_id(app_id: str | None) -> bool:
     }
 
 
+def is_native_callback_url(value: str | None) -> bool:
+    return (value or "").startswith(NATIVE_OAUTH_SCHEMES)
+
+
 def validate_native_oauth_start(
     *,
     app_id: str | None,
@@ -44,8 +53,8 @@ def validate_native_oauth_start(
     challenge: str | None,
     state: str | None,
 ) -> bool:
-    native_callback = (return_to or "").startswith("cratemusic://")
-    if native_callback and return_to != NATIVE_OAUTH_CALLBACK_URL:
+    native_callback = is_native_callback_url(return_to)
+    if native_callback and return_to not in NATIVE_OAUTH_CALLBACK_URLS:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     requested = challenge is not None or state is not None
     if not requested:
@@ -59,7 +68,7 @@ def validate_native_oauth_start(
         )
     if mode != "login" or not is_native_listen_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
-    if return_to != NATIVE_OAUTH_CALLBACK_URL:
+    if return_to not in NATIVE_OAUTH_CALLBACK_URLS:
         raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
     if not challenge or not state:
         raise HTTPException(status_code=400, detail="Incomplete native OAuth binding")

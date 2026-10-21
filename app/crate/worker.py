@@ -6,7 +6,7 @@ from importlib import import_module
 
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
-from crate.db.queries.tasks import get_task, get_task_activity_snapshot
+from crate.db.queries.tasks import get_task_activity_snapshot
 from crate.db.repositories.tasks import (
     cleanup_zombie_tasks,
     redispatch_stale_pending_tasks,
@@ -50,11 +50,9 @@ def _configured_worker_slots(config: dict) -> int:
 
 
 def _is_cancelled(task_id: str) -> bool:
-    try:
-        task = get_task(task_id)
-        return task is not None and task.get("status") == "cancelled"
-    except Exception:
-        return False
+    from crate.worker_handlers import is_cancelled
+
+    return is_cancelled(task_id)
 
 
 def run_worker(config: dict):
@@ -236,6 +234,9 @@ def _run_periodic_cleanup(config: dict | None = None) -> None:
     )
     from crate.db.worker_logs import cleanup_old_logs
 
+    from crate.db.repositories.show_extraction_jobs import cleanup_expired_show_sources
+
+    cleanup_expired_show_sources()
     cleanup_old_events(max_age_hours=48)
     cleanup_old_tasks(max_age_days=7)
     cleanup_expired_sessions(max_age_days=3, stale_age_days=30)
@@ -537,6 +538,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
 
 _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
+        "crate.worker_handlers.ai_configuration",
+        "AI_CONFIGURATION_TASK_HANDLERS",
+        ("ai_catalog_refresh", "ai_profile_test"),
+    ),
+    (
         "crate.worker_handlers.acquisition",
         "ACQUISITION_TASK_HANDLERS",
         (
@@ -588,6 +594,9 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_musicbrainz_genre_graph",
             "cleanup_invalid_genre_taxonomy",
             "compute_popularity",
+            "compute_smart_mix_profile",
+            "backfill_smart_mix_profiles",
+            "refresh_smart_mix_coverage",
             "backfill_track_audio_fingerprints",
             "analyze_tracks",
             "analyze_all",
@@ -689,9 +698,25 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.quality",
+        "QUALITY_TASK_HANDLERS",
+        ("quality_check",),
+    ),
+    (
+        "crate.worker_handlers.show_imports",
+        "SHOW_IMPORT_TASK_HANDLERS",
+        ("show_extract",),
+    ),
+    (
+        "crate.worker_handlers.agent_library",
+        "AGENT_LIBRARY_TASK_HANDLERS",
+        ("agent_maintenance", "agent_control"),
+    ),
+    (
         "crate.worker_handlers.management",
         "MANAGEMENT_TASK_HANDLERS",
         (
+            "prepare_library_repairs",
             "health_check",
             "repair",
             "repair_duplicate_tracks",

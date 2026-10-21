@@ -942,7 +942,7 @@ def api_artist_hero_candidate_preview(request: Request, artist_id: int, candidat
 def api_analyze_artist_hero_candidate(
     request: Request, artist_id: int, body: ArtistHeroCandidateAnalysisRequest
 ):
-    _require_artwork_editor(request)
+    actor = _require_artwork_editor(request)
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
@@ -960,7 +960,7 @@ def api_analyze_artist_hero_candidate(
     )
     if loaded is None:
         return JSONResponse({"error": "Candidate not found"}, status_code=404)
-    analysis = analyze_candidate_image(loaded[0])
+    analysis = analyze_candidate_image(loaded[0], actor_id=actor.get("id"))
     if analysis is None:
         return JSONResponse(
             {"error": "The configured model cannot analyze images"}, status_code=409

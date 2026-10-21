@@ -98,34 +98,13 @@
     "snapshot": null
   },
   "filterOptions": {
-    "genres": [
-      "Ambient",
-      "Rock"
-    ],
-    "formats": [
-      "flac",
-      "mp3"
-    ],
-    "keys": [
-      "Am",
-      "C"
-    ],
-    "artists": [
-      "Costa Norte",
-      "Bruma"
-    ],
-    "scales": [
-      "major",
-      "minor"
-    ],
-    "year_range": [
-      "1980",
-      "2026"
-    ],
-    "bpm_range": [
-      60,
-      200
-    ]
+    "genres": ["Ambient", "Rock"],
+    "formats": ["flac", "mp3"],
+    "keys": ["Am", "C"],
+    "artists": ["Costa Norte", "Bruma"],
+    "scales": ["major", "minor"],
+    "year_range": ["1980", "2026"],
+    "bpm_range": [60, 200]
   },
   "candidates": [
     {
@@ -167,10 +146,7 @@
     },
     "duration_total_sec": 630,
     "avg_year": 2025,
-    "year_range": [
-      2024,
-      2026
-    ]
+    "year_range": [2024, 2026]
   },
   "proposal": {
     "summary": "Una pista duplicada puede retirarse.",
@@ -179,10 +155,7 @@
         "type": "duplicate",
         "severity": "warning",
         "message": "Duplicado de muestra detectado.",
-        "positions": [
-          1,
-          2
-        ]
+        "positions": [1, 2]
       }
     ],
     "actions": [
@@ -195,7 +168,9 @@
         "track_id": 11
       }
     ],
-    "score_version": "playlist_refinement_v1"
+    "score_version": "editorial-v1",
+    "proposal_id": "review-proposal-1",
+    "editorial_revision": 1
   },
   "description": {
     "description": "Una selección nocturna de ambient y costa.",

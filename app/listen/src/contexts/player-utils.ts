@@ -36,7 +36,6 @@ export function getStoredVolume(): number {
 
 export interface StoredQueue {
   queue: Track[];
-  playSource: PlaySource | null;
   currentIndex: number;
   currentTime: number;
   wasPlaying: boolean;
@@ -51,6 +50,7 @@ export interface StoredQueue {
    * active at persistence time. `null` when shuffle was off.
    */
   unshuffledQueue: Track[] | null;
+  playSource: PlaySource | null;
   savedAt: string | null;
 }
 
@@ -70,19 +70,12 @@ export function getStoredQueue(): StoredQueue {
           : null;
         const storedQueue = {
           queue,
-          playSource:
-            parsed.playSource &&
-            typeof parsed.playSource.name === "string" &&
-            ["album", "crate", "playlist", "radio", "track", "queue"].includes(
-              parsed.playSource.type,
-            )
-              ? (parsed.playSource as PlaySource)
-              : null,
           currentIndex: parsed.currentIndex ?? 0,
           currentTime: parsed.currentTime ?? 0,
           wasPlaying: parsed.wasPlaying === true,
           shuffle: parsed.shuffle === true,
           unshuffledQueue,
+          playSource: persistablePlaySource(parsed.playSource),
           savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
         };
         if (fromLegacy) {
@@ -101,13 +94,43 @@ export function getStoredQueue(): StoredQueue {
   }
   return {
     queue: [],
-    playSource: null,
     currentIndex: 0,
     currentTime: 0,
     wasPlaying: false,
     shuffle: false,
     unshuffledQueue: null,
+    playSource: null,
     savedAt: null,
+  };
+}
+
+const PERSISTED_PLAY_SOURCE_TYPES = new Set<PlaySource["type"]>([
+  "album",
+  "crate",
+  "playlist",
+  "radio",
+  "track",
+  "queue",
+]);
+
+function persistablePlaySource(value: unknown): PlaySource | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<PlaySource>;
+  if (
+    !source.type ||
+    !PERSISTED_PLAY_SOURCE_TYPES.has(source.type) ||
+    typeof source.name !== "string"
+  ) {
+    return null;
+  }
+  return {
+    type: source.type,
+    name: source.name,
+    id:
+      typeof source.id === "string" || typeof source.id === "number"
+        ? source.id
+        : null,
+    href: typeof source.href === "string" ? source.href : null,
   };
 }
 
@@ -128,11 +151,11 @@ function normalizeStoredTrack(track: Track): Track {
 }
 
 export interface SaveQueueOptions {
-  playSource?: PlaySource | null;
   currentTime?: number;
   wasPlaying?: boolean;
   shuffle?: boolean;
   unshuffledQueue?: Track[] | null;
+  playSource?: PlaySource | null;
 }
 
 export function saveQueue(
@@ -149,12 +172,14 @@ export function saveQueue(
       STORAGE_KEY,
       JSON.stringify({
         queue: safeQueue,
-        playSource: safeQueue.length ? (options.playSource ?? null) : null,
         currentIndex,
         currentTime: options.currentTime ?? 0,
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
         unshuffledQueue: safeUnshuffled,
+        playSource: safeQueue.length
+          ? persistablePlaySource(options.playSource)
+          : null,
         savedAt: new Date().toISOString(),
       }),
     );
@@ -243,7 +268,7 @@ export function getOfflineStreamUrl(
 ): string | null {
   if (!track.entityUid && !track.path) return null;
   return getOfflineNativePlaybackUrl(
-    track.entityUid ? { entityUid: track.entityUid } : (track.path ?? null),
+    track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
     undefined,
     options,
   );

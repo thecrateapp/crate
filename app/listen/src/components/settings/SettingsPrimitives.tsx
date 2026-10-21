@@ -154,7 +154,7 @@ export function ToggleRow({
   label,
   description,
   checked,
-  disabled,
+  disabled = false,
   onChange,
 }: {
   label: string;

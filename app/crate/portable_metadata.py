@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import shutil
+import stat
 import tempfile
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -16,6 +18,74 @@ PORTABLE_SCHEMA_VERSION = 1
 TAG_SCHEMA_VERSION = "1"
 _ARTWORK_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 _ARTWORK_NAMES = {"cover", "folder", "front", "album", "artwork"}
+MAX_SIDECAR_BYTES = 16 * 1024 * 1024
+MAX_SIDECAR_TRACKS = 10000
+
+
+def _safe_relative(value: Any) -> Path:
+    raw = str(value or "")
+    path = Path(raw)
+    if (
+        not raw
+        or "\\" in raw
+        or "\x00" in raw
+        or path.is_absolute()
+        or ".." in path.parts
+    ):
+        raise ValueError("Metadata path must stay inside its album")
+    if not path.parts or path == Path("."):
+        raise ValueError("Metadata path is empty")
+    return path
+
+
+def _album_root(value: str | Path) -> Path:
+    root = Path(value).absolute()
+    current = Path(root.anchor)
+    for part in root.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("Symlink album directory components are not supported")
+    return root
+
+
+def _contained_path(root: Path, relative: str | Path) -> Path:
+    relative = _safe_relative(relative)
+    candidate = root / relative
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("Symlink metadata paths are not supported")
+    if not candidate.resolve().is_relative_to(root.resolve()):
+        raise ValueError("Metadata path is outside its album")
+    return candidate
+
+
+def _track_relative(track: dict[str, Any], album_dir: Path) -> Path:
+    relative = track.get("relative_path") or track.get("filename")
+    path = track.get("path")
+    if path:
+        source = Path(str(path)).absolute()
+        try:
+            actual_relative = source.relative_to(album_dir)
+        except ValueError:
+            raise ValueError("Track source is outside its album") from None
+        _contained_path(album_dir, actual_relative)
+        if not relative:
+            relative = str(actual_relative)
+    return _safe_relative(relative)
+
+
+def _copy_regular_file(source: Path, target: Path) -> None:
+    source_fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(source_fd, "rb") as reader:
+        if not stat.S_ISREG(os.fstat(reader.fileno()).st_mode):
+            raise ValueError("Metadata source is not a regular file")
+        target_fd = os.open(
+            target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+        )
+        with os.fdopen(target_fd, "wb") as writer:
+            shutil.copyfileobj(reader, writer)
 
 
 def _json_default(value: Any) -> str:
@@ -59,7 +129,11 @@ def _find_artwork_files(album_dir: Path) -> list[str]:
         return []
     matches: list[str] = []
     for child in album_dir.iterdir():
-        if not child.is_file() or child.suffix.lower() not in _ARTWORK_EXTENSIONS:
+        if (
+            child.is_symlink()
+            or not child.is_file()
+            or child.suffix.lower() not in _ARTWORK_EXTENSIONS
+        ):
             continue
         stem = child.stem.lower().strip()
         if stem in _ARTWORK_NAMES or stem.startswith("cover"):
@@ -68,10 +142,19 @@ def _find_artwork_files(album_dir: Path) -> list[str]:
 
 
 def _sidecar_payload(album_payload: dict[str, Any], album_dir: Path) -> dict[str, Any]:
-    payload = dict(album_payload)
+    payload = {
+        key: value for key, value in album_payload.items() if not key.startswith("_")
+    }
     album = dict(payload.get("album") or {})
     album["artwork_files"] = _find_artwork_files(album_dir)
     payload["album"] = album
+    tracks = payload.get("tracks") or []
+    if not isinstance(tracks, list) or len(tracks) > MAX_SIDECAR_TRACKS:
+        raise ValueError("Invalid portable track list")
+    payload["tracks"] = [
+        {**track, "relative_path": str(_track_relative(track, album_dir))}
+        for track in tracks
+    ]
     payload["schema_version"] = PORTABLE_SCHEMA_VERSION
     payload["generated_at"] = datetime.now(timezone.utc).isoformat()
     return payload
@@ -83,11 +166,27 @@ def write_album_sidecar(album_payload: dict[str, Any]) -> Path:
     if not album_path:
         raise ValueError("album payload does not include a path")
 
-    album_dir = Path(str(album_path))
+    album_dir = _album_root(str(album_path))
+    if not album_dir.is_dir():
+        raise ValueError("Album directory is unavailable")
+    _contained_path(album_dir, ".crate/album.json")
     sidecar_dir = album_dir / ".crate"
     sidecar_dir.mkdir(parents=True, exist_ok=True)
     sidecar_path = sidecar_dir / "album.json"
     payload = _sidecar_payload(album_payload, album_dir)
+    serialized = (
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+            default=_json_default,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+    if len(serialized.encode("utf-8")) > MAX_SIDECAR_BYTES:
+        raise ValueError("Portable sidecar exceeds the size limit")
 
     fd, tmp_name = tempfile.mkstemp(
         prefix="album.", suffix=".json.tmp", dir=sidecar_dir
@@ -95,15 +194,7 @@ def write_album_sidecar(album_payload: dict[str, Any]) -> Path:
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(
-                payload,
-                handle,
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
-                default=_json_default,
-            )
-            handle.write("\n")
+            handle.write(serialized)
         tmp_path.replace(sidecar_path)
     except Exception:
         try:
@@ -190,12 +281,12 @@ def _image_mime(path: Path) -> str:
 def find_album_artwork_file(
     album_dir: str | Path, names: list[str] | None = None
 ) -> Path | None:
-    root = Path(str(album_dir))
+    root = _album_root(str(album_dir))
     if not root.is_dir():
         return None
     candidates = names or _find_artwork_files(root)
     for name in candidates:
-        path = root / name
+        path = _contained_path(root, name)
         if path.is_file() and path.suffix.lower() in _ARTWORK_EXTENSIONS:
             return path
     return None
@@ -293,6 +384,8 @@ def write_track_identity_tags(
     audio_fingerprint_source: Any = None,
 ) -> dict[str, Any]:
     path = Path(str(track_path))
+    if path.is_symlink():
+        raise ValueError("Symlink audio files are not supported")
     if not path.exists():
         return {"written": False, "path": str(path), "error": "file not found"}
 
@@ -369,6 +462,8 @@ def write_track_rich_tags(
     artwork_path: str | Path | None = None,
 ) -> dict[str, Any]:
     path = Path(str(track_path))
+    if path.is_symlink():
+        raise ValueError("Symlink audio files are not supported")
     if not path.exists():
         return {"written": False, "path": str(path), "error": "file not found"}
 
@@ -406,6 +501,12 @@ def write_album_portable_metadata(
     write_audio_tags: bool = True,
     write_sidecars: bool = True,
 ) -> dict[str, Any]:
+    album_path = (album_payload.get("album") or {}).get("path")
+    if not album_path:
+        raise ValueError("Album path is required")
+    album_dir = _album_root(str(album_path))
+    for track in album_payload.get("tracks") or []:
+        _contained_path(album_dir, _track_relative(track, album_dir))
     artist_uid = (album_payload.get("artist") or {}).get("entity_uid")
     album_uid = (album_payload.get("album") or {}).get("entity_uid")
     result: dict[str, Any] = {
@@ -445,38 +546,67 @@ def write_album_portable_metadata(
 def iter_album_sidecars(
     root_path: str | Path, *, limit: int | None = None
 ) -> list[Path]:
-    root = Path(str(root_path))
+    root = _album_root(str(root_path))
     if not root.exists():
         return []
     sidecars: list[Path] = []
-    for candidate in sorted(root.rglob("album.json")):
+    for candidate in root.rglob("album.json"):
         if candidate.parent.name != ".crate":
             continue
+        _contained_path(root, candidate.relative_to(root))
         sidecars.append(candidate)
         if limit is not None and len(sidecars) >= limit:
             break
-    return sidecars
+    return sorted(sidecars)
 
 
 def load_album_sidecar(sidecar_path: str | Path) -> dict[str, Any]:
     path = Path(str(sidecar_path))
-    with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
+    album_dir = _album_root(path.parent.parent)
+    path = _contained_path(album_dir, path.absolute().relative_to(album_dir))
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError("Portable sidecar is not a regular file")
+        raw = handle.read(MAX_SIDECAR_BYTES + 1)
+    if len(raw) > MAX_SIDECAR_BYTES:
+        raise ValueError("Portable sidecar exceeds the size limit")
 
-    album_dir = path.parent.parent
+    def reject_constant(value):
+        raise ValueError("Non-finite values are not valid portable metadata")
+
+    payload = json.loads(raw, parse_constant=reject_constant)
+    if (
+        not isinstance(payload, dict)
+        or type(payload.get("schema_version")) is not int
+        or payload.get("schema_version") != PORTABLE_SCHEMA_VERSION
+    ):
+        raise ValueError("Unsupported portable metadata schema")
+    if not isinstance(payload.get("album"), dict) or not isinstance(
+        payload.get("artist", {}), dict
+    ):
+        raise ValueError("Invalid portable album metadata")
+    source_tracks = payload.get("tracks")
+    if not isinstance(source_tracks, list) or len(source_tracks) > MAX_SIDECAR_TRACKS:
+        raise ValueError("Invalid portable track list")
     album = dict(payload.get("album") or {})
     album["path"] = str(album_dir)
     payload["album"] = album
     payload["_sidecar_path"] = str(path)
+    payload["_sidecar_sha256"] = hashlib.sha256(raw).hexdigest()
 
     tracks = []
-    for track_payload in payload.get("tracks") or []:
+    for track_payload in source_tracks:
+        if not isinstance(track_payload, dict):
+            raise ValueError("Invalid portable track metadata")
         track = dict(track_payload)
         relative_path = str(track.get("relative_path") or "").strip()
-        if relative_path:
-            track["path"] = str(album_dir / relative_path)
-        elif track.get("filename"):
-            track["path"] = str(album_dir / str(track["filename"]))
+        relative_path = relative_path or str(track.get("filename") or "")
+        if not relative_path and track.get("path"):
+            relative_path = Path(str(track["path"])).name
+        relative = _safe_relative(relative_path)
+        track["relative_path"] = str(relative)
+        track["path"] = str(_contained_path(album_dir, relative))
         tracks.append(track)
     payload["tracks"] = tracks
     return payload
@@ -497,12 +627,14 @@ def _copy_artwork_files(
 ) -> int:
     copied = 0
     for name in names:
-        source = source_album_dir / name
+        source = _contained_path(source_album_dir, name)
         if not source.is_file():
             continue
-        target = export_album_dir / name
+        target = _contained_path(export_album_dir, name)
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        if target.exists():
+            raise ValueError("Artwork export destination already exists")
+        _copy_regular_file(source, target)
         copied += 1
     return copied
 
@@ -515,6 +647,8 @@ def export_album_rich_metadata(
     write_rich_tags: bool = True,
 ) -> dict[str, Any]:
     source_album = album_payload.get("album") or {}
+    if not source_album.get("path"):
+        raise ValueError("Album path is required")
     artist_payload = album_payload.get("artist") or {}
     artist_name = (
         artist_payload.get("name") or source_album.get("artist") or "Unknown Artist"
@@ -522,21 +656,30 @@ def export_album_rich_metadata(
     album_name = (
         source_album.get("name") or source_album.get("tag_album") or "Unknown Album"
     )
+    destination = _album_root(export_root)
+    export_relative = Path(
+        _safe_segment(artist_name, "Unknown Artist")
+    ) / _safe_segment(album_name, "Unknown Album")
+    export_album_dir = _contained_path(destination, export_relative)
+    source_album_dir = _album_root(str(source_album.get("path") or ""))
+    for track in album_payload.get("tracks") or []:
+        _contained_path(source_album_dir, _track_relative(track, source_album_dir))
+    artwork_names = list(
+        source_album.get("artwork_files") or _find_artwork_files(source_album_dir)
+    )
+    for name in artwork_names:
+        _contained_path(source_album_dir, name)
     export_album_dir = (
-        Path(str(export_root))
+        destination
         / _safe_segment(artist_name, "Unknown Artist")
         / _safe_segment(album_name, "Unknown Album")
     )
-    export_album_dir.mkdir(parents=True, exist_ok=True)
+    export_album_dir.mkdir(parents=True, exist_ok=False)
 
     export_payload = deepcopy(album_payload)
     export_album = dict(export_payload.get("album") or {})
-    source_album_dir = Path(str(source_album.get("path") or ""))
     artwork_path = None
     if source_album_dir.is_dir():
-        artwork_names = list(
-            source_album.get("artwork_files") or _find_artwork_files(source_album_dir)
-        )
         artwork_copied = _copy_artwork_files(
             source_album_dir, export_album_dir, artwork_names
         )
@@ -552,19 +695,16 @@ def export_album_rich_metadata(
     for track_payload in export_payload.get("tracks") or []:
         track = dict(track_payload)
         source_path = Path(str(track.get("path") or ""))
-        relative_path = str(
-            track.get("relative_path")
-            or source_path.name
-            or track.get("filename")
-            or ""
-        ).strip()
+        relative_path = _track_relative(track, source_album_dir)
+        target_path = _contained_path(export_album_dir, relative_path)
         if include_audio:
             if not source_path.is_file():
                 tag_errors.append({"path": str(source_path), "error": "file not found"})
                 continue
-            target_path = export_album_dir / relative_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, target_path)
+            if target_path.exists():
+                raise ValueError("Audio export destination already exists")
+            _copy_regular_file(source_path, target_path)
             track["path"] = str(target_path)
             track["relative_path"] = str(target_path.relative_to(export_album_dir))
             tracks_exported += 1
@@ -580,6 +720,9 @@ def export_album_rich_metadata(
                     tag_errors.append(tag_result)
                 elif tag_result.get("artwork_error"):
                     tag_errors.append(tag_result)
+        else:
+            track["path"] = str(target_path)
+            track["relative_path"] = str(relative_path)
         exported_tracks.append(track)
 
     export_album["path"] = str(export_album_dir)

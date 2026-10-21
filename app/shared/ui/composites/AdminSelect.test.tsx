@@ -361,3 +361,21 @@ describe("AdminSelect", () => {
     },
   );
 });
+
+it.each([false, true])(
+  "uses an explicit accessible name with searchable=%s",
+  async (searchable) => {
+    render(
+      <Harness
+        searchable={searchable}
+        ariaLabel="Model"
+        placeholder="Choose one"
+      />,
+    );
+    await userEvent.click(screen.getByRole("combobox", { name: "Model" }));
+    await userEvent.click(screen.getByRole("option", { name: /^Ambient/ }));
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent(
+      "Ambient",
+    );
+  },
+);

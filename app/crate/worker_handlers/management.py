@@ -50,6 +50,9 @@ from crate.db.repositories.playlists import (
     set_generation_status,
     update_playlist,
 )
+from crate.db.repositories.playlists_generation_state import (
+    enqueue_system_playlist_generation,
+)
 from crate.db.repositories.tasks import create_task
 from crate.task_progress import TaskProgress, emit_progress
 from crate.utils import PHOTO_NAMES
@@ -96,6 +99,11 @@ def _unmark_processing(artist_name: str):
 
 
 def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
+    if params.get("agent_command"):
+        from crate.agent_maintenance import execute_agent_job
+
+        return execute_agent_job(task_id, config)
+
     from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
 
     p_hc = TaskProgress(phase="health_check", phase_count=1)
@@ -133,16 +141,44 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
-    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
-    from crate.repair import LibraryRepair
+    if params.get("preparation_task_id"):
+        from crate.admin_repairs import apply_admin_repairs
+
+        return apply_admin_repairs(task_id, params, config)
+    if params.get("agent_command"):
+        from crate.agent_maintenance import execute_agent_job
+
+        return execute_agent_job(task_id, config)
+
     from crate.db.admin_health_surface import publish_health_surface_signal
     from crate.db.domain_events import append_domain_event
+    from crate.health_check import ARTIST_SCOPED_CHECKS, LibraryHealthCheck
+    from crate.repair import LibraryRepair
 
     dry_run = params.get("dry_run", True)
     auto_only = params.get("auto_only", True)
     specific_issues = params.get("issues")
 
-    if specific_issues:
+    if specific_issues is not None:
+        if not specific_issues:
+            return {
+                "status": "skipped",
+                "actions": [],
+                "item_results": [],
+                "reason": "empty_selection",
+            }
+        if params.get("plan_version") is not None or "plan_item_ids" in params:
+            from crate.db.queries.repair_plans import get_open_repair_issues
+
+            try:
+                specific_issues = get_open_repair_issues(
+                    [issue["id"] for issue in specific_issues]
+                )
+            except (ValueError, KeyError, TypeError):
+                return {
+                    "status": "conflict",
+                    "error": "Repair sources changed; prepare a new plan",
+                }
         report = {"issues": specific_issues}
     else:
         # Pull directly from the persisted health_issues table so each issue
@@ -161,16 +197,25 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
             report_issues.append(issue)
         report = {"issues": report_issues}
 
-    affected_artists = set()
+    versioned_selection = (
+        params.get("plan_version") is not None or "plan_item_ids" in params
+    )
+    issue_artists = {}
+    report_artists = set()
     for issue in report.get("issues", []):
         details = issue.get("details") or issue.get("details_json") or {}
         artist = details.get("artist") or details.get("db_artist") or ""
         if artist:
-            affected_artists.add(artist)
+            issue_artists[issue.get("id")] = artist
+            report_artists.add(artist)
+
+    affected_artists = set() if versioned_selection else report_artists
+    marked_artists = set()
 
     if not dry_run:
         for artist in affected_artists:
             _mark_processing(artist)
+            marked_artists.add(artist)
 
     try:
         p_repair = TaskProgress(phase="repair", phase_count=1)
@@ -207,6 +252,13 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                 "unsupported",
             }:
                 return
+            if versioned_selection:
+                artist = issue_artists.get(payload.get("issue_id"))
+                if artist:
+                    affected_artists.add(artist)
+                    if artist not in marked_artists:
+                        _mark_processing(artist)
+                        marked_artists.add(artist)
             append_domain_event(
                 f"library.repair.item.{outcome}",
                 {
@@ -223,16 +275,37 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
             )
 
         repairer = LibraryRepair(config)
-        result = repairer.repair(
-            report,
-            dry_run=dry_run,
-            auto_only=auto_only,
-            task_id=task_id,
-            progress_callback=_repair_progress,
-            event_callback=_repair_event,
-        )
+        selection = {}
+        if params.get("plan_version") is not None or "plan_item_ids" in params:
+            selection = {
+                "expected_plan_version": params.get("plan_version"),
+                "plan_item_ids": params.get("plan_item_ids") or [],
+                "confirm_risky": bool(params.get("confirm_risky")),
+            }
+        try:
+            result = repairer.repair(
+                report,
+                dry_run=dry_run,
+                auto_only=auto_only,
+                task_id=task_id,
+                progress_callback=_repair_progress,
+                event_callback=_repair_event,
+                **selection,
+            )
+        except ValueError as error:
+            from crate.repair_selection import RepairSelectionError
+
+            if not isinstance(error, RepairSelectionError):
+                raise
+            return {"status": "conflict", "error": str(error), "code": error.code}
 
         action_count = len(result.get("actions", []))
+        if versioned_selection:
+            affected_artists.update(
+                issue_artists[item["issue_id"]]
+                for item in result.get("item_results", [])
+                if item.get("issue_id") in issue_artists
+            )
         resolved_ids = result.get("resolved_ids", [])
         repair_summary = result.get("summary") or {}
         applied_check_types = sorted(
@@ -250,6 +323,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
 
             for check_type in applied_check_types:
                 catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
+                if check_type == "has_photo_desync":
+                    artist_revalidation_check_types.append(check_type)
+                    continue
                 if (
                     catalog_entry is not None
                     and not catalog_entry.supports_global_scope
@@ -527,7 +603,7 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         return result
     finally:
         if not dry_run:
-            for artist in affected_artists:
+            for artist in marked_artists:
                 _unmark_processing(artist)
 
 
@@ -2207,6 +2283,23 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
     if not playlist:
         return {"error": "Playlist not found"}
 
+    if triggered_by == "scheduler" and (
+        not playlist.get("is_active") or not playlist.get("auto_refresh_enabled")
+    ):
+        return {"status": "skipped", "reason": "Automatic refresh is disabled"}
+    expected_revision = params.get("expected_revision")
+    expected_epoch = params.get("expected_epoch")
+    if triggered_by == "scheduler" and (
+        expected_revision is None or expected_epoch is None
+    ):
+        return {"status": "skipped", "reason": "Automatic refresh token is missing"}
+    if (
+        expected_revision is not None
+        and playlist["editorial_revision"] != expected_revision
+    ) or (
+        expected_epoch is not None and playlist["generation_epoch"] != expected_epoch
+    ):
+        return {"status": "skipped", "reason": "Playlist changed after enqueue"}
     rules = playlist.get("smart_rules")
     if not rules:
         return {"error": "No smart rules configured"}
@@ -2214,7 +2307,14 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
     name = playlist.get("name", f"Playlist {playlist_id}")
     emit_task_event(task_id, "info", {"message": f"Generating: {name}"})
 
-    set_generation_status(playlist_id, "running")
+    generation_token = set_generation_status(
+        playlist_id,
+        "running",
+        expected_revision=playlist["editorial_revision"],
+        expected_epoch=expected_epoch,
+    )
+    if generation_token is None:
+        return {"error": "Playlist changed before generation started"}
     log_id = log_generation_start(playlist_id, rules, triggered_by)
     progress = TaskProgress(phase="evaluate_rules", phase_count=2, total=2, item=name)
     emit_progress(task_id, progress, force=True)
@@ -2245,11 +2345,13 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             playlist_id,
             track_dicts,
             target_count=target_count,
+            expected_revision=generation_token[0],
+            expected_epoch=generation_token[1],
         )
         refreshed = get_playlist(playlist_id) or {}
         total_duration = refreshed.get("total_duration") or 0
 
-        set_generation_status(playlist_id, "idle")
+        set_generation_status(playlist_id, "idle", expected_epoch=generation_token[1])
         log_generation_complete(log_id, track_count, total_duration)
         progress.done = 2
         emit_progress(task_id, progress, force=True)
@@ -2275,7 +2377,9 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
         return {"track_count": track_count, "duration_sec": total_duration}
 
     except Exception as e:
-        set_generation_status(playlist_id, "failed", str(e))
+        set_generation_status(
+            playlist_id, "failed", str(e), expected_epoch=generation_token[1]
+        )
         log_generation_failed(log_id, str(e))
         emit_task_event(
             task_id,
@@ -2303,14 +2407,17 @@ def _handle_refresh_system_smart_playlists(
         progress.done += 1
         progress.item = str(pl.get("name") or pl["id"])
         emit_progress(task_id, progress)
-        create_task(
-            "generate_system_playlist",
-            {
-                "playlist_id": pl["id"],
-                "triggered_by": "scheduler",
-            },
-        )
-        enqueued += 1
+        try:
+            admitted = enqueue_system_playlist_generation(
+                pl["id"],
+                triggered_by="scheduler",
+                expected_revision=pl["editorial_revision"],
+                expected_epoch=pl["generation_epoch"],
+            )
+        except ValueError:
+            continue
+        if not admitted["deduplicated"]:
+            enqueued += 1
 
     emit_task_event(
         task_id, "info", {"message": f"Enqueued {enqueued} playlist generation tasks"}
@@ -2704,17 +2811,24 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
         )
         base_messages = dict((latest or {}).get("messages_json") or {})
 
+    from crate.ai.consumers import resume_action, revalidate_call
+
     try:
+        ai_call = resume_action(
+            "i18n.listen.draft", params.get("ai_acceptance"), job_id=task_id
+        )
         draft = generate_i18n_translation_draft(
             target_locale=locale,
             source_messages=source_messages,
+            ai_call=ai_call,
         )
         translations = validate_i18n_translation_draft(
             draft,
             expected_keys=set(source_messages),
             target_locale=locale,
         )
-    except Exception as exc:
+        revalidate_call(ai_call)
+    except Exception:
         update_translation_request_status(
             app=app,
             locale=locale,
@@ -2728,14 +2842,14 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
             {
                 "message": "Listen translation draft requires manual translation",
                 "locale": locale,
-                "error": str(exc)[:500],
+                "error": "AI_TRANSLATION_UNAVAILABLE",
             },
         )
         return {
             "status": "manual_required",
             "locale": locale,
             "source_version": source_version,
-            "reason": str(exc)[:500],
+            "reason": "AI_TRANSLATION_UNAVAILABLE",
         }
 
     bundle = insert_translation_bundle_draft(
@@ -2771,7 +2885,14 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
     }
 
 
+def _handle_prepare_library_repairs(task_id: str, params: dict, config: dict) -> dict:
+    from crate.admin_repairs import prepare_admin_repairs
+
+    return prepare_admin_repairs(task_id, params, config)
+
+
 MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
+    "prepare_library_repairs": _handle_prepare_library_repairs,
     "health_check": _handle_health_check,
     "repair": _handle_repair,
     "repair_duplicate_tracks": _handle_repair_duplicate_tracks,

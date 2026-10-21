@@ -494,3 +494,13 @@ describe("I18nReview", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("keeps manual review available when AI draft action is unavailable", async () => {
+  mockApi.mockResolvedValue({ requests: [], bundles: [], locales: [] });
+  render(<I18nReview />);
+  expect(
+    screen.getByText(
+      /AI draft action unavailable; requests remain available for manual translation review/,
+    ),
+  ).toBeVisible();
+});

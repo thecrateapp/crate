@@ -72,7 +72,7 @@ def get_show_cities() -> list[str]:
         rows = (
             session.execute(
                 text(
-                    "SELECT DISTINCT city FROM shows WHERE date >= :today AND city IS NOT NULL AND city != '' ORDER BY city"
+                    "SELECT DISTINCT city FROM shows WHERE date >= :today AND merged_into_id IS NULL AND city IS NOT NULL AND city != '' ORDER BY city"
                 ),
                 {"today": today},
             )
@@ -88,7 +88,7 @@ def get_show_countries() -> list[str]:
         rows = (
             session.execute(
                 text(
-                    "SELECT DISTINCT country FROM shows WHERE date >= :today AND country IS NOT NULL ORDER BY country"
+                    "SELECT DISTINCT country FROM shows WHERE date >= :today AND merged_into_id IS NULL AND country IS NOT NULL ORDER BY country"
                 ),
                 {"today": today},
             )

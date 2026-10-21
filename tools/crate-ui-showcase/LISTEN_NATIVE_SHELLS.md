@@ -63,10 +63,9 @@ importa la misma vista y refleja el cambio automáticamente.
 ## Antes de desplegar
 
 **Web:** la combinación Bricolage Grotesque + IBM Plex Sans + JetBrains Mono está
-aprobada. Quedan integración con `main`, CI/cierre de fase y preflight. Hay una colisión
-comprobada: esta rama define `revision="109"` para instance listening rollups y `main`
-la usa para Smart Mix profiles. Hay que reconciliar el historial y la revisión de Stats
-al integrar, antes de aplicar migraciones; no desplegar esta rama directamente como main.
+aprobada. Se integra `origin/main` (`d3e6ef6b`); la migración de Stats pasa a `132`,
+con padre `131`, conservando intacta la cadena publicada de main. Quedan CI/cierre de fase,
+merge revisado a main y preflight. La rama no se despliega directamente como main.
 API, readplane, workers y frontend deben pertenecer al mismo release. Validar backfill,
 rollups y snapshots; el frontend local aún apunta al backend de producción anterior.
 Después, smoke de sesión, artwork, playback, Stats, Paths, búsqueda y offline.

@@ -10,7 +10,7 @@ import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { Readout } from "@crate/ui/primitives/Readout";
-import { useLLMAvailable } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 
 const EQ_BAND_COUNT = 10;
 const FLAT_GAINS: number[] = new Array(EQ_BAND_COUNT).fill(0);
@@ -60,7 +60,8 @@ export function GenreEqEditor({
   const [clearing, setClearing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [reasoning, setReasoning] = useState(eqReasoning || "");
-  const llmAvailable = useLLMAvailable();
+  const llmAvailable =
+    useActionLLMStatus("genres.eq.propose")?.available ?? false;
   const motionAllowed = useMotionAllowed();
 
   useEffect(() => {
@@ -179,6 +180,7 @@ export function GenreEqEditor({
         <div className="flex flex-wrap gap-2">
           {llmAvailable && (
             <AIButton
+              actionId="genres.eq.propose"
               onClick={generateWithAI}
               loading={generating}
               disabled={saving || clearing}

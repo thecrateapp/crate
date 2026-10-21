@@ -1,0 +1,102 @@
+{
+  "arms": {
+    "baseline": {
+      "api_latency_ms": {
+        "max": 60.517,
+        "p50": 55.795,
+        "p95": 60.041,
+        "p99": 60.517,
+        "samples": 48
+      },
+      "api_sql_ms": {
+        "max": 13.431,
+        "p50": 4.024,
+        "p95": 12.308,
+        "p99": 13.431,
+        "samples": 96
+      },
+      "api_sql_statements": 96,
+      "cpu_seconds": 0.3428853219999999,
+      "elapsed_seconds": 1.3282948629930615,
+      "worker_latency_ms": {
+        "max": 25.905,
+        "p50": 15.909,
+        "p95": 25.905,
+        "p99": 25.905,
+        "samples": 12
+      },
+      "worker_sql_ms": {
+        "max": 3.344,
+        "p50": 0.295,
+        "p95": 1.286,
+        "p99": 2.087,
+        "samples": 240
+      },
+      "worker_sql_statements": 240
+    },
+    "mixed": {
+      "api_latency_ms": {
+        "max": 68.015,
+        "p50": 57.278,
+        "p95": 63.943,
+        "p99": 68.015,
+        "samples": 48
+      },
+      "api_sql_ms": {
+        "max": 14.672,
+        "p50": 5.195,
+        "p95": 12.442,
+        "p99": 14.672,
+        "samples": 96
+      },
+      "api_sql_statements": 96,
+      "cpu_seconds": 0.7571037069999997,
+      "elapsed_seconds": 1.427590925944969,
+      "worker_latency_ms": {
+        "max": 27.37,
+        "p50": 17.102,
+        "p95": 27.37,
+        "p99": 27.37,
+        "samples": 12
+      },
+      "worker_sql_ms": {
+        "max": 4.001,
+        "p50": 0.341,
+        "p95": 1.512,
+        "p99": 2.723,
+        "samples": 240
+      },
+      "worker_sql_statements": 240
+    }
+  },
+  "errors": [],
+  "fixture": {
+    "albums": 4800,
+    "artists": 900,
+    "pipeline_rows": 96000,
+    "tracks": 48000
+  },
+  "interpretation": "Synthetic common-service foreground endpoint and worker metadata adapter, loopback HTTP, same process/dataset, API concurrency 2, worker concurrency 1, MCP concurrency 2. Not production capacity or a rollout budget.",
+  "mcp_latency_ms": {
+    "max": 78.975,
+    "p50": 57.591,
+    "p95": 72.998,
+    "p99": 78.975,
+    "samples": 48
+  },
+  "mcp_response_bytes": {
+    "max": 2344,
+    "p50": 2344.0,
+    "p95": 2344,
+    "p99": 2344,
+    "samples": 48
+  },
+  "mcp_sql_ms": {
+    "max": 3.587,
+    "p50": 0.435,
+    "p95": 1.638,
+    "p99": 3.024,
+    "samples": 192
+  },
+  "process_max_rss_kib": 256340
+}

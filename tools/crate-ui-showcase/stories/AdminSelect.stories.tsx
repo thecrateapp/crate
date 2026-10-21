@@ -60,3 +60,7 @@ export const Validation: Story = {
     </FormField>
   ),
 };
+
+export const ExplicitAccessibleName: Story = {
+  args: { ariaLabel: "Genre filter", placeholder: "Choose one" },
+};

@@ -59,7 +59,11 @@ function Biography({
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-white/70">Biography</h3>
         {canResearch && onResearch ? (
-          <AIButton type="button" onClick={onResearch}>
+          <AIButton
+            actionId="artists.bio.research"
+            type="button"
+            onClick={onResearch}
+          >
             Research with AI
           </AIButton>
         ) : null}

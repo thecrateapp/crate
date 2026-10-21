@@ -9,7 +9,6 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-from crate.db.jobs.tasks import get_task_status
 
 log = logging.getLogger(__name__)
 
@@ -37,12 +36,15 @@ def audio_extensions() -> set[str]:
 
 
 def is_cancelled(task_id: str) -> bool:
-    """Check if a task has been cancelled."""
-    try:
-        status = get_task_status(task_id)
-        return status == "cancelled"
-    except Exception:
-        return False
+    """Revalidate task authority and report a cooperative stop request.
+
+    Returns True for a cancelled task or a pending cancellation request, without
+    acknowledging worker termination. Agent authority failures and database errors
+    propagate so processing stops without falsely acknowledging cancellation.
+    """
+    from crate.db.repositories.agent_task_control import check_task_authority
+
+    return check_task_authority(task_id)
 
 
 def compute_dir_hash(directory: Path, extensions: set[str] | None = None) -> str:
@@ -53,7 +55,7 @@ def compute_dir_hash(directory: Path, extensions: set[str] | None = None) -> str
         for f in sorted(directory.rglob("*")):
             if f.is_file() and f.suffix.lower() in exts:
                 entries.append(f"{f.name}:{f.stat().st_size}")
-    return hashlib.md5("|".join(entries).encode()).hexdigest()
+    return hashlib.md5("|".join(entries).encode(), usedforsecurity=False).hexdigest()
 
 
 # Enrichment cache key prefixes (used by enrichment + management handlers)

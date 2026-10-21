@@ -124,12 +124,16 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
             {
                 "analysis-worker",
                 "api",
-                "cast-receiver",
                 "media-worker",
                 "playback-worker",
                 "worker",
             },
         ),
+        ("package-lock.json", {"cast-receiver", "listen", "ui"}),
+        ("package.json", {"cast-receiver", "listen", "ui"}),
+        ("app/ui/Dockerfile.dockerignore", {"ui"}),
+        ("app/listen/Dockerfile.dockerignore", {"listen"}),
+        ("app/cast-receiver/Dockerfile.dockerignore", {"cast-receiver"}),
         (".github/workflows/build-images.yml", set(IMAGE_SPECS)),
     ],
 )

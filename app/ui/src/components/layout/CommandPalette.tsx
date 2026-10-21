@@ -202,6 +202,18 @@ export function CommandPalette() {
       capabilities: ["users.view"],
     },
     {
+      label: "Agents",
+      path: "/agents",
+
+      capabilities: ["agents.plans.review", "agents.integrations.manage"],
+    },
+    {
+      label: "Agent approvals",
+      path: "/agents/approvals",
+
+      capabilities: ["agents.plans.review"],
+    },
+    {
       label: "Roles",
       path: "/roles",
       capabilities: ["roles.view"],
@@ -249,6 +261,12 @@ export function CommandPalette() {
       label: "Discovery",
       path: "/discover",
       capabilities: ["library.view"],
+    },
+    {
+      label: "AI models",
+      path: "/ai",
+
+      capabilities: ["ai.config.read"],
     },
     {
       label: "Settings",

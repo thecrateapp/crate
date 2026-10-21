@@ -1,3 +1,4 @@
+import { SmartMixSettings } from "./SmartMixSettings";
 import { useState } from "react";
 
 import {
@@ -61,6 +62,7 @@ export function PlaybackSection({ ruled }: { ruled?: boolean } = {}) {
   return (
     <PlaybackSettingsView
       ruled={ruled}
+      smartMixSettings={<SmartMixSettings />}
       value={{ ...value, equalizerEnabled }}
       onChange={change}
       mobilePlaybackRuntime={mobilePlaybackRuntime}

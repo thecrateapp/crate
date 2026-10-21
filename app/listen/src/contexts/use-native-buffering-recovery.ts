@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import { clampIndex } from "@/contexts/player-queue-helpers";
-import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
+import { toStartupEngineQueueSnapshot } from "@/contexts/player-engine-adapter";
 import { getStreamUrl } from "@/contexts/player-utils";
 import { refreshAuthToken } from "@/lib/api";
 import {
@@ -20,6 +20,7 @@ import {
   subscribeNativePlaybackIntentChanges,
 } from "@/lib/native-playback-intent";
 import { notify } from "@crate/ui/lib/notify";
+import { getNativeCrossfadeMs } from "@/lib/player-playback-prefs";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
 const NATIVE_PLAYBACK_DIAGNOSTIC_KEY = "listen-native-playback-diagnostic:v1";
@@ -88,8 +89,10 @@ export interface UseNativeBufferingRecoveryParams {
   currentTrackRef: ValueRef<Track | undefined>;
   effectiveCrossfadeMsRef: ValueRef<number>;
   lastNonZeroVolumeRef: ValueRef<number>;
+  playSourceRef: ValueRef<PlaySource | null>;
   queueRef: ValueRef<Track[]>;
   repeatRef: ValueRef<"off" | "one" | "all">;
+  shuffleRef: ValueRef<boolean>;
 }
 
 export function useNativeBufferingRecovery({
@@ -102,8 +105,10 @@ export function useNativeBufferingRecovery({
   currentTrackRef,
   effectiveCrossfadeMsRef,
   lastNonZeroVolumeRef,
+  playSourceRef,
   queueRef,
   repeatRef,
+  shuffleRef,
 }: UseNativeBufferingRecoveryParams) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -191,23 +196,22 @@ export function useNativeBufferingRecovery({
         }
         if (!isCurrentIntent()) return false;
 
-        const engineTracks = await toStartupEngineTracks(
-          queueSnapshot,
-          index,
-          undefined,
-          { target: "android-native" },
-        );
-        if (!isCurrentIntent()) return false;
-        await androidNativeEngine.loadQueue({
-          revision: createQueueRevision(),
-          tracks: engineTracks,
+        const revision = createQueueRevision();
+        const snapshot = await toStartupEngineQueueSnapshot({
+          revision,
+          tracks: queueSnapshot,
           currentIndex: index,
           positionMs,
           autoplay: options.autoplay ?? true,
           repeat: repeatRef.current,
-          crossfadeMs: effectiveCrossfadeMsRef.current,
+          crossfadeMs: getNativeCrossfadeMs(),
           volume: lastNonZeroVolumeRef.current,
+          playSource: playSourceRef.current,
+          shuffle: shuffleRef.current,
+          target: "android-native",
         });
+        if (!isCurrentIntent()) return false;
+        await androidNativeEngine.loadQueue(snapshot);
         const cancellation =
           nativePlaybackRecoveryCancellationSince(intentGeneration);
         if (cancellation === "pause") {
@@ -232,8 +236,10 @@ export function useNativeBufferingRecovery({
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     ],
   );
 
@@ -379,23 +385,22 @@ export function useNativeBufferingRecovery({
           throw new Error("Could not refresh the native playback token");
         }
         if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
-        const engineTracks = await toStartupEngineTracks(
-          queueSnapshot,
-          index,
-          undefined,
-          { target: "android-native" },
-        );
-        if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
-        await androidNativeEngine.loadQueue({
-          revision: createQueueRevision(),
-          tracks: engineTracks,
+        const revision = createQueueRevision();
+        const snapshot = await toStartupEngineQueueSnapshot({
+          revision,
+          tracks: queueSnapshot,
           currentIndex: index,
           positionMs,
           autoplay: true,
           repeat: repeatRef.current,
-          crossfadeMs: effectiveCrossfadeMsRef.current,
+          crossfadeMs: getNativeCrossfadeMs(),
           volume: lastNonZeroVolumeRef.current,
+          playSource: playSourceRef.current,
+          shuffle: shuffleRef.current,
+          target: "android-native",
         });
+        if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
+        await androidNativeEngine.loadQueue(snapshot);
         const cancellation =
           nativePlaybackRecoveryCancellationSince(intentGeneration);
         if (cancellation === "pause") await androidNativeEngine.pause();
@@ -433,8 +438,10 @@ export function useNativeBufferingRecovery({
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     ],
   );
 

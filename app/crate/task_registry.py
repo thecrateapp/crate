@@ -38,12 +38,19 @@ TASK_CATEGORIES: dict[str, str] = {
 }
 
 TASK_TYPES: dict[str, TaskTypeInfo] = {
+    "ai_catalog_refresh": TaskTypeInfo("AI Model Catalog Refresh", "enrichment"),
+    "ai_profile_test": TaskTypeInfo("AI Synthetic Profile Test", "enrichment"),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),
     "health_check": TaskTypeInfo("Health Check", "library"),
+    "quality_check": TaskTypeInfo("Library Quality Check", "library"),
+    "show_extract": TaskTypeInfo("Show extraction", "enrichment"),
+    "agent_maintenance": TaskTypeInfo("Agent Library Maintenance", "library"),
+    "agent_control": TaskTypeInfo("Agent Job Control", "library"),
     "fix_issues": TaskTypeInfo("Fix Health Issues", "library"),
     "repair": TaskTypeInfo("Library Repair", "library"),
+    "prepare_library_repairs": TaskTypeInfo("Prepare Library Repairs", "library"),
     "repair_duplicate_tracks": TaskTypeInfo("Duplicate Track Cleanup", "library"),
     "resolve_duplicates": TaskTypeInfo("Resolve Duplicates", "library"),
     "process_new_content": TaskTypeInfo("Process New Content", "library"),
@@ -178,6 +185,11 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "analyze_all": TaskTypeInfo("Full Audio Analysis", "analysis"),
     "analyze_album_full": TaskTypeInfo("Album Analysis", "analysis"),
     "compute_bliss": TaskTypeInfo("Bliss Similarity", "analysis"),
+    "compute_smart_mix_profile": TaskTypeInfo("Smart Mix Profile", "analysis"),
+    "backfill_smart_mix_profiles": TaskTypeInfo(
+        "Smart Mix Profile Backfill", "analysis"
+    ),
+    "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
     "materialize_artwork_variants": TaskTypeInfo("Artwork Variants", "artwork"),
     "backfill_artwork_variants": TaskTypeInfo("Artwork Variant Backfill", "artwork"),
     "cleanup_artwork_variants": TaskTypeInfo("Artwork Variant Cleanup", "artwork"),

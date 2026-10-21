@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 import uuid
 
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.concurrency import iterate_in_threadpool
 
 from crate.db.repositories import federation as federation_repo
 from crate.db.repositories.streaming import (
@@ -189,7 +190,7 @@ def stream_global_track(
         source_node_uid=str(selection["node_uid"]),
     )
 
-    def body() -> Iterator[bytes]:
+    def body() -> Generator[bytes, None, None]:
         try:
             for chunk in upstream.iter_bytes(chunk_size=64 * 1024):
                 if chunk:
@@ -198,10 +199,19 @@ def stream_global_track(
             context.__exit__(None, None, None)
             client.close()
 
+    stream_body = body()
+
+    async def closing_body():
+        try:
+            async for chunk in iterate_in_threadpool(stream_body):
+                yield chunk
+        finally:
+            stream_body.close()
+
     response_headers = filter_response_headers(dict(upstream.headers))
     response_headers["cache-control"] = "private, no-store"
     return StreamingResponse(
-        body(),
+        closing_body(),
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type"),
         headers=response_headers,

@@ -4,23 +4,31 @@ import android.app.PendingIntent;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.media.AudioManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.media.audiofx.Equalizer;
+import android.content.IntentFilter;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
+import androidx.core.content.ContextCompat;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.audio.AudioProcessor;
+import androidx.media3.common.util.ExperimentalApi;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -30,8 +38,11 @@ import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.datasource.ResolvingDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
+import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.session.CommandButton;
 import androidx.media3.session.CacheBitmapLoader;
@@ -44,7 +55,12 @@ import androidx.media3.session.SessionResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -53,7 +69,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 
 @UnstableApi
@@ -62,50 +79,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private static final String CHANNEL_ID = "crate_playback";
     private static final int NOTIFICATION_ID = 7301;
 
-    public interface EventSink {
-        void emit(String eventName, JSObject payload);
-    }
-
-    public static final class NativeTrack {
-        public final String id;
-        public final String url;
-        public final String authorization;
-        public final String title;
-        public final String artist;
-        public final String album;
-        public final String artwork;
-        public final String artworkAuthorization;
-        public final long durationMs;
-        @Nullable
-        public final float[] eqGains;
-
-        public NativeTrack(
-            String id,
-            String url,
-            String authorization,
-            String title,
-            String artist,
-            String album,
-            String artwork,
-            String artworkAuthorization,
-            long durationMs,
-            @Nullable float[] eqGains
-        ) {
-            this.id = valueOrDefault(id, UUID.randomUUID().toString());
-            this.url = valueOrDefault(url, "");
-            this.authorization = valueOrDefault(authorization, "");
-            this.title = valueOrDefault(title, "Unknown");
-            this.artist = valueOrDefault(artist, "");
-            this.album = valueOrDefault(album, "");
-            this.artwork = valueOrDefault(artwork, "");
-            this.artworkAuthorization = valueOrDefault(artworkAuthorization, "");
-            this.durationMs = Math.max(0L, durationMs);
-            this.eqGains = eqGains;
-        }
-    }
-
     private static final int PLAY_EVENT_CHECKPOINT_MS = 5000;
     private static final int MAX_BUFFERED_EVENTS = 200;
+    private static final long MIX_PROGRESS_EVENT_INTERVAL_MS = 250L;
 
     private final IBinder binder = new LocalBinder();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -119,32 +95,114 @@ public class CrateNativePlaybackService extends MediaSessionService {
             syncPositionTicker();
         }
     };
-    private final List<JSObject> bufferedEvents = new ArrayList<>();
-    private final List<NativeTrack> queue = new ArrayList<>();
+    private final Runnable nativeMixTicker = new Runnable() {
+        @Override
+        public void run() {
+            nativeMixTickerStarted = false;
+            evaluateNativeMix();
+            syncNativeMixTicker();
+        }
+    };
+    static final boolean USE_PCM_BUS = true;
+    static final long DEFAULT_EQ_RAMP_MS = 80L;
+    static final int DECK_BACK_BUFFER_MS = 5_000;
+    private final PcmBusMixer pcmBusMixer = new PcmBusMixer();
+    private final NativeQueueState queueState = new NativeQueueState();
+    private final NativeContinuationPolicy continuationPolicy =
+        new NativeContinuationPolicy();
+    private final NativeContinuationPolicy refillPolicy = new NativeContinuationPolicy();
+    private static final int REFILL_BATCH = 10;
+    private static final int MAX_APPENDED_LOG = 200;
+    private final List<JSObject> appendedLog = new ArrayList<>();
+    private String appendedLogRevision = "";
+    private long appendSequence = 0L;
+    private final NativeContinuationClient continuationClient =
+        new NativeContinuationClient(NativeContinuationClient.httpTransport());
+    private final ExecutorService continuationExecutor =
+        Executors.newSingleThreadExecutor();
+    @Nullable
+    private volatile NativeContinuationClient.Config continuationConfig;
+    private boolean appInForeground = true;
+    private final NativePlaybackTelemetry telemetry =
+        new NativePlaybackTelemetry(MAX_BUFFERED_EVENTS);
+
     private final NativeEventSequence nativeEventSequence = new NativeEventSequence();
 
-    private ExoPlayer player;
+    private ExoPlayer deckAPlayer;
+    private ExoPlayer deckBPlayer;
+    private CrateMixPlayer player;
+    private ExoPlayerNativePlaybackDeck deckA;
+    private ExoPlayerNativePlaybackDeck deckB;
+    private NativeMixController mixController;
+    private NativeMixAudioProcessor deckAAudioProcessor;
+    private NativeMixAudioProcessor deckBAudioProcessor;
+    private NativeInterruptionCoordinator interruptionCoordinator;
+    private NativeEqController eqController;
     private volatile Map<String, String> streamAuthorizationByOrigin =
         Collections.emptyMap();
     private volatile Map<String, String> artworkAuthorizationByOrigin =
         Collections.emptyMap();
     private DataSource.Factory artworkDataSourceFactory;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
     private MediaSession mediaSession;
-    private Equalizer systemEqualizer;
-    private EventSink eventSink;
     private PlaybackCheckpointStore checkpointStore;
-    private String queueRevision = "";
     private int crossfadeMs = 0;
     private boolean positionTickerStarted = false;
-    private int lastPlayEventCheckpointIndex = -1;
-    private long lastPlayEventCheckpointPositionMs = 0L;
+    private boolean nativeMixTickerStarted = false;
+    private final NativePlayEventCheckpoints playEventCheckpoints =
+        new NativePlayEventCheckpoints(PLAY_EVENT_CHECKPOINT_MS);
+    private final NativeDeckErrorRouter deckErrorRouter = new NativeDeckErrorRouter(
+        deck -> mixController != null && mixController.onDeckError(deck)
+    );
     private float[] currentEqGains = new float[10];
     private boolean eqEnabled = false;
+    private long eqRampMs = DEFAULT_EQ_RAMP_MS;
     private boolean sessionRegistered = false;
     private boolean resumeAuthorizationPending = false;
     private boolean restoredPlayWhenReady = false;
     private ResumeAuthorizationIntent resumeAuthorizationIntent;
-    private int systemEqAudioSessionId = C.AUDIO_SESSION_ID_UNSET;
+    private boolean audioFocusHeld = false;
+    private boolean handlingInterruption = false;
+    private boolean noisyReceiverRegistered = false;
+    private NativeTransitionPlan activeTransitionPlan;
+    private ExoPlayerNativePlaybackDeck transitionOutgoingDeck;
+    private String fallenBackEdge = "";
+    private String lastMixDiagnostic = "";
+    private int transitionOutgoingIndex = -1;
+    private long transitionStartedWallMs;
+    private long lastTransitionProgressEventElapsedMs;
+    private final AudioManager.OnAudioFocusChangeListener
+        audioFocusChangeListener = this::handleAudioFocusChange;
+    static final String CAPTURE_START_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_START";
+    static final String CAPTURE_STOP_ACTION = BuildConfig.APPLICATION_ID + ".BUS_CAPTURE_STOP";
+    static final String SEEK_TO_CUE_ACTION = BuildConfig.APPLICATION_ID + ".BUS_SEEK_TO_CUE";
+    private boolean captureReceiverRegistered;
+    private final BroadcastReceiver captureReceiver =
+        new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent != null) handleCaptureIntent(intent);
+            }
+        };
+    private final BroadcastReceiver noisyAudioReceiver =
+        new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (
+                    intent == null ||
+                    !AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(
+                        intent.getAction()
+                    )
+                ) {
+                    return;
+                }
+                if (interruptionCoordinator != null) {
+                    interruptionCoordinator.onNoisyRoute();
+                }
+                abandonPlaybackFocus();
+            }
+        };
 
     public final class LocalBinder extends Binder {
         CrateNativePlaybackService getService() {
@@ -165,28 +223,190 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .build();
         notificationProvider.setSmallIcon(R.drawable.ic_stat_crate);
         setMediaNotificationProvider(notificationProvider);
-        player = buildPlayer();
-        assignStableAudioSessionId();
-        player.setWakeMode(C.WAKE_MODE_LOCAL);
-        player.setAudioAttributes(
-            new AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                .build(),
-            true
+        deckAAudioProcessor = new NativeMixAudioProcessor();
+        deckBAudioProcessor = new NativeMixAudioProcessor();
+        deckAAudioProcessor.setEnvelopeReporter(
+            summary -> Log.i(NativeMixAudioProcessor.QOE_TAG, summary)
         );
-        player.setHandleAudioBecomingNoisy(true);
-        player.addAnalyticsListener(new AnalyticsListener() {
-            @Override
-            public void onAudioSessionIdChanged(EventTime eventTime, int audioSessionId) {
-                applyEqForCurrentTrack();
+        deckBAudioProcessor.setEnvelopeReporter(
+            summary -> Log.i(NativeMixAudioProcessor.QOE_TAG, summary)
+        );
+        eqController = new NativeEqController();
+        deckAPlayer = buildPlayer(deckAAudioProcessor, 0);
+        deckBPlayer = buildPlayer(deckBAudioProcessor, 1);
+        configurePhysicalPlayer(deckAPlayer);
+        configurePhysicalPlayer(deckBPlayer);
+        deckA = new ExoPlayerNativePlaybackDeck(
+            deckAPlayer,
+            deckAAudioProcessor,
+            USE_PCM_BUS ? pcmBusMixer : null,
+            0
+        );
+        deckB = new ExoPlayerNativePlaybackDeck(
+            deckBPlayer,
+            deckBAudioProcessor,
+            USE_PCM_BUS ? pcmBusMixer : null,
+            1
+        );
+        player = new CrateMixPlayer(
+            deckAPlayer,
+            new CrateMixPlayer.CommandInterceptor() {
+                @Override
+                public boolean beforePlay() {
+                    return requestPlaybackFocus();
+                }
+
+                @Override
+                public void beforePause() {
+                    cancelNativeTransition("media_session_pause");
+                    if (!handlingInterruption) {
+                        if (interruptionCoordinator != null) {
+                            interruptionCoordinator.onUserPause();
+                        }
+                        abandonPlaybackFocus();
+                    }
+                }
+
+                @Override
+                public void beforeStop() {
+                    cancelNativeTransition("media_session_stop");
+                    if (interruptionCoordinator != null) {
+                        interruptionCoordinator.onUserPause();
+                    }
+                    abandonPlaybackFocus();
+                }
+
+                @Override
+                public void beforeSeek(
+                    int mediaItemIndex,
+                    long positionMs,
+                    int seekCommand
+                ) {
+                    cancelNativeTransition("media_session_seek");
+                }
+
+                @Override
+                public void beforeRepeatModeChange(int repeatMode) {
+                    deckAPlayer.setRepeatMode(repeatMode);
+                    deckBPlayer.setRepeatMode(repeatMode);
+                    if (mixController != null) {
+                        mixController.setRepeatOne(
+                            repeatMode == Player.REPEAT_MODE_ONE
+                        );
+                    }
+                    syncNativeMixTicker();
+                }
             }
-        });
+        );
+        mixController = new NativeMixController(
+            deckA,
+            deckB,
+            new NativeMixController.Listener() {
+                @Override
+                public void onHandoff(
+                    long executionId,
+                    int newIndex,
+                    NativePlaybackDeck activeDeck
+                ) {
+                    ExoPlayerNativePlaybackDeck promoted =
+                        (ExoPlayerNativePlaybackDeck) activeDeck;
+                    player.promote(promoted.player());
+                    applyEqForCurrentTrack();
+                    requestNotificationUpdate();
+                }
+
+                @Override
+                public void onCompleted(long executionId, int finalIndex) {
+                    if (activeTransitionPlan == null) return;
+                    if (activeTransitionPlan.isBeatmatch()) {
+                        Log.i(
+                            NativeMixAudioProcessor.QOE_TAG,
+                            "beatmatch completed ratio=" + activeTransitionPlan.incomingTempoRatio
+                                + " phaseErrorMs=" + mixController.medianPhaseErrorMs()
+                        );
+                    }
+                    pcmBusMixer.markCapture("completed");
+                    startTempoRestore();
+                    JSObject payload = transitionPayload(activeTransitionPlan, 1.0f);
+                    payload.put("finalIndex", finalIndex);
+                    clearNativeTransitionState();
+                    emit("transitionEnded", payload);
+                }
+
+                @Override
+                public void onCancelled(
+                    long executionId,
+                    String reason,
+                    boolean afterHandoff
+                ) {
+                    pcmBusMixer.markCapture("cancelled " + reason);
+                    startTempoRestore();
+                    clearNativeTransitionState();
+                    JSObject payload = basePayload();
+                    payload.put("executionId", executionId);
+                    payload.put("reason", reason);
+                    payload.put("afterHandoff", afterHandoff);
+                    emit("transitionCancelled", payload);
+                }
+
+                @Override
+                public void onFailed(String reason) {
+                    clearNativeTransitionState();
+                    JSObject payload = basePayload();
+                    payload.put("reason", reason);
+                    payload.put("afterHandoff", false);
+                    emit("transitionCancelled", payload);
+                }
+            }
+        );
+        watchDeckErrors(deckAPlayer, deckA);
+        watchDeckErrors(deckBPlayer, deckB);
+        interruptionCoordinator = new NativeInterruptionCoordinator(
+            new NativeInterruptionCoordinator.Playback() {
+                @Override
+                public boolean isPlaying() {
+                    return player != null && player.isPlaying();
+                }
+
+                @Override
+                public void cancelTransition(String reason) {
+                    cancelNativeTransition(reason);
+                }
+
+                @Override
+                public void pause() {
+                    pauseForInterruption();
+                }
+
+                @Override
+                public void play() {
+                    if (player != null) {
+                        player.play();
+                    }
+                }
+
+                @Override
+                public void setDuckMultiplier(float multiplier) {
+                    if (mixController != null) {
+                        mixController.setDuckMultiplier(multiplier);
+                    }
+                }
+
+                @Override
+                public void checkpoint() {
+                    persistCheckpoint();
+                }
+            }
+        );
+        audioManager = getSystemService(AudioManager.class);
+        registerNoisyAudioReceiver();
+        registerCaptureReceiver();
         player.addListener(new Player.Listener() {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
                 emitPosition();
                 syncPositionTicker();
+                syncNativeMixTicker();
                 persistCheckpoint();
                 emitState("stateChanged");
                 requestNotificationUpdate();
@@ -196,6 +416,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             public void onPlaybackStateChanged(int playbackState) {
                 emitState("stateChanged");
                 requestNotificationUpdate();
+                syncNativeMixTicker();
                 if (playbackState == Player.STATE_READY) {
                     applyEqForCurrentTrack();
                 }
@@ -210,12 +431,21 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     emit("bufferingChanged", payload);
                 }
                 if (playbackState == Player.STATE_ENDED) {
+                    abandonPlaybackFocus();
                     emit("queueEnded", basePayload());
                 }
             }
 
             @Override
             public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
+                if (
+                    mixController != null &&
+                    !mixController.isTransitionActive()
+                ) {
+                    mixController.onActiveTrackChanged(
+                        mediaItem == null ? "" : mediaItem.mediaId
+                    );
+                }
                 resetPlayEventCheckpoint();
                 applyEqForCurrentTrack();
                 requestNotificationUpdate();
@@ -229,7 +459,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 payload.put("durationMs", safeDuration(player.getDuration()));
                 payload.put("isPlaying", player.isPlaying());
                 emit("trackChanged", payload);
+                maybeRequestContinuation();
+                maybeRefillQueue();
                 emitNearQueueEndIfNeeded();
+                syncNativeMixTicker();
             }
 
             @Override
@@ -238,6 +471,15 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 Player.PositionInfo newPosition,
                 int reason
             ) {
+                if (
+                    mixController != null &&
+                    !mixController.isTransitionActive()
+                ) {
+                    mixController.updateQueue(
+                        queueState.snapshot(),
+                        currentMediaItemId()
+                    );
+                }
                 resetPlayEventCheckpoint();
                 if (resumeAuthorizationPending) {
                     ResumeAuthorizationIntent current = currentResumeAuthorizationIntent();
@@ -245,7 +487,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                         newPosition.mediaItemIndex,
                         newPosition.positionMs,
                         current.playWhenReady,
-                        queue.size()
+                        queueState.size()
                     );
                     emitResumeAuthorizationRequired(resumeAuthorizationIntent);
                     openAppForAuthorization();
@@ -253,10 +495,18 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 emitPosition();
                 persistCheckpoint();
                 emitState("stateChanged");
+                syncNativeMixTicker();
             }
 
             @Override
             public void onPlayerError(PlaybackException error) {
+                if (
+                    mixController != null &&
+                    deckErrorRouter.onFacadeError(error, mixController.activeDeck())
+                ) {
+                    Log.w(TAG, "Deck error resolved by the active Smart Mix transition", error);
+                    return;
+                }
                 JSObject payload = basePayload();
                 NativeTrack currentTrack = getCurrentNativeTrack();
                 Throwable rootCause = rootCause(error);
@@ -375,6 +625,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             requestNotificationUpdate();
         }
         syncPositionTicker();
+        syncNativeMixTicker();
     }
 
     static boolean isCommandBlockedDuringResumeAuthorization(int playerCommand) {
@@ -420,13 +671,56 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private void requestNotificationUpdate() {
         if (mediaSession == null || player == null) return;
-        onUpdateNotification(mediaSession, player.isPlaying());
+        onUpdateNotification(
+            mediaSession,
+            NativeForegroundPolicy.shouldRunInForeground(
+                player.getPlayWhenReady(),
+                player.getPlaybackState()
+            )
+        );
     }
 
-    private ExoPlayer buildPlayer() {
-        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(this)
-            .setEnableDecoderFallback(true)
-            .setEnableAudioTrackPlaybackParams(true);
+    @OptIn(markerClass = ExperimentalApi.class)
+    private ExoPlayer buildPlayer(
+        NativeMixAudioProcessor audioProcessor,
+        int busChannel
+    ) {
+        DefaultRenderersFactory renderersFactory =
+            new DefaultRenderersFactory(this) {
+                @Override
+                protected AudioSink buildAudioSink(
+                    android.content.Context context,
+                    boolean enableFloatOutput,
+                    boolean enableAudioTrackPlaybackParams
+                ) {
+                    if (USE_PCM_BUS) {
+                        return new DefaultAudioSink.Builder(context)
+                            .setEnableFloatOutput(false)
+                            .setEnableAudioTrackPlaybackParams(false)
+                            .setAudioProcessors(
+                                PcmBusAudioOutputProvider.busAudioProcessors(audioProcessor)
+                            )
+                            .setAudioOutputProvider(
+                                new PcmBusAudioOutputProvider(
+                                    pcmBusMixer,
+                                    pcmBusMixer.channel(busChannel)
+                                )
+                            )
+                            .build();
+                    }
+                    return new DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(
+                            enableAudioTrackPlaybackParams
+                        )
+                        .setAudioProcessors(
+                            new AudioProcessor[] { audioProcessor }
+                        )
+                        .build();
+                }
+            }
+                .setEnableDecoderFallback(true)
+                .setEnableAudioTrackPlaybackParams(true);
         DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(false)
             .setConnectTimeoutMs(10_000)
@@ -436,7 +730,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         ResolvingDataSource.Factory authorizedDataSourceFactory =
             new ResolvingDataSource.Factory(
                 dataSourceFactory,
-                dataSpec -> withAuthorization(dataSpec, streamAuthorizationByOrigin)
+                this::authorizeStream
             );
         DefaultHttpDataSource.Factory artworkHttpDataSourceFactory =
             new DefaultHttpDataSource.Factory()
@@ -453,21 +747,300 @@ public class CrateNativePlaybackService extends MediaSessionService {
             this,
             renderersFactory,
             mediaSourceFactory
-        ).build();
+        )
+            .setLoadControl(
+                new DefaultLoadControl.Builder()
+                    .setBackBuffer(DECK_BACK_BUFFER_MS, true)
+                    .build()
+            )
+            .experimentalSetDynamicSchedulingEnabled(USE_PCM_BUS)
+            .build();
     }
 
-    private void assignStableAudioSessionId() {
+    private void watchDeckErrors(ExoPlayer physicalPlayer, NativePlaybackDeck deck) {
+        physicalPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onPlayerError(PlaybackException error) {
+                deckErrorRouter.onPhysicalDeckError(
+                    error,
+                    deck,
+                    activePhysicalPlayer() == physicalPlayer
+                );
+            }
+        });
+    }
+
+    private void configurePhysicalPlayer(ExoPlayer physicalPlayer) {
+        assignStableAudioSessionId(physicalPlayer);
+        physicalPlayer.setWakeMode(C.WAKE_MODE_LOCAL);
+        physicalPlayer.setAudioAttributes(
+            new AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build(),
+            false
+        );
+        physicalPlayer.setHandleAudioBecomingNoisy(false);
+        physicalPlayer.addAnalyticsListener(new AnalyticsListener() {
+            @Override
+            public void onAudioSessionIdChanged(
+                EventTime eventTime,
+                int audioSessionId
+            ) {
+                if (activePhysicalPlayer() == physicalPlayer) {
+                    applyEqForCurrentTrack();
+                }
+            }
+
+            @Override
+            public void onAudioUnderrun(
+                EventTime eventTime,
+                int bufferSize,
+                long bufferSizeMs,
+                long elapsedSinceLastFeedMs
+            ) {
+                Log.w(
+                    NativeMixAudioProcessor.QOE_TAG,
+                    "underrun active=" + (activePhysicalPlayer() == physicalPlayer)
+                        + " bufferMs=" + bufferSizeMs
+                        + " sinceLastFeedMs=" + elapsedSinceLastFeedMs
+                );
+            }
+        });
+    }
+
+    private boolean requestPlaybackFocus() {
+        if (audioFocusHeld) return true;
+        if (audioManager == null) return true;
+        try {
+            int result;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (audioFocusRequest == null) {
+                    audioFocusRequest = new AudioFocusRequest.Builder(
+                        AudioManager.AUDIOFOCUS_GAIN
+                    )
+                        .setAudioAttributes(
+                            new android.media.AudioAttributes.Builder()
+                                .setUsage(
+                                    android.media.AudioAttributes.USAGE_MEDIA
+                                )
+                                .setContentType(
+                                    android.media.AudioAttributes
+                                        .CONTENT_TYPE_MUSIC
+                                )
+                                .build()
+                        )
+                        .setOnAudioFocusChangeListener(
+                            audioFocusChangeListener,
+                            mainHandler
+                        )
+                        .setWillPauseWhenDucked(false)
+                        .build();
+                }
+                result = audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                result = requestLegacyAudioFocus();
+            }
+            audioFocusHeld =
+                result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            return audioFocusHeld;
+        } catch (RuntimeException error) {
+            audioFocusHeld = false;
+            Log.w(TAG, "Could not request shared playback audio focus", error);
+            return false;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private int requestLegacyAudioFocus() {
+        return audioManager.requestAudioFocus(
+            audioFocusChangeListener,
+            AudioManager.STREAM_MUSIC,
+            AudioManager.AUDIOFOCUS_GAIN
+        );
+    }
+
+    private void abandonPlaybackFocus() {
+        if (!audioFocusHeld || audioManager == null) return;
+        try {
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                audioFocusRequest != null
+            ) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            } else {
+                abandonLegacyAudioFocus();
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not abandon shared playback audio focus", error);
+        } finally {
+            audioFocusHeld = false;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void abandonLegacyAudioFocus() {
+        audioManager.abandonAudioFocus(audioFocusChangeListener);
+    }
+
+    private void handleAudioFocusChange(int focusChange) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(() -> handleAudioFocusChange(focusChange));
+            return;
+        }
+        if (interruptionCoordinator == null) return;
+        NativeInterruptionCoordinator.FocusChange mapped;
+        switch (focusChange) {
+            case AudioManager.AUDIOFOCUS_GAIN:
+                audioFocusHeld = true;
+                mapped = NativeInterruptionCoordinator.FocusChange.GAIN;
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS:
+                audioFocusHeld = false;
+                mapped = NativeInterruptionCoordinator.FocusChange.LOSS;
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                mapped =
+                    NativeInterruptionCoordinator.FocusChange.TRANSIENT_LOSS;
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                mapped = NativeInterruptionCoordinator.FocusChange.DUCK;
+                break;
+            default:
+                return;
+        }
+        interruptionCoordinator.onFocusChange(mapped);
+    }
+
+    private void pauseForInterruption() {
         if (player == null) return;
+        handlingInterruption = true;
+        try {
+            player.pause();
+        } finally {
+            handlingInterruption = false;
+        }
+    }
+
+    private void registerCaptureReceiver() {
+        if (!BuildConfig.DEBUG || !USE_PCM_BUS || captureReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(CAPTURE_START_ACTION);
+        filter.addAction(CAPTURE_STOP_ACTION);
+        filter.addAction(SEEK_TO_CUE_ACTION);
+        ContextCompat.registerReceiver(
+            this,
+            captureReceiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED
+        );
+        captureReceiverRegistered = true;
+    }
+
+    private void unregisterCaptureReceiver() {
+        if (!captureReceiverRegistered) return;
+        unregisterReceiver(captureReceiver);
+        captureReceiverRegistered = false;
+    }
+
+    private void seekBeforeNextCue(long leadMs) {
+        NativeTransitionPlan plan = pendingTransitionPlan();
+        if (player == null || plan == null) {
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "bus seek skipped: no pending transition");
+            return;
+        }
+        long cueMs = NativeMixTrigger.effectiveCueMs(plan, currentTrackDurationMs());
+        long targetMs = Math.max(0L, cueMs - leadMs);
+        player.seekTo(targetMs);
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "bus seek edge=" + plan.outgoingTrackId + ">" + plan.incomingTrackId
+                + " mode=" + plan.mode + " cueMs=" + cueMs + " targetMs=" + targetMs
+        );
+    }
+
+    private void handleCaptureIntent(Intent intent) {
+        if (SEEK_TO_CUE_ACTION.equals(intent.getAction())) {
+            seekBeforeNextCue(intent.getLongExtra("leadMs", 12_000L));
+            return;
+        }
+        String name = intent.getStringExtra("name");
+        String safeName = name == null || name.isEmpty()
+            ? "capture-" + System.currentTimeMillis()
+            : name.replaceAll("[^A-Za-z0-9._-]", "_");
+        File directory = new File(getExternalFilesDir(null), "captures");
+        try {
+            if (CAPTURE_START_ACTION.equals(intent.getAction())) {
+                if (!directory.isDirectory() && !directory.mkdirs()) {
+                    throw new IOException("Cannot create " + directory);
+                }
+                File file = new File(directory, safeName + ".wav");
+                pcmBusMixer.startCapture(file);
+                Log.i(NativeMixAudioProcessor.QOE_TAG, "bus capture started " + file);
+                return;
+            }
+            JSONObject summary = pcmBusMixer.stopCapture();
+            if (summary == null) return;
+            String file = summary.getString("file");
+            File summaryFile = new File(directory, file.replaceAll("\\.wav$", "") + ".json");
+            try (FileOutputStream output = new FileOutputStream(summaryFile)) {
+                output.write(summary.toString(2).getBytes(StandardCharsets.UTF_8));
+            }
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "bus capture stopped " + summary);
+        } catch (IOException | JSONException error) {
+            Log.w(NativeMixAudioProcessor.QOE_TAG, "bus capture failed", error);
+        }
+    }
+
+    private void registerNoisyAudioReceiver() {
+        if (noisyReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(
+            AudioManager.ACTION_AUDIO_BECOMING_NOISY
+        );
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(
+                    noisyAudioReceiver,
+                    filter,
+                    Context.RECEIVER_NOT_EXPORTED
+                );
+            } else {
+                registerReceiver(noisyAudioReceiver, filter);
+            }
+            noisyReceiverRegistered = true;
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not register noisy audio receiver", error);
+        }
+    }
+
+    private void unregisterNoisyAudioReceiver() {
+        if (!noisyReceiverRegistered) return;
+        try {
+            unregisterReceiver(noisyAudioReceiver);
+        } catch (IllegalArgumentException error) {
+            Log.w(TAG, "Noisy audio receiver was already unregistered", error);
+        } finally {
+            noisyReceiverRegistered = false;
+        }
+    }
+
+    private void assignStableAudioSessionId(ExoPlayer physicalPlayer) {
         try {
             AudioManager audioManager = getSystemService(AudioManager.class);
             if (audioManager == null) return;
             int audioSessionId = audioManager.generateAudioSessionId();
             if (audioSessionId > 0 && audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
-                player.setAudioSessionId(audioSessionId);
+                physicalPlayer.setAudioSessionId(audioSessionId);
             }
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not assign stable audio session id; using player-managed session", error);
         }
+    }
+
+    @Nullable
+    private ExoPlayer activePhysicalPlayer() {
+        if (player == null) return null;
+        Player active = player.activePlayer();
+        return active instanceof ExoPlayer ? (ExoPlayer) active : null;
     }
 
     private List<CommandButton> mediaButtonPreferences() {
@@ -513,26 +1086,15 @@ public class CrateNativePlaybackService extends MediaSessionService {
         PlaybackCheckpointStore.Checkpoint checkpoint = checkpointStore.load();
         if (checkpoint == null || checkpoint.tracks.isEmpty()) return;
 
-        queueRevision = checkpoint.revision;
-        queue.clear();
+        List<NativeTrack> restoredTracks = new ArrayList<>();
         List<MediaItem> mediaItems = new ArrayList<>();
         for (PlaybackCheckpointStore.SafeTrack track : checkpoint.tracks) {
-            NativeTrack restoredTrack = new NativeTrack(
-                track.id,
-                "",
-                "",
-                track.title,
-                track.artist,
-                track.album,
-                track.artwork,
-                "",
-                track.durationMs,
-                null
-            );
-            queue.add(restoredTrack);
+            NativeTrack restoredTrack = NativeTrack.fromCheckpoint(track);
+            restoredTracks.add(restoredTrack);
             mediaItems.add(toCheckpointMediaItem(restoredTrack));
         }
-        int index = Math.max(0, Math.min(checkpoint.index, mediaItems.size() - 1));
+        queueState.replace(checkpoint.revision, restoredTracks);
+        int index = queueState.clampPlaybackIndex(checkpoint.index);
         player.setMediaItems(mediaItems, index, checkpoint.positionMs);
         player.setRepeatMode(toRepeatMode(checkpoint.repeat));
         restoredPlayWhenReady = checkpoint.playWhenReady;
@@ -547,29 +1109,20 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private void persistCheckpoint() {
         if (checkpointStore == null || player == null) return;
-        if (queue.isEmpty()) {
+        if (queueState.isEmpty()) {
             checkpointStore.clear();
             return;
         }
         List<PlaybackCheckpointStore.SafeTrack> safeTracks = new ArrayList<>();
-        for (NativeTrack track : queue) {
-            safeTracks.add(
-                new PlaybackCheckpointStore.SafeTrack(
-                    track.id,
-                    track.title,
-                    track.artist,
-                    track.album,
-                    track.artwork,
-                    track.durationMs
-                )
-            );
+        for (NativeTrack track : queueState.snapshot()) {
+            safeTracks.add(track.toSafeCheckpointTrack());
         }
         ResumeAuthorizationIntent pendingIntent = resumeAuthorizationPending
             ? currentResumeAuthorizationIntent()
             : null;
         checkpointStore.save(
             new PlaybackCheckpointStore.Checkpoint(
-                queueRevision,
+                queueState.revision(),
                 safeTracks,
                 pendingIntent == null
                     ? Math.max(0, player.getCurrentMediaItemIndex())
@@ -591,7 +1144,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             player == null ? 0 : player.getCurrentMediaItemIndex(),
             player == null ? 0L : player.getCurrentPosition(),
             restoredPlayWhenReady,
-            queue.size()
+            queueState.size()
         );
     }
 
@@ -647,7 +1200,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
+        continuationExecutor.shutdownNow();
+        pcmBusMixer.release();
         stopPositionTicker();
+        stopNativeMixTicker();
+        unregisterNoisyAudioReceiver();
+        unregisterCaptureReceiver();
+        abandonPlaybackFocus();
+        cancelNativeTransition("service_destroyed");
         if (mediaSession != null) {
             if (sessionRegistered) {
                 removeSession(mediaSession);
@@ -656,29 +1216,44 @@ public class CrateNativePlaybackService extends MediaSessionService {
             mediaSession.release();
             mediaSession = null;
         }
+        Player facadePlayer = player == null
+            ? null
+            : player.activePlayer();
         if (player != null) {
             player.release();
             player = null;
         }
-        releaseSystemEqualizer();
+        if (eqController != null) {
+            eqController.releaseAll();
+            eqController = null;
+        }
+        if (deckAPlayer != null && deckAPlayer != facadePlayer) {
+            deckAPlayer.release();
+        }
+        if (deckBPlayer != null && deckBPlayer != facadePlayer) {
+            deckBPlayer.release();
+        }
+        deckAPlayer = null;
+        deckBPlayer = null;
+        deckA = null;
+        deckB = null;
+        mixController = null;
+        deckAAudioProcessor = null;
+        deckBAudioProcessor = null;
         super.onDestroy();
     }
 
-    public void setEventSink(@Nullable EventSink sink) {
-        eventSink = sink;
+    public void setEventSink(@Nullable NativePlaybackTelemetry.EventSink sink) {
+        telemetry.setEventSink(sink);
         if (sink != null && resumeAuthorizationPending) {
             emitResumeAuthorizationRequired(currentResumeAuthorizationIntent());
         }
         syncPositionTicker();
+        syncNativeMixTicker();
     }
 
     public JSArray drainEvents() {
-        JSArray events = new JSArray();
-        for (JSObject event : bufferedEvents) {
-            events.put(event);
-        }
-        bufferedEvents.clear();
-        return events;
+        return telemetry.drain();
     }
 
     public JSObject getSnapshot() {
@@ -694,7 +1269,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         payload.put("index", player == null ? -1 : player.getCurrentMediaItemIndex());
         payload.put("positionMs", player == null ? 0L : Math.max(0L, player.getCurrentPosition()));
         payload.put("durationMs", player == null ? 0L : safeDuration(player.getDuration()));
-        payload.put("queueSize", queue.size());
+        payload.put("queueSize", queueState.size());
         payload.put("crossfadeMs", crossfadeMs);
         payload.put("eqEnabled", eqEnabled);
         return payload;
@@ -708,17 +1283,17 @@ public class CrateNativePlaybackService extends MediaSessionService {
         boolean autoplay,
         String repeat,
         int crossfadeMs,
-        float volume
+        float volume,
+        @Nullable List<JSONObject> transitionPlanPayloads
     ) {
         if (player == null) return;
-        queueRevision = valueOrDefault(revision, UUID.randomUUID().toString());
         resumeAuthorizationPending = false;
         resumeAuthorizationIntent = null;
-        queue.clear();
         this.crossfadeMs = Math.max(0, crossfadeMs);
         resetPlayEventCheckpoint();
 
         List<MediaItem> mediaItems = new ArrayList<>();
+        List<NativeTrack> playableTracks = new ArrayList<>();
         int filteredStartIndex = 0;
         List<NativeTrack> inputTracks = tracks == null ? Collections.emptyList() : tracks;
         applyQueueAuthorization(inputTracks);
@@ -728,40 +1303,336 @@ public class CrateNativePlaybackService extends MediaSessionService {
             if (index < startIndex) {
                 filteredStartIndex++;
             }
-            queue.add(track);
+            playableTracks.add(track);
             mediaItems.add(toMediaItem(track));
         }
 
-        int safeIndex = mediaItems.isEmpty()
+        queueState.replace(
+            revision,
+            playableTracks,
+            resolveTransitionPlans(playableTracks, transitionPlanPayloads)
+        );
+        int safeIndex = queueState.clampPlaybackIndex(filteredStartIndex);
+        int standbyIndex = mediaItems.isEmpty()
             ? 0
-            : Math.max(0, Math.min(filteredStartIndex, mediaItems.size() - 1));
-        player.setMediaItems(mediaItems, safeIndex, Math.max(0L, positionMs));
-        player.setRepeatMode(toRepeatMode(repeat));
-        player.setVolume(clampVolume(volume));
+            : Math.min(safeIndex + 1, mediaItems.size() - 1);
+        deckA.replaceQueue(
+            playableTracks,
+            mediaItems,
+            safeIndex,
+            Math.max(0L, positionMs)
+        );
+        deckB.replaceQueue(
+            playableTracks,
+            mediaItems,
+            standbyIndex,
+            0L
+        );
+        int repeatMode = toRepeatMode(repeat);
+        deckAPlayer.setRepeatMode(repeatMode);
+        deckBPlayer.setRepeatMode(repeatMode);
+        mixController.setOutputVolume(clampVolume(volume));
+        mixController.setRepeatOne(repeatMode == Player.REPEAT_MODE_ONE);
+        mixController.setEnabled(this.crossfadeMs > 0);
+        boolean allowedAutoplay =
+            autoplay && requestPlaybackFocus();
+        mixController.setQueue(
+            playableTracks,
+            safeIndex,
+            Math.max(0L, positionMs),
+            allowedAutoplay
+        );
         Log.i(
             TAG,
             "Loading native queue"
-                + " revision=" + queueRevision
+                + " revision=" + queueState.revision()
                 + " size=" + mediaItems.size()
                 + " index=" + safeIndex
                 + " autoplay=" + autoplay
-                + " firstUrl=" + (queue.isEmpty() ? "" : redactUrl(queue.get(safeIndex).url))
+                + " firstUrl="
+                + (
+                    queueState.isEmpty()
+                        ? ""
+                        : redactUrl(queueState.get(safeIndex).url)
+                )
         );
-        player.prepare();
         applyEqForCurrentTrack();
         refreshMediaSessionControls();
         emitState("stateChanged");
-        if (autoplay && !mediaItems.isEmpty()) {
-            player.play();
-        }
         persistCheckpoint();
         emitPosition();
         syncPositionTicker();
+        syncNativeMixTicker();
+    }
+
+    public void setContinuationConfig(
+        @Nullable NativeContinuationClient.Config config
+    ) {
+        continuationConfig = config;
+        continuationPolicy.reset();
+        refillPolicy.reset();
+        maybeRequestContinuation();
+        maybeRefillQueue();
+    }
+
+    public void setAppInForeground(boolean foreground) {
+        appInForeground = foreground;
+        if (!foreground) {
+            maybeRequestContinuation();
+            maybeRefillQueue();
+        }
+    }
+
+    private void maybeRefillQueue() {
+        NativeContinuationClient.Config config = continuationConfig;
+        if (player == null) return;
+        boolean configured =
+            config != null && config.refill && config.isUsable(System.currentTimeMillis());
+        if (
+            !refillPolicy.nextRefill(
+                appInForeground,
+                configured,
+                player.getCurrentMediaItemIndex(),
+                queueState.size(),
+                SystemClock.elapsedRealtime()
+            )
+        ) {
+            return;
+        }
+        String revision = queueState.revision();
+        List<NativeTrack> queue = queueState.snapshot();
+        continuationExecutor.execute(() -> {
+            NativeContinuationClient.Continuation result =
+                continuationClient.fetchContinuation(config, queue, REFILL_BATCH);
+            mainHandler.post(() -> applyRefill(revision, result));
+        });
+    }
+
+    private void applyRefill(
+        String revision,
+        NativeContinuationClient.Continuation result
+    ) {
+        if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
+            refillPolicy.onUnauthorized();
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill unauthorized");
+            return;
+        }
+        if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
+            refillPolicy.onFailure(SystemClock.elapsedRealtime());
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill failed");
+            return;
+        }
+        if (result.tracks.isEmpty()) {
+            if (result.exhausted) {
+                refillPolicy.onExhausted();
+            } else {
+                refillPolicy.onSuccess();
+            }
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "continuation refill empty exhausted=" + result.exhausted
+            );
+            return;
+        }
+        refillPolicy.onSuccess();
+        if (!revision.equals(queueState.revision())) return;
+        int before = queueState.size();
+        appendTracks(revision, result.tracks);
+        if (queueState.size() == before) return;
+        recordAppended(revision, result);
+        queueState.mergeTransitionPlans(
+            revision,
+            resolveTransitionPlans(queueState.snapshot(), result.plans)
+        );
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "continuation appended=" + result.tracks.size()
+                + " sequence=" + appendSequence
+                + " plans=" + result.plans.size()
+        );
+    }
+
+    private void recordAppended(
+        String revision,
+        NativeContinuationClient.Continuation result
+    ) {
+        if (!revision.equals(appendedLogRevision)) {
+            appendedLog.clear();
+            appendedLogRevision = revision;
+        }
+        for (int index = 0; index < result.tracks.size(); index++) {
+            NativeTrack track = result.tracks.get(index);
+            JSObject entry = new JSObject();
+            entry.put("sequence", ++appendSequence);
+            entry.put("id", track.id);
+            entry.put("entityUid", track.entityUid);
+            entry.put("durationMs", track.durationMs);
+            try {
+                entry.put("source", new JSObject(result.sources.get(index)));
+            } catch (JSONException error) {
+                entry.put("source", new JSObject());
+            }
+            appendedLog.add(entry);
+        }
+        while (appendedLog.size() > MAX_APPENDED_LOG) {
+            appendedLog.remove(0);
+        }
+    }
+
+    public JSObject getAppendedTracks(String revision, long afterSequence) {
+        JSArray tracks = new JSArray();
+        if (revision != null && revision.equals(appendedLogRevision)) {
+            for (JSObject entry : appendedLog) {
+                if (entry.optLong("sequence", 0L) > afterSequence) {
+                    tracks.put(entry);
+                }
+            }
+        }
+        JSObject result = new JSObject();
+        result.put("revision", appendedLogRevision);
+        result.put("tracks", tracks);
+        return result;
+    }
+
+    private void maybeRequestContinuation() {
+        NativeContinuationClient.Config config = continuationConfig;
+        if (player == null) return;
+        int currentIndex = player.getCurrentMediaItemIndex();
+        boolean configured =
+            config != null && config.isUsable(System.currentTimeMillis());
+        int plannedAhead = queueState.serverPlannedEdgesAhead(currentIndex);
+        NativeContinuationPolicy.Window window = continuationPolicy.nextRequest(
+            appInForeground,
+            configured,
+            crossfadeMs > 0,
+            currentIndex,
+            queueState.size(),
+            plannedAhead,
+            SystemClock.elapsedRealtime()
+        );
+        if (window == null) {
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "continuation idle foreground=" + appInForeground
+                    + " configured=" + configured
+                    + " mix=" + (crossfadeMs > 0)
+                    + " index=" + currentIndex
+                    + " size=" + queueState.size()
+                    + " plannedAhead=" + plannedAhead
+            );
+            return;
+        }
+        String revision = queueState.revision();
+        List<NativeTrack> tracks = queueState.snapshot();
+        continuationExecutor.execute(() -> {
+            NativeContinuationClient.Result result = continuationClient.fetchPlans(
+                config,
+                tracks,
+                window.fromIndex,
+                window.edgeCount
+            );
+            mainHandler.post(() -> applyContinuationResult(revision, tracks, result));
+        });
+    }
+
+    private void applyContinuationResult(
+        String revision,
+        List<NativeTrack> tracks,
+        NativeContinuationClient.Result result
+    ) {
+        if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
+            continuationPolicy.onUnauthorized();
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation unauthorized");
+            return;
+        }
+        if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
+            continuationPolicy.onFailure(SystemClock.elapsedRealtime());
+            Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation failed");
+            return;
+        }
+        continuationPolicy.onSuccess();
+        boolean merged = queueState.mergeTransitionPlans(
+            revision,
+            resolveTransitionPlans(tracks, result.plans)
+        );
+        Log.i(
+            NativeMixAudioProcessor.QOE_TAG,
+            "continuation planned=" + result.plans.size() + " merged=" + merged
+        );
+    }
+
+    public boolean setTransitionPlans(
+        String revision,
+        @Nullable List<JSONObject> transitionPlanPayloads
+    ) {
+        return queueState.replaceTransitionPlans(
+            revision,
+            resolveTransitionPlans(queueState.snapshot(), transitionPlanPayloads)
+        );
     }
 
     private void applyQueueAuthorization(List<NativeTrack> tracks) {
         streamAuthorizationByOrigin = streamAuthorizationByOrigin(tracks);
         artworkAuthorizationByOrigin = artworkAuthorizationByOrigin(tracks);
+    }
+
+    private List<NativeTransitionPlan> resolveTransitionPlans(
+        List<NativeTrack> playableTracks,
+        @Nullable List<JSONObject> transitionPlanPayloads
+    ) {
+        if (
+            playableTracks == null ||
+            playableTracks.isEmpty() ||
+            transitionPlanPayloads == null ||
+            transitionPlanPayloads.isEmpty()
+        ) {
+            return Collections.emptyList();
+        }
+
+        List<NativeTransitionPlan> resolvedPlans = new ArrayList<>();
+        for (JSONObject payload : transitionPlanPayloads) {
+            if (payload == null) continue;
+            String outgoingTrackId = payload.optString("outgoingTrackId", "");
+            String incomingTrackId = payload.optString("incomingTrackId", "");
+            int outgoingIndex = indexOfTrack(playableTracks, outgoingTrackId);
+            if (
+                outgoingIndex < 0 ||
+                outgoingIndex + 1 >= playableTracks.size() ||
+                !incomingTrackId.equals(
+                    playableTracks.get(outgoingIndex + 1).id
+                )
+            ) {
+                Log.w(TAG, "Ignoring Smart Mix plan for a non-adjacent queue edge");
+                continue;
+            }
+
+            NativeTrack outgoing = playableTracks.get(outgoingIndex);
+            NativeTrack incoming = playableTracks.get(outgoingIndex + 1);
+            try {
+                resolvedPlans.add(
+                    NativeTransitionPlan.fromJson(
+                        payload,
+                        outgoing.id,
+                        incoming.id,
+                        crossfadeMs
+                    )
+                );
+            } catch (IllegalArgumentException error) {
+                Log.w(TAG, "Ignoring invalid Smart Mix transition plan", error);
+            }
+        }
+        return resolvedPlans;
+    }
+
+    private static int indexOfTrack(
+        List<NativeTrack> tracks,
+        String trackId
+    ) {
+        if (trackId == null || trackId.isEmpty()) return -1;
+        for (int index = 0; index < tracks.size(); index++) {
+            if (trackId.equals(tracks.get(index).id)) return index;
+        }
+        return -1;
     }
 
     static Map<String, String> streamAuthorizationByOrigin(List<NativeTrack> tracks) {
@@ -784,7 +1655,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             String authorization = artwork
                 ? track.artworkAuthorization
                 : track.authorization;
-            String origin = httpsOrigin(url);
+            String origin = trustedOrigin(url);
             if (!authorization.isEmpty() && !origin.isEmpty()) {
                 authorizationByOrigin.put(origin, authorization);
             }
@@ -792,20 +1663,83 @@ public class CrateNativePlaybackService extends MediaSessionService {
         return Collections.unmodifiableMap(authorizationByOrigin);
     }
 
-    private static String httpsOrigin(String url) {
+    private static String trustedOrigin(String url) {
         try {
             URI uri = URI.create(valueOrDefault(url, ""));
-            if (
-                !"https".equalsIgnoreCase(uri.getScheme()) ||
-                uri.getHost() == null ||
-                uri.getRawUserInfo() != null
-            ) {
+            if (uri.getHost() == null || uri.getRawUserInfo() != null) {
                 return "";
             }
-            return "https://" + uri.getRawAuthority();
+            String scheme = uri.getScheme();
+            if ("https".equalsIgnoreCase(scheme)) {
+                return "https://" + uri.getRawAuthority();
+            }
+            if (
+                BuildConfig.DEBUG &&
+                "http".equalsIgnoreCase(scheme) &&
+                isLoopbackHost(uri.getHost())
+            ) {
+                return "http://" + uri.getRawAuthority();
+            }
+            return "";
         } catch (RuntimeException error) {
             return "";
         }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
+    }
+
+    private static final long BEATMATCH_LOG_INTERVAL_MS = 500L;
+    private long lastBeatmatchLogElapsedMs;
+    private static final long TEMPO_RESTORE_MS = 4_000L;
+    private static final long TEMPO_RESTORE_STEP_MS = 500L;
+    @Nullable
+    private Runnable tempoRestoreTicker;
+
+    private void startTempoRestore() {
+        float fromSpeed = mixController.pendingTempoRestoreSpeed();
+        if (fromSpeed == 1.0f) return;
+        mixController.clearPendingTempoRestore();
+        NativePlaybackDeck deck = mixController.activeDeck();
+        long startedAtMs = SystemClock.elapsedRealtime();
+        if (tempoRestoreTicker != null) mainHandler.removeCallbacks(tempoRestoreTicker);
+        tempoRestoreTicker = new Runnable() {
+            @Override
+            public void run() {
+                float progress = Math.min(
+                    1.0f,
+                    (SystemClock.elapsedRealtime() - startedAtMs) / (float) TEMPO_RESTORE_MS
+                );
+                deck.setSpeed(fromSpeed + (1.0f - fromSpeed) * progress);
+                if (progress < 1.0f) {
+                    mainHandler.postDelayed(this, TEMPO_RESTORE_STEP_MS);
+                }
+            }
+        };
+        mainHandler.post(tempoRestoreTicker);
+    }
+
+    private DataSpec authorizeStream(DataSpec dataSpec) {
+        String origin = trustedOrigin(dataSpec.uri.toString());
+        NativeContinuationClient.Config config = continuationConfig;
+        long nowWallMs = System.currentTimeMillis();
+        String continuationToken =
+            config != null &&
+            config.isUsable(nowWallMs) &&
+            !origin.isEmpty() &&
+            origin.equals(trustedOrigin(config.apiBase))
+                ? config.token
+                : null;
+        String authorization = NativeStreamAuthorization.choose(
+            streamAuthorizationByOrigin.get(origin),
+            continuationToken,
+            nowWallMs
+        );
+        if (authorization == null || authorization.isEmpty()) return dataSpec;
+        return dataSpec.withAdditionalHeaders(
+            Collections.singletonMap("Authorization", authorization)
+        );
     }
 
     private static DataSpec withAuthorization(
@@ -813,7 +1747,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         Map<String, String> authorizationByOrigin
     ) {
         String authorization = authorizationByOrigin.get(
-            httpsOrigin(dataSpec.uri.toString())
+            trustedOrigin(dataSpec.uri.toString())
         );
         if (authorization == null || authorization.isEmpty()) return dataSpec;
         return dataSpec.withAdditionalHeaders(
@@ -822,53 +1756,70 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void appendTracks(String revision, List<NativeTrack> tracks) {
-        if (!isCurrentRevision(revision)) return;
         if (player == null || tracks == null || tracks.isEmpty()) return;
-        List<NativeTrack> updatedQueue = new ArrayList<>(queue);
-        updatedQueue.addAll(tracks);
-        applyQueueAuthorization(updatedQueue);
+        List<NativeTrack> playableTracks = new ArrayList<>();
         for (NativeTrack track : tracks) {
             if (track.url.isEmpty()) continue;
-            queue.add(track);
-            player.addMediaItem(toMediaItem(track));
+            playableTracks.add(track);
         }
+        if (!queueState.append(revision, playableTracks)) return;
+        applyQueueAuthorization(queueState.snapshot());
+        List<MediaItem> mediaItems = new ArrayList<>();
+        for (NativeTrack track : playableTracks) {
+            mediaItems.add(toMediaItem(track));
+        }
+        deckA.append(playableTracks, mediaItems);
+        deckB.append(playableTracks, mediaItems);
+        mixController.updateQueue(
+            queueState.snapshot(),
+            currentMediaItemId()
+        );
         persistCheckpoint();
         refreshMediaSessionControls();
         emitState("stateChanged");
     }
 
     public void insertTrack(String revision, int index, NativeTrack track) {
-        if (!isCurrentRevision(revision)) return;
         if (player == null || track == null || track.url.isEmpty()) return;
-        int safeIndex = Math.max(0, Math.min(index, queue.size()));
-        List<NativeTrack> updatedQueue = new ArrayList<>(queue);
-        updatedQueue.add(safeIndex, track);
-        applyQueueAuthorization(updatedQueue);
-        queue.add(safeIndex, track);
-        player.addMediaItem(safeIndex, toMediaItem(track));
+        int safeIndex = queueState.insert(revision, index, track);
+        if (safeIndex < 0) return;
+        applyQueueAuthorization(queueState.snapshot());
+        MediaItem mediaItem = toMediaItem(track);
+        deckA.insert(safeIndex, track, mediaItem);
+        deckB.insert(safeIndex, track, mediaItem);
+        mixController.updateQueue(
+            queueState.snapshot(),
+            currentMediaItemId()
+        );
         persistCheckpoint();
         refreshMediaSessionControls();
         emitState("stateChanged");
     }
 
     public void removeTrack(String revision, int index) {
-        if (!isCurrentRevision(revision)) return;
-        if (player == null || index < 0 || index >= queue.size()) return;
-        queue.remove(index);
-        applyQueueAuthorization(queue);
-        player.removeMediaItem(index);
+        if (player == null || !queueState.remove(revision, index)) return;
+        applyQueueAuthorization(queueState.snapshot());
+        deckA.remove(index);
+        deckB.remove(index);
+        mixController.updateQueue(
+            queueState.snapshot(),
+            currentMediaItemId()
+        );
         persistCheckpoint();
         refreshMediaSessionControls();
         emitState("stateChanged");
     }
 
     public void reorderTrack(String revision, int fromIndex, int toIndex) {
-        if (!isCurrentRevision(revision)) return;
-        if (player == null) return;
-        if (fromIndex < 0 || fromIndex >= queue.size() || toIndex < 0 || toIndex >= queue.size()) return;
-        NativeTrack moved = queue.remove(fromIndex);
-        queue.add(toIndex, moved);
-        player.moveMediaItem(fromIndex, toIndex);
+        if (player == null || !queueState.reorder(revision, fromIndex, toIndex)) {
+            return;
+        }
+        deckA.move(fromIndex, toIndex);
+        deckB.move(fromIndex, toIndex);
+        mixController.updateQueue(
+            queueState.snapshot(),
+            currentMediaItemId()
+        );
         persistCheckpoint();
         refreshMediaSessionControls();
         emitState("stateChanged");
@@ -883,6 +1834,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (player != null) {
             player.play();
             syncPositionTicker();
+            syncNativeMixTicker();
         }
     }
 
@@ -893,9 +1845,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .withPlayWhenReady(false);
         }
         if (player != null) {
+            cancelNativeTransition("pause");
             player.pause();
             emitPosition();
             syncPositionTicker();
+            syncNativeMixTicker();
         }
     }
 
@@ -906,8 +1860,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 .withPlayWhenReady(false);
         }
         if (player != null) {
+            cancelNativeTransition("stop");
             player.stop();
+            abandonPlaybackFocus();
             persistCheckpoint();
+            syncNativeMixTicker();
         }
     }
 
@@ -918,8 +1875,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
             )
         ) return;
         if (player != null) {
+            cancelNativeTransition("seek");
             player.seekTo(Math.max(0L, positionMs));
             emitPosition();
+            syncNativeMixTicker();
         }
     }
 
@@ -942,48 +1901,76 @@ public class CrateNativePlaybackService extends MediaSessionService {
             )
         ) return;
         if (player == null || index < 0 || index >= player.getMediaItemCount()) return;
+        cancelNativeTransition("jump");
         player.seekToDefaultPosition(index);
+        mixController.updateQueue(queueState.snapshot(), currentMediaItemId());
         if (autoplay) player.play();
+        syncNativeMixTicker();
     }
 
     public void next() {
         if (
             blockIfResumeAuthorizationPending(currentResumeAuthorizationIntent().next())
         ) return;
-        if (player != null && player.hasNextMediaItem()) player.seekToNextMediaItem();
+        if (player != null && player.hasNextMediaItem()) {
+            cancelNativeTransition("next");
+            player.seekToNextMediaItem();
+            mixController.updateQueue(queueState.snapshot(), currentMediaItemId());
+            syncNativeMixTicker();
+        }
     }
 
     public void previous() {
         if (
             blockIfResumeAuthorizationPending(currentResumeAuthorizationIntent().previous())
         ) return;
-        if (player != null && player.hasPreviousMediaItem()) player.seekToPreviousMediaItem();
+        if (player != null && player.hasPreviousMediaItem()) {
+            cancelNativeTransition("previous");
+            player.seekToPreviousMediaItem();
+            mixController.updateQueue(queueState.snapshot(), currentMediaItemId());
+            syncNativeMixTicker();
+        }
     }
 
     public void setRepeat(String repeat) {
         if (player != null) {
-            player.setRepeatMode(toRepeatMode(repeat));
+            int repeatMode = toRepeatMode(repeat);
+            deckAPlayer.setRepeatMode(repeatMode);
+            deckBPlayer.setRepeatMode(repeatMode);
+            mixController.setRepeatOne(
+                repeatMode == Player.REPEAT_MODE_ONE
+            );
             persistCheckpoint();
+            syncNativeMixTicker();
         }
     }
 
     public void setCrossfadeMs(int crossfadeMs) {
         this.crossfadeMs = Math.max(0, crossfadeMs);
+        if (mixController != null) {
+            mixController.setEnabled(this.crossfadeMs > 0);
+        }
         JSObject payload = basePayload();
         payload.put("crossfadeMs", this.crossfadeMs);
         emit("crossfadeChanged", payload);
+        syncNativeMixTicker();
     }
 
     public void setAppVolume(float volume) {
-        if (player != null) player.setVolume(clampVolume(volume));
+        if (mixController != null) {
+            mixController.setOutputVolume(clampVolume(volume));
+        }
     }
 
     public void setPlaybackRate(float rate) {
-        if (player != null) player.setPlaybackSpeed(clampPlaybackRate(rate));
+        float safeRate = clampPlaybackRate(rate);
+        if (deckAPlayer != null) deckAPlayer.setPlaybackSpeed(safeRate);
+        if (deckBPlayer != null) deckBPlayer.setPlaybackSpeed(safeRate);
     }
 
-    public void setEq(boolean enabled, float[] gains) {
+    public void setEq(boolean enabled, float[] gains, int rampMs) {
         eqEnabled = enabled;
+        eqRampMs = Math.max(0, rampMs);
         currentEqGains = gains == null ? new float[10] : gains;
         applyEqForCurrentTrack();
     }
@@ -992,7 +1979,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         long delayMs = NativePositionTickerPolicy.nextDelayMs(
             player != null && player.isPlaying(),
             player != null && player.getMediaItemCount() > 0,
-            eventSink != null
+            telemetry.hasEventSink()
         );
         mainHandler.removeCallbacks(positionTicker);
         positionTickerStarted = delayMs > 0L;
@@ -1005,6 +1992,321 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (!positionTickerStarted) return;
         positionTickerStarted = false;
         mainHandler.removeCallbacks(positionTicker);
+    }
+
+    private void syncNativeMixTicker() {
+        mainHandler.removeCallbacks(nativeMixTicker);
+        nativeMixTickerStarted = false;
+        if (
+            player == null ||
+            mixController == null ||
+            (
+                !mixController.isTransitionActive() &&
+                (
+                    crossfadeMs <= 0 ||
+                    !player.isPlaying() ||
+                    player.getMediaItemCount() == 0 ||
+                    !hasMixableAdjacentTrack()
+                )
+            )
+        ) {
+            if (player != null && mixController != null) {
+                logMixDiagnostic(
+                    "ticker idle crossfadeMs=" + crossfadeMs
+                        + " playing=" + player.isPlaying()
+                        + " items=" + player.getMediaItemCount()
+                        + " mixableNext=" + hasMixableAdjacentTrack()
+                );
+            }
+            return;
+        }
+
+        long delayMs = activeTransitionPlan == null
+            ? evaluatePendingMix().nextCheckDelayMs
+            : 20L;
+        nativeMixTickerStarted = true;
+        mainHandler.postDelayed(nativeMixTicker, delayMs);
+    }
+
+    private void stopNativeMixTicker() {
+        nativeMixTickerStarted = false;
+        mainHandler.removeCallbacks(nativeMixTicker);
+    }
+
+    private void evaluateNativeMix() {
+        if (player == null || mixController == null) return;
+        long nowElapsedMs = SystemClock.elapsedRealtime();
+        if (activeTransitionPlan != null) {
+            float phaseErrorMs = mixController.measurePhase();
+            if (
+                mixController.isBeatmatching() &&
+                nowElapsedMs - lastBeatmatchLogElapsedMs >= BEATMATCH_LOG_INTERVAL_MS
+            ) {
+                lastBeatmatchLogElapsedMs = nowElapsedMs;
+                Log.i(
+                    NativeMixAudioProcessor.QOE_TAG,
+                    "beatmatch phase progress=" + mixController.transitionProgress()
+                        + " errorMs=" + phaseErrorMs
+                        + " speed=" + mixController.beatmatchSpeed()
+                );
+            }
+            float progress = mixController.transitionProgress();
+            if (
+                progress >= 1.0f ||
+                nowElapsedMs - lastTransitionProgressEventElapsedMs >=
+                    MIX_PROGRESS_EVENT_INTERVAL_MS
+            ) {
+                emitNativeTransitionProgress(progress);
+                lastTransitionProgressEventElapsedMs = nowElapsedMs;
+            }
+            mixController.observeProgress(
+                mixController.executionId(),
+                progress,
+                nowElapsedMs
+            );
+            return;
+        }
+
+        int outgoingIndex = player.getCurrentMediaItemIndex();
+        NativeTransitionPlan plan = pendingTransitionPlan();
+        if (plan == null) return;
+        if (mixController.isPrerolling()) {
+            mixController.scheduleHeldStart();
+            float phaseErrorMs = mixController.measurePhase();
+            if (nowElapsedMs - lastBeatmatchLogElapsedMs >= BEATMATCH_LOG_INTERVAL_MS) {
+                lastBeatmatchLogElapsedMs = nowElapsedMs;
+                Log.i(
+                    NativeMixAudioProcessor.QOE_TAG,
+                    "beatmatch preroll phase " + mixController.phaseDebug()
+                        + " errorMs=" + phaseErrorMs
+                );
+            }
+        }
+        maybeBeginPreroll(plan);
+        NativeMixTrigger.Decision decision = evaluatePendingMix(plan);
+        logMixDiagnostic(
+            "decision edge=" + plan.outgoingTrackId + ">" + plan.incomingTrackId
+                + " action=" + decision.action
+                + " mode=" + plan.mode
+                + " cueMs=" + plan.outgoingCueMs
+                + " durationMs=" + plan.durationMs
+                + " outgoingDurationMs=" + currentTrackDurationMs()
+                + " standbyReady=" + mixController.isStandbyReadyAt(
+                    readinessCueMs(plan),
+                    NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
+                )
+        );
+        if (decision.action == NativeMixTrigger.Action.FALL_BACK) {
+            fallenBackEdge = edgeKey(plan);
+            logMixDiagnostic("fell back edge=" + edgeKey(plan));
+            return;
+        }
+        if (decision.action != NativeMixTrigger.Action.START) return;
+        ExoPlayer outgoingPlayer = activePhysicalPlayer();
+        if (outgoingPlayer == null) return;
+        NativeTransitionPlan boundedPlan = plan.withTiming(
+            Math.max(0L, player.getCurrentPosition()),
+            readinessCueMs(plan),
+            decision.durationMs
+        );
+
+        transitionOutgoingDeck = outgoingPlayer == deckA.player() ? deckA : deckB;
+        transitionOutgoingIndex = outgoingIndex;
+        transitionStartedWallMs = System.currentTimeMillis();
+        lastTransitionProgressEventElapsedMs = nowElapsedMs;
+        activeTransitionPlan = boundedPlan;
+        transitionOutgoingDeck.setPauseAtEndOfTrack(true);
+        if (!mixController.beginTransition(boundedPlan)) {
+            logMixDiagnostic("begin rejected edge=" + edgeKey(boundedPlan));
+            clearNativeTransitionState();
+            return;
+        }
+        if (boundedPlan.isBeatmatch()) {
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "beatmatch start " + mixController.phaseDebug()
+                    + " engaged=" + mixController.isBeatmatching()
+                    + " phaseErrorMs=" + mixController.lastPhaseErrorMs()
+                    + " ratio=" + boundedPlan.incomingTempoRatio
+                    + " bassHandoff=" + boundedPlan.bassHandoff
+            );
+        }
+        pcmBusMixer.markCapture(
+            "start " + edgeKey(boundedPlan)
+                + " mode=" + boundedPlan.mode
+                + " engaged=" + mixController.isBeatmatching()
+                + " bass=" + boundedPlan.bassHandoff
+        );
+        emit("transitionStarted", transitionPayload(boundedPlan, 0.0f));
+    }
+
+    private long readinessCueMs(NativeTransitionPlan plan) {
+        return mixController.isPrerolling()
+            ? plan.startIncomingCueMs()
+            : plan.prepareIncomingCueMs();
+    }
+
+    private void maybeBeginPreroll(NativeTransitionPlan plan) {
+        if (!plan.isBeatmatch() || mixController.isPrerolling() || !player.isPlaying()) {
+            return;
+        }
+        long cueMs = NativeMixTrigger.effectiveCueMs(plan, currentTrackDurationMs());
+        long positionMs = Math.max(0L, player.getCurrentPosition());
+        long startsAtMs = cueMs - NativeMixController.PREROLL_MS;
+        if (positionMs < startsAtMs || positionMs >= cueMs - NativeMixTrigger.START_SAFETY_LEAD_MS) {
+            return;
+        }
+        if (mixController.beginPreroll(plan)) {
+            Log.i(
+                NativeMixAudioProcessor.QOE_TAG,
+                "beatmatch preroll " + mixController.phaseDebug()
+                    + " prepareCue=" + plan.prepareIncomingCueMs()
+                    + " effectiveCue=" + cueMs
+            );
+        }
+    }
+
+    private NativeMixTrigger.Decision evaluatePendingMix() {
+        return evaluatePendingMix(pendingTransitionPlan());
+    }
+
+    private NativeMixTrigger.Decision evaluatePendingMix(
+        @Nullable NativeTransitionPlan plan
+    ) {
+        if (plan != null) {
+            mixController.prepareStandbyAt(
+                readinessCueMs(plan),
+                SystemClock.elapsedRealtime()
+            );
+        }
+        return NativeMixTrigger.evaluate(
+            player.isPlaying(),
+            Math.max(0L, player.getCurrentPosition()),
+            currentTrackDurationMs(),
+            plan,
+            plan != null &&
+                mixController.isStandbyReadyAt(
+                    readinessCueMs(plan),
+                    NativeMixTrigger.STANDBY_BUFFER_MARGIN_MS
+                )
+        );
+    }
+
+    @Nullable
+    private NativeTransitionPlan pendingTransitionPlan() {
+        int outgoingIndex = player.getCurrentMediaItemIndex();
+        NativeTrack outgoing = queueState.get(outgoingIndex);
+        NativeTrack incoming = queueState.get(outgoingIndex + 1);
+        if (outgoing == null || incoming == null) return null;
+        NativeTransitionPlan plan = queueState.transitionPlanFor(
+            outgoing.id,
+            incoming.id
+        );
+        if (plan == null) {
+            plan = NativeTransitionPlan.safeFallback(
+                outgoing.id,
+                incoming.id,
+                crossfadeMs,
+                "missing_plan"
+            );
+        }
+        return fallenBackEdge.equals(edgeKey(plan))
+            ? null
+            : plan.withPrerollRoom(currentTrackDurationMs());
+    }
+
+    private void logMixDiagnostic(String message) {
+        if (message.equals(lastMixDiagnostic)) return;
+        lastMixDiagnostic = message;
+        Log.i(NativeMixAudioProcessor.QOE_TAG, message);
+    }
+
+    private String edgeKey(NativeTransitionPlan plan) {
+        return queueState.revision() + ":" + plan.outgoingTrackId + ">" + plan.incomingTrackId;
+    }
+
+    private boolean hasMixableAdjacentTrack() {
+        if (player == null) return false;
+        int outgoingIndex = player.getCurrentMediaItemIndex();
+        NativeTrack outgoing = queueState.get(outgoingIndex);
+        NativeTrack incoming = queueState.get(outgoingIndex + 1);
+        if (outgoing == null || incoming == null) {
+            return false;
+        }
+        boolean sameAlbum =
+            !outgoing.album.isEmpty() &&
+            outgoing.album.equals(incoming.album) &&
+            outgoing.artist.equals(incoming.artist);
+        return !sameAlbum;
+    }
+
+    private void cancelNativeTransition(String reason) {
+        if (mixController == null) {
+            clearNativeTransitionState();
+            return;
+        }
+        if (mixController.isTransitionActive()) {
+            mixController.cancel(reason);
+            return;
+        }
+        mixController.cancelPreroll();
+        clearNativeTransitionState();
+    }
+
+    private void clearNativeTransitionState() {
+        if (transitionOutgoingDeck != null) {
+            transitionOutgoingDeck.setPauseAtEndOfTrack(false);
+        }
+        activeTransitionPlan = null;
+        transitionOutgoingDeck = null;
+        transitionOutgoingIndex = -1;
+        transitionStartedWallMs = 0L;
+        lastTransitionProgressEventElapsedMs = 0L;
+    }
+
+    private void emitNativeTransitionProgress(float progress) {
+        if (activeTransitionPlan == null) return;
+        emit(
+            "transitionProgress",
+            transitionPayload(activeTransitionPlan, progress)
+        );
+    }
+
+    private JSObject transitionPayload(
+        NativeTransitionPlan plan,
+        float progress
+    ) {
+        JSObject payload = basePayload();
+        payload.put("type", "crossfade");
+        payload.put("executionId", mixController.executionId());
+        payload.put("outgoingTrackId", plan.outgoingTrackId);
+        payload.put("incomingTrackId", plan.incomingTrackId);
+        payload.put("outgoingIndex", transitionOutgoingIndex);
+        payload.put("incomingIndex", transitionOutgoingIndex + 1);
+        payload.put("durationMs", plan.durationMs);
+        payload.put("startedAtNativeMs", transitionStartedWallMs);
+        payload.put("progress", progress);
+        payload.put(
+            "outgoingVolume",
+            NativeMixAudioProcessor.equalPowerOutgoing(progress)
+        );
+        payload.put(
+            "incomingVolume",
+            NativeMixAudioProcessor.equalPowerIncoming(progress)
+        );
+        return payload;
+    }
+
+    private long currentTrackDurationMs() {
+        if (player == null) return 0L;
+        long durationMs = safeDuration(player.getDuration());
+        if (durationMs > 0L) {
+            return durationMs;
+        }
+        NativeTrack currentTrack = getCurrentNativeTrack();
+        return currentTrack == null
+            ? 0L
+            : Math.max(0L, currentTrack.durationMs);
     }
 
     private void emitPosition() {
@@ -1024,20 +2326,19 @@ public class CrateNativePlaybackService extends MediaSessionService {
         int index = player.getCurrentMediaItemIndex();
         if (index < 0) return;
 
-        long positionMs = Math.max(0L, player.getCurrentPosition());
-        boolean trackChanged = index != lastPlayEventCheckpointIndex;
-        boolean movedBackwards = positionMs < lastPlayEventCheckpointPositionMs;
-        boolean intervalElapsed = positionMs - lastPlayEventCheckpointPositionMs >= PLAY_EVENT_CHECKPOINT_MS;
-        if (!trackChanged && !movedBackwards && !intervalElapsed) return;
-
-        lastPlayEventCheckpointIndex = index;
-        lastPlayEventCheckpointPositionMs = positionMs;
+        MediaItem mediaItem = player.getCurrentMediaItem();
+        NativePlayEventCheckpoints.Checkpoint checkpoint = playEventCheckpoints.observe(
+            index,
+            mediaItem == null ? "" : mediaItem.mediaId,
+            player.getCurrentPosition(),
+            true
+        );
+        if (checkpoint == null) return;
 
         JSObject payload = basePayload();
-        MediaItem mediaItem = player.getCurrentMediaItem();
-        payload.put("index", index);
-        payload.put("trackId", mediaItem == null ? "" : mediaItem.mediaId);
-        payload.put("positionMs", positionMs);
+        payload.put("index", checkpoint.index);
+        payload.put("trackId", checkpoint.trackId);
+        payload.put("positionMs", checkpoint.positionMs);
         payload.put("durationMs", safeDuration(player.getDuration()));
         payload.put("isPlaying", true);
         payload.put("checkpointMs", PLAY_EVENT_CHECKPOINT_MS);
@@ -1045,8 +2346,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void resetPlayEventCheckpoint() {
-        lastPlayEventCheckpointIndex = -1;
-        lastPlayEventCheckpointPositionMs = 0L;
+        playEventCheckpoints.reset();
     }
 
     private void emitState(String eventName) {
@@ -1056,8 +2356,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void emitNearQueueEndIfNeeded() {
-        if (player == null || queue.size() < 4) return;
-        int remaining = queue.size() - player.getCurrentMediaItemIndex() - 1;
+        if (player == null || queueState.size() < 4) return;
+        int remaining =
+            queueState.size() - player.getCurrentMediaItemIndex() - 1;
         if (remaining <= 3) {
             JSObject payload = basePayload();
             payload.put("remainingTracks", remaining);
@@ -1065,28 +2366,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
     }
 
-    private void emit(String eventName, JSObject payload) {
-        JSObject event = new JSObject();
-        event.put("event", eventName);
-        event.put("payload", payload);
-        if (eventSink != null) {
-            eventSink.emit(eventName, payload);
-            return;
-        }
-        if ("positionChanged".equals(eventName)) {
-            bufferLatestPositionEvent(event);
-            return;
-        }
-        bufferEvent(event);
+    private String currentMediaItemId() {
+        if (player == null) return "";
+        MediaItem mediaItem = player.getCurrentMediaItem();
+        return mediaItem == null ? "" : mediaItem.mediaId;
     }
 
-    private void bufferLatestPositionEvent(JSObject event) {
-        coalesceLatestPositionEvent(
-            bufferedEvents,
-            event,
-            candidate -> "positionChanged".equals(candidate.optString("event", ""))
-        );
-        trimBufferedEvents();
+    private void emit(String eventName, JSObject payload) {
+        telemetry.emit(eventName, payload);
     }
 
     static <T> void coalesceLatestPositionEvent(
@@ -1102,24 +2389,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
         events.add(latestPosition);
     }
 
-    private void bufferEvent(JSObject event) {
-        bufferedEvents.add(event);
-        trimBufferedEvents();
-    }
-
-    private void trimBufferedEvents() {
-        while (bufferedEvents.size() > MAX_BUFFERED_EVENTS) {
-            bufferedEvents.remove(0);
-        }
-    }
-
-    private boolean isCurrentRevision(String revision) {
-        return revision == null || revision.isEmpty() || queueRevision.equals(revision);
-    }
-
     private JSObject basePayload() {
         JSObject payload = new JSObject();
-        payload.put("revision", queueRevision);
+        payload.put("revision", queueState.revision());
         payload.put("nativeSequence", nativeEventSequence.next());
         payload.put("nativeTimeMs", System.currentTimeMillis());
         return payload;
@@ -1190,69 +2462,37 @@ public class CrateNativePlaybackService extends MediaSessionService {
         emit("eqChanged", payload);
     }
 
-    @SuppressWarnings("deprecation")
-    private boolean applySystemEqualizer(float[] gains) {
-        if (player == null) return false;
-        int audioSessionId = player.getAudioSessionId();
-        if (audioSessionId == C.AUDIO_SESSION_ID_UNSET || audioSessionId <= 0) return false;
+    private int eqRampFrames() {
+        return (int) (eqRampMs * PcmBusMixer.SAMPLE_RATE / 1_000L);
+    }
 
-        try {
-            if (systemEqualizer == null || systemEqAudioSessionId != audioSessionId) {
-                releaseSystemEqualizer();
-                systemEqualizer = new Equalizer(0, audioSessionId);
-                systemEqAudioSessionId = audioSessionId;
-            }
-            short[] range = systemEqualizer.getBandLevelRange();
-            short minLevel = range != null && range.length > 0 ? range[0] : -1500;
-            short maxLevel = range != null && range.length > 1 ? range[1] : 1500;
-            short bandCount = systemEqualizer.getNumberOfBands();
-            for (short band = 0; band < bandCount; band++) {
-                int centerHz = Math.max(1, systemEqualizer.getCenterFreq(band) / 1000);
-                int crateBand = nearestCrateBand(centerHz);
-                float gainDb = gains != null && crateBand < gains.length ? gains[crateBand] : 0f;
-                short level = clampMillibels(Math.round(gainDb * 100f), minLevel, maxLevel);
-                systemEqualizer.setBandLevel(band, level);
-            }
-            systemEqualizer.setEnabled(true);
+    private boolean applySystemEqualizer(float[] gains) {
+        if (USE_PCM_BUS) {
+            pcmBusMixer.equalizer().setGains(gains, eqRampFrames());
             return true;
-        } catch (RuntimeException error) {
-            Log.w(TAG, "System equalizer failed; continuing without native EQ", error);
-            releaseSystemEqualizer();
+        }
+        if (
+            eqController == null ||
+            deckAPlayer == null ||
+            deckBPlayer == null
+        ) {
             return false;
         }
+        return eqController.apply(
+            true,
+            new int[] {
+                deckAPlayer.getAudioSessionId(),
+                deckBPlayer.getAudioSessionId()
+            },
+            gains
+        );
     }
 
-    @SuppressWarnings("deprecation")
     private void releaseSystemEqualizer() {
-        if (systemEqualizer == null) return;
-        try {
-            systemEqualizer.setEnabled(false);
-            systemEqualizer.release();
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Could not release system equalizer.", error);
-        } finally {
-            systemEqualizer = null;
-            systemEqAudioSessionId = C.AUDIO_SESSION_ID_UNSET;
+        pcmBusMixer.equalizer().setGains(null, eqRampFrames());
+        if (eqController != null) {
+            eqController.releaseAll();
         }
-    }
-
-    private int nearestCrateBand(int frequencyHz) {
-        final int[] crateBands = new int[] { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
-        int bestIndex = 0;
-        double bestDistance = Double.MAX_VALUE;
-        double target = Math.log(Math.max(1, frequencyHz));
-        for (int index = 0; index < crateBands.length; index++) {
-            double distance = Math.abs(Math.log(crateBands[index]) - target);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                bestIndex = index;
-            }
-        }
-        return bestIndex;
-    }
-
-    private short clampMillibels(int value, short minLevel, short maxLevel) {
-        return (short) Math.max(minLevel, Math.min(maxLevel, value));
     }
 
     private JSArray gainsToArray(float[] gains) {
@@ -1334,8 +2574,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     @Nullable
     private NativeTrack getCurrentNativeTrack() {
         if (player == null) return null;
-        int index = player.getCurrentMediaItemIndex();
-        return index >= 0 && index < queue.size() ? queue.get(index) : null;
+        return queueState.get(player.getCurrentMediaItemIndex());
     }
 
     @Nullable

@@ -766,6 +766,7 @@ function responseFor(pathname: string): unknown {
   if (pathname === "/api/me/devices") return { devices: [] };
   if (pathname === "/api/me/connect/preferences") return { enabled: false };
   if (pathname === "/api/auth/providers") return {};
+  if (pathname === "/api/auth/access-tokens") return [];
   if (pathname === "/api/auth/config") {
     return { registration_enabled: false, password_login_enabled: true };
   }

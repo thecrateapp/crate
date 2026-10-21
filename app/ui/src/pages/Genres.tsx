@@ -166,10 +166,7 @@ interface TaxonomyTree {
 interface TaxonomyNodeProposal {
   source_kind?: "taxonomy_node" | "raw_genre";
   recommended_action?:
-    | "create_node"
-    | "alias_existing"
-    | "delete_marginal"
-    | "needs_review";
+    "create_node" | "alias_existing" | "delete_marginal" | "needs_review";
   recommended_target_slug?: string | null;
   description: string;
   aliases: string[];
@@ -516,7 +513,11 @@ function TaskButton({
 }) {
   if (ai) {
     return (
-      <AIButton onClick={onClick} loading={busy}>
+      <AIButton
+        actionId="genres.taxonomy.propose"
+        onClick={onClick}
+        loading={busy}
+      >
         {label}
       </AIButton>
     );
@@ -787,6 +788,7 @@ function TaxonomyNodeEditorialEditor({
                 </div>
               </div>
               <AIButton
+                actionId="genres.taxonomy.propose"
                 onClick={inferNodeProposal}
                 loading={savingKey === "proposal"}
                 disabled={savingKey !== null && savingKey !== "proposal"}
@@ -921,6 +923,7 @@ function TaxonomyNodeEditorialEditor({
               </div>
               <div className="flex flex-wrap gap-2">
                 <AIButton
+                  actionId="genres.taxonomy.propose"
                   onClick={inferNodeProposal}
                   loading={savingKey === "proposal"}
                   disabled={savingKey !== null && savingKey !== "proposal"}

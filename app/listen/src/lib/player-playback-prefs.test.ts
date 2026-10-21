@@ -16,7 +16,16 @@ import {
   getMobileEnhancedAudioPreference,
   setMobileEnhancedAudioPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
+  getNativeSmartMixEnabledPreference,
+  setNativeSmartMixEnabledPreference,
+  getNativeSmartMixSecondsPreference,
+  setNativeSmartMixSecondsPreference,
+  isNativeMixRuntime,
+  registerNativeMixRuntime,
 } from "./player-playback-prefs";
+
+const runtime = { androidNative: false };
+registerNativeMixRuntime(() => runtime.androidNative);
 
 beforeEach(() => {
   localStorage.clear();
@@ -244,5 +253,100 @@ describe("mobile enhanced audio", () => {
     expect(
       localStorage.getItem("listen-player-mobile-enhanced-audio"),
     ).toBeNull();
+  });
+});
+
+describe("native Smart Mix preference", () => {
+  beforeEach(() => {
+    runtime.androidNative = true;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+  });
+
+  afterEach(() => {
+    runtime.androidNative = false;
+  });
+
+  it("defaults to enabled with a six second maximum on Android native", () => {
+    expect(isNativeMixRuntime()).toBe(true);
+    expect(getNativeSmartMixEnabledPreference()).toBe(true);
+    expect(getNativeSmartMixSecondsPreference()).toBe(6);
+    expect(getCrossfadeDurationPreference()).toBe(6);
+  });
+
+  it("keeps an explicit opt-out", () => {
+    setNativeSmartMixEnabledPreference(false);
+
+    expect(getNativeSmartMixEnabledPreference()).toBe(false);
+    expect(getCrossfadeDurationPreference()).toBe(0);
+    expect(localStorage.getItem("listen-player-native-smart-mix")).toBe(
+      "false",
+    );
+  });
+
+  it("treats a zero maximum duration as disabled", () => {
+    setNativeSmartMixSecondsPreference(0);
+
+    expect(getNativeSmartMixSecondsPreference()).toBe(0);
+    expect(getCrossfadeDurationPreference()).toBe(0);
+  });
+
+  it("caps the maximum duration at twelve seconds", () => {
+    setNativeSmartMixSecondsPreference(30);
+
+    expect(getNativeSmartMixSecondsPreference()).toBe(12);
+    expect(getCrossfadeDurationPreference()).toBe(12);
+  });
+
+  it("migrates the legacy rollout flag once as an explicit choice", () => {
+    localStorage.setItem("crate-native-smart-mix-rollout-enabled", "true");
+
+    expect(getNativeSmartMixEnabledPreference()).toBe(true);
+    expect(
+      localStorage.getItem("crate-native-smart-mix-rollout-enabled"),
+    ).toBeNull();
+    expect(localStorage.getItem("listen-player-native-smart-mix")).toBe("true");
+  });
+
+  it("never overrides an explicit opt-out with the legacy rollout flag", () => {
+    setNativeSmartMixEnabledPreference(false);
+    localStorage.setItem("crate-native-smart-mix-rollout-enabled", "true");
+
+    expect(getNativeSmartMixEnabledPreference()).toBe(false);
+  });
+
+  it("does not mix when the native player is disabled", () => {
+    localStorage.setItem("crate-native-player-disabled", "true");
+
+    expect(isNativeMixRuntime()).toBe(false);
+    expect(getCrossfadeDurationPreference()).toBe(0);
+  });
+
+  it("announces changes to the player runtime", () => {
+    const listener = vi.fn();
+    window.addEventListener(PLAYER_PLAYBACK_PREFS_EVENT, listener);
+
+    setNativeSmartMixEnabledPreference(false);
+
+    window.removeEventListener(PLAYER_PLAYBACK_PREFS_EVENT, listener);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
+      nativeSmartMixEnabled: false,
+    });
+  });
+});
+
+describe("mobile web Smart Mix", () => {
+  it("never mixes outside the native player", () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    localStorage.setItem("listen-player-native-smart-mix", "true");
+
+    expect(isNativeMixRuntime()).toBe(false);
+    expect(getCrossfadeDurationPreference()).toBe(0);
   });
 });

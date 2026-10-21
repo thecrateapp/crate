@@ -26,7 +26,7 @@ vi.mock("react-router", () => ({
   useNavigate: () => navigate,
 }));
 vi.mock("@/hooks/use-api", () => ({ useApi: vi.fn() }));
-vi.mock("@/hooks/use-llm", () => ({ useLLMStatus: vi.fn() }));
+vi.mock("@/hooks/use-llm", () => ({ useActionLLMStatus: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {},
   api: vi.fn(),
@@ -35,7 +35,7 @@ vi.mock("@/lib/api", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 import { useApi } from "@/hooks/use-api";
-import { useLLMStatus } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { PlaylistEditor } from "./PlaylistEditor";
@@ -67,9 +67,9 @@ beforeEach(() => {
   loading = false;
   surface = structuredClone(fixture.surface);
   vi.stubGlobal("EventSource", SampleStream);
-  vi.mocked(useLLMStatus).mockReturnValue({ available: true } as ReturnType<
-    typeof useLLMStatus
-  >);
+  vi.mocked(useActionLLMStatus).mockReturnValue({
+    available: true,
+  } as ReturnType<typeof useActionLLMStatus>);
   mockUseApi.mockImplementation((url: string | null) => ({
     data: url?.endsWith("editor-snapshot") ? surface : fixture.filterOptions,
     error: null,
@@ -245,7 +245,6 @@ describe("PlaylistEditor text actions with real consumers", () => {
           featured_rank: 1,
           is_active: true,
           is_curated: true,
-          smart_rules: fixture.surface.playlist.smart_rules,
           auto_refresh_enabled: true,
         },
       ),
@@ -328,7 +327,7 @@ describe("PlaylistEditor text actions with real consumers", () => {
     );
     await user.click(
       screen.getByRole("button", {
-        name: "Refine tracklist with AI",
+        name: "Suggest refinements",
       }),
     );
     expect(
@@ -339,7 +338,7 @@ describe("PlaylistEditor text actions with real consumers", () => {
       expect(mockApi).toHaveBeenCalledWith(
         "/api/admin/system-playlists/42/refine/apply",
         "POST",
-        { actions: fixture.proposal.actions, action_ids: ["remove-duplicate"] },
+        { proposal_id: "review-proposal-1", action_ids: ["remove-duplicate"] },
       ),
     );
   });
@@ -398,9 +397,9 @@ describe("PlaylistEditor text actions with real consumers", () => {
       generation_mode: "static",
       smart_rules: null,
     };
-    vi.mocked(useLLMStatus).mockReturnValue({ available: false } as ReturnType<
-      typeof useLLMStatus
-    >);
+    vi.mocked(useActionLLMStatus).mockReturnValue({
+      available: false,
+    } as ReturnType<typeof useActionLLMStatus>);
     render(<PlaylistEditor />);
     const user = userEvent.setup();
     expect(
@@ -408,9 +407,9 @@ describe("PlaylistEditor text actions with real consumers", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
-        name: "Refine tracklist with AI",
+        name: "Suggest refinements",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Duplicate" }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/playlists/99"));
     await user.click(screen.getByRole("button", { name: "Back to playlists" }));
@@ -421,18 +420,19 @@ describe("PlaylistEditor text actions with real consumers", () => {
     const { unmount } = render(<PlaylistEditor />);
     expect(streams).toHaveLength(1);
     expect(streams[0]!.url).toBe("/api/admin/system-playlists/42/stream");
-    act(() =>
-      streams[0]!.onmessage?.(
-        new MessageEvent("message", {
-          data: JSON.stringify({
-            ...fixture.surface,
-            playlist: {
-              ...fixture.surface.playlist,
-              generation_status: "running",
-            },
+    act(
+      () =>
+        streams[0]!.onmessage?.(
+          new MessageEvent("message", {
+            data: JSON.stringify({
+              ...fixture.surface,
+              playlist: {
+                ...fixture.surface.playlist,
+                generation_status: "running",
+              },
+            }),
           }),
-        }),
-      ),
+        ),
     );
     expect(screen.getByText("Generating")).toBeInTheDocument();
     expect(streams).toHaveLength(1);

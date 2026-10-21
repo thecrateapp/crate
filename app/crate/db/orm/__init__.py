@@ -32,6 +32,7 @@ from crate.db.orm.bandcamp import (
     CredentialSecret,
     UserBandcampItem,
 )
+from crate.db.orm.access_tokens import UserAccessToken
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.orm.playlist import (
     Playlist,
@@ -41,6 +42,7 @@ from crate.db.orm.playlist import (
 )
 from crate.db.orm.releases import NewRelease
 from crate.db.orm.settings import Setting
+from crate.db.orm.smart_mix import TrackMixProfileRow
 from crate.db.orm.tidal import TidalDownload, TidalMonitoredArtist
 from crate.db.orm.user import (
     AuthInvite,
@@ -84,9 +86,11 @@ __all__ = [
     "Setting",
     "TidalDownload",
     "TidalMonitoredArtist",
+    "TrackMixProfileRow",
     "User",
     "UserBandcampItem",
     "UserFollowedPlaylist",
     "UserGlobalTrackLike",
     "UserExternalIdentity",
+    "UserAccessToken",
 ]

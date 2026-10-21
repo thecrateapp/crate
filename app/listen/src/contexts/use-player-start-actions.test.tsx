@@ -6,11 +6,11 @@ import { cancelNativePlaybackRecoveryIntent } from "@/lib/native-playback-intent
 
 const mocks = vi.hoisted(() => ({
   loadQueue: vi.fn(),
-  toStartupEngineTracks: vi.fn(),
+  toStartupEngineQueueSnapshot: vi.fn(),
 }));
 
 vi.mock("@/contexts/player-engine-adapter", () => ({
-  toStartupEngineTracks: mocks.toStartupEngineTracks,
+  toStartupEngineQueueSnapshot: mocks.toStartupEngineQueueSnapshot,
 }));
 
 vi.mock("@/lib/android-native-engine", () => ({
@@ -41,6 +41,7 @@ function createParams() {
     currentIndexRef: { current: 0 },
     jamQueueLockedRef: { current: false },
     repeatRef: { current: "off" as const },
+    shuffleRef: { current: false },
     bufferingIntentRef: { current: false },
     pendingRestoreTimeRef: { current: 0 },
     resumeAfterReloadRef: { current: false },
@@ -75,7 +76,7 @@ describe("usePlayerStartActions", () => {
   it("does not publish a native queue after the start intent is cancelled", async () => {
     const track = { id: "track-1", title: "Track" } as Track;
     let resolveTracks!: (tracks: []) => void;
-    mocks.toStartupEngineTracks.mockReturnValue(
+    mocks.toStartupEngineQueueSnapshot.mockReturnValue(
       new Promise<[]>((resolve) => {
         resolveTracks = resolve;
       }),
@@ -83,7 +84,9 @@ describe("usePlayerStartActions", () => {
     const { result } = renderHook(() => usePlayerStartActions(createParams()));
 
     act(() => result.current.play(track));
-    await waitFor(() => expect(mocks.toStartupEngineTracks).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mocks.toStartupEngineQueueSnapshot).toHaveBeenCalled(),
+    );
 
     cancelNativePlaybackRecoveryIntent("pause");
     resolveTracks([]);

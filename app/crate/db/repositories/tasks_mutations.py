@@ -32,6 +32,12 @@ def create_task(
     dedup_key: str | None = None,
     dispatch: bool = True,
     session=None,
+    origin="unknown",
+    actor_user_id=None,
+    agent_context=None,
+    required_grants=None,
+    retry_of=None,
+    schedule_name=None,
 ) -> str:
     return _create_task(
         task_type,
@@ -42,6 +48,12 @@ def create_task(
         dedup_key=dedup_key,
         dispatch=dispatch,
         session=session,
+        origin=origin,
+        actor_user_id=actor_user_id,
+        agent_context=agent_context,
+        required_grants=required_grants,
+        retry_of=retry_of,
+        schedule_name=schedule_name,
         dispatch_task_fn=dispatch_task,
         dumps_fn=dumps,
         register_tasks_surface_signal_fn=register_tasks_surface_signal,
@@ -57,6 +69,12 @@ def create_task_dedup(
     priority: int | None = None,
     pool: str | None = None,
     session=None,
+    origin="unknown",
+    actor_user_id=None,
+    agent_context=None,
+    required_grants=None,
+    retry_of=None,
+    schedule_name=None,
 ) -> str | None:
     return _create_task_dedup(
         task_type,
@@ -66,6 +84,12 @@ def create_task_dedup(
         session,
         priority=priority,
         pool=pool,
+        origin=origin,
+        actor_user_id=actor_user_id,
+        agent_context=agent_context,
+        required_grants=required_grants,
+        retry_of=retry_of,
+        schedule_name=schedule_name,
         dispatch_task_fn=dispatch_task,
         dumps_fn=dumps,
         register_tasks_surface_signal_fn=register_tasks_surface_signal,
@@ -102,9 +126,20 @@ def update_task(
 
 
 def start_task(
-    task_id: str, *, worker_id: str | None = None, session=None
+    task_id: str,
+    *,
+    worker_id: str | None = None,
+    session=None,
+    expected_policy_revision: int | None = None,
+    expected_policy_hash: str | None = None,
 ) -> dict | None:
-    return _start_task(task_id, worker_id=worker_id, session=session)
+    return _start_task(
+        task_id,
+        worker_id=worker_id,
+        session=session,
+        expected_policy_revision=expected_policy_revision,
+        expected_policy_hash=expected_policy_hash,
+    )
 
 
 def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:

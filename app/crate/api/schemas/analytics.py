@@ -1,11 +1,22 @@
 """Schema models for analytics and reporting endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from crate.api.schemas.common import IdentityFieldsMixin
+
+
+class QualityRefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal["global"]
+
+
+class QualityRefreshResponse(BaseModel):
+    task_id: str | None
+    deduplicated: bool
 
 
 class AnalyticsTopArtistResponse(BaseModel):
@@ -133,6 +144,7 @@ class ActivitySystemsResponse(BaseModel):
 
 
 class ActivityLiveResponse(BaseModel):
+    admission_policy: dict[str, Any] | None = None
     engine: str | None = None
     running_tasks: list[RunningTaskResponse] = Field(default_factory=list)
     pending_tasks: list[RunningTaskResponse] = Field(default_factory=list)

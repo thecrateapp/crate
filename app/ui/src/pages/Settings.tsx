@@ -29,9 +29,13 @@ import {
   TableBody,
   TableCell,
 } from "@crate/ui/shadcn/table";
+import { Link } from "react-router";
+import { useActionLLMStatus, type ActionLLMStatus } from "@/hooks/use-llm";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
+import { reasonText } from "@/lib/ai-models";
+import { useAuth } from "@/contexts/AuthContext";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 import { toast } from "sonner";
@@ -1276,6 +1280,91 @@ function SchedulesSection({
 
 // ── Enrichment ─────────────────────────────────────────────────
 
+function ManageInAiModelsLink({ canManageAi }: { canManageAi: boolean }) {
+  if (!canManageAi) return <>Manage in AI models</>;
+  return (
+    <Link className="text-primary underline" to="/ai">
+      Manage in AI models
+    </Link>
+  );
+}
+
+function AIRefinementStatus({
+  pathAI,
+  canManageAi,
+  llmRefinementEnabled,
+  savingPaths,
+  savePathsSetting,
+  cacheTtlHours,
+}: {
+  pathAI: ActionLLMStatus | null;
+  canManageAi: boolean;
+  llmRefinementEnabled: boolean;
+  savingPaths: boolean;
+  savePathsSetting: (enabled: boolean) => void;
+  cacheTtlHours: number;
+}) {
+  if (!pathAI) {
+    return <p className="text-sm text-white/45">Checking AI refinement…</p>;
+  }
+
+  if (pathAI.status === "legacy") {
+    return (
+      <FieldRow
+        label="AI refinement"
+        hint={
+          pathAI.available
+            ? `Uses ${pathAI.model_id} from server settings. Accepted refinements are cached for ${cacheTtlHours} hours.`
+            : `Unavailable: ${reasonText(pathAI.error_code)}.`
+        }
+      >
+        <Toggle
+          checked={llmRefinementEnabled}
+          onChange={savePathsSetting}
+          disabled={savingPaths}
+          ariaLabel="AI refinement"
+        />
+        <Badge
+          variant={llmRefinementEnabled ? "default" : "secondary"}
+          className="text-[10px]"
+        >
+          {llmRefinementEnabled ? "Enabled" : "Disabled"}
+        </Badge>
+        {savingPaths ? (
+          <Loader2 size={13} className="animate-spin text-muted-foreground" />
+        ) : null}
+        <span className="text-sm">
+          <ManageInAiModelsLink canManageAi={canManageAi} />
+        </span>
+      </FieldRow>
+    );
+  }
+
+  if (pathAI.status === "configured") {
+    return (
+      <p className="text-sm">
+        AI refinement: On · uses {pathAI.model_id} ·{" "}
+        <ManageInAiModelsLink canManageAi={canManageAi} />
+      </p>
+    );
+  }
+
+  if (pathAI.error_code === "AI_ACTION_DISABLED") {
+    return (
+      <p className="text-sm">
+        AI refinement: Off · <ManageInAiModelsLink canManageAi={canManageAi} />
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-sm">
+      AI refinement: Unavailable · {reasonText(pathAI.error_code)} ·{" "}
+      <ManageInAiModelsLink canManageAi={canManageAi} />
+    </p>
+  );
+}
+
 function EnrichmentSection({
   settings,
   refetch,
@@ -1283,6 +1372,9 @@ function EnrichmentSection({
   settings: SettingsData;
   refetch: () => void;
 }) {
+  const pathAI = useActionLLMStatus("music_paths.refine");
+  const { hasCapability } = useAuth();
+  const canManageAi = hasCapability("ai.config.read");
   const enrichment = settings.enrichment;
   const proc = settings.processing ?? {
     mb_auto_apply_threshold: 85,
@@ -1410,29 +1502,17 @@ function EnrichmentSection({
       >
         <PanelCard
           icon={Bot}
-          title="LLM Refinement"
-          description="Let the configured LLM review generated paths and apply safe swaps from deterministic candidates."
+          title="AI refinement"
+          description="An optional AI review after Crate computes a path. Paths work without it."
         >
-          <FieldRow
-            label="LLM refinement"
-            hint={`Accepted refinements are cached for ${paths.llm_refinement_cache_ttl_hours} hours per path signature.`}
-          >
-            <Toggle
-              checked={llmRefinementEnabled}
-              onChange={savePathsSetting}
-              disabled={savingPaths}
-              ariaLabel="LLM refinement"
-            />
-            <Badge variant={llmRefinementEnabled ? "default" : "secondary"}>
-              {llmRefinementEnabled ? "Enabled" : "Disabled"}
-            </Badge>
-            {savingPaths ? (
-              <Loader2
-                size={13}
-                className="animate-spin text-muted-foreground"
-              />
-            ) : null}
-          </FieldRow>
+          <AIRefinementStatus
+            pathAI={pathAI}
+            canManageAi={canManageAi}
+            llmRefinementEnabled={llmRefinementEnabled}
+            savingPaths={savingPaths}
+            savePathsSetting={savePathsSetting}
+            cacheTtlHours={paths.llm_refinement_cache_ttl_hours}
+          />
         </PanelCard>
       </Section>
 

@@ -8,6 +8,7 @@ import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
+import { usePendingApprovals } from "@/hooks/use-pending-approvals";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { cn } from "@/lib/utils";
 import { useAuth, userCanAccessAdminConsole } from "@/contexts/AuthContext";
@@ -137,6 +138,13 @@ const navItems = [
     capabilities: ["users.view"],
   },
   {
+    to: "/agents",
+
+    label: "Agents",
+    badgeKey: "pending_approvals" as const,
+    capabilities: ["agents.plans.review", "agents.integrations.manage"],
+  },
+  {
     to: "/roles",
     label: "Roles",
     capabilities: ["roles.view"],
@@ -145,6 +153,12 @@ const navItems = [
     to: "/i18n",
     label: "Translations",
     capabilities: ["admin.access"],
+  },
+  {
+    to: "/ai",
+
+    label: "AI models",
+    capabilities: ["ai.config.read"],
   },
   {
     to: "/settings",
@@ -235,6 +249,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
   const setPreviewRole = auth.setPreviewRole ?? (() => {});
   const clearPreview = clearRolePreview ?? (() => {});
   const { data: opsSnapshot } = useOpsSnapshot();
+  const pendingApprovals = usePendingApprovals();
   const profileHref =
     user && hasAnyCapability(["users.view"])
       ? `/users?inspect=${user.id}`
@@ -245,6 +260,7 @@ export function Sidebar({ onNavigate, presentation = "rail" }: SidebarProps) {
     issue_count: opsSnapshot?.status.issue_count || 0,
     pending_imports: opsSnapshot?.status.pending_imports || 0,
     running_tasks: opsSnapshot?.status.running_tasks || 0,
+    pending_approvals: pendingApprovals,
   };
 
   function toggleExpanded() {

@@ -11,7 +11,6 @@ interface UsePlaybackPersistenceOptions {
   currentIndex: number;
   isPlaying: boolean;
   shuffle: boolean;
-  playSource: PlaySource | null;
   queueRef: MutableRefObject<Track[]>;
   currentIndexRef: MutableRefObject<number>;
   currentTimeRef: MutableRefObject<number>;
@@ -23,12 +22,14 @@ interface UsePlaybackPersistenceOptions {
    * the user started from.
    */
   unshuffledQueueRef: MutableRefObject<Track[] | null>;
+  playSource: PlaySource | null;
+  playSourceRef: MutableRefObject<PlaySource | null>;
 }
 
 /**
  * Persists the player state to localStorage across three triggers:
  *
- *   1. Structural changes (queue / currentIndex / play-pause / shuffle / source) — write
+ *   1. Structural changes (queue / currentIndex / play-pause) — write
  *      immediately on the corresponding state update.
  *   2. Periodic checkpoint every 5s while a queue is loaded, so a tab
  *      crash doesn't lose more than a few seconds of resume position.
@@ -45,25 +46,26 @@ export function usePlaybackPersistence({
   currentIndex,
   isPlaying,
   shuffle,
-  playSource,
   queueRef,
   currentIndexRef,
   currentTimeRef,
   isPlayingRef,
   shuffleRef,
   unshuffledQueueRef,
+  playSource,
+  playSourceRef,
 }: UsePlaybackPersistenceOptions): void {
   const persistNow = useEffectEvent((playing: boolean) => {
     saveQueue(queueRef.current, currentIndexRef.current, {
       currentTime: currentTimeRef.current,
-      playSource,
       wasPlaying: playing,
       shuffle: shuffleRef.current,
       unshuffledQueue: unshuffledQueueRef.current,
+      playSource: playSourceRef.current,
     });
   });
 
-  // Structural: immediate writes on queue / cursor / play-pause / shuffle / source changes.
+  // Structural: immediate writes on queue / cursor / play-pause / shuffle changes.
   useEffect(() => {
     persistNow(isPlaying);
   }, [queue, currentIndex, isPlaying, shuffle, playSource]);

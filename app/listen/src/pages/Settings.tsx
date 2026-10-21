@@ -4,6 +4,7 @@ import { CRATE_CONNECT_FEATURE_ENABLED } from "@/lib/crate-connect";
 import { useTabParam } from "@/hooks/use-tab-param";
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 
+import { AccessTokensSection } from "@/components/settings/AccessTokensSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
 import { LanguageSection } from "@/components/settings/LanguageSection";
@@ -46,6 +47,7 @@ export function Settings() {
             <OpenSubsonicCredentialsSection
               ruled={CRATE_CONNECT_FEATURE_ENABLED}
             />
+            <AccessTokensSection />
             <ScrobbleSection />
             <BandcampSection />
             <ServersSection />

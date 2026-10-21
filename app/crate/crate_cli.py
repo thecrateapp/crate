@@ -306,8 +306,12 @@ def run_analyze(
         args.extend(["--dir", directory, "--extensions", extensions])
     else:
         return None
+    from crate.resource_governor import low_priority_command
+
     try:
-        result = subprocess.run(args, capture_output=True, text=True, timeout=3600)
+        result = subprocess.run(
+            low_priority_command(args), capture_output=True, text=True, timeout=3600
+        )
         if result.returncode != 0:
             log.warning("crate-cli analyze failed: %s", result.stderr[:200])
             return None

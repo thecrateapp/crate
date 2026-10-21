@@ -166,7 +166,6 @@ row/card compatibility. Coarse targets reserve44px in layout, not overlapping ps
 Do not use an icon-only control for ambiguous domain operations or final confirmations. AI
 availability, BackLink/navigation and specialized PlayButton/progress remain separate contracts.
 
-
 ## Headers — local 1AU
 
 PageHeader owns ordinary title/context/subtitle/meta typography and delegates positioning to
@@ -225,7 +224,6 @@ fallbacks. Route LoadingState retains its200ms threshold; SkipLink targets the a
 Tabs retain1Q; each app owns its URL helper and coalesces duplicate pre-render selection writes.
 PageHero stretches its inner frame through the used hero height; do not restore percentage height
 inside a minimum-height-only parent or compensate the resulting clipping in individual pages.
-
 
 ## Shell/collection amendments — local1AY
 

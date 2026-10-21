@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import text
@@ -41,7 +42,7 @@ def duplicate_playlist(
                 )
                 VALUES (
                     :name, :description, :scope, :user_id, :managed_by_user_id,
-                    :is_smart, :generation_mode, :smart_rules_json, :is_curated, :is_active,
+                    :is_smart, :generation_mode, CAST(:smart_rules_json AS jsonb), :is_curated, :is_active,
                     :category, :featured_rank, :visibility, :auto_refresh_enabled,
                     :created_at, :updated_at
                 )
@@ -56,13 +57,13 @@ def duplicate_playlist(
                     "managed_by_user_id": original.get("managed_by_user_id"),
                     "is_smart": original.get("is_smart", False),
                     "generation_mode": original.get("generation_mode", "static"),
-                    "smart_rules_json": original.get("smart_rules_json"),
+                    "smart_rules_json": json.dumps(original.get("smart_rules_json")),
                     "is_curated": original.get("is_curated", False),
                     "is_active": False,
                     "category": original.get("category"),
                     "featured_rank": None,
                     "visibility": original.get("visibility", "public"),
-                    "auto_refresh_enabled": original.get("auto_refresh_enabled", True),
+                    "auto_refresh_enabled": False,
                     "created_at": now,
                     "updated_at": now,
                 },
@@ -74,24 +75,33 @@ def duplicate_playlist(
             return None
 
         new_id = int(duplicated["id"])
-        if original.get("generation_mode") != "smart":
-            s.execute(
-                text(
-                    """
+        s.execute(
+            text(
+                """
                     INSERT INTO playlist_tracks (
                         playlist_id, global_track_uid, track_id, track_entity_uid, track_path, track_storage_id,
-                        title, artist, album, duration, position, added_at
+                        title, artist, album, duration, position, source, locked, added_at
                     )
                     SELECT
                         :new_id, global_track_uid, track_id, track_entity_uid, track_path, track_storage_id,
-                        title, artist, album, duration, position, :added_at
+                        title, artist, album, duration, position, source, locked, :added_at
                     FROM playlist_tracks
                     WHERE playlist_id = :old_id
                     ORDER BY position
                     """
-                ),
-                {"new_id": new_id, "old_id": playlist_id, "added_at": now},
-            )
+            ),
+            {"new_id": new_id, "old_id": playlist_id, "added_at": now},
+        )
+        s.execute(
+            text("""INSERT INTO playlist_track_exclusions
+                (playlist_id,global_track_uid,track_id,track_entity_uid,track_storage_id,
+                 track_path,reason,created_by)
+                SELECT :new_id,global_track_uid,track_id,track_entity_uid,track_storage_id,
+                       track_path,reason,created_by
+                FROM playlist_track_exclusions WHERE playlist_id=:old_id
+                ON CONFLICT DO NOTHING"""),
+            {"new_id": new_id, "old_id": playlist_id},
+        )
         emit_playlist_domain_event(
             s,
             playlist_id=new_id,

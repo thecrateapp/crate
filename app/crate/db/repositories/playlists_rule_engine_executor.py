@@ -5,7 +5,10 @@ from typing import Literal, overload
 from sqlalchemy import text
 
 from crate.db.repositories.playlists_rule_engine_builder import build_rule_conditions
-from crate.db.repositories.playlists_rule_engine_config import SORT_MAP
+from crate.db.repositories.playlists_rule_engine_config import (
+    SORT_MAP,
+    LEAST_PLAYED_JOIN,
+)
 from crate.db.repositories.playlists_rule_engine_genre import combine_sql_extrema
 from crate.db.tracklist_engine import (
     TracklistRequest,
@@ -265,6 +268,7 @@ def _fetch_smart_rule_rows(
     limit: int,
 ):
     query_params = {**params, "lim": limit}
+    play_join = LEAST_PLAYED_JOIN if "play_stats." in sort_clause else ""
     return (
         session.execute(
             text(
@@ -278,6 +282,7 @@ def _fetch_smart_rule_rows(
             FROM library_tracks t
             LEFT JOIN library_albums a ON t.album_id = a.id
             LEFT JOIN library_artists a_artist ON t.artist = a_artist.name
+            {play_join}
             WHERE ({where})
               AND (t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
             ORDER BY {sort_clause}
@@ -326,14 +331,14 @@ def _single_genre_ctes(genre_match_sql: str) -> str:
     """
 
 
-def _single_genre_from_join_sql() -> str:
+def _single_genre_from_join_sql(*, least_played: bool = False) -> str:
     return """
         FROM library_tracks t
         LEFT JOIN library_albums a ON t.album_id = a.id
         LEFT JOIN library_artists a_artist ON t.artist = a_artist.name
         LEFT JOIN album_genre_matches ON album_genre_matches.album_id = t.album_id
         LEFT JOIN artist_genre_matches ON artist_genre_matches.artist_name = t.artist
-    """
+    """ + (LEAST_PLAYED_JOIN if least_played else "")
 
 
 def _single_genre_where_sql(track_match_sql: str) -> str:
@@ -392,7 +397,7 @@ def _fetch_single_genre_rule_rows(
                    a.id AS album_id, a.slug AS album_slug,
                    a_artist.id AS artist_id, a_artist.slug AS artist_slug,
                    {score_sql} AS genre_relevance_score
-            {_single_genre_from_join_sql()}
+            {_single_genre_from_join_sql(least_played="play_stats." in sort_clause)}
             {_single_genre_where_sql(track_match_sql)}
             ORDER BY genre_relevance_score DESC, {sort_clause}
             LIMIT :lim

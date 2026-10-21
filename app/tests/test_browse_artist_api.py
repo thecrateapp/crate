@@ -787,3 +787,35 @@ def test_catalog_artists_decade_filter_uses_global_catalog(monkeypatch):
     }
     assert payload["items"][0]["name"] == "High Vis"
     assert payload["items"][0]["global_artist_uid"] == "global-high-vis"
+
+
+def test_upcoming_show_items_carry_their_show_id(test_app, monkeypatch):
+    from crate.api import browse_artist
+
+    monkeypatch.setattr(browse_artist, "get_new_releases", lambda limit=50: [])
+    monkeypatch.setattr(
+        browse_artist,
+        "db_get_shows",
+        lambda limit=200: [
+            {
+                "id": 41,
+                "artist_name": "External Band",
+                "date": "2027-03-02",
+                "venue": "Sala Norte",
+                "city": "Madrid",
+                "country": "Spain",
+                "lineup": [],
+            }
+        ],
+    )
+    monkeypatch.setattr(browse_artist, "_lookup_artist_refs", lambda _names: {})
+    monkeypatch.setattr(
+        browse_artist, "get_all_artist_genre_map", lambda _names, limit=3: {}
+    )
+
+    response = test_app.get("/api/upcoming")
+
+    assert response.status_code == 200
+    [show] = [item for item in response.json()["items"] if item["type"] == "show"]
+    assert show["show_id"] == 41
+    assert show["venue"] == "Sala Norte"

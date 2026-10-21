@@ -320,8 +320,8 @@ services:
 
   node-a-listen:
     build:
-      context: ./app
-      dockerfile: listen/Dockerfile
+      context: .
+      dockerfile: app/listen/Dockerfile
     container_name: fed-a-listen
     ports:
       - "15174:80"
@@ -336,8 +336,8 @@ services:
 
   node-a-admin:
     build:
-      context: ./app
-      dockerfile: ui/Dockerfile
+      context: .
+      dockerfile: app/ui/Dockerfile
     container_name: fed-a-admin
     ports:
       - "15173:80"

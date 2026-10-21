@@ -4,6 +4,7 @@ import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks
 import { usePlayerEnginePreferenceRuntime } from "@/contexts/use-player-engine-preference-runtime";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlayerIntelligenceActions } from "@/contexts/use-player-intelligence-actions";
+import { useNativeContinuationAdoption } from "@/contexts/use-native-continuation-adoption";
 import { useNativePlaybackRuntime } from "@/contexts/use-native-playback-runtime";
 import { usePlayerPlaybackObservability } from "@/contexts/use-player-playback-observability";
 import { usePlayerPreferenceRuntime } from "@/contexts/use-player-preference-runtime";
@@ -93,7 +94,6 @@ export function usePlayerPlaybackRuntime({
 
   usePlaybackPersistence({
     queue,
-    playSource,
     currentIndex,
     isPlaying,
     shuffle,
@@ -103,6 +103,8 @@ export function usePlayerPlaybackRuntime({
     isPlayingRef,
     shuffleRef,
     unshuffledQueueRef,
+    playSource,
+    playSourceRef,
   });
 
   useEqualizerRuntime(currentTrack);
@@ -130,8 +132,10 @@ export function usePlayerPlaybackRuntime({
       currentTimeRef,
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
+      playSourceRef,
       queueRef,
       repeatRef,
+      shuffleRef,
     },
   );
 
@@ -197,6 +201,7 @@ export function usePlayerPlaybackRuntime({
   });
 
   const {
+    adoptNativeTracks,
     appendAndAdvance,
     appendIntelligenceTracks,
     insertSuggestionAfterCurrent,
@@ -234,7 +239,13 @@ export function usePlayerPlaybackRuntime({
       },
     });
 
+  const adoptNativeAppendedTracks = useNativeContinuationAdoption({
+    adoptTracks: adoptNativeTracks,
+    queueRef,
+  });
+
   useNativePlaybackRuntime({
+    adoptNativeAppendedTracks,
     beginSoftInterruption,
     bufferingIntentRef,
     commitCurrentIndex,
@@ -242,9 +253,11 @@ export function usePlayerPlaybackRuntime({
     commitDuration,
     commitIsBuffering,
     commitIsPlaying,
+    crossfadeTimerRef,
     currentIndexRef,
     currentTimeRef,
     currentTrackRef,
+    durationRef,
     effectiveCrossfadeMsRef,
     ensureTrackerSession,
     flushCurrentPlayEvent,
@@ -255,6 +268,8 @@ export function usePlayerPlaybackRuntime({
     rememberActiveTrack,
     repeatRef,
     rotateTrackerSession,
+    setCrossfadeTransition,
+    shuffleRef,
   });
 
   usePlayerPreferenceRuntime({

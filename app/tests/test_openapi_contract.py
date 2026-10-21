@@ -1,6 +1,26 @@
 """Contract checks for the generated OpenAPI schema."""
 
 
+def test_show_import_editor_routes_use_cookie_auth_and_named_contracts(test_app):
+    schema = test_app.get("/openapi.json").json()
+    paths = schema["paths"]
+    prepare = paths["/api/show-imports/plans"]["post"]
+    assert prepare["tags"] == ["curation"]
+    assert prepare["security"] == [{"cookieAuth": []}]
+    assert prepare["requestBody"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ShowImportSelection")
+    assert prepare["responses"]["202"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ShowAcceptedJob")
+    assert paths["/api/show-imports/jobs/{job_id}"]["get"]["responses"]["200"][
+        "content"
+    ]["application/json"]["schema"]["$ref"].endswith("/ShowJobState")
+    assert paths["/api/show-imports/plans/{plan_id}"]["get"]["responses"]["200"][
+        "content"
+    ]["application/json"]["schema"]["$ref"].endswith("/ShowPlanEvidence")
+
+
 def test_openapi_exposes_security_schemes(test_app):
     resp = test_app.get("/openapi.json")
 
@@ -1200,6 +1220,11 @@ def test_openapi_types_browse_shows_upcoming_and_media_routes(test_app):
     assert upcoming_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/UpcomingResponse")
+    upcoming_item = data["components"]["schemas"]["UpcomingItemResponse"]
+    assert upcoming_item["properties"]["show_id"]["anyOf"] == [
+        {"type": "integer"},
+        {"type": "null"},
+    ]
 
     assert external_network_operation["security"] == [
         {"cookieAuth": []},
@@ -1745,3 +1770,26 @@ def test_openapi_types_stats_range_routes(test_app):
         assert operation["responses"]["200"]["content"]["application/json"]["schema"][
             "$ref"
         ].endswith("/StatsRangeResponse")
+
+
+def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app):
+    schema = test_app.get("/openapi.json").json()
+    admin_schema = test_app.get("/openapi-admin-system.json").json()
+    expected = {
+        ("/api/admin/agent-integrations", "get"): "AgentCollectionResponse",
+        ("/api/admin/agent-integrations", "post"): "AgentCredentialSecretResponse",
+        ("/api/admin/agent-plans", "get"): "AgentCollectionResponse",
+        ("/api/admin/agent-plans/summary", "get"): "AgentPlanCountsResponse",
+    }
+    assert "agents" in {tag["name"] for tag in admin_schema["tags"]}
+    for (path, method), model in expected.items():
+        for document in (schema, admin_schema):
+            operation = document["paths"][path][method]
+            assert operation["tags"] == ["agents"]
+            assert operation["security"] == [{"cookieAuth": []}]
+            assert (
+                operation["responses"]["200"]["content"]["application/json"]["schema"][
+                    "$ref"
+                ]
+                == f"#/components/schemas/{model}"
+            )

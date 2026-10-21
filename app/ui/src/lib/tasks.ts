@@ -13,11 +13,15 @@ const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
 async function fetchTaskCompletion(
   taskId: string,
   signal?: AbortSignal,
+  completionPath?: string,
 ): Promise<TaskCompletion | null> {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
-    credentials: "include",
-    signal,
-  });
+  const response = await fetch(
+    completionPath ?? `/api/tasks/${encodeURIComponent(taskId)}`,
+    {
+      credentials: "include",
+      signal,
+    },
+  );
   if (!response.ok) return null;
   const payload = (await response.json()) as TaskDetailResponse;
   if (!TERMINAL_TASK_STATUSES.has(String(payload.status || ""))) return null;
@@ -32,6 +36,7 @@ export function waitForTask(
   taskId: string,
   timeoutMs = 120000,
   signal?: AbortSignal,
+  completionPath?: string,
 ): Promise<TaskCompletion> {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -61,7 +66,7 @@ export function waitForTask(
 
     const poll = () => {
       if (settled) return;
-      void fetchTaskCompletion(taskId, signal)
+      void fetchTaskCompletion(taskId, signal, completionPath)
         .then((task) => {
           if (!task || settled) return;
           cleanup();
@@ -105,7 +110,7 @@ export function waitForTask(
 
         // Older workers did not include the handler result in the SSE event.
         // Read the committed task once so callers never fall back to stale data.
-        void fetchTaskCompletion(taskId, signal)
+        void fetchTaskCompletion(taskId, signal, completionPath)
           .then((completion) => {
             if (settled) return;
             cleanup();

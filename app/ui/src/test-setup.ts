@@ -53,3 +53,22 @@ if (typeof window !== "undefined") {
     configurable: true,
   });
 }
+
+// jsdom has no ResizeObserver. Radix controls inside a <form> render a
+// hidden native input that measures its control with one, so stub it.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class TestResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: TestResizeObserver,
+    writable: true,
+    configurable: true,
+  });
+}
+
+// The shared Select uses Radix pointer capture and scroll focus APIs absent in jsdom.
+import { installRadixElementPolyfills } from "./test/radix-element-polyfills";
+installRadixElementPolyfills();

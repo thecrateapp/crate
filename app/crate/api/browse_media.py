@@ -16,13 +16,17 @@ from crate.api._deps import (
     library_path,
     safe_path,
 )
-from crate.api.auth import _require_auth
+from crate.api.auth import (
+    _require_auth,
+    _require_stream_access,
+    _require_vdj_scope,
+)
+from crate.api.permissions import require_permission
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
-from crate.api.permissions import require_permission
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.media import (
     AlbumEqualizerPresetMutationResponse,
@@ -64,6 +68,10 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
 )
 from crate.db.queries.browse_media_favorites import list_favorites
+from crate.db.queries.browse_media_search import parse_dj_query, search_dj_tracks
+from crate.subsonic.services import preferences
+from crate.local_search import search_local_library
+from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.streaming import (
     get_track_delivery_row_by_entity_uid,
@@ -92,8 +100,6 @@ from crate.federation.global_playback import (
     resolve_global_track_playback,
 )
 from crate.federation.playback_prepare import prepare_remote_playback_variants
-from crate.local_search import search_local_library
-from crate.metrics import record_later
 from crate.streaming.paths import resolve_data_file
 from crate.streaming.policy import normalize_policy
 from crate.streaming.service import (
@@ -102,7 +108,6 @@ from crate.streaming.service import (
     resolution_to_payload,
     resolve_playback,
 )
-from crate.subsonic.services import preferences
 
 log = logging.getLogger(__name__)
 
@@ -165,6 +170,16 @@ def _queue_completeness_refresh() -> str:
     return task_id
 
 
+def _without_server_paths(results: dict) -> dict:
+    return {
+        **results,
+        "tracks": [
+            {key: value for key, value in track.items() if key != "path"}
+            for track in results.get("tracks", [])
+        ],
+    }
+
+
 @router.get(
     "/api/search",
     response_model=SearchResponse,
@@ -177,16 +192,34 @@ def api_search(
     q: str = "",
     limit: int = 20,
     scope: str = "local",
+    fields: str | None = None,
 ):
-    user = _require_auth(request)
+    user = _require_vdj_scope(request, "vdj.catalog.read")
     q_stripped = q.strip()
     capped_limit = max(1, min(limit, 50))
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
+    is_access_token = user.get("auth_type") == "access_token"
+    if fields == "dj":
+        try:
+            parse_dj_query(q_stripped)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "artists": [],
+            "albums": [],
+            "tracks": search_dj_tracks(q_stripped, capped_limit),
+        }
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
+    if scope != "local" and is_access_token:
+        raise HTTPException(
+            status_code=403,
+            detail="Access tokens can only search the local library",
+        )
     if scope == "local":
-        return search_local_library(q_stripped, capped_limit)
+        results = search_local_library(q_stripped, capped_limit)
+        return _without_server_paths(results) if is_access_token else results
 
     use_global_catalog = scope == "auto"
     global_catalog_revision = ""
@@ -1156,11 +1189,48 @@ def api_playback_by_id(
 def api_stream_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    _require_stream_access(request)
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     return _stream_track(request, track, delivery)
+
+
+@router.get(
+    "/api/vdj/tracks/by-entity/{entity_uid}/stream",
+    responses=_STREAM_RESPONSES,
+    summary="Stream a VirtualDJ track by entity UID",
+)
+@router.head(
+    "/api/vdj/tracks/by-entity/{entity_uid}/stream",
+    include_in_schema=False,
+)
+def api_vdj_stream_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
+    _require_vdj_scope(request, "vdj.media.read")
+    track = get_track_delivery_row_by_entity_uid(entity_uid)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return _stream_track(request, track, delivery)
+
+
+@router.get(
+    "/api/vdj/tracks/by-entity/{entity_uid}/playback",
+    response_model=PlaybackResolutionResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Resolve a VirtualDJ track by entity UID",
+)
+def api_vdj_playback_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
+    user = _require_vdj_scope(request, "vdj.media.read")
+    track = get_track_delivery_row_by_entity_uid(entity_uid)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    payload = _playback_payload_for_track(track, delivery, user_id=user["id"])
+    payload["entity_uid"] = str(track["entity_uid"])
+    return payload
 
 
 @router.get(
@@ -1172,7 +1242,7 @@ def api_stream_by_entity_uid(
 def api_playback_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    user = _require_auth(request)
+    user = _require_vdj_scope(request, "vdj.media.read")
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")

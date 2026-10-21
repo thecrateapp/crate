@@ -122,7 +122,7 @@ def my_social(request: Request):
 )
 def social_search(
     request: Request,
-    q: str = Query("", min_length=1),
+    q: str = Query(..., min_length=1),
     limit: int = Query(20, ge=1, le=50),
 ):
     _require_auth(request)

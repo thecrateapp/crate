@@ -1,8 +1,23 @@
 """Readable copy and stable identity for health issues."""
 
 import pytest
-
 from crate.health_issue_text import describe_health_issue, health_issue_identity
+
+
+def test_photo_identity_preserves_existing_dismissals_when_uid_evidence_is_added():
+    original = {"artist": "Echo", "db_has_photo": False, "fs_has_photo": True}
+    expanded = {
+        **original,
+        "artist_uid": "10000000-0000-0000-0000-000000000001",
+        "folder_name": "echo",
+        "filesystem_fingerprint": "evidence",
+    }
+    assert health_issue_identity("has_photo_desync", original) == health_issue_identity(
+        "has_photo_desync", expanded
+    )
+    assert health_issue_identity("has_photo_desync", original) != health_issue_identity(
+        "has_photo_desync", {**expanded, "fs_has_photo": False}
+    )
 
 
 def test_identity_ignores_key_order_and_changes_with_details():

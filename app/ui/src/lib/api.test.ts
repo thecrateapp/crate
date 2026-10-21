@@ -34,6 +34,26 @@ describe("createApiClient", () => {
     await expect(client("/api/test")).rejects.toThrow(ApiError);
   });
 
+  it("exposes the X-Crate-Error code on API errors", async () => {
+    const client = createApiClient();
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      text: async () => "Conflict",
+      headers: new Headers({ "X-Crate-Error": "AI_CONFIGURATION_CONFLICT" }),
+    });
+
+    try {
+      await client("/api/test");
+      throw new Error("expected client to reject");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(409);
+      expect((error as ApiError).code).toBe("AI_CONFIGURATION_CONFLICT");
+    }
+  });
+
   it("calls onUnauthorized for 401 responses", async () => {
     const onUnauthorized = vi.fn();
     const client = createApiClient({ onUnauthorized });

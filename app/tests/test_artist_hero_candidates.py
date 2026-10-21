@@ -117,6 +117,9 @@ def test_discovery_returns_all_valid_sources_with_same_origin_previews(
 
 
 def test_visual_analysis_falls_back_without_a_vision_capable_model(monkeypatch):
+    from tests.ai_consumer_fakes import pin_actions
+
+    pin_actions(monkeypatch)
     from crate.artist_hero_candidates import analyze_candidate_image
 
     monkeypatch.setattr(

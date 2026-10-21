@@ -18,6 +18,16 @@ def _rowcount(result: object) -> int:
 
 def check_siblings_complete(parent_task_id: str) -> dict:
     with transaction_scope() as session:
+        parent = (
+            session.execute(
+                text(
+                    "SELECT status,cancellation_requested_at FROM tasks WHERE id=:id FOR UPDATE"
+                ),
+                {"id": parent_task_id},
+            )
+            .mappings()
+            .first()
+        )
         row = (
             session.execute(
                 text(
@@ -38,8 +48,22 @@ def check_siblings_complete(parent_task_id: str) -> dict:
         )
         total = row["total"] if row else 0
         done = row["done"] if row else 0
-        all_done = total > 0 and done == total
+        all_done = (
+            total > 0
+            and done == total
+            and parent is not None
+            and parent["status"] == "delegated"
+        )
 
+        if (
+            all_done
+            and parent is not None
+            and parent["cancellation_requested_at"] is not None
+        ):
+            from crate.db.repositories.task_control import acknowledge_cancellation
+
+            acknowledge_cancellation(parent_task_id, session=session)
+            all_done = False
         if all_done:
             claimed = session.execute(
                 text(
@@ -105,7 +129,7 @@ def cleanup_zombie_tasks(
                 text(
                     """
                 WITH stale AS (
-                    SELECT id, retry_count, max_retries
+                    SELECT id, retry_count, max_retries, cancellation_requested_at
                     FROM tasks
                     WHERE status = 'running'
                       AND (
@@ -119,23 +143,28 @@ def cleanup_zombie_tasks(
                 )
                 UPDATE tasks t
                 SET status = CASE
-                        WHEN stale.retry_count < stale.max_retries THEN 'pending'
+                        WHEN stale.cancellation_requested_at IS NULL AND stale.retry_count < stale.max_retries THEN 'pending'
                         ELSE 'failed'
                     END,
                     retry_count = CASE
-                        WHEN stale.retry_count < stale.max_retries THEN stale.retry_count + 1
+                        WHEN stale.cancellation_requested_at IS NULL AND stale.retry_count < stale.max_retries THEN stale.retry_count + 1
                         ELSE stale.retry_count
                     END,
                     error = CASE
-                        WHEN stale.retry_count < stale.max_retries
+                        WHEN stale.cancellation_requested_at IS NULL AND stale.retry_count < stale.max_retries
                         THEN 'Worker died (no heartbeat); requeued'
                         ELSE 'Worker died (no heartbeat)'
                     END,
                     progress = CASE
-                        WHEN stale.retry_count < stale.max_retries
+                        WHEN stale.cancellation_requested_at IS NULL AND stale.retry_count < stale.max_retries
                         THEN 'Retrying after lost worker heartbeat'
                         ELSE t.progress
                     END,
+                    result_json = CASE WHEN stale.cancellation_requested_at IS NOT NULL
+                        THEN COALESCE(t.result_json,'{}'::jsonb) || jsonb_build_object(
+                            'execution',COALESCE(t.result_json->'execution','{}'::jsonb)||'{"status": "partial"}'::jsonb,
+                            'verification',COALESCE(t.result_json->'verification','{}'::jsonb)||'{"status": "manual_reconciliation_required"}'::jsonb)
+                        ELSE t.result_json END,
                     updated_at = NOW(),
                     heartbeat_at = NULL,
                     worker_id = NULL

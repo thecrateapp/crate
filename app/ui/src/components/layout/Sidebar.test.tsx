@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
+vi.mock("@/hooks/use-pending-approvals", () => ({
+  usePendingApprovals: () => 4,
+}));
 vi.mock("@/contexts/OpsSnapshotContext", () => ({
   useOpsSnapshot: () => ({
     data: { status: { issue_count: 3, running_tasks: 12 } },
@@ -117,4 +120,31 @@ describe("Sidebar", () => {
     expect(close).toHaveBeenCalledOnce();
     expect(localStorage.getItem(SIDEBAR_KEY)).toBe("false");
   });
+});
+
+it("links agents reviewers to the unified Agents section with the pending badge", () => {
+  renderWithAdminProviders(<Sidebar />, { auth: only("agents.plans.review") });
+  const link = screen.getByRole("link", { name: /Agents/i });
+  expect(link).toHaveAttribute("href", "/agents");
+  expect(link).toHaveTextContent("4");
+  expect(
+    screen.queryByRole("link", { name: /Agent plans/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: /Agent integrations/i }),
+  ).not.toBeInTheDocument();
+});
+it("gates AI navigation by configuration read capability", () => {
+  const { unmount } = renderWithAdminProviders(<Sidebar />, {
+    auth: only("library.view"),
+  });
+  expect(
+    screen.queryByRole("link", { name: /AI models/i }),
+  ).not.toBeInTheDocument();
+  unmount();
+  renderWithAdminProviders(<Sidebar />, { auth: only("ai.config.read") });
+  expect(screen.getByRole("link", { name: /AI models/i })).toHaveAttribute(
+    "href",
+    "/ai",
+  );
 });

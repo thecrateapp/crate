@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from sqlalchemy import and_, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.entity_ids import track_entity_uid
@@ -14,6 +16,7 @@ from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
 )
 from crate.db.repositories.library_processing_state import ensure_track_processing_rows
+from crate.db.repositories.smart_mix import mark_track_mix_source_revision
 from crate.db.repositories.library_shared import (
     allocate_unique_slug,
     coerce_uuid_or_none,
@@ -22,7 +25,9 @@ from crate.db.tx import optional_scope
 from crate.slugs import build_track_slug
 
 
-def upsert_track(data: dict, *, session: Session | None = None) -> None:
+def upsert_track(
+    data: dict, *, session: Session | None = None, strict_identity: bool = False
+) -> None:
     with optional_scope(session) as s:
         now = datetime.now(timezone.utc)
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
@@ -50,17 +55,27 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
             LibraryTrack.audio_fingerprint,
             LibraryTrack.audio_fingerprint_source,
             LibraryTrack.audio_fingerprint_computed_at,
+            LibraryTrack.album_id,
+            LibraryTrack.path,
         )
-        existing = s.execute(
-            select(*existing_columns)
-            .where(
-                or_(
-                    path_match,
-                    entity_match,
-                )
+        existing_query = (
+            select(*existing_columns).where(or_(path_match, entity_match)).limit(1)
+        )
+        if strict_identity:
+            if requested_entity_uid is None:
+                raise ValueError("Strict track upserts require an approved entity UID")
+            existing_query = existing_query.with_for_update()
+        existing = s.execute(existing_query).first()
+        if (
+            strict_identity
+            and existing
+            and (
+                existing[9] != data.get("album_id")
+                or existing[10] != data["path"]
+                or str(existing[3]) != str(requested_entity_uid)
             )
-            .limit(1)
-        ).first()
+        ):
+            raise ValueError("Strict track identity conflicts with an indexed path")
         album_entity_uid = None
         album_id = data.get("album_id")
         if album_id is not None:
@@ -76,6 +91,8 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                 .limit(1)
             ).scalar_one_or_none()
             if entity_uid_is_occupied is not None:
+                if strict_identity:
+                    raise ValueError("Strict track entity UID is already occupied")
                 requested_entity_uid = track_entity_uid(
                     album_uid=album_entity_uid,
                     artist_name=data["artist"],
@@ -192,6 +209,10 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                     key_value=requested_track_mbid,
                 )
             ensure_track_processing_rows(s, track_id)
+            if data.get("smart_mix_source_revision"):
+                mark_track_mix_source_revision(
+                    track_id, data["smart_mix_source_revision"], session=s
+                )
             enqueue_local_dirty_source("track", str(entity_uid), "upsert", session=s)
             return
         insert_stmt = pg_insert(LibraryTrack).values(
@@ -224,9 +245,15 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
             path=data["path"],
             updated_at=now,
         )
-        s.execute(
+        inserted = s.execute(
             insert_stmt.on_conflict_do_update(
                 index_elements=[LibraryTrack.path],
+                where=and_(
+                    LibraryTrack.album_id == data.get("album_id"),
+                    LibraryTrack.entity_uid == requested_entity_uid,
+                )
+                if strict_identity
+                else None,
                 set_={
                     "storage_id": func.coalesce(
                         LibraryTrack.storage_id, insert_stmt.excluded.storage_id
@@ -275,6 +302,8 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                 },
             )
         )
+        if strict_identity and cast(CursorResult[Any], inserted).rowcount != 1:
+            raise ValueError("Strict track identity changed during insertion")
 
         track_id = int(
             s.execute(
@@ -309,6 +338,10 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                 key_value=requested_track_mbid,
             )
         ensure_track_processing_rows(s, track_id)
+        if data.get("smart_mix_source_revision"):
+            mark_track_mix_source_revision(
+                track_id, data["smart_mix_source_revision"], session=s
+            )
         enqueue_local_dirty_source("track", str(entity_uid), "upsert", session=s)
 
 

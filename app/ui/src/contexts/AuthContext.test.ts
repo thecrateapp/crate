@@ -80,3 +80,14 @@ describe("AuthContext permission helpers", () => {
     ).toBe(true);
   });
 });
+
+it("allows AI configuration readers into the Admin console", () => {
+  expect(userCanAccessAdminConsole(user("ai-reader", ["ai.config.read"]))).toBe(
+    true,
+  );
+  expect(
+    userCanAccessAdminConsole(
+      user("ai-credentials", ["ai.credentials.manage"]),
+    ),
+  ).toBe(false);
+});

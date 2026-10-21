@@ -33,8 +33,6 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
   "lib/color-contrast":
     "Pure contrast helpers used to verify the fixed identity's accessible colours.",
   "lib/use-sheet-drag": "Drag engine shared by AppModal and MobileActionSheet.",
-  "primitives/RadioGroup":
-    "Unused form primitive retained for the explicit PD47 review; Radix dropdown radios do not consume it.",
   "primitives/Spinner": "Phase 1 base loading primitive.",
   "primitives/StarRating":
     "Rating primitive; admin and listen still render local rating copies.",

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { usePlayerRuntimeState } from "./use-player-runtime-state";
@@ -17,12 +18,16 @@ const source: PlaySource = {
 
 function useSession() {
   const state = usePlayerRuntimeState();
+  useEffect(() => {
+    state.playSourceRef.current = state.playSource;
+  }, [state.playSource]);
   usePlaybackPersistence({
     queue: state.queue,
     currentIndex: state.currentIndex,
     isPlaying: state.isPlaying,
     shuffle: state.shuffle,
     playSource: state.playSource,
+    playSourceRef: state.playSourceRef,
     queueRef: state.queueRef,
     currentIndexRef: state.currentIndexRef,
     currentTimeRef: state.currentTimeRef,
@@ -68,6 +73,7 @@ it("persists origin changes even if the queue and cursor do not change", () => {
   const album: PlaySource = {
     type: "album",
     name: "Luz de octubre",
+    id: null,
     href: "/artists/costa-norte/luz-de-octubre",
   };
   act(() => result.current.setPlaySource(album));

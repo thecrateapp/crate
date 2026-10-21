@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crate editorial playlists"
+  short_description: "Plan and publish Crate system playlists"
+  default_prompt: "Create or refine a Crate editorial playlist from my brief."

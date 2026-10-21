@@ -2,21 +2,25 @@ import { type ComponentProps } from "react";
 import { Bot, Loader2, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 import { cn } from "@/lib/utils";
-import { useLLMStatus } from "@/hooks/use-llm";
+import { useActionLLMStatus } from "@/hooks/use-llm";
 
-interface AIButtonProps
-  extends Omit<ComponentProps<typeof Button>, "variant" | "size"> {
+interface AIButtonProps extends Omit<
+  ComponentProps<typeof Button>,
+  "variant" | "size"
+> {
+  actionId: string;
   loading?: boolean;
 }
 
 export function AIButton({
+  actionId,
   loading,
   children,
   className,
   disabled,
   ...props
 }: AIButtonProps) {
-  const llmStatus = useLLMStatus();
+  const llmStatus = useActionLLMStatus(actionId);
 
   if (!llmStatus?.available) return null;
 

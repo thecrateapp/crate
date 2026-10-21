@@ -82,6 +82,7 @@ _invalidation_subscriber = None
 
 _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
+        "*",
         "home",
         "library",
         "global_catalog",
@@ -128,6 +129,13 @@ def broadcast_invalidation(*scopes: str):
     except Exception:
         log.warning("Failed to persist cache invalidations", exc_info=True)
     _get_invalidation_dispatcher().submit(normalized)
+
+
+def broadcast_committed_invalidation(*scopes: str) -> None:
+    """Deliver an already committed outbox invalidation without creating another event."""
+    normalized = tuple(dict.fromkeys(scope for scope in scopes if scope))
+    if normalized:
+        _get_invalidation_dispatcher().submit(normalized)
 
 
 def wait_for_cache_invalidation(*, timeout: float = 2.0) -> bool:
@@ -466,6 +474,7 @@ async def cache_invalidate_endpoint(request: Request, body: CacheInvalidationReq
 
 # Map mutation routes to cache scopes they invalidate.
 _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
+    (re.compile(r"^/api/admin/ai(?:/|$)"), ["ai_configuration"]),
     (re.compile(r"^/api/auth/(?:logout|sessions|profile)"), ["auth"]),
     (re.compile(r"^/api/admin/(?:auth/)?users/\d+(?:/|$)"), ["auth"]),
     (re.compile(r"^/api/me/likes"), ["likes"]),

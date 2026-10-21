@@ -12,7 +12,8 @@ const { genreRefetchMock, taxonomyRefetchMock } = vi.hoisted(() => ({
   taxonomyRefetchMock: vi.fn(),
 }));
 
-vi.mock("@/contexts/AuthContext", () => ({
+vi.mock("@/contexts/AuthContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/contexts/AuthContext")>()),
   useAuth: () => ({
     hasCapability: (capability: string) =>
       capability === "curation.genres.write",

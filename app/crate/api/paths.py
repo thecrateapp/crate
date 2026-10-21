@@ -48,7 +48,8 @@ class PreviewPathRequest(BaseModel):
 )
 def api_create_path(request: Request, body: CreatePathRequest):
     user = _require_auth(request)
-    from crate.db.paths import create_music_path, resolve_endpoint_label
+    from crate.music_paths import create_music_path
+    from crate.db.paths_compute import resolve_endpoint_label
 
     name = body.name
     if not name:
@@ -124,7 +125,7 @@ def api_delete_path(request: Request, path_id: int):
 )
 def api_regenerate_path(request: Request, path_id: int):
     user = _require_auth(request)
-    from crate.db.paths import regenerate_music_path
+    from crate.music_paths import regenerate_music_path
 
     result = regenerate_music_path(path_id, user["id"])
     if not result:
@@ -141,7 +142,7 @@ def api_regenerate_path(request: Request, path_id: int):
 )
 def api_preview_path(request: Request, body: PreviewPathRequest):
     user = _require_auth(request)
-    from crate.db.paths import preview_music_path
+    from crate.music_paths import preview_music_path
 
     result = preview_music_path(
         origin_type=body.origin.type,

@@ -80,13 +80,15 @@ def test_health_identity_migration_matches_its_schema_section(monkeypatch):
     assert "CREATE TABLE IF NOT EXISTS health_check_runs" in joined
 
 
-def test_v109_creates_instance_rollups_and_indexes(monkeypatch):
+def test_v132_creates_instance_rollups_and_indexes(monkeypatch):
     from contextlib import nullcontext
 
     migration = import_module(
-        "crate.db.migrations.versions.109_instance_listening_rollups"
+        "crate.db.migrations.versions.132_instance_listening_rollups"
     )
-    section = import_module("crate.db.schema_sections.activity_v109")
+    assert migration.revision == "132"
+    assert migration.down_revision == "131"
+    section = import_module("crate.db.schema_sections.activity_v132")
     executor = RecordingExecutor()
     blocks: list[int] = []
 
@@ -99,7 +101,7 @@ def test_v109_creates_instance_rollups_and_indexes(monkeypatch):
     monkeypatch.setattr(migration, "op", executor)
     migration.upgrade()
     section_executor = RecordingExecutor()
-    section.create_instance_listening_rollups_v109_schema(section_executor)
+    section.create_instance_listening_rollups_v132_schema(section_executor)
 
     # Section (tables + indexes on the new empty tables) replays verbatim first.
     assert executor.statements[: len(section_executor.statements)] == (
@@ -123,3 +125,36 @@ def test_v109_creates_instance_rollups_and_indexes(monkeypatch):
         "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_entity_firsts_key ON user_entity_firsts(entity_type, entity_key)",
     ]
     assert blocks == [len(section_executor.statements)]
+
+
+def test_instance_rollup_bootstrap_matches_its_schema_section():
+    from crate.db.schema_sections.activity import create_activity_schema
+    from crate.db.schema_sections.activity_v132 import (
+        create_instance_listening_rollups_v132_schema,
+    )
+
+    bootstrap = RecordingExecutor()
+    section = RecordingExecutor()
+    create_activity_schema(bootstrap)
+    create_instance_listening_rollups_v132_schema(section)
+    assert bootstrap.statements[-len(section.statements) :] == section.statements
+
+
+def test_v132_downgrade_removes_only_instance_rollups_and_its_indexes(monkeypatch):
+    from contextlib import nullcontext
+
+    migration = import_module(
+        "crate.db.migrations.versions.132_instance_listening_rollups"
+    )
+    executor = RecordingExecutor()
+    executor.get_context = lambda: type(
+        "Context", (), {"autocommit_block": lambda self: nullcontext()}
+    )()
+    monkeypatch.setattr(migration, "op", executor)
+    migration.downgrade()
+    assert executor.statements == [
+        "DROP INDEX IF EXISTS idx_user_entity_firsts_key",
+        "DROP INDEX IF EXISTS idx_user_track_daily_day",
+        "DROP TABLE IF EXISTS instance_entity_firsts",
+        "DROP TABLE IF EXISTS instance_track_daily",
+    ]

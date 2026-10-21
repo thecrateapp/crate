@@ -21,6 +21,7 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
+import { SmartMixCoverage } from "@/components/SmartMixCoverage";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   useOpsSnapshot,
@@ -644,6 +645,13 @@ export function Analysis() {
             </div>
           </div>
         </div>
+      </OpsPanel>
+
+      <OpsPanel
+        title="Smart Mix"
+        description="Versioned transition-analysis coverage and bounded backfill controls."
+      >
+        <SmartMixCoverage />
       </OpsPanel>
 
       <OpsPanel

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import threading
 import time
@@ -29,8 +30,22 @@ def run_projector_loop(
     home_warm_interval = max(0.0, float(home_warm_interval_seconds))
     outbox_cleanup_interval = max(60.0, float(outbox_cleanup_interval_seconds))
     last_home_warm = 0.0
+    last_agent_health_warm: float | None = None
     last_outbox_cleanup: float | None = None
     while not stop_event.is_set():
+        now = time.monotonic()
+        if os.environ.get("CRATE_MCP_ENABLED", "false").lower() == "true" and (
+            last_agent_health_warm is None or now - last_agent_health_warm >= 60
+        ):
+            last_agent_health_warm = now
+            try:
+                from crate.db.jobs.agent_diagnostic_snapshots import (
+                    warm_agent_health_snapshot,
+                )
+
+                warm_agent_health_snapshot()
+            except Exception:
+                log.warning("Diagnostic health snapshot warm failed", exc_info=True)
         try:
             from crate.domain_event_relay import relay_domain_events
 

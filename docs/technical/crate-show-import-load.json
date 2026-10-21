@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-16",
+  "environment": "Linux, Python 3.13, real disposable PostgreSQL; synthetic external artist dates",
+  "single": {
+    "selected_shows": 1,
+    "read_statements": 71,
+    "elapsed_seconds": 0.035
+  },
+  "batch": {
+    "selected_shows": 50,
+    "read_statements": 71,
+    "elapsed_seconds": 0.083
+  },
+  "batch_invalidation_events": 3,
+  "scope": "Acceptance plus execution; SELECT/WITH reads exclude advisory-lock coordination. Fixed authority and runtime checks are included. No production-scale latency claim."
+}

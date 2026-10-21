@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { RangeRow, Section, SelectRow, ToggleRow } from "./SettingsPrimitives";
 export interface PlaybackSettingsValue {
@@ -42,7 +43,9 @@ export function PlaybackSettingsView({
   mobilePlaybackRuntime,
   androidNativePlayerEnabled,
   onChange,
+  smartMixSettings,
 }: {
+  smartMixSettings?: ReactNode;
   ruled?: boolean;
   value: PlaybackSettingsValue;
   mobilePlaybackRuntime: boolean;
@@ -106,6 +109,7 @@ export function PlaybackSettingsView({
           />
         </>
       ) : null}
+      {smartMixSettings}
       {!mobilePlaybackRuntime || androidNativePlayerEnabled ? (
         <ToggleRow
           label={t("player.equalizer")}

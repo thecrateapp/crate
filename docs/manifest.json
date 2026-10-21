@@ -108,6 +108,15 @@
     "order": 99
   },
   {
+    "sourcePath": "docs/technical/11-crate-mcp.md",
+    "route": "/architecture/agents-and-mcp",
+    "section": "architecture",
+    "title": "Agents and MCP",
+    "summary": "How remote agents use Crate's shared plans, permissions and workers for diagnostics and curation.",
+    "keywords": ["mcp", "agents", "oauth", "plans", "editorial", "shows"],
+    "order": 100
+  },
+  {
     "sourcePath": "docs/operators/cast-receiver.md",
     "route": "/operations/cast-receiver",
     "section": "operations",
@@ -205,6 +214,24 @@
     "summary": "Gate native readplane delivery of local audio and artwork with measurable safety and rollback criteria.",
     "keywords": ["media", "readplane", "streaming", "slos"],
     "order": 150
+  },
+  {
+    "sourcePath": "docs/technical/crate-mcp.md",
+    "route": "/operations/crate-mcp",
+    "section": "operations",
+    "title": "Crate MCP",
+    "summary": "Connect remote agents with OAuth, scoped maintenance and exact human plan review.",
+    "keywords": ["mcp", "agents", "diagnostics", "credentials", "maintenance"],
+    "order": 170
+  },
+  {
+    "sourcePath": "docs/technical/crate-mcp-distribution.md",
+    "route": "/operations/crate-mcp-distribution",
+    "section": "operations",
+    "title": "Crate MCP distribution and acceptance",
+    "summary": "Versioned contracts, reproducible evaluation and staged rollout evidence.",
+    "keywords": ["mcp", "oauth", "contract", "evaluation", "rollout"],
+    "order": 171
   },
   {
     "sourcePath": "docs/technical/storage-retention.md",
@@ -367,5 +394,44 @@
     "summary": "Reference notes for Crate enrichment sources and flow.",
     "keywords": ["enrichment", "metadata", "providers"],
     "order": 50
+  },
+  {
+    "sourcePath": "docs/technical/ai-agents.md",
+    "route": "/operations/ai-agents",
+    "section": "operations",
+    "title": "AI agents configuration",
+    "summary": "Action routing, validated native model profiles, private credentials and bounded usage in Crate.",
+    "keywords": ["ai", "models", "reasoning", "credentials", "usage"],
+    "order": 95
+  },
+  {
+    "sourcePath": "docs/technical/smart-mix-design.md",
+    "route": "/architecture/smart-mix",
+    "section": "architecture",
+    "title": "Smart Mix - diseño unificado",
+    "summary": "Contrato y arquitectura para terminar Smart Mix, crossfade Android nativo y VirtualDJ desde el WIP existente.",
+    "keywords": [
+      "smart mix",
+      "crossfade",
+      "android",
+      "virtualdj",
+      "implementation"
+    ],
+    "order": 99
+  },
+  {
+    "sourcePath": "docs/technical/smart-mix-implementation-plan.md",
+    "route": "/developer/smart-mix-continuation",
+    "section": "developer",
+    "title": "Smart Mix - plan de continuación",
+    "summary": "Tareas, dependencias, pruebas y gates para completar la feature unificada desde su estado WIP.",
+    "keywords": [
+      "smart mix",
+      "crossfade",
+      "android",
+      "virtualdj",
+      "implementation"
+    ],
+    "order": 45
   }
 ]

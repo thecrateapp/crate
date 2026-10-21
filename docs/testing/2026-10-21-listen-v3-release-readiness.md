@@ -28,15 +28,28 @@ Este documento no acredita merge, CI remoto ni despliegue.
 La ejecución de pruebas de este lote es focalizada. No sustituye la suite completa de fase,
 CI del futuro merge, QA de accesibilidad manual ni pruebas en dispositivos físicos.
 
+## Integración con main validada localmente
+
+- Main integrado desde `d3e6ef6b`; revisión Alembic única `132`, cadena publicada preservada.
+- Builds de Listen, Admin y frontend Desktop; Listen 222571 bytes gzip de JavaScript inicial
+  (límite 307200). Typechecks y lint de Listen/Admin, Storybook y catálogos de traducción.
+- Backend: 150 tests de migraciones/bootstrap, búsquedas/metadata y OpenAPI; 13 contratos
+  de imágenes frontend. PostgreSQL de tests aislado; no se modifica producción.
+- Pruebas focalizadas de Select/ConfirmDialog, ajustes y persistencia Playing from, contratos
+  operativos de tareas, navegación/AI/show workflows y edición de playlists. Se adaptan los
+  tests de formularios nuevos al combobox/listbox/option accesible del Select compartido.
+- 17 comprobaciones de navegador en ambos previews: fuentes reales, controles nativos,
+  geometría móvil y header de Paths. El catálogo queda consistente.
+- No equivale a CI remoto, QA de toda la plataforma ni aprobación de despliegue.
+
 ## Pendientes antes del despliegue web
 
-1. **Integrar con main y resolver la colisión de migraciones.** Tras el fetch de este cierre,
-   `origin/main` tiene 326 commits ausentes de la base local y la base de la rama 146 ausentes
-   de main. No se ha intentado el merge ni se ha certificado ausencia de otros conflictos.
-   Esta rama añade `109_instance_listening_rollups.py` (`revision="109"`, padre `108`);
-   main ya contiene `109_smart_mix_profiles.py`, con el mismo identificador y padre, y llega
-   hasta la revisión `131` en esa observación. La migración de Stats y sus referencias deben
-   reconciliarse con el head vigente. No aplicar ambas como si fueran una sola migración.
+1. **Integración local con main resuelta.** Se integra `origin/main` en `d3e6ef6b`
+   (326 commits de main), conservando la identidad y componentes V3 y los nuevos contratos
+   de Smart Mix, shows y agentes. La revisión publicada `109` de Smart Mix y la cadena
+   `110`–`131` quedan intactas. Stats pasa a `132_instance_listening_rollups.py`, con padre
+   `131`, helper/bootstrap y tests actualizados; Alembic debe tener un único head `132`.
+   Esta integración en la rama de trabajo no publica cambios en main ni en producción.
 2. **Validar el SHA integrado.** Pasar CI/cierre completo de frontend, contratos backend/readplane
    afectados y revisión de diferencias visuales. No actualizar baselines automáticamente para
    ocultar drift. En pruebas más amplias del preview Admin se observaron un `System` embebido

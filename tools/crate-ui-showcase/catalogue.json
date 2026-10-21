@@ -256,8 +256,8 @@
       "sources": ["app/shared/ui/composites/AdminSelect.tsx"],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/AdminSelect.tsx": "fe340f1220c67b7be6d23027dfc96b0d838667c33d6272daafa6fd93e78e01b5",
-        "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx": "b91b2ad48ee94ca2e88cc328cb09a82ac2342b237641d85edc8331cfa99f8194",
+        "app/shared/ui/composites/AdminSelect.tsx": "8681d2582336753b2742bb92d606fb6c769320b5bf44abccb92ac5cd3a7f5e4f",
+        "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx": "da878e3ce6675fb917d9512182818a4fb7d99eaa85ffbab6d233ea6feaa9ff74",
         "tools/crate-ui-showcase/docs/AdminSelect.mdx": "514079fdb7b57c9b61cbc0cafd8cd5f2bfa3778cc9309a89b405aa1ea27f1e9c"
       },
       "category": "Forms"

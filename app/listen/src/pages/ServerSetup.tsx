@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, CheckCircle2, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { ServerSetupView } from "@/components/auth/ServerSetupView";
@@ -10,6 +10,7 @@ import {
   normaliseServerUrl,
   setCurrentServerId,
 } from "@/lib/server-store";
+import { FIXED_SERVER_URL } from "@/lib/mobile-build-config";
 
 /**
  * First-run setup for Capacitor builds. Lets the user point the app at
@@ -78,6 +79,10 @@ export function ServerSetup() {
   const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [probeState, setProbeState] = useState<ProbeState>({ status: "idle" });
+
+  if (FIXED_SERVER_URL) {
+    return <Navigate to="/login" replace />;
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();

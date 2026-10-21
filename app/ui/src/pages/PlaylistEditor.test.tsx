@@ -21,7 +21,7 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
-  useLLMStatus: () => ({
+  useActionLLMStatus: () => ({
     available: true,
     model: "gemini-test",
     provider: "gemini",
@@ -152,7 +152,7 @@ describe("PlaylistEditor", () => {
       screen.getByPlaceholderText("Search tracks matching this playlist..."),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Refine tracklist with AI/i }),
+      screen.getByRole("button", { name: /Suggest refinements/i }),
     ).toBeInTheDocument();
     expect(screen.getByText("Add rule")).toBeInTheDocument();
     expect(screen.getByText("generated")).toBeInTheDocument();

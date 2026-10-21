@@ -16,7 +16,7 @@ deploy, testing policy) live in the root `AGENTS.md`; this file only covers the 
 | `orm/`                                                     | SQLAlchemy 2.0 `Mapped` models. `orm/contract.py:ACTIVE_ORM_MODELS` is checked against the live schema                                                                                                                                             |
 | `models/`                                                  | Pydantic output models for DB results                                                                                                                                                                                                              |
 | `schema_sections/`                                         | Idempotent DDL used by `schema_bootstrap.create_schema()` (called by migration `001`) and, for newer features, by the migration itself (`crates_v099/v100/v102.py`)                                                                                |
-| `migrations/versions/`                                     | Alembic revisions `001`..`109`, linear, 3-digit string ids                                                                                                                                                                                         |
+| `migrations/versions/`                                     | Alembic revisions `001`..`132`, linear, 3-digit string ids                                                                                                                                                                                         |
 | `ui_snapshot_*.py`, `snapshot_events.py`                   | `ui_snapshots` read model: `get_or_build_ui_snapshot()` (read, else build + upsert with `source_seq`), `mark_ui_snapshots_stale()`, Redis pub of snapshot versions                                                                                 |
 | `domain_events.py`, `domain_event_outbox.py`               | Transactional outbox: `append_domain_event(..., session=s)` enqueues in the caller's transaction; relay publishes to Redis Streams; projector consumes                                                                                             |
 | `init_db.py`, `core_migrations.py`, `core_provisioning.py` | Startup: advisory lock, `alembic upgrade head`, seeds                                                                                                                                                                                              |
@@ -138,7 +138,7 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
 - `CREATE INDEX CONCURRENTLY` fails inside a transaction; always wrap in `autocommit_block()`.
 - A failed or interrupted `CREATE INDEX CONCURRENTLY IF NOT EXISTS` leaves an INVALID index that
   later runs skip, because the name already exists. After deploying migrations `080`
-  (`idx_global_tracks_lower_artist_title_album`) and `109` (`idx_user_track_daily_day`,
+  (`idx_global_tracks_lower_artist_title_album`) and `132` (`idx_user_track_daily_day`,
   `idx_user_entity_firsts_key`), check them with
   `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`. Rebuild any index it lists
   with `REINDEX INDEX CONCURRENTLY <name>`; Alembic will not rerun a revision that is already

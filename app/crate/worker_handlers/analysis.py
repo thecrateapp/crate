@@ -1,7 +1,7 @@
 import logging
 import time
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, TypeGuard
 
 from crate.audio_fingerprint import compute_audio_fingerprint_with_source
 from crate.db.cache_store import set_cache
@@ -14,6 +14,23 @@ from crate.db.jobs.analysis import (
     requeue_tracks,
     store_track_audio_fingerprint,
     update_album_popularity as _db_update_album_popularity,
+)
+from crate.db.jobs.analysis_storage import (
+    SmartMixPublication,
+    capture_smart_mix_source,
+    publish_smart_mix_profile,
+    record_smart_mix_failure,
+    resolve_smart_mix_track,
+)
+from crate.db.jobs.smart_mix_backfill import (
+    claim_smart_mix_backfill_batch,
+    complete_smart_mix_campaign,
+    count_smart_mix_in_flight,
+    get_smart_mix_campaign,
+    queue_next_smart_mix_batch,
+    refresh_live_smart_mix_coverage,
+    refresh_smart_mix_coverage,
+    release_smart_mix_claims,
 )
 from crate.db.events import emit_task_event
 from crate.db.repositories.library import (
@@ -49,6 +66,9 @@ _MAX_BACKFILL_FINGERPRINT_LIMIT = 50_000
 # Concurrency / backpressure constants
 _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
+_SMART_MIX_BACKFILL_POLL_SECONDS = 15
+_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS = 600
+_sleep = time.sleep
 
 # Registry of post-processing functions for fan-out coordinators.
 # Keyed by the child task_type. Called once by the last chunk to complete.
@@ -71,14 +91,37 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
 
     p = TaskProgress(phase="analytics", phase_count=2)
 
+    class CancellationObserved(Exception):
+        pass
+
     def _progress(data):
+        if is_cancelled(task_id):
+            raise CancellationObserved()
         p.done = data.get("artists_done", p.done)
         p.total = data.get("artists_total", p.total)
         p.item = data.get("artist", p.item)
         emit_progress(task_id, p)
 
     emit_progress(task_id, p, force=True)
-    data = compute_analytics(lib, exts, progress_callback=_progress, incremental=True)
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "cancelled", "effects": "not_started"},
+        }
+    try:
+        data = compute_analytics(
+            lib, exts, progress_callback=_progress, incremental=True
+        )
+    except CancellationObserved:
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
+    if is_cancelled(task_id):
+        return {
+            "status": "cancelled",
+            "execution": {"status": "partial", "phase": "analytics"},
+        }
     set_cache("analytics", data, ttl=3600)
 
     p.phase = "stats"
@@ -90,6 +133,15 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
     artists = albums = tracks = total_size = 0
     formats: dict[str, int] = {}
     for artist_dir in lib.iterdir():
+        if is_cancelled(task_id):
+            return {
+                "status": "cancelled",
+                "execution": {
+                    "status": "partial",
+                    "analytics_cache_updated": True,
+                    "artists_scanned": artists,
+                },
+            }
         if not artist_dir.is_dir() or artist_dir.name.startswith("."):
             continue
         artists += 1
@@ -494,6 +546,8 @@ def _chunk_coordinator(
     )
 
     for index, chunk in enumerate(chunks):
+        if is_cancelled(task_id):
+            break
         create_task(
             chunk_task_type,
             {"artists": chunk, "chunk_index": index, "total_chunks": len(chunks)},
@@ -760,6 +814,14 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
+    from crate.ai.consumers import resume_action, revalidate_call
+
+    ai_call = resume_action(
+        "genres.description.generate",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     limit = max(
         1,
@@ -798,7 +860,9 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
         include_external=include_external,
         progress_callback=_tax_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     emit_task_event(
         task_id,
         "info",
@@ -816,6 +880,14 @@ def _handle_rebuild_genre_taxonomy_proposals(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
+    from crate.ai.consumers import resume_action, revalidate_call
+
+    ai_call = resume_action(
+        "genres.taxonomy.propose",
+        params.get("ai_acceptance"),
+        actor_id=params.get("actor_user_id"),
+        job_id=task_id,
+    )
 
     alias_limit = max(
         1,
@@ -867,7 +939,9 @@ def _handle_rebuild_genre_taxonomy_proposals(
         aggressive=aggressive,
         progress_callback=_proposal_progress,
         event_callback=lambda data: emit_task_event(task_id, "info", data),
+        ai_call=ai_call,
     )
+    revalidate_call(ai_call)
     summary = result.get("summary") or {}
     emit_task_event(
         task_id,
@@ -1159,6 +1233,179 @@ def _handle_backfill_track_audio_fingerprints(
     }
 
 
+def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) -> dict:
+    del config
+    track = resolve_smart_mix_track(
+        track_id=int(params["track_id"]) if params.get("track_id") else None,
+        track_entity_uid=params.get("track_entity_uid"),
+    )
+    if track is None:
+        return {"error": "Smart Mix track not found"}
+
+    track_id = int(track["id"])
+    path = str(track["path"])
+    claim_token = params.get("claim_token")
+    capture = capture_smart_mix_source(track_id, path, claim_token=claim_token)
+    try:
+        from crate.audio_analysis import analyze_mix_profile
+
+        draft = analyze_mix_profile(path)
+    except Exception as exc:
+        record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
+        log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
+        _refresh_live_coverage()
+        return {
+            "error": f"Smart Mix analysis failed: {exc}",
+            "track_id": track_id,
+        }
+
+    try:
+        outcome = publish_smart_mix_profile(capture, draft)
+    except Exception as exc:
+        record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
+        log.warning("Smart Mix profile publication failed for %s", path, exc_info=True)
+        _refresh_live_coverage()
+        return {
+            "error": f"Smart Mix profile publication failed: {exc}",
+            "track_id": track_id,
+        }
+    stored = outcome is SmartMixPublication.PUBLISHED
+    _refresh_live_coverage()
+    if stored:
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": "Smart Mix profile ready",
+                "track_id": track_id,
+                "quality": str(draft.quality),
+            },
+        )
+    return {
+        "track_id": track_id,
+        "stored": stored,
+        "outcome": str(outcome),
+        "quality": str(draft.quality),
+    }
+
+
+def _refresh_live_coverage() -> None:
+    try:
+        refresh_live_smart_mix_coverage()
+    except Exception:
+        log.warning("Smart Mix coverage refresh failed", exc_info=True)
+
+
+def _handle_backfill_smart_mix_profiles(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from crate.resource_governor import wait_while_pressured
+
+    campaign = get_smart_mix_campaign()
+    if not _smart_mix_campaign_running(campaign):
+        return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
+    if not wait_while_pressured(
+        label="Smart Mix profile backfill",
+        task_type="backfill_smart_mix_profiles",
+        is_cancelled_fn=is_cancelled,
+        task_id=task_id,
+        params=params,
+        emit_event_fn=emit_task_event,
+        max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
+    ):
+        return {"claimed": 0, "queued": 0, "paused": True}
+
+    batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
+    max_attempts = int(campaign.get("max_attempts") or 3)
+    in_flight = count_smart_mix_in_flight()
+    waited = 0
+    while in_flight >= batch_size and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
+        _sleep(_SMART_MIX_BACKFILL_POLL_SECONDS)
+        waited += _SMART_MIX_BACKFILL_POLL_SECONDS
+        campaign = get_smart_mix_campaign()
+        if not _smart_mix_campaign_running(campaign):
+            return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
+        in_flight = count_smart_mix_in_flight()
+    if in_flight >= batch_size:
+        return {
+            "claimed": 0,
+            "queued": 0,
+            "deferred": True,
+            "next_task_id": queue_next_smart_mix_batch(),
+        }
+
+    offline_ids = [
+        int(track_id)
+        for track_id in (params.get("offline_track_ids") or [])[:batch_size]
+        if track_id
+    ]
+    from crate.crate_cli import has_subcommands, is_available
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=batch_size - in_flight,
+        offline_track_ids=offline_ids,
+        max_attempts=max_attempts,
+        claimed_by=f"task:{task_id}",
+        promote_python_profiles=is_available() and has_subcommands(),
+    )
+    queued = 0
+    released: list[int] = []
+    from crate.db.repositories.tasks import create_task_dedup
+
+    for track in claimed:
+        track_id = int(track["id"])
+        child_id = create_task_dedup(
+            "compute_smart_mix_profile",
+            {
+                "track_id": track_id,
+                "track_entity_uid": track.get("entity_uid"),
+                "claim_token": track.get("claim_token"),
+            },
+            dedup_key=f"smart-mix-profile:{track_id}",
+        )
+        if child_id:
+            queued += 1
+        else:
+            released.append(track_id)
+    if released:
+        release_smart_mix_claims(released)
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
+
+    if not claimed and in_flight == 0:
+        complete_smart_mix_campaign()
+        return {"claimed": 0, "queued": 0, "completed": True}
+    return {
+        "claimed": len(claimed),
+        "queued": queued,
+        "released": len(released),
+        "next_task_id": queue_next_smart_mix_batch(
+            batches=1 if claimed else 0, claimed=len(claimed)
+        ),
+    }
+
+
+def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:
+    return campaign is not None and campaign.get("status") == "running"
+
+
+def _campaign_control(campaign: dict | None) -> str:
+    return str(campaign.get("status")) if campaign else "idle"
+
+
+def _handle_refresh_smart_mix_coverage(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    campaign = get_smart_mix_campaign() or {}
+    snapshot = refresh_smart_mix_coverage(
+        max_attempts=int(
+            params.get("max_attempts") or campaign.get("max_attempts") or 3
+        )
+    )
+    return {"total_tracks": snapshot["total_tracks"]}
+
+
 # Populate finalizers now that handler functions are defined
 register_parent_finalizer("compute_popularity", _popularity_finalize)
 
@@ -1177,6 +1424,9 @@ ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_musicbrainz_genre_graph": _handle_sync_musicbrainz_genre_graph,
     "cleanup_invalid_genre_taxonomy": _handle_cleanup_invalid_genre_taxonomy,
     "compute_popularity": _handle_compute_popularity,
+    "compute_smart_mix_profile": _handle_compute_smart_mix_profile,
+    "backfill_smart_mix_profiles": _handle_backfill_smart_mix_profiles,
+    "refresh_smart_mix_coverage": _handle_refresh_smart_mix_coverage,
     "backfill_track_audio_fingerprints": _handle_backfill_track_audio_fingerprints,
     # Re-analysis: just resets state, background daemons pick up the work
     "analyze_tracks": _handle_requeue_analysis,

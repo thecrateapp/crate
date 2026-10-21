@@ -676,3 +676,49 @@ describe("command palette helpers", () => {
     expect(matchesCommandQuery("Sync Library", "health")).toBe(false);
   });
 });
+
+it("offers the AI models page to configuration readers", async () => {
+  mockAuth(["ai.config.read"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("AI models")).toBeVisible();
+});
+it("does not offer the AI models page without read capability", async () => {
+  mockAuth(["settings.manage"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  await screen.findByRole("dialog", { name: "Command palette" });
+  expect(screen.queryByText("AI models")).not.toBeInTheDocument();
+});
+
+it("offers Agent approvals to plan reviewers", async () => {
+  mockAuth(["agents.plans.review"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("Agent approvals")).toBeInTheDocument();
+  expect(screen.getByText("Agents")).toBeInTheDocument();
+});
+
+it("offers Agents without Agent approvals to connection managers only", async () => {
+  mockAuth(["agents.integrations.manage"]);
+  render(
+    <MemoryRouter>
+      <CommandPalette />
+    </MemoryRouter>,
+  );
+  fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+  expect(await screen.findByText("Agents")).toBeInTheDocument();
+  expect(screen.queryByText("Agent approvals")).not.toBeInTheDocument();
+});
