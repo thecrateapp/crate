@@ -32,6 +32,7 @@ export function buildDiggingShareData(
 ) {
   const artist = dashboard.artist_of_period?.artist_name;
   const highlights = dashboard.highlights;
+  const topGenre = dashboard.genre_trend?.find((genre) => !genre.faller);
   const stats = [
     {
       value: new Intl.NumberFormat().format(
@@ -39,10 +40,11 @@ export function buildDiggingShareData(
       ),
       label: t("stats.headline.minutes"),
     },
-    ...(dashboard.genre_trend?.[0]
+    // The appended biggest faller is not part of the ranking.
+    ...(topGenre
       ? [
           {
-            value: dashboard.genre_trend[0].genre_name.toLowerCase(),
+            value: topGenre.genre_name.toLowerCase(),
             label: t("stats.digging.topGenre"),
           },
         ]

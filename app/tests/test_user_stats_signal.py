@@ -459,3 +459,65 @@ def test_audio_profile_reports_unknown_analysis_as_null():
     assert payload["energy"] is None
     assert payload["valence"] is None
     assert payload["danceability"] == 0.0
+
+
+def test_genre_trend_ignores_drops_below_the_faller_threshold(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Seventh", 0.096)]
+    previous = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Seventh", 0.1)]
+
+    assert len(_trend(monkeypatch, current, previous)) == 6
+
+
+def test_genre_trend_keeps_the_real_share_of_a_genre_ranked_below_twelve(
+    monkeypatch,
+):
+    current = [_share(f"G{i}", 0.06) for i in range(13)] + [_share("Deep", 0.015)]
+    previous = [_share(f"G{i}", 0.06) for i in range(13)] + [_share("Deep", 0.095)]
+
+    faller = _trend(monkeypatch, current, previous)[-1]
+
+    assert faller["genre_name"] == "Deep"
+    assert faller["share"] == 0.015
+    assert faller["delta_vs_previous"] == -0.08
+
+
+def test_genre_trend_matches_names_that_differ_only_in_case(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Shoegaze", 0.05)]
+    previous = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("shoegaze", 0.05)]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert len(trend) == 6
+    assert all(item["delta_vs_previous"] == 0.0 for item in trend)
+
+
+def test_global_audio_profile_reports_unknown_analysis_as_null(monkeypatch):
+    from contextlib import contextmanager
+    from datetime import datetime, timezone
+
+    from crate.db.queries import user_library_stats_global as global_stats
+
+    class _Result:
+        def mappings(self):
+            return self
+
+        def first(self):
+            return {"energy": None, "danceability": 0, "valence": None, "bpm": None}
+
+    class _Session:
+        def execute(self, *args, **kwargs):
+            return _Result()
+
+    @contextmanager
+    def _scope():
+        yield _Session()
+
+    monkeypatch.setattr(global_stats, "read_scope", _scope)
+
+    payload = global_stats._audio_profile_payload(
+        current_start=datetime(2026, 9, 1, tzinfo=timezone.utc)
+    )
+
+    assert payload["energy"] is None
+    assert payload["valence"] is None
+    assert payload["danceability"] == 0.0

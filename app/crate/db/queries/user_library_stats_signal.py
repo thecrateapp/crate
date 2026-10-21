@@ -793,7 +793,7 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
 
 
 def _genre_shares(
-    session, user_id: int | None, filter_sql: str, params: dict
+    session, user_id: int | None, filter_sql: str, params: dict, limit: int = 12
 ) -> list[dict]:
     rows = session.execute(
         text(
@@ -812,14 +812,22 @@ def _genre_shares(
                 """
             )
         ),
-        {"user_id": user_id, "lim": 12, **params},
+        {"user_id": user_id, "lim": limit, **params},
     ).mappings()
     return format_weighted_genre_rows(list(rows))
 
 
+_FULL_GENRE_READ = 500
+_FALLER_MIN_DELTA = -0.005
+
+
 def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict]:
     params = period_params(period)
-    current = _genre_shares(session, user_id, period_day_filter(period), params)
+    # Shares are relative to the whole window, so a wide read keeps the top six
+    # intact and lets a genre that fell below rank 12 keep its real current share.
+    current = _genre_shares(
+        session, user_id, period_day_filter(period), params, limit=_FULL_GENRE_READ
+    )
     previous_rows: list[dict] = []
     if period.previous_start is not None and period.start is not None:
         previous_rows = _genre_shares(
@@ -857,7 +865,7 @@ def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict
         item
         for item in candidates
         if item["genre_name"].lower() not in shown
-        and (item["delta_vs_previous"] or 0) < 0
+        and (item["delta_vs_previous"] or 0) <= _FALLER_MIN_DELTA
     ]
     if candidates:
         trend.append(

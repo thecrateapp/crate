@@ -158,7 +158,8 @@ describe("SoundProfileCard", () => {
   });
 
   it("renders unknown audio values as a dash", () => {
-    renderWithListenProviders(
+    // R26: the shared Meter shows "n/a" for unknown values, not "—".
+    const { container } = renderWithListenProviders(
       <SoundProfileCard
         profile={{ energy: null, danceability: 0, valence: null, bpm: null }}
         skipRate={0}
@@ -166,11 +167,39 @@ describe("SoundProfileCard", () => {
       />,
     );
 
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
     expect(screen.queryByRole("meter", { name: "Energy" })).toBeNull();
+    expect(
+      screen.getByRole("group", { name: "Energy" }),
+    ).toHaveAccessibleDescription("n/a");
+    expect(
+      screen.getByRole("group", { name: "Brightness" }),
+    ).toHaveAccessibleDescription("n/a");
+    expect(screen.getAllByText("n/a")).toHaveLength(2);
+    // only the real zero (movement) and the skip rate read 0%
+    expect(screen.getAllByText("0%")).toHaveLength(2);
+    expect(container.querySelectorAll(".crate-meter-fill")).toHaveLength(1);
     expect(screen.getByRole("meter", { name: "Movement" })).toHaveAttribute(
       "aria-valuenow",
       "0",
     );
+  });
+
+  it("places the previous marker at the previous value", () => {
+    const { container } = renderWithListenProviders(
+      <SoundProfileCard
+        profile={profile}
+        previousProfile={{
+          energy: 0.3,
+          danceability: 0,
+          valence: null,
+          bpm: null,
+        }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    const ticks = container.querySelectorAll<HTMLElement>(".crate-meter-limit");
+    expect(Array.from(ticks, (tick) => tick.style.left)).toEqual(["30%", "0%"]);
   });
 });

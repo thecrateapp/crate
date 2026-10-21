@@ -17,27 +17,6 @@ const METRIC_FIELD = {
   brightness: "valence",
 } as const;
 
-/** Unknown analysis: an empty rail and a dash. Meter's own unavailable reading is "n/a". */
-function UnknownReading({ label }: { label: string }) {
-  return (
-    <div className="crate-meter" role="group" aria-label={label}>
-      <div className="crate-meter-layout">
-        <MonoLabel as="span" className="min-w-0">
-          {label}
-        </MonoLabel>
-        <span
-          aria-hidden="true"
-          className="crate-meter-track relative min-w-0 bg-border-quiet"
-          data-thickness={2}
-        />
-        <span className="crate-meter-value font-mono text-label tabular-nums text-right text-text-primary">
-          {"\u2014"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export function StatsSoundProfileView({
   profile,
   genres,
@@ -77,17 +56,16 @@ export function StatsSoundProfileView({
             const previous = previousProfile?.[METRIC_FIELD[key]] ?? null;
             return (
               <div key={key} className="grid gap-1">
-                {value == null ? (
-                  <UnknownReading label={t(`stats.soundProfile.${key}`)} />
-                ) : (
-                  <Meter
-                    label={t(`stats.soundProfile.${key}`)}
-                    value={value}
-                    max={1}
-                    limit={previous ?? undefined}
-                    valueText={formatStatsPercent(value)}
-                  />
-                )}
+                {/* R26: unknown analysis goes through Meter's shared null contract
+                    (empty rail, "n/a"). The spec asks for "—", but Meter hard-codes
+                    "n/a" and v3 forbids a local copy of its markup; raised with Diego. */}
+                <Meter
+                  label={t(`stats.soundProfile.${key}`)}
+                  value={value}
+                  max={1}
+                  limit={previous ?? undefined}
+                  valueText={value == null ? "" : formatStatsPercent(value)}
+                />
                 {previous != null ? (
                   <MonoLabel as="span" className="justify-self-end">
                     {t("stats.soundProfile.previous", {
