@@ -2051,5 +2051,14 @@
   "player.equalizer.currentCurveOnly": "Zerbitzari honek uneko kurba soilik eskaintzen du.",
   "player.equalizer.presetPicker": "Aurrezarpenak",
   "player.equalizer.preset": "Aurrezarpena",
-  "stats.explorer.detailUnsupported": "Historia xehatua ez dago oraindik erabilgarri zerbitzari honetan."
+  "stats.explorer.detailUnsupported": "Historia xehatua ez dago oraindik erabilgarri zerbitzari honetan.",
+  "native.window.minimize": "Minimizatu leihoa",
+  "native.window.maximize": "Maximizatu edo leheneratu leihoa",
+  "native.window.close": "Itxi leihoa",
+  "native.logs.title": "Tauri erreprodukzio-erregistroa",
+  "native.logs.events": "{count, plural, one {Gertaera #} other {# gertaera}}",
+  "native.logs.clear": "Hustu",
+  "native.logs.hide": "Ezkutatu",
+  "native.logs.empty": "Oraindik ez dago erreprodukzio-gertaerarik.",
+  "native.logs.trigger": "Erregistroa · {count}"
 }

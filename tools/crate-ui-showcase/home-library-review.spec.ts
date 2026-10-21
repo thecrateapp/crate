@@ -19,7 +19,7 @@ for (const host of ["storybook", "standalone"] as const) {
       );
       await expect(
         page.getByRole("heading", { name: "Good evening, Alex" }),
-      ).toHaveCSS("font-family", /Bricolage/);
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
       for (const text of [
         "84 plays",
         "2 albums · 0 tracks",

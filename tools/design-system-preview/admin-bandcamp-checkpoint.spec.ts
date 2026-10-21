@@ -28,7 +28,7 @@ for (const width of [1440, 768, 390]) {
         await real
           .getByRole("heading", { level: 1 })
           .evaluate((element) => getComputedStyle(element).fontFamily),
-      ).toContain("Bricolage");
+      ).toContain("Bricolage Grotesque");
       const metric = real.locator(".crate-form-field").first();
       expect(
         await metric.evaluate((element) => {
@@ -48,12 +48,12 @@ for (const width of [1440, 768, 390]) {
         await metric
           .locator(":scope > :last-child")
           .evaluate((element) => getComputedStyle(element).fontFamily),
-      ).toContain("Bricolage");
+      ).toContain("Bricolage Grotesque");
       expect(
         await page
           .locator("body")
           .evaluate((element) => getComputedStyle(element).fontFamily),
-      ).toContain("Poppins");
+      ).toContain("IBM Plex Sans");
       await expect(real.locator("svg:not([data-admin-ux])")).toHaveCount(0);
       for (const button of await real.getByRole("button").all())
         expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);

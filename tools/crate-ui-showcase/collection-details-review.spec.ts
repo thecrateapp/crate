@@ -75,7 +75,7 @@ for (const host of ["storybook", "standalone"] as const) {
       );
       await expect(
         page.getByRole("heading", { name: "Night collection", exact: true }),
-      ).toHaveCSS("font-family", /Bricolage/, { timeout: 30000 });
+      ).toHaveCSS("font-family", /Bricolage Grotesque/, { timeout: 30000 });
       await checkFields(page);
       const cover = page
         .getByRole("row", { name: "Night music", exact: true })

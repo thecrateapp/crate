@@ -60,7 +60,7 @@ for (const host of ["storybook", "standalone"] as const) {
           name: "Night Drives",
           exact: true,
         });
-        await expect(source).toHaveCSS("font-family", /Poppins/);
+        await expect(source).toHaveCSS("font-family", /IBM Plex Sans/);
         await expect(source).toHaveCSS("text-transform", "none");
         await source.click();
         await expect(

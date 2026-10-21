@@ -38,7 +38,7 @@ for (const width of [390, 768, 1200]) {
           page.getByRole("searchbox", { name: "Search tracks", exact: true }),
         ]) {
           await expect(control).toHaveCSS("height", coarse ? "44px" : "40px");
-          await expect(control).toHaveCSS("font-family", /Poppins/);
+          await expect(control).toHaveCSS("font-family", /IBM Plex Sans/);
           await expect(control).toHaveCSS("font-size", "15px");
           await expect(control).toHaveCSS("line-height", "21px");
           await expect(control).toHaveCSS("font-weight", "400");
@@ -103,7 +103,7 @@ for (const width of [390, 768, 1200]) {
           expect(gap).toBeCloseTo(8, 1);
         }
         const value = page.getByRole("status", { name: "Library path" });
-        await expect(value).toHaveCSS("font-family", /Poppins/);
+        await expect(value).toHaveCSS("font-family", /IBM Plex Sans/);
         await expect(value).toHaveCSS("font-size", "15px");
         await expect(value).toHaveCSS("font-weight", "400");
         await expect(page.locator(".crate-readout")).toHaveCSS(

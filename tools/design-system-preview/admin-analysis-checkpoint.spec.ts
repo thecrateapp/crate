@@ -59,7 +59,7 @@ for (const width of [1440, 1299, 768, 390]) {
       ).toHaveCSS("font-family", /Bricolage Grotesque/);
       await expect(
         real.getByRole("button", { name: "Refresh", exact: true }),
-      ).toHaveCSS("font-family", /^Poppins/);
+      ).toHaveCSS("font-family", /^"IBM Plex Sans"/);
       for (const field of await real.locator(".crate-form-field").all()) {
         await expect(field.locator(":scope > :first-child")).toHaveCSS(
           "font-family",
@@ -75,7 +75,11 @@ for (const width of [1440, 1299, 768, 390]) {
           .filter((face) => face.status === "loaded")
           .map((face) => face.family),
       );
-      for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Poppins"])
+      for (const family of [
+        "Bricolage Grotesque",
+        "JetBrains Mono",
+        "IBM Plex Sans",
+      ])
         expect(loaded).toContain(family);
       await expect(
         real.getByRole("heading", { name: "Operator notes", exact: true }),

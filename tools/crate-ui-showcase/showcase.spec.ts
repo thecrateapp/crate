@@ -64,14 +64,14 @@ test("the catalogue is English and its chrome uses the Crate identity", async ({
   ).toBeVisible();
   await expect(page.locator("#storybook-sidebar-region")).toHaveCSS(
     "font-family",
-    /Poppins/,
+    /IBM Plex Sans/,
   );
   await expect(
     content.getByRole("heading", {
       name: "Crate UI — Design System",
       exact: true,
     }),
-  ).toHaveCSS("font-family", /Bricolage/);
+  ).toHaveCSS("font-family", /Bricolage Grotesque/);
   await expect(content.locator(".sbdocs-wrapper")).toHaveCSS(
     "background-color",
     "rgb(10, 10, 15)",
@@ -116,13 +116,13 @@ test("foundation typography samples load the declared Crate font faces", async (
     "/iframe.html?id=system-foundations--typography&viewMode=story",
   );
   await expect(
-    page.getByText("Poppins · body and controls", { exact: true }),
-  ).toHaveCSS("font-family", /Poppins/);
+    page.getByText("IBM Plex Sans · body and controls", { exact: true }),
+  ).toHaveCSS("font-family", /IBM Plex Sans/);
   await expect(
     page.getByText("Bricolage Grotesque · headings and numerals", {
       exact: true,
     }),
-  ).toHaveCSS("font-family", /Bricolage/);
+  ).toHaveCSS("font-family", /Bricolage Grotesque/);
   await expect(
     page.getByText("JetBrains Mono · labels and metadata", { exact: true }),
   ).toHaveCSS("font-family", /JetBrains/);
@@ -156,7 +156,7 @@ for (const width of [390, 1200])
     await expect(number).toBeVisible();
     expect(
       await number.evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
   });
 test("badge and filter stories retain geometry and keyboard behaviour", async ({
   page,

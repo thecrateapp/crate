@@ -17,6 +17,7 @@ describe("native upload file-drop transport", () => {
       // Tauri's default native interception suppresses HTML5 drops on Windows.
       // Linux replaces the whole windows array, so its override retains the same contract.
       expect(window.dragDropEnabled).toBe(false);
+      expect(window.backgroundThrottling).toBe("disabled");
     },
   );
 });

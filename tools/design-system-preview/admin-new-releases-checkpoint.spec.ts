@@ -28,12 +28,12 @@ for (const width of [1440, 768, 390]) {
       await root
         .getByRole("heading", { level: 1 })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     expect(
       await root
         .getByRole("textbox", { name: "Search releases" })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Poppins");
+    ).toContain("IBM Plex Sans");
     expect(
       await root
         .getByText("Release type", { exact: true })

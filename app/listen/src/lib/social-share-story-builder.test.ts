@@ -12,6 +12,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import {
+  buildSquarePostCard,
   resolveArtworkAuthHeaders,
   resolveCrateStoryComposition,
 } from "@/lib/social-share-story-builder";
@@ -170,5 +171,38 @@ describe("Instagram story subtitle", () => {
     expect(
       buildInstagramStorySubtitle({ ...album, kind: "artist", subtitle: "" }),
     ).toBe("Crate");
+  });
+});
+
+describe("share card typography", () => {
+  it("warms the shared variable body face for canvas exports, including extended Latin", async () => {
+    const previous = Object.getOwnPropertyDescriptor(document, "fonts");
+    const load = vi.fn().mockResolvedValue([]);
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: { load },
+    });
+    const context = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(null);
+    try {
+      await expect(
+        buildSquarePostCard({ kind: "album", title: "Björk", url: "/album/1" }),
+      ).rejects.toThrow("Canvas is not available");
+      expect(load.mock.calls.map(([font]) => font)).toEqual([
+        '600 16px "IBM Plex Sans"',
+        '700 16px "IBM Plex Sans"',
+        '800 16px "IBM Plex Sans"',
+      ]);
+      expect(
+        load.mock.calls.every(
+          ([, text]) => text.includes("ẞ") && text.includes("œ"),
+        ),
+      ).toBe(true);
+    } finally {
+      context.mockRestore();
+      if (previous) Object.defineProperty(document, "fonts", previous);
+      else Reflect.deleteProperty(document, "fonts");
+    }
   });
 });

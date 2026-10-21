@@ -31,7 +31,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { name: "Users", exact: true })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,

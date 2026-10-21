@@ -17,7 +17,7 @@ export const CRATE_STORY_STYLES = ["bento", "podium", "chart"] as const;
 export type CrateStoryStyle = (typeof CRATE_STORY_STYLES)[number];
 export const DEFAULT_CRATE_STORY_STYLE: CrateStoryStyle = "bento";
 
-const FONT_STACK = "Poppins, ui-sans-serif, system-ui";
+const FONT_STACK = '"IBM Plex Sans", ui-sans-serif, system-ui';
 const CARD_MARGIN = 72;
 
 export type CrateStoryComposition = "ranked-stack" | "coverflow-fan";

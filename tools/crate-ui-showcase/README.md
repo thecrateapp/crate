@@ -55,7 +55,7 @@ presentation. Keep the historical app/web@258bbaee pin; do not silently replace 
 
 The catalogue, examples and contracts are in English. Manager and docs use Storybook's supported
 theme API, mapped from `CRATE_IDENTITY_VARIABLES`: the same Crate surfaces, borders, cyan accents,
-Poppins and JetBrains Mono. Owned documentation headings use Bricolage Grotesque. Font files are
+IBM Plex Sans and JetBrains Mono. Owned documentation headings use Bricolage Grotesque. Font files are
 self-hosted. The native Storybook controls and navigation remain functional; there is no custom
 skin selector or CSS targeting internal manager selectors.
 

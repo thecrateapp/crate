@@ -300,7 +300,9 @@ describe("Music paths pages", () => {
       locale: "es",
     });
 
-    expect(screen.getByText("Rutas")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Rutas" }),
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("page-header")).getByText("2 canciones"),
     ).toBeInTheDocument();
@@ -312,7 +314,7 @@ describe("Music paths pages", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders path steps as track rows with distance meta, playing from the step", async () => {
+  it("renders path steps as track rows without a debug distance, playing from the step", async () => {
     const playAll = vi.fn();
     renderWithListenProviders(<PathDetail />, {
       route: "/paths/77",
@@ -322,7 +324,7 @@ describe("Music paths pages", () => {
 
     const row = screen.getByRole("row", { name: "Track Two" });
     expect(row).toHaveClass("track-row");
-    expect(screen.getByText("0.200")).toBeInTheDocument();
+    expect(screen.queryByText("0.200")).not.toBeInTheDocument();
 
     fireEvent.click(row);
     expect(playAll).toHaveBeenCalledWith(

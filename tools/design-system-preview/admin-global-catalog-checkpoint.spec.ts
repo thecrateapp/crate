@@ -26,7 +26,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { level: 1 })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     expect(
       await root
         .getByText("Artists", { exact: true })
@@ -36,7 +36,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("button", { name: "Refresh", exact: true })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Poppins");
+    ).toContain("IBM Plex Sans");
     expect(
       await root
         .getByText("sample-run-20261018", { exact: true })

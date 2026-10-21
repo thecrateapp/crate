@@ -2051,5 +2051,14 @@
   "player.equalizer.currentCurveOnly": "Ce serveur fournit uniquement la courbe actuelle.",
   "player.equalizer.presetPicker": "Préréglages",
   "player.equalizer.preset": "Préréglage",
-  "stats.explorer.detailUnsupported": "L’historique détaillé n’est pas encore disponible sur ce serveur."
+  "stats.explorer.detailUnsupported": "L’historique détaillé n’est pas encore disponible sur ce serveur.",
+  "native.window.minimize": "Réduire la fenêtre",
+  "native.window.maximize": "Agrandir ou restaurer la fenêtre",
+  "native.window.close": "Fermer la fenêtre",
+  "native.logs.title": "Journal de lecture Tauri",
+  "native.logs.events": "{count, plural, one {# événement} other {# événements}}",
+  "native.logs.clear": "Effacer",
+  "native.logs.hide": "Masquer",
+  "native.logs.empty": "Aucun événement de lecture pour le moment.",
+  "native.logs.trigger": "Journal · {count}"
 }

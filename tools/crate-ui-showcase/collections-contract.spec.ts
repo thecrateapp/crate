@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 for (const host of ["preview", "storybook"]) {
   for (const coarse of [false, true]) {
-    test.describe(`${host} track playback ${coarse ? "coarse" : "fine"}`, () => {
+    test.describe(`${host} track playback ${
+      coarse ? "coarse" : "fine"
+    }`, () => {
       test.use({ viewport: { width: 1100, height: 1000 }, hasTouch: coarse });
       test("keeps V2 cover/play proportions, white glyph, ring and independent actions", async ({
         page,
@@ -24,7 +26,7 @@ for (const host of ["preview", "storybook"]) {
             .evaluate((el) => getComputedStyle(el).color),
         );
         await expect(glyph.locator("svg")).toHaveAttribute("width", "18");
-          const cover = await row.locator(".crate-track-leading").boundingBox();
+        const cover = await row.locator(".crate-track-leading").boundingBox();
         expect(cover!.width).toBe(48);
         expect((await glyph.boundingBox())!.width).toBe(24);
         await row
@@ -133,7 +135,7 @@ for (const host of ["preview", "storybook"]) {
         );
         await expect(active.locator(".crate-entity-title")).toHaveCSS(
           "font-family",
-          /Poppins/,
+          /IBM Plex Sans/,
         );
         await expect(
           page.getByRole("link", { name: /Selected album/ }),

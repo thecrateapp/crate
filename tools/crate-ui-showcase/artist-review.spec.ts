@@ -107,7 +107,7 @@ for (const host of ["storybook", "standalone"] as const)
       const play = hero.getByRole("button", { name: "Play", exact: true });
       expect(
         await play.evaluate((element) => getComputedStyle(element).fontFamily),
-      ).toMatch(/Poppins/i);
+      ).toMatch(/IBM Plex Sans/i);
       await hero.getByLabel("Follow", { exact: true }).click();
       await expect(hero.getByText("Following", { exact: true })).toHaveCSS(
         "text-transform",

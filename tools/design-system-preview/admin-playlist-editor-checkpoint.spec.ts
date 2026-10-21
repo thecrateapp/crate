@@ -236,7 +236,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { name: "Costa de noche" })
         .evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     const chips = await root
       .locator("span.rounded-full.font-mono:visible")
       .evaluateAll((es) =>

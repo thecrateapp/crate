@@ -1,0 +1,372 @@
+{
+  "downloaded": "2026-10-21",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "families": [
+    {
+      "family": "Hubot Sans",
+      "cssFamily": "Review Hubot Sans",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Hubot+Sans:wght@200..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/github/hubot-sans/main/OFL.txt",
+      "files": [
+        {
+          "file": "hubot-sans/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/hubotsans/v5/pe0-MIiULYxOvxVLbVwhONyy6zb7yFM9V5G3ibfV-VoEvg.woff2",
+          "bytes": 18572,
+          "sha256": "9c8934da784691e6ec61b4853d9afa50f6b1a635a030728521114f0b4d387f02",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "hubot-sans/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/hubotsans/v5/pe0-MIiULYxOvxVLbVwhONyy6zb7yFM9V5G3ibfb-Vo.woff2",
+          "bytes": 48284,
+          "sha256": "bf14f3d03f7e62cf5039f85fc2f0bf4a8022b679ba5ca6f876fec0d73b175f66",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Mona Sans",
+      "cssFamily": "Review Mona Sans",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Mona+Sans:wght@200..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/github/mona-sans/main/OFL.txt",
+      "files": [
+        {
+          "file": "mona-sans/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/monasans/v4/o-0bIpQmx24alC5A4PNB6Ryti20_6n1iPHjc5aDdu2ui.woff2",
+          "bytes": 15524,
+          "sha256": "5adec652263260d219807b036bca9fe94ab6dc2ba6d30c0d45dc6a955dac270e",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "mona-sans/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/monasans/v4/o-0bIpQmx24alC5A4PNB6Ryti20_6n1iPHjc5a7duw.woff2",
+          "bytes": 39788,
+          "sha256": "a59061e38c5e7e6a00aaa6b6645a220c7d9c530991167f058cc0f8575f5d5844",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Saira",
+      "cssFamily": "Review Saira",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Saira:wght@100..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/Omnibus-Type/Saira/master/OFL.txt",
+      "files": [
+        {
+          "file": "saira/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/saira/v23/memjYa2wxmKQyPMrZX79wwYZQMhsyuSLhovSZSk.woff2",
+          "bytes": 25476,
+          "sha256": "cbdb7074cd38a4bf09bf34012dd3072bf34ccc6ad95a2ebf2ebf3eac9484edf1",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "saira/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/saira/v23/memjYa2wxmKQyPMrZX79wwYZQMhsyuSLiIvS.woff2",
+          "bytes": 32888,
+          "sha256": "7eb811eb14b2ee22e3fba942b25c6cd062ff050bde10d29af1a4e16f99712e17",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Anybody",
+      "cssFamily": "Review Anybody",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Anybody:wght@100..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/Etcetera-Type-Co/Anybody/master/OFL.txt",
+      "files": [
+        {
+          "file": "anybody/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/anybody/v13/VuJudNvK2Ib2ppdWYq311GH32hxIv0sd5iDlWdTKRA.woff2",
+          "bytes": 22208,
+          "sha256": "b6400adf4dc8954746df1984a63d430ef26d901a2e9b1c47dfcf39fd8f4f6eb8",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "anybody/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/anybody/v13/VuJudNvK2Ib2ppdWYq311GH32hxIv0sd5iDrWdQ.woff2",
+          "bytes": 24048,
+          "sha256": "3df452b46907169ba89172a1f1a9bdd3bba9b0f1a303661c2addbfc5c7ee9ec7",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Spline Sans",
+      "cssFamily": "Review Spline Sans",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300..700&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/SorkinType/SplineSans/main/OFL.txt",
+      "files": [
+        {
+          "file": "spline-sans/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/splinesans/v16/_6_7ED73Uf-2WfU2LzycEbAsmC0PSQ.woff2",
+          "bytes": 21112,
+          "sha256": "2c2e7ddfe8d6b0b445d29f0f73a8fe8fe2893d5c561fbe98644eda47a9a20f7f",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "spline-sans/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/splinesans/v16/_6_7ED73Uf-2WfU2LzycEbAimC0.woff2",
+          "bytes": 57984,
+          "sha256": "64513365c2d82a4ba56470e830577247342ffbf54ed8dc8df011957db5d65a9e",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Tektur",
+      "cssFamily": "Review Tektur",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/tektur/OFL.txt",
+      "files": [
+        {
+          "file": "tektur/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/tektur/v6/XoH62YHtS7q969kXCjzlV0aSkS_o8OacszWcvGHE.woff2",
+          "bytes": 14704,
+          "sha256": "a6d4d0a825ef9ea09774cf487ca0a6181c6d4b33aeb4d3708d52d6c98526fbd8",
+          "weight": "400 900",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "tektur/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/tektur/v6/XoH62YHtS7q969kXCjzlV0aSkS_o8OacszucvA.woff2",
+          "bytes": 12148,
+          "sha256": "2c4e3f0723427b12e30b10fd233c362244963124ecbdd3a3cba40dcf78c3f22e",
+          "weight": "400 900",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Golos Text",
+      "cssFamily": "Review Golos Text",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/golostext/OFL.txt",
+      "files": [
+        {
+          "file": "golos-text/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/golostext/v7/q5uCsoe9Lv5t7Meb31EcEx18hLxR.woff2",
+          "bytes": 19180,
+          "sha256": "05befabe4813f41238ce6ea4f5ecd6b758591e9ef2f303a9932bff68ba66dc66",
+          "weight": "400 900",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "golos-text/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/golostext/v7/q5uCsoe9Lv5t7Meb31EcExN8hA.woff2",
+          "bytes": 37916,
+          "sha256": "9a69d0aa4734c4022224c002a3d944a702e0204972a49d892789f5668b922c2a",
+          "weight": "400 900",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Chakra Petch",
+      "cssFamily": "Review Chakra Petch",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/chakrapetch/OFL.txt",
+      "files": [
+        {
+          "file": "chakra-petch/latin-ext-300.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeNIh1SZ_F7AY.woff2",
+          "bytes": 9136,
+          "sha256": "57cc3e4278dd298bd2e130d2d7d8f25dcc6bbb482b497ff671eae940aad15e2d",
+          "weight": "300",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "chakra-petch/latin-300.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeNIh1R5_F.woff2",
+          "bytes": 10008,
+          "sha256": "a02dd3805b4144162914dff96a638e79da5950232d6a22aecfc2b100b375469d",
+          "weight": "300",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        },
+        {
+          "file": "chakra-petch/latin-ext-400.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIf6MapbsEk7TDLdtEz1BwkWkapgeL4.woff2",
+          "bytes": 8860,
+          "sha256": "df0ee4f9fdbffea8f81c03d950be8f78a606ad9fa8a94252202faaf95bd6d9ec",
+          "weight": "400",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "chakra-petch/latin-400.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIf6MapbsEk7TDLdtEz1BwkWn6pg.woff2",
+          "bytes": 9756,
+          "sha256": "7d75be85dd1627e27ec151e9a3701e661bc4f8c2a93611bdd92f3a05d6bbd942",
+          "weight": "400",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        },
+        {
+          "file": "chakra-petch/latin-ext-500.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkebIl1SZ_F7AY.woff2",
+          "bytes": 9028,
+          "sha256": "5e6545c4da21734334bcf06853ef74df582737ae23682f8278fe9f1ba70908cc",
+          "weight": "500",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "chakra-petch/latin-500.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkebIl1R5_F.woff2",
+          "bytes": 9956,
+          "sha256": "36ad966cb653de70ba37355c41003b02de8940b2df6cbcd46480a6ad8cadd65d",
+          "weight": "500",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        },
+        {
+          "file": "chakra-petch/latin-ext-600.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeQI51SZ_F7AY.woff2",
+          "bytes": 9056,
+          "sha256": "eb128c93678bd6b08fc3f0a7b5a44e73a6a4e374d0f449f9d26cf8ad48964d40",
+          "weight": "600",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "chakra-petch/latin-600.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeQI51R5_F.woff2",
+          "bytes": 9968,
+          "sha256": "a5888696e9eb1b4bbbecc8eb3922b8369f49d4bddb72263e033cbd17f399be76",
+          "weight": "600",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        },
+        {
+          "file": "chakra-petch/latin-ext-700.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeJI91SZ_F7AY.woff2",
+          "bytes": 9068,
+          "sha256": "3b237255d05e401601c1c566a5d65aeb1a65c65eea514e2ec0130cc9de0b5a96",
+          "weight": "700",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "chakra-petch/latin-700.woff2",
+          "url": "https://fonts.gstatic.com/s/chakrapetch/v13/cIflMapbsEk7TDLdtEz1BwkeJI91R5_F.woff2",
+          "bytes": 9900,
+          "sha256": "ce5095dc1cb200aaa939e38067a0677018d10e9f26ec38cdcf1557ac524fc775",
+          "weight": "700",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "IBM Plex Sans",
+      "cssFamily": "Review IBM Plex Sans",
+      "cssSource": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@100..700&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/ibmplexsans/OFL.txt",
+      "files": [
+        {
+          "file": "ibm-plex-sans/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxQKYbABA.woff2",
+          "bytes": 30964,
+          "sha256": "d160e20920ae4d6556518d352d3af27a74e9b0de3d8fe17b1c1044fc75aa2f81",
+          "weight": "100 700",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "ibm-plex-sans/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYY.woff2",
+          "bytes": 45712,
+          "sha256": "e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470",
+          "weight": "100 700",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Oxanium",
+      "cssFamily": "Review Oxanium",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/oxanium/OFL.txt",
+      "files": [
+        {
+          "file": "oxanium/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/oxanium/v21/RrQQboN_4yJ0JmiMe2zE0YBB.woff2",
+          "bytes": 7824,
+          "sha256": "75b9254b2437310f3baa788ea6d005d35256cb3e98b2b723fea702f77cd31064",
+          "weight": "200 800",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "oxanium/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/oxanium/v21/RrQQboN_4yJ0JmiMe2LE0Q.woff2",
+          "bytes": 14044,
+          "sha256": "3aa555c528430aab19bb2693dc206bab557767d3082dba66400784c9cc90cfbb",
+          "weight": "200 800",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Hanken Grotesk",
+      "cssFamily": "Review Hanken Grotesk",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@100..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/hankengrotesk/OFL.txt",
+      "files": [
+        {
+          "file": "hanken-grotesk/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/hankengrotesk/v12/ieVn2YZDLWuGJpnzaiwFXS9tYtpT59CjCQ.woff2",
+          "bytes": 19588,
+          "sha256": "768af2923e0ab1549f1dfba0a5c8ea749c4c01f01d8e77ffaf7fcd12f57a0a24",
+          "weight": "100 900",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "hanken-grotesk/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/hankengrotesk/v12/ieVn2YZDLWuGJpnzaiwFXS9tYtpd59A.woff2",
+          "bytes": 34704,
+          "sha256": "e9201eddf1d41d0b62253295d869ce3cf65768f7102b797f02c7f8c876b4a9d5",
+          "weight": "100 900",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Unbounded",
+      "cssFamily": "Review Unbounded",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Unbounded:wght@200..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/unbounded/OFL.txt",
+      "files": [
+        {
+          "file": "unbounded/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/unbounded/v12/Yq6W-LOTXCb04q32xlpwtcZfrxE.woff2",
+          "bytes": 118348,
+          "sha256": "845e1c9fe2e9a7bfbedfeb447fbeba4bc1b5ecd6246277910ccdaad35a7a532c",
+          "weight": "200 900",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "unbounded/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/unbounded/v12/Yq6W-LOTXCb04q32xlpwu8Zf.woff2",
+          "bytes": 50904,
+          "sha256": "22f9b928aa3928a896340422b54d690fbb5875c30eae4c106f029c61f2289fd6",
+          "weight": "200 900",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    {
+      "family": "Onest",
+      "cssFamily": "Review Onest",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Onest:wght@100..900&display=swap",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/onest/OFL.txt",
+      "files": [
+        {
+          "file": "onest/latin-ext.woff2",
+          "url": "https://fonts.gstatic.com/s/onest/v11/gNMKW3F-SZuj7xmR-HY6EQ.woff2",
+          "bytes": 28452,
+          "sha256": "14e7d3079b75860e2ab50efc6c318c398fdb46ede9b56e625f12ae70a3c5d9a4",
+          "weight": "100 900",
+          "unicodeRange": "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF"
+        },
+        {
+          "file": "onest/latin.woff2",
+          "url": "https://fonts.gstatic.com/s/onest/v11/gNMKW3F-SZuj7xmf-HY.woff2",
+          "bytes": 33760,
+          "sha256": "052df74533250c2e0ca0c4bdd32de594e107d99c1648e63820ef9c6142067828",
+          "weight": "100 900",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    }
+  ]
+}

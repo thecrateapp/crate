@@ -484,7 +484,6 @@ actualizados con fuentes reales; regla registrada en shared/AGENTS.94Listen,92sh
 52Desktop y12browser verdes; tipos, lint, i18n, builds/catálogo correctos. Se mantienen las tres
 instancias. Esta aprobación visual no autoriza un nuevo commit; Comunidad sigue sin publicar.
 
-
 Última enmienda local1BD: enlaces MonoLabel y opciones de ContextMenu pasan a accent al hover/
 foco, sin fondo. SectionActionButton comparte VIEW ALL, Show more y More/Less con dot y sin
 sangría; conserva44px y callbacks. PlayerBar mantiene Playing from en MonoLabel y ahora guarda/
@@ -492,7 +491,6 @@ restaura su origen junto a la cola, sin autoplay. Storybook, preview aislado de 
 de artista actualizados.72Listen,101shared,10Admin,52Desktop y12browser relevantes verdes;
 tipos, lint, builds y catálogo correctos. Tres servicios activos; sigue pendiente de revisión,
 sin commit/push. Evidencia y límites en el plan de Comunidad.
-
 
 ### Comunidad publicada;1BD Compartir e importaciones en revisión local
 
@@ -593,7 +591,6 @@ Meter (columna de lectura max-content, mínima5ch) y se completa su entrada, doc
 catálogo. Dos consumidores reales conservados: Listen Offline/Stats y Admin SystemHealth. Sin
 reparaciones CSS en callers ni cambios en el mockup histórico. Sigue sin commit para revisión.
 
-
 Cierre local de las enmiendas1BD Offline/Bandcamp: la revisión fresca de portadas detectó cuatro
 hallazgos importantes, resueltos en una única pasada TDD: rutas relativas en webviews nativas,
 decodificación previa/evicción de imágenes corruptas, invalidación por perfil/asset y Meter a704px
@@ -612,7 +609,6 @@ JSinicial205131/307200bytes gzip, avisos existentes de chunks grandes. Capturas 
 instancias; HEAD/origin515bbb3b, índice vacío. Parada para revisión sin commit/push. QA física de
 iOS/Android/Tauri sigue explícitamente pendiente; no mutaciones ni importaciones en producción.
 
-
 Enmienda final Settings1BD: Section expone `ruled`, ya existente en InstrumentPanel. La primera
 sección visible de cada pestaña recibe false y las líneas internas se conservan; Connections
 respeta el gate de Connect y empieza en OpenSubsonic sin línea cuando no está habilitado.
@@ -624,7 +620,6 @@ Verificación final de la regla Settings:119tests Listen/19archivos y54Desktop/9
 Listen/Desktop/Storybook, lint17archivos, catálogo y tres builds/bundle correctos. Inspección real
 confirma border0px en Offline y portada local visible. HEAD/origin515bbb3b, índice vacío.
 
-
 Diego aprueba el cierre1BD Offline y sus enmiendas (portadas, Bandcamp y regla opcional de
 Settings) y autoriza commit/push. Siguiente lote anunciado antes de empezar:1BE Stats y Crate
 Digging, composición de métricas/listas/lecturas/estados y narrativa editorial con vistas reales.
@@ -632,7 +627,6 @@ Se conservan periodos, alcance propio/global/usuario, privacidad, datos horarios
 Lyrics/Info/output/targets/Tauri quedan para siguientes lotes internos1BE; sin nuevos instrumentos
 H3 ni cambios de protocolo. Storybook y preview pequeño, tres servicios activos y parada para
 revisión antes del próximo commit.
-
 
 1BD publicado como295f283a. Implementación local1BE Stats/Digging: vistas reales de cabecera,
 estados, resúmenes, artista/ranking/highlights, perfil sonoro y tarjetas de cierre separadas de
@@ -813,3 +807,37 @@ bloque `snapshot`).
 entrega 1,2 s), arrastre táctil para explorar el heatmap, tarea de backfill "quiet" (no hay
 mecanismo de silencio; hoy notifica) y texto localizado para el "n/a" de `Meter`. QA física
 nativa/AT pendiente.
+
+## Cierre web y primer corte nativo · 2026-10-21
+
+El cierre de datos TrackRow y reconciliación de Stats quedó aprobado, commiteado y
+subido en `85a05ac8` (`feat/crate_v3`). El siguiente corte mantiene la shell Tauri:
+barra Linux real documentada, mismos controles y colocación GNOME, diagnóstico DEV
+compuesto con primitivas canónicas, suscripción acotada a Tauri DEV y cleanup/foco.
+Se conserva el contrato de ventanas tanto en base como en el override Linux.
+
+Capacitor añade cobertura de Atrás, teclado iOS y viewport, además de una escena
+aislada que compone las vistas móviles reales con valores de entorno simulados.
+El build Linux debug por el wrapper Tauri, Rust tests y bundle/sync Capacitor pasan;
+esto no certifica QA física ni distribución de instaladores. Estado y límites en
+`tools/crate-ui-showcase/LISTEN_NATIVE_SHELLS.md`; preview
+`review-1be-native-chrome.html`, story `reviews-1be-native-chrome--complete`.
+
+La enmienda de Paths elimina el enlace de retorno de la cabecera normal y su fila
+reservada; el contenido empieza por el título. La vista compartida por los dos
+previews refleja el mismo cambio. El usuario ha pedido además una propuesta de
+fuentes para sustituir Poppins/Bricolage, conservando JetBrains Mono; se investiga
+sin aplicar fuentes globalmente. El nuevo corte queda sin commit para revisión.
+
+## 2026-10-21 — Cierre nativo y tipografía aprobados; commit/push autorizados
+
+Diego confirma Bricolage Grotesque para títulos, IBM Plex Sans para cuerpo y JetBrains Mono
+para los roles técnicos existentes, y autoriza commit/push de todo el lote pendiente: shell
+Linux, diagnóstico Tauri DEV, pruebas Capacitor/Paths, decisión tipográfica y comparadores.
+No autoriza merge a main ni despliegue en este turno.
+
+La revisión de integración encuentra una colisión de Alembic: la `109` de Stats de esta rama
+y la `109` de Smart Mix de `origin/main` son revisiones diferentes con el mismo identificador.
+Antes del despliegue hay que integrar main, reconciliar la migración, validar el SHA resultante
+y construir su release. El inventario concreto de gates web/nativos queda en
+[Listen V3 release readiness](../testing/2026-10-21-listen-v3-release-readiness.md).

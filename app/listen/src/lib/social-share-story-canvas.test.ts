@@ -15,7 +15,7 @@ import {
 } from "./social-share-story-canvas";
 
 interface Recorded {
-  texts: { text: string; y: number }[];
+  texts: { text: string; y: number; font: string }[];
   images: number;
 }
 
@@ -25,7 +25,7 @@ function fakeContext(): [CanvasRenderingContext2D, Recorded] {
   const fontSize = () => Number(/(\d+)px/.exec(String(state.font))?.[1] ?? 10);
   const methods: Record<string, unknown> = {
     fillText: (text: string, _x: number, y: number) =>
-      recorded.texts.push({ text, y }),
+      recorded.texts.push({ text, y, font: String(state.font) }),
     drawImage: () => {
       recorded.images += 1;
     },
@@ -96,6 +96,9 @@ describe("crate story styles", () => {
         false,
       );
       expect(texts).toContain("Best of 2026");
+      expect(
+        recorded.texts.every(({ font }) => font.includes('"IBM Plex Sans"')),
+      ).toBe(true);
       expect(
         recorded.texts
           .filter(({ text }) => !ranks.includes(text))

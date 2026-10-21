@@ -28,7 +28,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { level: 1 })
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     expect(
       await root
         .getByText("librarian", { exact: true })
@@ -41,7 +41,7 @@ for (const width of [1440, 768, 390])
           { exact: true },
         )
         .evaluate((el) => getComputedStyle(el).fontFamily),
-    ).toContain("Poppins");
+    ).toContain("IBM Plex Sans");
     await expect(
       root.getByText("3 capabilities", { exact: true }),
     ).toBeVisible();

@@ -53,7 +53,7 @@ for (const width of [1440, 768, 390])
         name: "Refresh metrics",
         exact: true,
       });
-      await expect(refresh).toHaveCSS("font-family", /^Poppins/);
+      await expect(refresh).toHaveCSS("font-family", /^"IBM Plex Sans"/);
       await expect(real.locator("svg.lucide")).toHaveCount(1);
       await expect(
         real.locator('svg[data-admin-ux="header-refresh-metrics"]'),

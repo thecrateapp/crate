@@ -2051,5 +2051,14 @@
   "player.equalizer.currentCurveOnly": "Este servidor solo proporciona la curva actual.",
   "player.equalizer.presetPicker": "Preajustes",
   "player.equalizer.preset": "Preajuste",
-  "stats.explorer.detailUnsupported": "El historial detallado aún no está disponible en este servidor."
+  "stats.explorer.detailUnsupported": "El historial detallado aún no está disponible en este servidor.",
+  "native.window.minimize": "Minimizar ventana",
+  "native.window.maximize": "Maximizar o restaurar ventana",
+  "native.window.close": "Cerrar ventana",
+  "native.logs.title": "Registro de reproducción de Tauri",
+  "native.logs.events": "{count, plural, one {# evento} other {# eventos}}",
+  "native.logs.clear": "Vaciar",
+  "native.logs.hide": "Ocultar",
+  "native.logs.empty": "Aún no hay eventos de reproducción.",
+  "native.logs.trigger": "Registro · {count}"
 }

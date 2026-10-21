@@ -2051,5 +2051,14 @@
   "player.equalizer.currentCurveOnly": "Dieser Server stellt nur die aktuelle Kurve bereit.",
   "player.equalizer.presetPicker": "Voreinstellungen",
   "player.equalizer.preset": "Voreinstellung",
-  "stats.explorer.detailUnsupported": "Der detaillierte Verlauf ist auf diesem Server noch nicht verfügbar."
+  "stats.explorer.detailUnsupported": "Der detaillierte Verlauf ist auf diesem Server noch nicht verfügbar.",
+  "native.window.minimize": "Fenster minimieren",
+  "native.window.maximize": "Fenster maximieren oder wiederherstellen",
+  "native.window.close": "Fenster schließen",
+  "native.logs.title": "Tauri-Wiedergabeprotokoll",
+  "native.logs.events": "{count, plural, one {# Ereignis} other {# Ereignisse}}",
+  "native.logs.clear": "Leeren",
+  "native.logs.hide": "Ausblenden",
+  "native.logs.empty": "Noch keine Wiedergabeereignisse.",
+  "native.logs.trigger": "Protokoll · {count}"
 }

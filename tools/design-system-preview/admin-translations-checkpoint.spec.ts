@@ -55,7 +55,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { level: 1 })
         .evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     expect(
       await root
         .getByText("1 draft", { exact: true })
@@ -66,7 +66,7 @@ for (const width of [1440, 768, 390])
         .locator("p")
         .first()
         .evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("Poppins");
+    ).toContain("IBM Plex Sans");
     await root
       .getByRole("tab", { name: "Bundles", exact: true })
       .press("Enter");

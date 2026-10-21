@@ -50,7 +50,7 @@ for (const width of [1440, 768, 390])
       await root
         .getByRole("heading", { name: "Upcoming", exact: true })
         .evaluate((e) => getComputedStyle(e).fontFamily),
-    ).toContain("Bricolage");
+    ).toContain("Bricolage Grotesque");
     await gaps(root);
     expect(
       await page.evaluate(

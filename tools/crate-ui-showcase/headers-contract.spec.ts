@@ -33,14 +33,14 @@ for (const host of ["preview", "storybook"]) {
             name: "Costa de noche",
             exact: true,
           });
-          await expect(title).toHaveCSS("font-family", /Bricolage/);
+          await expect(title).toHaveCSS("font-family", /Bricolage Grotesque/);
           await expect(title).toHaveCSS("font-size", "30px");
           await expect(title).toHaveCSS("font-weight", "600");
           await expect(
             pageGroup.getByText(
               "A playlist keeps its identity alongside compact actions.",
             ),
-          ).toHaveCSS("font-family", /Poppins/);
+          ).toHaveCSS("font-family", /IBM Plex Sans/);
           await expect(pageGroup.getByText("smart", { exact: true })).toHaveCSS(
             "text-transform",
             "none",
@@ -103,7 +103,7 @@ for (const host of ["preview", "storybook"]) {
           const section = page.getByRole("region", { name: "Section headers" });
           await expect(
             section.getByRole("heading", { name: "Recent albums" }),
-          ).toHaveCSS("font-family", /Bricolage/);
+          ).toHaveCSS("font-family", /Bricolage Grotesque/);
           await expect(
             section.getByRole("heading", { name: "Recent albums" }),
           ).toHaveCSS("font-size", "18px");
@@ -121,7 +121,7 @@ for (const host of ["preview", "storybook"]) {
           ])
             await expect(
               page.getByRole("heading", { name, exact: true }),
-            ).toHaveCSS("font-family", /Bricolage/);
+            ).toHaveCSS("font-family", /Bricolage Grotesque/);
           const longHero = page
             .getByRole("region", { name: "Compact media hero" })
             .getByTestId("page-hero");
@@ -288,7 +288,7 @@ test("header body roles follow the existing native font variable without changin
   ).toHaveCSS("font-family", "system-ui");
   await expect(
     page.getByRole("heading", { name: "Costa de noche", exact: true }),
-  ).toHaveCSS("font-family", /Bricolage/);
+  ).toHaveCSS("font-family", /Bricolage Grotesque/);
   await expect(page.getByTestId("hero-action-bar")).toHaveCSS(
     "font-family",
     "system-ui",

@@ -1,0 +1,48 @@
+@import "../../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../../app/shared/fonts/poppins.css";
+@import "../assets/font-pairing/fonts.css";
+
+/* Explicit font experiment, scoped to samples. Component geometry, weights,
+   tracking, colors and the JetBrains Mono role keep their production values. */
+.font-pairing-sample {
+  font-family: var(--font-brand), system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="current"] {
+  --font-brand: "Poppins";
+  --font-display-stack: "Bricolage Grotesque", Poppins, system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="hubot-mona"] {
+  --font-brand: "Review Mona Sans";
+  --font-display-stack: "Review Hubot Sans", system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="saira"] {
+  --font-brand: "Review Saira";
+  --font-display-stack: "Review Saira", system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="anybody-spline"] {
+  --font-brand: "Review Spline Sans";
+  --font-display-stack: "Review Anybody", system-ui, sans-serif;
+}
+
+.font-pairing-sample[data-font-pairing="tektur-golos"] {
+  --font-brand: "Review Golos Text";
+  --font-display-stack: "Review Tektur", system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="chakra-plex"] {
+  --font-brand: "Review IBM Plex Sans";
+  --font-display-stack: "Review Chakra Petch", system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="oxanium-hanken"] {
+  --font-brand: "Review Hanken Grotesk";
+  --font-display-stack: "Review Oxanium", system-ui, sans-serif;
+}
+.font-pairing-sample[data-font-pairing="unbounded-onest"] {
+  --font-brand: "Review Onest";
+  --font-display-stack: "Review Unbounded", system-ui, sans-serif;
+}
+
+.font-pairing-sample[data-font-pairing="bricolage-plex"] {
+  --font-brand: "Review IBM Plex Sans";
+  --font-display-stack: "Bricolage Grotesque", "Review IBM Plex Sans", system-ui,
+    sans-serif;
+}

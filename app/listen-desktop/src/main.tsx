@@ -1,4 +1,3 @@
-import "../../shared/fonts/poppins.css";
 import "../../listen/src/index.css";
 import "./linux-theme.css";
 
@@ -57,16 +56,14 @@ async function bootstrapDesktopApp(): Promise<void> {
   void primeOfflineRuntimeProfile();
   startTauriOAuthRuntime();
   createRoot(root).render(
-    <>
+    <I18nProvider>
       {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
       {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
       <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
-        <I18nProvider>
-          <App />
-        </I18nProvider>
+        <App />
         <Toaster {...toasterConfig} theme="dark" position="bottom-center" />
       </HashRouter>
-    </>,
+    </I18nProvider>,
   );
 }
 

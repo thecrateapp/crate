@@ -48,7 +48,7 @@ for (const host of ["storybook", "standalone"] as const)
       await expect(context).toHaveCSS("text-transform", "uppercase");
       await expect(
         dialog.getByRole("heading", { name: "Night Music" }),
-      ).toHaveCSS("font-family", /Bricolage/);
+      ).toHaveCSS("font-family", /Bricolage Grotesque/);
       const whatsapp = dialog.getByRole("button", {
         name: "WhatsApp",
         exact: true,

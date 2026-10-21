@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { BackLink, PageHeader } from "@crate/ui/domain/navigation";
+import { PageHeader } from "@crate/ui/domain/navigation";
 import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -27,7 +27,6 @@ export function PathDetailHeaderView({
   return (
     <PageHeader
       title={name}
-      back={<BackLink to="/paths" label={t("paths.back")} />}
       meta={
         <MonoLabel
           meta={[origin, destination, t("common.trackCountLabel", { count })]}

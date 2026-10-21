@@ -3455,6 +3455,42 @@
     "sourceHash": "sha256:f0b591275e13f065f9dbd4045bbb0f968e01f1b349de2739015c201661414493",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "native.logs.clear": {
+    "sourceHash": "sha256:2442eae4dc7431eac790bcde338edc2be4f9431ada05fed33c40156e9ba34377",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.logs.empty": {
+    "sourceHash": "sha256:d94a4bdab713159acbda901abb1fe527b80eabce702390155d35990fbed657c1",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.logs.events": {
+    "sourceHash": "sha256:ebd520cedcc89ee9dccd8d516f657318d0d7f6a5be536ee452bb3e46ca3de6b9",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.logs.hide": {
+    "sourceHash": "sha256:fb24a8acfc19ce15aab9e13ced9aed714bd26a7214d4e0f242401e25412d0c2f",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.logs.title": {
+    "sourceHash": "sha256:584c1c07a6a03ab872df2d62d2a52b4dca757128cf642d8fe205e2a258f52943",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.logs.trigger": {
+    "sourceHash": "sha256:51d19aeabb73416c91dd3a039d58ce862f9e2e3049d5d3589c6f85fa0ed15544",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.window.close": {
+    "sourceHash": "sha256:187f16812f85f12a6aa6d4e84cb28472dfd8327f906c01b50832e1c8335a9e9a",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.window.maximize": {
+    "sourceHash": "sha256:b2d4fbff9c839e1cf51ef1d34dd873efe5e407bdf0b08742ffe5adfdddd1e71c",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
+  "native.window.minimize": {
+    "sourceHash": "sha256:1ece59ca883d5c841759a6a18c6fd239cc07d82af4170c58fec76bb1a277d930",
+    "reviewedAt": "2026-10-21T14:47:28.529Z"
+  },
   "nav.collection": {
     "sourceHash": "sha256:1737434b047290ec75c24eb0c5dd576c944d9c690bde8775d348473041e68de6",
     "reviewedAt": "2026-07-07T15:39:22.141Z"

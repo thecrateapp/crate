@@ -11,7 +11,7 @@ import {
   isOfflineMediaCacheName,
   primeOfflineRuntimeProfile,
 } from "./lib/offline";
-import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
+import { shouldRegisterServiceWorker } from "./lib/platform";
 import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
@@ -52,8 +52,6 @@ async function disableDevServiceWorker() {
   }
 }
 
-const isCapacitorBuild = import.meta.env.MODE === "capacitor";
-
 function ListenToaster() {
   return (
     <Toaster
@@ -65,13 +63,6 @@ function ListenToaster() {
       }}
     />
   );
-}
-
-// Load Poppins only on web — iOS/Android use system fonts (San
-// Francisco / Roboto) for a native feel. The mode guard is build-time
-// constant, so Vite drops the font chunk from Capacitor bundles.
-if (!isCapacitorBuild && !usesMobileShell) {
-  import("../../shared/fonts/poppins.css");
 }
 
 function renderApp(): void {

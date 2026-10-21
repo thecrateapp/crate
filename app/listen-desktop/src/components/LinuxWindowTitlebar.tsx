@@ -1,35 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, Square, X, type LucideIcon } from "lucide-react";
-
-type WindowControl = "minimize" | "maximize" | "close";
-
-interface WindowButtonLayout {
-  left: WindowControl[];
-  right: WindowControl[];
-}
+import { useTranslation } from "react-i18next";
+import {
+  LinuxWindowTitlebarView,
+  type WindowButtonLayout,
+  type WindowControl,
+} from "./LinuxWindowTitlebarView";
 
 const DEFAULT_BUTTON_LAYOUT: WindowButtonLayout = {
   left: [],
   right: ["minimize", "maximize", "close"],
-};
-
-const WINDOW_CONTROLS: Record<
-  WindowControl,
-  { label: string; Icon: LucideIcon }
-> = {
-  minimize: {
-    label: "Minimize window",
-    Icon: Minus,
-  },
-  maximize: {
-    label: "Maximize or restore window",
-    Icon: Square,
-  },
-  close: {
-    label: "Close window",
-    Icon: X,
-  },
 };
 
 const WINDOW_BUTTON_LAYOUT_ATTRIBUTE = "data-crate-linux-window-button-layout";
@@ -39,6 +19,7 @@ type WindowSizeActions = Pick<
 >;
 
 export function LinuxWindowTitlebar() {
+  const { t } = useTranslation();
   const currentWindow = useMemo(() => getCurrentWindow(), []);
   const [layout, setLayout] = useState(readWindowButtonLayout);
   const windowActionInProgressRef = useRef(false);
@@ -89,6 +70,9 @@ export function LinuxWindowTitlebar() {
         } else {
           unlistenResize = unlisten;
         }
+      })
+      .catch(() => {
+        // The compositor can reject resize subscriptions while a window closes.
       });
 
     const observer = new MutationObserver(() => {
@@ -108,32 +92,34 @@ export function LinuxWindowTitlebar() {
   }, [currentWindow]);
 
   return (
-    <div className="listen-desktop-window-titlebar fixed inset-x-0 top-0 flex h-9 shrink-0 items-center border-b border-border-quiet bg-surface-canvas/82 text-text-secondary backdrop-blur-sm">
-      <WindowControls
-        controls={layout.left}
-        window={currentWindow}
-        onToggleMaximize={toggleWindowSize}
-      />
-      <div
-        aria-hidden="true"
-        className="relative h-full min-w-0 flex-1"
-        onMouseDown={(event) => {
+    <div className="listen-desktop-window-titlebar fixed inset-x-0 top-0">
+      <LinuxWindowTitlebarView
+        layout={layout}
+        labels={{
+          minimize: t("native.window.minimize"),
+          maximize: t("native.window.maximize"),
+          close: t("native.window.close"),
+        }}
+        onAction={(control) => {
+          const action =
+            control === "maximize"
+              ? toggleWindowSize
+              : control === "minimize"
+                ? () => currentWindow.minimize()
+                : () => currentWindow.close();
+          void action().catch(() => {
+            // A window action may race the compositor closing this webview.
+          });
+        }}
+        onDrag={(event) => {
           if (event.buttons !== 1) return;
           if (event.detail === 2) {
             event.preventDefault();
             void toggleWindowSize();
           } else {
-            void currentWindow.startDragging();
+            void currentWindow.startDragging().catch(() => {});
           }
         }}
-      />
-      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 select-none text-xs font-medium text-text-secondary">
-        Crate
-      </span>
-      <WindowControls
-        controls={layout.right}
-        window={currentWindow}
-        onToggleMaximize={toggleWindowSize}
       />
     </div>
   );
@@ -151,53 +137,6 @@ export async function toggleLinuxWindowSize(
     await currentWindow.maximize();
     setWindowMaximizedAttribute(true);
   }
-}
-
-function WindowControls({
-  controls,
-  window,
-  onToggleMaximize,
-}: {
-  controls: WindowControl[];
-  window: ReturnType<typeof getCurrentWindow>;
-  onToggleMaximize: () => Promise<void>;
-}) {
-  if (!controls.length) return null;
-
-  return (
-    <div className="relative z-10 flex h-full shrink-0 items-center px-1">
-      {controls.map((control) => {
-        const { label, Icon } = WINDOW_CONTROLS[control];
-        const runAction = {
-          minimize: () => window.minimize(),
-          maximize: onToggleMaximize,
-          close: () => window.close(),
-        }[control];
-
-        return (
-          <button
-            key={control}
-            aria-label={label}
-            className="group flex h-full w-7 items-center justify-center"
-            onClick={() => void runAction()}
-            title={label}
-            type="button"
-          >
-            <span
-              className="listen-desktop-window-control-dot relative grid size-[13px] place-items-center rounded-full"
-              data-window-control={control}
-            >
-              <Icon
-                aria-hidden="true"
-                className="absolute size-[7px] text-black/75 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                strokeWidth={2.5}
-              />
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 function setWindowMaximizedAttribute(maximized: boolean) {

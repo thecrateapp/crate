@@ -2051,5 +2051,14 @@
   "player.equalizer.currentCurveOnly": "Only the current curve is available from this server.",
   "player.equalizer.presetPicker": "Presets",
   "player.equalizer.preset": "Preset",
-  "stats.explorer.detailUnsupported": "Detailed history isn't available on this server yet."
+  "stats.explorer.detailUnsupported": "Detailed history isn't available on this server yet.",
+  "native.window.minimize": "Minimize window",
+  "native.window.maximize": "Maximize or restore window",
+  "native.window.close": "Close window",
+  "native.logs.title": "Tauri playback logs",
+  "native.logs.events": "{count, plural, one {# event} other {# events}}",
+  "native.logs.clear": "Clear",
+  "native.logs.hide": "Hide",
+  "native.logs.empty": "No playback events yet.",
+  "native.logs.trigger": "Logs · {count}"
 }

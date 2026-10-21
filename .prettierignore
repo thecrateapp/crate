@@ -7,3 +7,6 @@ app/listen-desktop/src-tauri/vendor/wry/
 # Preserve captured measurement artifacts byte-for-byte.
 docs/testing/measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36930987123.json
 docs/testing/measurements/tauri-r03-r05-offline-windows-2026-10-01-run-36935505561.json
+
+# Generated from the typed registry; design-system:tokens:check verifies exact output.
+app/shared/ui/tokens/themes.css

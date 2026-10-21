@@ -1,12 +1,14 @@
 @import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/ibm-plex-sans.css";
 @import "../../app/shared/fonts/jetbrains-mono.css";
-@import "../../app/shared/fonts/poppins.css";
 @import "../../app/shared/ui/tokens/index.css";
 @import "tailwindcss";
 @source '../../app/shared/ui';
 @source './stories';
 @source './components';
 @source './reviews';
+@source '../../app/listen-desktop/src/components';
+@source '../../app/listen/src/components/dev';
 :root {
   color-scheme: dark;
   background: var(--surface-canvas);

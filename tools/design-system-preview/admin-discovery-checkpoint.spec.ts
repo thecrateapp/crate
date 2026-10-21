@@ -41,7 +41,7 @@ for (const width of [1440, 768, 390]) {
         await real
           .getByRole("heading", { level: 1 })
           .evaluate((el) => getComputedStyle(el).fontFamily),
-      ).toContain("Bricolage");
+      ).toContain("Bricolage Grotesque");
       expect(
         await real
           .locator(".crate-form-field")
@@ -53,7 +53,7 @@ for (const width of [1440, 768, 390]) {
         await page
           .locator("body")
           .evaluate((el) => getComputedStyle(el).fontFamily),
-      ).toContain("Poppins");
+      ).toContain("IBM Plex Sans");
       for (const field of await real.locator(".crate-form-field").all())
         expect(
           await field.evaluate((el) => {

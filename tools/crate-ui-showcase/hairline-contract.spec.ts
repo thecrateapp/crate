@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-test("row typography owns the approved 12/18 Poppins role in every context", async ({
+test("row typography owns the approved 12/18 IBM Plex Sans role in every context", async ({
   page,
 }) => {
   await page.goto(
@@ -13,7 +13,7 @@ test("row typography owns the approved 12/18 Poppins role in every context", asy
     await expect(text).toHaveCSS("font-size", "12px");
     await expect(text).toHaveCSS("line-height", "18px");
     await expect(text).toHaveCSS("font-weight", "400");
-    await expect(text).toHaveCSS("font-family", /Poppins/);
+    await expect(text).toHaveCSS("font-family", /IBM Plex Sans/);
   }
 });
 for (const width of [390, 1200]) {
@@ -43,7 +43,7 @@ for (const width of [390, 1200]) {
             await expect(carrier).toHaveCSS("font-size", "12px");
             await expect(carrier).toHaveCSS("line-height", "18px");
             await expect(carrier).toHaveCSS("font-weight", "400");
-            await expect(carrier).toHaveCSS("font-family", /Poppins/);
+            await expect(carrier).toHaveCSS("font-family", /IBM Plex Sans/);
             await expect(carrier).toHaveCSS("padding-top", "10px");
             await expect(carrier).toHaveCSS("padding-bottom", "10px");
             await expect(carrier).toHaveCSS(
@@ -94,8 +94,8 @@ test("long titles truncate or wrap without overflowing the row", async ({
   await expect(rows).toHaveCount(2);
   const metrics = await rows.evaluateAll((elements) =>
     elements.map((row) => {
-      const title = Array.from(row.querySelectorAll("span,div")).find((e) =>
-        e.textContent?.startsWith("LongUnbrokenTitle"),
+      const title = Array.from(row.querySelectorAll("span,div")).find(
+        (e) => e.textContent?.startsWith("LongUnbrokenTitle"),
       )!;
       return {
         rowWidth: row.clientWidth,

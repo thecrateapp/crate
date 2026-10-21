@@ -1,6 +1,6 @@
 @import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/ibm-plex-sans.css";
 @import "../../app/shared/fonts/jetbrains-mono.css";
-@import "../../app/shared/fonts/poppins.css";
 @import "../../app/shared/ui/tokens/index.css";
 @import "tailwindcss";
 @source "./skip-link-demo.tsx";

@@ -36,7 +36,7 @@ for (const host of ["preview", "storybook"]) {
             level: 2,
             name: "Saved query",
           });
-          await expect(title).toHaveCSS("font-family", /Poppins/);
+          await expect(title).toHaveCSS("font-family", /IBM Plex Sans/);
           await expect(title).toHaveCSS("font-size", "16px");
           await expect(title).toHaveCSS("font-weight", "600");
           await expect(title).toHaveCSS("line-height", "24px");

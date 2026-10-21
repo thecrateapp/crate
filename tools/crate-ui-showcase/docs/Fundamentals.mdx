@@ -14,7 +14,7 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h2">Contract</DocHeading>
 
-- One identity for Admin and Listen. Actual Bricolage Grotesque, Poppins and JetBrains Mono faces; token-based colors and surfaces.
+- One identity for Admin and Listen. Self-hosted Bricolage Grotesque (display), IBM Plex Sans (body) and JetBrains Mono faces; token-based colors and surfaces.
 - No selectable visual themes or duplicated hex recipes.
 - Samples and token tables read the real CSS. Scene geometry does not change a component's anatomy.
 
@@ -33,7 +33,7 @@ The 1AQ reference remains approved. Changes through 1AY are approved; consumer a
 
 All field captions use MonoLabel (Mono 400, uppercase, 11/15.4 px), including inline Checkbox, Switch and RadioGroup options. Inline is a layout choice, not a different typographic role. Helpers/errors use Mono 400 at 11.5/16.1 px. Editable controls and ordinary readonly output use the brand body face at 400, 15/21 px. Filters and segmented modes use Mono 400 at 12/16 px. Readout keeps its contextual Mono role; StatNumber uses display numerals and a normal-weight Mono caption. Surrounding headings or bold text must not change these defaults.
 
-Native brand-font exceptions remain resolved through the existing font variables. General form ranges now use Slider in both apps; playback and EQ retain specialized controls.
+Bricolage Grotesque and IBM Plex Sans are packaged for display and body in web, Tauri and Capacitor; JetBrains Mono retains its existing role. General form ranges now use Slider in both apps; playback and EQ retain specialized controls.
 
 ## Track metadata columns — local 1BA amendment
 
@@ -62,9 +62,9 @@ Canvas is the app background. Card is an opaque standalone object on surface-obj
 
 ## Header roles — 1AU
 
-PageHeader is the ordinary page identity: Bricolage600 at24/30px with body subtitle, optional
+PageHeader is the ordinary page identity: Bricolage Grotesque600 at24/30px with body subtitle, optional
 MonoLabel text context, artwork and metadata. PageHeaderLayout owns container-aware positioning
-for both apps. SectionHeader is the content/rail role (Bricolage700 at18/24/30), with a Mono count.
+for both apps. SectionHeader is the content/rail role (Bricolage Grotesque700 at18/24/30), with a Mono count.
 PageHero preserves media/artist/editorial/card roles and a compact title option. HeroActionBar
 retains playback actions; ordinary upper-right actions use ActionGroup. BackLink preserves text
 and navigation, with coarse targets occupying real layout space. Sample captions compose
@@ -197,3 +197,15 @@ collapse a column. Narrow rows retain their standard duration/actions layout. St
 use the full page width instead of sharing a two-column layout with artist posters. The
 Stats row consistency review and the track metadata review exercise the same production pieces
 at375/640/760/900/1200px; they do not repair the row with scene CSS.
+
+## Approved font pairing — 21 October 2026
+
+Diego approved Bricolage Grotesque for display and IBM Plex Sans for body, preserving JetBrains Mono.
+Only font families change: existing sizes, weights, tracking, geometry and colors remain.
+Font packaging checks verify both subsets and their source hashes; browser checks confirm the
+actual loaded faces and the unchanged Mono role.
+Variable normal faces (display 200–800, body 100–700; Latin + Latin Extended) are self-hosted with their OFL notices.
+The shared identity reaches Admin, Listen web, Tauri and Capacitor. Sharing canvases and the
+SVG export script use IBM Plex Sans. Previous/candidate pairings stay scoped to the comparison.
+
+[Compare the actual components](http://127.0.0.1:5186/review-1be-font-pairings.html?pairing=bricolage-plex).

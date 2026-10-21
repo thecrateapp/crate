@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   appAddListener,
   appGetLaunchUrl,
+  appExit,
+  keyboardAddListener,
   consumeOAuthCallbackUrl,
   networkAddListener,
   retryPendingNativeOAuthCallback,
@@ -13,6 +15,8 @@ const {
 } = vi.hoisted(() => ({
   appAddListener: vi.fn(),
   appGetLaunchUrl: vi.fn(),
+  appExit: vi.fn(),
+  keyboardAddListener: vi.fn(),
   consumeOAuthCallbackUrl: vi.fn(),
   networkAddListener: vi.fn(),
   retryPendingNativeOAuthCallback: vi.fn(),
@@ -28,7 +32,7 @@ vi.mock("@capacitor/app", () => {
     App: {
       addListener: appAddListener,
       getLaunchUrl: appGetLaunchUrl,
-      exitApp: vi.fn(),
+      exitApp: appExit,
     },
   };
 });
@@ -41,7 +45,7 @@ vi.mock("@capacitor/keyboard", () => {
       setResizeMode: vi.fn(),
       setAccessoryBarVisible: vi.fn(),
       setScroll: vi.fn(),
-      addListener: vi.fn(),
+      addListener: keyboardAddListener,
     },
     KeyboardResize: { Body: "body" },
     KeyboardStyle: { Dark: "dark" },
@@ -98,6 +102,8 @@ describe("Capacitor initialization", () => {
     pluginImports.network = 0;
     pluginImports.statusBar = 0;
     appAddListener.mockReset();
+    appExit.mockReset();
+    keyboardAddListener.mockReset().mockResolvedValue({ remove: vi.fn() });
     appGetLaunchUrl.mockReset().mockResolvedValue(null);
     consumeOAuthCallbackUrl
       .mockReset()
@@ -110,6 +116,115 @@ describe("Capacitor initialization", () => {
     storePendingOAuthProviderError.mockReset();
     appAddListener.mockResolvedValue({ remove: vi.fn() });
     networkAddListener.mockResolvedValue({ remove: vi.fn() });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.documentElement.style.removeProperty("--listen-viewport-height");
+    document.documentElement.style.removeProperty("--listen-keyboard-height");
+    document.documentElement.removeAttribute("data-keyboard-open");
+  });
+
+  it.each(["overlay", "history", "exit"])(
+    "routes native back to %s in priority order",
+    async (destination) => {
+      const back = vi
+        .spyOn(window.history, "back")
+        .mockImplementation(() => {});
+      const intercept = (event: Event) => event.preventDefault();
+      if (destination === "overlay")
+        window.addEventListener("crate:native-back", intercept);
+      try {
+        const { initCapacitor } = await import("./capacitor-init");
+        await initCapacitor();
+        const callback = appAddListener.mock.calls.find(
+          ([name]) => name === "backButton",
+        )![1];
+        callback({ canGoBack: destination !== "exit" });
+        expect(back).toHaveBeenCalledTimes(destination === "history" ? 1 : 0);
+        expect(appExit).toHaveBeenCalledTimes(destination === "exit" ? 1 : 0);
+      } finally {
+        window.removeEventListener("crate:native-back", intercept);
+      }
+    },
+  );
+
+  it("keeps iOS viewport and keyboard clearances in sync and reveals the focused field", async () => {
+    runtime.isIosRuntime = true;
+    runtime.platform = "ios";
+    vi.stubGlobal("innerHeight", 812);
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    const add = vi.spyOn(window, "addEventListener");
+    const input = document.createElement("input");
+    const scroll = vi.fn();
+    input.scrollIntoView = scroll;
+    document.body.append(input);
+    input.focus();
+    const changed = vi.fn();
+    window.addEventListener("crate:keyboard-change", changed);
+    try {
+      const { initCapacitor } = await import("./capacitor-init");
+      await initCapacitor();
+      await initCapacitor();
+      expect(keyboardAddListener).toHaveBeenCalledTimes(2);
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--listen-viewport-height",
+        ),
+      ).toBe("812px");
+      const show = keyboardAddListener.mock.calls.find(
+        ([name]) => name === "keyboardWillShow",
+      )![1];
+      const hide = keyboardAddListener.mock.calls.find(
+        ([name]) => name === "keyboardWillHide",
+      )![1];
+      show({ keyboardHeight: 300 });
+      expect(document.documentElement).toHaveAttribute("data-keyboard-open");
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--listen-keyboard-height",
+        ),
+      ).toBe("300px");
+      expect(scroll).toHaveBeenCalledWith({
+        block: "center",
+        inline: "nearest",
+        behavior: "smooth",
+      });
+      expect(changed.mock.calls[0]![0].detail.height).toBe(300);
+      vi.stubGlobal("innerHeight", 844);
+      hide();
+      expect(document.documentElement).not.toHaveAttribute(
+        "data-keyboard-open",
+      );
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--listen-keyboard-height",
+        ),
+      ).toBe("0px");
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--listen-viewport-height",
+        ),
+      ).toBe("844px");
+      vi.stubGlobal("innerHeight", 390);
+      window.dispatchEvent(new Event("orientationchange"));
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--listen-viewport-height",
+        ),
+      ).toBe("390px");
+    } finally {
+      input.remove();
+      window.removeEventListener("crate:keyboard-change", changed);
+      for (const [name, callback] of add.mock.calls) {
+        if (name === "resize" || name === "orientationchange")
+          window.removeEventListener(name, callback);
+      }
+    }
   });
 
   it("registers native lifecycle listeners only once", async () => {

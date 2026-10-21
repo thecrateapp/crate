@@ -94,9 +94,9 @@ export const CRATE_IDENTITY_VARIABLES = {
   "--radius-md": "0.25rem",
   "--radius-lg": "0.375rem",
   "--radius-xl": "0.5rem",
-  "--font-brand": "Poppins",
+  "--font-brand": '"IBM Plex Sans"',
   "--font-display-stack":
-    '"Bricolage Grotesque", Poppins, system-ui, sans-serif',
+    '"Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif',
   "--font-mono-stack":
     '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
   "--brand-logo-start": "#06b6d4",

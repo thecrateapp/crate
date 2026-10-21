@@ -9,9 +9,9 @@ const config: StorybookConfig = {
   features: { sidebarOnboardingChecklist: false },
   staticDirs: [{ from: "../../../app/shared/fonts", to: "/crate-fonts" }],
   managerHead: (head) => `${head}
-    <link rel="stylesheet" href="./crate-fonts/poppins.css">
-    <link rel="stylesheet" href="./crate-fonts/jetbrains-mono.css">
-    <link rel="stylesheet" href="./crate-fonts/bricolage-grotesque.css">`,
+    <link rel="stylesheet" href="./crate-fonts/bricolage-grotesque.css">
+    <link rel="stylesheet" href="./crate-fonts/ibm-plex-sans.css">
+    <link rel="stylesheet" href="./crate-fonts/jetbrains-mono.css">`,
   async viteFinal(config) {
     config.plugins = [...(config.plugins ?? []), tailwindcss()];
     // Storybook already supplies all story/annotation entries; release cold-start deps
