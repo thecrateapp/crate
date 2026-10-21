@@ -1879,6 +1879,7 @@
   "stats.highlights.playObsession": "Reproducir {title}",
   "stats.replay.card.meta": "{count, plural, one {# canción} other {# canciones}} · {duration}",
   "stats.heatmap.title": "Cuándo escuchas",
+  "stats.heatmap.titleNeutral": "Escucha por horas",
   "stats.heatmap.grid": "Escucha por día de la semana y hora",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minuto} other {# minutos}}",

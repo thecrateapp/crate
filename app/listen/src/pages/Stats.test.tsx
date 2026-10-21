@@ -539,6 +539,59 @@ describe("Stats page", () => {
     },
   );
 
+  it("resets the heatmap band per subject and plays each subject's wave once", async () => {
+    const user = userEvent.setup();
+    const personal = signalDashboard();
+    const pulse = signalDashboard();
+    pulse.heatmap = {
+      cells: Array.from({ length: 7 }, (_, weekday) =>
+        Array.from({ length: 24 }, (_, hour) =>
+          weekday === 0 && hour === 9 ? 60 : 5,
+        ),
+      ),
+      peak: { weekday: 0, hour: 9 },
+      night_share: 0.2,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+      listener_count: 4,
+    };
+    mockUseApi.mockImplementation((url: string | null) => ({
+      data: url?.startsWith("/api/stats/dashboard")
+        ? pulse
+        : url === "/api/me/stats/today"
+          ? null
+          : personal,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    // No route pattern: the same mounted <Stats/> follows the scope links.
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      locale: "en",
+    });
+    const listening = () => container.querySelector<HTMLElement>("#listening")!;
+    const grid = () => within(listening()).getByRole("grid");
+    const readout = () =>
+      listening().querySelector("[data-slot='heatmap-readout']");
+
+    expect(readout()).toHaveTextContent("Sunday 22:00 · 1h 30m");
+    expect(grid()).toHaveAttribute("data-entering");
+    fireEvent.click(
+      within(grid()).getByRole("gridcell", { name: "Friday 07:00, 5 minutes" }),
+    );
+    expect(readout()).toHaveTextContent("Friday 07:00 · 5m");
+
+    // Crate Pulse: its own peak, its own first wave.
+    await user.click(screen.getByRole("link", { name: "Crate Pulse" }));
+    expect(readout()).toHaveTextContent("Monday 09:00 · 1h");
+    expect(grid()).toHaveAttribute("data-entering");
+
+    // Back to the viewer's own stats: the peak again, no second wave.
+    await user.click(screen.getByRole("link", { name: "Crate DNA" }));
+    expect(readout()).toHaveTextContent("Sunday 22:00 · 1h 30m");
+    expect(grid()).not.toHaveAttribute("data-entering");
+  });
+
   it("hides the Crate Pulse heatmap grid below three listeners", () => {
     const dashboard = signalDashboard();
     // As the instance builder ships it below three listeners (PD43).

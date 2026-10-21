@@ -7071,6 +7071,10 @@
     "sourceHash": "sha256:ff50bdb4e4a5a7a843a7e083e6417a66b7d16b18dda837211070a5862319a4a7",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
   },
+  "stats.heatmap.titleNeutral": {
+    "sourceHash": "sha256:e0bb24f4ec8cf77ad56657e7a178189bc7f585440d0a7db4d6f4133ffb69606c",
+    "reviewedAt": "2026-10-21T03:03:47.595Z"
+  },
   "stats.heatmap.topGenre": {
     "sourceHash": "sha256:00f870db619f70fa968432538a6f6952a028d8bd1e88b8ad6662d7c412a165cc",
     "reviewedAt": "2026-10-21T02:33:58.603Z"

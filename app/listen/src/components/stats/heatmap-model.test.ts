@@ -155,6 +155,22 @@ describe("heatmap model", () => {
     expect(model.nightRange).toEqual({ start: 22, end: 5 });
   });
 
+  it("reads the night range from the circular run in any order", () => {
+    const range = (night_hours: number[]) =>
+      buildHeatmapModel(
+        heatmap(() => 1, { night_hours }),
+        {
+          timezone: null,
+          now: at("2026-01-15T12:00:00Z"),
+        },
+      ).nightRange;
+    expect(range([22, 23, 0, 1, 2, 3, 4, 5])).toEqual({ start: 22, end: 5 });
+    expect(range([0, 1, 2, 3, 4, 5, 22, 23])).toEqual({ start: 22, end: 5 });
+    expect(range([5, 23, 1, 22, 0, 4, 3, 2])).toEqual({ start: 22, end: 5 });
+    // A band that does not cross midnight.
+    expect(range([3, 1, 2])).toEqual({ start: 1, end: 3 });
+  });
+
   it("names the first top genre, never the faller", () => {
     expect(
       heatmapTopGenre(

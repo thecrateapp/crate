@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -141,12 +142,35 @@ describe("ListeningHeatmap", () => {
     expect(within(counters).getByText("38%")).toBeInTheDocument();
     expect(within(counters).getByText("Top genre")).toBeInTheDocument();
     expect(within(counters).getByText("Metalcore")).toBeInTheDocument();
-    // The figure sentence summarises the grid.
+    // The figure sentence summarises the grid, through one association only.
+    const sentence =
+      "Most listening happens on Sunday around 22:00; 38% of it at night.";
+    expect(screen.getByRole("figure", { name: sentence })).toBeInTheDocument();
+    expect(grid).not.toHaveAttribute("aria-describedby");
+    expect(grid).toHaveAccessibleDescription("");
+    // The viewer's own stats speak to them.
     expect(
-      screen.getByText(
-        "Most listening happens on Sunday around 22:00; 38% of it at night.",
-      ),
+      screen.getByRole("heading", { name: "When you listen" }),
     ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["global", 4],
+    ["user", null],
+  ] as const)("uses a neutral title on %s stats", (scope, listeners) => {
+    renderWithListenProviders(
+      <ListeningHeatmap
+        heatmap={fixture({ listener_count: listeners })}
+        timezone={null}
+        showNow={false}
+        scope={scope}
+        topGenre={null}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Listening by hour" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("When you listen")).toBeNull();
   });
 
   it("hides the instance grid below three listeners", () => {
@@ -271,6 +295,44 @@ describe("ListeningHeatmap", () => {
     const clear = vi.spyOn(window, "clearTimeout");
     unmount();
     expect(clear).toHaveBeenCalled();
+  });
+
+  it("finds the current hour when the now outline turns on later", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    // Mounted on another subject at Wednesday 12:59:30 Madrid.
+    vi.setSystemTime(new Date("2026-10-21T10:59:30Z"));
+    // Keep the same band mounted (RTL's rerender would drop the providers
+    // and remount it) and flip showNow from inside.
+    let turnOn = () => {};
+    function Harness() {
+      const [showNow, setShowNow] = useState(false);
+      turnOn = () => setShowNow(true);
+      return (
+        <ListeningHeatmap
+          heatmap={fixture()}
+          timezone="Europe/Madrid"
+          showNow={showNow}
+          scope="personal"
+          topGenre={null}
+        />
+      );
+    }
+    renderWithListenProviders(<Harness />);
+    const mounted = screen.getByRole("grid");
+    expect(mounted.querySelectorAll("[data-now]")).toHaveLength(0);
+    // The hour turns with no timer running, then the outline turns on.
+    vi.setSystemTime(new Date("2026-10-21T11:09:30Z"));
+    act(() => turnOn());
+    expect(screen.getByRole("grid")).toBe(mounted);
+    expect(cell("Wednesday 13:00, 5 minutes, now")).toHaveAttribute("data-now");
+    expect(
+      screen.getByRole("grid").querySelectorAll("[data-now]"),
+    ).toHaveLength(1);
+    // And the timer runs from there: 14:00 Madrid is 50:30 away.
+    act(() => {
+      vi.advanceTimersByTime(50 * 60_000 + 30_000);
+    });
+    expect(cell("Wednesday 14:00, 5 minutes, now")).toHaveAttribute("data-now");
   });
 
   it("shows no now cell on other subjects and schedules nothing", () => {

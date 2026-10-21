@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useState } from "react";
 import { statsDashboardReadState } from "./stats-page-model";
 import { Link } from "react-router";
 import {
@@ -113,9 +113,12 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
   const tape = dashboard?.tape;
   const highlights = dashboard?.highlights;
   const comparison = statsComparison(page);
-  // The sections remount while an uncached period loads; this flag outlives
-  // them so the heatmap's entrance wave plays once per page session.
-  const heatmapEntrance = useRef(false);
+  // The sections remount while an uncached period loads, and the three Stats
+  // routes share this mounted page. One flag per subject outlives both, so
+  // each subject's heatmap wave plays once per page session (R28).
+  const [heatmapEntrances] = useState(
+    () => new Map<string, { current: boolean }>(),
+  );
   return (
     <StatsPageView
       header={<StatsHeader page={page} />}
@@ -207,7 +210,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
             loading={dashboardLoading && !dashboard}
           />
         </StatsReveal>
-        <StatsListeningSection page={page} entranceRef={heatmapEntrance} />
+        <StatsListeningSection page={page} entrances={heatmapEntrances} />
         {dashboard?.music_age ? (
           <StatsReveal>
             <StatsMusicAgeCard musicAge={dashboard.music_age} />
@@ -222,20 +225,36 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
   );
 }
 
+/** The entrance flag of one subject, created on first use. */
+function heatmapEntranceFor(
+  entrances: Map<string, { current: boolean }>,
+  subject: string,
+) {
+  let entrance = entrances.get(subject);
+  if (!entrance) {
+    entrance = { current: false };
+    entrances.set(subject, entrance);
+  }
+  return entrance;
+}
+
 function StatsListeningSection({
   page,
-  entranceRef,
+  entrances,
 }: {
   page: StatsPageController;
-  entranceRef: { current: boolean };
+  entrances: Map<string, { current: boolean }>;
 }) {
   const { dashboard } = page;
   const scope = statsScope(page);
+  // R28: a new subject gets a fresh band (its own peak, readout and focus).
+  const subject = `${scope}:${page.username ?? ""}`;
   return (
     <StatsReveal>
       <StatsListeningView
         band={
           <ListeningHeatmap
+            key={subject}
             heatmap={dashboard?.heatmap}
             timezone={dashboard?.timezone}
             showNow={scope === "personal"}
@@ -246,7 +265,7 @@ function StatsListeningSection({
             )}
             loading={page.dashboardLoading && !dashboard}
             pending={dashboard?.snapshot?.pending === true}
-            entranceRef={entranceRef}
+            entranceRef={heatmapEntranceFor(entrances, subject)}
           />
         }
       >

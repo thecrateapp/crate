@@ -75,8 +75,9 @@ export interface ListeningHeatmapProps {
   pending?: boolean;
   /**
    * Set once the entrance wave has played. Pass a ref that outlives the band
-   * (the page keeps one above the section that remounts while a period loads)
-   * so the wave plays only on the first real payload of the page session.
+   * (the page keeps one per subject above the section that remounts while a
+   * period loads) so the wave plays only on that subject's first real payload
+   * of the page session. Without it, each mount plays the wave once.
    */
   entranceRef?: { current: boolean };
 }
@@ -99,7 +100,7 @@ export function ListeningHeatmap({
   if (!heatmap) {
     // Error or absent payload: the band is not mounted.
     return loading || pending ? (
-      <HeatmapPlaceholder building={pending && !loading} />
+      <HeatmapPlaceholder building={pending && !loading} scope={scope} />
     ) : null;
   }
   return (
@@ -114,12 +115,22 @@ export function ListeningHeatmap({
   );
 }
 
-function HeatmapPlaceholder({ building }: { building: boolean }) {
+/** "When you listen" speaks to the viewer; other subjects get a neutral title. */
+const titleKey = (scope: HeatmapScope) =>
+  scope === "personal" ? "stats.heatmap.title" : "stats.heatmap.titleNeutral";
+
+function HeatmapPlaceholder({
+  building,
+  scope,
+}: {
+  building: boolean;
+  scope: HeatmapScope;
+}) {
   const { t } = useTranslation();
   return (
     <Card className="gap-4 p-5" aria-busy="true">
       <MonoLabel as="h3" tone="accent">
-        {t("stats.heatmap.title")}
+        {t(titleKey(scope))}
       </MonoLabel>
       <div className="stats-heatmap-band" aria-hidden="true">
         <div className="stats-heatmap">
@@ -165,20 +176,24 @@ function HeatmapBand({
   const hidden = heatmapGridHidden(heatmap, scope);
 
   // The "now" outline moves with one timer aligned to the next hour in the
-  // subject's zone (DST, :30 and :45 offsets); each fire reschedules.
-  const [clock, setClock] = useState(() => Date.now());
+  // subject's zone (DST, :30 and :45 offsets); each fire bumps `clock`, which
+  // rebuilds the model and reschedules. The timer (re)starts whenever the
+  // outline turns on (`zone` changes).
+  const [clock, setClock] = useState(0);
   useEffect(() => {
     if (!zone || hidden) return;
     const delay = msUntilNextHour(zone, new Date());
     if (delay === null) return;
-    const timer = window.setTimeout(() => setClock(Date.now()), delay);
+    const timer = window.setTimeout(() => setClock((tick) => tick + 1), delay);
     return () => window.clearTimeout(timer);
   }, [zone, hidden, clock]);
 
-  // History invalidations refetch identical payloads: rebuild only on content.
+  // History invalidations refetch identical payloads: rebuild only on content,
+  // zone or the hour tick, and always against the current time (a model built
+  // while the outline was off must not keep an old hour).
   const signature = useMemo(() => JSON.stringify(heatmap), [heatmap]);
   const model = useMemo(
-    () => buildHeatmapModel(heatmap, { timezone: zone, now: new Date(clock) }),
+    () => buildHeatmapModel(heatmap, { timezone: zone, now: new Date() }),
     [signature, zone, clock],
   );
 
@@ -368,7 +383,7 @@ function HeatmapBand({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <MonoLabel as="h3" tone="accent">
-            {t("stats.heatmap.title")}
+            {t(titleKey(scope))}
           </MonoLabel>
           {scope === "global" && !hidden ? (
             <MonoLabel as="span">{t("stats.heatmap.localTime")}</MonoLabel>
@@ -388,7 +403,9 @@ function HeatmapBand({
           {t("stats.heatmap.fewListeners", { count: HEATMAP_MIN_LISTENERS })}
         </p>
       ) : (
-        <figure className="stats-heatmap-band">
+        // The sentence names the figure; the grid keeps its own name only, so
+        // the summary is not announced twice.
+        <figure className="stats-heatmap-band" aria-labelledby={captionId}>
           <HeatmapGrid
             gridRef={gridRef}
             model={model}
@@ -399,7 +416,6 @@ function HeatmapBand({
             nowIndex={nowIndex}
             entering={entering}
             gridLabel={t("stats.heatmap.grid")}
-            captionId={captionId}
             onKeyDown={onKeyDown}
             onFocus={onFocus}
             onClick={onClick}
@@ -460,7 +476,6 @@ const HeatmapGrid = memo(function HeatmapGrid({
   nowIndex,
   entering,
   gridLabel,
-  captionId,
   onKeyDown,
   onFocus,
   onClick,
@@ -478,7 +493,6 @@ const HeatmapGrid = memo(function HeatmapGrid({
   nowIndex: number | null;
   entering: boolean;
   gridLabel: string;
-  captionId: string;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   onFocus: (event: FocusEvent<HTMLDivElement>) => void;
   onClick: (event: MouseEvent<HTMLDivElement>) => void;
@@ -491,7 +505,6 @@ const HeatmapGrid = memo(function HeatmapGrid({
       ref={gridRef}
       role="grid"
       aria-label={gridLabel}
-      aria-describedby={captionId}
       className="stats-heatmap"
       data-entering={entering ? "" : undefined}
       onKeyDown={onKeyDown}

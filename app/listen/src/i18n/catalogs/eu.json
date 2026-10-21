@@ -1871,6 +1871,7 @@
   "stats.highlights.playObsession": "Erreproduzitu {title}",
   "stats.replay.card.meta": "{count, plural, one {# abesti} other {# abesti}} · {duration}",
   "stats.heatmap.title": "Noiz entzuten duzun",
+  "stats.heatmap.titleNeutral": "Entzunaldiak orduka",
   "stats.heatmap.grid": "Entzunaldiak asteko egunaren eta orduaren arabera",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minutu} other {# minutu}}",

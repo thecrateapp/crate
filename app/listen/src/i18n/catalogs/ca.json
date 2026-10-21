@@ -1871,6 +1871,7 @@
   "stats.highlights.playObsession": "Reprodueix {title}",
   "stats.replay.card.meta": "{count, plural, one {# cançó} other {# cançons}} · {duration}",
   "stats.heatmap.title": "Quan escoltes",
+  "stats.heatmap.titleNeutral": "Escolta per hores",
   "stats.heatmap.grid": "Escolta per dia de la setmana i hora",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minut} other {# minuts}}",

@@ -444,6 +444,7 @@ export function StatsOverviewReview({
           band={
             legacy ? null : (
               <ListeningHeatmap
+                key={scope}
                 heatmap={
                   long
                     ? zeroHeatmap

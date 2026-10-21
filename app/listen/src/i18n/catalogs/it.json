@@ -1871,6 +1871,7 @@
   "stats.highlights.playObsession": "Riproduci {title}",
   "stats.replay.card.meta": "{count, plural, one {# brano} other {# brani}} · {duration}",
   "stats.heatmap.title": "Quando ascolti",
+  "stats.heatmap.titleNeutral": "Ascolto per ora",
   "stats.heatmap.grid": "Ascolto per giorno della settimana e ora",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minuto} other {# minuti}}",

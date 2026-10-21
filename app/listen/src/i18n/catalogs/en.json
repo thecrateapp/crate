@@ -1879,6 +1879,7 @@
   "stats.highlights.playObsession": "Play {title}",
   "stats.replay.card.meta": "{count, plural, one {# track} other {# tracks}} · {duration}",
   "stats.heatmap.title": "When you listen",
+  "stats.heatmap.titleNeutral": "Listening by hour",
   "stats.heatmap.grid": "Listening by weekday and hour",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minute} other {# minutes}}",

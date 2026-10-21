@@ -116,6 +116,25 @@ export function msUntilNextHour(
   return 3_600_000 - elapsed;
 }
 
+/**
+ * The night band as start and end hours of its longest run around the clock,
+ * whatever order `night_hours` arrives in: {22, 23, 0..5} is 22–05.
+ */
+function nightRun(night: ReadonlySet<number>) {
+  if (!night.size) return null;
+  if (night.size === HOURS) return { start: 0, end: HOURS - 1 };
+  let best: { start: number; length: number } | null = null;
+  for (const hour of night) {
+    // Only an hour whose previous hour is day starts a run.
+    if (night.has((hour + HOURS - 1) % HOURS)) continue;
+    let length = 1;
+    while (night.has((hour + length) % HOURS)) length++;
+    if (!best || length > best.length) best = { start: hour, length };
+  }
+  if (!best) return null;
+  return { start: best.start, end: (best.start + best.length - 1) % HOURS };
+}
+
 export function buildHeatmapModel(
   heatmap: StatsHeatmap,
   { timezone, now }: { timezone: string | null; now: Date },
@@ -183,9 +202,7 @@ export function buildHeatmapModel(
       Number.isFinite(heatmap.night_share)
         ? heatmap.night_share
         : null,
-    nightRange: nightHours.length
-      ? { start: nightHours[0]!, end: nightHours[nightHours.length - 1]! }
-      : null,
+    nightRange: nightRun(night),
     nowCell: heatmapNowCell(timezone, now),
   };
 }

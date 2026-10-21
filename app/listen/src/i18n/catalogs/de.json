@@ -1871,6 +1871,7 @@
   "stats.highlights.playObsession": "{title} abspielen",
   "stats.replay.card.meta": "{count, plural, one {# Titel} other {# Titel}} · {duration}",
   "stats.heatmap.title": "Wann du hörst",
+  "stats.heatmap.titleNeutral": "Hören nach Stunden",
   "stats.heatmap.grid": "Hören nach Wochentag und Uhrzeit",
   "stats.heatmap.readout": "{weekday} {hour}:00 · {minutes}",
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# Minute} other {# Minuten}}",
