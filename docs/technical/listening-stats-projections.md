@@ -98,8 +98,9 @@ dashboard snapshot.
 
 ## Listen surfaces
 
-- `/stats`: period picker, signal tape (custom SVG), headline numbers, artist of the period,
-  highlights, heatmap, genre trend, music age and discoveries.
+- `/stats`: period picker, the stats explorer (range window over the tape, backed by
+  `/api/me/stats/range`, `/api/users/{u}/stats/range` and `/api/stats/range`), headline numbers,
+  artist of the period, highlights, heatmap band, genre trend, music age and movement.
 - `/stats/digging`: full-screen story chapters built from the same payload. The share action
   renders a 1080x1920 canvas card (`drawDiggingStoryCard`) for Instagram stories.
 

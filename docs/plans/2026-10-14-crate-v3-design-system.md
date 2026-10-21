@@ -1599,6 +1599,7 @@ regenerating the site's `scale.json` (6.5). Behaviour changes are marked
 | 4.22 | `StackMap`              | `architecture/SystemMap.astro`        | Admin                  | `app/ui/src/components/ops/stack-map`              | P1  | L   | stack sampler, action policy                                            |
 | 4.23 | `EventPipelinePanel`    | `viz/OutboxSequence.astro`            | Admin                  | `app/ui/src/components/ops/event-pipeline`         | P2  | M   | `list_domain_events` bug                                                |
 | 4.24 | `RedisPair`             | `viz/RedisPair.astro`                 | Admin                  | `app/ui/src/components/ops/redis-pair`             | P2  | M   | Redis sampler                                                           |
+| 4.26 | `StatsExplorer`         | none                                  | Listen                 | `app/listen/src/components/stats/explorer`         | P0  | L   | range endpoints                                                         |
 
 Admin folder convention: domain folders only (`components/{health,ops,genres,analysis,acquisition,
 federation}`, `components/album/portable-metadata`, `components/artist/enrichment`); there is no
@@ -2420,6 +2421,23 @@ snapshot block survives in all three routes, limit alignment. i18n keys under
 
 **Decisions and risks.** [D30] hide the instance grid below 3 listeners. `history` invalidations are
 global (up to 8 per aggregate refresh): renders must be cheap when data is unchanged.
+
+**Shipped (Stats refactor, 2026-10-21).** Where this entry and the list below differ, the list is
+what ships; spec `2026-10-21-crate-v3-stats-refactor-design.md` C.8 supersedes the counters above.
+
+- Band variant only. The Home Listening DNA tile is not shipped.
+- Counters show heatmap facts (peak slot, night share, top genre; never a faller), not the headline
+  numbers.
+- The `.stats-heatmap*` recipe stays in the shared `recipes.css` (R25); it does not move to Listen
+  CSS.
+- [D30]/PD43 is enforced on the server: below 3 listeners the instance builder returns zero cells,
+  null `peak` and `night_share`, and `hidden_reason: "few_listeners"`; Listen hides the band on it
+  (R27).
+- Non-personal scopes (`/stats/global`, `/users/:u/stats`) use a neutral title (R28).
+- The wave plays once per subject per page session; the band is keyed by subject, so a switch
+  resets the readout to the new peak.
+- Deferred: the top-genre scramble (no `@crate/ui/lib/scramble.ts` exists), the 1.6 s count-up
+  (ships 1.2 s) and touch drag-to-scrub.
 
 ---
 
@@ -3629,6 +3647,47 @@ capability-gated links, 375 px render; `SystemHealth.test.tsx` (new).
 before eviction; PD45 lowers `maxmemory`, 6.5); volatile-lru plus growing no-TTL keys leads to OOM
 errors; the durable 75% threshold needs confirming; `clear_cache type=all` runs a synchronous
 `SCAN` in a request.
+
+### 4.26 `StatsExplorer`
+
+|                   |                                                                                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| Site source       | none (product instrument; replaces the Stats signal tape)                                                |
+| Home              | `app/listen/src/components/stats/explorer/` (`StatsExplorer`, `StatsExplorerView`, `StatsExplorerPanel`) |
+| Priority · effort | P0 · L                                                                                                   |
+
+**Surface.** Listen `/stats`, `/stats/global` and `/users/:u/stats`. `TapeBars` stays for the Home
+mini tape; the explorer replaces only the Stats page signal tape.
+
+**Data.** `GET /api/me/stats/range`, `GET /api/users/{u}/stats/range` and `GET /api/stats/range`
+(`from`/`to` bounded to 400 days, `limit` 1 to 20). They return the stretch's top artists, albums
+and tracks, discoveries and totals; the global route returns `available=false` while the instance
+rollups backfill. The dashboard tape, mood and peaks feed the chart; the range payload feeds the
+panel. `useStatsRange` caches per account and server and drops everything on a `history`
+invalidation.
+
+**Behaviour.** Adaptive modes (`explorerMode`): `full` for `7d`, `30d` and `month:*` (the window is
+the whole tape, no handles); `window` for longer selections, with a draggable window over the tape
+(daily: default 30, min 7, max 400 days; weekly: default 12, min 2, max 57 weeks). The window opens
+from the narrowest span ending today. Hover, focus and tap read out a bucket; selecting a day
+loads that day's plays.
+
+**Input.** Pointer: drag the frame to move, the edge handles to resize, press outside to centre the
+window and keep dragging (pointer capture; middle of narrow windows stays movable on touch).
+Keyboard on the window: arrows move by 1 bucket (Shift for a larger step), Home and End jump to the
+ends, `+` and `-` resize. Touch hit areas extend outward only. Touch: Listen's `index.css` gives
+focusable elements `touch-action: manipulation` on coarse pointers, which overrides a plain-class
+`touch-action: none`; the explorer drag surfaces use a more specific selector, and any new drag
+surface in Listen needs the same.
+
+**Composition.** Pure views (`StatsExplorerView`, `StatsExplorerPanel`) take `links` and
+`renderImage` props so the showcase mounts them without `library-routes` (R17); the
+`StatsExplorer` adapter supplies both. Failed stretch and day loads show `stats.explorer.error` and
+keep the last loaded blocks dimmed. Weekly tapes hide the silent-days line (R13).
+
+**Tests.** Vitest: model (modes, clamping, stretch summary), chart, hook (cache, account scope,
+invalidation), view and panel, adapter. pytest: range queries and the three routes. Showcase entry
+and `stats-review.spec.ts`.
 
 ### 4.25 Site visuals with no product home
 
@@ -5159,7 +5218,6 @@ controls use the same canonical component/size. No repair CSS or new main-mockup
 [1AT scope and limits](2026-10-19-crate-v3-surfaces-reconciliation.md), and
 [requested future groups proposal](2026-10-19-crate-v3-component-checkpoint-groups.md).
 Both previews active; stop before1AT commit/push. Broader adoption and phase/native/canonical QA remain open.
-
 
 ## 1AT publication and 1AU header reconciliation — 2026-10-19
 

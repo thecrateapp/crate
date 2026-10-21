@@ -657,3 +657,38 @@ lint45archivos, i18n0/0, catálogo63/93/120, tres builds/bundle correctos (20487
 Sin segunda revisión ni regeneración de baselines; QA física nativa/AT de fase pendiente. Tres
 servicios activos, HEAD295f283a e índice vacío; se para para revisión sin commit/push de1BE.
 Capturas1be-search-loading.png y1be-stats-final.png bajo.artifacts/crate-v3.
+
+## Refactor de Stats — explorador, rango e instrumento de escucha · 2026-10-21
+
+Rama `feat/stats-explorer`; spec `2026-10-21-crate-v3-stats-refactor-design.md`, plan
+`2026-10-21-crate-v3-stats-refactor-plan.md`. Tres fases.
+
+**A · Backend.** Los tres dashboards conservan el bloque `snapshot`/pending; límites de instancia
+unificados a 14 (albums). Endpoints de rango `/api/me/stats/range`, `/api/users/{u}/stats/range` y
+`/api/stats/range` (ventana máxima 400 días, `limit` 1–20; `available=false` mientras se rellenan
+los rollups de instancia). Migración 109: `instance_track_daily`, `instance_entity_firsts` y sus
+tareas de rebuild/backfill, también al borrar un usuario. Ventana previa (`previous_window`),
+marcas `is_new`, `music_age.share_this_year` (0 es un hecho, null es desconocido), perfil sonoro
+previo, tendencia de géneros con el mayor "faller" aparte y audio desconocido como null. Clave de
+snapshot `v3` en Python y Go, idéntica byte a byte.
+
+**B · Explorador.** `components/stats/explorer/` sustituye al signal tape de `/stats`; `TapeBars`
+sigue en el mini tape de Home. Modos adaptativos (completo para 7d/30d/mes, ventana arrastrable
+para el resto), `useStatsRange` con caché por cuenta e invalidación `history`, panel con
+artistas/álbumes/pistas/descubrimientos del tramo y del día. Vistas puras con `links`/`renderImage`
+como props (showcase). Comparación con el periodo anterior, hero de artista, acción/replay,
+movimiento (Rising/Falling) y perfil sonoro con marcador previo; se retiran las tarjetas de
+discoveries y las claves `stats.signal.*`/`stats.story.*Body`.
+
+**C · Instrumento de escucha.** `ListeningHeatmap` en variante banda con contadores del propio
+mapa (pico, noche, género principal), PD43 en servidor (`hidden_reason: "few_listeners"`), título
+neutro fuera del ámbito personal, ola una vez por sujeto y sesión.
+
+**Decisiones.** Rulings R1–R28 en `.superpowers/sdd/2026-10-21-crate-v3-stats-refactor-plan/progress.md`;
+reflejados en `design-system.md` §4.7 y §4.26, `app/listen/AGENTS.md` y
+`docs/technical/listening-stats-projections.md`.
+
+**Diferido.** Scramble del género principal (no existe `scramble.ts`), count-up de 1,6 s (se
+entrega 1,2 s), arrastre táctil para explorar el heatmap, tarea de backfill "quiet" (no hay
+mecanismo de silencio; hoy notifica) y texto localizado para el "n/a" de `Meter`. QA física
+nativa/AT pendiente.
