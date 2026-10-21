@@ -1876,6 +1876,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minutu} other {# minutu}}",
   "stats.heatmap.nowCell": "{cell}, orain",
   "stats.heatmap.figure": "Entzunaldi gehienak: {weekday}, {hour} aldera; {share} gauez.",
+  "stats.heatmap.figurePeak": "Entzunaldi gehienak: {weekday}, {hour} aldera.",
   "stats.heatmap.peak": "Gailurra",
   "stats.heatmap.night": "Gaua {start}–{end}",
   "stats.heatmap.topGenre": "Genero nagusia",

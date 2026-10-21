@@ -1876,6 +1876,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minuto} other {# minuti}}",
   "stats.heatmap.nowCell": "{cell}, adesso",
   "stats.heatmap.figure": "Picco di ascolto: {weekday} verso le {hour}; il {share} di notte.",
+  "stats.heatmap.figurePeak": "Picco di ascolto: {weekday} verso le {hour}.",
   "stats.heatmap.peak": "Picco",
   "stats.heatmap.night": "Notte {start}–{end}",
   "stats.heatmap.topGenre": "Genere principale",

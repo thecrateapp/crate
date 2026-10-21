@@ -2,6 +2,8 @@ import type { StatsGenre, StatsGenreTrend, StatsHeatmap } from "./stats-types";
 
 /** D30: the instance grid needs at least this many listeners. */
 export const HEATMAP_MIN_LISTENERS = 3;
+/** PD43: the instance builder's `hidden_reason` below three listeners. */
+export const HEATMAP_HIDDEN_FEW_LISTENERS = "few_listeners";
 /** The backend's `_NIGHT_HOURS`, for payloads older than `night_hours`. */
 export const DEFAULT_NIGHT_HOURS: readonly number[] = [
   22, 23, 0, 1, 2, 3, 4, 5,
@@ -40,7 +42,8 @@ export interface HeatmapModel {
   max: number;
   peak: (HeatmapSlot & { minutes: number }) | null;
   nightHours: number[];
-  nightShare: number;
+  /** Null when unknown: hidden by the server, or no listening at all. */
+  nightShare: number | null;
   nightRange: { start: number; end: number } | null;
   nowCell: HeatmapSlot | null;
 }
@@ -175,9 +178,11 @@ export function buildHeatmapModel(
     peak,
     nightHours,
     nightShare:
-      total > 0 && Number.isFinite(heatmap.night_share)
+      total > 0 &&
+      typeof heatmap.night_share === "number" &&
+      Number.isFinite(heatmap.night_share)
         ? heatmap.night_share
-        : 0,
+        : null,
     nightRange: nightHours.length
       ? { start: nightHours[0]!, end: nightHours[nightHours.length - 1]! }
       : null,
@@ -196,11 +201,16 @@ export function heatmapTopGenre(
   return name || null;
 }
 
-/** D30: the instance grid stays hidden below three listeners (or without a count). */
+/**
+ * D30/PD43: the instance grid stays hidden below three listeners. The server's
+ * `hidden_reason` decides; the count (or its absence) is the fallback for
+ * payloads built before the server rule.
+ */
 export function heatmapGridHidden(
   heatmap: StatsHeatmap,
   scope: HeatmapScope,
 ): boolean {
+  if (heatmap.hidden_reason === HEATMAP_HIDDEN_FEW_LISTENERS) return true;
   return (
     scope === "global" && (heatmap.listener_count ?? 0) < HEATMAP_MIN_LISTENERS
   );

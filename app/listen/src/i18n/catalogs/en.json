@@ -1884,6 +1884,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minute} other {# minutes}}",
   "stats.heatmap.nowCell": "{cell}, now",
   "stats.heatmap.figure": "Most listening happens on {weekday} around {hour}; {share} of it at night.",
+  "stats.heatmap.figurePeak": "Most listening happens on {weekday} around {hour}.",
   "stats.heatmap.peak": "Peak",
   "stats.heatmap.night": "Night {start}–{end}",
   "stats.heatmap.topGenre": "Top genre",

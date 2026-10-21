@@ -323,9 +323,12 @@ export interface StatsArtistOfPeriod {
 export interface StatsHeatmap {
   cells: number[][];
   peak?: { weekday: number; hour: number } | null;
-  night_share: number;
+  /** Null when the instance heatmap is hidden (PD43). */
+  night_share: number | null;
   night_hours?: number[];
   listener_count?: number | null;
+  /** "few_listeners": the instance builder blanked cells, peak and night share (PD43). */
+  hidden_reason?: string | null;
 }
 
 export interface StatsDecadeAlbum {

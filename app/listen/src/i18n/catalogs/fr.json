@@ -1876,6 +1876,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minute} other {# minutes}}",
   "stats.heatmap.nowCell": "{cell}, maintenant",
   "stats.heatmap.figure": "L'écoute culmine le {weekday} vers {hour} ; {share} a lieu la nuit.",
+  "stats.heatmap.figurePeak": "L'écoute culmine le {weekday} vers {hour}.",
   "stats.heatmap.peak": "Pic",
   "stats.heatmap.night": "Nuit {start}–{end}",
   "stats.heatmap.topGenre": "Genre principal",

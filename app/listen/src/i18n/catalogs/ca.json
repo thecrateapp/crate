@@ -1876,6 +1876,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minut} other {# minuts}}",
   "stats.heatmap.nowCell": "{cell}, ara",
   "stats.heatmap.figure": "Sobretot s'escolta el {weekday} cap a les {hour}; el {share}, de nit.",
+  "stats.heatmap.figurePeak": "Sobretot s'escolta el {weekday} cap a les {hour}.",
   "stats.heatmap.peak": "Pic",
   "stats.heatmap.night": "Nit {start}–{end}",
   "stats.heatmap.topGenre": "Gènere principal",

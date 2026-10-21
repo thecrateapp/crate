@@ -7039,6 +7039,10 @@
     "sourceHash": "sha256:0118eab69cc7e7e8e7dc49e154819ab29e6ca12ed4090a3e8a776c97eb5c4d7f",
     "reviewedAt": "2026-10-21T02:33:58.603Z"
   },
+  "stats.heatmap.figurePeak": {
+    "sourceHash": "sha256:4ff9494a7a6299dab44a08c7fc3ec0c13809d44f1e7ffbb9df6559910aed4d0e",
+    "reviewedAt": "2026-10-21T02:48:36.003Z"
+  },
   "stats.heatmap.grid": {
     "sourceHash": "sha256:4d9f3054d6fc091f7020836553d402a5e34c7dd83e3428202afa221c7819bc9f",
     "reviewedAt": "2026-10-21T02:33:58.603Z"

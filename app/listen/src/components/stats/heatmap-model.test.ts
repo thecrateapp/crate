@@ -195,4 +195,37 @@ describe("heatmap model", () => {
       heatmapGridHidden({ ...sparse, listener_count: null }, "global"),
     ).toBe(true);
   });
+
+  it("follows the server's hidden reason first", () => {
+    // PD43: the instance builder blanks the payload and says why.
+    const blanked = heatmap(() => 0, {
+      peak: null,
+      night_share: null,
+      listener_count: 2,
+      hidden_reason: "few_listeners",
+    });
+    expect(heatmapGridHidden(blanked, "global")).toBe(true);
+    // The server flag wins even over a count that looks sufficient.
+    expect(heatmapGridHidden({ ...blanked, listener_count: 7 }, "global")).toBe(
+      true,
+    );
+    const model = buildHeatmapModel(blanked, {
+      timezone: null,
+      now: at("2026-01-15T12:00:00Z"),
+    });
+    expect(model.peak).toBeNull();
+    expect(model.nightShare).toBeNull();
+  });
+
+  it("keeps a missing night share unknown, not zero", () => {
+    const model = buildHeatmapModel(
+      heatmap((weekday, hour) => (weekday === 2 && hour === 9 ? 40 : 2), {
+        peak: { weekday: 2, hour: 9 },
+        night_share: null,
+      }),
+      { timezone: null, now: at("2026-01-15T12:00:00Z") },
+    );
+    expect(model.peak).toEqual({ weekday: 2, hour: 9, minutes: 40 });
+    expect(model.nightShare).toBeNull();
+  });
 });

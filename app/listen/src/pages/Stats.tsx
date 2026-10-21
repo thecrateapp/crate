@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { statsDashboardReadState } from "./stats-page-model";
 import { Link } from "react-router";
 import {
@@ -112,6 +113,9 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
   const tape = dashboard?.tape;
   const highlights = dashboard?.highlights;
   const comparison = statsComparison(page);
+  // The sections remount while an uncached period loads; this flag outlives
+  // them so the heatmap's entrance wave plays once per page session.
+  const heatmapEntrance = useRef(false);
   return (
     <StatsPageView
       header={<StatsHeader page={page} />}
@@ -203,7 +207,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
             loading={dashboardLoading && !dashboard}
           />
         </StatsReveal>
-        <StatsListeningSection page={page} />
+        <StatsListeningSection page={page} entranceRef={heatmapEntrance} />
         {dashboard?.music_age ? (
           <StatsReveal>
             <StatsMusicAgeCard musicAge={dashboard.music_age} />
@@ -218,7 +222,13 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
   );
 }
 
-function StatsListeningSection({ page }: { page: StatsPageController }) {
+function StatsListeningSection({
+  page,
+  entranceRef,
+}: {
+  page: StatsPageController;
+  entranceRef: { current: boolean };
+}) {
   const { dashboard } = page;
   const scope = statsScope(page);
   return (
@@ -236,6 +246,7 @@ function StatsListeningSection({ page }: { page: StatsPageController }) {
             )}
             loading={page.dashboardLoading && !dashboard}
             pending={dashboard?.snapshot?.pending === true}
+            entranceRef={entranceRef}
           />
         }
       >

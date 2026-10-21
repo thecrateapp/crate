@@ -150,9 +150,16 @@ describe("ListeningHeatmap", () => {
   });
 
   it("hides the instance grid below three listeners", () => {
+    // The server-shaped payload (PD43): zero cells, no peak, no night share.
     const { rerender } = renderWithListenProviders(
       <ListeningHeatmap
-        heatmap={fixture({ listener_count: 2 })}
+        heatmap={fixture({
+          cells: Array.from({ length: 7 }, () => Array(24).fill(0)),
+          peak: null,
+          night_share: null,
+          listener_count: 2,
+          hidden_reason: "few_listeners",
+        })}
         timezone={null}
         showNow={false}
         scope="global"
@@ -168,6 +175,20 @@ describe("ListeningHeatmap", () => {
     // Only the top genre remains: the peak and night share would expose a listener.
     expect(screen.getByText("Metalcore")).toBeInTheDocument();
     expect(screen.queryByText("Peak")).toBeNull();
+    expect(screen.queryByText(/^Night/)).toBeNull();
+    expect(document.querySelector("[data-slot='heatmap-readout']")).toBeNull();
+
+    // An older payload without the reason still hides on the count.
+    rerender(
+      <ListeningHeatmap
+        heatmap={fixture({ listener_count: 2 })}
+        timezone={null}
+        showNow={false}
+        scope="global"
+        topGenre="Metalcore"
+      />,
+    );
+    expect(screen.queryByRole("grid")).toBeNull();
     expect(screen.queryByText("38%")).toBeNull();
 
     rerender(
@@ -181,6 +202,49 @@ describe("ListeningHeatmap", () => {
     );
     expect(screen.getByRole("grid")).toBeInTheDocument();
     expect(screen.getByText("Listener local time")).toBeInTheDocument();
+  });
+
+  it("tolerates a missing night share", () => {
+    renderWithListenProviders(
+      <ListeningHeatmap
+        heatmap={fixture({ night_share: null })}
+        timezone={null}
+        showNow={false}
+        scope="personal"
+        topGenre={null}
+      />,
+    );
+    expect(screen.getByRole("grid")).toBeInTheDocument();
+    expect(readout()).toHaveTextContent("Sunday 22:00 · 1h 30m");
+    // No invented 0 %: the night counter and the share drop out.
+    expect(screen.queryByText(/^Night/)).toBeNull();
+    expect(screen.getByText("Sunday 22:00")).toBeInTheDocument();
+    expect(
+      screen.getByText("Most listening happens on Sunday around 22:00."),
+    ).toBeInTheDocument();
+  });
+
+  it("plays the entrance wave once per page session", () => {
+    // The page keeps this ref above the band, which remounts while an
+    // uncached period loads.
+    const entrance = { current: false };
+    const band = (
+      <ListeningHeatmap
+        heatmap={fixture()}
+        timezone={null}
+        showNow={false}
+        scope="personal"
+        topGenre={null}
+        entranceRef={entrance}
+      />
+    );
+    const first = renderWithListenProviders(band);
+    expect(screen.getByRole("grid")).toHaveAttribute("data-entering");
+    expect(entrance.current).toBe(true);
+    first.unmount();
+
+    renderWithListenProviders(band);
+    expect(screen.getByRole("grid")).not.toHaveAttribute("data-entering");
   });
 
   it("marks the now cell and moves it on the next hour", () => {

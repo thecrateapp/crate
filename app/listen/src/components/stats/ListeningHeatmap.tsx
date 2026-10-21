@@ -73,6 +73,12 @@ export interface ListeningHeatmapProps {
   loading?: boolean;
   /** Cold snapshot: the projection is still being built. */
   pending?: boolean;
+  /**
+   * Set once the entrance wave has played. Pass a ref that outlives the band
+   * (the page keeps one above the section that remounts while a period loads)
+   * so the wave plays only on the first real payload of the page session.
+   */
+  entranceRef?: { current: boolean };
 }
 
 /**
@@ -88,6 +94,7 @@ export function ListeningHeatmap({
   topGenre = null,
   loading = false,
   pending = false,
+  entranceRef,
 }: ListeningHeatmapProps) {
   if (!heatmap) {
     // Error or absent payload: the band is not mounted.
@@ -102,6 +109,7 @@ export function ListeningHeatmap({
       showNow={showNow}
       scope={scope}
       topGenre={topGenre}
+      entranceRef={entranceRef}
     />
   );
 }
@@ -140,12 +148,14 @@ function HeatmapBand({
   showNow,
   scope,
   topGenre,
+  entranceRef,
 }: {
   heatmap: StatsHeatmap;
   timezone: string | null;
   showNow: boolean;
   scope: HeatmapScope;
   topGenre: string | null;
+  entranceRef?: { current: boolean };
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -200,13 +210,17 @@ function HeatmapBand({
   const active = chosen ?? peakIndex ?? 0;
   const readoutIndex = hovered ?? chosen ?? peakIndex;
 
-  // Diagonal wave on the first real payload only; later data transitions opacity.
+  // Diagonal wave on the first real payload of the session only; later data
+  // transitions opacity. Render only reads the flag; the effect sets it.
+  const ownEntrance = useRef(false);
+  const entrance = entranceRef ?? ownEntrance;
   const real = model.total > 0 && !hidden;
-  const [entering, setEntering] = useState(() => real && !isMotionBlocked());
-  const enteredRef = useRef(real);
+  const [entering, setEntering] = useState(
+    () => real && !entrance.current && !isMotionBlocked(),
+  );
   useEffect(() => {
-    if (!real || enteredRef.current) return;
-    enteredRef.current = true;
+    if (!real || entrance.current) return;
+    entrance.current = true;
     if (!isMotionBlocked()) setEntering(true);
   }, [real]);
 
@@ -303,13 +317,19 @@ function HeatmapBand({
         minutes: formatStatsMinutes(readoutCell.minutes),
       })
     : "";
-  const figure = model.peak
-    ? t("stats.heatmap.figure", {
-        weekday: longDays[model.peak.weekday],
-        hour: `${pad(model.peak.hour)}:00`,
-        share: percent.format(model.nightShare),
-      })
-    : t("stats.heatmap.empty");
+  const nightShare = model.nightShare;
+  const figure = !model.peak
+    ? t("stats.heatmap.empty")
+    : nightShare === null
+      ? t("stats.heatmap.figurePeak", {
+          weekday: longDays[model.peak.weekday],
+          hour: `${pad(model.peak.hour)}:00`,
+        })
+      : t("stats.heatmap.figure", {
+          weekday: longDays[model.peak.weekday],
+          hour: `${pad(model.peak.hour)}:00`,
+          share: percent.format(nightShare),
+        });
 
   const counters: { key: string; label: string; value: ReactNode }[] = [];
   if (!hidden && model.peak) {
@@ -319,7 +339,8 @@ function HeatmapBand({
       value: `${longDays[model.peak.weekday]} ${pad(model.peak.hour)}:00`,
     });
   }
-  if (!hidden && model.total > 0 && model.nightRange) {
+  // An unknown night share drops out rather than reading as 0 %.
+  if (!hidden && nightShare !== null && model.nightRange) {
     counters.push({
       key: "night",
       label: t("stats.heatmap.night", {
@@ -328,7 +349,7 @@ function HeatmapBand({
       }),
       value: (
         <CountUpNumber
-          value={Math.round(model.nightShare * 100)}
+          value={Math.round(nightShare * 100)}
           format={formatPercent}
         />
       ),

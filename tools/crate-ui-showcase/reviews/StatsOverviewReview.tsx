@@ -134,9 +134,17 @@ const renderDecades: DiggingMedia["renderDecades"] = (age) => (
     className="stats-digging-decades"
   />
 );
-// Heatmap fixtures: Crate Pulse below three listeners hides its grid (D30);
-// "long and zero" shows the flat zero-minute grid.
-const globalHeatmap = { ...dashboard.heatmap!, listener_count: 2 };
+// Heatmap fixtures: Crate Pulse below three listeners arrives blanked by the
+// instance builder (PD43) and hides its grid; "long and zero" shows the flat
+// zero-minute grid.
+const globalHeatmap = {
+  cells: Array.from({ length: 7 }, () => Array<number>(24).fill(0)),
+  peak: null,
+  night_share: null,
+  night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+  listener_count: 2,
+  hidden_reason: "few_listeners",
+};
 const zeroHeatmap = {
   cells: Array.from({ length: 7 }, () => Array<number>(24).fill(0)),
   peak: null,

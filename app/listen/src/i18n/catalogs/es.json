@@ -1884,6 +1884,7 @@
   "stats.heatmap.cell": "{weekday} {hour}:00, {minutes, plural, one {# minuto} other {# minutos}}",
   "stats.heatmap.nowCell": "{cell}, ahora",
   "stats.heatmap.figure": "Se escucha sobre todo el {weekday} hacia las {hour}; el {share}, de noche.",
+  "stats.heatmap.figurePeak": "Se escucha sobre todo el {weekday} hacia las {hour}.",
   "stats.heatmap.peak": "Pico",
   "stats.heatmap.night": "Noche {start}–{end}",
   "stats.heatmap.topGenre": "Género principal",

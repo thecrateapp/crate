@@ -541,7 +541,15 @@ describe("Stats page", () => {
 
   it("hides the Crate Pulse heatmap grid below three listeners", () => {
     const dashboard = signalDashboard();
-    dashboard.heatmap!.listener_count = 2;
+    // As the instance builder ships it below three listeners (PD43).
+    dashboard.heatmap = {
+      cells: Array.from({ length: 7 }, () => Array<number>(24).fill(0)),
+      peak: null,
+      night_share: null,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+      listener_count: 2,
+      hidden_reason: "few_listeners",
+    };
     mockApis(dashboard);
     const { container } = renderWithListenProviders(<Stats />, {
       route: "/stats/global",
