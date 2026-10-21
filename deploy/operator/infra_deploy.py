@@ -61,10 +61,15 @@ def _check_optional(path):
 
 
 def _context_root(root):
-    raw = (root / ".env").read_text()
+    # grep/tail/cut select LF-delimited records and preserve every other byte.
+    # Reject binary/non-UTF8 input rather than emulate grep's binary-file behavior.
+    raw = (root / ".env").read_bytes()
+    if b"\0" in raw:
+        raise ValueError("Unsupported binary host environment")
+    raw = raw.decode("utf-8")
     matches = [
         line.partition("=")[2]
-        for line in raw.splitlines()
+        for line in raw.split("\n")
         if line.startswith("DATA_DIR=")
     ]
     value = matches[-1] if matches else ""
@@ -72,6 +77,8 @@ def _context_root(root):
     value = (
         value.removesuffix('"').removeprefix('"').removesuffix("'").removeprefix("'")
     )
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ValueError("Unsupported control character in DATA_DIR")
     directory = Path(value + "/hermes-agent")
     if not directory.is_absolute():
         directory = root / directory
@@ -112,10 +119,7 @@ def validate_host(root, *, backup_id=None):
         for line in script.splitlines()
         if line.strip().startswith("python3 ")
     ]
-    if not calls or any(
-        not line.startswith("python3 -I ")
-        for line in calls
-    ):
+    if not calls or any(not line.startswith("python3 -I ") for line in calls):
         raise ValueError("Host helper requires isolated Python imports")
     context = _context_root(root)
     if context.parent.exists() or context.parent.is_symlink():

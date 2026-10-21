@@ -28,7 +28,11 @@ active/candidate release files, optional federation config, staging/backup direc
 per-operation backup descendants and the configured context marker destination.
 Present consumed files and their ancestors must be root-owned, non-writable by group
 or others, regular and not symlinks; dangling symlinks are also rejected. Optional
-absence is explicit. Install this revision of `deploy-remote.sh`: helper calls use
+absence is explicit. The host `.env` must be UTF-8 without NUL bytes. `DATA_DIR`
+uses the shell's LF-delimited, last-matching-key and surrounding-quote semantics;
+ASCII control characters (including a retained CR from CRLF) are rejected before
+startup/effects, so validation cannot select a normalized alternative destination.
+Install this revision of `deploy-remote.sh`: helper calls use
 `python3 -I`, preventing local-module/cwd/user-site shadow imports. The helper's fixed
 stdlib imports are checked; new local/import dependencies require a code review and
 closed enumeration update. The unit

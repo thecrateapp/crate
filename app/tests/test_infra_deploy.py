@@ -391,3 +391,108 @@ def test_host_helper_import_closure_and_isolated_invocation_are_enforced(
     )
     with pytest.raises(ValueError, match="isolated Python"):
         validate_host(root)
+
+
+def _shell_data_dir(root):
+    """Execute only the repository's actual selector, never a deployment step."""
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts/deploy-remote.sh"
+    ).read_text()
+    function = script.split("env_file_value() {", 1)[1].split("\n}\n", 1)[0]
+    return subprocess.run(
+        [
+            "/bin/bash",
+            "-eu",
+            "-c",
+            "env_file_value() {" + function + "\n}\nenv_file_value .env DATA_DIR",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
+    ).stdout
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"DATA_DIR=./data\n",
+        b'DATA_DIR="./data with spaces"\n',
+        b"DATA_DIR='./single'\n",
+        b"DATA_DIR=./first\nDATA_DIR='./last'\n",
+        b"DATA_DIR=./no-final-newline",
+        "DATA_DIR=./unicode\u0085separator\u2028path\n".encode(),
+        b"OTHER=value\n",
+    ],
+)
+def test_context_destination_matches_actual_shell_normal_values(tmp_path, raw):
+    from deploy.operator.infra_deploy import _context_root
+
+    (tmp_path / ".env").write_bytes(raw)
+    selected = _shell_data_dir(tmp_path).decode("utf-8")
+    expected = Path(selected + "/hermes-agent/context")
+    if not expected.is_absolute():
+        expected = tmp_path / expected
+    assert _context_root(tmp_path) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"DATA_DIR=./data\r\n",
+        b"DATA_DIR=./data\vother\n",
+        b"DATA_DIR=./data\x1cother\n",
+        b"OTHER=\0\nDATA_DIR=./data\n",
+        b"DATA_DIR=./data\xff\n",
+    ],
+)
+def test_context_destination_rejects_unsupported_bytes(tmp_path, raw):
+    from deploy.operator.infra_deploy import _context_root
+
+    (tmp_path / ".env").write_bytes(raw)
+    with pytest.raises(ValueError):
+        _context_root(tmp_path)
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason="Disposable root filesystem fixture")
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"DATA_DIR=./data\r\n",
+        b"DATA_DIR=./data\vother\n",
+        b"DATA_DIR=./data\x1cother\n",
+        b'DATA_DIR="./quoted data"\n',
+        b"DATA_DIR=./ignored\nDATA_DIR='./last'\n",
+        "DATA_DIR=./unicode\u0085separator\u2028path\n".encode(),
+    ],
+)
+def test_startup_rejects_actual_shell_selected_untrusted_destination(raw):
+    root = Path("/root") / ("crate-infra-context-" + uuid.uuid4().hex)
+    root.mkdir(mode=0o700)
+    try:
+        for name in REQUIRED:
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{}\n")
+        (root / "scripts/deploy-remote.sh").write_text(
+            "python3 -I deploy/hermes/activate_context.py --root test\n"
+        )
+        (root / "deploy/hermes/activate_context.py").write_text("import json\n")
+        (root / ".env").write_bytes(raw)
+        selected = _shell_data_dir(root).decode("utf-8")
+        target = root / selected / "hermes-agent/context/deployment.json"
+        target.parent.mkdir(parents=True)
+        target.write_text("{}\n")
+        assert all(path.stat().st_uid == 0 for path in target.parents)
+        if not any(ord(character) < 32 for character in selected):
+            validate_host(root)
+        os.chown(target, 1000, 1000)
+        runner = FakeCommands()
+        policy = SimpleNamespace(
+            provisioned=True, config={"enabled": True, "server_path": str(root)}
+        )
+        with pytest.raises(ValueError, match="Root-owned|control character"):
+            Executor(policy, runner=runner, real=True)
+        assert not runner.calls
+    finally:
+        shutil.rmtree(root)
