@@ -2,8 +2,12 @@ import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import type { Track } from "@/contexts/PlayerContext";
 import { toPlayableTrack } from "@/lib/playable-track";
 
-import type { StatsRangeTrack, StatsTrack, ReplayMix } from "./stats-types";
+import type { StatsRangeTrack, StatsTrack } from "./stats-types";
 export type * from "./stats-types";
+export {
+  localizedReplaySubtitle,
+  localizedReplayTitle,
+} from "./stats-replay-title";
 export {
   buildStatsGenreProfile,
   formatStatsMinutes,
@@ -43,39 +47,4 @@ export function statsTrackRowData(item: StatsTrack): TrackRowData {
     valence: item.valence,
     bliss_vector: item.bliss_vector,
   };
-}
-
-type ReplayTranslate = (
-  key: string,
-  values?: Record<string, string | number>,
-) => string;
-
-function replayYear(replay: ReplayMix): string {
-  return /^year:(\d{4})$/.exec(replay.window)?.[1] ?? "";
-}
-
-export function localizedReplayTitle(
-  replay: ReplayMix | undefined,
-  t: ReplayTranslate,
-): string | undefined {
-  if (replay?.title_key) {
-    return t(replay.title_key, {
-      defaultValue: replay.title,
-      year: replayYear(replay),
-    });
-  }
-  return replay?.title || undefined;
-}
-
-export function localizedReplaySubtitle(
-  replay: ReplayMix | undefined,
-  t: ReplayTranslate,
-): string | undefined {
-  if (replay?.subtitle_key) {
-    return t(replay.subtitle_key, {
-      defaultValue: replay.subtitle,
-      year: replayYear(replay),
-    });
-  }
-  return replay?.subtitle || undefined;
 }

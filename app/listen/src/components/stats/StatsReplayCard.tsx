@@ -10,7 +10,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 
 import { formatStatsMinutes } from "./stats-format";
-import { localizedReplayTitle } from "./stats-model";
+import { localizedReplayTitle } from "./stats-replay-title";
 import type { ReplayMix, StatsTrack } from "./stats-types";
 
 const MOSAIC_SIZE = 4;
