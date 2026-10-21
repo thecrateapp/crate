@@ -1991,5 +1991,14 @@
   "settings.offline.state.downloading": "Wird heruntergeladen",
   "settings.offline.state.syncing": "Gespeicherte Musik wird aktualisiert",
   "settings.offline.state.ready": "Offline verfügbar",
-  "settings.offline.state.error": "Bitte prüfen"
+  "settings.offline.state.error": "Bitte prüfen",
+  "player.output.group.local": "Dieses Gerät",
+  "player.output.group.cast": "Google Cast",
+  "player.output.group.system": "Systemausgänge",
+  "player.output.group.connect": "Crate Connect",
+  "player.output.loadFailed": "Deine Ausgänge konnten nicht geladen werden. Versuche es erneut.",
+  "player.output.providerFailed": "Einige Ausgänge sind nicht verfügbar. Versuche es erneut.",
+  "player.output.connecting": "Verbindung wird hergestellt...",
+  "player.output.cast.session": "Cast-Sitzung",
+  "player.volume.mute": "Stummschalten"
 }

@@ -1991,5 +1991,14 @@
   "settings.offline.state.downloading": "Deskargatzen",
   "settings.offline.state.syncing": "Gordetako musika eguneratzen",
   "settings.offline.state.ready": "Lineaz kanpo erabilgarri",
-  "settings.offline.state.error": "Arreta behar du"
+  "settings.offline.state.error": "Arreta behar du",
+  "player.output.group.local": "Gailu hau",
+  "player.output.group.cast": "Google Cast",
+  "player.output.group.system": "Sistemaren irteerak",
+  "player.output.group.connect": "Crate Connect",
+  "player.output.loadFailed": "Ezin izan dira irteerak kargatu. Saiatu berriro.",
+  "player.output.providerFailed": "Irteera batzuk ez daude erabilgarri. Saiatu berriro.",
+  "player.output.connecting": "Konektatzen...",
+  "player.output.cast.session": "Cast saioa",
+  "player.volume.mute": "Mututu"
 }

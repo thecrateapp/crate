@@ -6,7 +6,7 @@ import {
   RadioTower,
 } from "@crate/ui/icons";
 
-import type { PlaybackTarget } from "@/lib/playback-targets";
+import type { PlaybackTarget } from "../../lib/playback-target-data";
 
 export function PlaybackTargetIcon({ target }: { target: PlaybackTarget }) {
   if (target.kind === "google-cast") return <Cast size={CRATE_ICON_SIZE.md} />;

@@ -1991,5 +1991,14 @@
   "settings.offline.state.downloading": "Baixant",
   "settings.offline.state.syncing": "Actualitzant la música desada",
   "settings.offline.state.ready": "Disponible sense connexió",
-  "settings.offline.state.error": "Necessita atenció"
+  "settings.offline.state.error": "Necessita atenció",
+  "player.output.group.local": "Aquest dispositiu",
+  "player.output.group.cast": "Google Cast",
+  "player.output.group.system": "Rutes del sistema",
+  "player.output.group.connect": "Crate Connect",
+  "player.output.loadFailed": "No s’han pogut carregar les sortides. Torna-ho a provar.",
+  "player.output.providerFailed": "Algunes sortides no estan disponibles. Torna-ho a provar.",
+  "player.output.connecting": "Connectant...",
+  "player.output.cast.session": "Sessió de Cast",
+  "player.volume.mute": "Silenciar"
 }

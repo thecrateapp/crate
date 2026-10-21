@@ -4311,6 +4311,10 @@
     "sourceHash": "sha256:0eb272959a15ea1b76155dd1e5ace7359caee9442ec9552c92249a74e9d497bb",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "player.output.cast.session": {
+    "sourceHash": "sha256:2ad60a1adcc22658ada691c97749de7a53bd361977f64a667ece2dd605d22f67",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
   "player.output.cast.stop": {
     "sourceHash": "sha256:df7b79354abdfd9c28f8d889867e01599aed3e118b7067b13e52f27392085877",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
@@ -4319,17 +4323,45 @@
     "sourceHash": "sha256:40dd8f65417ea53e9015cf6d442930c20ee100b2d30487e2d9af319362814316",
     "reviewedAt": "2026-10-07T13:21:25.887Z"
   },
+  "player.output.connecting": {
+    "sourceHash": "sha256:c23781e56d66901226d5de330a51be230726c1e0b01d6c311ad014569215aeba",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
   "player.output.empty": {
     "sourceHash": "sha256:5bdd4aa22291ff5a319c7800c6345954a1b2254e7bb6c898af3003961dfa3420",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.output.group.cast": {
+    "sourceHash": "sha256:48836bed52a83e52bd38d14e0c3e0cb10c6f7fb8325bd89ebb358e78a4c7b4d4",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
+  "player.output.group.connect": {
+    "sourceHash": "sha256:35b7ac8cd4072a498a6be31c759f2436506a2d772c6f5842a07fc0f2f50c8777",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
+  "player.output.group.local": {
+    "sourceHash": "sha256:cb0966770c5fdd6af405c58ec44ce71a8cdc4115e95952661991057216aa3be4",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
+  "player.output.group.system": {
+    "sourceHash": "sha256:bfb39d435d6426a58393685e94bc2b43232557ebc550d76d2e793237ec733239",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
   },
   "player.output.label": {
     "sourceHash": "sha256:cc84677711ac2adb8d888d4f6c273864a85ae742256cc01b08f699b8f131e41f",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "player.output.loadFailed": {
+    "sourceHash": "sha256:184bba80cd378459cfb62bbcad9a3cd7740615944767c4aae107f5306f31dfb0",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
+  },
   "player.output.loading": {
     "sourceHash": "sha256:c49189c075d7a2351b8eec6669b3bbf0ac66d1f5fef6bdae85f2eb9596c444ed",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.output.providerFailed": {
+    "sourceHash": "sha256:41386a143671cdf1daf4690f9b28aec3a93323e985b40be5ff8dd5e000a68e69",
+    "reviewedAt": "2026-10-20T22:25:47.949Z"
   },
   "player.output.targets": {
     "sourceHash": "sha256:b173dbeffa53a39d06c0de38b45078aad84e98769681ee142bb05969574416dc",
@@ -4542,6 +4574,10 @@
   "player.volume.label": {
     "sourceHash": "sha256:2d9fe9678de1afb694bb5bf331d08c0bdcc831b95f35f4141a3506d5b0b07bde",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "player.volume.mute": {
+    "sourceHash": "sha256:b38edc28605d2a49f69589c3bba0a5225e33c9c7cf75110714f614707e94c39c",
+    "reviewedAt": "2026-10-20T22:47:07.094Z"
   },
   "player.volume.unmute": {
     "sourceHash": "sha256:8547f7a97267f91dc672d32c501c1fd92c05af3cb254405a3488ff1e8e22cbfe",

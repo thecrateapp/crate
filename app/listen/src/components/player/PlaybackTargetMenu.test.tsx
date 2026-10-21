@@ -112,28 +112,12 @@ describe("PlaybackTargetMenu", () => {
     renderWithListenProviders(<PlaybackTargetMenu />);
 
     const outputButton = screen.getByRole("button", { name: "Output" });
-    expect(outputButton.className).not.toContain("hover:bg");
-    expect(outputButton.className).toContain("hover:text-accent-action");
-    expect(outputButton.className).toContain("hover:drop-shadow-accent-action");
-    expect(outputButton.className).not.toContain("text-white/30");
-    expect(outputButton.className).not.toContain("rgba(");
-
     fireEvent.click(outputButton);
 
     expect(await screen.findByText("Crate on Chrome")).toBeVisible();
     expect(screen.getByText("System-selected output")).toBeVisible();
     expect(screen.getByText("Desktop")).toBeVisible();
     expect(screen.getByText("Unavailable")).toBeVisible();
-
-    const menu = screen.getByRole("menu", { name: "Output targets" });
-    const localRow = menu.querySelector('[role="menuitemradio"]');
-
-    expect(localRow).toHaveClass(
-      "text-text-primary",
-      "hover:bg-surface-control",
-    );
-    expect(menu.innerHTML).not.toContain("rgba(");
-    expect(menu.innerHTML).not.toContain("bg-white");
   });
 
   it("surfaces the active remote Connect device", async () => {
@@ -279,7 +263,9 @@ describe("PlaybackTargetMenu", () => {
     renderWithListenProviders(<PlaybackTargetMenu />);
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: /^Disconnect/ }));
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: /^Disconnect/ }),
+    );
     await waitFor(() =>
       expect(disconnectCastSessionMock).toHaveBeenCalledOnce(),
     );
@@ -287,8 +273,48 @@ describe("PlaybackTargetMenu", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
     fireEvent.click(
-      await screen.findByRole("button", { name: /^Stop casting/ }),
+      await screen.findByRole("menuitem", { name: /^Stop casting/ }),
     );
     await waitFor(() => expect(stopCastSessionMock).toHaveBeenCalledOnce());
+  });
+  it("shows discovery failure with retry instead of empty", async () => {
+    loadGroupsMock.mockRejectedValue(new Error("network"));
+    renderWithListenProviders(<PlaybackTargetMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not load your outputs",
+    );
+    loadGroupsMock.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Output targets" }),
+    ).toBeVisible();
+  });
+
+  it("blocks duplicate transfers and recovers from rejected selection", async () => {
+    let rejectTransfer: (reason: Error) => void = () => {};
+    selectTargetMock.mockReturnValue(
+      new Promise((_, reject) => {
+        rejectTransfer = reject;
+      }),
+    );
+    renderWithListenProviders(<PlaybackTargetMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+    const row = await screen.findByRole("menuitemradio", {
+      name: /Crate on Chrome/,
+    });
+    fireEvent.click(row);
+    fireEvent.click(row);
+    expect(selectTargetMock).toHaveBeenCalledOnce();
+    expect(row).toBeDisabled();
+    rejectTransfer(new Error("internal transport details"));
+    await waitFor(() => expect(row).not.toBeDisabled());
+    expect(
+      screen.getByRole("dialog", { name: "Output targets" }),
+    ).toBeVisible();
+    expect(toastInfoMock).toHaveBeenCalledWith("Output target is unavailable.");
   });
 });

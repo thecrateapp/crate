@@ -1991,5 +1991,14 @@
   "settings.offline.state.downloading": "Downloading",
   "settings.offline.state.syncing": "Updating saved music",
   "settings.offline.state.ready": "Available offline",
-  "settings.offline.state.error": "Needs attention"
+  "settings.offline.state.error": "Needs attention",
+  "player.output.group.local": "This device",
+  "player.output.group.cast": "Google Cast",
+  "player.output.group.system": "System routes",
+  "player.output.group.connect": "Crate Connect",
+  "player.output.loadFailed": "Could not load your outputs. Try again.",
+  "player.output.providerFailed": "Some outputs are unavailable. Try again.",
+  "player.output.connecting": "Connecting...",
+  "player.output.cast.session": "Cast session",
+  "player.volume.mute": "Mute"
 }

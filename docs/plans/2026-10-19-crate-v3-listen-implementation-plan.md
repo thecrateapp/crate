@@ -685,3 +685,33 @@ loading/error/empty mantienen contraste completo. Las líneas sincronizadas pose
 incluso sin Card antecesor. Reproducción RED y posterior GREEN en ambos hosts. Validación final:
 163testsListen/4skips existentes,48Desktop y8casos browser; tres tipos y tres builds correctos,
 lint acotado, i18n0/0 y catálogo63/93/120. Tres servicios activos; se para sin commit para revisión.
+
+### 1BE · siguiente lote interno: Output y dispositivos (2026-10-21)
+
+Lyrics/Info aprobado y publicado como`a193a1b2`. Output conserva proveedores Cast/Connect/local/
+native y autoridad Jam/remote; PlaybackTargetMenu queda como adaptador, con cancelación de
+refresh/eventos y contexto por ref. Panel/Picker reales comparten AppPopover, AppMenuButton,
+FormField8px, MonoLabel, StatusDot y estados de carga/error/empty. Motivos no disponibles
+visibles, retry de proveedor sin ocultar salidas sanas, pending sin acciones duplicadas y errores
+amigables. Desconectar Cast y detener playback siguen siendo acciones diferentes. Teclado/foco,
+scroll y altura/ancho se resuelven en el Picker que usan producción y review.
+Enmienda de Diego: volumen comparte trazo2px con progreso, objetivo44px y control nativo de
+teclado/wheel/pointer intacto. CSS vertical vive con seek/volume; el review usa los controles reales.
+Storybook Listen/Player/Output and Devices y Reviews/1BE/Output and Devices comparten escena
+con5186/review-1be-player-output.html, sin API/audio/preferences writes. No se añade DevicesH3
+ni se certifican protocolos nativos; visualizer/Tauri chrome siguen para próximos lotes.
+Se para sin commit para revisión; Stats sigue fuera de alcance de este lote.
+
+Ampliación aprobada de volumen: hover abre sin robar foco, click mute/restaura último nivel;
+2.5s fuera/inactivo cierra, drag/foco de teclado conservan el panel. Touch abre con tap y ofrece
+mute interno; flechas en el icono abren con foco. Icono con glow proporcional sin pulsación y
+gate Effects. Se corrige centrado24px a la derecha por competencia de transform de entrada;
+PlayerProgressBeam comparte orientación vertical y una sola posición para cabeza/relleno/estela.
+La rueda sobre icono/popover ajusta3% (Shift1%) sin desplazar la página, incluso en0/100;
+listeners nativos no pasivos limitados a esas superficies, con limpieza al cerrar/desmontar.
+Fuera del control el scroll permanece normal. Corregidos también click externo consumido,
+mute en dispositivos híbridos y foco de teclado pendiente al reabrir con hover.
+Validación de cierre:170testsListen,48Desktop y16casos browser; tipos Listen/Desktop/Storybook,
+tres builds, presupuesto inicial204902/307200gzipbytes, lint, i18n0/0 y catálogo correctos.
+Servicios5174(APIprod),5186y6006activos. Diego aprueba Output/Volume y autoriza commit/push;
+la siguiente entrega interna de1BE es Visualizador y estados de análisis.

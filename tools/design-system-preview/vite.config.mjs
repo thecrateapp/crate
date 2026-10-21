@@ -201,6 +201,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        review1bePlayerOutput: fileURLToPath(
+          new URL("review-1be-player-output.html", import.meta.url),
+        ),
         review1bePlayerReading: fileURLToPath(
           new URL("review-1be-player-reading.html", import.meta.url),
         ),
