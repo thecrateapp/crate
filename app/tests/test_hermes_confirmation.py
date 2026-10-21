@@ -125,6 +125,88 @@ def test_native_callback_passes_sdk_identity_and_rejects_wrong_sender(monkeypatc
     asyncio.run(run())
 
 
+@pytest.mark.parametrize(
+    "ack_error",
+    [
+        TimeoutError("timeout"),
+        ValueError(
+            "Query is too old and response timeout expired or query ID is invalid"
+        ),
+    ],
+)
+def test_ack_failure_still_submits_once_and_delivers_durable_outcome(
+    monkeypatch, ack_error
+):
+    sdk(monkeypatch)
+    module = plugin()
+
+    async def run():
+        cid = "a" * 32
+        terminal = {"state": "approved", "job": {"job_id": "job-ack-failed"}}
+        presenter = module.NativePresenter(None, [])
+        durable = {}
+
+        async def event(data):
+            if data["kind"] == "callback":
+                durable["result"] = terminal
+                return terminal
+            if data["kind"] == "pending":
+                return {
+                    "state": "outcome",
+                    "confirmation_id": cid,
+                    "chat_id": 123,
+                    "result": durable["result"],
+                }
+            assert data["kind"] == "outcome_delivered"
+            durable.clear()
+            presenter.application = None
+            return {"state": "delivered"}
+
+        provider = SimpleNamespace(
+            pattern=module.PATTERN, allowed={123}, event=AsyncMock(side_effect=event)
+        )
+        message = SimpleNamespace(
+            chat=SimpleNamespace(id=123, type="private"),
+            message_id=44,
+            reply_text=AsyncMock(),
+        )
+        query = SimpleNamespace(
+            message=message,
+            from_user=SimpleNamespace(id=123, is_bot=False),
+            data="ct:d:" + cid + ":approve",
+            id="sdk-query",
+            answer=AsyncMock(side_effect=ack_error),
+        )
+        await presenter.callback(
+            provider, SimpleNamespace(callback_query=query, update_id=456)
+        )
+        provider.event.assert_awaited_once()
+        assert provider.event.await_args.args[0]["kind"] == "callback"
+        assert durable["result"] == terminal
+        message.reply_text.assert_not_awaited()
+        bot = SimpleNamespace(
+            send_message=AsyncMock(return_value=SimpleNamespace(message_id=45))
+        )
+        app = SimpleNamespace(bot=bot)
+        presenter.application = app
+        original_sleep = asyncio.sleep
+
+        async def no_wait(_):
+            await original_sleep(0)
+
+        monkeypatch.setattr(module.asyncio, "sleep", no_wait)
+        await presenter.present(app, provider)
+        assert "job-ack-failed" in bot.send_message.await_args.kwargs["text"]
+        assert [call.args[0]["kind"] for call in provider.event.await_args_list] == [
+            "callback",
+            "pending",
+            "outcome_delivered",
+        ]
+        assert durable == {}
+
+    asyncio.run(run())
+
+
 def test_presenter_delivers_full_page_then_receipt_and_outcome(monkeypatch):
     sdk(monkeypatch)
     module = plugin()

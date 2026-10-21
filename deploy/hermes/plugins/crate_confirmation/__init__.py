@@ -128,7 +128,12 @@ class NativePresenter:
             await query.answer("Private bound human required", show_alert=True)
             return
         _, _, confirmation, action = query.data.split(":")
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:  # noqa: BLE001,S110 — SDK errors may contain secrets
+            # Acknowledgement is best-effort UI feedback. Queued native updates
+            # may outlive Telegram's answer window while their plan is current.
+            pass
         try:
             result = await provider.event(
                 {

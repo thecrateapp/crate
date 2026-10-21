@@ -14,6 +14,7 @@ from crate.db.repositories import agent_requests as requests
 from crate.db.repositories import agent_telegram as store
 from crate.db.repositories.auth_user_roles import set_user_roles
 from crate.db.repositories.tasks_updates import start_task
+from crate.db.tx import transaction_scope
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -145,6 +146,69 @@ def test_native_multi_page_approval_atomically_admits_exact_operation(native_wor
     change("UPDATE agent_telegram_bindings SET revoked_at=NOW()")
     with pytest.raises(DiagnosticError, match="linked native human"):
         jobs.start_operation_effect(result["job"]["job_id"])
+
+
+@pytest.mark.parametrize("commit", [True, False])
+def test_native_admission_dispatch_waits_for_outer_transaction(
+    native_world, monkeypatch, commit
+):
+    from crate.db.repositories import tasks_mutations
+
+    confirmation, message = show_all(native_world)
+    observed = []
+
+    def dispatched(kind, job):
+        # Observe from independent connections just as an immediate worker would.
+        observed.append(
+            (
+                kind,
+                job,
+                scalar(
+                    "SELECT count(*) FROM agent_jobs WHERE task_id=:id", {"id": job}
+                ),
+                scalar(
+                    "SELECT state FROM agent_telegram_confirmations WHERE id=:id",
+                    {"id": confirmation["confirmation_id"]},
+                ),
+            )
+        )
+
+    monkeypatch.setattr(tasks_mutations, "dispatch_task", dispatched)
+    with transaction_scope() as outer:
+        result = store.native_event(
+            {
+                "kind": "callback",
+                "instance_id": "test-instance",
+                "confirmation_id": confirmation["confirmation_id"],
+                "action": "approve",
+                "chat_id": 123,
+                "chat_type": "private",
+                "message_id": message,
+                "user_id": 123,
+                "update_id": 98765,
+                "query_id": "outer-boundary-query",
+            },
+            uuid4().hex,
+            session=outer,
+        )
+        assert result["state"] == "approved"
+        assert observed == []
+        assert (
+            scalar(
+                "SELECT count(*) FROM agent_jobs WHERE task_id=:id",
+                {"id": result["job"]["job_id"]},
+            )
+            == 0
+        )
+        if not commit:
+            outer.rollback()
+    assert observed == (
+        [("agent_maintenance", result["job"]["job_id"], 1, "approved")]
+        if commit
+        else []
+    )
+    assert scalar("SELECT count(*) FROM agent_plan_approvals") == int(commit)
+    assert scalar("SELECT count(*) FROM agent_jobs") == (2 if commit else 1)
 
 
 @pytest.mark.parametrize(
