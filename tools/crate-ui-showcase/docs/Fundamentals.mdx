@@ -154,3 +154,9 @@ a compact caption/hairline, never table-shaped dash readings. Route delay and mo
 unchanged. See the four Feedback skeleton entries and LoadingState for actual compositions.
 
 Search loading is an immediate section state: `fullWidth` fills its available panel content width. CatalogSearch names a single requested entity type; global/mixed searches say Finding your music... in the active locale. The 200ms route mark keeps its separate fixed geometry.
+
+The Stats explorer recipe (`stats-explorer-*`) is a hand-built Listen instrument: an overview
+strip with a draggable window, a detail chart whose scale column sizes to its longest localized
+label, and an "In this stretch" panel that moves below the chart in containers under 50rem. Its
+only motion is the one-time opening from today backwards (ease-out-expo); reduced motion renders
+the final state and nothing moves at rest. Its actual view is Listen's StatsExplorerView.

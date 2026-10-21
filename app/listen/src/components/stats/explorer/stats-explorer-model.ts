@@ -35,7 +35,8 @@ function addDays(value: string, days: number): string {
   return isoDay(dayTime(value) + days * DAY_MS);
 }
 
-function mondayOf(value: string): string {
+/** Monday (UTC calendar day) of the ISO week that contains `value`. */
+export function mondayOf(value: string): string {
   const weekday = (new Date(dayTime(value)).getUTCDay() + 6) % 7;
   return addDays(value, -weekday);
 }

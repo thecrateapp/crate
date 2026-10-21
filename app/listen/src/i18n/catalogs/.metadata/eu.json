@@ -6859,6 +6859,102 @@
     "sourceHash": "sha256:d8612567999480c24fd9e00db3a887765b24443bbf80a4e887994bb3f19bb9a3",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "stats.explorer.average": {
+    "sourceHash": "sha256:c2143678d872881f508a54ff94a3e46f2826c966995dc0ecd1c1716c7bbdbb36",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.averageLine": {
+    "sourceHash": "sha256:dc70676a963840083614866b69f2ffc26af4dcef43e617dcd496bca9e13c5651",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.back": {
+    "sourceHash": "sha256:daaae7ed3f6880704bf3aba712b10a0e18c0c5e8e3e976c938abf31e1c417f95",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.chart": {
+    "sourceHash": "sha256:9abb092487b9bd5a7685b319fadd7ecb7a989952933d042b716aa91feda517bc",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.day": {
+    "sourceHash": "sha256:53948aba67701bb3adcc15ff3df46cf5fd4e408c38055c4b9909b3be33d6c9c1",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.days": {
+    "sourceHash": "sha256:6c1ab4bb830e284525946a37754d01b1e0f92728554dd889dc7d9b68d3be186a",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.discoveries": {
+    "sourceHash": "sha256:a17d986e5423546cac05f5a01f5918ee6d90e40640dcc207e636a219df0e423b",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.energy": {
+    "sourceHash": "sha256:930dd507e5a6ba8c4df11599f903330ad3fedc6ccf1167a5d4cb5ebe0400b31e",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.hint": {
+    "sourceHash": "sha256:c953c082c25d49238fd7de31bbeffdc0c6b6bddfdabb56c803d0b292285342f4",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.mood": {
+    "sourceHash": "sha256:f0e399d76375c282f8d01adcfd1ae7ba1e9fcf830969e5470877d39a593f49e4",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.noDiscoveries": {
+    "sourceHash": "sha256:fb2d961e991774051f3f0002d55eabfe3a5125ac0aeb2e9696c697a96629af40",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.nothingPlayed": {
+    "sourceHash": "sha256:4fe728b878a777ca24c8420014f2edb0124f10669fd37041f2f65dd358b0c633",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.openDay": {
+    "sourceHash": "sha256:b33d1ebe7991ce07f38a2b150a39d9d838c4de4a15bfda5acbc236a8f3d4c38b",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.plays": {
+    "sourceHash": "sha256:cb2a9e50890bb667f94b9b0fdaa4c58daa9433c1a296d4eb00a95501d500eb5c",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.silent": {
+    "sourceHash": "sha256:39886740643d6c4c595cfed31d35070289a11631ac55237d9130e827446858bf",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.stretch": {
+    "sourceHash": "sha256:933d6c2ea90f0a5a8a3673a5d5d302139984a5923278df1e3f69eec58dc41ae8",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.topAlbum": {
+    "sourceHash": "sha256:1daa173c3e6a738bbf8178aa1739317ef6561850a860923b5f24b260a90d2bc7",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.topArtist": {
+    "sourceHash": "sha256:90f18a2f9f0b3b44d7fb15d38148377798794429689cde7f733abb8bc954f52d",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.topTrack": {
+    "sourceHash": "sha256:0c2f3cf65031f7843ed655c8a0bbc9adbe0837c9c6ac17ce2ae7e9d3eddf9674",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.unavailable": {
+    "sourceHash": "sha256:b1281474bee0161cfdbbb86ea5b20fe071c4c5058ed33b305a8a1e897eadf0ad",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.valence": {
+    "sourceHash": "sha256:f7bf8c7640ac345b7f9c0c06b9e0e90e0c10edc4e1d42fa09685da030fd4d386",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.week": {
+    "sourceHash": "sha256:792f070bb16103552fe2581a15f03cc4893ab4caf15e49c42ae83f28c52fa0e9",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.window": {
+    "sourceHash": "sha256:1cc0dcfc532b94932b20d15a1e5f3bd12c7616cff6a60e7765e4abfb8b56428d",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
+  "stats.explorer.windowValue": {
+    "sourceHash": "sha256:e28b2a8d6b2f0f95560ea3fa7a6ae0fd707ac9359e336e38c7265482bbae7289",
+    "reviewedAt": "2026-10-21T00:31:06.116Z"
+  },
   "stats.genreTrend.rising": {
     "sourceHash": "sha256:9c71132813055b5aeff946398ad7771cdd97337bf13a5877dcdc96c07e215eb1",
     "reviewedAt": "2026-10-08T00:23:45.012Z"
