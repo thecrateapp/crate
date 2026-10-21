@@ -35,6 +35,8 @@ _MAX_AGE_SECONDS = 300
 _STALE_MAX_AGE_SECONDS = 86_400
 _SCHEDULE_DEBOUNCE_SECONDS = 300
 _PREWARMED_WINDOWS = ("30d", "90d", "365d", "all_time")
+# PD43 / D30: the instance heatmap needs at least this many listeners.
+MIN_HEATMAP_LISTENERS = 3
 _DEFAULT_LIMITS = {
     "tracks_limit": 12,
     "artists_limit": 10,
@@ -59,6 +61,24 @@ def instance_stats_subject_key(
         f"v3:instance:{period}:{tracks_limit}:{artists_limit}:{albums_limit}:"
         f"{genres_limit}:{replay_limit}"
     )
+
+
+def hide_sparse_heatmap(heatmap: dict[str, Any] | None) -> dict[str, Any] | None:
+    """PD43: below three listeners the instance heatmap reveals individual habits.
+
+    The builder blanks it before the snapshot is stored: an all-zero 7x24 grid
+    (shipped Listen builds call ``cells.flat()``), no peak, no night share and
+    ``hidden_reason="few_listeners"``. ``listener_count`` and ``night_hours`` stay.
+    """
+    if not heatmap or (heatmap.get("listener_count") or 0) >= MIN_HEATMAP_LISTENERS:
+        return heatmap
+    return {
+        **heatmap,
+        "cells": [[0.0] * 24 for _ in range(7)],
+        "peak": None,
+        "night_share": None,
+        "hidden_reason": "few_listeners",
+    }
 
 
 def build_instance_stats_dashboard(
@@ -112,6 +132,7 @@ def build_instance_stats_dashboard(
             "previous": signal.pop("overview_previous"),
         }
         payload.update(signal)
+        payload["heatmap"] = hide_sparse_heatmap(payload.get("heatmap"))
         payload["top_listeners"] = get_top_listeners(session, period)
         mark_new_items(
             session,
@@ -215,9 +236,11 @@ def schedule_instance_stats_dashboard_refresh() -> int:
 
 
 __all__ = [
+    "MIN_HEATMAP_LISTENERS",
     "SCOPE",
     "build_instance_stats_dashboard",
     "get_instance_stats_dashboard",
+    "hide_sparse_heatmap",
     "instance_stats_subject_key",
     "refresh_instance_stats_dashboard_snapshot",
     "schedule_instance_stats_dashboard_refresh",

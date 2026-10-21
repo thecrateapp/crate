@@ -762,9 +762,12 @@ class StatsHeatmapPeakResponse(BaseModel):
 class StatsHeatmapResponse(BaseModel):
     cells: list[list[float]] = Field(default_factory=list)
     peak: StatsHeatmapPeakResponse | None = None
-    night_share: float = 0
+    # Null when the instance heatmap is hidden (PD43).
+    night_share: float | None = 0
     night_hours: list[int] = Field(default_factory=list)
     listener_count: int | None = None
+    # "few_listeners" when Crate Pulse has fewer than three listeners (PD43).
+    hidden_reason: str | None = None
 
 
 class StatsYearAlbumResponse(BaseModel):
