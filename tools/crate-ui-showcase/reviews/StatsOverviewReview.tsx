@@ -278,21 +278,20 @@ export function StatsOverviewReview({
           />
         ) : null}
         <StatsActionBandView
-          showDigging={scope === "personal"}
-          actions={
-            <>
-              {scope === "personal" ? (
-                <Button onClick={() => setDigging(true)}>
-                  {t("stats.digging.open")}
-                </Button>
-              ) : null}
-              <StatsReplayCard
-                replay={replayFixture}
-                onPlay={() => setAction("Replay played")}
-                onShuffle={() => setAction("Replay shuffled")}
-                coverUrl={(item) => IMAGE_SAMPLES[(item.track_id ?? 0) % 2]!}
-              />
-            </>
+          diggingAction={
+            scope === "personal" ? (
+              <Button onClick={() => setDigging(true)}>
+                {t("stats.digging.open")}
+              </Button>
+            ) : undefined
+          }
+          replay={
+            <StatsReplayCard
+              replay={replayFixture}
+              onPlay={() => setAction("Replay played")}
+              onShuffle={() => setAction("Replay shuffled")}
+              coverUrl={(item) => IMAGE_SAMPLES[(item.track_id ?? 0) % 2]!}
+            />
           }
         />
         {!legacy ? (

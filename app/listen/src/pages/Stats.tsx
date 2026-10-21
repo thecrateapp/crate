@@ -149,7 +149,10 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
           highlights={
             highlights ? (
               <StatsReveal>
-                <StatsHighlights highlights={highlights} />
+                <StatsHighlights
+                  highlights={highlights}
+                  allTime={page.selection === "all_time"}
+                />
               </StatsReveal>
             ) : null
           }
@@ -258,29 +261,28 @@ function StatsActionBand({ page }: { page: StatsPageController }) {
   if (!showDigging && !showReplay) return null;
   return (
     <StatsActionBandView
-      showDigging={showDigging}
-      actions={
-        <>
-          {showDigging ? (
-            <Button asChild>
-              <Link
-                to={`/stats/digging?window=${encodeURIComponent(page.selection)}`}
-              >
-                <Sparkles size={CRATE_ICON_SIZE.sm} />
-                {t("stats.digging.open")}
-              </Link>
-            </Button>
-          ) : null}
-          {page.replay && showReplay ? (
-            <StatsReplayCard
-              replay={page.replay}
-              onPlay={page.playReplay}
-              onShuffle={page.shuffleReplay}
-              coverUrl={replayCoverUrl}
-              renderImage={renderReplayCover}
-            />
-          ) : null}
-        </>
+      diggingAction={
+        showDigging ? (
+          <Button asChild>
+            <Link
+              to={`/stats/digging?window=${encodeURIComponent(page.selection)}`}
+            >
+              <Sparkles size={CRATE_ICON_SIZE.sm} />
+              {t("stats.digging.open")}
+            </Link>
+          </Button>
+        ) : undefined
+      }
+      replay={
+        page.replay && showReplay ? (
+          <StatsReplayCard
+            replay={page.replay}
+            onPlay={page.playReplay}
+            onShuffle={page.shuffleReplay}
+            coverUrl={replayCoverUrl}
+            renderImage={renderReplayCover}
+          />
+        ) : undefined
       }
     />
   );

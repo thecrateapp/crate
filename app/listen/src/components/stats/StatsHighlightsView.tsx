@@ -11,13 +11,18 @@ import { CountUpNumber } from "./CountUpNumber";
 import { formatStatsMinutes, formatStatsPercent } from "./stats-format";
 import type { StatsHighlights as Highlights } from "./stats-types";
 
-function formatDay(value: string | null | undefined, locale: string) {
+function formatDay(
+  value: string | null | undefined,
+  locale: string,
+  withYear = false,
+) {
   if (!value) return "";
   const date =
     value.length > 10 ? new Date(value) : new Date(`${value}T00:00:00Z`);
   return date.toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
     ...(value.length > 10 ? {} : { timeZone: "UTC" }),
   });
 }
@@ -26,11 +31,14 @@ export function StatsHighlightsView({
   highlights,
   obsessionArtwork,
   onPlayObsession,
+  allTime = false,
 }: {
   highlights: Highlights;
   obsessionArtwork?: ReactNode;
   /** Plays the obsession track; the adapter owns the player. */
   onPlayObsession?: () => void;
+  /** All-time selection: streak dates always carry their year. */
+  allTime?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const formatInteger = useCallback(
@@ -41,6 +49,11 @@ export function StatsHighlightsView({
   const newArtists = highlights.new_artists;
   const session = highlights.longest_session;
   const obsession = highlights.obsession;
+  const withYear =
+    allTime ||
+    (streak?.start != null &&
+      streak.end != null &&
+      streak.start.slice(0, 4) !== streak.end.slice(0, 4));
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -53,8 +66,8 @@ export function StatsHighlightsView({
           {streak.start && streak.end ? (
             <p className="text-xs text-text-primary">
               {t("stats.highlights.streakRange", {
-                start: formatDay(streak.start, i18n.language),
-                end: formatDay(streak.end, i18n.language),
+                start: formatDay(streak.start, i18n.language, withYear),
+                end: formatDay(streak.end, i18n.language, withYear),
               })}
             </p>
           ) : null}

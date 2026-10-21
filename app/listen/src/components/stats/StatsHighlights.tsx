@@ -5,7 +5,13 @@ import { usePlayerActions } from "@/contexts/PlayerContext";
 import { StatsHighlightsView } from "./StatsHighlightsView";
 import { toPlayerTrack } from "./stats-model";
 import type { StatsHighlights as Highlights } from "./stats-types";
-export function StatsHighlights({ highlights }: { highlights: Highlights }) {
+export function StatsHighlights({
+  highlights,
+  allTime = false,
+}: {
+  highlights: Highlights;
+  allTime?: boolean;
+}) {
   const { playAll } = usePlayerActions();
   const obsession = highlights.obsession;
   const track = obsession?.track;
@@ -38,6 +44,7 @@ export function StatsHighlights({ highlights }: { highlights: Highlights }) {
     <StatsHighlightsView
       highlights={highlights}
       onPlayObsession={playObsession}
+      allTime={allTime}
       obsessionArtwork={
         track ? (
           <MediaCover

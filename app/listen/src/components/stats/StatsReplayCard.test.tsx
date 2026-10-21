@@ -50,4 +50,17 @@ describe("StatsReplayCard", () => {
     expect(onPlay).toHaveBeenCalledTimes(1);
     expect(onShuffle).toHaveBeenCalledTimes(1);
   });
+
+  it("renders fallback tiles for fewer than four items or missing covers", () => {
+    const { container } = renderWithListenProviders(
+      <StatsReplayCard
+        replay={{ ...replay, items: [track(1)] }}
+        onPlay={vi.fn()}
+        onShuffle={vi.fn()}
+        coverUrl={() => null}
+      />,
+    );
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+  });
 });

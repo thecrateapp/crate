@@ -66,4 +66,20 @@ describe("StatsHighlightsView", () => {
       "#movement",
     );
   });
+
+  it("adds years to a streak that crosses a year or covers all time", () => {
+    const crossing = {
+      ...highlights,
+      longest_streak: { days: 30, start: "2025-12-20", end: "2026-01-18" },
+    };
+    const view = renderWithListenProviders(
+      <StatsHighlightsView highlights={crossing} />,
+    );
+    expect(screen.getByText("Dec 20, 2025 – Jan 18, 2026")).toBeInTheDocument();
+    view.unmount();
+    renderWithListenProviders(
+      <StatsHighlightsView highlights={highlights} allTime />,
+    );
+    expect(screen.getByText("Aug 2, 2026 – Sep 17, 2026")).toBeInTheDocument();
+  });
 });

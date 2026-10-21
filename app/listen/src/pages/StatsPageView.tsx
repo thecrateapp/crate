@@ -157,27 +157,39 @@ export function StatsPanel({
   );
 }
 
+/** Layout only: the Digging entry card and the Replay card sit side by side as siblings. */
 export function StatsActionBandView({
-  showDigging,
-  actions,
+  diggingAction,
+  replay,
 }: {
-  showDigging: boolean;
-  actions: ReactNode;
+  /** Opens Crate Digging; omitted when Digging is unavailable. */
+  diggingAction?: ReactNode;
+  /** A self-contained card (StatsReplayCard); never wrapped in another card. */
+  replay?: ReactNode;
 }) {
   const { t } = useTranslation();
+  if (!diggingAction && !replay) return null;
   return (
-    <Card
-      as="section"
-      className="gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+    <section
+      className={
+        diggingAction && replay
+          ? "grid min-w-0 gap-4 lg:grid-cols-2"
+          : "grid min-w-0 gap-4"
+      }
     >
-      {showDigging ? (
-        <SectionHeader
-          title={t("stats.digging.band.title")}
-          subtitle={t("stats.digging.band.body")}
-        />
+      {diggingAction ? (
+        <Card className="gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <SectionHeader
+            title={t("stats.digging.band.title")}
+            subtitle={t("stats.digging.band.body")}
+          />
+          <div className="flex flex-wrap gap-2 *:grow sm:*:grow-0">
+            {diggingAction}
+          </div>
+        </Card>
       ) : null}
-      <div className="flex flex-wrap gap-2 *:grow sm:*:grow-0">{actions}</div>
-    </Card>
+      {replay}
+    </section>
   );
 }
 
