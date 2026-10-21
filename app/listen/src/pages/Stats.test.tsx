@@ -493,6 +493,55 @@ describe("Stats page", () => {
     },
   );
 
+  it.each([
+    ["a visible new artist", "/stats", ["Fresh Face"], true],
+    ["only excluded new artists", "/stats", ["Hero", "Top One"], false],
+    ["no New column", "/stats/global", ["Fresh Face"], false],
+  ] as const)(
+    "links the New artists highlight to Movement with %s",
+    (_case, route, discoveries, linked) => {
+      const dashboard = signalDashboard();
+      dashboard.artist_of_period = {
+        ...dashboard.artist_of_period!,
+        artist_name: "Hero",
+      };
+      dashboard.top_artists = {
+        window: "30d",
+        items: [
+          {
+            artist_name: "Top One",
+            play_count: 5,
+            minutes_listened: 20,
+            complete_play_count: 5,
+          },
+        ],
+      } as StatsDashboard["top_artists"];
+      dashboard.story = {
+        ...dashboard.story!,
+        discoveries: discoveries.map((name) => ({
+          artist_name: name,
+          play_count: 9,
+          minutes_listened: 30,
+        })),
+      };
+      mockApis(dashboard);
+      renderWithListenProviders(<Stats />, {
+        route,
+        path: route,
+        locale: "en",
+      });
+
+      expect(screen.getByText("New artists")).toBeInTheDocument();
+      const link = screen.queryByRole("link", { name: /New artists/ });
+      if (linked) {
+        expect(link).toHaveAttribute("href", "#movement");
+      } else {
+        // The New column is empty or absent: nothing to jump to.
+        expect(link).toBeNull();
+      }
+    },
+  );
+
   it("offers the rolling year instead of the calendar year for Crate Pulse", () => {
     mockApis(signalDashboard());
 

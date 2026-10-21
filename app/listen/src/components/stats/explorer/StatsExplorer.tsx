@@ -116,8 +116,10 @@ export function StatsExplorer({
   rangeEndpoint,
 }: StatsExplorerProps) {
   if (!tape.points.length) return null;
-  // A new period or tape shape starts a fresh explorer and its opening.
+  // A new subject, period or tape shape starts a fresh explorer and its
+  // opening: moving from your stats to someone else's never keeps a day open.
   const key = [
+    rangeEndpoint,
     selection,
     tape.granularity,
     tape.start,

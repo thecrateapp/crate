@@ -1896,7 +1896,7 @@
   "stats.topListeners.title": "Oients destacats",
   "stats.musicAge.oldest": "El teu disc més antic d'aquest període: {album} ({year}).",
   "stats.musicAge.newest": "El teu disc més recent d'aquest període: {album} ({year}).",
-  "stats.musicAge.shareThisYear": "El {share}% del que escoltes és d'aquest any.",
+  "stats.musicAge.shareThisYear": "El {share}% del que escoltes és de {year}.",
   "stats.musicAge.decadeTop": "Anys {decade}, {share}% de la teva escolta. Disc més escoltat: {album} de {artist}",
   "stats.movement.title": "Moviment",
   "stats.digging.open": "Mira la història",

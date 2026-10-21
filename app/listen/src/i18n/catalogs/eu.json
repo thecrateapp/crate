@@ -1896,7 +1896,7 @@
   "stats.topListeners.title": "Entzule nagusiak",
   "stats.musicAge.oldest": "Aldi honetako zure disko zaharrena: {album} ({year}).",
   "stats.musicAge.newest": "Aldi honetako zure disko berriena: {album} ({year}).",
-  "stats.musicAge.shareThisYear": "Zure entzunaldien %{share} urte honetakoa da.",
+  "stats.musicAge.shareThisYear": "Zure entzunaldien %{share} {year}koa da.",
   "stats.musicAge.decadeTop": "{decade}ko hamarkada, zure entzunaldien %{share}. Disko entzunena: {album} ({artist})",
   "stats.movement.title": "Mugimendua",
   "stats.digging.open": "Ikusi istorioa",

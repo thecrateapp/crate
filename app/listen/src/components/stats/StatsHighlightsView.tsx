@@ -32,6 +32,7 @@ export function StatsHighlightsView({
   obsessionArtwork,
   onPlayObsession,
   allTime = false,
+  newArtistsHref,
 }: {
   highlights: Highlights;
   obsessionArtwork?: ReactNode;
@@ -39,6 +40,11 @@ export function StatsHighlightsView({
   onPlayObsession?: () => void;
   /** All-time selection: streak dates always carry their year. */
   allTime?: boolean;
+  /**
+   * Where the New artists card jumps to; omitted, the card is not a link.
+   * The page passes `#movement` only while the New column shows someone.
+   */
+  newArtistsHref?: string;
 }) {
   const { t, i18n } = useTranslation();
   const formatInteger = useCallback(
@@ -81,7 +87,7 @@ export function StatsHighlightsView({
       {newArtists ? (
         <HighlightCard
           label={t("stats.highlights.newArtists")}
-          href="#movement"
+          href={newArtistsHref}
         >
           <StatNumber
             size="md"

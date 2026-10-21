@@ -187,6 +187,34 @@ describe("StatsExplorer", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("starts a fresh session when the subject changes on the same period", async () => {
+    let setEndpoint: (value: string) => void = () => {};
+    function Host() {
+      const [endpoint, setValue] = useState(BASE);
+      setEndpoint = setValue;
+      return (
+        <StatsExplorer
+          tape={dailyTape()}
+          selection="90d"
+          rangeEndpoint={endpoint}
+        />
+      );
+    }
+    renderWithListenProviders(<Host />, { locale: "en" });
+    const chart = screen.getByRole("group", {
+      name: "Listening in the selected stretch",
+    });
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    fireEvent.keyDown(chart, { key: "Enter" });
+    expect(screen.getByText("Day in detail")).toBeInTheDocument();
+
+    // Your stats -> Ana's stats with a cached dashboard of the same period.
+    act(() => setEndpoint("/api/users/ana/stats/range"));
+
+    expect(screen.queryByText("Day in detail")).not.toBeInTheDocument();
+    expect(screen.getByText("In this stretch")).toBeInTheDocument();
+  });
+
   it("dims the last stretch while the next loads, never across a base change", async () => {
     const OTHER = "/api/users/ana/stats/range";
     apiMock.mockImplementation((url: string) => {

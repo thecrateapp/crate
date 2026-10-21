@@ -77,9 +77,12 @@ export function StatsDecadeColumnsView({
 
 export function StatsMusicAgeCardView({
   musicAge,
+  shareYear,
   decades,
 }: {
   musicAge: StatsMusicAge;
+  /** Year `share_this_year` measures: the period's last year, not today's. */
+  shareYear: number;
   decades: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -110,6 +113,8 @@ export function StatsMusicAgeCardView({
         <p className="text-sm leading-6 text-text-secondary">
           {t("stats.musicAge.shareThisYear", {
             share: Math.round(musicAge.share_this_year * 100),
+            // A label, not a quantity: never group it as "2,023".
+            year: String(shareYear),
           })}
         </p>
       ) : null}

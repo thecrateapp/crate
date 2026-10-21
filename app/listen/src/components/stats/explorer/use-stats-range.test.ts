@@ -36,6 +36,14 @@ function payload(start: string, end: string): StatsRange {
   };
 }
 
+function marked(name: string, available = true): StatsRange {
+  return {
+    ...payload(A.start, A.end),
+    available,
+    top_artists: [{ artist_name: name, minutes: 1, plays: 1, share: 1 }],
+  };
+}
+
 const BASE = "/api/me/stats/range";
 const A = { start: "2026-01-01", end: "2026-01-10" };
 const B = { start: "2026-02-01", end: "2026-02-10" };
@@ -250,6 +258,59 @@ describe("useStatsRange", () => {
     rerender({ range: A });
     expect(result.current.error).toBe(false);
     expect(result.current.loading).toBe(true);
+  });
+
+  it("shows a stretch that is still being prepared without caching it", async () => {
+    apiMock.mockResolvedValueOnce(marked("Preparing", false));
+    apiMock.mockResolvedValueOnce(marked("Ready"));
+    const first = renderHook(() => useStatsRange(BASE, A, 5));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(first.result.current.data?.available).toBe(false);
+    expect(first.result.current.loading).toBe(false);
+    first.unmount();
+
+    // The backfill finishes: the next visit asks again instead of serving
+    // "still being prepared" for the rest of the session.
+    const second = renderHook(() => useStatsRange(BASE, A, 5));
+    expect(second.result.current.data).toBeNull();
+    expect(second.result.current.loading).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(second.result.current.data?.available).toBe(true);
+    expect(second.result.current.data?.top_artists[0]?.artist_name).toBe(
+      "Ready",
+    );
+  });
+
+  it("does not cache a response that resolves after a history clear", async () => {
+    let resolveStale: (value: StatsRange) => void = () => {};
+    apiMock.mockImplementationOnce(
+      () => new Promise<StatsRange>((resolve) => (resolveStale = resolve)),
+    );
+    apiMock.mockResolvedValueOnce(marked("Fresh"));
+    const { result } = renderHook(() => useStatsRange(BASE, A, 5));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+
+    // The play lands and clears the cache; the in-flight response resolves
+    // before React gets to clean up the effect that requested it.
+    await act(async () => {
+      cacheHooks.listeners.forEach((fn) => fn("history"));
+      resolveStale(marked("Stale"));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(result.current.data?.top_artists[0]?.artist_name).toBe("Fresh");
   });
 
   it("does not refetch for a new range object with the same dates", async () => {

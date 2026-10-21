@@ -1896,7 +1896,7 @@
   "stats.topListeners.title": "Top-Hörer",
   "stats.musicAge.oldest": "Deine älteste Platte in diesem Zeitraum: {album} ({year}).",
   "stats.musicAge.newest": "Dein neuestes Album in diesem Zeitraum: {album} ({year}).",
-  "stats.musicAge.shareThisYear": "{share}% deiner Hörzeit stammen aus diesem Jahr.",
+  "stats.musicAge.shareThisYear": "{share}% deiner Hörzeit stammen aus dem Jahr {year}.",
   "stats.musicAge.decadeTop": "{decade}er, {share} % deines Hörens. Top-Album: {album} von {artist}",
   "stats.movement.title": "Bewegung",
   "stats.digging.open": "Story ansehen",

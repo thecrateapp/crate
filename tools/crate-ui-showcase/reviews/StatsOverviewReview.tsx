@@ -39,7 +39,11 @@ import {
   StatsDecadeColumnsView,
   StatsMusicAgeCardView,
 } from "../../../app/listen/src/components/stats/StatsClosingViews";
-import { StatsMovementView } from "../../../app/listen/src/components/stats/StatsMovementView";
+import { musicAgeShareYear } from "../../../app/listen/src/components/stats/stats-tape-model";
+import {
+  StatsMovementView,
+  statsMovementNewArtists,
+} from "../../../app/listen/src/components/stats/StatsMovementView";
 import { StatsArtistRankView } from "../../../app/listen/src/pages/StatsArtistRankView";
 import { StatsPeriodPicker } from "../../../app/listen/src/components/stats/StatsPeriodPicker";
 import { StatsPlayMeta } from "../../../app/listen/src/components/stats/StatsPlayMeta";
@@ -349,6 +353,15 @@ export function StatsOverviewReview({
             highlights={
               <StatsHighlightsView
                 highlights={dashboard.highlights!}
+                newArtistsHref={
+                  statsMovementNewArtists(
+                    dashboard.story!,
+                    [artist.artist_name],
+                    scope,
+                  ).length
+                    ? "#movement"
+                    : undefined
+                }
                 onPlayObsession={() => setAction("Obsession played")}
                 obsessionArtwork={
                   <MediaCover
@@ -493,6 +506,7 @@ export function StatsOverviewReview({
           <div className="grid min-w-0 gap-5">
             <StatsMusicAgeCardView
               musicAge={dashboard.music_age!}
+              shareYear={musicAgeShareYear(dashboard.tape, 2026)}
               decades={
                 <StatsDecadeColumnsView
                   musicAge={dashboard.music_age!}

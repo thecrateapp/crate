@@ -8,9 +8,11 @@ import type { StatsHighlights as Highlights } from "./stats-types";
 export function StatsHighlights({
   highlights,
   allTime = false,
+  newArtistsHref,
 }: {
   highlights: Highlights;
   allTime?: boolean;
+  newArtistsHref?: string;
 }) {
   const { playAll } = usePlayerActions();
   const obsession = highlights.obsession;
@@ -45,6 +47,7 @@ export function StatsHighlights({
       highlights={highlights}
       onPlayObsession={playObsession}
       allTime={allTime}
+      newArtistsHref={newArtistsHref}
       obsessionArtwork={
         track ? (
           <MediaCover

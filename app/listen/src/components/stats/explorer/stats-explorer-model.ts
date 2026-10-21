@@ -22,6 +22,8 @@ const DAY_MS = 86_400_000;
 const WEEKLY_SPANS = { defaultSpan: 12, minSpan: 2, maxSpan: 57 } as const;
 const DAILY_SPANS = { defaultSpan: 30, minSpan: 7 } as const;
 const DAILY_MAX_SPAN = 400;
+/** Mirrors the backend `_MOOD_DAILY_MAX_DAYS`: longer tapes key mood by Monday. */
+const MOOD_DAILY_MAX_DAYS = 120;
 
 function dayTime(value: string): number {
   return Date.parse(`${value}T00:00:00Z`);
@@ -145,9 +147,12 @@ export function summarizeStretch(
   };
   if (to <= from) return empty;
 
-  // Mood buckets are daily for short ranges and Monday-keyed weekly beyond
-  // that, independent of the points granularity; fall back to the Monday.
+  // Mood buckets are daily up to 120 days and Monday-keyed weekly beyond
+  // that, independent of the points granularity. Only weekly mood falls back
+  // to the Monday: on daily mood a day without a reading has none.
   const mood = new Map(tape.mood.map((item) => [item.bucket, item]));
+  const moodWeekly =
+    (dayTime(tape.end) - dayTime(tape.start)) / DAY_MS > MOOD_DAILY_MAX_DAYS;
   let minutes = 0;
   let silent = 0;
   let days = 0;
@@ -161,7 +166,9 @@ export function summarizeStretch(
     minutes += point.minutes;
     if (point.minutes <= 0) silent += 1;
     days += daysIn(bucketRange(tape, index));
-    const item = mood.get(point.bucket) ?? mood.get(mondayOf(point.bucket));
+    const item =
+      mood.get(point.bucket) ??
+      (moodWeekly ? mood.get(mondayOf(point.bucket)) : undefined);
     if (!item || point.minutes <= 0) continue;
     if (typeof item.energy === "number") {
       energySum += item.energy * point.minutes;

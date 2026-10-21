@@ -1896,7 +1896,7 @@
   "stats.topListeners.title": "Auditeurs les plus actifs",
   "stats.musicAge.oldest": "Ton disque le plus ancien de la période : {album} ({year}).",
   "stats.musicAge.newest": "Votre album le plus récent sur cette période : {album} ({year}).",
-  "stats.musicAge.shareThisYear": "{share} % de votre écoute date de cette année.",
+  "stats.musicAge.shareThisYear": "{share} % de votre écoute date de {year}.",
   "stats.musicAge.decadeTop": "Années {decade}, {share} % de ton écoute. Disque phare : {album} de {artist}",
   "stats.movement.title": "Mouvement",
   "stats.digging.open": "Voir l'histoire",

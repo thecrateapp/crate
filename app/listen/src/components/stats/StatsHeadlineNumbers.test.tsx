@@ -53,6 +53,33 @@ it("shows signed deltas against the previous period", () => {
   expect(screen.getByText("vs previous 30 days")).toBeVisible();
 });
 
+it("keeps each delta in a dd of its metric group", () => {
+  const { container } = renderWithListenProviders(
+    <StatsHeadlineNumbers
+      minutes={112}
+      plays={194}
+      activeDays={5}
+      artists={20}
+      today={{ day: "2026-10-21", timezone: "UTC", minutes: 7, plays: 2 }}
+      comparison={{ previous, caption: "vs previous 30 days" }}
+    />,
+    { locale: "en" },
+  );
+  const list = container.querySelector("dl")!;
+  // A dl holds only div groups of dt followed by dd (axe "dlitem").
+  for (const group of Array.from(list.children)) {
+    expect(group.tagName).toBe("DIV");
+    const tags = Array.from(group.children).map((child) => child.tagName);
+    expect(tags[0]).toBe("DT");
+    expect(tags.slice(1).every((tag) => tag === "DD")).toBe(true);
+  }
+  const delta = screen.getByText("+12%");
+  expect(delta.closest("dd")).not.toBeNull();
+  expect(delta.closest("div")?.querySelector("dt")).toHaveTextContent(
+    "minutes",
+  );
+});
+
 it("shows a no-previous note when the period has no previous data", () => {
   renderWithListenProviders(
     <StatsHeadlineNumbers

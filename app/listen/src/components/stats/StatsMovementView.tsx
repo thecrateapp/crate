@@ -26,6 +26,19 @@ export function statsMovementVisible(
 const isRealGain = (artist: StatsStoryArtistSignal) =>
   (artist.delta_play_count ?? 0) > 0;
 
+/** The New column as shown: none on Crate Pulse, exclusions applied otherwise. */
+export function statsMovementNewArtists(
+  story: Pick<StatsStory, "discoveries">,
+  exclude: readonly string[],
+  scope: StatsMovementScope,
+) {
+  if (scope === "global") return [];
+  return statsMovementVisible(
+    story.discoveries,
+    new Set(exclude.map((name) => name.trim())),
+  );
+}
+
 export function StatsMovementView({
   story,
   exclude,
@@ -64,7 +77,7 @@ export function StatsMovementView({
         title={t("stats.story.newBlood")}
         emptyTitle={t("stats.story.noNewObsession")}
         emptyBody={t("stats.story.discoveryFallback")}
-        items={statsMovementVisible(story.discoveries, skip)}
+        items={statsMovementNewArtists(story, exclude, scope)}
         body={(artist) =>
           t("stats.explorer.plays", { count: artist.play_count })
         }
@@ -86,7 +99,13 @@ export function StatsMovementView({
     );
   }
   return (
-    <section id="movement" className="@container grid min-w-0 gap-4">
+    // The Listen header is fixed over a document-scrolling page: the
+    // #movement jump from Highlights clears it with the shell's page-top
+    // metric (header height plus the standard gap below it).
+    <section
+      id="movement"
+      className="@container grid min-w-0 scroll-mt-(--listen-mobile-page-top) gap-4"
+    >
       <SectionHeader title={t("stats.movement.title")} />
       <div
         className={

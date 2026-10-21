@@ -59,12 +59,23 @@ describe("StatsHighlightsView", () => {
     expect(screen.getByText("Aug 2 – Sep 17")).toBeInTheDocument();
   });
 
-  it("links new artists to movement", () => {
-    renderWithListenProviders(<StatsHighlightsView highlights={highlights} />);
+  it("links new artists to movement when the page gives it a target", () => {
+    renderWithListenProviders(
+      <StatsHighlightsView
+        highlights={highlights}
+        newArtistsHref="#movement"
+      />,
+    );
     expect(screen.getByRole("link", { name: /New artists/ })).toHaveAttribute(
       "href",
       "#movement",
     );
+  });
+
+  it("leaves new artists unlinked without a target", () => {
+    renderWithListenProviders(<StatsHighlightsView highlights={highlights} />);
+    expect(screen.getByText("New artists")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /New artists/ })).toBeNull();
   });
 
   it("adds years to a streak that crosses a year or covers all time", () => {

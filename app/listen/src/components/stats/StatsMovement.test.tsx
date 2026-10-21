@@ -79,6 +79,17 @@ describe("StatsMovement", () => {
     expect(screen.queryByRole("heading", { name: "Comeback" })).toBeNull();
   });
 
+  it("lands the #movement jump below the fixed Listen header", () => {
+    // The shell header is position: fixed over a document-scrolling page, so
+    // the anchor target clears it with the shell's own page-top metric.
+    const { container } = renderWithListenProviders(
+      <StatsMovement scope="personal" exclude={[]} story={story({})} />,
+    );
+    expect(container.querySelector("#movement")).toHaveClass(
+      "scroll-mt-(--listen-mobile-page-top)",
+    );
+  });
+
   it("shows empty copy per column", () => {
     renderWithListenProviders(
       <StatsMovement scope="personal" exclude={[]} story={story()} />,

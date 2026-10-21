@@ -166,12 +166,28 @@ describe("stats explorer model", () => {
   });
 
   it("matches weekly mood buckets on long daily tapes", () => {
-    const tape = dailyTape(14);
+    const tape = dailyTape(121);
     // 2026-01-05 is a Monday; mood of a 121+ day daily tape is weekly.
     tape.mood = [{ bucket: "2026-01-05", energy: 0.6, valence: 0.3 }];
     const summary = summarizeStretch(tape, { from: 4, to: 11 });
     expect(summary.energy).toBeCloseTo(0.6);
     expect(summary.valence).toBeCloseTo(0.3);
+  });
+
+  it("never borrows the Monday mood on daily-mood tapes", () => {
+    // Up to 120 days the backend sends one mood bucket per day: a day with
+    // minutes but no analysed mood has no reading, not its Monday's.
+    for (const days of [30, 120]) {
+      const tape = dailyTape(days);
+      tape.mood = [
+        { bucket: "2026-01-05", energy: 0.6, valence: 0.3 },
+        { bucket: "2026-01-06", energy: 0.2, valence: 0.1 },
+      ];
+      // Monday 5, Tuesday 6 and Wednesday 7 (no mood), 10 minutes each.
+      const summary = summarizeStretch(tape, { from: 4, to: 7 });
+      expect(summary.energy).toBeCloseTo((0.6 + 0.2) / 2);
+      expect(summary.valence).toBeCloseTo((0.3 + 0.1) / 2);
+    }
   });
 
   it("summarizes an empty stretch without NaN", () => {

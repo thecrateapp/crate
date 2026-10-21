@@ -1904,7 +1904,7 @@
   "stats.topListeners.title": "Top listeners",
   "stats.musicAge.oldest": "Your oldest record this period: {album} ({year}).",
   "stats.musicAge.newest": "Your newest record this period: {album} ({year}).",
-  "stats.musicAge.shareThisYear": "{share}% of your listening is from this year.",
+  "stats.musicAge.shareThisYear": "{share}% of your listening is from {year}.",
   "stats.musicAge.decadeTop": "{decade}s, {share}% of your listening. Top record: {album} by {artist}",
   "stats.movement.title": "Movement",
   "stats.digging.open": "Open the story",

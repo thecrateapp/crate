@@ -57,6 +57,12 @@ export function useStatsRange(
   // Entries are scoped to the current server and user so accounts never mix.
   const key = url ? cacheScopedKey(url) : null;
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  // "Still being prepared" (available=false) answers are shown but never
+  // cached, so the next visit asks again once the instance backfill finishes.
+  const [uncached, setUncached] = useState<{
+    key: string;
+    data: StatsRange;
+  } | null>(null);
   const [, bump] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
@@ -72,16 +78,24 @@ export function useStatsRange(
     if (!key || rangeCache.has(key)) return;
     const controller = new AbortController();
     let cancelled = false;
+    // A history clear can land while the request is in flight, before React
+    // cleans up this effect; its response then belongs to the cleared cache.
+    const startedGeneration = generation;
     setErrorKey(null);
     const timer = setTimeout(() => {
       api<StatsRange>(url as string, "GET", undefined, {
         signal: controller.signal,
       })
         .then((payload) => {
-          cacheSet(key, payload);
+          const current = generation === startedGeneration;
+          const ready = payload.available !== false;
+          if (current && ready) cacheSet(key, payload);
           if (cancelled) return;
           setErrorKey(null);
-          bump();
+          // A superseded response is dropped: the generation bump refetches.
+          if (!current) return;
+          if (ready) bump();
+          else setUncached({ key, data: payload });
         })
         .catch((e: unknown) => {
           if (cancelled || controller.signal.aborted || isAbort(e)) return;
@@ -95,7 +109,9 @@ export function useStatsRange(
     };
   }, [key, seenGeneration]);
 
-  const data = key ? (rangeCache.get(key) ?? null) : null;
+  const data = key
+    ? (rangeCache.get(key) ?? (uncached?.key === key ? uncached.data : null))
+    : null;
   const error = key !== null && data === null && errorKey === key;
   return { data, loading: key !== null && data === null && !error, error };
 }

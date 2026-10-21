@@ -20,6 +20,7 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { StatsArtistOfPeriod } from "@/components/stats/StatsArtistOfPeriod";
 import { StatsMusicAgeCard } from "@/components/stats/StatsClosingCards";
 import { StatsMovement } from "@/components/stats/StatsMovement";
+import { statsMovementNewArtists } from "@/components/stats/StatsMovementView";
 import { StatsExplorer } from "@/components/stats/explorer/StatsExplorer";
 import { StatsGenreTrendCard } from "@/components/stats/StatsGenreTrendCard";
 import { StatsFreshness } from "@/components/stats/StatsFreshness";
@@ -108,6 +109,18 @@ function movementExclusions(page: StatsPageController): string[] {
   return hero ? [hero, ...names] : names;
 }
 
+/** `#movement` only while its New column shows someone after the exclusions. */
+function newArtistsHref(page: StatsPageController): string | undefined {
+  const story = page.dashboard?.story;
+  if (!story) return undefined;
+  const visible = statsMovementNewArtists(
+    story,
+    movementExclusions(page),
+    statsScope(page),
+  );
+  return visible.length ? "#movement" : undefined;
+}
+
 function StatsPageContent({ page }: { page: StatsPageController }) {
   const { dashboard, dashboardLoading, hasStats } = page;
   const tape = dashboard?.tape;
@@ -171,6 +184,7 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
                 <StatsHighlights
                   highlights={highlights}
                   allTime={page.selection === "all_time"}
+                  newArtistsHref={newArtistsHref(page)}
                 />
               </StatsReveal>
             ) : null
@@ -213,7 +227,10 @@ function StatsPageContent({ page }: { page: StatsPageController }) {
         <StatsListeningSection page={page} entrances={heatmapEntrances} />
         {dashboard?.music_age ? (
           <StatsReveal>
-            <StatsMusicAgeCard musicAge={dashboard.music_age} />
+            <StatsMusicAgeCard
+              musicAge={dashboard.music_age}
+              tape={dashboard.tape}
+            />
           </StatsReveal>
         ) : null}
         <AffinityCard

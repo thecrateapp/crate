@@ -1,6 +1,7 @@
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
-import type { StatsDecadeAlbum, StatsMusicAge } from "./stats-types";
+import { musicAgeShareYear } from "./stats-tape-model";
+import type { StatsDecadeAlbum, StatsMusicAge, StatsTape } from "./stats-types";
 import {
   StatsDecadeColumnsView,
   StatsMusicAgeCardView,
@@ -31,10 +32,17 @@ export function StatsDecadeColumns(props: {
     />
   );
 }
-export function StatsMusicAgeCard({ musicAge }: { musicAge: StatsMusicAge }) {
+export function StatsMusicAgeCard({
+  musicAge,
+  tape,
+}: {
+  musicAge: StatsMusicAge;
+  tape: StatsTape | null | undefined;
+}) {
   return (
     <StatsMusicAgeCardView
       musicAge={musicAge}
+      shareYear={musicAgeShareYear(tape, new Date().getFullYear())}
       decades={<StatsDecadeColumns musicAge={musicAge} linked />}
     />
   );

@@ -84,10 +84,14 @@ export function StatsHeadlineNumbers({
               />
             </dd>
             {comparison?.previous ? (
-              <MonoLabel as="span" className="order-last">
-                {formatStatsDelta(item.value, item.before, i18n.language) ??
-                  "\u2014"}
-              </MonoLabel>
+              // A second dd of the same group keeps the dl valid and ties the
+              // delta to its metric for assistive tech.
+              <dd className="order-last m-0">
+                <MonoLabel as="span" className="block">
+                  {formatStatsDelta(item.value, item.before, i18n.language) ??
+                    "\u2014"}
+                </MonoLabel>
+              </dd>
             ) : null}
           </div>
         ))}
