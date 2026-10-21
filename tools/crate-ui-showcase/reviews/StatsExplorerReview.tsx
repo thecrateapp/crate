@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState } from "react";
-import { StatsExplorerPanel } from "../../../app/listen/src/components/stats/explorer/StatsExplorerPanel";
+import {
+  StatsExplorerPanel,
+  type ExplorerLinks,
+} from "../../../app/listen/src/components/stats/explorer/StatsExplorerPanel";
 import { StatsExplorerView } from "../../../app/listen/src/components/stats/explorer/StatsExplorerView";
 import {
   bucketRange,
@@ -68,6 +71,13 @@ function stretchData(start: string, end: string): StatsRange {
   };
 }
 
+const LINKS: ExplorerLinks = {
+  albumCover: () => IMAGE_SAMPLES[0]!,
+  artistPhoto: () => IMAGE_SAMPLES[1]!,
+  artistHref: () => "/fixture/artist",
+  albumHref: () => "/fixture/album",
+};
+
 /**
  * The real explorer view and panel with local state and fixture blocks: no
  * network, no player and no router navigation.
@@ -134,6 +144,7 @@ export function StatsExplorerReview({
             chartRef.current?.focus();
           }}
           onPlayTrack={() => {}}
+          links={LINKS}
           renderImage={({ alt, className }) => (
             <img src={IMAGE_SAMPLES[0]} alt={alt} className={className} />
           )}

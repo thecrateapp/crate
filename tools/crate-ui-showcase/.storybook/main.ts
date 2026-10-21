@@ -1,7 +1,6 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
-import { listenLibraryRoutesFixture } from "../fixtures/listen-routes-plugin.ts";
 const config: StorybookConfig = {
   framework: "@storybook/react-vite",
   stories: ["../docs/**/*.mdx", "../stories/**/*.stories.tsx"],
@@ -14,11 +13,7 @@ const config: StorybookConfig = {
     <link rel="stylesheet" href="./crate-fonts/jetbrains-mono.css">
     <link rel="stylesheet" href="./crate-fonts/bricolage-grotesque.css">`,
   async viteFinal(config) {
-    config.plugins = [
-      ...(config.plugins ?? []),
-      listenLibraryRoutesFixture(),
-      tailwindcss(),
-    ];
+    config.plugins = [...(config.plugins ?? []), tailwindcss()];
     // Storybook already supplies all story/annotation entries; release cold-start deps
     // without waiting on the virtual preview import crawl (Vite8 middleware mode).
     config.optimizeDeps = { ...config.optimizeDeps, holdUntilCrawlEnd: false };

@@ -18,12 +18,6 @@ import type {
   StatsRangeArtist,
   StatsRangeTrack,
 } from "../stats-types";
-import {
-  albumCoverApiUrl,
-  albumPagePath,
-  artistPagePath,
-  artistPhotoApiUrl,
-} from "../../../lib/library-routes";
 import { cn } from "../../../lib/utils";
 
 import {
@@ -50,7 +44,24 @@ export interface ExplorerDayDetail {
   available: boolean;
 }
 
+/** Artwork and page links, supplied by the adapter so this view stays pure. */
+export interface ExplorerLinks {
+  /** Cover for an album or the album of a track; null when there is none. */
+  albumCover: (
+    item: { album?: string | null; artist?: string | null } & Pick<
+      StatsRangeAlbum,
+      "album_id" | "global_album_uid"
+    >,
+  ) => string | null;
+  artistPhoto: (artist: StatsRangeArtist) => string | null;
+  /** Undefined when the artist has no page. */
+  artistHref: (artist: StatsRangeArtist) => string | undefined;
+  /** Undefined when the album has no page. */
+  albumHref: (album: StatsRangeAlbum) => string | undefined;
+}
+
 export interface StatsExplorerPanelProps {
+  links: ExplorerLinks;
   granularity: "day" | "week";
   /** Inclusive local days of the stretch. */
   stretch: { start: string; end: string };
@@ -83,26 +94,6 @@ function moodKey(energy: number, valence: number): string {
   return valence >= MOOD_SPLIT ? "chill" : "melancholy";
 }
 
-function albumCover(
-  item: { album?: string | null; artist?: string | null } & Pick<
-    StatsRangeAlbum,
-    "album_id" | "global_album_uid"
-  >,
-): string | null {
-  if (!item.album) return null;
-  return (
-    albumCoverApiUrl(
-      {
-        albumId: item.album_id,
-        globalAlbumUid: item.global_album_uid,
-        albumName: item.album,
-        artistName: item.artist ?? undefined,
-      },
-      { size: 128 },
-    ) || null
-  );
-}
-
 export function StatsExplorerPanel({
   granularity,
   stretch,
@@ -116,6 +107,7 @@ export function StatsExplorerPanel({
   onBack,
   onPlayTrack,
   renderImage,
+  links,
 }: StatsExplorerPanelProps) {
   const headingId = useId();
   const busy = day ? day.loading : loading && (!data || stale);
@@ -134,6 +126,7 @@ export function StatsExplorerPanel({
           onBack={onBack}
           onPlayTrack={onPlayTrack}
           renderImage={renderImage}
+          links={links}
         />
       ) : (
         <StretchSummaryView
@@ -148,6 +141,7 @@ export function StatsExplorerPanel({
           available={available}
           onPlayTrack={onPlayTrack}
           renderImage={renderImage}
+          links={links}
         />
       )}
     </aside>
@@ -175,6 +169,7 @@ function StretchSummaryView({
   available,
   onPlayTrack,
   renderImage,
+  links,
 }: Omit<StatsExplorerPanelProps, "day" | "onBack"> & { headingId: string }) {
   const { t, i18n } = useTranslation();
   const dates = formatExplorerRange(stretch, i18n.language);
@@ -223,12 +218,16 @@ function StretchSummaryView({
         <div className="stats-explorer-server" data-stale={stale || undefined}>
           {artist ? (
             <PanelBlock label={t("stats.explorer.topArtist")}>
-              <ArtistRow artist={artist} renderImage={renderImage} />
+              <ArtistRow
+                artist={artist}
+                renderImage={renderImage}
+                links={links}
+              />
             </PanelBlock>
           ) : null}
           {album ? (
             <PanelBlock label={t("stats.explorer.topAlbum")}>
-              <AlbumRow album={album} renderImage={renderImage} />
+              <AlbumRow album={album} renderImage={renderImage} links={links} />
             </PanelBlock>
           ) : null}
           {track ? (
@@ -237,6 +236,7 @@ function StretchSummaryView({
                 track={track}
                 onPlayTrack={onPlayTrack}
                 renderImage={renderImage}
+                links={links}
               />
             </PanelBlock>
           ) : null}
@@ -282,6 +282,7 @@ function DayDetail({
   onBack,
   onPlayTrack,
   renderImage,
+  links,
 }: {
   headingId: string;
   granularity: "day" | "week";
@@ -289,6 +290,7 @@ function DayDetail({
   onBack: () => void;
   onPlayTrack: (track: StatsRangeTrack) => void;
   renderImage?: RenderImage;
+  links: ExplorerLinks;
 }) {
   const { t, i18n } = useTranslation();
   const weekly = granularity === "week";
@@ -331,6 +333,7 @@ function DayDetail({
               track={track}
               onPlayTrack={onPlayTrack}
               renderImage={renderImage}
+              links={links}
               withAlbum
             />
           </li>
@@ -443,16 +446,12 @@ function MoodReading({
 function ArtistRow({
   artist,
   renderImage,
+  links,
 }: {
   artist: StatsRangeArtist;
   renderImage?: RenderImage;
+  links: ExplorerLinks;
 }) {
-  const route = {
-    artistId: artist.artist_id,
-    artistSlug: artist.artist_slug,
-    artistName: artist.artist_name,
-  };
-  const linked = artist.artist_id != null || Boolean(artist.artist_slug);
   return (
     <EntityRow
       title={artist.artist_name}
@@ -461,14 +460,11 @@ function ArtistRow({
       )}`}
       shape="circle"
       cover={{
-        src:
-          artist.artist_id != null
-            ? artistPhotoApiUrl(route, { size: 128 })
-            : null,
+        src: links.artistPhoto(artist),
         alt: "",
         renderImage,
       }}
-      href={linked ? artistPagePath(route) : undefined}
+      href={links.artistHref(artist)}
       menuButton="none"
       density="compact"
     />
@@ -478,28 +474,19 @@ function ArtistRow({
 function AlbumRow({
   album,
   renderImage,
+  links,
 }: {
   album: StatsRangeAlbum;
   renderImage?: RenderImage;
+  links: ExplorerLinks;
 }) {
-  const linked = album.album_id != null || Boolean(album.global_album_uid);
   return (
     <EntityRow
       title={album.album ?? ""}
       subtitle={album.artist ?? undefined}
       meta={formatStatsMinutes(album.minutes)}
-      cover={{ src: albumCover(album), alt: "", renderImage }}
-      href={
-        linked
-          ? albumPagePath({
-              albumId: album.album_id,
-              albumSlug: album.album_slug,
-              albumName: album.album ?? undefined,
-              artistName: album.artist ?? undefined,
-              globalAlbumUid: album.global_album_uid,
-            })
-          : undefined
-      }
+      cover={{ src: links.albumCover(album), alt: "", renderImage }}
+      href={links.albumHref(album)}
       menuButton="none"
       density="compact"
     />
@@ -510,11 +497,13 @@ function TrackRow({
   track,
   onPlayTrack,
   renderImage,
+  links,
   withAlbum = false,
 }: {
   track: StatsRangeTrack;
   onPlayTrack: (track: StatsRangeTrack) => void;
   renderImage?: RenderImage;
+  links: ExplorerLinks;
   withAlbum?: boolean;
 }) {
   const { t } = useTranslation();
@@ -526,7 +515,7 @@ function TrackRow({
       title={track.title ?? ""}
       subtitle={subtitle || undefined}
       meta={t("stats.explorer.plays", { count: track.plays })}
-      cover={{ src: albumCover(track), alt: "", renderImage }}
+      cover={{ src: links.albumCover(track), alt: "", renderImage }}
       trailing={
         track.track_id != null ? (
           <ActionButton

@@ -12,6 +12,7 @@ import {
   type StatsExplorerPanelProps,
 } from "@/components/stats/explorer/StatsExplorerPanel";
 import type { StretchSummary } from "@/components/stats/explorer/stats-explorer-model";
+import { EXPLORER_LINKS } from "@/components/stats/explorer/StatsExplorer";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const STRETCH = { start: "2026-09-01", end: "2026-09-30" };
@@ -85,6 +86,7 @@ function panel(props: PanelProps = {}) {
       loading={false}
       available
       day={null}
+      links={EXPLORER_LINKS}
       onBack={() => {}}
       onPlayTrack={() => {}}
       {...props}

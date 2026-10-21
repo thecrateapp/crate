@@ -13,10 +13,17 @@ import type {
 } from "@/components/stats/stats-types";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { cacheScopedKey } from "@/lib/cache";
+import {
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 
 import {
   StatsExplorerPanel,
   type ExplorerDayDetail,
+  type ExplorerLinks,
 } from "./StatsExplorerPanel";
 import { StatsExplorerView } from "./StatsExplorerView";
 import {
@@ -49,6 +56,52 @@ const renderCover: MediaCoverProps["renderImage"] = ({
     loading="lazy"
   />
 );
+
+export const EXPLORER_LINKS: ExplorerLinks = {
+  albumCover: (item) => {
+    if (!item.album) return null;
+    return (
+      albumCoverApiUrl(
+        {
+          albumId: item.album_id,
+          globalAlbumUid: item.global_album_uid,
+          albumName: item.album,
+          artistName: item.artist ?? undefined,
+        },
+        { size: 128 },
+      ) || null
+    );
+  },
+  artistPhoto: (artist) =>
+    artist.artist_id != null
+      ? artistPhotoApiUrl(
+          {
+            artistId: artist.artist_id,
+            artistSlug: artist.artist_slug,
+            artistName: artist.artist_name,
+          },
+          { size: 128 },
+        )
+      : null,
+  artistHref: (artist) =>
+    artist.artist_id != null || artist.artist_slug
+      ? artistPagePath({
+          artistId: artist.artist_id,
+          artistSlug: artist.artist_slug,
+          artistName: artist.artist_name,
+        })
+      : undefined,
+  albumHref: (album) =>
+    album.album_id != null || album.global_album_uid
+      ? albumPagePath({
+          albumId: album.album_id,
+          albumSlug: album.album_slug,
+          albumName: album.album ?? undefined,
+          artistName: album.artist ?? undefined,
+          globalAlbumUid: album.global_album_uid,
+        })
+      : undefined,
+};
 
 export interface StatsExplorerProps {
   tape: StatsTape;
@@ -209,6 +262,7 @@ function ExplorerSession({
           onBack={backToStretch}
           onPlayTrack={playTrack}
           renderImage={renderCover}
+          links={EXPLORER_LINKS}
         />
       }
     />
