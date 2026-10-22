@@ -24,10 +24,20 @@ IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 cd "$SERVER_PATH"
 
 COMPOSE=(docker compose -f docker-compose.yaml -f docker-compose.project.yaml)
-# A bootstrap overlay keeps the independent operator declared on older releases too.
-if [[ -f .deploy/hermes.compose.yaml ]]; then
-  COMPOSE+=(-f .deploy/hermes.compose.yaml)
-fi
+# The bootstrap overlay preserves the Hermes profile on older releases. Once the
+# base release declares the service, applying the copied full-service overlay
+# duplicates list fields such as security_opt and makes Compose reject the stack.
+select_hermes_overlay() {
+  [[ -f .deploy/hermes.compose.yaml ]] || return 0
+
+  local base_services
+  base_services="$(docker compose --profile hermes \
+    -f docker-compose.yaml -f docker-compose.project.yaml config --services)"
+  if ! grep -Fxq "crate-hermes-agent" <<< "$base_services"; then
+    COMPOSE+=(-f .deploy/hermes.compose.yaml)
+  fi
+}
+select_hermes_overlay
 PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
 RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
