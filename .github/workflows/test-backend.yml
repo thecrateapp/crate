@@ -135,10 +135,11 @@ jobs:
         run: pip install -r requirements-test.txt
         working-directory: app
 
-      - name: Install local OCR test dependencies
+      - name: Install media and OCR test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+          ffmpeg -version
 
       - name: Run test shard with coverage
         env:
