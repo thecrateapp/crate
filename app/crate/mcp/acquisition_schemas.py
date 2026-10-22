@@ -7,6 +7,7 @@ from pydantic import Field
 from crate.mcp.schemas import ClosedInput, EntityUID, IdempotencyKey, Identifier
 
 Provider = Literal["soulseek", "tidal", "bandcamp"]
+SoulseekProvider = Literal["soulseek"]
 
 
 class AcquisitionReadiness(ClosedInput):
@@ -14,7 +15,7 @@ class AcquisitionReadiness(ClosedInput):
 
 
 class AcquisitionSearch(ClosedInput):
-    provider: Provider
+    provider: SoulseekProvider
     query: Annotated[
         str, Field(min_length=2, max_length=160, pattern=r"^[^\x00-\x1f\x7f]+$")
     ]

@@ -26,6 +26,26 @@ MAX_BYTES = 2147483648
 MAX_FILES = 50
 MAX_TIDAL_RESULTS = 50
 MAX_TIDAL_DISCOVERY = 500
+MAX_SEARCH_RESPONSE_BYTES = 32 * 1024 * 1024
+MAX_SEARCH_RESPONSE_SECONDS = 30
+_AUDIO_EXTENSIONS = {
+    "aac",
+    "aif",
+    "aiff",
+    "alac",
+    "ape",
+    "flac",
+    "m4a",
+    "m4b",
+    "mp3",
+    "mpc",
+    "oga",
+    "ogg",
+    "opus",
+    "wav",
+    "wma",
+    "wv",
+}
 
 
 def _digest(value):
@@ -50,6 +70,12 @@ def _transport(method: str, endpoint: str, body: Any = None) -> Any:
     from crate import soulseek
 
     started = time.monotonic()
+    search_responses = (
+        method == "GET"
+        and re.fullmatch(r"searches/[0-9a-fA-F-]{36}/responses", endpoint) is not None
+    )
+    max_bytes = MAX_SEARCH_RESPONSE_BYTES if search_responses else 1048576
+    max_seconds = MAX_SEARCH_RESPONSE_SECONDS if search_responses else 15
     try:
         with requests.request(
             method,
@@ -79,7 +105,7 @@ def _transport(method: str, endpoint: str, body: Any = None) -> Any:
             data = bytearray()
             for chunk in response.iter_content(65536):
                 data.extend(chunk)
-                if len(data) > 1048576 or time.monotonic() - started > 15:
+                if len(data) > max_bytes or time.monotonic() - started > max_seconds:
                     raise ValueError("Response too large")
             return json.loads(data) if data else {}
     except Exception:  # noqa: BLE001 — redact all credential-bearing transport errors.
@@ -177,21 +203,30 @@ def _selections(search_id, raw):
     if not isinstance(raw, list):
         raise DiagnosticError("PROVIDER_UNAVAILABLE", "Invalid search response")
     groups = {}
+    non_flac_groups = set()
     for peer in raw[:50]:
         try:
             username = _identifier(peer["username"])
             for file in peer.get("files", [])[:500]:
                 filename = _identifier(file["filename"], path=True)
                 parts = filename.replace("\\", "/").split("/")
-                if len(parts) < 3 or not filename.lower().endswith(".flac"):
+                if len(parts) < 3:
+                    continue
+                group_key = (username, "/".join(parts[:-1]))
+                extension = (
+                    parts[-1].rsplit(".", 1)[-1].casefold() if "." in parts[-1] else ""
+                )
+                if extension in _AUDIO_EXTENSIONS and extension != "flac":
+                    non_flac_groups.add(group_key)
+                    continue
+                if extension != "flac":
                     continue
                 if any(
                     type(file.get(k)) is not int or file[k] <= 0
                     for k in ("size", "bitDepth", "sampleRate")
                 ):
                     continue
-                key = (username, "/".join(parts[:-1]))
-                groups.setdefault(key, []).append(
+                groups.setdefault(group_key, []).append(
                     {
                         "filename": filename,
                         "size": file["size"],
@@ -204,6 +239,8 @@ def _selections(search_id, raw):
     result = []
     provider_version = _provider_version()
     for (username, folder), files in groups.items():
+        if (username, folder) in non_flac_groups:
+            continue
         size = sum(f["size"] for f in files)
         names = [f["filename"].replace("\\", "/").split("/")[-1] for f in files]
         if (
@@ -231,16 +268,22 @@ def _selections(search_id, raw):
 
 
 def search_acquisition(principal, *, provider, query, limit=5, trace_id=None):
-    readiness = get_acquisition_readiness(principal, provider=provider)["data"]
-    if not readiness["executable"]:
-        raise DiagnosticError("NOT_EXECUTABLE", readiness["reason"])
+    if provider != "soulseek":
+        raise DiagnosticError(
+            "NOT_EXECUTABLE",
+            "Generic acquisition search supports Soulseek only; use the dedicated provider search",
+        )
     if (
         not isinstance(query, str)
         or not 2 <= len(query) <= 160
         or re.search(r"[\x00-\x1f\x7f]", query)
+        or type(limit) is not int
         or not 1 <= limit <= 5
     ):
         raise ValueError("Invalid acquisition search")
+    readiness = get_acquisition_readiness(principal, provider=provider)["data"]
+    if not readiness["executable"]:
+        raise DiagnosticError("NOT_EXECUTABLE", readiness["reason"])
     response = _transport(
         "POST",
         "searches",

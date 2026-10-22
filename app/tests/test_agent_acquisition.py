@@ -13,6 +13,7 @@ from crate.agent_diagnostics import DiagnosticError
 from crate.db.repositories import agent_acquisition as store
 from crate.db.repositories.tasks_updates import start_task
 from crate.db.tx import read_scope
+from crate.mcp.acquisition_schemas import AcquisitionSearch
 from crate.worker_handlers.acquisition import (
     _coerce_moved_count,
     _handle_soulseek_download,
@@ -385,6 +386,26 @@ def test_search_permissions_provider_readiness_and_no_transfer(world):
     assert world["state"]["posts"] == 0
 
 
+def test_generic_search_is_soulseek_only_and_schema_rejects_other_providers(world):
+    with pytest.raises(DiagnosticError) as error:
+        acquisition.search_acquisition(
+            world["principal"], provider="tidal", query="Echo New"
+        )
+    assert error.value.code == "NOT_EXECUTABLE"
+    assert world["state"]["calls"] == []
+    with pytest.raises(ValueError):
+        AcquisitionSearch.model_validate({"provider": "tidal", "query": "Echo New"})
+
+
+@pytest.mark.parametrize("limit", [2.5, True])
+def test_search_rejects_non_integer_limits_before_provider_call(world, limit):
+    with pytest.raises(ValueError, match="Invalid acquisition search"):
+        acquisition.search_acquisition(
+            world["principal"], provider="soulseek", query="Echo New", limit=limit
+        )
+    assert not any(endpoint == "searches" for _, endpoint, _ in world["state"]["calls"])
+
+
 @pytest.mark.parametrize(
     "bad",
     [
@@ -416,6 +437,62 @@ def test_transport_redacts_credentials_and_rejects_large_response(monkeypatch):
         acquisition._transport("GET", "application")
     assert "password" not in str(error.value)
     assert "secret" not in str(error.value)
+
+
+def test_transport_allows_bounded_large_search_response_only(monkeypatch):
+    from uuid import uuid4
+
+    monkeypatch.setattr("crate.soulseek._api_key", lambda: "synthetic-key")
+    monkeypatch.setattr("crate.soulseek._base_url", lambda: "http://slskd")
+    body = ('["' + "x" * (1024 * 1024) + '"]').encode()
+
+    class Response:
+        status_code = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_content(self, chunk_size):
+            for offset in range(0, len(body), chunk_size):
+                yield body[offset : offset + chunk_size]
+
+    monkeypatch.setattr(
+        acquisition.requests, "request", lambda *_args, **_kwargs: Response()
+    )
+    result = acquisition._transport("GET", f"searches/{uuid4()}/responses")
+    assert len(result[0]) == 1024 * 1024
+
+    with pytest.raises(DiagnosticError, match="bounded transport budget"):
+        acquisition._transport("GET", "application")
+
+    body = b'["' + b"x" * acquisition.MAX_SEARCH_RESPONSE_BYTES + b'"]'
+    with pytest.raises(DiagnosticError, match="bounded transport budget"):
+        acquisition._transport("GET", f"searches/{uuid4()}/responses")
+
+
+def test_selection_omits_album_when_folder_contains_non_flac_audio(world):
+    raw = [
+        {
+            "username": "peer name",
+            "files": [
+                {
+                    "filename": "Echo\\New\\One.flac",
+                    "size": 100,
+                    "bitDepth": 16,
+                    "sampleRate": 44100,
+                },
+                {"filename": "Echo\\New\\Two.mp3", "size": 100000},
+            ],
+        }
+    ]
+
+    assert acquisition._selections(world["state"]["search_id"], raw) == []
 
 
 SILENT_FLAC = "eJztzb9KQmEAhvHngIj/Dji0K01N0jFx+8A6OKUmkhdwtE8UTMNOSm2CW+3dSmd3ly5CZ0c3xUHwFoT3tz3v8vZqgQ9cO5ETgQtualnZghOtdzeLt9X3f+W32ZxvSrkYfGWAWjDtle8KXsG7LcaBNBBMwsF7aKrd/jh7zGHn4/VsS54207CzY4SDcGjN08i6wHPr3n9stOsP1ZbxrgA76o5f7MScP83JIyIiIiIiIiIiIiIiIiIiIly8/e4zgfPXBn78A8ZmMoU="
