@@ -123,7 +123,7 @@ function JsonPreview({ value }: { value: unknown }) {
     const tone = isKey
       ? "text-accent-action-hi"
       : token.startsWith('"')
-        ? "text-state-success-text"
+        ? "text-accent-action"
         : /^(true|false|null)$/.test(token)
           ? "text-state-warning-text"
           : "text-state-info";

@@ -248,7 +248,7 @@ export function ShowSourcePanel({
       </div>
       {!source.availability && source.availabilityFailed ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <p role="alert" className="text-state-danger-text">
+          <p role="alert" className="text-state-warning-text">
             Couldn&apos;t load the import methods.
           </p>
           <Button
@@ -279,7 +279,7 @@ export function ShowSourcePanel({
         </p>
       )}
       {source.error ? (
-        <p role="alert" className="text-sm text-state-danger-text">
+        <p role="alert" className="text-sm text-state-warning-text">
           {source.error}
         </p>
       ) : null}
@@ -288,7 +288,9 @@ export function ShowSourcePanel({
       </p>
       {source.warnings.length ? (
         <div className="space-y-1">
-          <h3 className="text-xs font-medium text-muted-foreground font-display">Notes</h3>
+          <h3 className="text-xs font-medium text-muted-foreground font-display">
+            Notes
+          </h3>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
             {source.warnings.map((warning) => (
               <li key={warning}>{warning}</li>

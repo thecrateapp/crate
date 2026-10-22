@@ -687,7 +687,7 @@ function itemTitle(item: BandcampItem) {
 
 function importStatusClass(status?: string | null) {
   if (status === "completed")
-    return "border-state-success/25 bg-state-success/10 text-state-success-text";
+    return "border-accent-action/25 bg-accent-action/10 text-accent-action";
   if (status === "failed")
     return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
   if (status === "running")

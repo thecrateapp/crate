@@ -122,7 +122,7 @@ function ApprovalsList({ view }: { view: PlanView }) {
       ) : null}
       {error ? (
         <div className="flex flex-wrap items-center gap-3">
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-state-warning-text">
             {apiErrorText(error, "The plans could not be loaded.")}
           </p>
           <Button

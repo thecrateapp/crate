@@ -126,7 +126,7 @@ function PresetCard({
         {description}
       </span>
       {reason ? (
-        <span id={reasonId} className="text-sm text-destructive">
+        <span id={reasonId} className="text-sm text-state-warning-text">
           {reason}
         </span>
       ) : null}

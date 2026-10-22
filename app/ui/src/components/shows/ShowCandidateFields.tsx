@@ -179,7 +179,7 @@ export function ShowCandidateFields({
           aria-describedby={describedBy}
           className={cn(
             "h-9",
-            REQUIRED.has(spec.key) && "aria-invalid:border-state-danger",
+            REQUIRED.has(spec.key) && "aria-invalid:border-state-warning",
           )}
           type={spec.type ?? "text"}
           value={candidate[spec.key] ?? ""}
@@ -240,7 +240,7 @@ export function ShowCandidateFields({
         )}
       </div>
       {missing.length ? (
-        <p id={missingId} className="text-xs text-state-danger-text">
+        <p id={missingId} className="text-xs text-state-warning-text">
           {missingText(missing)}
         </p>
       ) : null}

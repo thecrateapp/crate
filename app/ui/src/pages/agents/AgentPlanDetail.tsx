@@ -153,7 +153,7 @@ function PlanDetail({ planId }: { planId?: string }) {
           </p>
         ) : null}
         {errorText ? (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-state-warning-text">
             {errorText}
           </p>
         ) : null}
@@ -201,7 +201,7 @@ function PlanDetail({ planId }: { planId?: string }) {
             {requester ? <p className="text-white/55">{requester}</p> : null}
           </div>
           {errorText ? (
-            <p role="alert" className="text-sm text-red-300">
+            <p role="alert" className="text-sm text-state-warning-text">
               {errorText}
             </p>
           ) : null}
@@ -221,7 +221,7 @@ function PlanDetail({ planId }: { planId?: string }) {
           {item.executable === false ? (
             <p
               role="alert"
-              className="flex items-start gap-2 text-sm text-amber-100"
+              className="flex items-start gap-2 text-sm text-state-warning-text"
             >
               <TriangleAlert
                 aria-hidden="true"
@@ -262,7 +262,10 @@ function PlanDetail({ planId }: { planId?: string }) {
         </div>
       </OpsPanel>
       {awaiting && !canDecide && !complete ? (
-        <p role="alert" className="flex items-start gap-2 text-sm text-red-200">
+        <p
+          role="alert"
+          className="flex items-start gap-2 text-sm text-state-warning-text"
+        >
           <TriangleAlert
             aria-hidden="true"
             className="mt-0.5 size-4 shrink-0"

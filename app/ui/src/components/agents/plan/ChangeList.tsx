@@ -36,8 +36,8 @@ function BeforeAfter({
         </dt>
         <dd className="mt-1 text-sm text-white/70">{current}</dd>
       </div>
-      <div className="min-w-0 rounded-md border border-cyan-400/20 bg-cyan-400/[0.06] p-3">
-        <dt className="flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70 font-mono">
+      <div className="min-w-0 rounded-md border border-accent-action/20 bg-accent-action/[0.06] p-3">
+        <dt className="flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-accent-action/70 font-mono">
           <ArrowRight aria-hidden="true" className="size-3" />
           Proposed
         </dt>
@@ -48,9 +48,9 @@ function BeforeAfter({
 }
 
 const rowTone: Record<FieldDiffRow["status"], string> = {
-  changed: "bg-amber-400/[0.07]",
-  added: "bg-emerald-400/[0.06]",
-  cleared: "bg-red-500/[0.08]",
+  changed: "bg-state-warning/[0.07]",
+  added: "bg-accent-action/[0.06]",
+  cleared: "bg-state-warning/[0.08]",
   unchanged: "",
 };
 
@@ -62,9 +62,9 @@ const statusWord: Record<FieldDiffRow["status"], string> = {
 };
 
 const markerTone: Record<FieldDiffRow["status"], string> = {
-  changed: "text-amber-200/80",
-  added: "text-emerald-200/80",
-  cleared: "text-red-200/80",
+  changed: "text-state-warning-text/80",
+  added: "text-accent-action-hi/80",
+  cleared: "text-state-warning-text/80",
   unchanged: "text-white/45",
 };
 
@@ -99,7 +99,7 @@ function FieldDiffTable({
   return (
     <div className="space-y-2">
       {identifiersOnly ? (
-        <p className="text-[11px] text-amber-200/80">
+        <p className="text-[11px] text-state-warning-text/80">
           Identifiers change · see Technical details
         </p>
       ) : null}
@@ -129,7 +129,7 @@ function FieldDiffTable({
                   </TableCell>
                   <TableCell className="align-top break-words whitespace-normal text-white">
                     {row.status === "cleared" ? (
-                      <span className="text-red-200">Cleared</span>
+                      <span className="text-state-warning-text">Cleared</span>
                     ) : (
                       <StructuredValue value={row.after} />
                     )}
@@ -178,7 +178,7 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
       return (
         <div className="space-y-2">
           {body.seeTechnical ? (
-            <p className="text-[11px] text-amber-200/80">
+            <p className="text-[11px] text-state-warning-text/80">
               Changed · see Technical details
             </p>
           ) : null}
@@ -186,7 +186,7 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
             current={<StructuredValue value={body.current} />}
             proposed={
               body.cleared ? (
-                <span className="text-red-200">Cleared</span>
+                <span className="text-state-warning-text">Cleared</span>
               ) : (
                 <StructuredValue value={body.proposed} />
               )

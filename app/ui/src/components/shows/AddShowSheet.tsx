@@ -238,9 +238,9 @@ export function AddShowSheet({
   const discarded = unsavedWithContent(draft, saved).length;
   const sourceHasContent = Boolean(
     source.text.trim() ||
-      source.url.trim() ||
-      source.images.length ||
-      source.storedImages.length,
+    source.url.trim() ||
+    source.images.length ||
+    source.storedImages.length,
   );
   // An import whose acceptance was lost keeps its key for «Retry import»;
   // starting over would drop it and could pay for a second extraction.
@@ -376,12 +376,12 @@ export function AddShowSheet({
             {status}
           </p>
           {notice ? (
-            <p role="alert" className="text-sm text-state-danger-text">
+            <p role="alert" className="text-sm text-state-warning-text">
               {notice}
             </p>
           ) : null}
           {flow.error ? (
-            <p role="alert" className="text-sm text-state-danger-text">
+            <p role="alert" className="text-sm text-state-warning-text">
               {flow.error}
             </p>
           ) : null}

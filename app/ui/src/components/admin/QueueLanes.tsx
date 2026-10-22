@@ -190,7 +190,7 @@ function TaskChip({
       "border-dashed border-state-warning-text/80 text-state-warning-text",
     task.status === "failed" &&
       state === "done" &&
-      "border-state-danger/60 text-state-danger-text",
+      "border-state-warning/60 text-state-warning-text",
   );
   const style = {
     left,

@@ -244,7 +244,7 @@ export function ActivityPanel({
           <p className="text-sm text-white/50">Loading activity…</p>
         ) : null}
         {failed ? (
-          <p role="alert" className="text-sm text-amber-100">
+          <p role="alert" className="text-sm text-state-warning-text">
             {LOAD_ERROR}
           </p>
         ) : null}

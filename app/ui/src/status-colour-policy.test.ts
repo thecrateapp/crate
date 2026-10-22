@@ -10,33 +10,41 @@ const forbidden = new RegExp(
   `\\b(?:text|bg|border(?:-[trblxyse])?|ring|stroke|fill|from|via|to|decoration|accent|outline|shadow|divide)-(?:(${hues})-\\d+|state-(?:success|danger)(?:-[a-z]+)?|destructive)\\b`,
   "g",
 );
-function violations(source: string) {
+function violations(
+  source: string,
+  tree?: ts.SourceFile,
+  sharedChecker?: ts.TypeChecker,
+) {
   const found = [...source.matchAll(forbidden)].map((match) => match[0]);
-  const tree = ts.createSourceFile(
-    "source.tsx",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
-  const checker = ts
-    .createProgram(
-      ["source.tsx"],
-      { noLib: true, noResolve: true },
-      {
-        ...ts.createCompilerHost({}),
-        getSourceFile: (file) => (file === "source.tsx" ? tree : undefined),
-      },
-    )
-    .getTypeChecker();
+  const sourceTree =
+    tree ??
+    ts.createSourceFile(
+      "source.tsx",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+  const program = sharedChecker
+    ? undefined
+    : ts.createProgram(
+        ["source.tsx"],
+        { noLib: true, noResolve: true },
+        {
+          ...ts.createCompilerHost({}),
+          getSourceFile: (file) =>
+            file === "source.tsx" ? sourceTree : undefined,
+        },
+      );
+  const checker = sharedChecker ?? program!.getTypeChecker();
   function visit(node: ts.Node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const component = node.tagName.getText(tree);
+      const component = node.tagName.getText(sourceTree);
       if (component !== "ConfirmDialog") {
         for (const attr of node.attributes.properties) {
           if (
             !ts.isJsxAttribute(attr) ||
-            !["variant", "tone"].includes(attr.name.getText(tree)) ||
+            !["variant", "tone"].includes(attr.name.getText(sourceTree)) ||
             !attr.initializer
           )
             continue;
@@ -68,20 +76,22 @@ function violations(source: string) {
             )
           )
             found.push(
-              `${component}: ${attr.name.getText(tree)} outside ConfirmDialog`,
+              `${component}: ${attr.name.getText(sourceTree)} outside ConfirmDialog`,
             );
         }
       }
     }
     if (
       ts.isPropertyAssignment(node) &&
-      node.name.getText(tree) === "variant" &&
-      /["'](?:destructive|danger-soft)["']/.test(node.initializer.getText(tree))
+      node.name.getText(sourceTree) === "variant" &&
+      /["'](?:destructive|danger-soft)["']/.test(
+        node.initializer.getText(sourceTree),
+      )
     )
       found.push("indirect destructive variant");
     ts.forEachChild(node, visit);
   }
-  visit(tree);
+  visit(sourceTree);
   return found;
 }
 function files(directory: string): string[] {
@@ -123,11 +133,28 @@ describe("Admin status colour contract", () => {
     expect(violations(source)).toEqual([]),
   );
   it("keeps all Admin source on accent/warning/neutral, with danger confined to ConfirmDialog", () => {
-    const found = files(root).flatMap((file) =>
-      violations(readFileSync(file, "utf8")).map(
+    const allFiles = files(root);
+    const tsFiles = allFiles.filter((file) => /\.tsx?$/.test(file));
+    const program = ts.createProgram(tsFiles, {
+      noLib: true,
+      noResolve: true,
+    });
+    const checker = program.getTypeChecker();
+    const found = allFiles.flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      const tree =
+        program.getSourceFile(file) ??
+        ts.createSourceFile(
+          file,
+          source,
+          ts.ScriptTarget.Latest,
+          true,
+          ts.ScriptKind.TSX,
+        );
+      return violations(source, tree, checker).map(
         (value) => `${relative(root, file)}: ${value}`,
-      ),
-    );
+      );
+    });
     expect(found).toEqual([]);
   });
 });

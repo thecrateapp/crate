@@ -142,10 +142,10 @@ export function SmartMixActivity({
               <CrateChip
                 className={cn(
                   "text-[10px]",
-                  track.outcome === "failed" && "text-red-200",
+                  track.outcome === "failed" && "text-state-warning-text",
                   track.outcome !== "published" &&
                     track.outcome !== "failed" &&
-                    "text-amber-200",
+                    "text-state-warning-text",
                 )}
               >
                 {track.outcome}

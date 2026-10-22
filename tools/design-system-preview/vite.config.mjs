@@ -413,6 +413,9 @@ export default defineConfig({
         reviewAdminHealthRecovery: fileURLToPath(
           new URL("review-admin-health-recovery.html", import.meta.url),
         ),
+        reviewAdminStatusColors: fileURLToPath(
+          new URL("review-admin-status-colors.html", import.meta.url),
+        ),
         reviewAdminCatalog: fileURLToPath(
           new URL("review-admin-catalog.html", import.meta.url),
         ),

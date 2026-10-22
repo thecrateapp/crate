@@ -2,14 +2,12 @@
 
 Actualizado: 2026-10-22
 
-Estado: A0 reconciliado. A1a (Shell), A1b (superficies operativas compartidas), A1c (cabeceras
-abiertas), A2a (superficies operativas anidadas), A2b (streams de tarea compartidos), A2c
-(vigencia/recuperación operativa), A2d (recuperación de Library Health), A3a (Browse + Genres),
-A3b (Artist + Album), A3c (Discover + Insights/Analysis), A4a–A4c (Acquisition), A4d (New Releases
-+ Upcoming/Shows), A4e (Bandcamp + Global Catalog), A4f (Staged Imports + cuenta del Shell), A5a
-(Playlists + editor), A5b (Users + Roles), A5c (Settings + Translations), A5d (Federation) y A5e
-(Contributions) están implementados localmente y aprobados visualmente. A5f confirma el alcance de
-Orphans; A5 queda cerrado en local. A1, A2, A3 y A4 siguen abiertos. No hay commit/push.
+Estado actualizado: 2026-10-22. A0–A5f están reconciliados; los cortes implementados están
+aprobados y publicados en `20ad97b0` y `7f3fe7e8` (`feat/crate_v3`). A1a (Shell) está cerrado y
+aprobado; se ha revisado al menos tres veces y no debe volver a proponerse como siguiente corte.
+A1–A5 no siguen abiertos por el estado histórico que describen las notas de cada revisión. El único
+corte local pendiente de revisión es la unificación de colores semánticos de estado en Admin; su
+Storybook y preview ya están preparados y validados, a falta de revisión visual.
 
 ## Objetivo
 
@@ -23,10 +21,11 @@ superficies sólidas, reglas hairline, tipografía Bricolage Grotesque + Roboto 
 acentos cyan/amber contenidos, jerarquía clara y datos que expresan su procedencia y estado. Cada
 página de Admin conserva la composición que mejor explica su propio flujo.
 
-## Estado de partida
+## Estado de partida original
 
-- Rama `feat/crate_v3`, en `9c14f396` (`fix(listen): finish web review and show locations`),
-  sincronizada con `origin/feat/crate_v3` al iniciar esta hoja de ruta.
+- Esta hoja de ruta se abrió en `9c14f396` (`fix(listen): finish web review and show locations`),
+  sincronizada con `origin/feat/crate_v3`. El estado de apertura es histórico; el estado vigente
+  aparece al inicio de este documento.
 - El trabajo web de Listen está prácticamente cerrado. Los cambios recientes están publicados en
   la rama; el despliegue de producción y los paquetes nativos son una fase posterior.
 - Dashboard V3 se conserva como referencia aprobada en
@@ -36,8 +35,8 @@ página de Admin conserva la composición que mejor explica su propio flujo.
   [`admin-adoption-debt.json`](../../scripts/design-system/admin-adoption-debt.json). Los trece
   registros son puntos de adopción por consumidor, no trece componentes nuevos ni una migración
   masiva autorizada.
-- No hay cambios de producto Admin pendientes de revisión al abrir este plan. La primera tarea es
-  reconciliar la cobertura para separar lo ya terminado, lo parcial, lo obsoleto y lo pendiente.
+- La primera tarea original fue reconciliar la cobertura; A0 la completó y dejó inventarios
+  históricos separados de la secuencia activa.
 
 ## Referencias y autoridad
 
@@ -109,7 +108,7 @@ que las piezas compartidas no cubren.
 largas no comprimen la identidad; las superficies migradas usan tokens comunes y dejan de añadir
 deuda. Stories muestran estados normal, carga, error/vacío y capacidades cuando corresponda.
 
-#### A1a — Chrome sólido · local para revisión
+#### A1a — Chrome sólido · aprobado, cerrado y publicado (`20ad97b0`)
 
 Cabeceras fijas desktop y mobile de `Shell` usan `bg-app-surface` sin transparencia ni blur. Se
 retira su única entrada (dos ocurrencias) del registro ejecutable de deuda; los otros doce registros
@@ -119,16 +118,16 @@ siguen intactos. El preview independiente
 acciones ficticias. Comprobación focalizada: `Shell.test.tsx` y
 `admin-navigation-checkpoint.spec.ts` en 1440, 768 y 390 px. No altera callbacks ni navegación.
 
-**Revisión local actualizada (2026-10-22):** `admin-shell-review.spec.ts` pasa 3/3 en 1440, 768
-y 390 px. Los dos tamaños mayores comprueban la cabecera desktop y el drawer se abre y conserva la
-navegación a 390 px. Las capturas están en `.artifacts/review/admin-shell-{1440,768,390}.png`;
-la vista real montada en Storybook y `review-admin-shell.html` siguen disponibles. El checkpoint
-completo de navegación pasa 10/10 y verifica el scrollbar fino/oscuro aprobado; se retiró del test
-una aserción residual del efecto de punto y estela que ya no forma parte de la interfaz. Falta la
-aprobación visual del usuario; no commit/push. OpsPageHero/OpsStatTile y adopción en páginas
-operativas continúan pendientes dentro de A1.
+**Revisión local (2026-10-22):** `admin-shell-review.spec.ts` pasa 3/3 en 1440, 768 y 390 px. Los
+dos tamaños mayores comprueban la cabecera desktop y el drawer se abre y conserva la navegación a
+390 px. Las capturas están en `.artifacts/review/admin-shell-{1440,768,390}.png`; la vista real
+montada en Storybook y `review-admin-shell.html` siguen disponibles. El checkpoint completo de
+navegación pasa 10/10 y verifica el scrollbar fino/oscuro aprobado; se retiró del test una aserción
+residual del efecto de punto y estela que ya no forma parte de la interfaz. La aprobación visual y
+el cierre de A1a ya están registrados; no volver a abrir este corte salvo petición expresa del
+usuario. A1b y A1c completaron después la adopción de superficies y cabeceras.
 
-#### A1b — Superficies operativas sólidas · local para revisión
+#### A1b — Superficies operativas sólidas · aprobado y publicado (`20ad97b0`)
 
 `OpsPageHero` y `OpsStatTile` usan `bg-panel-surface`/`bg-raised-surface`, borde quiet común y
 sin sombra/blur. Al ser piezas compartidas, el cambio alcanza sus consumidores actuales: Agents,
@@ -139,8 +138,8 @@ Stack, System Health y Tasks. No cambia datos, consultas, capacidades ni accione
 Storybook `Reviews/Admin/Operations` y el preview aislado
 [`review-admin-operations.html`](http://127.0.0.1:5186/review-admin-operations.html) montan el
 checkpoint real de Admin con acciones locales. La prueba verifica que Hero y stat tiles pintan
-superficies opacas sin sombra/blur en desktop y móvil; Vitest cubre tokens y semántica. No commit ni
-push antes de revisión.
+superficies opacas sin sombra/blur en desktop y móvil; Vitest cubre tokens y semántica. Este corte
+se aprobó y publicó en `20ad97b0`.
 
 **Validación local:** `ops-surfaces.test.tsx` 14/14; `admin-consistency-policy.test.ts` 21/21;
 typecheck, build y lint focalizado de Admin; typecheck y build de Storybook; build de preview;
@@ -151,7 +150,7 @@ componentes/páginas (41/1); no se modificaron para este bloque. La suite histó
 playlists tiene expectativas desfasadas de altura/nombre de acción y no es gate de estas
 superficies.
 
-#### A1c — Cabeceras abiertas como Dashboard · local para revisión
+#### A1c — Cabeceras abiertas como Dashboard · aprobado y publicado (`20ad97b0`)
 
 Los encabezados dejan de usar una tarjeta exterior: se quitan borde, fondo, sombra y padding del
 contenedor. `OpsPageHero` propaga la composición a Agents, AI Models, Analysis, Bandcamp, Discover,
@@ -171,7 +170,7 @@ navegador real; se cambió el import de `PageHeaderLayout` a una ruta relativa p
 fallo de resolución del alias Vite en el iframe. Confirmación tipográfica del runtime: Listen y
 Admin importan las mismas fuentes locales y `font-mono` calcula como JetBrains Mono. Varias
 etiquetas escritas a mano todavía omiten `MonoLabel`/`font-mono`; queda como deriva de aplicación
-tipográfica para un corte específico, sin cambio de fuentes en A1c. Sin commit/push.
+tipográfica para un corte específico, sin cambio de fuentes en A1c. A1c se publicó en `20ad97b0`.
 
 ### A2 — Operaciones y salud
 
@@ -184,7 +183,7 @@ lecturas operativas usando las fuentes existentes; evaluar `QueueLanes`, `Govern
 inventar cifras; SSE mantiene identidad de conexión estable; teclado, permisos y refresco se
 conservan. Si falta un dato, documentar el contrato backend pendiente y no simularlo en UI.
 
-#### A2a — Superficies operativas anidadas · local para revisión
+#### A2a — Superficies operativas anidadas · aprobado y publicado (`20ad97b0`)
 
 `OpsSurface` aplica una receta sólida común a las tarjetas de servicio de Stack y a las tarjetas
 anidadas de System Health: `bg-raised-surface`, borde quiet y sin sombra. Los estados semánticos
@@ -199,7 +198,7 @@ el grupo entero.
 
 **Validación local:** 66 pruebas Vitest focalizadas en Ops surfaces, System Health, Stack, Tasks,
 Logs y Health; 2 casos de preview a 1440/390 px; typecheck/lint Admin; typecheck y build Storybook;
-build del preview. Los servicios existentes siguen activos. Sin commit/push.
+build del preview. Los servicios existentes siguen activos. A2a se publicó en `20ad97b0`.
 
 ### A3 — Catálogo musical y análisis
 
@@ -212,7 +211,7 @@ instrumentos solo porque aparezcan en la auditoría antigua.
 ausentes se muestran como tales; las visualizaciones tienen estados vacíos/error, labels accesibles,
 layout adaptable y cobertura de pruebas para el comportamiento cambiado.
 
-#### A3a — Browse + Genres · local para revisión
+#### A3a — Browse + Genres · aprobado y publicado (`20ad97b0`)
 
 Browse y Genres mantienen la estructura de catálogo, pero hacen explícitos el ámbito de los filtros,
 los resultados visibles y la diferencia entre catálogo vacío y búsqueda sin resultados. La carga y
@@ -226,7 +225,7 @@ local: Browse/Genres 7/7; lint y typecheck Admin; build Admin; preview 4/4 en 14
 build y typecheck Storybook; build del preview; navegación real en Admin, preview y Storybook. Sin
 commit/push.
 
-#### A3b — Artist + Album · recuperación de rutas · local para revisión
+#### A3b — Artist + Album · recuperación de rutas · aprobado y publicado (`20ad97b0`)
 
 Las rutas de artista y álbum separan el fallo de carga de una entidad que ya no existe. Los errores
 de red muestran `ErrorState` de página con reintento; una respuesta vacía muestra un estado «no
@@ -247,12 +246,13 @@ La auditoría confirmó un conflicto real de rutas: `/artists/:artistSlug/:album
 orden de declaración, así que los enlaces antiguos por ID nunca cargaban la ficha de artista. Una
 sola ruta de dos segmentos ahora despacha IDs numéricos a Artist y slugs a Album; Artist consulta
 por ID y conserva el redirect existente a su URL canónica. Pruebas cubren la selección y la
-consulta legacy. No cambian los contratos del API ni los enlaces canónicos. Sin commit/push.
+consulta legacy. No cambian los contratos del API ni los enlaces canónicos. A3b se publicó en
+`20ad97b0`.
 
 **Subcorte que siguió:** A3c — Discover + Insights/Analysis; revisar estados, lecturas y decisiones
 que facilitan sus datos, sin crear instrumentos solo por uniformidad visual.
 
-#### A3c — Discover + Insights/Analysis · local para revisión
+#### A3c — Discover + Insights/Analysis · aprobado y publicado (`20ad97b0`)
 
 Discover ahora permite que cada feed falle por separado: si no carga la cobertura del catálogo,
 sus métricas muestran que el dato no está disponible y las demás fuentes siguen visibles. El panel
@@ -269,14 +269,14 @@ comprobaron en Admin. Se cubren desktop, tablet y móvil en Discovery, y desktop
 
 **Validación local:** Discover, Insights y Analysis 26/26 pruebas; build Admin; typecheck/build de
 Storybook; build de preview; checks Playwright focalizados del preview; `git diff --check`. Los
-cuatro servicios locales siguen activos. Sin commit/push.
+cuatro servicios locales siguen activos. A3c se publicó en `20ad97b0`.
 
 **Seguimiento A3c (2026-10-22):** `OpportunityCard` adopta `OpsSurface`, con el mismo borde y
 superficie sólida que el resto de las tarjetas operativas. La entrada obsoleta de sombra de
 Discover se retiró del registro de deuda y la página pasó a su ámbito de control. Storybook y el
 preview montan el componente real. La regresión nueva comprueba la receta compartida; Discover
 pasa 4/4 pruebas, el checkpoint del preview 4/4, y Admin pasa typecheck, lint y build. Storybook
-pasa typecheck y build. Sin commit/push; A3c queda local para revisión.
+pasa typecheck y build. El seguimiento de A3c se publicó en `20ad97b0`.
 
 **Siguiente subcorte:** revisar la adopción visual restante de A3 y su jerarquía de datos con
 historias representativas; mantener las diferencias de dominio y evitar cambios por uniformidad.
@@ -294,7 +294,7 @@ reanudar o entender fallos sin filtrar IDs internos como copy para el usuario.
 errores corresponden a tareas reales; importación, adquisición y acciones externas preservan sus
 confirmaciones y requisitos de capacidad.
 
-#### A4a — Espacio de búsqueda de Acquisition · local para revisión
+#### A4a — Espacio de búsqueda de Acquisition · aprobado y publicado (`20ad97b0`)
 
 Se separa la identidad de Acquisition del flujo de búsqueda: el encabezado identifica la página y
 el estado de conexión/cola, y una superficie ancha agrupa consulta, envío y calidad de Tidal con
@@ -311,7 +311,7 @@ No se llama al backend desde las muestras ni se encola nada.
 build y Playwright a 1440/768/390 px, incluida la búsqueda y el cambio entre fuentes. Sin
 commit/push.
 
-#### A4b — Upload, queue, wishlist e history · local para revisión
+#### A4b — Upload, queue, wishlist e history · aprobado y publicado (`20ad97b0`)
 
 Upload admite selección y arrastre de archivos, muestra la selección antes de encolarla y da
 confirmación legible al terminar. Queue, Wishlist e History usan paneles y filas sólidas, muestran
@@ -324,9 +324,9 @@ fallidos en 1440, 768 y 390 px. No se envían archivos a la API en preview/Story
 
 **Validación local:** Download Vitest 8/8; typecheck y lint Admin; typecheck Storybook; preview
 Playwright 9/9 (incluye la consulta, los cuatro paneles y Artist Browser en 1440/768/390 px);
-Prettier y `git diff --check`. Sin commit/push.
+Prettier y `git diff --check`. A4b se publicó en `20ad97b0`.
 
-#### A4c — Artist Browser y sugerencias de oyentes · local para revisión
+#### A4c — Artist Browser y sugerencias de oyentes · aprobado y publicado (`20ad97b0`)
 
 El navegador de álbumes de artista de Tidal usa superficie sólida con resumen de catálogo y
 releases disponibles/locales. Las cards muestran permanentemente su calidad, estado y acciones de
@@ -345,9 +345,9 @@ desbordan en 1440, 768 y 390 px.
 Playwright 9/9; Prettier y `git diff --check`. Admin, Listen, preview y Storybook están activos.
 La suite completa de Admin conserva 15 fallos repartidos en 20 archivos previos de rutas, políticas
 de iconos/colores/superficies, Playlist, Upcoming y Shows; el corte de Acquisition pasa aislado.
-Sin commit/push.
+A4c se publicó en `20ad97b0`.
 
-#### A4d — New Releases + Upcoming/Shows · local para revisión
+#### A4d — New Releases + Upcoming/Shows · aprobado y publicado (`20ad97b0`)
 
 New Releases mantiene los estados, filtros, datos y acciones existentes, con filtros, resultados y
 vacío sobre superficies sólidas. Upcoming mantiene las vistas lista/tarjetas/calendario, la
@@ -369,7 +369,7 @@ typecheck, lint y build; Storybook typecheck y build; build del preview; Prettie
 `git diff --check`. Los cuatro servicios responden en `:5173`, `:5174`, `:5186` y `:6006`. El
 servidor Storybook está activo y la historia se incluyó en el build; no se hizo commit/push.
 
-#### A4e — Bandcamp + Global Catalog · local para revisión
+#### A4e — Bandcamp + Global Catalog · aprobado y publicado (`20ad97b0`)
 
 Bandcamp y Global Catalog alinean sus superficies internas con el Dashboard: paneles opacos,
 bordes quiet y MonoLabel para estado y metadatos. Global Catalog da una jerarquía consistente a
@@ -386,9 +386,10 @@ Los demos interactivos existentes siguen disponibles en
 
 **Validación local:** Bandcamp y Global Catalog Vitest 30/30; preview Playwright 16/16 junto con
 Acquisition a 1440/768/390 px; Admin typecheck y lint; Storybook typecheck/build, preview build,
-Prettier y `git diff --check`. Las cuatro instancias locales siguen activas; sin commit/push.
+Prettier y `git diff --check`. Las cuatro instancias locales siguen activas; A4e se publicó en
+`20ad97b0`.
 
-#### A4f — Staged Imports + cuenta del Shell · local para revisión
+#### A4f — Staged Imports + cuenta del Shell · aprobado y publicado (`20ad97b0`)
 
 Staged Imports muestra la cola, actividad y metadatos portables con estados seguros y acciones de
 importación/eliminación controladas por sus contratos existentes. Los errores y notificaciones
@@ -408,7 +409,7 @@ focalizadas; el preview de Imports pasa 3/3 y el check de navegación pasa 10/10
 Admin typecheck/lint/build, Storybook typecheck/build y preview build pasan. De los tests backend
 relacionados, 256 pasaron y 13 se omitieron; la única expectativa que no pasó estaba obsoleta por
 los campos opcionales añadidos al esquema portable y su caso aislado pasa tras alinear el fixture.
-Las cuatro instancias locales siguen activas; sin commit/push.
+Las cuatro instancias locales siguen activas; A4f se publicó en `20ad97b0`.
 
 ### A5 — Herramientas curatoriales y administrativas
 
@@ -420,7 +421,7 @@ compartir una pieza si ambas apps tienen el mismo contrato de interacción.
 **Aceptación:** cada grupo conserva payloads y capacidades, incluye sus estados incompletos y
 errores, y verifica acciones destructivas, edición y navegación mediante tests focalizados.
 
-#### A5a — Playlists + editor · local, revisión visual aprobada
+#### A5a — Playlists + editor · revisión visual aprobada y publicada (`20ad97b0`)
 
 La lista usa `HairlineList`/`HairlineRow` con una jerarquía estable para artwork, estado de
 generación y acciones. El editor presenta las reglas smart como expresiones legibles, expone la
@@ -441,7 +442,7 @@ typecheck y build de Admin; typecheck y build de Storybook; build del preview; c
 Playwright del preview y tres de Storybook. Las pruebas de layout y navegación pasan en 1440, 768 y
 390 px. El 2026-10-22, con sesión autenticada, `/playlists` cargó 21 playlists y
 `/playlists/27` abrió el editor de Loma Prieta con 43 pistas. Solo se inspeccionaron datos; no se
-guardaron cambios. Sin commit/push.
+guardaron cambios. A5a se publicó en `20ad97b0`.
 
 **A5a — limpieza visual de los compositores (2026-10-22):** los paneles de creación estática e
 inteligente dejan de añadir sombras locales a `Card`. Se retira la deuda registrada en
@@ -450,14 +451,14 @@ prueba de Playlists cubre ambas variantes y preview/Storybook comprueban que su 
 ninguno. Playlists y la política de consistencia pasan 29/29; el inventario revisa 13 archivos con
 cero violaciones y cero deudas pendientes. Preview y Storybook pasan 5/5 cada uno; typecheck y lint
 de Admin, build de preview, build de Storybook y `git diff --check` pasan. Captura:
-`.artifacts/review/admin-playlist-composer-flat.png`. Se mantiene sin commit para revisión.
+`.artifacts/review/admin-playlist-composer-flat.png`. Esta limpieza se publicó en `20ad97b0`.
 
 **Revisión:** la revisión visual de A5a está aprobada; el listado y el editor también se comprobaron
 en sesión autenticada contra la API de producción. A5b y A5c cuentan con aprobación visual.
 Federation y Contributions quedan pendientes de revisión. Orphans se mantiene como dato/issues bajo
 Genres y Health.
 
-#### A5b — Users + Roles · local, revisión visual aprobada
+#### A5b — Users + Roles · revisión visual aprobada y publicada (`20ad97b0`)
 
 Users conserva búsqueda, filtros, presencia, paginación, inspección y acciones, pero reorganiza la
 lista en una cuadrícula semántica que adapta sus columnas en pantallas estrechas sin duplicar filas.
@@ -479,7 +480,7 @@ ni errores del navegador.
 y build de Storybook; build del preview; cuatro escenarios Playwright del preview y tres de
 Storybook. `git diff --check` queda limpio. En la sesión autenticada del 2026-10-22 `/users` cargó
 el directorio y `/roles` cargó la matriz de capacidades desde producción; la revisión fue de solo
-lectura, sin cambios de cuentas ni permisos. Sin commit/push.
+lectura, sin cambios de cuentas ni permisos. A5b se publicó en `20ad97b0`.
 
 **Revisión:** Users y Roles recibieron aprobación visual. Settings y Translations también quedaron
 aprobados visualmente en A5c. La comprobación autenticada del 2026-10-22 también confirmó que
@@ -487,7 +488,7 @@ aprobados visualmente en A5c. La comprobación autenticada del 2026-10-22 tambi�
 lectura sin cambios de cuentas o permisos. Federation y Contributions quedan para revisión; Orphans
 se mantiene como dato/issues bajo Genres y Health.
 
-#### A5c — Settings + Translations · aprobación visual registrada
+#### A5c — Settings + Translations · aprobado y publicado (`20ad97b0`)
 
 Settings agrupa las secciones de configuración en tabs enlazados al query string, con títulos de
 sección MonoLabel en accent y una cabecera abierta. `About` adopta `StatNumber` para alinear sus
@@ -521,13 +522,20 @@ de A5c ya está aprobada.
 
 ## Siguiente corte recomendado
 
-A5 está cerrado tras la aprobación del usuario a Federation y Contributions y la auditoría de
-Orphans. Continúa A1a: revisar el peso de la cabecera sólida en escritorio y en el drawer móvil.
-Después, resolver la revisión visual que quede pendiente dentro de A1 antes de pasar a otros grupos.
-Acquisition, Imports, New Releases, Upcoming, Bandcamp y Global Catalog ya tienen checkpoints
-propios; no se deben fusionar conexiones cuando sus payloads o filtros difieren.
+A1a está cerrado, aprobado y publicado; se ha revisado al menos tres veces y no debe volver a
+proponerse. El corte actual normaliza los colores semánticos de estado que detectaba la guarda de
+Admin (89 usos fuera del contrato) y queda detenido para revisión visual antes de commit.
 
-### Auditoría y A2b — Streams de tareas · 2026-10-21
+Después de aprobar ese corte, continuar con **A3d — Genres + GenreWheel y auditoría de taxonomía**.
+Montar en Admin el `GenreWheel` real del website, conservando su presentación y comportamiento.
+Antes de proponer cambios a los casi 700 géneros de producción, trazar con código y datos de solo
+lectura cómo se forman y asignan los géneros, cómo opera el mapeo, qué fuentes escriben o leen esa
+taxonomía y qué consumidores dependen de sus IDs y relaciones. Medir distribución, duplicados,
+sinónimos, nodos huérfanos, ramas sin uso y ambigüedades; separar los hallazgos verificables de las
+decisiones editoriales. El entregable incluirá un modelo de simplificación con ejemplos y riesgos;
+esta fase no modificará la taxonomía de producción. No repetir los checkpoints de cortes cerrados.
+
+### Auditoría y A2b — Streams de tareas · aprobado y publicado (`7f3fe7e8`)
 
 `OpsSnapshotProvider` se monta alrededor de todo el Shell protegido y mantiene `/api/admin/ops-stream`;
 el payload contiene colas y tareas resumidas, no historial completo, eventos de progreso, entradas
@@ -545,12 +553,12 @@ cancela el reintento al terminar la tarea o salir el último consumidor; `LiveTa
 estado del padre. El stream de historial de Tasks y los streams filtrables de Logs/Health siguen
 separados de `ops-stream`, porque sus payloads y filtros son distintos. La cobertura comprueba
 fan-out, cierre, reconexión, cancelación, streams por ID y expansión del detalle. Esta corrección de
-comportamiento queda local para revisión junto con A1c; no se hizo commit/push.
+comportamiento se publicó junto con Tasks en `7f3fe7e8`.
 
 **Validación del ajuste de streams:** `use-task-events`, Tasks y operaciones, Health, Album,
 ArtistRepairDialog y Health icons (70 pruebas); typecheck Admin; lint Admin; `git diff --check`.
 
-### A2c — Vigencia y recuperación operativa · local para revisión
+### A2c — Vigencia y recuperación operativa · aprobado y publicado (`7f3fe7e8`)
 
 Tasks, Logs y Stack distinguen ahora la vigencia del último snapshot de la salud de su stream:
 vigente/caducado y conectando/en directo/reconectando/en pausa. Si falla un refresco manual,
@@ -568,9 +576,9 @@ incluyen estados vigentes, caducados, reconexión y recuperación.
 build del preview; `admin-operations-checkpoint.spec.ts` 14/14 y
 `admin-system-health-checkpoint.spec.ts` 4/4. El preview muestra las rutas reales de Logs y Stack
 a 1440/768/390 px, sin API calls ni errores de navegador. Los servicios existentes siguen activos.
-Sin commit/push.
+A2c se publicó en `7f3fe7e8`.
 
-#### A2d — Recuperación de Library Health · local para revisión
+#### A2d — Recuperación de Library Health · aprobado y publicado (`7f3fe7e8`)
 
 La pantalla `/health` conserva el último snapshot de incidencias si falla una actualización tras
 haber recibido datos; el aviso ofrece reintento y los resultados siguen visibles. Si todavía no hay
@@ -589,9 +597,9 @@ conserva la cola anterior y el botón Retry recupera el snapshot.
 reintento 1/1, la escena 4/4 a 1440/768/390 px y 7/7 checks restantes de la página Health. El lint,
 typecheck/build de Admin, typecheck/build de Storybook, build del preview y `git diff --check` pasan.
 Una aserción histórica del CTA se alineó con el Button primario aprobado: fondo transparente,
-borde y texto accent. Los servicios existentes siguen activos. Sin commit/push.
+borde y texto accent. Los servicios existentes siguen activos. A2d se publicó en `7f3fe7e8`.
 
-#### A2e — QueueLanes en Tasks · local para revisión
+#### A2e — QueueLanes en Tasks · aprobado y publicado (`7f3fe7e8`)
 
 `WorkerControlPanel` presenta las cinco colas como carriles visuales con zonas de queued, running y
 done, conteos y etiquetas de workers. Los chips representan tareas concretas del snapshot, así que
@@ -623,22 +631,23 @@ otra ruta ni otro `EventSource`, pero sí se amplía el flujo SSE existente con 
 Storybook; preview 2/2 a desktop/móvil; Storybook Operations 1/1; build de Admin, Storybook y
 preview. El intérprete Python 3.13 de `.venv` local apunta a un binario inexistente, así que los
 tests backend se ejecutaron en un contenedor aislado con Python 3.13 y PostgreSQL de Testcontainers:
-27 pruebas de `tasks-stream`, ciclo de vida, recuperación y cancelación pasan. A2e queda local para
-revisión; no commit/push.
+27 pruebas de `tasks-stream`, ciclo de vida, recuperación y cancelación pasan. A2e se cerró y publicó
+en `7f3fe7e8`.
 
 **Auditoría de transiciones (2026-10-22):** el barrido de escrituras directas encontró tres cambios
 a `completing` fuera de `update_task`: finalización de tareas padre, importación exacta de shows y
 consolidación de shows. Los tres ahora registran `task_transition` con el registro actualizado en la
 misma transacción; el evento solo se publica tras el commit. Las suites completas de cancelación
 cooperativa y planes de shows pasan 53/53, incluidos los casos que afirman la transición
-`completing` antes de `completed`. A2e sigue local para revisión; sin commit/push.
+`completing` antes de `completed`. Estos cambios quedaron incluidos en A2e, publicado en `7f3fe7e8`.
 
 **Ajuste visual (2026-10-22):** el contador grande de cada cola recibe una corrección óptica de 2 px
 hacia abajo en escritorio y tablet, porque su cifra se percibía alta aun con las cajas centradas.
 En móvil, la información del lane ocupa la primera fila y el contador queda a la izquierda de la
 pista, centrado con ella. Playwright comprueba la diferencia deliberada de 2 px en 1440/768 y la
 alineación de 0 px en 390. Capturas: `.artifacts/review/queue-count-lane-{1440,390}.png`. Vitest de
-`QueueLanes` 8/8, Playwright del preview 2/2 y Storybook 1/1; sin commit/push.
+`QueueLanes` 8/8, Playwright del preview 2/2 y Storybook 1/1; el ajuste quedó incluido en A2e,
+publicado en `7f3fe7e8`.
 
 **Cierre de Tasks (2026-10-22):** `Worker Runtime` y `Task Desk` usan el mismo tono accent. Refresh,
 logs, cancelación global y reinicio siguen la receta de icon-only con nombres accesibles y targets
@@ -649,16 +658,16 @@ Resource Governor y DB-heavy gate conservan jerarquía y espaciado comunes; el e
 rota en la etiqueta de Worker Sample en vez de añadir una línea suelta. Playback Delivery vive en
 su pane propio, fuera del Task Desk. La suite focalizada de estas áreas pasa 88/88; typecheck, lint y
 build de Admin, typecheck/build de Storybook y build de preview pasan. Las builds señalan los chunks
-grandes habituales; no hay fallos de compilación. A2e queda en revisión visual; sin commit/push.
+grandes habituales; no hay fallos de compilación. A2e se aprobó y publicó en `7f3fe7e8`.
 
 **Movimiento reducido (2026-10-22):** `QueueLanes` usa el gate de movimiento compartido. Con
 `prefers-reduced-motion` activo, las transiciones se asientan sin retener artificialmente una tarea
 rápida en `running`; si la preferencia cambia durante esa retención, el chip se asienta de inmediato.
 El checkpoint verifica `transition-property: none` y el flujo en 1440, 768 y 390 px. QueueLanes pasa
 8/8; operaciones en preview 14/14 y Storybook 1/1. Los tres builds y checks de Admin pasan de nuevo;
-el único aviso es el tamaño de algunos chunks. Sin commit/push.
+el único aviso es el tamaño de algunos chunks. El corte quedó publicado en `7f3fe7e8`.
 
-### A5d — Federation · aprobado visualmente
+### A5d — Federation · aprobado y publicado (`20ad97b0`)
 
 La página `/federation` adopta la cabecera abierta y los tabs compartidos de Admin. Overview presenta
 la identidad del nodo, la confianza entre peers y su uso de streaming como secciones abiertas con
@@ -672,9 +681,9 @@ lectura. Las acciones de muestra se quedan en memoria; no alcanzan el API ni otr
 
 **Validación local:** 8 pruebas Vitest; Playwright del preview 4/4 a 1440/768/390 px y estados;
 Playwright de Storybook 3/3 a esos tamaños; typecheck y lint de Admin; typecheck/build de Storybook y
-build del preview. Los cuatro servicios locales permanecen activos. Sin commit/push.
+build del preview. Los cuatro servicios locales permanecen activos; A5d se publicó en `20ad97b0`.
 
-### A5e — Contributions · aprobado visualmente
+### A5e — Contributions · aprobado y publicado (`20ad97b0`)
 
 `/contributions` presenta cada aportación como una fila de revisión con portada, álbum enlazado,
 artista, origen, número de pistas y duración; la atribución de quien aportó y el estado se leen en
@@ -690,8 +699,8 @@ la cookie de sesión de forma compatible con HTTPS.
 
 **Validación local:** 10 pruebas Vitest de Contributions; lint, typecheck y build de Admin;
 typecheck/build de Storybook; build del preview; Playwright del preview 4/4 y Storybook 3/3 a
-1440/768/390 px; `git diff --check`. Admin, Listen, preview y Storybook siguen activos. Sin
-commit/push.
+1440/768/390 px; `git diff --check`. Admin, Listen, preview y Storybook siguen activos. A5e se
+publicó en `20ad97b0`.
 
 ### A5f — Orphans · auditoría de alcance completada
 

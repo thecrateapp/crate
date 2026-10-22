@@ -256,7 +256,7 @@ function OAuthAppRow({
         <Button
           type="button"
           size="sm"
-          variant={client.enabled ? "danger-soft" : "outline"}
+          variant="outline"
           aria-describedby={nameId}
           disabled={disabled}
           onClick={onToggle}
@@ -320,7 +320,7 @@ export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
         ) : null}
         {clients.error ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-sm text-state-warning-text">
               {apiErrorText(
                 clients.error,
                 "The OAuth apps could not be loaded.",

@@ -167,7 +167,7 @@ export function ConnectAgentDialog({
               </p>
             </div>
             {error ? (
-              <p role="alert" className="text-destructive">
+              <p role="alert" className="text-state-warning-text">
                 {error}
               </p>
             ) : null}
@@ -189,7 +189,7 @@ export function ConnectAgentDialog({
 
         {step === 3 && secret ? (
           <div className="space-y-4">
-            <p className="text-sm text-destructive">
+            <p className="text-sm text-state-warning-text">
               This token is shown only once. Copy it now.
             </p>
             <div className="flex items-center gap-2">

@@ -98,7 +98,7 @@ export function DecisionBar({
         <div role="alert" className="flex items-start gap-2 text-sm">
           <Clock
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-amber-200"
+            className="mt-0.5 size-4 shrink-0 text-state-warning-text"
           />
           {validExpiry ? (
             <p className="text-white/80">
@@ -122,7 +122,7 @@ export function DecisionBar({
         {!complete ? (
           <p
             role="alert"
-            className="flex items-start gap-2 text-sm text-red-200"
+            className="flex items-start gap-2 text-sm text-state-warning-text"
           >
             <TriangleAlert
               aria-hidden="true"
@@ -135,7 +135,7 @@ export function DecisionBar({
         {conflict ? (
           <div
             role="alert"
-            className="flex flex-wrap items-center gap-3 text-sm text-red-200"
+            className="flex flex-wrap items-center gap-3 text-sm text-state-warning-text"
           >
             <p className="min-w-0 flex-1 break-words">{conflict}</p>
             <Button

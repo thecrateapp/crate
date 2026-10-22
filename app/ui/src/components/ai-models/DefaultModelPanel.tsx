@@ -211,7 +211,9 @@ export function DefaultModelPanel({
       <div className="space-y-4">
         <p
           className={
-            status.warning ? "text-sm text-amber-100" : "text-sm text-white/70"
+            status.warning
+              ? "text-sm text-state-warning-text"
+              : "text-sm text-white/70"
           }
         >
           {status.text}

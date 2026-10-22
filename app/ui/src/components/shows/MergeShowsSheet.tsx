@@ -81,7 +81,7 @@ function MergeReview({ plan }: { plan: ShowConsolidationPlan }) {
         <p
           key={`${issue.item_id}-${index}`}
           role="alert"
-          className="text-sm text-state-danger-text"
+          className="text-sm text-state-warning-text"
         >
           {issueText(issue, null)}
         </p>
@@ -224,7 +224,7 @@ export function MergeShowsSheet({
             {status}
           </p>
           {!saved && flow.error ? (
-            <p role="alert" className="text-sm text-state-danger-text">
+            <p role="alert" className="text-sm text-state-warning-text">
               {flow.error}
             </p>
           ) : null}

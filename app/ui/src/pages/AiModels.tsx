@@ -71,7 +71,7 @@ export function AiModels() {
       </OpsPageHero>
 
       {snapshot?.truncated ? (
-        <p role="alert" className="text-sm text-amber-200">
+        <p role="alert" className="text-sm text-state-warning-text">
           Some saved profiles are not shown. Only the most recent ones can be
           used here.
         </p>

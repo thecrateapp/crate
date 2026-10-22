@@ -613,7 +613,6 @@ export function Playlists() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          variant="destructive"
                           onSelect={() => setDeleteTarget(playlist)}
                         >
                           <Trash2 aria-hidden="true" /> Delete playlist

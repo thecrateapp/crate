@@ -120,7 +120,7 @@ export function SmartMixCoverage() {
 
   if (error || !data) {
     return (
-      <div className="rounded-md border border-red-500/20 bg-red-500/8 p-4 text-sm text-red-100">
+      <div className="rounded-md border border-state-warning/20 bg-state-warning/8 p-4 text-sm text-state-warning-text">
         Smart Mix coverage is unavailable.
       </div>
     );
@@ -132,7 +132,7 @@ export function SmartMixCoverage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-primary">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/10 text-primary">
             <AudioLines size={17} />
           </div>
           <div className="space-y-1">
@@ -205,7 +205,7 @@ export function SmartMixCoverage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 text-red-200"
+                className="gap-2 text-state-warning-text"
                 disabled={activeAction !== null}
                 onClick={() => void runAction("cancel")}
               >

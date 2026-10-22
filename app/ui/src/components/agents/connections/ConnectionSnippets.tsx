@@ -59,7 +59,7 @@ export function ConnectionSnippets({
   return (
     <div className="space-y-2">
       {mcpEnabled ? null : (
-        <p role="note" className="text-sm text-amber-200">
+        <p role="note" className="text-sm text-state-warning-text">
           {MCP_OFF_WARNING}
         </p>
       )}

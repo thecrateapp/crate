@@ -150,9 +150,9 @@ export function AgentConnections() {
   // The sheet shows the freshest copy: the one it re-read after a change
   // (patched into the list as well) or the list's own after a reload.
   const current = selected
-    ? connections.items.find(
+    ? (connections.items.find(
         (item) => item.principal_id === selected.principal_id,
-      ) ?? selected
+      ) ?? selected)
     : null;
   const error = catalog.error
     ? catalog.error
@@ -217,7 +217,7 @@ export function AgentConnections() {
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-state-warning-text">
           {apiErrorText(error, "The connections could not be loaded.")}
         </p>
       ) : null}

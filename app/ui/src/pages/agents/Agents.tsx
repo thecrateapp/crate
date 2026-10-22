@@ -14,7 +14,7 @@ function sectionLinkClass({ isActive }: { isActive: boolean }): string {
   return cn(
     "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
     isActive
-      ? "border-cyan-400/25 bg-cyan-400/10 text-primary"
+      ? "border-accent-action/25 bg-accent-action/10 text-primary"
       : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/5 hover:text-white",
   );
 }

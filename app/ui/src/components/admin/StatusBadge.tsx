@@ -5,11 +5,12 @@ import { cn } from "@/lib/utils";
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 const toneClassName: Record<StatusTone, string> = {
-  neutral: "border-white/10 bg-white/[0.04] text-white/70",
-  info: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
-  success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-  warning: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-  danger: "border-red-500/25 bg-red-500/10 text-red-200",
+  neutral: "border-border-quiet bg-raised-surface text-text-subtle",
+  info: "border-accent-action/25 bg-accent-action/10 text-accent-action",
+  success: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
+  warning:
+    "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+  danger: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
 };
 
 export function StatusBadge({

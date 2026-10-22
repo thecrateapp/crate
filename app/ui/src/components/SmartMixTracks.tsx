@@ -157,7 +157,7 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
   const { data, loading, error } = useApi<SmartMixTrackPage>(url);
   const extra = more?.url === url ? more : null;
   const tracks = [...(data?.tracks ?? []), ...(extra?.tracks ?? [])];
-  const nextBefore = extra ? extra.nextBefore : data?.nextBefore ?? null;
+  const nextBefore = extra ? extra.nextBefore : (data?.nextBefore ?? null);
   const countsByFilter = filterCounts(counts);
 
   async function loadMore() {
@@ -223,7 +223,7 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
                 className={cn(
                   "text-[10px]",
                   version === entry.analyzerVersion && "border-primary/60",
-                  !entry.current && "text-amber-200",
+                  !entry.current && "text-state-warning-text",
                 )}
               >
                 {entry.analyzerVersion} · {entry.profiles.toLocaleString()}
@@ -269,7 +269,7 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
       </div>
 
       {error ? (
-        <div className="rounded-md border border-red-500/20 bg-red-500/8 p-4 text-sm text-red-100">
+        <div className="rounded-md border border-state-warning/20 bg-state-warning/8 p-4 text-sm text-state-warning-text">
           Smart Mix tracks are unavailable.
         </div>
       ) : loading && !data ? (
@@ -309,7 +309,7 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
                     <CrateChip
                       className={cn(
                         "text-[10px]",
-                        track.status !== "current" && "text-amber-200",
+                        track.status !== "current" && "text-state-warning-text",
                       )}
                     >
                       {STATUS_LABELS[track.status]}

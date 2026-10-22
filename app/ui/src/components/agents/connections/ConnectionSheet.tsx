@@ -112,7 +112,10 @@ function SheetSection({
   return (
     <section aria-labelledby={headingId} className="space-y-3 py-5 first:pt-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground font-display">
+        <h3
+          id={headingId}
+          className="text-sm font-semibold text-foreground font-display"
+        >
           {title}
         </h3>
         {action}
@@ -217,7 +220,7 @@ function TokenReveal({
 }) {
   return (
     <div className="space-y-3 rounded-md border border-border p-3">
-      <p className="text-sm text-destructive">
+      <p className="text-sm text-state-warning-text">
         This token is shown only once. Copy it now.
       </p>
       <div className="flex items-center gap-2">
@@ -596,7 +599,7 @@ export function ConnectionSheet({
         <div className="px-4 pb-6">
           {conflict ? (
             <div className="mb-5 space-y-2 rounded-md border border-border p-3">
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-state-warning-text">
                 {CONFLICT_TEXT}
               </p>
               <Button
@@ -643,7 +646,7 @@ export function ConnectionSheet({
                     disabled={policyLocked}
                   />
                   {formError ? (
-                    <p role="alert" className="text-sm text-destructive">
+                    <p role="alert" className="text-sm text-state-warning-text">
                       {formError}
                     </p>
                   ) : null}
@@ -725,7 +728,7 @@ export function ConnectionSheet({
                           <Button
                             type="button"
                             size="sm"
-                            variant="danger-soft"
+                            variant="outline"
                             disabled={busy}
                             onClick={() =>
                               confirmRevoke(credential.credential_id)
@@ -780,7 +783,7 @@ export function ConnectionSheet({
                           <Button
                             type="button"
                             size="sm"
-                            variant="danger-soft"
+                            variant="outline"
                             disabled={busy}
                             onClick={() =>
                               confirmDisconnect(authorization.authorization_id)
@@ -815,7 +818,7 @@ export function ConnectionSheet({
                 ) : null}
                 {activity.error ? (
                   <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-state-warning-text">
                       {apiErrorText(
                         activity.error,
                         "The activity could not be loaded.",
@@ -872,7 +875,7 @@ export function ConnectionSheet({
               <Button
                 type="button"
                 size="sm"
-                variant={policy.enabled ? "danger-soft" : "outline"}
+                variant="outline"
                 disabled={policyLocked}
                 onClick={confirmToggleEnabled}
               >

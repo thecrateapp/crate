@@ -129,7 +129,10 @@ function CatalogSelects({
         }
       />
       {failed ? (
-        <p role="alert" className="basis-full text-sm text-amber-100/80">
+        <p
+          role="alert"
+          className="basis-full text-sm text-state-warning-text/80"
+        >
           {CATALOG_ERROR}
         </p>
       ) : null}
@@ -173,7 +176,7 @@ export function ModelPicker({
   }, [value.connectionId, connection]);
 
   if (connections.length === 0) {
-    return <p className="text-sm text-amber-100/80">{NO_PROVIDER}</p>;
+    return <p className="text-sm text-state-warning-text/80">{NO_PROVIDER}</p>;
   }
 
   return (

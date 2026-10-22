@@ -348,19 +348,19 @@ export function ProfileForm({
           </div>
 
           {conflicted ? (
-            <p role="alert" className="text-sm text-amber-100">
+            <p role="alert" className="text-sm text-state-warning-text">
               {CONFLICT_TEXT}
             </p>
           ) : null}
 
           {model && !limitsValid ? (
-            <p className="text-sm text-amber-100">
+            <p className="text-sm text-state-warning-text">
               Choose an image detail and limits this model accepts.
             </p>
           ) : null}
 
           {modelChanged && !reviewed ? (
-            <p className="text-sm text-amber-100">
+            <p className="text-sm text-state-warning-text">
               Model changed. Review its options and limits before saving.
             </p>
           ) : null}
