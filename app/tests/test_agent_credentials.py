@@ -124,10 +124,12 @@ def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants
         "ops.schedules.write",
         "ops.runtime.write",
         "editorial.prepare",
+        "library.acquisition.write",
     }
     assert not ACTION_GRANTS & PILOT_GRANTS
     assert ALLOWED_GRANTS == PILOT_GRANTS | ACTION_GRANTS | {
         "curation.shows.read",
+        "library.acquisition.search",
         "ops.audit.read",
         "ops.jobs.manage_instance",
         "ops.schedules.read",

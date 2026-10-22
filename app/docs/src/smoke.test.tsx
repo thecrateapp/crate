@@ -12,6 +12,66 @@ afterEach(() => {
 });
 
 describe("docs app", () => {
+  it("publishes operator candidate authority, provisioning and rollback", async () => {
+    window.history.pushState(null, "", "/operations/hermes-operator-release");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Hermes operator candidate and rollout",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Root-managed provisioning for one future rollout",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Version transition, health and rollback",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("publishes independent operator delivery and human callback boundaries", async () => {
+    window.history.pushState(null, "", "/operations/independent-operator");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Independent deterministic operator",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", {
+        name: "Native human decision integration boundary",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "External watchdog" }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: "MCP observations" })
+        .getAttribute("href"),
+    ).toBe("/architecture/agents-and-mcp");
+  });
+
+  it("publishes the exact acquisition and schedule operator flow", async () => {
+    window.history.pushState(null, "", "/operations/crate-mcp-acquisition");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Reviewed MCP acquisition and schedule boundaries",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Operator flow" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Schedule audit" }),
+    ).toBeTruthy();
+  });
+
   it("publishes AI configuration with native controls and operational limits", async () => {
     window.history.pushState(null, "", "/operations/ai-agents");
     render(<App />);
@@ -116,6 +176,12 @@ describe("docs app", () => {
   });
 
   it.each([
+    {
+      route: "/operations/smart-mix",
+      heading: "Smart Mix: funcionamiento y operación",
+      linkName: "plan de continuación",
+      linkedRoute: "/developer/smart-mix-continuation",
+    },
     {
       route: "/architecture/smart-mix",
       heading:

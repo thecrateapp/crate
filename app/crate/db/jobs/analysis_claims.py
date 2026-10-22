@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 
+from crate.db.jobs.analysis_generations import accepted_claim_ids, lock_processing_rows
 from crate.db.jobs.analysis_shared import (
     append_pipeline_event,
     claim_batch_sql,
@@ -19,7 +20,6 @@ from crate.db.jobs.analysis_shared import (
     processing_pending_exists_sql,
     validate_state_column,
 )
-from crate.db.jobs.analysis_generations import accepted_claim_ids, lock_processing_rows
 from crate.db.tx import transaction_scope
 
 
@@ -71,6 +71,17 @@ def claim_tracks(state_column: str, *, limit: int = 1) -> list[dict]:
                     "limit": batch_size,
                 },
             ).scalars()
+        )
+        if not track_ids:
+            return []
+        from crate.db.jobs.operator_generations import allowed_generation_ids
+
+        track_ids = sorted(
+            allowed_generation_ids(
+                session,
+                rows=lock_processing_rows(session, track_ids, [pipeline]),
+                pipeline=pipeline,
+            )
         )
         if not track_ids:
             return []

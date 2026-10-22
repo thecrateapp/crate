@@ -26,6 +26,16 @@ TASK_CONTROLS = {
         "retry": False,
         "cancel": True,
     },
+    "soulseek_download": {
+        "grant": "library.acquisition.write",
+        "retry": False,
+        "cancel": True,
+    },
+    "agent_tidal_download": {
+        "grant": "library.acquisition.write",
+        "retry": False,
+        "cancel": True,
+    },
     "agent_maintenance": {"grant": None, "retry": False, "cancel": True},
 }
 
@@ -52,7 +62,7 @@ def _task(current, task_id, *, lock=False):
     return dict(row)
 
 
-def _grants(row, principal, operation, scope):
+def _grants(row, principal, operation, scope, current):
     contract = TASK_CONTROLS.get(row["type"])
     action = "retry" if operation == "job_retry" else "cancel"
     if contract is None or not contract[action]:
@@ -60,6 +70,36 @@ def _grants(row, principal, operation, scope):
             "NOT_EXECUTABLE",
             "This task type has no reviewed control contract; reconcile its effects and prepare a new domain plan",
         )
+    if row["type"] == "soulseek_download":
+        job = requests._job(current, row["id"])
+        if (
+            row["origin"] != "agent"
+            or not (row.get("params_json") or {}).get("agent_command")
+            or not job
+            or job["principal_id"] != principal.id
+            or job["operation"] != "apply_operation"
+            or job["payload"].get("domain_operation")
+            not in {"acquisition", "acquisition_publish"}
+        ):
+            raise DiagnosticError(
+                "NOT_EXECUTABLE",
+                "Only owned admitted agent acquisition jobs support cancellation",
+            )
+    if row["type"] == "agent_tidal_download":
+        job = requests._job(current, row["id"])
+        if (
+            row["origin"] != "agent"
+            or not (row.get("params_json") or {}).get("agent_command")
+            or not job
+            or job["principal_id"] != principal.id
+            or job["operation"] != "apply_operation"
+            or job["payload"].get("domain_operation")
+            not in {"tidal_acquisition", "tidal_artist_acquisition"}
+        ):
+            raise DiagnosticError(
+                "NOT_EXECUTABLE",
+                "Only owned approved Hermes Tidal imports support cancellation",
+            )
     context = row.get("origin_context") or {}
     grants = set(row.get("required_grants") or [])
     if row["origin"] == "agent":
@@ -124,7 +164,9 @@ def _retry_parameters(row):
 def inspect_control(principal, operation, parameters, *, session=None):
     with optional_scope(session) as current:
         row = _task(current, parameters["job_id"])
-        grants = _grants(row, principal, operation, parameters.get("scope", "own"))
+        grants = _grants(
+            row, principal, operation, parameters.get("scope", "own"), current
+        )
         if operation == "job_retry":
             if row["status"] != "failed" or row["cancellation_requested_at"]:
                 raise DiagnosticError(
@@ -188,7 +230,7 @@ def apply_control(operation, execution):
         row = _task(current, execution["job_id"], lock=True)
         if _fingerprint(row) != execution["fingerprint"]:
             raise DiagnosticError("PLAN_STALE", "Task changed after preview")
-        _grants(row, principal, operation, execution["scope"])
+        _grants(row, principal, operation, execution["scope"], current)
         if operation == "job_cancel":
             result = request_cancellation(
                 row["id"],
@@ -213,7 +255,7 @@ def apply_control(operation, execution):
                 _retry_parameters(row),
                 origin="agent",
                 actor_user_id=principal.actor_user_id,
-                agent_context=principal_context(principal),
+                agent_context=context,
                 required_grants=execution["required_grants"],
                 retry_of=row["id"],
                 session=current,
@@ -231,9 +273,14 @@ def apply_control(operation, execution):
         return result
 
 
-def check_task_authority(task_id):
-    """Raw catalog jobs retain the authorization that admitted them."""
-    with optional_scope(None) as current:
+def check_task_authority(task_id, *, session=None):
+    """Raw jobs and nested checkpoints retain the exact authority that admitted them."""
+    from crate.db.repositories.agent_operation_jobs import _ACTIVE_AUTHORITY
+
+    active = _ACTIVE_AUTHORITY.get()
+    with optional_scope(
+        session or (active[1] if active and active[0] == task_id else None)
+    ) as current:
         row = (
             current.execute(
                 text(
@@ -273,13 +320,49 @@ def check_task_authority(task_id):
             accepted_scopes=frozenset(auth["accepted_scopes"]) if auth else None,
         )
         requests._authorize(current, principal, row["required_grants"], worker=True)
+        if context.get("parent_authority"):
+            from crate.db.repositories.agent_descendants import validate_parent
+
+            validate_parent(context["parent_authority"], session=current)
+        else:
+            # Direct operation checkpoints inside a long callback use the held
+            # proof transaction. Cancellation reads do not lock the runtime task.
+            job = requests._job(current, task_id)
+            from crate.operator_provenance import is_operator
+
+            if job is None and is_operator(principal.id):
+                raise DiagnosticError(
+                    "FORBIDDEN", "Operator descendant has no retained parent approval"
+                )
+            if job and job["operation"] == "apply_operation":
+                from crate.db.repositories.agent_plans import _get
+                from crate.operator_provenance import validate
+
+                plan = _get(current, job["payload"]["plan_id"])
+                validate(
+                    principal.id, plan["execution_data"].get("operator_provenance")
+                )
         return stopping
+
+
+def with_task_authority(task_id, effect):
+    """Hold the delayed task's current parent proof through a short actual effect."""
+    from crate.db.repositories.agent_operation_jobs import _ACTIVE_AUTHORITY
+
+    active = _ACTIVE_AUTHORITY.get()
+    with optional_scope(
+        active[1] if active and active[0] == task_id else None
+    ) as current:
+        if check_task_authority(task_id, session=current):
+            raise DiagnosticError("CANCELLED", "Task cancellation was requested")
+        return effect()
 
 
 __all__ = [
     "TASK_CONTROLS",
-    "principal_context",
-    "inspect_control",
     "apply_control",
     "check_task_authority",
+    "inspect_control",
+    "principal_context",
+    "with_task_authority",
 ]

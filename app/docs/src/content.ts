@@ -44,6 +44,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/ai-agents.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/smart-mix-operations.md": () =>
+    import("../../../docs/technical/smart-mix-operations.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/smart-mix-design.md": () =>
     import("../../../docs/technical/smart-mix-design.md?raw").then(
       (module) => module.default,
@@ -126,6 +130,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/crate-mcp-distribution.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/crate-mcp-acquisition.md": () =>
+    import("../../../docs/technical/crate-mcp-acquisition.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/tauri-desktop-support.md": () =>
     import("../../../docs/technical/tauri-desktop-support.md?raw").then(
       (module) => module.default,
@@ -200,6 +208,18 @@ const loaders: Record<string, MarkdownLoader> = {
     ),
   "docs/technical/federation-upgrade-and-rollback.md": () =>
     import("../../../docs/technical/federation-upgrade-and-rollback.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/hermes-plan-confirmation.md": () =>
+    import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/hermes-operator-release.md": () =>
+    import("../../../docs/technical/hermes-operator-release.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-operator.md": () =>
+    import("../../../docs/technical/crate-operator.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/operations.md": () =>

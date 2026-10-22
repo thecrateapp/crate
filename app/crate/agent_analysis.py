@@ -124,6 +124,8 @@ def apply_operation(
             execution["pipelines"],
             expected_version=execution["database_version"],
             mode=execution["mode"],
+            operator_task_id=task_id if execution.get("operator_provenance") else None,
+            sources={f["entity_uid"]: f["source"] for f in execution["files"]},
         )
     )
     files = {f["entity_uid"]: f for f in execution["files"]}
@@ -266,4 +268,4 @@ def get_analysis_status(
     }
 
 
-__all__ = ["compile_operation", "apply_operation", "get_analysis_status"]
+__all__ = ["apply_operation", "compile_operation", "get_analysis_status"]

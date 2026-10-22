@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 from typing import get_args
 
+import pytest
 from crate.api.schemas.smart_mix import (
     CompatibleTracksResponse,
     TransitionPlanBatchRequest,
@@ -9,6 +10,7 @@ from crate.api.schemas.smart_mix import (
     TransitionPlanResponse,
 )
 from crate.smart_mix import versions
+from crate.smart_mix.policy import PLANNER_POLICY
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parent
@@ -65,3 +67,32 @@ def test_rust_beat_grid_format_matches_python() -> None:
     source = (REPO_ROOT / "tools/crate-cli/src/mix_profile.rs").read_text()
 
     assert f'pub const FORMAT_NAME: &str = "{versions.BEAT_GRID_FORMAT}";' in source
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        "API_CONTRACT_VERSION",
+        "PROFILE_SCHEMA_VERSION",
+        "ANALYZER_VERSION",
+        "MEASUREMENT_VERSION",
+        "BEAT_GRID_FORMAT",
+        "PLANNER_IDENTIFIER",
+        "PLANNER_POLICY_VERSION",
+        "PLANNER_POLICY.rules_revision",
+    ],
+)
+def test_operator_reference_versions_match_implemented_contract(identifier):
+    document = (REPO_ROOT / "docs/technical/smart-mix-operations.md").read_text()
+    rows = {}
+    for line in document.splitlines():
+        if line.startswith("|"):
+            cells = [cell.strip().strip("`") for cell in line.split("|")[1:-1]]
+            if len(cells) >= 2:
+                rows[cells[0]] = cells[1]
+    expected = (
+        PLANNER_POLICY.rules_revision
+        if identifier == "PLANNER_POLICY.rules_revision"
+        else getattr(versions, identifier)
+    )
+    assert rows[identifier] == str(expected)

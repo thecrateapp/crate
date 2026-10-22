@@ -21,6 +21,8 @@ sources:
 
 # Smart Mix, Android nativo y VirtualDJ: plan de continuación
 
+> **Funcionamiento implementado y diagnóstico:** consultar [Smart Mix: funcionamiento y operación](smart-mix-operations.md), contrastado con la release indicada en esa página. Este documento conserva el diseño/plan de continuación y sus gates; una tarea propuesta no acredita una capacidad desplegada.
+
 > **Para agentes:** usar la guía `viterbit-ai-tools:executing-plans` para ejecutar y verificar las tareas. Este plan y el [diseño unificado](smart-mix-design.md) son las únicas guías de desarrollo vigentes de esta feature. No ejecutar los planes/spikes sustituidos ni crear planes paralelos.
 
 **Objetivo:** entregar Smart Mix, crossfade Android nativo y el plugin VirtualDJ en releases R1–R4 que se cierran de forma independiente (§1.1). Lo que no pertenece a ninguna release queda en el backlog de §1.1 y no bloquea cierres.

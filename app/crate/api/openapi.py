@@ -457,6 +457,15 @@ def custom_openapi(app: FastAPI) -> dict:
     components = schema.setdefault("components", {})
     security_schemes = components.setdefault("securitySchemes", {})
     security_schemes.setdefault(
+        "nativeTelegramHmac",
+        {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Crate-Signature",
+            "description": "Native plugin HMAC over method, fixed path, timestamp, nonce and exact body; not a bearer credential.",
+        },
+    )
+    security_schemes.setdefault(
         "bearerAuth",
         {
             "type": "http",

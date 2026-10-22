@@ -8,25 +8,28 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
-from crate.entity_ids import track_entity_uid
-from crate.db.orm.library import LibraryAlbum
-from crate.db.orm.library import LibraryTrack
+from crate.db.orm.library import LibraryAlbum, LibraryTrack
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
 from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
 )
 from crate.db.repositories.library_processing_state import ensure_track_processing_rows
-from crate.db.repositories.smart_mix import mark_track_mix_source_revision
 from crate.db.repositories.library_shared import (
     allocate_unique_slug,
     coerce_uuid_or_none,
 )
+from crate.db.repositories.smart_mix import mark_track_mix_source_revision
 from crate.db.tx import optional_scope
+from crate.entity_ids import track_entity_uid
 from crate.slugs import build_track_slug
 
 
 def upsert_track(
-    data: dict, *, session: Session | None = None, strict_identity: bool = False
+    data: dict,
+    *,
+    session: Session | None = None,
+    strict_identity: bool = False,
+    operator_task_id=None,
 ) -> None:
     with optional_scope(session) as s:
         now = datetime.now(timezone.utc)
@@ -338,6 +341,17 @@ def upsert_track(
                 key_value=requested_track_mbid,
             )
         ensure_track_processing_rows(s, track_id)
+        if operator_task_id:
+            from crate.analysis_provenance import source_identity
+            from crate.db.jobs.operator_generations import bind_generation
+
+            bind_generation(
+                s,
+                track_id=track_id,
+                pipelines=["analysis", "bliss"],
+                task_id=operator_task_id,
+                source=source_identity(data["path"]),
+            )
         if data.get("smart_mix_source_revision"):
             mark_track_mix_source_revision(
                 track_id, data["smart_mix_source_revision"], session=s

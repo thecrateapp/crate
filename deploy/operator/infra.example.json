@@ -1,0 +1,23 @@
+{
+  "instance": "crate-production",
+  "enabled": false,
+  "services": ["crate-api", "crate-readplane"],
+  "humans": {"123456789": ["restart", "backup", "deploy", "restore"]},
+  "tokens": {
+    "read": "/etc/crate-infra/secrets/read-token",
+    "prepare": "/etc/crate-infra/secrets/prepare-token",
+    "apply": "/etc/crate-infra/secrets/apply-token"
+  },
+  "native_key_file": "/etc/crate-infra/secrets/native-key",
+  "state_directory": "/var/lib/crate-infra/state",
+  "socket": "/run/crate-infra/bridge.sock",
+  "server_path": "/opt/crate-host",
+  "approved_releases": "/etc/crate-infra/releases",
+  "backup_directory": "/var/lib/crate-infra/backups",
+  "restore_target": "crate-infra-disposable",
+  "postgres_image": "pgvector/pgvector:pg15@sha256:REPLACE_WITH_VERIFIED_IMMUTABLE_DIGEST",
+  "postgres_user": "crate",
+  "postgres_database": "crate",
+  "cooldown_seconds": 60,
+  "plan_ttl_seconds": 900
+}

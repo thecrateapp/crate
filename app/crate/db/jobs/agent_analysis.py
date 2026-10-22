@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from sqlalchemy import text
 
 from crate.db.jobs.analysis_generations import lock_processing_rows
@@ -22,6 +25,8 @@ def requeue_analysis_targets(
     *,
     expected_version: str,
     mode: str,
+    operator_task_id=None,
+    sources: Mapping[str, Mapping[str, Any]] | None = None,
     session=None,
 ) -> dict:
     if mode not in {"pending", "refresh"}:
@@ -52,6 +57,22 @@ def requeue_analysis_targets(
                 ),
                 {"id": row["track_id"], "pipeline": row["pipeline"]},
             ).scalar_one()
+            if operator_task_id:
+                from crate.db.jobs.operator_generations import bind_generation
+
+                track_uid = uids_by_id.get(row["track_id"])
+                source = sources.get(track_uid) if sources and track_uid else None
+                if source is None:
+                    raise ValueError(
+                        "Operator analysis requeue requires exact source evidence"
+                    )
+                bind_generation(
+                    current,
+                    track_id=row["track_id"],
+                    pipelines=[row["pipeline"]],
+                    task_id=operator_task_id,
+                    source=source,
+                )
             column = (
                 "analysis_state" if row["pipeline"] == "analysis" else "bliss_state"
             )

@@ -117,7 +117,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("129").down_revision == "128"
     assert scripts.get_revision("130").down_revision == "129"
     assert scripts.get_revision("131").down_revision == "130"
-    assert scripts.get_heads() == ["131"]
+    assert scripts.get_revision("134").down_revision == "133"
+    assert scripts.get_heads() == ["134"]
 
 
 def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> None:

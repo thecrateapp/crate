@@ -5,8 +5,23 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 60
-verified: 2026-07-21
-sources: [app/crate/api, app/crate/db, app/crate/projector.py]
+verified: 2026-10-21
+sources:
+  - app/crate/api
+  - app/crate/db
+  - app/crate/projector.py
+  - app/crate/db/user_stats_dashboard_surface.py
+  - app/crate/db/instance_stats_dashboard_surface.py
+  - app/crate/db/jobs/user_listening_projections.py
+  - app/crate/db/domain_events.py
+  - app/readplane/internal/routes/stats_dashboard.go
+  - app/readplane/internal/snapshots/store.go
+  - app/tests/test_user_listening_projections.py
+  - app/tests/test_user_stats_dashboard_surface.py
+  - app/tests/test_instance_stats_dashboard_surface.py
+  - app/tests/test_projector.py
+  - app/readplane/internal/routes/stats_dashboard_test.go
+  - app/readplane/internal/snapshots/store_test.go
 ---
 
 # Backend API and Data Layer
@@ -320,3 +335,67 @@ Crate intentionally mixes:
 
 That keeps high-complexity SQL visible while still gaining transaction and
 composition ergonomics where they help.
+
+## Smart Mix data and HTTP boundaries
+
+Smart Mix section verified against source on 2026-10-21.
+
+Smart Mix persists versioned per-track profiles in `track_mix_profiles`, with claim and
+processing state under pipeline `smart_mix`. Source/profile revisions govern publication;
+profile reads, planning and compatibility are separate from backfill and coverage refresh.
+The Go readplane serves the summary profile surface; full reads and planning retain their
+FastAPI contract. Admin control requires `library.analysis.manage`; the Admin status GET can
+schedule a coverage refresh, so HTTP method alone does not establish a pure read.
+See [Smart Mix operation](smart-mix-operations.md) for current state semantics, provenance,
+HTTP boundaries and evidence available to Hermes.
+
+
+## Precalculated listening statistics and snapshot fallback
+
+Verified against implementation and tests on 2026-10-21. `user_play_events` is the event
+source, not the dashboard query surface. Accepted events mark listening days dirty;
+`db/jobs/user_listening_projections.py` rebuilds affected local days, first plays, sessions
+and window aggregates. User timezone changes trigger a rebuild; session boundaries use a
+30-minute gap. The aggregate runner serializes a user's projection work. Missing tracks
+do not erase listening history. Instance statistics combine listeners; they are distinct
+from an individual user's personal statistics and timezone.
+
+The persisted dashboard scopes are `stats:dashboard` (user) and
+`stats:dashboard:instance` (Crate Pulse). The subject key includes period and requested
+limits; user keys have version `v2`. Both dashboard getters serve a snapshot fresh for
+300 seconds, otherwise serve a usable snapshot up to 86,400 seconds old with `stale=true`
+and schedule a deduplicated refresh. With no usable snapshot, the response is a cold
+placeholder with `snapshot.pending=true`, `version=0`, `provisional=true` and
+`computed_until=null`. Its zeroes are not evidence of zero listening. Refresh workers
+build the projections and publish snapshots; the HTTP request never rebuilds the dashboard.
+Read freshness, `built_at`, `source_seq`, `metrics_version`, timezone and `computed_until`
+where available before comparing periods. Personal calendar-year/month windows and
+instance rolling windows have different validation; do not assume parity.
+
+The Go stats route authenticates the user and reads the matching persisted subject.
+The snapshot store distinguishes fresh, stale-but-usable and expired records using its
+scope freshness policy; decorated responses carry snapshot metadata. Missing/unusable
+snapshots, store failures and unsupported query shapes try configured FastAPI fallback.
+Without fallback, the route returns the corresponding error (including 404 for missing
+snapshot and 503 for unavailable store). A readplane `hit` or HTTP 200 is not a claim of
+fresh data. FastAPI fallback can enqueue the deduplicated refresh described above, so
+this dashboard GET is not a pure operational observation for the Hermes pilot.
+
+Domain writers append PostgreSQL outbox events in their transaction. The relay publishes
+them to Redis Streams; the projector coalesces affected work and acknowledges only events
+whose required projection actions succeed. Pending events are retried, and a failed
+projection does not certify fresh snapshots. `user.play_event.recorded` updates recent
+home playback; `user.listening_aggregates.updated` schedules user and instance stats
+refreshes. Catalog invalidations can warm recent users' home snapshots. Observe outbox
+backlog, stream lag/pending and snapshot age separately; source code alone cannot prove
+that the current projector or fallback is healthy.
+
+Implementation: `app/crate/db/user_stats_dashboard_surface.py`,
+`app/crate/db/instance_stats_dashboard_surface.py`, `app/crate/db/jobs/user_listening_projections.py`,
+`app/crate/db/domain_events.py`, `app/crate/projector.py`,
+`app/readplane/internal/routes/stats_dashboard.go` and `internal/snapshots/store.go`.
+Regression evidence: `app/tests/test_user_listening_projections.py` (incremental/full
+parity, timezone/DST, deleted tracks), `test_user_stats_dashboard_surface.py` and
+`test_instance_stats_dashboard_surface.py` (warm/cold reads and refresh scheduling),
+`test_projector.py` (poison projection isolation), and
+`app/readplane/internal/routes/stats_dashboard_test.go` / `internal/snapshots/store_test.go`.

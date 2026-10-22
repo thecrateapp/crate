@@ -20,11 +20,15 @@ pytest_plugins = ["tests.agent_command_fixtures", "tests.test_agent_admin"]
 
 
 def pending_plan(world):
+    _, preview = observed_plan(world)
     change(
         "UPDATE agent_principals SET require_approval=TRUE WHERE id=:id",
         {"id": world["principal"].id},
     )
-    _, preview = observed_plan(world)
+    change(
+        "UPDATE agent_repair_plans SET approval_required=TRUE,state='awaiting_approval' WHERE id=:id",
+        {"id": preview["plan_id"]},
+    )
     return plans.get_plan(preview["plan_id"])
 
 
@@ -225,7 +229,9 @@ def test_cancelled_job_cannot_consume_approval_for_another_job(
     job = requests.accept_apply(
         principal, plan["plan_id"], plan["plan_version"], "apply"
     )
-    requests.cancel_job(principal, job["job_id"])
+    # A separate human task operator can cancel; legacy integration cancellation
+    # now correctly requires its own exact reviewed plan.
+    change("UPDATE tasks SET status='cancelled' WHERE id=:id", {"id": job["job_id"]})
     replay = requests.accept_apply(
         principal, plan["plan_id"], plan["plan_version"], "new-key"
     )

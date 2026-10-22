@@ -154,7 +154,12 @@ def test_projector_refreshes_ops_for_federation_catalog_events(monkeypatch):
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 0}
+    assert result == {
+        "processed": 1,
+        "failed": 0,
+        "ops_refreshes": 1,
+        "home_refreshes": 0,
+    }
     assert calls["ops"] == [True]
     assert calls["processed"] == [["1682349000100-0"]]
 

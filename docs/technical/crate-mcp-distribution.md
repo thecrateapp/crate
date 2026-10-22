@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 171
-verified: 2026-10-18
+verified: 2026-10-21
 sources:
   - app/crate/mcp/contract.py
   - app/crate/mcp/telemetry.py
@@ -28,10 +28,10 @@ guide covers provisioning, OAuth endpoints and exact Admin review.
 
 ## Versioned distribution
 
-The Crate tool contract is **1.1.0**, independent of the MCP wire protocol and migration version.
+The Crate tool contract is **1.2.0** (unreleased additive candidate), independent of the MCP wire protocol and migration version.
 The server reports this version; `get_operation_catalog` returns SDK/protocol versions, schema
 fingerprints, grants, limits and readiness. The output envelope remains `schema_version="1"`.
-The [distributable JSON contract](crate-mcp-v1.json) contains all **52 tools**, all **30 scopes**
+The [distributable JSON contract](crate-mcp-v1.json) contains all **71 tools**, all **32 scopes**
 and human capability ceilings, closed input schemas and the output schema, without instance
 configuration or credentials. Regenerate from `app/` using repository dependencies:
 
@@ -53,7 +53,9 @@ An SDK upgrade requires regenerated distribution and protocol/OAuth acceptance.
 
 `tools/list` shows registered tools visible to current grants and the action flag, rather than
 promising execution readiness. The operation catalog distinguishes `enabled`, `denied`,
-`disabled` and `unavailable`. Actions cannot be enabled there without fresh persisted worker
+`disabled` and `unavailable`. Each operation exposes only its readiness `status` and `missing`
+reasons; shared readiness details are returned once as `data.worker_readiness` to keep the catalog
+within the bounded response size. Actions cannot be enabled there without fresh persisted worker
 evidence and worker handler registrations. This is not a live probe: exact authority, targets,
 approval, provider/filesystem dependencies and runtime admission are rechecked in the worker.
 Discovery can be followed by a target-specific conflict.
@@ -213,7 +215,7 @@ sustained load before rollout. This local evidence does not establish a producti
 Automatic boundaries: 64 KiB request body, 60 KiB structured tool payload, 2 calls per principal /
 8 globally, 60 admitted calls per principal per rolling minute, eight local executions with
 immediate `RATE_LIMITED` on excess, bounded worker admission and target/plan byte caps. Discovery
-is finite (52 schemas); the structured tool-result byte cap does not describe `tools/list`.
+is finite (56 schemas in the 1.2 candidate); the structured tool-result byte cap does not describe `tools/list`.
 Redis admission fails closed. Disconnect does not authorize repeating an accepted action.
 
 ## Metrics and staged withdrawal
@@ -240,3 +242,5 @@ for each stage. Endpoint/OAuth/action flags remain false by default. Removing a 
 calls and pending workers reauthorize. For urgent withdrawal revoke credentials/delegations or
 disable actions in API and workers through normal deployment; inspect in-flight jobs for applied
 effects and real acknowledgment. Disabling MCP does not roll back library state or prove work stopped.
+
+The reviewed [acquisition and schedule contract](crate-mcp-acquisition.md) describes the two-approval Soulseek transfer/publication flow and provider/version boundaries.

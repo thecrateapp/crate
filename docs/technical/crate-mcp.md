@@ -301,7 +301,7 @@ Input schemas reject unknown arguments; filters are limited to the supported fie
 | `list_jobs`             | `ops.jobs.read`                                                                               | Optional `states`, allowlisted `types`, `limit`, `cursor`. Returns sanitized task history.                                                                                                                                 |
 | `get_job`               | `ops.jobs.read`                                                                               | `job_id`. Returns the safe fields of one task without raw parameters or results.                                                                                                                                           |
 | `read_diagnostics`      | `ops.logs.read` for `worker_logs`; `ops.status.read` for `worker_status` or `analysis_status` | Required `source`; optional `limit`. `worker_logs` also accepts `task_id`, `since` and `until`.                                                                                                                            |
-| `get_operation_catalog` | Any granted scope                                                                             | No arguments. Returns contract version, schema fingerprints, enabled/denied/disabled/unavailable status, worker readiness evidence, limits and support for all 17 repair checks. Discovery grants no additional authority. |
+| `get_operation_catalog` | Any granted scope                                                                             | No arguments. Returns contract version, schema fingerprints, enabled/denied/disabled/unavailable status, limits and support for all repair checks. Per-operation readiness contains `status` and `missing`; shared worker evidence is returned once as `data.worker_readiness`. Discovery grants no additional authority. |
 | `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.                                                |
 | `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.                                             |
 
@@ -1686,6 +1686,16 @@ is selected. «Start over» discards the draft and its source, after a confirmat
 hold anything; shows already saved stay in Crate. Excluded dates remain pending. Changing any
 selected content invalidates the preview.
 
+After extraction, a candidate with a venue and city but no street address gets a best-effort
+venue lookup. It first reuses a matching location from another saved Crate show in that city,
+preferring fields whose provenance is manual or MCP; then it checks the long-lived venue cache;
+only then does it query Nominatim. Venue and city must match, with country/region used to reject
+known conflicts. The worker fills only missing address, postal/country and coordinate fields; it
+never asks the model to invent coordinates. A lookup failure leaves the candidate editable and
+adds a review warning. The draft is still private and exact human review is required before a show
+is saved. Suggestions reused from Crate are identified as such; Nominatim suggestions carry
+OpenStreetMap attribution.
+
 Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming: from the
 toolbar with typed show IDs, or from a show's detail, which loads that show and the other upcoming
 shows with the same artist and date. Every merge still needs its review and approval. A plan that
@@ -1935,3 +1945,7 @@ modes and the persisted invocation actor; the historical audit rows were not
 rewritten and no further paid call was needed. The Task 6 focused gate passed
 21 backend/Compose cases without skips, plus eight documentation smoke cases;
 document integrity checked 45 canonical documents and the docs build passed.
+
+## Reviewed acquisition and schedule writes
+
+The unreleased 1.2.0 contract adds twelve acquisition tools and two least-privilege scopes (71 tools, 32 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact Soulseek transfer/publication and Tidal single-album/full-artist flows, human approval, worker/cancellation checks, reconciliation semantics, slskd 0.26.1 prerequisite and schedule audit.

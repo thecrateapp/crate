@@ -25,5 +25,6 @@ def _handle_agent_control(task_id: str, params: dict, config: dict) -> dict:
 
 AGENT_LIBRARY_TASK_HANDLERS = {
     "agent_maintenance": _handle_agent_maintenance,
+    "agent_tidal_download": _handle_agent_maintenance,
     "agent_control": _handle_agent_control,
 }

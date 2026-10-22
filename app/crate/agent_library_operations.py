@@ -10,6 +10,10 @@ from crate.db.queries.agent_operation_targets import operation_target_keys
 from crate.db.repositories import agent_operation_jobs as jobs
 
 _ADAPTERS = {
+    "acquisition": "crate.agent_acquisition",
+    "acquisition_publish": "crate.agent_acquisition",
+    "tidal_acquisition": "crate.agent_acquisition",
+    "tidal_artist_acquisition": "crate.agent_acquisition",
     "shows_import": "crate.agent_shows",
     "job_retry": "crate.agent_instance_operations",
     "job_cancel": "crate.agent_instance_operations",
@@ -101,6 +105,12 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
         ):
             raise DiagnosticError("FORBIDDEN", "MCP library operations are disabled")
         if effect_depth:
+            from crate.operator_provenance import validate
+
+            validate(
+                job["principal_id"],
+                job["plan"]["execution_data"].get("operator_provenance"),
+            )
             return effect() if effect is not None else None
 
         def held():
@@ -142,6 +152,17 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                 job["payload"]["parameters"],
                 config,
                 **(
+                    {"task_id": task_id}
+                    if operation
+                    in {
+                        "acquisition",
+                        "acquisition_publish",
+                        "tidal_acquisition",
+                        "tidal_artist_acquisition",
+                    }
+                    else {}
+                ),
+                **(
                     {"principal": jobs.requests._principal_for_job(job)}
                     if operation
                     in {
@@ -150,6 +171,10 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                         "schedule_run",
                         "editorial_change",
                         "shows_import",
+                        "acquisition",
+                        "acquisition_publish",
+                        "tidal_acquisition",
+                        "tidal_artist_acquisition",
                     }
                     else {}
                 ),
@@ -244,4 +269,4 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
         )
 
 
-__all__ = ["prepare_operation", "apply_operation", "execute_operation_job"]
+__all__ = ["apply_operation", "execute_operation_job", "prepare_operation"]

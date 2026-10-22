@@ -10,6 +10,92 @@ from crate.db.repositories.agent_plans import get_owned_plan
 from crate.health_check import ARTIST_SCOPED_CHECKS
 
 _LIMITS = {
+    "get_acquisition_readiness": {
+        "providers": ["soulseek", "tidal", "bandcamp"],
+        "supported_slskd": "0.26.1",
+    },
+    "search_acquisition": {
+        "selections": 5,
+        "files_per_selection": 50,
+        "receipt_validity_seconds": 900,
+        "response_bytes": 55000,
+        "automatic_download": False,
+    },
+    "search_tidal_missing_albums": {
+        "discography_limit": 50,
+        "results": 50,
+        "local_artist_must_be_unambiguous": True,
+        "automatic_download": False,
+        "receipt_validity_seconds": 900,
+    },
+    "search_tidal_missing_artist": {
+        "discography_limit": 500,
+        "max_releases_per_approval": 50,
+        "local_artist_must_be_unambiguous": True,
+        "complete_catalog_required": True,
+        "automatic_download": False,
+        "receipt_validity_seconds": 900,
+    },
+    "preview_tidal_acquisition": {
+        "albums": 1,
+        "approval": "mandatory_telegram",
+        "destination": "new_album_only",
+        "overwrite": False,
+    },
+    "apply_tidal_acquisition": {
+        "plans": 1,
+        "download_and_import": "single_exact_approved_operation",
+        "overwrite": False,
+        "postverification": "library_index",
+    },
+    "preview_tidal_artist_acquisition": {
+        "albums": 50,
+        "approval": "mandatory_telegram",
+        "destination": "new_albums_only",
+        "overwrite": False,
+    },
+    "apply_tidal_artist_acquisition": {
+        "plans": 1,
+        "download_and_import": "complete_exact_missing_discography",
+        "overwrite": False,
+        "postverification": "every_album_indexed",
+    },
+    "preview_acquisition": {
+        "files": 50,
+        "max_bytes": 2147483648,
+        "cost_minor": 0,
+        "approval": "mandatory",
+        "server_receipt_required": True,
+    },
+    "apply_acquisition": {
+        "plans": 1,
+        "destination": "provider_staging_only",
+        "library_publication": "separate_plan",
+    },
+    "preview_acquisition_publication": {
+        "source_jobs": 1,
+        "actual_audio_sha256": True,
+        "destination": "new_album_only",
+        "approval": "mandatory",
+    },
+    "apply_acquisition_publication": {
+        "plans": 1,
+        "overwrite": False,
+        "postverification": "files_and_index",
+    },
+    "get_instance_inventory": {"services": 32, "live_image_ids": False},
+    "get_observability_summary": {
+        "pipelines": 8,
+        "refresh": False,
+        "response_bytes": 55000,
+    },
+    "get_pipeline_status": {"pipelines": 1, "task_sample": 20, "lookback_hours": 24},
+    "get_smart_mix_status": {
+        "response_bytes": 55000,
+        "tracks": 50,
+        "refresh": False,
+        "stored_evidence_only": True,
+    },
     "search_shows": {"rows": 50, "offset": 10000},
     "preview_shows_import": {
         "shows": 50,
@@ -91,7 +177,8 @@ _LIMITS = {
         "dedup": True,
     },
     "preview_schedule_update": {
-        "schedules": 16,
+        "reviewed_schedules": ["compute_analytics"],
+        "minimum_nonzero_interval_seconds": 600,
         "maximum_interval_seconds": 2678400,
         "expected_revision": True,
     },
@@ -108,19 +195,24 @@ _LIMITS = {
 
 def get_operation_catalog(principal: AgentPrincipal) -> dict:
     from crate.agent_operation_catalog import OPERATIONS
-    from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
     from crate.mcp.contract import (
         CONTRACT_VERSION,
         contract_metadata,
         schema_fingerprint,
         worker_readiness,
     )
+    from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
 
     operations = []
     readiness = (
         worker_readiness()
         if actions_enabled()
         and any(_allowed(principal, name) for name in ACTION_CATALOG)
+        else None
+    )
+    operation_readiness = (
+        {"status": readiness["status"], "missing": readiness["missing"]}
+        if readiness is not None
         else None
     )
     for name, (model, grant, _) in (CATALOG | ACTION_CATALOG).items():
@@ -158,7 +250,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
                 "status": status,
                 "contract_version": CONTRACT_VERSION,
                 "input_schema_sha256": schema_fingerprint(model),
-                "readiness": readiness
+                "readiness": operation_readiness
                 if action and allowed and actions_enabled()
                 else {
                     "status": status,
@@ -276,6 +368,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
             "contract": contract_metadata(),
             "operations": operations,
             "checks": checks,
+            "worker_readiness": readiness,
             "metadata_presets": presets,
         },
         "interpretation": "Only enabled operations and supported checks can execute through MCP. Catalog discovery grants no permissions; each call rechecks current authority. Conditional repair variants can still require manual intervention. Every complete plan must fit both its target and byte budgets.",
@@ -353,8 +446,8 @@ def get_analysis_status(
     principal: AgentPrincipal, *, track_uids=None, plan_id=None, limit=50, cursor=None
 ) -> dict:
     from crate.agent_analysis import get_analysis_status as read_status
-    from crate.db.repositories.agent_plans import get_owned_analysis_references
     from crate.agent_diagnostics import _cursor, _decode, _fingerprint, _rows
+    from crate.db.repositories.agent_plans import get_owned_analysis_references
 
     if type(limit) is not int or not 1 <= limit <= 100:
         raise DiagnosticError("INVALID_ARGUMENT", "Analysis page size must be 1 to 100")
@@ -435,8 +528,8 @@ def get_library_quality(*, category=None, limit=50, cursor=None) -> dict:
 
 
 __all__ = [
+    "get_analysis_status",
     "get_library_quality",
     "get_operation_catalog",
     "get_plan",
-    "get_analysis_status",
 ]

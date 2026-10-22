@@ -180,6 +180,24 @@
     "order": 120
   },
   {
+    "sourcePath": "docs/technical/crate-operator.md",
+    "route": "/operations/independent-operator",
+    "section": "operations",
+    "title": "Independent deterministic operator",
+    "summary": "Standalone incident state, bounded job watches, fixed delivery and an external watchdog without model dependence.",
+    "keywords": ["supervisor", "incidents", "watchdog", "delivery", "Hermes"],
+    "order": 125
+  },
+  {
+    "sourcePath": "docs/technical/hermes-plan-confirmation.md",
+    "route": "/operations/native-plan-confirmation",
+    "section": "operations",
+    "title": "Native Telegram plan confirmation",
+    "summary": "Exact human button review, deterministic job admission and the opt-in Hermes write profile.",
+    "keywords": ["Hermes", "Telegram", "approval", "plans", "operator"],
+    "order": 126
+  },
+  {
     "sourcePath": "docs/technical/ops-runbook.md",
     "route": "/operations/backup-and-recovery",
     "section": "operations",
@@ -232,6 +250,15 @@
     "summary": "Versioned contracts, reproducible evaluation and staged rollout evidence.",
     "keywords": ["mcp", "oauth", "contract", "evaluation", "rollout"],
     "order": 171
+  },
+  {
+    "sourcePath": "docs/technical/crate-mcp-acquisition.md",
+    "route": "/operations/crate-mcp-acquisition",
+    "section": "operations",
+    "title": "Reviewed MCP acquisition and schedule boundaries",
+    "summary": "Exact Soulseek and Tidal receipts, independent Telegram approval and bounded schedule contracts.",
+    "keywords": ["mcp", "acquisition", "soulseek", "approval", "schedules"],
+    "order": 172
   },
   {
     "sourcePath": "docs/technical/storage-retention.md",
@@ -433,5 +460,37 @@
       "implementation"
     ],
     "order": 45
+  },
+  {
+    "sourcePath": "docs/technical/smart-mix-operations.md",
+    "route": "/operations/smart-mix",
+    "section": "operations",
+    "title": "Smart Mix - funcionamiento y operación",
+    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Hermes.",
+    "keywords": [
+      "smart mix",
+      "backfill",
+      "cue beats",
+      "planner",
+      "hermes",
+      "diagnostics"
+    ],
+    "order": 165
+  },
+  {
+    "sourcePath": "docs/technical/hermes-operator-release.md",
+    "route": "/operations/hermes-operator-release",
+    "section": "operations",
+    "title": "Hermes operator candidate and rollout",
+    "summary": "Complete opt-in operator architecture, authority and coverage matrix, root provisioning, disposable acceptance and rollback.",
+    "order": 127,
+    "keywords": [
+      "hermes",
+      "operator",
+      "provenance",
+      "approval",
+      "recovery",
+      "rollout"
+    ]
   }
 ]

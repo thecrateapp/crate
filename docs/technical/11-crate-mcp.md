@@ -5,21 +5,30 @@ section: architecture
 audience: [developer, operator]
 status: canonical
 order: 100
-verified: 2026-10-19
+verified: 2026-10-21
 sources:
   - app/crate/mcp/server.py
   - app/crate/mcp/tools.py
   - app/crate/mcp/contract.py
+  - app/crate/agent_observability.py
+  - app/crate/db/queries/agent_observability.py
+  - app/tests/test_agent_observability_db.py
+  - app/tests/test_mcp_observability.py
   - app/crate/agent_access.py
   - app/crate/agent_operations.py
   - app/crate/agent_editorial.py
   - app/crate/agent_shows.py
+  - app/crate/mcp/show_schemas.py
   - app/crate/db/repositories/agent_operation_jobs.py
   - app/crate/db/repositories/agent_plans.py
   - app/crate/db/repositories/show_identities.py
+  - app/crate/db/repositories/show_import_selection.py
   - app/crate/show_extraction.py
   - app/ui/src/pages/agents/AgentPlanDetail.tsx
   - .agents/skills/crate-editorial-playlists/SKILL.md
+  - app/tests/test_show_import_plans.py
+  - app/tests/test_show_import_api.py
+  - app/tests/test_agent_plan_approvals.py
 ---
 
 # Agents and MCP
@@ -222,3 +231,130 @@ rollout budget remain explicit release gates.
 For the surrounding runtime read [Workers and tasks](03-worker-tasks-and-background-services.md),
 [Auth and sessions](07-auth-users-social-and-sessions.md) and
 [Frontend architecture](08-frontends-admin-and-listen.md).
+
+## Exact structured show review and publication
+
+Verified against implementation and tests on 2026-10-21. Admin manual/structured import
+and remote `preview_shows_import` / `apply_shows_import` reuse the shared immutable
+operation engine. A selection contains 1–50 explicit candidate rows, each with an
+`item_id`; the input schema also bounds payload bytes. A tour exceeding a selection must
+be tracked as several reviewed batches. The server does not infer unselected dates,
+perform OCR through MCP, buy tickets or send show notifications as a side effect.
+
+Preparation records each row's full candidate, before state, expected canonical show ID
+and revision, source provenance and per-row issues. Invalid or ambiguous drafts remain
+reviewable but `executable=false`; neither an approval nor a successful extraction makes
+them executable. Review the complete plan, not its task summary: exact lineup, date,
+place, session/time, field corrections, unresolved identities, source versions and public
+impact. Unknown time/coordinates remain unknown. An empty search is not proof that a show
+does not exist. Private extraction drafts are bound to their owning human editor; corrected
+fields cannot replace the original evidence.
+
+`agent_plans.py` binds an approval to plan ID/version, content hash, authorization context,
+policy revision and expiry, and reserves it for one admitted job. Approval is required
+when current policy demands it; consolidation always requires human approval. Admin's
+human cookie/origin/capability checks and MCP's integration/delegation checks feed the same
+plan engine. The agent cannot approve its own plan or expand authority through a document.
+
+At apply, one transaction locks authority, task and canonical identities, validates the
+exact stored execution and expected revisions, applies the selected rows, invalidates
+views and stores the durable result. Conflicting revisions or write failures roll back
+the selected batch; per-item `BATCH_NOT_APPLIED` is not partial publication. A concurrently
+created identical show can resolve to the same identity; different fields require review.
+Shows and durable completion commit together, so replay after outer-worker interruption
+recovers the result without another write. Success can report `verification=passed` with
+`projection=pending`: database publication does not establish that every consumer already
+shows the new event. A changed proposal needs a fresh preview; a lost response uses the
+same key/payload or durable job inspection.
+
+Regression evidence: `app/tests/test_show_import_plans.py` covers changed-show atomicity,
+concurrent identity, durable completion replay, fifty-date batching and mandatory
+consolidation approval; `app/tests/test_show_import_api.py` covers human capability/origin
+and fresh correction preview; `app/tests/test_agent_plan_approvals.py` covers exact approval
+binding. Current instance show/job state requires authorized MCP evidence. If the pilot's
+read grants lack that surface, report it unavailable instead of invoking an import or
+assuming publication from these source contracts.
+
+## Bounded observation coverage (contract 1.2 candidate)
+
+Contract 1.2.0 adds four read tools with the existing envelope schema `1`.
+`get_instance_inventory`, `get_observability_summary` and `get_pipeline_status` require
+`ops.status.read`; `get_smart_mix_status` requires `library.health.read`. Actions remain
+explicit opt-in. Listing or discovering a tool grants no authority.
+
+Every source envelope declares `source`, `observed_at`, `availability`, `reason`,
+`freshness` (age, fresh threshold and expiry), `version` and `coverage`. Source envelopes
+are under `data.sources`; summary pipelines are under `data.subsystems[NAME].sources`.
+`queried_at` is read time, not the time a producer last measured its subsystem. Task rows
+retain their own creation/update/heartbeat timestamps. No tool invokes an HTTP handler,
+rebuilds a snapshot, refreshes coverage, probes Docker/Redis or enqueues domain work.
+The usual bounded MCP admission and diagnostic audit still apply.
+
+| Surface / subsystem                              | Persisted source and implementation                                                                                                                                      | Coverage                                              | Explicitly missing evidence                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instance inventory                               | `agent_observability.read_observation_evidence`: `alembic_version`; fixed service allowlist from stored `ui_snapshots` `ops:stack/global`; current MCP contract constant | Partial                                               | Default/unprovisioned API has no verified release/context/image proof. The opt-in operator mounts public provenance and exposes fresh verified release SHA, context hash, per-service image IDs/source commits and observation time; missing, stale or unverified evidence stays unavailable. Image identity and container state do not establish functional health. `get_release_context` separately describes release versus reused-image provenance. |
+| Worker and import                                | Stored `ops_runtime_state.worker_live` counters and `imports_pending.count`, produced by worker/import queue updates                                                     | Partial                                               | Live worker/dependency probes, complete pipeline progress and fresh storage validation                                                                                                                                                                                                                                                                                                                                                                  |
+| Analysis / Bliss                                 | Worker-produced `ops_runtime_state.analysis_status` counters; the two pipelines remain distinct                                                                          | Partial                                               | Live daemon probes, exact complete backlog from counters, Smart Mix profile coverage                                                                                                                                                                                                                                                                                                                                                                    |
+| Enrichment / playback / federation / acquisition | At most 20 matching newest task rows created in the last 24 hours (21st row is a truncation sentinel); task categories come from `task_registry`                         | Partial                                               | Complete backlog, older long-running tasks, provider connectivity, end-to-end playback/federation success                                                                                                                                                                                                                                                                                                                                               |
+| Projector                                        | Stored `ops/dashboard.eventing.outbox` allowlisted counters with snapshot build time/version/source sequence                                                             | Partial                                               | Live relay/Redis probes, complete consumer lag, per-event delivery; producer `unavailable` survives and is never a healthy zero                                                                                                                                                                                                                                                                                                                         |
+| Smart Mix coverage / campaign                    | Stored `smart_mix:coverage` and `smart_mix:backfill_campaign` with independent DB timestamps and stored versions                                                         | Implemented stored read, partial operational coverage | No coverage recompute, campaign control or proof of DSP completion from enqueue. Missing coverage is null, not an empty zero-count default.                                                                                                                                                                                                                                                                                                             |
+| Smart Mix exact profiles                         | One UUID-batched lookup of `track_mix_profiles` and `track_processing_state` for at most 50 unique exact track UUIDs                                                     | Implemented bounded read, partial library coverage    | No library scan, new acoustic validation, candidate ranking, transition plan or physical/platform acceptance                                                                                                                                                                                                                                                                                                                                            |
+| Provider / storage / streaming / Redis health    | No functional probe is called by these tools                                                                                                                             | Unavailable                                           | Current functional health; HTTP 200 or a running process cannot establish it                                                                                                                                                                                                                                                                                                                                                                            |
+| Operational event cursor                         | No global UI-event journal is synthesized                                                                                                                                | Unavailable in these tools                            | A supervisor supplies its own durable operational event cursor                                                                                                                                                                                                                                                                                                                                                                                          |
+
+`get_pipeline_status.pipeline` is the closed enum `import`, `enrichment`, `analysis`,
+`bliss`, `playback`, `projector`, `federation`, `acquisition`. The returned exact task type
+list defines the sample; it is not a claim to cover every domain effect or daemon.
+Empty samples do not mean zero backlog. `complete` is false. Projector is an event
+consumer rather than a task category, so its task type sample is empty.
+
+Runtime and pipeline evidence is fresh for 180 seconds, stack evidence for 30 seconds;
+older evidence is stale until 86,400 seconds, then unavailable. Invalidated snapshots
+remain stale. Missing/future timestamps are unavailable. Current profile versions and
+freshness are independent: `profile_status=current` means stored analyzer/schema versions
+match this API, while its source envelope can still be stale or expired. Stored outdated
+coverage and campaign targets remain visible with an explicit stale version reason.
+These constants define evidence freshness, not subsystem health or a universal alert SLA.
+
+SQL uses a five-second statement timeout and one rollback-only read scope, fixed persisted
+keys, and `ANY` for exact track UUIDs. Selected JSON records over 32,768 bytes are reported
+unavailable; unrelated worker task payloads are excluded before applying that bound.
+Only allowlisted fields leave the service; nested evidence is capped at depth five,
+20 entries and 512 characters per string with credential/location redaction. Sanitized
+source data over 12,000 bytes is explicitly unavailable. Smart Mix limits the whole response
+to a 55,000-byte budget before the transport cap: `truncated`, `returned_count` and
+`data.omitted_track_uids` identify exact track results to request again in smaller batches. Inventory
+keeps validated image references separate, considers at most 32 stored containers and
+reports truncation. The inventory's `redis-durable` key maps explicitly to the actual
+Docker container name `crate-redis-durable`, recorded as `container_name` in its envelope.
+Unknown/missing service images remain explicit; no Docker socket,
+shell, arbitrary SQL, filesystem or new HTTP observer is exposed.
+
+See [Smart Mix operation](smart-mix-operations.md) for profile/campaign interpretation.
+Unit, PostgreSQL read-only and actual SDK authorization/no-refresh tests are in
+`test_agent_observability.py`, `test_agent_observability_db.py`, and
+`test_mcp_observability.py`. Local tests do not establish real-host rollout acceptance.
+
+The assembled summary also has a 55,000-byte UTF-8 budget. If needed, it omits the largest
+source data blocks while retaining source names, timestamps, freshness and versions. Those
+source envelopes become explicitly unavailable and truncated; top-level `truncated` and
+`data.omitted_source_data` list their paths. Unaffected sources remain readable. Worker,
+analysis and import counters must be nonnegative integers within signed 64-bit bounds;
+worker engine must be a string of at most 128 characters. Invalid fields are omitted and
+reported in `invalid_fields`, never turned into healthy zero counters.
+
+## Native Telegram human confirmation
+
+The opt-in managed operator can request exact native bot review using
+`request_plan_confirmation`; its model cannot submit a human decision. The
+existing plan engine admits an explicitly approved operation with its stable key
+on the human button, without another Admin review or model invocation. Current
+approval policy and worker authority remain server-enforced, including denial of
+legacy direct-command bypasses. See [Native Telegram plan confirmation](hermes-plan-confirmation.md)
+for binding, page review, replay/expiry, operator profile and reconciliation.
+
+The [integrated Hermes operator candidate](hermes-operator-release.md) binds
+server-configured operator principals to fresh release/context/per-image evidence
+at direct MCP, native approval, admission and worker effect boundaries. It packages
+independent recovery/monitoring, native incident decisions and automatic job watches;
+production activation remains separately reviewed.

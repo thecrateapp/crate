@@ -87,3 +87,5 @@ def test_every_label_is_human_text():
     )
     assert SCOPE_DETAILS["ops.jobs.cancel_pending"].label == "Cancel owned pending jobs"
     assert "worker adoption" in SCOPE_DETAILS["ops.runtime.read"].label
+    assert SCOPE_DETAILS["library.acquisition.search"].access == "read"
+    assert SCOPE_DETAILS["library.acquisition.write"].access == "change"

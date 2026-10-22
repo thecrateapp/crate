@@ -123,6 +123,19 @@ def _authorize(current, principal, grants, *, worker=False):
         )
 
 
+def _require_legacy_policy(current, principal):
+    from crate.operator_provenance import is_operator
+
+    required = current.execute(
+        text("SELECT require_approval FROM agent_principals WHERE id=:id FOR SHARE"),
+        {"id": principal.id},
+    ).scalar_one()
+    if required or is_operator(principal.id):
+        raise DiagnosticError(
+            "APPROVAL_REQUIRED", "Use an exact reviewed plan for this integration"
+        )
+
+
 def _lock_principal(current, principal_id):
     current.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
@@ -361,7 +374,12 @@ def _accept(
             retry_after=5,
         )
     task_type = (
-        "show_extract"
+        "agent_tidal_download"
+        if payload.get("domain_operation")
+        in {"tidal_acquisition", "tidal_artist_acquisition"}
+        else "soulseek_download"
+        if payload.get("domain_operation") in {"acquisition", "acquisition_publish"}
+        else "show_extract"
         if operation == "extract_shows"
         else "agent_control"
         if payload.get("domain_operation") == "job_cancel"
@@ -409,8 +427,8 @@ def _accept(
             "authorization_context": json.dumps(authorization_context(principal)),
         },
     )
-    from crate.db.repositories.task_control import record_task_provenance
     from crate.db.repositories.agent_task_control import principal_context
+    from crate.db.repositories.task_control import record_task_provenance
 
     record_task_provenance(
         task_id,
@@ -446,6 +464,7 @@ def accept_health_check(
     key = _key(idempotency_key)
     with optional_scope(session) as current:
         _authorize(current, principal, {"library.health.run"})
+        _require_legacy_policy(current, principal)
         _lock_principal(current, principal.id)
         replay = _replay(current, principal, "run_health_check", key, _hash(payload))
         if replay:
@@ -565,6 +584,7 @@ def retry_job(
     key = _key(idempotency_key)
     with optional_scope(session) as current:
         _authorize(current, principal, {"ops.jobs.retry", "library.health.run"})
+        _require_legacy_policy(current, principal)
         _lock_principal(current, principal.id)
         request_hash = _hash({"job_id": job_id})
         replay = _replay(current, principal, "retry_job", key, request_hash)
@@ -625,6 +645,7 @@ def cancel_job(
 ) -> dict:
     with optional_scope(session) as current:
         _authorize(current, principal, {"ops.jobs.cancel_pending"})
+        _require_legacy_policy(current, principal)
         _lock_principal(current, principal.id)
         job = _job(current, job_id, lock=True)
         if (
@@ -685,6 +706,8 @@ def _execution_job(current, task_id):
     _authorize(
         current, _principal_for_job(initial), initial["required_grants"], worker=True
     )
+    if initial["operation"] == "run_health_check":
+        _require_legacy_policy(current, _principal_for_job(initial))
     job = _job(current, task_id, lock=True)
     if job is None:
         raise DiagnosticError("NOT_FOUND", "Agent job was not found")
@@ -695,7 +718,13 @@ def _execution_job(current, task_id):
             "STATE_CONFLICT", "Agent job has not been claimed for execution"
         )
     expected = (
-        "show_extract"
+        "agent_tidal_download"
+        if job["payload"].get("domain_operation")
+        in {"tidal_acquisition", "tidal_artist_acquisition"}
+        else "soulseek_download"
+        if job["payload"].get("domain_operation")
+        in {"acquisition", "acquisition_publish"}
+        else "show_extract"
         if job["operation"] == "extract_shows"
         else "agent_control"
         if job["payload"].get("domain_operation") == "job_cancel"

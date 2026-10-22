@@ -1,0 +1,105 @@
+{
+  "model": {
+    "default": "gpt-6-luna",
+    "provider": "openai-codex"
+  },
+  "toolsets": ["crate", "crate_context", "memory"],
+  "platform_toolsets": {
+    "telegram": ["crate", "crate_context", "memory"],
+    "cli": ["crate", "crate_context", "memory"]
+  },
+  "agent": {
+    "max_turns": 15,
+    "disabled_toolsets": [
+      "terminal",
+      "file",
+      "code_execution",
+      "delegation",
+      "connections",
+      "catalog",
+      "cronjob",
+      "skills",
+      "browser",
+      "web",
+      "search",
+      "messaging",
+      "vision",
+      "image_gen",
+      "tts",
+      "computer_use",
+      "kanban",
+      "project",
+      "session_search"
+    ]
+  },
+  "approvals": {
+    "mode": "manual",
+    "cron_mode": "deny",
+    "unattended_mode": "deny",
+    "single_query_mode": "deny"
+  },
+  "platforms": {
+    "telegram": {
+      "enabled": true
+    },
+    "api_server": {
+      "enabled": false
+    }
+  },
+  "security": {
+    "redact_secrets": true
+  },
+  "mcp_servers": {
+    "crate": {
+      "url": "${CRATE_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${CRATE_MCP_TOKEN}",
+        "Host": "${CRATE_MCP_HOST}"
+      },
+      "timeout": 30,
+      "tools": {
+        "include": [
+          "get_operation_catalog",
+          "get_instance_status",
+          "list_jobs",
+          "get_job",
+          "read_diagnostics",
+          "list_library_issues",
+          "inspect_artist",
+          "get_library_quality",
+          "get_analysis_status",
+          "read_audit",
+          "list_schedules",
+          "get_runtime_policy"
+        ],
+        "prompts": false,
+        "resources": false
+      }
+    },
+    "crate_context": {
+      "command": "/opt/hermes/.venv/bin/python",
+      "args": ["/opt/crate-hermes/context_server.py"],
+      "env": {
+        "CRATE_CONTEXT_ROOT": "/opt/crate-context/active"
+      },
+      "tools": {
+        "include": [
+          "get_release_context",
+          "search_crate_context",
+          "read_crate_context"
+        ]
+      }
+    }
+  },
+  "mcp_single_query_discovery_timeout": 45,
+  "auxiliary": {
+    "title_generation": {
+      "model_upgrade_enabled": false
+    }
+  },
+  "tools": {
+    "tool_search": {
+      "enabled": "off"
+    }
+  }
+}

@@ -9,9 +9,21 @@ from sqlalchemy import text
 from crate.agent_access import AgentPrincipal, authorization_context
 from crate.agent_diagnostics import DiagnosticError, _safe
 from crate.agent_operation_catalog import interrupted_operation_result
-from crate.db.repositories.agent_human_sessions import require_agent_human_capabilities
+from crate.db.repositories.agent_human_sessions import (
+    ApprovedHuman,
+    TelegramHuman,
+    require_agent_human_capabilities,
+)
 from crate.db.repositories.agent_requests import _hash
 from crate.db.tx import optional_scope, read_scope
+
+
+def _reviewed_provenance(row):
+    # Original directed photo plans have no document; their existing immutable
+    # execution JSON holds the same reviewed evidence as generalized plans.
+    return (row.get("document") or row.get("execution_data") or {}).get(
+        "operator_provenance"
+    )
 
 
 def _document(row, *, identity=False):
@@ -83,6 +95,8 @@ def _document(row, *, identity=False):
         "approval_required": row["approval_required"],
         "expires_at": row["expires_at"].isoformat(),
     }
+    if _reviewed_provenance(row) is not None:
+        content["operator_provenance"] = _reviewed_provenance(row)
     return {
         "plan_id": row["id"],
         "principal_id": str(row["principal_id"]),
@@ -283,6 +297,9 @@ def count_pending_plans(*, operations: list[str] | None = None, session=None) ->
 
 
 def validate_plan_authorization(current, plan, principal, *, worker=False, job_id=None):
+    from crate.operator_provenance import validate
+
+    validate(plan["principal_id"], _reviewed_provenance(plan))
     policy = (
         current.execute(
             text("""
@@ -334,6 +351,29 @@ def validate_plan_authorization(current, plan, principal, *, worker=False, job_i
         raise DiagnosticError(
             "APPROVAL_REQUIRED", "An exact current human approval is required"
         )
+    from crate.operator_provenance import is_operator
+
+    if (
+        approval.get("telegram_binding_id")
+        or _reviewed_provenance(plan) is not None
+        or is_operator(plan["principal_id"])
+    ):
+        from crate.agent_operation_catalog import OPERATIONS
+
+        require_agent_human_capabilities(
+            TelegramHuman(
+                id=approval["approved_by"],
+                telegram_binding_id=str(approval["telegram_binding_id"]),
+            )
+            if approval.get("telegram_binding_id")
+            else ApprovedHuman(id=approval["approved_by"]),
+            {
+                "agents.plans.approve",
+                "agents.plans.review",
+                OPERATIONS.get(plan["operation"], (None, "library.repair.run"))[1],
+            },
+            session=current,
+        )
     valid = current.execute(
         text("SELECT :expiry > NOW()"), {"expiry": approval["expires_at"]}
     ).scalar_one()
@@ -379,8 +419,14 @@ def decide_plan(
             session=current,
         )
         plan = _get(current, plan_id, lock=True)
-        # decide_plan is only reached from the Admin approve/reject HTTP routes
-        # (crate.api.agent_plans), so its returned document carries plan identity.
+        if decision == "approved":
+            from crate.operator_provenance import validate
+
+            validate(
+                plan["principal_id"],
+                _reviewed_provenance(plan),
+            )
+        # Cookie and verified native-human callers receive the complete review identity.
         document = _document(plan, identity=True)
         if decision == "approved" and document.get("executable") is False:
             raise DiagnosticError(
@@ -404,6 +450,15 @@ def decide_plan(
             or policy["policy_revision"] != policy_revision
             or plan["policy_revision"] != policy_revision
             or not plan["approval_required"]
+            or plan["approval_required"]
+            != bool(policy["require_approval"] or plan.get("mandatory_approval", False))
+            or (
+                plan.get("document") is not None
+                and _hash(
+                    {"document": plan["document"], "execution": plan["execution_data"]}
+                )
+                != plan["version"]
+            )
             or document["content_hash"] != content_hash
             or plan["version"] != plan_version
             or _hash(plan["authorization_context"]) != authorization_context_hash
@@ -462,8 +517,8 @@ def decide_plan(
         current.execute(
             text("""
             INSERT INTO agent_plan_approvals (plan_id, principal_id, plan_version, content_hash,
-                authorization_context, policy_revision, decision, approved_by, expires_at)
-            VALUES (:id, :principal, :version, :hash, CAST(:context AS jsonb), :policy, :decision, :user, :expiry)
+                authorization_context, policy_revision, decision, approved_by, expires_at, telegram_binding_id)
+            VALUES (:id, :principal, :version, :hash, CAST(:context AS jsonb), :policy, :decision, :user, :expiry, :binding)
         """),
             {
                 "id": plan["id"],
@@ -475,6 +530,9 @@ def decide_plan(
                 "decision": decision,
                 "user": actor["id"],
                 "expiry": plan["expires_at"],
+                "binding": actor["telegram_binding_id"]
+                if isinstance(actor, TelegramHuman)
+                else None,
             },
         )
         state = "authorized" if decision == "approved" else "rejected"
@@ -509,8 +567,8 @@ def decide_plan(
 __all__ = [
     "count_pending_plans",
     "decide_plan",
-    "get_plan",
     "get_owned_plan",
+    "get_plan",
     "list_plans",
     "reserve_plan_approval",
     "validate_plan_authorization",

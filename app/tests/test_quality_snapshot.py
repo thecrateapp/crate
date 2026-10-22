@@ -209,6 +209,9 @@ def quality_worker(monkeypatch):
     monkeypatch.setattr(worker, "quality_report", scanner)
     monkeypatch.setattr(worker, "audio_extensions", lambda: {".flac", ".mp3"})
     monkeypatch.setattr(worker, "is_cancelled", lambda task_id: False)
+    # This unit fixture has no durable task; integration authority is covered by
+    # test_operator_effect_authority with real admitted jobs.
+    monkeypatch.setattr(worker, "with_task_authority", lambda task_id, effect: effect())
     return begin, complete, scanner
 
 

@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "purpose": "Isolated retrieval acceptance; real-model conversational acceptance remains a final rollout check.",
+  "cases": [
+    {
+      "id": "crates-permissions",
+      "question_es": "¿Quién puede editar una Crate privada y qué ocurre al desactivar colaboración?",
+      "source_path": "docs/technical/08-frontends-admin-and-listen.md",
+      "search_queries": [
+        "is_collaborative=true"
+      ],
+      "required_evidence": [
+        "collaboration",
+        "private",
+        "410"
+      ],
+      "unavailability_expectation_es": "Sin evidencia actual de acceso o miembros no se afirma que este usuario pueda editar.",
+      "required_limit_evidence": [
+        "Without current task/cache/access evidence"
+      ]
+    },
+    {
+      "id": "crates-share",
+      "question_es": "¿Un enlace público deja escuchar o descargar sin iniciar sesión?",
+      "source_path": "docs/technical/08-frontends-admin-and-listen.md",
+      "search_queries": [
+        "anonymous playback"
+      ],
+      "required_evidence": [
+        "short code",
+        "authentication",
+        "current Crate access"
+      ],
+      "unavailability_expectation_es": "La visibilidad actual y la vigencia del enlace requieren evidencia de la instancia.",
+      "required_limit_evidence": [
+        "does not grant anonymous playback"
+      ]
+    },
+    {
+      "id": "crates-download",
+      "question_es": "¿Una descarga pending ya tiene ZIP y cómo recupera Listen los fallos de SSE?",
+      "source_path": "docs/technical/08-frontends-admin-and-listen.md",
+      "search_queries": [
+        "crate_download"
+      ],
+      "required_evidence": [
+        "HTTP 202",
+        "deduplicated",
+        "deadline does not cancel"
+      ],
+      "unavailability_expectation_es": "Sin tarea y caché actuales no se asegura que el archivo esté listo.",
+      "required_limit_evidence": [
+        "Without current task/cache/access evidence"
+      ]
+    },
+    {
+      "id": "shows-structured",
+      "question_es": "¿Puede MCP extraer un cartel e importar una gira completa sin revisar cada fecha?",
+      "source_path": "docs/technical/11-crate-mcp.md",
+      "search_queries": [
+        "Exact structured show review"
+      ],
+      "required_evidence": [
+        "1–50",
+        "executable=false",
+        "projection=pending"
+      ],
+      "unavailability_expectation_es": "Sin evidencia de publicación no se da la gira por importada; el piloto no obtiene autoridad de escritura.",
+      "required_limit_evidence": [
+        "Current instance show/job state requires authorized MCP evidence"
+      ]
+    },
+    {
+      "id": "shows-approval",
+      "question_es": "¿Vale una aprobación anterior si ha cambiado el plan de conciertos?",
+      "source_path": "docs/technical/11-crate-mcp.md",
+      "search_queries": [
+        "authorization context"
+      ],
+      "required_evidence": [
+        "policy revision and expiry",
+        "fresh preview",
+        "same key/payload"
+      ],
+      "unavailability_expectation_es": "Se requiere plan/versión y autorización vigentes; una descripción documental no los acredita.",
+      "required_limit_evidence": [
+        "report it unavailable"
+      ]
+    },
+    {
+      "id": "stats-cold",
+      "question_es": "¿Por qué mis estadísticas dan cero y pending? ¿Recalculo al pedirlas?",
+      "source_path": "docs/technical/02-backend-api-and-data.md",
+      "search_queries": [
+        "snapshot.pending=true"
+      ],
+      "required_evidence": [
+        "300 seconds",
+        "86,400",
+        "zeroes are not evidence",
+        "deduplicated refresh"
+      ],
+      "unavailability_expectation_es": "Los ceros del placeholder no prueban ausencia de escuchas; falta la proyección actual.",
+      "required_limit_evidence": [
+        "zeroes are not evidence"
+      ]
+    },
+    {
+      "id": "stats-projector",
+      "question_es": "¿Un 200 del readplane demuestra que el projector está al día?",
+      "source_path": "docs/technical/02-backend-api-and-data.md",
+      "search_queries": [
+        "snapshot fallback"
+      ],
+      "required_evidence": [
+        "FastAPI fallback",
+        "acknowledges only events",
+        "not a pure operational observation"
+      ],
+      "unavailability_expectation_es": "Se necesitan antigüedad de snapshot, lag y outbox actuales; no invocar el GET que encola trabajo como observación pura.",
+      "required_limit_evidence": [
+        "source code alone cannot prove"
+      ]
+    },
+    {
+      "id": "workers-deferral",
+      "question_es": "¿Está atascada una tarea pending con carga alta y qué cola la consume?",
+      "source_path": "docs/technical/03-worker-tasks-and-background-services.md",
+      "search_queries": [
+        "Deferral, cancellation"
+      ],
+      "required_evidence": [
+        "crate-fast-worker",
+        "same task",
+        "policy revision/hash"
+      ],
+      "unavailability_expectation_es": "Sin heartbeat, cola y motivo actuales no se concluye bloqueo ni salud por contenedor en ejecución.",
+      "required_limit_evidence": [
+        "A running container alone does not prove"
+      ]
+    },
+    {
+      "id": "workers-cancel",
+      "question_es": "¿Puedo decir que una tarea está parada al solicitar cancelación?",
+      "source_path": "docs/technical/03-worker-tasks-and-background-services.md",
+      "search_queries": [
+        "cancellation_acknowledged_at"
+      ],
+      "required_evidence": [
+        "cancellation_requested_at",
+        "completing",
+        "wait for active descendants"
+      ],
+      "unavailability_expectation_es": "Sin acuse del worker no se afirma parada; los efectos parciales no son rollback.",
+      "required_limit_evidence": [
+        "not be described as an acknowledged stop"
+      ]
+    },
+    {
+      "id": "workers-replay",
+      "question_es": "¿Puedo reintentar con otra clave si se perdió la respuesta de una operación?",
+      "source_path": "docs/technical/03-worker-tasks-and-background-services.md",
+      "search_queries": [
+        "idempotency key"
+      ],
+      "required_evidence": [
+        "same payload",
+        "provenance-linked retry",
+        "reconcile"
+      ],
+      "unavailability_expectation_es": "Si el efecto es incierto se inspecciona resultado durable antes de admitir otra operación.",
+      "required_limit_evidence": [
+        "reconcile"
+      ]
+    },
+    {
+      "id": "smart-mix-unavailable",
+      "question_es": "¿Tiene Hermes cobertura dedicada de Smart Mix y sabe que terminó el backfill?",
+      "source_path": "docs/technical/smart-mix-operations.md",
+      "search_queries": [
+        "Hermes"
+      ],
+      "required_evidence": [
+        "get_smart_mix_status",
+        "50 UUIDs exactos",
+        "enqueue"
+      ],
+      "unavailability_expectation_es": "El candidato MCP 1.2 expone cobertura/campaña almacenadas con timestamps y versiones; no acredita probes funcionales del host en vivo ni aceptación física por plataforma, y enqueue no demuestra finalización.",
+      "required_limit_evidence": [
+        "No expone probes funcionales del host en vivo",
+        "aceptación física por plataforma"
+      ]
+    }
+  ]
+}

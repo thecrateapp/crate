@@ -204,9 +204,9 @@ def test_sync_verifies_track_uid_and_rolls_back_an_unexpected_identity(
     before = read_sync_state(album["entity_uid"])
     real_upsert = agent_sync.upsert_track
 
-    def substitute_identity(data, *, session, strict_identity):
-        real_upsert(data, session=session, strict_identity=strict_identity)
-        session.execute(
+    def substitute_identity(data, **kwargs):
+        real_upsert(data, **kwargs)
+        kwargs["session"].execute(
             text(
                 "UPDATE library_tracks SET entity_uid=CAST(:uid AS uuid) WHERE id=:id"
             ),

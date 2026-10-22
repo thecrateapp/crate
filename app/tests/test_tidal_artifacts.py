@@ -376,7 +376,12 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
     download_calls: list[str] = []
 
     def _fake_download(
-        _url: str, quality: str = "max", task_id: str = "", progress_callback=None
+        _url: str,
+        quality: str = "max",
+        task_id: str = "",
+        progress_callback=None,
+        checkpoint=None,
+        processing_id=None,
     ):
         download_calls.append(quality)
         path = (

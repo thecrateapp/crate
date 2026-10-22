@@ -374,6 +374,65 @@ class TestShowsUpcomingQueries:
         assert counts["lastfm_count"] == 1
 
 
+class TestShowVenueLocationQueries:
+    def test_existing_venue_location_matches_city_and_prefers_manual_provenance(
+        self, pg_db
+    ):
+        from sqlalchemy import text
+
+        from crate.db.queries.shows_location_queries import (
+            get_show_venue_location_candidates,
+        )
+        from crate.db.tx import transaction_scope
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO shows (
+                        artist_name, date, venue, address_line1, city, region,
+                        country, country_code, latitude, longitude, source,
+                        field_provenance, created_at, updated_at
+                    ) VALUES (
+                        'Other Band', CURRENT_DATE + 10, 'Sala Nazca',
+                        'Calle de Orense 24', 'Madrid', 'Madrid', 'Spain', 'ES',
+                        40.421, -3.701, 'ticketmaster',
+                        '{
+                            "address_line1": {
+                                "provider": "manual", "actor": "user:1"
+                            }
+                        }'::jsonb,
+                        NOW(), NOW()
+                    ), (
+                        'Another Band', CURRENT_DATE + 20, 'Nazca',
+                        'Provider Street 5', 'Madrid', 'Madrid', 'Spain', 'ES',
+                        40.422, -3.702, 'ticketmaster', '{}'::jsonb, NOW(), NOW()
+                    ), (
+                        'Different City Band', CURRENT_DATE + 30, 'Sala Nazca',
+                        'Barcelona Street 1', 'Barcelona', 'Catalonia', 'Spain', 'ES',
+                        41.4, 2.1, 'manual', '{}'::jsonb, NOW(), NOW()
+                    )
+                    """
+                )
+            )
+
+        matches = get_show_venue_location_candidates(
+            "Sala Nazca", "Madrid", country_code="ES", region="Madrid"
+        )
+
+        assert len(matches) == 2
+        assert matches[0]["address_line1"] == "Calle de Orense 24"
+        assert matches[0]["manually_verified"] is True
+        assert matches[1]["address_line1"] == "Provider Street 5"
+
+        assert (
+            get_show_venue_location_candidates(
+                "Sala Nazca", "Barcelona", country_code="ES", region="Madrid"
+            )
+            == []
+        )
+
+
 class TestShowsUserQueries:
     def test_get_attending_show_ids_empty(self, pg_db):
         from crate.db.queries.shows_user_queries import get_attending_show_ids

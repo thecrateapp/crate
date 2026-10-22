@@ -141,6 +141,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
     "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
     "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "agent_tidal_download": TaskPoolConfig("default", 0, 14400, 0),
     "agent_control": TaskPoolConfig("fast", 0, 60, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
     "prepare_library_repairs": TaskPoolConfig("maintenance", 0, 1800, 0),
@@ -337,7 +338,12 @@ def _release_db_heavy_lock(task_id: str):
 # workers via a Redis-based counting semaphore.
 
 DOWNLOAD_TASK_TYPES = frozenset(
-    {"tidal_download", "soulseek_download", "bandcamp_import_purchase"}
+    {
+        "tidal_download",
+        "agent_tidal_download",
+        "soulseek_download",
+        "bandcamp_import_purchase",
+    }
 )
 
 
@@ -515,14 +521,17 @@ def _try_acquire_download_slot(redis_client, task_id: str) -> bool:
 
 
 def _acquire_download_slot(
-    task_id: str, timeout: int = DOWNLOAD_SLOT_TIMEOUT_SECONDS
+    task_id: str,
+    timeout: int = DOWNLOAD_SLOT_TIMEOUT_SECONDS,
+    *,
+    fail_closed: bool = False,
 ) -> bool:
     try:
         from crate.db.cache_runtime import get_redis
 
         r = get_redis()
         if not r:
-            return True
+            return not fail_closed
         deadline = time.time() + timeout
         while time.time() < deadline:
             if _try_acquire_download_slot(r, task_id):
@@ -530,8 +539,8 @@ def _acquire_download_slot(
             time.sleep(10)
         return False
     except Exception:
-        log.warning("Failed to acquire download slot, proceeding", exc_info=True)
-        return True
+        log.warning("Failed to acquire download slot", exc_info=True)
+        return not fail_closed
 
 
 def _release_download_slot(task_id: str):
@@ -564,8 +573,8 @@ def _execute_task(task_type: str, task_id: str):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
-    from crate.db.repositories.tasks import fail_or_retry_task, start_task, update_task
     from crate.db.repositories.task_control import acknowledge_cancellation
+    from crate.db.repositories.tasks import fail_or_retry_task, start_task, update_task
     from crate.resource_governor import record_decision, should_defer_task
     from crate.worker import TASK_HANDLERS, _is_cancelled
 
@@ -583,7 +592,13 @@ def _execute_task(task_type: str, task_id: str):
         update_task(task_id, status="failed", error=f"Unknown task type: {task_type}")
         return
 
-    resource_decision = should_defer_task(task_type, task.get("params", {}))
+    resource_decision = should_defer_task(
+        "agent_maintenance"
+        if task_type in {"soulseek_download", "agent_tidal_download"}
+        and task.get("params", {}).get("agent_command")
+        else task_type,
+        task.get("params", {}),
+    )
     if not resource_decision.allowed:
         record_decision(resource_decision, task_type=task_type, source="task_start")
         log.info(
@@ -654,7 +669,11 @@ def _execute_task(task_type: str, task_id: str):
 
     # Download concurrency limiter
     if is_download:
-        if not _acquire_download_slot(task_id):
+        if not (
+            _acquire_download_slot(task_id, fail_closed=True)
+            if task.get("params", {}).get("agent_command")
+            else _acquire_download_slot(task_id)
+        ):
             log.info(
                 "Task %s (%s) waiting for download slot, re-enqueueing in 30s",
                 task_id,
@@ -736,7 +755,15 @@ def _execute_task(task_type: str, task_id: str):
             except DiagnosticError as error:
                 from crate.db.repositories.agent_requests import fail_job
 
-                result = fail_job(task_id, error.code, str(error))
+                if (task.get("params") or {}).get("agent_command"):
+                    result = fail_job(task_id, error.code, str(error))
+                else:
+                    result = {
+                        "status": "failed",
+                        "error": str(error),
+                        "error_code": error.code,
+                        "verification": {"status": "not_required"},
+                    }
                 authority_failed = True
         if not authority_failed:
             config = load_config()

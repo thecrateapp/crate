@@ -23,6 +23,7 @@ from crate.show_ocr import (
 )
 
 EXTRACTOR_VERSION = "shows-extraction-v2"
+MAX_VENUE_LOOKUPS_PER_EXTRACTION = 5
 
 
 class ExtractedShows(BaseModel):
@@ -264,6 +265,97 @@ def _parse_sources(sources):
     return draft
 
 
+def _enrich_missing_venue_locations(draft: dict, *, cancelled=lambda: False) -> None:
+    """Best-effort venue lookup for candidates without a street address."""
+    from crate.geolocation import geocode_venue
+
+    attempted: dict[tuple[str, str, str, str], dict | None] = {}
+    successful = False
+    successful_sources: set[str] = set()
+    skipped_for_limit = False
+    warnings = draft.setdefault("warnings", [])
+
+    for candidate in draft.get("candidates", []):
+        if cancelled():
+            raise ValueError("CANCELLED")
+        if (candidate.get("address_line1") or "").strip():
+            continue
+
+        venue = (candidate.get("venue") or "").strip()
+        city = (candidate.get("city") or "").strip()
+        if not venue or not city:
+            continue
+
+        key = (
+            venue.casefold(),
+            city.casefold(),
+            (candidate.get("region") or "").strip().casefold(),
+            (candidate.get("country_code") or candidate.get("country") or "")
+            .strip()
+            .casefold(),
+        )
+        if key not in attempted:
+            if len(attempted) >= MAX_VENUE_LOOKUPS_PER_EXTRACTION:
+                skipped_for_limit = True
+                continue
+            attempted[key] = geocode_venue(
+                venue,
+                city,
+                region=candidate.get("region"),
+                country=candidate.get("country"),
+                country_code=candidate.get("country_code"),
+            )
+
+        location = attempted[key]
+        if not location:
+            warning = (
+                f"No se encontró una coincidencia fiable para {venue}, {city}; "
+                "revisa la dirección manualmente."
+            )
+            if warning not in warnings:
+                warnings.append(warning)
+            continue
+
+        if not location.get("address_line1"):
+            warning = (
+                f"Se encontraron coordenadas para {venue}, {city}, pero no una calle; "
+                "completa la dirección manualmente."
+            )
+            if warning not in warnings:
+                warnings.append(warning)
+
+        for field in ("address_line1", "postal_code", "country", "country_code"):
+            if not candidate.get(field) and location.get(field):
+                candidate[field] = location[field]
+        if candidate.get("latitude") is None and candidate.get("longitude") is None:
+            candidate["latitude"] = location.get("latitude")
+            candidate["longitude"] = location.get("longitude")
+        elif candidate.get("latitude") is None and location.get("latitude") is not None:
+            candidate["latitude"] = location["latitude"]
+        elif (
+            candidate.get("longitude") is None and location.get("longitude") is not None
+        ):
+            candidate["longitude"] = location["longitude"]
+        successful = True
+        successful_sources.add(location.get("source", "openstreetmap"))
+
+    if successful and "crate_shows" in successful_sources:
+        warnings.append(
+            "La ubicación se ha reutilizado de otro show existente en Crate; "
+            "verifica la dirección y el pin antes de guardar."
+        )
+    if successful and "openstreetmap" in successful_sources:
+        warnings.append(
+            "Las ubicaciones sugeridas proceden de OpenStreetMap "
+            "(© OpenStreetMap contributors); verifica la dirección y el pin antes de guardar."
+        )
+    if skipped_for_limit:
+        warnings.append(
+            f"La búsqueda de salas se limitó a {MAX_VENUE_LOOKUPS_PER_EXTRACTION} "
+            "recintos por cartel; completa manualmente las ubicaciones restantes."
+        )
+
+
 def extract_show_candidates(
     source: dict,
     images: list[dict],
@@ -436,6 +528,7 @@ def extract_show_candidates(
         draft["coverage"] = "incomplete"
     if cancelled():
         raise ValueError("CANCELLED")
+    _enrich_missing_venue_locations(draft, cancelled=cancelled)
     return draft
 
 

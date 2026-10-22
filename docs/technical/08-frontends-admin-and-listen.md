@@ -5,8 +5,22 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 97
-verified: 2026-09-06
-sources: [app/ui, app/listen, app/shared/ui, app/shared/web]
+verified: 2026-10-21
+sources:
+  - app/ui
+  - app/listen
+  - app/shared/ui
+  - app/shared/web
+  - app/crate/api/smart_mix_admin.py
+  - app/crate/api/crates.py
+  - app/crate/api/share.py
+  - app/crate/db/queries/crates.py
+  - app/crate/worker_handlers/crate_download.py
+  - app/crate/download_cache.py
+  - app/listen/src/lib/collaboration-access.ts
+  - app/tests/test_crates_api.py
+  - app/tests/test_crate_downloads.py
+  - app/listen/src/components/crates/crate-download.test.ts
 ---
 
 # Frontend Architecture: Admin and Listen
@@ -241,3 +255,71 @@ invalidation feed for catalog-like scopes (`home`, `library`, `upcoming`,
 when those events arrive. This is important for Bandcamp imports and uploads:
 the user expects sections such as Just Landed to update after the worker commits
 new library content.
+
+## Smart Mix surfaces
+
+Smart Mix section verified against source on 2026-10-21.
+
+Admin's Analysis page embeds `SmartMixCoverage`, exposing coverage by version/quality,
+paginated profile and processing states, activity and campaign controls. It uses the Admin
+Smart Mix API; viewing its status can enqueue coverage refresh. This surface is distinct
+from the read-only MCP authority granted to Hermes.
+
+Listen discovers server capabilities and applies user preferences. In the current engine
+adapter, server transition planning and native continuation are selected for
+`android-native`. Sharing TypeScript with web/desktop/iOS does not establish equivalent
+native execution. See [Smart Mix operation](smart-mix-operations.md) for the consumer matrix,
+flag dependencies and outstanding platform/physical acceptance gates.
+
+
+## Listen Crates: permissions, sharing and downloads
+
+Verified against implementation and tests on 2026-10-21. A Crate is an album collection,
+not a track playlist. Its ordered album identities come from the global catalog; playback
+resolves currently available tracks, while offline transfer and ZIP download select local
+tracks. Neither operation acquires missing remote music.
+
+`app/crate/db/queries/crates.py` computes `access` as `owner`, `collaborator`, `public` or
+`none`. Collaboration requires both membership and `is_collaborative=true`; disabling it
+removes collaborator access to private Crates until enabled again. Owners edit content,
+change visibility/collaboration, manage members and delete the Crate. Collaborators edit
+content and can leave; public viewers cannot edit. Private or inaccessible details return
+404. Listen derives controls from access through `app/listen/src/lib/collaboration-access.ts`;
+the server rechecks authority, so a hidden button is not the permission boundary.
+
+Owners add collaborators by user ID or username. The create/list/accept invitation-link
+routes return 410; old invite tables do not mean invitation links are supported. Public
+Crates can be followed by signed-in users (owners cannot follow themselves), and accessible
+Crates can be copied into an independent private Crate. Owned/shared and followed lists
+have separate endpoints under `/api/me/crates` and `/api/me/crates/followed`.
+
+Public details are readable anonymously at `/api/crates/{ref}`, without member data.
+The reference can be a UUID, eight-character short code or `{slug}-{short_code}`. Renaming
+changes the slug while the code still resolves; `/share/crate/{ref}` redirects legacy
+references to the canonical public reference. The share landing page and scoped artwork
+are public only while the Crate is public. Sharing does not grant anonymous playback or
+ZIP access: those endpoints require authentication and current Crate access.
+
+`POST /api/crates/{id}/download` returns `ready` with an artifact URL on a cache hit,
+or HTTP 202 `pending` with a deduplicated `crate_download` task. No local tracks yields
+404; disabled download cache or inability to queue yields 503. The worker builds a ZIP
+under the download cache with a cache-key lock, capacity/free-space checks and temporary
+file cleanup. Keys include the Crate ID/name and ordered local track IDs, paths, artist/album, size and
+`updated_at` values; publication uses the worker's current source selection. A prepared artifact GET validates
+current access, cache-key shape, expiry and the artifact's `crate_id` before serving it.
+A URL is not a permanent grant and a pending task is not a ready download.
+
+Listen follows task SSE progress/completion and falls back to bounded task polling when
+SSE is unavailable or closed. Failed/cancelled tasks and the client deadline produce a
+failure state; the client deadline does not cancel the server task. Offline device storage
+is a separate flow, not proof that a ZIP exists. Hermes' read-only pilot cannot start a
+download or change visibility. Without current task/cache/access evidence it must describe
+these contracts and report the live state as unavailable.
+
+Source and regression map: `app/crate/api/crates.py`, `app/crate/api/share.py`,
+`app/crate/db/queries/crates.py`, `app/crate/worker_handlers/crate_download.py`,
+`app/crate/download_cache.py` and `app/listen/src/components/crates/crate-download.ts`.
+`app/tests/test_crates_api.py` covers anonymous/public/private detail, short-code redirects,
+owner/collaborator control and disabled invites. `app/tests/test_crate_downloads.py` covers
+deduplication, cache reuse, access/expiry, archive limits and disk pressure;
+`app/listen/src/components/crates/crate-download.test.ts` covers the client task lifecycle.

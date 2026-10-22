@@ -35,6 +35,7 @@ ALLOWED_GRANTS = (
             "editorial.write",
             "editorial.publish",
             "curation.shows.read",
+            "library.acquisition.search",
         }
     )
 )
@@ -55,6 +56,7 @@ SCOPE_CAPABILITIES = {
     "editorial.write": "curation.playlists.write",
     "editorial.publish": "curation.playlists.write",
     "curation.shows.read": "library.view",
+    "library.acquisition.search": "library.import.manage",
 }
 SCOPE_CAPABILITIES.update(
     {grant: capability for grant, capability in OPERATIONS.values()}

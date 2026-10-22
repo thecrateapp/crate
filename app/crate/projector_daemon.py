@@ -49,7 +49,7 @@ def run_projector_loop(
         try:
             from crate.domain_event_relay import relay_domain_events
 
-            relay_domain_events(limit=batch_limit)
+            relay_result = relay_domain_events(limit=batch_limit)
             now = time.monotonic()
             if (
                 last_outbox_cleanup is None
@@ -62,6 +62,10 @@ def run_projector_loop(
                 if cleaned:
                     log.info("Pruned %d delivered domain outbox event(s)", cleaned)
             result = process_domain_events(limit=batch_limit)
+            if not relay_result.get("failed") and not result.get("failed"):
+                from crate.role_readiness import progress
+
+                progress("projector")
             if result.get("processed"):
                 log.info(
                     "Processed %d domain events (ops=%d, home=%d)",
