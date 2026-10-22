@@ -4204,11 +4204,7 @@
             "type": "integer"
           },
           "provider": {
-            "enum": [
-              "soulseek",
-              "tidal",
-              "bandcamp"
-            ],
+            "const": "soulseek",
             "title": "Provider",
             "type": "string"
           },
@@ -4227,7 +4223,7 @@
         "title": "AcquisitionSearch",
         "type": "object"
       },
-      "input_schema_sha256": "02417daa699f96815cb247e57e42a81d3bfc62f476a0b28beff0e2b71df3be46",
+      "input_schema_sha256": "9cd9c65e183994694798cc2902caf51ea1fde4cb73ac760b2af1cfa8d51a8fd8",
       "name": "search_acquisition",
       "read_only": false
     },
