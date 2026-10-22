@@ -223,6 +223,18 @@ The acquisition worker does more than download bytes. It also:
 
 Crate also treats external event data as part of enrichment/discovery.
 
+During user-triggered flyer extraction, the worker also tries to resolve a venue when it has a
+venue name and city but no street address. It first searches saved Crate shows for the same venue
+and city, preferring manually supplied location fields and rejecting known country or region
+conflicts. If there is no local match, it checks the venue/city cache, which keeps successful
+results for one year and misses for seven days. It then queries Nominatim, with at most five
+distinct venues per draft. Nominatim requests are serialized through Redis and spaced by 1.1
+seconds; only an exact normalized venue-name match in the requested city is accepted. Matches fill
+missing address and coordinates in the private draft for review; they do not publish a show. The
+warning identifies Crate-sourced suggestions and attributes Nominatim results to OpenStreetMap.
+This is a small, user-triggered lookup flow, not scheduled or bulk geocoding; follow the
+[Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/).
+
 Key integrations:
 
 - Ticketmaster

@@ -216,6 +216,136 @@ def test_combined_model_sources_use_server_manifest_instead_of_first_source(
     assert draft["coverage"] == "incomplete"
 
 
+def test_model_extraction_enriches_missing_venue_address_and_coordinates(monkeypatch):
+    calls = _configured_model(
+        monkeypatch,
+        "text_llm",
+        [
+            {
+                "item_id": "first",
+                "date": "2027-03-04",
+                "venue": "Sala Nazca",
+                "city": "Madrid",
+                "evidence": "4 MAR · Sala Nazca · Madrid",
+            },
+            {
+                "item_id": "second",
+                "date": "2027-03-05",
+                "venue": "Sala Norte",
+                "city": "Madrid",
+                "address_line1": "Calle Mayor 10",
+                "evidence": "5 MAR · Sala Norte · Madrid",
+            },
+        ],
+    )
+    lookups = []
+    monkeypatch.setattr(
+        "crate.geolocation.geocode_venue",
+        lambda venue, city, **kwargs: (
+            lookups.append((venue, city))
+            or {
+                "address_line1": "Calle de Orense 24",
+                "postal_code": "28020",
+                "country": "España",
+                "country_code": "ES",
+                "latitude": 40.421,
+                "longitude": -3.701,
+            }
+        ),
+    )
+
+    draft = extract.extract_show_candidates(
+        {"mode": "text_llm", "raw_text": "4 MAR · Sala Nazca · Madrid"}, []
+    )
+
+    assert len(calls) == 1
+    assert lookups == [("Sala Nazca", "Madrid")]
+    assert draft["candidates"][0]["address_line1"] == "Calle de Orense 24"
+    assert draft["candidates"][0]["postal_code"] == "28020"
+    assert draft["candidates"][0]["latitude"] == 40.421
+    assert draft["candidates"][0]["longitude"] == -3.701
+    assert draft["candidates"][1]["address_line1"] == "Calle Mayor 10"
+    assert "OpenStreetMap" in draft["warnings"][-1]
+
+
+def test_venue_enrichment_caps_distinct_lookups_and_reuses_duplicate_venue(
+    monkeypatch,
+):
+    from crate.show_extraction import _enrich_missing_venue_locations
+
+    calls = []
+    monkeypatch.setattr(
+        "crate.geolocation.geocode_venue",
+        lambda venue, city, **kwargs: calls.append((venue, city)) or None,
+    )
+    draft = {
+        "candidates": [
+            {"venue": f"Venue {index}", "city": "Madrid"} for index in range(5)
+        ]
+        + [
+            {"venue": "Venue 0", "city": "Madrid"},
+            {"venue": "Venue 5", "city": "Madrid"},
+        ],
+        "warnings": [],
+    }
+
+    _enrich_missing_venue_locations(draft)
+
+    assert calls == [(f"Venue {index}", "Madrid") for index in range(5)]
+    assert any("limitó a 5" in warning for warning in draft["warnings"])
+
+
+def test_venue_enrichment_warns_when_lookup_has_coordinates_but_no_street(
+    monkeypatch,
+):
+    from crate.show_extraction import _enrich_missing_venue_locations
+
+    monkeypatch.setattr(
+        "crate.geolocation.geocode_venue",
+        lambda *args, **kwargs: {
+            "address_line1": None,
+            "latitude": 40.421,
+            "longitude": -3.701,
+        },
+    )
+    draft = {
+        "candidates": [{"venue": "Sala Nazca", "city": "Madrid"}],
+        "warnings": [],
+    }
+
+    _enrich_missing_venue_locations(draft)
+
+    assert draft["candidates"][0]["latitude"] == 40.421
+    assert draft["candidates"][0]["longitude"] == -3.701
+    assert any("pero no una calle" in warning for warning in draft["warnings"])
+
+
+def test_venue_enrichment_attributes_existing_crate_location_without_osm_warning(
+    monkeypatch,
+):
+    from crate.show_extraction import _enrich_missing_venue_locations
+
+    monkeypatch.setattr(
+        "crate.geolocation.geocode_venue",
+        lambda *args, **kwargs: {
+            "address_line1": "Calle de Orense 24",
+            "latitude": 40.421,
+            "longitude": -3.701,
+            "source": "crate_shows",
+        },
+    )
+    draft = {
+        "candidates": [{"venue": "Sala Nazca", "city": "Madrid"}],
+        "warnings": [],
+    }
+
+    _enrich_missing_venue_locations(draft)
+
+    assert draft["candidates"][0]["address_line1"] == "Calle de Orense 24"
+    assert any("show existente en Crate" in warning for warning in draft["warnings"])
+    assert all("OpenStreetMap" not in warning for warning in draft["warnings"])
+
+
 def test_ocr_sources_share_text_and_candidate_budgets(monkeypatch):
     images = _ocr_sources(
         monkeypatch,

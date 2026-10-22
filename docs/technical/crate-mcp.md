@@ -1686,6 +1686,16 @@ is selected. «Start over» discards the draft and its source, after a confirmat
 hold anything; shows already saved stay in Crate. Excluded dates remain pending. Changing any
 selected content invalidates the preview.
 
+After extraction, a candidate with a venue and city but no street address gets a best-effort
+venue lookup. It first reuses a matching location from another saved Crate show in that city,
+preferring fields whose provenance is manual or MCP; then it checks the long-lived venue cache;
+only then does it query Nominatim. Venue and city must match, with country/region used to reject
+known conflicts. The worker fills only missing address, postal/country and coordinate fields; it
+never asks the model to invent coordinates. A lookup failure leaves the candidate editable and
+adds a review warning. The draft is still private and exact human review is required before a show
+is saved. Suggestions reused from Crate are identified as such; Nominatim suggestions carry
+OpenStreetMap attribution.
+
 Merging duplicate saved shows is a separate «Merge duplicates» action on Upcoming: from the
 toolbar with typed show IDs, or from a show's detail, which loads that show and the other upcoming
 shows with the same artist and date. Every merge still needs its review and approval. A plan that
