@@ -53,7 +53,9 @@ An SDK upgrade requires regenerated distribution and protocol/OAuth acceptance.
 
 `tools/list` shows registered tools visible to current grants and the action flag, rather than
 promising execution readiness. The operation catalog distinguishes `enabled`, `denied`,
-`disabled` and `unavailable`. Actions cannot be enabled there without fresh persisted worker
+`disabled` and `unavailable`. Each operation exposes only its readiness `status` and `missing`
+reasons; shared readiness details are returned once as `data.worker_readiness` to keep the catalog
+within the bounded response size. Actions cannot be enabled there without fresh persisted worker
 evidence and worker handler registrations. This is not a live probe: exact authority, targets,
 approval, provider/filesystem dependencies and runtime admission are rechecked in the worker.
 Discovery can be followed by a target-specific conflict.

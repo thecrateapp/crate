@@ -125,8 +125,10 @@ def test_actual_publication_rechecks_inside_copy_and_never_replays(
 
     world = acquisition_operator
     transfer, result = _execute(world, world["human"], _preview(world)["plan"])
-    assert result["verification"]["status"] == "passed"
-    plan = _publication(world, transfer["job_id"])["plan"]
+    assert result["verification"]["status"] == "passed", result
+    publication_result = _publication(world, transfer["job_id"])
+    assert "plan" in publication_result, publication_result
+    plan = publication_result["plan"]
     job = admit(world, plan)
     original = publication.os.fsync
 
@@ -395,7 +397,9 @@ def test_native_acquisition_cancel_reaches_real_running_effect(
     plan = _preview(world)["plan"]
     if publish:
         transfer, result = _execute(world, world["human"], plan)
-        plan = _publication(world, transfer["job_id"])["plan"]
+        publication_result = _publication(world, transfer["job_id"])
+        assert "plan" in publication_result, publication_result
+        plan = publication_result["plan"]
     job = admit(world, plan)
     entered, release = Event(), Event()
     real_fsync = publication.os.fsync
@@ -592,7 +596,9 @@ def test_acquisition_inserted_generations_retain_publication_authority(
 
     world = acquisition_operator
     transfer, _ = _execute(world, world["human"], _preview(world)["plan"])
-    plan = _publication(world, transfer["job_id"])["plan"]
+    publication_result = _publication(world, transfer["job_id"])
+    assert "plan" in publication_result, publication_result
+    plan = publication_result["plan"]
     parent = admit(world, plan, native=True)
     result = run(world, parent)
     assert result["execution"]["status"] == "completed", result

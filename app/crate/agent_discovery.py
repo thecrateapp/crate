@@ -210,6 +210,11 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
         and any(_allowed(principal, name) for name in ACTION_CATALOG)
         else None
     )
+    operation_readiness = (
+        {"status": readiness["status"], "missing": readiness["missing"]}
+        if readiness is not None
+        else None
+    )
     for name, (model, grant, _) in (CATALOG | ACTION_CATALOG).items():
         action = name in ACTION_CATALOG
         limits = {
@@ -245,7 +250,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
                 "status": status,
                 "contract_version": CONTRACT_VERSION,
                 "input_schema_sha256": schema_fingerprint(model),
-                "readiness": readiness
+                "readiness": operation_readiness
                 if action and allowed and actions_enabled()
                 else {
                     "status": status,
@@ -363,6 +368,7 @@ def get_operation_catalog(principal: AgentPrincipal) -> dict:
             "contract": contract_metadata(),
             "operations": operations,
             "checks": checks,
+            "worker_readiness": readiness,
             "metadata_presets": presets,
         },
         "interpretation": "Only enabled operations and supported checks can execute through MCP. Catalog discovery grants no permissions; each call rechecks current authority. Conditional repair variants can still require manual intervention. Every complete plan must fit both its target and byte budgets.",

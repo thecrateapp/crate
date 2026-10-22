@@ -486,9 +486,14 @@ def test_new_action_discovery_and_catalog_describe_actual_grants_and_flags(
         async with app.router.lifespan_context(app), _client(app, token) as session:
             client = session[0]
             listed = {tool.name: tool for tool in (await client.list_tools()).tools}
-            catalog = (
-                await client.call_tool("get_operation_catalog", {})
-            ).structured_content["data"]
+            catalog_result = await client.call_tool("get_operation_catalog", {})
+            assert not catalog_result.is_error, catalog_result.structured_content
+            catalog = catalog_result.structured_content["data"]
+            if enabled == "true":
+                assert (
+                    "target_preconditions"
+                    in catalog["worker_readiness"]["checked_in_worker"]
+                )
             entries = {entry["name"]: entry for entry in catalog["operations"]}
             names = {case[0] for case in PREPARE_CASES} | {
                 case[0] for case in APPLY_CASES

@@ -116,10 +116,14 @@ def test_catalog_versions_schemas_and_explains_missing_worker(monkeypatch):
     catalog = get_operation_catalog(principal)["data"]
     assert catalog["contract"]["version"] == "1.2.0"
     assert catalog["contract"]["protocol_versions"]
+    assert "target_preconditions" in catalog["worker_readiness"]["checked_in_worker"]
     operations = {row["name"]: row for row in catalog["operations"]}
     health = operations["run_health_check"]
     assert health["status"] == "unavailable"
-    assert health["readiness"]["missing"] == ["fresh_worker_evidence"]
+    assert health["readiness"] == {
+        "status": "unavailable",
+        "missing": ["fresh_worker_evidence"],
+    }
     assert len(health["input_schema_sha256"]) == 64
     assert health["contract_version"] == "1.2.0"
     assert operations["get_instance_status"]["status"] == "denied"
@@ -132,14 +136,13 @@ def test_catalog_fresh_evidence_still_requires_exact_preview(monkeypatch):
         lambda: {"data": {"worker": {"availability": "available"}}},
     )
     principal = AgentPrincipal("a", "c", "Agent", frozenset({"library.health.run"}))
+    catalog = get_operation_catalog(principal)["data"]
     health = next(
-        row
-        for row in get_operation_catalog(principal)["data"]["operations"]
-        if row["name"] == "run_health_check"
+        row for row in catalog["operations"] if row["name"] == "run_health_check"
     )
     assert health["status"] == "enabled"
-    assert health["readiness"]["status"] == "evidence_available"
-    assert "target_preconditions" in health["readiness"]["checked_in_worker"]
+    assert health["readiness"] == {"status": "evidence_available", "missing": []}
+    assert "target_preconditions" in catalog["worker_readiness"]["checked_in_worker"]
 
 
 def test_catalog_does_not_enable_actions_without_registered_worker_handlers(
