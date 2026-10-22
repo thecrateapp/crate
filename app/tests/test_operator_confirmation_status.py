@@ -325,7 +325,7 @@ def test_status_exhaustion_and_receipt_expiry_never_infer_live_coverage(
     monkeypatch.setattr(store, "datetime", SimpleNamespace(now=lambda _: later))
     expired = store.get_confirmation_status(principal, cid)
     assert expired["monitoring"]["state"] == "unavailable"
-    assert expired["monitoring"]["reason"] == "Enrollment receipt expired"
+    assert expired["monitoring"]["reason"] == "Enrollment receipt expired or invalid"
     assert (
         scalar(
             "SELECT result->'monitoring'->>'state' FROM agent_telegram_confirmations"
