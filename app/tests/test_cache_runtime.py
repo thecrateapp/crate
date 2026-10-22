@@ -92,6 +92,52 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     assert cache_store.get_cache("key", max_age_seconds=10) is None
 
 
+def test_get_caches_reads_many_values_in_one_redis_pipeline(monkeypatch):
+    import uuid
+
+    from crate.db import cache_runtime, cache_store
+
+    keys = [f"setlist:{uuid.uuid4().hex}" for _ in range(2)]
+    values = {f"cache:{key}": json.dumps({"key": key}) for key in keys}
+
+    class ReadPipeline:
+        def __init__(self):
+            self.commands: list[tuple[str, str]] = []
+
+        def get(self, key):
+            self.commands.append(("get", key))
+            return self
+
+        def pttl(self, key):
+            self.commands.append(("pttl", key))
+            return self
+
+        def execute(self):
+            return [
+                values.get(key) if command == "get" else 60_000
+                for command, key in self.commands
+            ]
+
+    class ReadRedis:
+        def __init__(self):
+            self.pipeline_calls = 0
+
+        def pipeline(self, transaction=False):
+            assert transaction is False
+            self.pipeline_calls += 1
+            return ReadPipeline()
+
+    redis = ReadRedis()
+    cache_runtime._mem_cache.clear()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    assert cache_store.get_caches(keys) == {
+        key: {"key": key} for key in keys
+    }
+    assert redis.pipeline_calls == 1
+
+
 class _FakeRedisPipeline:
     def __init__(self, redis: "_FakeRedis") -> None:
         self.redis = redis

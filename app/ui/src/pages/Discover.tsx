@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSurface,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { Button } from "@crate/ui/shadcn/button";
@@ -109,7 +111,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
       : undefined;
 
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+    <OpsSurface className="p-4">
       <div className="flex items-start gap-3">
         <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/8 bg-white/[0.04]">
           <img
@@ -155,10 +157,13 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
           </div>
 
           <div className="space-y-1">
-            <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
+            <div
+              data-admin-ux="discovery-coverage-progress"
+              className="h-px overflow-hidden rounded-full bg-white/[0.06]"
+            >
               <div
                 className={cn(
-                  "h-full rounded-sm transition-[width,background-color]",
+                  "h-full rounded-full transition-[width,background-color]",
                   completionTone(artist.pct),
                 )}
                 style={{ width: `${Math.min(artist.pct, 100)}%` }}
@@ -205,7 +210,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
           Acquire missing
         </Button>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -294,6 +299,60 @@ function PopularityRow({
   );
 }
 
+function DiscoveryFeedNotice({
+  label,
+  loading,
+  error,
+  hasData,
+  onRetry,
+}: {
+  label: string;
+  loading: boolean;
+  error: string | null;
+  hasData: boolean;
+  onRetry: () => void;
+}) {
+  if (error) {
+    return (
+      <OpsRefreshNotice
+        message={
+          hasData
+            ? `${label} could not refresh. Showing the last available data.`
+            : `${label} could not be loaded. Other discovery data remains available.`
+        }
+        onRetry={onRetry}
+        className="mb-4"
+      />
+    );
+  }
+
+  if (loading && !hasData) {
+    return (
+      <div
+        role="status"
+        aria-label={`Loading ${label.toLowerCase()}`}
+        aria-busy="true"
+        className="mb-4 flex min-h-11 items-center gap-3 rounded-md border border-border-quiet bg-panel-surface px-4 py-3 text-sm text-text-muted"
+      >
+        <Loader2
+          aria-hidden="true"
+          className="h-4 w-4 animate-spin text-primary"
+        />
+        Loading {label.toLowerCase()}…
+      </div>
+    );
+  }
+
+  return null;
+}
+
+type DiscoveryFeed = {
+  loading: boolean;
+  error: string | null;
+  hasData: boolean;
+  retry: () => void;
+};
+
 interface DiscoverViewProps {
   navigate: (to: string) => void;
   search: string;
@@ -315,6 +374,11 @@ interface DiscoverViewProps {
   genreOpportunities: InsightsData["top_genres"];
   trendingArtists: InsightsData["popularity"];
   momentumAlbums: InsightsData["top_albums"];
+  feeds: {
+    completeness: DiscoveryFeed;
+    releases: DiscoveryFeed;
+    insights: DiscoveryFeed;
+  };
 }
 
 function DiscoverView({
@@ -333,6 +397,7 @@ function DiscoverView({
   genreOpportunities,
   trendingArtists,
   momentumAlbums,
+  feeds,
 }: DiscoverViewProps) {
   return (
     <div className="space-y-6">
@@ -399,39 +464,87 @@ function DiscoverView({
           </PageHeaderActions>
         }
       >
-        <InfoBadge active>
-          {summary.opportunityArtists} acquisition targets
+        <InfoBadge
+          active={feeds.completeness.hasData && summary.opportunityArtists > 0}
+        >
+          {feeds.completeness.hasData
+            ? `${summary.opportunityArtists} acquisition targets`
+            : "Catalogue gaps unavailable"}
         </InfoBadge>
-        <InfoBadge>{summary.detectedReleases} detected releases</InfoBadge>
-        <InfoBadge>{summary.incompleteArtists} incomplete artists</InfoBadge>
-        <InfoBadge>{trendingArtists.length} momentum signals</InfoBadge>
+        <InfoBadge>
+          {feeds.releases.hasData
+            ? `${summary.detectedReleases} detected releases`
+            : "Release radar unavailable"}
+        </InfoBadge>
+        <InfoBadge>
+          {feeds.completeness.hasData
+            ? `${summary.incompleteArtists} incomplete artists`
+            : "Catalogue coverage unavailable"}
+        </InfoBadge>
+        <InfoBadge>
+          {feeds.insights.hasData
+            ? `${trendingArtists.length + momentumAlbums.length} momentum signals`
+            : "Momentum data unavailable"}
+        </InfoBadge>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
           label="Acquisition targets"
-          value={summary.opportunityArtists.toLocaleString()}
-          caption="Artists with missing catalogue worth filling"
+          value={
+            feeds.completeness.hasData
+              ? summary.opportunityArtists.toLocaleString()
+              : "—"
+          }
+          caption={
+            feeds.completeness.hasData
+              ? "Artists with missing catalogue worth filling"
+              : "Catalogue gaps are not available"
+          }
           tone={summary.opportunityArtists > 0 ? "primary" : "default"}
         />
         <OpsStatTile
           label="Detected releases"
-          value={summary.detectedReleases.toLocaleString()}
-          caption="Albums already found by the radar"
+          value={
+            feeds.releases.hasData
+              ? summary.detectedReleases.toLocaleString()
+              : "—"
+          }
+          caption={
+            feeds.releases.hasData
+              ? "Albums already found by the radar"
+              : "Release radar data is not available"
+          }
           tone={summary.detectedReleases > 0 ? "success" : "default"}
         />
         <OpsStatTile
           label="Incomplete artists"
-          value={summary.incompleteArtists.toLocaleString()}
-          caption={`${summary.totalArtists.toLocaleString()} artists scanned for catalogue gaps`}
+          value={
+            feeds.completeness.hasData
+              ? summary.incompleteArtists.toLocaleString()
+              : "—"
+          }
+          caption={
+            feeds.completeness.hasData
+              ? `${summary.totalArtists.toLocaleString()} artists scanned for catalogue gaps`
+              : "Catalogue coverage is not available"
+          }
           tone={summary.incompleteArtists > 0 ? "warning" : "default"}
         />
         <OpsStatTile
           label="Trend signals"
-          value={(
-            trendingArtists.length + momentumAlbums.length
-          ).toLocaleString()}
-          caption="Popularity and momentum slices from the library orbit"
+          value={
+            feeds.insights.hasData
+              ? (
+                  trendingArtists.length + momentumAlbums.length
+                ).toLocaleString()
+              : "—"
+          }
+          caption={
+            feeds.insights.hasData
+              ? "Popularity and momentum slices from the library orbit"
+              : "Popularity signals are not available"
+          }
         />
       </div>
 
@@ -465,22 +578,30 @@ function DiscoverView({
         title="Acquisition opportunities"
         description="Artists with enough listener weight and enough missing catalogue to justify a download or curation pass."
       >
+        <DiscoveryFeedNotice
+          label="Catalogue gaps"
+          loading={feeds.completeness.loading}
+          error={feeds.completeness.error}
+          hasData={feeds.completeness.hasData}
+          onRetry={feeds.completeness.retry}
+        />
         {opportunityArtists.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {opportunityArtists.slice(0, 8).map((artist) => (
               <OpportunityCard key={artist.artist} artist={artist} />
             ))}
           </div>
-        ) : (
+        ) : feeds.completeness.hasData ||
+          (!feeds.completeness.loading && !feeds.completeness.error) ? (
           <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
             No acquisition opportunities match the current filter.
           </div>
-        )}
+        ) : null}
       </OpsPanel>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <OpsPanel
-          title="Release radar"
+          title="Release Radar"
           description="Freshly detected albums from your orbit that may deserve immediate acquisition."
           action={
             <Button
@@ -489,27 +610,42 @@ function DiscoverView({
               className="min-h-11 gap-2"
               onClick={() => navigate("/new-releases")}
             >
-              Open full radar
+              Open Release Radar
             </Button>
           }
         >
+          <DiscoveryFeedNotice
+            label="Release Radar"
+            loading={feeds.releases.loading}
+            error={feeds.releases.error}
+            hasData={feeds.releases.hasData}
+            onRetry={feeds.releases.retry}
+          />
           {detectedReleases.length > 0 ? (
             <div className="space-y-2">
               {detectedReleases.slice(0, 8).map((release) => (
                 <ReleaseRadarRow key={release.id} release={release} />
               ))}
             </div>
-          ) : (
+          ) : feeds.releases.hasData ||
+            (!feeds.releases.loading && !feeds.releases.error) ? (
             <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
               No detected releases available right now.
             </div>
-          )}
+          ) : null}
         </OpsPanel>
 
         <OpsPanel
           title="Genres to expand"
           description="Top genres in your library, useful for spotting where a discovery sweep would most naturally fit."
         >
+          <DiscoveryFeedNotice
+            label="Momentum signals"
+            loading={feeds.insights.loading}
+            error={feeds.insights.error}
+            hasData={feeds.insights.hasData}
+            onRetry={feeds.insights.retry}
+          />
           {genreOpportunities.length > 0 ? (
             <div className="space-y-2">
               {genreOpportunities.map((genre) => (
@@ -521,11 +657,12 @@ function DiscoverView({
                 />
               ))}
             </div>
-          ) : (
+          ) : feeds.insights.hasData ||
+            (!feeds.insights.loading && !feeds.insights.error) ? (
             <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
               Genre expansion data is not available yet.
             </div>
-          )}
+          ) : null}
         </OpsPanel>
       </div>
 
@@ -549,11 +686,12 @@ function DiscoverView({
                 />
               ))}
             </div>
-          ) : (
+          ) : feeds.insights.hasData ||
+            (!feeds.insights.loading && !feeds.insights.error) ? (
             <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
               No momentum data available yet.
             </div>
-          )}
+          ) : null}
         </OpsPanel>
 
         <OpsPanel
@@ -575,11 +713,12 @@ function DiscoverView({
                 />
               ))}
             </div>
-          ) : (
+          ) : feeds.insights.hasData ||
+            (!feeds.insights.loading && !feeds.insights.error) ? (
             <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
               No album momentum data available yet.
             </div>
-          )}
+          ) : null}
         </OpsPanel>
       </div>
     </div>
@@ -796,6 +935,26 @@ export function Discover() {
       genreOpportunities={genreOpportunities}
       trendingArtists={trendingArtists}
       momentumAlbums={momentumAlbums}
+      feeds={{
+        completeness: {
+          loading: completenessLoading,
+          error: completenessError,
+          hasData: completeness !== null,
+          retry: refetchCompleteness,
+        },
+        releases: {
+          loading: releasesLoading,
+          error: releasesError,
+          hasData: releaseData !== null,
+          retry: refetchReleases,
+        },
+        insights: {
+          loading: insightsLoading,
+          error: insightsError,
+          hasData: insights !== null,
+          retry: refetchInsights,
+        },
+      }}
     />
   );
 }

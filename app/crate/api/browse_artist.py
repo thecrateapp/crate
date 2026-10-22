@@ -59,6 +59,7 @@ from crate.api.schemas.browse import (
     ArtistPageResponse,
     ArtistSetlistPlayableResponse,
     CachedShowsResponse,
+    ProbableSetlistCoverageResponse,
     ShowsListResponse,
     UpcomingResponse,
     ArtistShowsResponse,
@@ -1849,33 +1850,127 @@ def api_artists_with_shows(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="List cached upcoming shows",
 )
-def api_cached_shows(request: Request, limit: int = Query(50)):
+def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
     _require_auth(request)
 
     shows = db_get_shows(limit=limit)
-    artist_names = [
-        artist_name
-        for show in shows
-        for artist_name in ([show.get("artist_name")] + list(show.get("lineup") or []))
-        if artist_name
-    ]
+    artist_names = _billed_show_artist_names(shows)
     genre_map = get_all_artist_genre_map(artist_names, limit=3)
 
     refs_by_name = _lookup_artist_refs(artist_names)
+    from crate import setlistfm
+
+    setlist_health = setlistfm.get_probable_setlist_health(artist_names)
     events = []
     for show in shows:
-        artist_ref = refs_by_name.get((show.get("artist_name") or "").lower())
+        artist_name = str(show.get("artist_name") or "")
+        artist_ref = refs_by_name.get(artist_name.lower())
+        lineup_artists = _show_lineup_artists(show, refs_by_name)
+        if artist_name and not any(
+            str(artist.get("name") or "").strip().casefold()
+            == artist_name.strip().casefold()
+            for artist in lineup_artists
+        ):
+            primary = {"name": artist_name}
+            if artist_ref:
+                primary.update(
+                    {"id": artist_ref.get("id"), "slug": artist_ref.get("slug")}
+                )
+            lineup_artists.insert(0, primary)
+        for artist in lineup_artists:
+            health = setlist_health.get(
+                " ".join(str(artist.get("name") or "").split()).casefold(),
+                {"status": "missing", "song_count": 0},
+            )
+            artist.update(
+                {
+                    "probable_setlist_status": health["status"],
+                    "probable_setlist_generated_at": health.get("generated_at"),
+                    "probable_setlist_song_count": health.get("song_count", 0),
+                    "probable_setlist_source_show_count": health.get(
+                        "source_show_count"
+                    ),
+                    "probable_setlist_mode": health.get("mode"),
+                    "probable_setlist_tour_name": health.get("tour_name"),
+                }
+            )
+        health = setlist_health.get(
+            " ".join(artist_name.split()).casefold(),
+            {"status": "missing", "song_count": 0},
+        )
         events.append(
             {
                 **show,
                 "artist_id": artist_ref.get("id") if artist_ref else None,
                 "artist_slug": artist_ref.get("slug") if artist_ref else None,
-                "lineup_artists": _show_lineup_artists(show, refs_by_name),
-                "artist_genres": genre_map.get(show["artist_name"], [])[:3],
+                "lineup_artists": lineup_artists,
+                "artist_genres": genre_map.get(artist_name, [])[:3],
                 "artist_listeners": 0,
+                "probable_setlist_status": health["status"],
+                "probable_setlist_generated_at": health.get("generated_at"),
+                "probable_setlist_song_count": health.get("song_count", 0),
+                "probable_setlist_source_show_count": health.get(
+                    "source_show_count"
+                ),
+                "probable_setlist_mode": health.get("mode"),
+                "probable_setlist_tour_name": health.get("tour_name"),
             }
         )
-    return {"events": events}
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "unknown": 0}
+    for health in setlist_health.values():
+        status = health.get("status")
+        if status in counts:
+            counts[status] += 1
+    return {
+        "events": events,
+        "setlist_coverage": {
+            "artist_count": len(artist_names),
+            **counts,
+        },
+    }
+
+
+@router.post(
+    "/api/shows/probable-setlists/refresh",
+    response_model=ProbableSetlistCoverageResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Queue refreshes for missing or outdated show setlists",
+)
+def api_refresh_show_probable_setlists(request: Request):
+    require_permission(request, "library.metadata.write")
+    shows = db_get_shows(limit=5000)
+    artist_names = _billed_show_artist_names(shows)
+    from crate import setlistfm
+
+    health = setlistfm.get_probable_setlist_health(artist_names)
+    refresh_names = [
+        name
+        for name in artist_names
+        if health.get(name.casefold(), {}).get("status") != "fresh"
+    ]
+    task_ids = setlistfm.queue_probable_setlist_refreshes(
+        refresh_names, force=True
+    )
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "unknown": 0}
+    for status in health.values():
+        if status.get("status") in counts:
+            counts[status["status"]] += 1
+    return {
+        "artist_count": len(artist_names),
+        **counts,
+        "queued": len(task_ids),
+    }
+
+
+def _billed_show_artist_names(shows: list[dict[str, Any]]) -> list[str]:
+    """Return each credited artist once, matching the setlist cache key rules."""
+    unique: dict[str, str] = {}
+    for show in shows:
+        for raw_name in [show.get("artist_name"), *(show.get("lineup") or [])]:
+            name = " ".join(str(raw_name or "").split())
+            if name:
+                unique.setdefault(name.casefold(), name)
+    return list(unique.values())
 
 
 @router.get(

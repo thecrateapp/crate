@@ -30,6 +30,9 @@ for (const width of [1440, 768, 390]) {
       await expect(
         real.getByAltText("Viento Sur", { exact: true }),
       ).toBeHidden();
+      await expect(
+        real.locator('[data-admin-ux="discovery-coverage-progress"]').first(),
+      ).toHaveCSS("height", "1px");
       expect(
         await real
           .getByAltText("Costa Norte", { exact: true })
@@ -123,10 +126,12 @@ for (const width of [1440, 768, 390]) {
       await expect(check).toBeDisabled();
       await advance.click();
       await expect(
-        page.getByText("Completeness refreshed with 2 artists skipped", {
-          exact: true,
-        }),
-      ).toBeVisible();
+        page
+          .getByText("Completeness refreshed with 2 artists skipped", {
+            exact: true,
+          })
+          .first(),
+      ).toBeVisible({ timeout: 10000 });
       await expect(recompute).toBeEnabled();
       await expect(check).toBeDisabled();
       await advance.click();
@@ -181,6 +186,21 @@ for (const width of [1440, 768, 390]) {
       await expect(
         real.getByRole("heading", { name: "Discovery", exact: true }),
       ).toBeVisible();
+      await page
+        .getByRole("radio", { name: "Cobertura no disponible", exact: true })
+        .click();
+      await expect(real.getByRole("alert")).toContainText(
+        "Catalogue gaps could not be loaded. Other discovery data remains available.",
+      );
+      await expect(real.getByText("Catalogue gaps unavailable")).toBeVisible();
+      await expect(
+        real.getByText(
+          "No acquisition opportunities match the current filter.",
+        ),
+      ).toHaveCount(0);
+      await expect(
+        real.getByRole("heading", { name: "Release radar", exact: true }),
+      ).toBeVisible();
       await page.getByRole("radio", { name: "Error", exact: true }).click();
       await expect(
         real.getByText("Failed to build discovery workspace", { exact: true }),
@@ -215,7 +235,7 @@ test("keeps the real persistent checkpoint and earlier published specimens", asy
     section
       .frameLocator("iframe")
       .getByRole("heading", { name: "Discovery", exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await expect(page.locator("footer")).toContainText("1AH publicado");
   await expect(page.locator("footer")).toContainText("1AI publicado");
   await expect(

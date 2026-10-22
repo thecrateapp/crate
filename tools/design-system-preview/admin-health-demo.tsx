@@ -73,6 +73,7 @@ function Demo() {
                 { value: "limited", label: "Lista limitada" },
                 { value: "mixed", label: "Severidades mixtas" },
                 { value: "partial", label: "Sin catálogo" },
+                { value: "refresh-error", label: "Error al actualizar" },
                 { value: "offline", label: "Sin servicio" },
               ]}
             />

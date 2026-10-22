@@ -1,6 +1,15 @@
-import { EventDate } from "@/components/ui/EventDate";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { UpcomingEventRow } from "@crate/ui/domain/shows/UpcomingEventRow";
+import { UpcomingDateStamp } from "@crate/ui/domain/shows/UpcomingDateStamp";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import {
+  CRATE_ICON_SIZE,
+  Disc3,
+  Download as DownloadIcon,
+} from "@crate/ui/icons";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -20,14 +29,15 @@ import { toast } from "sonner";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsSurface,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { Button } from "@crate/ui/shadcn/button";
+import { ListPagination } from "@/components/admin/ListPagination";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { api, apiSseUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -49,7 +59,8 @@ interface Release {
   year: string;
   release_date: string | null;
   release_type: string | null;
-  tracks: number;
+  tracks: number | null;
+  available_tracks?: number | null;
   quality: string;
   status: string;
   detected_at: string;
@@ -63,12 +74,9 @@ interface NewReleasesSurface {
 const EMPTY_RELEASES: Release[] = [];
 
 type ViewMode = "timeline" | "grid";
-type StatusFilter =
-  | "all"
-  | "detected"
-  | "downloading"
-  | "downloaded"
-  | "upcoming";
+type StatusFilter = "all" | "detected" | "downloading" | "downloaded";
+type DateFilter = "" | "upcoming" | "released" | "unknown";
+const RELEASES_PAGE_SIZE = 20;
 
 function releaseArtistHref(release: Release) {
   if (release.artist_id == null) return undefined;
@@ -89,22 +97,129 @@ function releaseAlbumHref(release: Release) {
   });
 }
 
-function releaseDateValue(release: Release) {
-  return release.release_date || release.detected_at?.slice(0, 10) || "";
-}
-
 function isUpcomingRelease(release: Release) {
   const date = release.release_date;
   if (!date) return false;
   return date >= new Date().toISOString().slice(0, 10);
 }
 
+function compareRadarDates(left: Release, right: Release) {
+  const bucket = (release: Release) =>
+    !release.release_date ? 2 : isUpcomingRelease(release) ? 0 : 1;
+  const leftBucket = bucket(left);
+  const rightBucket = bucket(right);
+  if (leftBucket !== rightBucket) return leftBucket - rightBucket;
+  if (leftBucket === 0)
+    return (left.release_date || "").localeCompare(right.release_date || "");
+  if (leftBucket === 1)
+    return (right.release_date || "").localeCompare(left.release_date || "");
+  return (right.detected_at || "").localeCompare(left.detected_at || "");
+}
+
 function ReleaseDateBadge({ release }: { release: Release }) {
+  if (release.release_date) {
+    const value = new Date(`${release.release_date}T12:00:00`);
+    const valid =
+      !Number.isNaN(value.getTime()) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(release.release_date) &&
+      value.getFullYear() === Number(release.release_date.slice(0, 4)) &&
+      value.getMonth() + 1 === Number(release.release_date.slice(5, 7)) &&
+      value.getDate() === Number(release.release_date.slice(8, 10));
+    if (valid)
+      return <UpcomingDateStamp date={release.release_date} locale="en-US" />;
+    return (
+      <span
+        data-slot="upcoming-date-invalid"
+        aria-label="Unknown release date"
+        title={release.release_date}
+        className="w-14 shrink-0 truncate px-1 text-center font-mono text-label text-text-secondary"
+      >
+        {release.release_date}
+      </span>
+    );
+  }
   return (
-    <EventDate
-      date={releaseDateValue(release)}
-      labelPrefix={release.release_date ? undefined : "Detected"}
-    />
+    <div
+      data-slot="upcoming-date-unknown"
+      className="flex w-14 shrink-0 flex-col items-center justify-center gap-1 px-2"
+      aria-label="Release date unknown"
+    >
+      <MonoLabel as="span">TBA</MonoLabel>
+      <span className="font-display text-2xl font-bold leading-none tracking-display text-text-primary tabular-nums">
+        —
+      </span>
+      <MonoLabel as="span">DATE</MonoLabel>
+    </div>
+  );
+}
+
+function releaseTimingLabel(release: Release) {
+  if (!release.release_date) return "Date unconfirmed";
+  if (!isUpcomingRelease(release)) return "Released";
+  const days = Math.ceil(
+    (new Date(`${release.release_date}T00:00:00`).getTime() - Date.now()) /
+      86_400_000,
+  );
+  return days <= 0 ? "Release day" : `${days} days to go`;
+}
+
+function ReleaseRowActions({
+  release,
+  onDownload,
+  onDismiss,
+}: {
+  release: Release;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
+}) {
+  const downloading = release.status === "downloading";
+  const downloaded = release.status === "downloaded";
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {downloaded ? (
+        <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+          Downloaded
+        </InfoBadge>
+      ) : null}
+      {downloading ? (
+        <InfoBadge active>
+          <Loader2
+            aria-hidden="true"
+            data-admin-ux="releases-download-loading"
+            size={12}
+            className="animate-spin"
+          />
+          Downloading
+        </InfoBadge>
+      ) : null}
+      {!downloaded && !downloading ? (
+        <ActionGroup label={`Actions for ${release.album_title}`}>
+          {release.tidal_url && onDownload ? (
+            <ActionButton
+              label="Download"
+              onClick={() => onDownload(release.id)}
+            >
+              <DownloadIcon
+                size={CRATE_ICON_SIZE.md}
+                data-admin-ux="releases-timeline-download"
+              />
+            </ActionButton>
+          ) : null}
+          {onDismiss ? (
+            <ActionButton
+              label="Dismiss release"
+              onClick={() => onDismiss(release.id)}
+            >
+              <X
+                size={CRATE_ICON_SIZE.md}
+                aria-hidden="true"
+                data-admin-ux="releases-timeline-dismiss"
+              />
+            </ActionButton>
+          ) : null}
+        </ActionGroup>
+      ) : null}
+    </div>
   );
 }
 
@@ -119,72 +234,25 @@ function ReleaseMeta({ release }: { release: Release }) {
           {release.quality}
         </InfoBadge>
       ) : null}
-      {release.year ? <InfoBadge>{release.year}</InfoBadge> : null}
-      {release.tracks > 0 ? (
+      {!release.release_date && release.year ? (
+        <InfoBadge>{release.year}</InfoBadge>
+      ) : null}
+      {release.tracks != null && release.tracks > 0 ? (
         <InfoBadge>{release.tracks} tracks</InfoBadge>
       ) : null}
+      {release.available_tracks != null ? (
+        <InfoBadge
+          tone={
+            release.tracks != null && release.available_tracks >= release.tracks
+              ? "success"
+              : "accent"
+          }
+          title="Tracks already available in this library"
+        >
+          {release.available_tracks} / {release.tracks ?? "?"} in library
+        </InfoBadge>
+      ) : null}
       <InfoBadge>{timeAgo(release.detected_at)}</InfoBadge>
-    </div>
-  );
-}
-
-function ReleaseActions({
-  release,
-  onDownload,
-  onDismiss,
-}: {
-  release: Release;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
-}) {
-  if (release.status === "downloaded") {
-    return (
-      <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-        Downloaded
-      </InfoBadge>
-    );
-  }
-  if (release.status === "downloading") {
-    return (
-      <InfoBadge active>
-        <Loader2
-          aria-hidden="true"
-          data-admin-ux="releases-download-loading"
-          size={12}
-          className="animate-spin"
-        />
-        Downloading
-      </InfoBadge>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {release.tidal_url && onDownload ? (
-        <Button
-          size="sm"
-          className="min-h-11 gap-2"
-          onClick={() => onDownload(release.id)}
-        >
-          Download
-        </Button>
-      ) : null}
-      {onDismiss ? (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onDismiss(release.id)}
-          title="Dismiss release"
-          aria-label="Dismiss release"
-          className="h-11 min-h-11 w-11 min-w-11 md:min-h-11 md:min-w-11"
-        >
-          <X
-            size={15}
-            aria-hidden="true"
-            data-admin-ux="releases-timeline-dismiss"
-          />
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -198,69 +266,69 @@ function ReleaseTimelineRow({
   onDownload?: (id: number) => void;
   onDismiss?: (id: number) => void;
 }) {
-  const artistHref = releaseArtistHref(release);
   const albumHref = releaseAlbumHref(release);
+  const availability =
+    release.available_tracks != null
+      ? `${release.available_tracks} / ${release.tracks ?? "?"} in library`
+      : null;
 
   return (
-    <div className="group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors hover:border-white/14  xl:flex-row xl:items-center">
-      <div className="flex items-center gap-4 xl:w-[320px] xl:flex-shrink-0">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-white/8 bg-white/[0.03]">
-          <ReleaseDateBadge release={release} />
-        </div>
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-white/8 bg-white/[0.04]">
-          {release.cover_url ? (
-            <img
-              src={release.cover_url}
-              alt=""
-              className="h-full w-full object-cover"
+    <article
+      data-slot="release-radar-row"
+      aria-label={`${release.album_title} by ${release.artist_name}`}
+      className="item-action-target overflow-hidden rounded-panel border border-border-quiet bg-surface-object transition-colors hover:border-border-interactive"
+    >
+      <UpcomingEventRow
+        artwork={
+          <MediaCover
+            src={release.cover_url}
+            alt=""
+            fallbackIcon={Disc3}
+            iconSize={CRATE_ICON_SIZE.xl}
+            className="size-[88px] shrink-0 rounded-none"
+          />
+        }
+        href={albumHref}
+        openLabel={albumHref ? release.album_title : undefined}
+        details={
+          <>
+            <span className="block truncate text-caption font-semibold text-text-primary">
+              {release.album_title}
+            </span>
+            <MonoLabel
+              as="span"
+              className="mt-1 block truncate"
+              meta={[
+                release.artist_name,
+                release.release_type,
+                release.quality,
+                release.tracks != null ? `${release.tracks} tracks` : null,
+              ]}
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center"></div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          {albumHref ? (
-            <Link
-              to={albumHref}
-              className="block truncate text-base font-semibold tracking-tight text-white transition-colors hover:text-primary"
-            >
-              {release.album_title}
-            </Link>
-          ) : (
-            <div className="truncate text-base font-semibold tracking-tight text-white">
-              {release.album_title}
-            </div>
-          )}
-          {artistHref ? (
-            <Link
-              to={artistHref}
-              className="text-sm text-white/45 transition-colors hover:text-white/80"
-            >
-              {release.artist_name}
-            </Link>
-          ) : (
-            <div className="text-sm text-white/45">{release.artist_name}</div>
-          )}
-        </div>
-      </div>
-
-      <div className="min-w-0 flex-1 space-y-2">
-        <ReleaseMeta release={release} />
-        <div className="text-sm text-white/35">
-          {isUpcomingRelease(release)
-            ? "Upcoming release on the radar"
-            : "Detected by the release monitor and ready for acquisition triage"}
-        </div>
-      </div>
-
-      <div className="flex items-center xl:justify-end">
-        <ReleaseActions
-          release={release}
-          onDownload={onDownload}
-          onDismiss={onDismiss}
-        />
-      </div>
-    </div>
+            <MonoLabel
+              as="span"
+              className="mt-1 block truncate"
+              accent={releaseTimingLabel(release)}
+              meta={[release.status, availability]}
+              title={
+                release.detected_at
+                  ? `Detected ${timeAgo(release.detected_at)}`
+                  : undefined
+              }
+            />
+          </>
+        }
+        date={<ReleaseDateBadge release={release} />}
+        actionsClassName="px-1.5"
+        actions={
+          <ReleaseRowActions
+            release={release}
+            onDownload={onDownload}
+            onDismiss={onDismiss}
+          />
+        }
+      />
+    </article>
   );
 }
 
@@ -277,8 +345,12 @@ function ReleaseGridCard({
   const artistHref = releaseArtistHref(release);
 
   return (
-    <div className="group overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="relative aspect-square bg-white/[0.04]">
+    <OpsSurface
+      as="article"
+      aria-label={`${release.album_title} by ${release.artist_name}`}
+      className="group overflow-hidden p-0"
+    >
+      <div className="relative aspect-square bg-surface-canvas">
         {release.cover_url ? (
           <img
             src={release.cover_url}
@@ -309,24 +381,24 @@ function ReleaseGridCard({
           {albumHref ? (
             <Link
               to={albumHref}
-              className="block truncate text-sm font-semibold text-white transition-colors hover:text-primary"
+              className="block truncate text-sm font-semibold text-text-primary transition-colors hover:text-accent-action-hi"
             >
               {release.album_title}
             </Link>
           ) : (
-            <div className="truncate text-sm font-semibold text-white">
+            <div className="truncate text-sm font-semibold text-text-primary">
               {release.album_title}
             </div>
           )}
           {artistHref ? (
             <Link
               to={artistHref}
-              className="block truncate text-xs text-white/45 transition-colors hover:text-white/80"
+              className="block truncate text-xs text-text-muted transition-colors hover:text-accent-action-hi"
             >
               {release.artist_name}
             </Link>
           ) : (
-            <div className="truncate text-xs text-white/45">
+            <div className="truncate text-xs text-text-muted">
               {release.artist_name}
             </div>
           )}
@@ -362,7 +434,7 @@ function ReleaseGridCard({
           ) : null}
         </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -374,12 +446,14 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-4 py-16 text-center">
-      <div className="text-lg font-semibold text-white/80">{title}</div>
-      <div className="mx-auto mt-2 max-w-xl text-sm text-white/40">
+    <OpsSurface role="status" className="px-4 py-16 text-center">
+      <h3 className="font-display text-lg font-semibold text-text-primary">
+        {title}
+      </h3>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
         {description}
-      </div>
-    </div>
+      </p>
+    </OpsSurface>
   );
 }
 
@@ -402,8 +476,10 @@ export function NewReleases() {
   const [checking, setChecking] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("detected");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("");
   const [typeFilter, setTypeFilter] = useState("");
   const [view, setView] = useState<ViewMode>("timeline");
+  const [page, setPage] = useState(1);
   const releases =
     liveSurface?.releases ?? releaseSurface?.releases ?? EMPTY_RELEASES;
 
@@ -447,8 +523,14 @@ export function NewReleases() {
           return false;
         if (statusFilter === "downloaded" && release.status !== "downloaded")
           return false;
-        if (statusFilter === "upcoming" && !isUpcomingRelease(release))
+        if (dateFilter === "upcoming" && !isUpcomingRelease(release))
           return false;
+        if (
+          dateFilter === "released" &&
+          (!release.release_date || isUpcomingRelease(release))
+        )
+          return false;
+        if (dateFilter === "unknown" && release.release_date) return false;
         if (typeFilter && (release.release_type || "unknown") !== typeFilter)
           return false;
         if (!normalized) return true;
@@ -458,8 +540,17 @@ export function NewReleases() {
           .toLowerCase()
           .includes(normalized);
       })
-      .sort((a, b) => releaseDateValue(b).localeCompare(releaseDateValue(a)));
-  }, [releases, search, statusFilter, typeFilter]);
+      .sort(compareRadarDates);
+  }, [releases, search, statusFilter, dateFilter, typeFilter]);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filtered.length / RELEASES_PAGE_SIZE),
+  );
+  const currentPage = Math.min(page, pageCount);
+  const visibleReleases = filtered.slice(
+    (currentPage - 1) * RELEASES_PAGE_SIZE,
+    currentPage * RELEASES_PAGE_SIZE,
+  );
 
   const stats = useMemo(() => {
     const detected = releases.filter(
@@ -536,8 +627,8 @@ export function NewReleases() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        title="New Releases"
-        description="Release radar for library artists, with quick triage for what should land next in Crate."
+        title="Release Radar"
+        description="See what is coming, what has already landed, and how much of each album is in the library."
         compactActions
         actions={
           <PageHeaderActions>
@@ -594,13 +685,7 @@ export function NewReleases() {
             </>
           </PageHeaderActions>
         }
-      >
-        <InfoBadge active>{releases.length} total</InfoBadge>
-        <InfoBadge>{stats.detected} need action</InfoBadge>
-        <InfoBadge>{stats.downloading} downloading</InfoBadge>
-        <InfoBadge>{stats.downloaded} in library</InfoBadge>
-        <InfoBadge>{stats.upcoming} upcoming</InfoBadge>
-      </OpsPageHero>
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
@@ -647,7 +732,10 @@ export function NewReleases() {
               <Input
                 id="releases-search"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
                 placeholder="Search artist or album..."
                 className="min-h-11 pl-9"
               />
@@ -657,44 +745,69 @@ export function NewReleases() {
             <FilterChip
               className="min-h-11"
               active={statusFilter === "all"}
-              onClick={() => setStatusFilter("all")}
+              onClick={() => {
+                setStatusFilter("all");
+                setPage(1);
+              }}
             >
               All
             </FilterChip>
             <FilterChip
               className="min-h-11"
               active={statusFilter === "detected"}
-              onClick={() => setStatusFilter("detected")}
+              onClick={() => {
+                setStatusFilter("detected");
+                setPage(1);
+              }}
             >
               Needs action
             </FilterChip>
             <FilterChip
               className="min-h-11"
               active={statusFilter === "downloading"}
-              onClick={() => setStatusFilter("downloading")}
+              onClick={() => {
+                setStatusFilter("downloading");
+                setPage(1);
+              }}
             >
               Downloading
             </FilterChip>
             <FilterChip
               className="min-h-11"
               active={statusFilter === "downloaded"}
-              onClick={() => setStatusFilter("downloaded")}
+              onClick={() => {
+                setStatusFilter("downloaded");
+                setPage(1);
+              }}
             >
               Downloaded
             </FilterChip>
-            <FilterChip
-              className="min-h-11"
-              active={statusFilter === "upcoming"}
-              onClick={() => setStatusFilter("upcoming")}
-            >
-              Upcoming
-            </FilterChip>
           </div>
+          <label className="crate-form-field">
+            <MonoLabel as="span">Release date</MonoLabel>
+            <AdminSelect
+              value={dateFilter}
+              onChange={(value) => {
+                setDateFilter(value as DateFilter);
+                setPage(1);
+              }}
+              options={[
+                { value: "upcoming", label: "Upcoming" },
+                { value: "released", label: "Released" },
+                { value: "unknown", label: "Date unknown" },
+              ]}
+              placeholder="Any date"
+              triggerClassName="min-h-11 min-w-[150px]"
+            />
+          </label>
           <label className="crate-form-field">
             <MonoLabel as="span">Release type</MonoLabel>
             <AdminSelect
               value={typeFilter}
-              onChange={setTypeFilter}
+              onChange={(value) => {
+                setTypeFilter(value);
+                setPage(1);
+              }}
               options={typeOptions}
               placeholder="All types"
               searchable
@@ -706,8 +819,8 @@ export function NewReleases() {
       </OpsPanel>
 
       <OpsPanel
-        title="Release radar"
-        description="Use timeline when you want to triage in date order, or grid when you need a visual scan of artwork and release types."
+        title="Releases"
+        description="Triage acquisition state independently from release dates and library coverage."
       >
         {loading ? (
           <div
@@ -729,7 +842,7 @@ export function NewReleases() {
           />
         ) : view === "timeline" ? (
           <div className="space-y-3">
-            {filtered.map((release) => (
+            {visibleReleases.map((release) => (
               <ReleaseTimelineRow
                 key={release.id}
                 release={release}
@@ -740,7 +853,7 @@ export function NewReleases() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
-            {filtered.map((release) => (
+            {visibleReleases.map((release) => (
               <ReleaseGridCard
                 key={release.id}
                 release={release}
@@ -750,6 +863,15 @@ export function NewReleases() {
             ))}
           </div>
         )}
+        {!loading && filtered.length > 0 ? (
+          <ListPagination
+            label="releases"
+            itemCount={filtered.length}
+            page={currentPage}
+            pageSize={RELEASES_PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        ) : null}
       </OpsPanel>
     </div>
   );

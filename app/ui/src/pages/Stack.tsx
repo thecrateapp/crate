@@ -25,7 +25,11 @@ import { toast } from "sonner";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
   OpsStatTile,
+  OpsSurface,
+  type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -57,6 +61,8 @@ interface StackSnapshotData {
     scope: string;
     subject_key: string;
     version: number;
+    built_at?: string | null;
+    stale_after?: string | null;
     stale: boolean;
     generation_ms: number;
   };
@@ -212,9 +218,10 @@ function ServiceCard({
   const state = stateMeta(container.state);
 
   return (
-    <article
+    <OpsSurface
+      as="article"
       aria-label={`Service ${container.name}`}
-      className="overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]"
+      className="overflow-hidden"
     >
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -316,7 +323,7 @@ function ServiceCard({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
               Status
             </div>
             <div className="text-sm font-medium text-white/85">
@@ -324,7 +331,7 @@ function ServiceCard({
             </div>
           </div>
           <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
               Ports
             </div>
             <div className="text-sm font-medium text-white/85">
@@ -334,7 +341,7 @@ function ServiceCard({
             </div>
           </div>
           <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
               Public route
             </div>
             <div className="text-sm font-medium text-white/85">
@@ -386,7 +393,7 @@ function ServiceCard({
           )}
         </div>
       ) : null}
-    </article>
+    </OpsSurface>
   );
 }
 
@@ -394,6 +401,8 @@ export function Stack() {
   const [snapshot, setSnapshot] = useState<StackSnapshotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ServiceFilter>("all");
   const [restartTarget, setRestartTarget] = useState<string | null>(null);
@@ -416,16 +425,6 @@ export function Stack() {
       setError(null);
     } catch {
       setError("Failed to load Docker stack status");
-      setSnapshot({
-        snapshot: {
-          scope: "ops:stack",
-          subject_key: "global",
-          version: 0,
-          stale: true,
-          generation_ms: 0,
-        },
-        stack: { available: false, total: 0, running: 0, containers: [] },
-      });
     } finally {
       setLoading(false);
     }
@@ -442,11 +441,13 @@ export function Stack() {
     const connect = () => {
       if (closed) return;
       stream = createStackEventSource();
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         if (event.origin && event.origin !== window.location.origin) return;
         try {
           setSnapshot(JSON.parse(event.data) as StackSnapshotData);
           setError(null);
+          setStreamStatus("live");
           setLoading(false);
         } catch {
           // Ignore malformed stream payloads and wait for the next event.
@@ -455,6 +456,7 @@ export function Stack() {
       stream.onerror = () => {
         stream?.close();
         if (closed) return;
+        setStreamStatus("reconnecting");
         reconnectTimerRef.current = window.setTimeout(connect, 3000);
       };
     };
@@ -609,7 +611,18 @@ export function Stack() {
         <InfoBadge>
           {data?.available ? "Docker available" : "Docker unavailable"}
         </InfoBadge>
+        <OpsSnapshotStatus
+          snapshot={snapshot?.snapshot}
+          streamStatus={streamStatus}
+        />
       </OpsPageHero>
+
+      {error && data ? (
+        <OpsRefreshNotice
+          message="Could not refresh Docker stack status. Showing the last successful snapshot."
+          onRetry={() => void fetchSnapshot(true)}
+        />
+      ) : null}
 
       {!data?.available ? (
         <OpsPanel

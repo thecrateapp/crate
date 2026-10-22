@@ -90,7 +90,7 @@ function JamNowPlayingTrack(props: JamNowPlayingTrackProps) {
           </div>
         )}
         <div className="mt-3 flex items-center gap-3">
-          <div className="jam-progress-track h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">
+          <div className="jam-progress-track h-px min-w-0 flex-1 overflow-hidden rounded-full">
             <div
               className="jam-progress-fill jam-progress-fill-dynamic h-full rounded-full"
               style={

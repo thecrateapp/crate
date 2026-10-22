@@ -234,6 +234,11 @@ export function CommandPalette() {
       capabilities: ["library.import.manage"],
     },
     {
+      label: "Staged Imports",
+      path: "/imports",
+      capabilities: ["library.import.manage"],
+    },
+    {
       label: "Bandcamp",
       path: "/bandcamp",
       capabilities: ["library.bandcamp.manage"],
@@ -244,7 +249,7 @@ export function CommandPalette() {
       capabilities: ["curation.playlists.write"],
     },
     {
-      label: "Upcoming",
+      label: "Show Management",
       path: "/upcoming",
       capabilities: [
         "curation.shows.write",
@@ -253,7 +258,7 @@ export function CommandPalette() {
       ],
     },
     {
-      label: "New Releases",
+      label: "Release Radar",
       path: "/new-releases",
       capabilities: ["curation.releases.write", "library.tidal.manage"],
     },
@@ -302,7 +307,7 @@ export function CommandPalette() {
         }}
         className="top-[18vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl"
       >
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
+        <DialogTitle className="sr-only font-display">Command palette</DialogTitle>
         <DialogDescription className="sr-only">
           Search pages, run actions or find artists and albums.
         </DialogDescription>

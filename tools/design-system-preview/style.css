@@ -15,6 +15,7 @@
 @source "./admin-ops-checkpoint.tsx";
 @source "./admin-operations-checkpoint.tsx";
 @source "./admin-analysis-checkpoint.tsx";
+@source "./admin-insights-demo.tsx";
 @source "./forms-checkpoint.tsx";
 @source "./selection-checkpoint.tsx";
 @source "./tabs-checkpoint.tsx";
@@ -22,8 +23,13 @@
 @source "./tracks-checkpoint.tsx";
 @source "./status-colour-checkpoint.tsx";
 @source "../../app/ui/src/components/admin/ops-surfaces.tsx";
+@source "../../app/ui/src/components/admin/ListPagination.tsx";
+@source "../../app/ui/src/pages/PlaylistEditor.tsx";
+@source "../../app/ui/src/pages/Playlists.tsx";
 @source "../../app/ui/src/components/admin/status-indicators.tsx";
 @source "../../app/ui/src/components/scanner/IssueList.tsx";
+@source "../../app/ui/src/pages/Download.tsx";
+@source "../crate-ui-showcase/reviews/AdminAcquisitionReview.tsx";
 
 @source "../../app/listen/src/components/player/bar/PlayerSeekBarVariants.tsx";
 @source "../../app/listen/src/components/player/bar/PlayerProgressBeam.tsx";
@@ -1011,3 +1017,6 @@ footer p {
     gap: 16px;
   }
 }
+
+@source "../crate-ui-showcase/reviews/AdminSettingsTranslationsReview.tsx";
+@source "./admin-settings-translations-demo.tsx";

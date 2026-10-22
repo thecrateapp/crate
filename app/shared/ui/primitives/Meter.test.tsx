@@ -21,6 +21,9 @@ describe("Meter", () => {
     expect(meter).toHaveAttribute("aria-valuemax", "10");
     expect(meter).toHaveAttribute("aria-valuenow", "8");
     expect(meter).toHaveAttribute("aria-valuetext", "8 / 10");
+    expect(meter.querySelector(".crate-meter-track")).not.toHaveAttribute(
+      "data-thickness",
+    );
     expect(screen.getByText("8 / 10")).toBeInTheDocument();
     expect(valueRef.current?.style.getPropertyValue("--v")).toBe("0.8");
     expect(valueRef.current).toHaveClass("bg-accent-action-hi", "origin-left");

@@ -45,6 +45,9 @@ describe("Upcoming bounded icon retirement", () => {
     expect(
       container.querySelector('[data-admin-ux="upcoming-search"]'),
     ).toBeInTheDocument();
+    expect(
+      container.querySelector(".mt-5.bg-raised-surface"),
+    ).toBeInTheDocument();
     for (const icon of container.querySelectorAll("svg")) {
       if (!icon.hasAttribute("data-admin-ux"))
         expect(icon.closest("button[role=combobox]")).toBeInTheDocument();
@@ -90,7 +93,7 @@ describe("Upcoming bounded icon retirement", () => {
   });
   it("preserves search, strict type filters and calendar back/next UX", async () => {
     const user = userEvent.setup();
-    renderWithAdminProviders(<Upcoming />);
+    const { container } = renderWithAdminProviders(<Upcoming />);
     const artist = await screen.findByRole("textbox", { name: "Artist" });
     await user.type(artist, "Luz Polar");
     expect(
@@ -108,6 +111,9 @@ describe("Upcoming bounded icon retirement", () => {
         .querySelector("svg"),
     ).toHaveAttribute("data-admin-ux", "upcoming-previous");
     await user.click(screen.getByRole("button", { name: "Next month" }));
+    expect(
+      container.querySelector(".p-4.bg-raised-surface"),
+    ).toBeInTheDocument();
   });
   it("keeps existing ten-second sync busy/refetch timer and failure feedback", async () => {
     vi.useFakeTimers();
@@ -140,6 +146,10 @@ describe("Upcoming bounded icon retirement", () => {
     ).toBeInTheDocument();
     await act(async () => finish({ items: [] }));
     expect(screen.getByText("Nothing upcoming")).toBeInTheDocument();
+    const empty = screen
+      .getByText("Nothing upcoming")
+      .closest('[role="status"]');
+    expect(empty).toHaveClass("bg-raised-surface", "shadow-none");
     expect(container.querySelectorAll("svg")).toHaveLength(5); // Search, two view controls and two compact header actions.
   });
 

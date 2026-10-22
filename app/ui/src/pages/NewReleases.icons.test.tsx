@@ -28,7 +28,9 @@ class SampleStream {
   }
 }
 type SampleRelease = {
-  [K in keyof (typeof fixture)["releases"][number]]: (typeof fixture)["releases"][number][K];
+  [
+    K in keyof (typeof fixture)["releases"][number]
+  ]: (typeof fixture)["releases"][number][K];
 };
 let data: { releases: SampleRelease[] } = structuredClone(fixture);
 function Location() {
@@ -61,6 +63,14 @@ async function ready(capabilities?: string[]) {
   await screen.findByText("Luz de octubre", {});
   return v;
 }
+function statValue(label: string) {
+  const field = Array.from(document.querySelectorAll(".crate-form-field")).find(
+    (element) => element.children[0]?.textContent?.trim() === label,
+  );
+  const value = field?.children[1];
+  if (!value) throw new Error(`Could not find the ${label} statistic value`);
+  return value.textContent?.trim();
+}
 beforeEach(() => {
   vi.clearAllMocks();
   data = structuredClone(fixture);
@@ -83,7 +93,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
     await ready();
     expect(
       Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
-        (el) => !el.closest('[role="combobox"]'),
+        (el) =>
+          !el.closest('[role="combobox"]') &&
+          !el.closest('[data-testid="media-cover-fallback"]'),
       ),
     ).toHaveLength(0);
     expect(
@@ -96,23 +108,37 @@ describe("New Releases text presentation with real data hook and handlers", () =
         .getByRole("combobox", { name: "All types" })
         .closest(".crate-form-field"),
     ).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "New Releases" })).toHaveClass(
+    expect(screen.getByRole("heading", { name: "Release Radar" })).toHaveClass(
       "font-display",
     );
     expect(
       screen.getByRole("link", { name: "Luz de octubre" }),
     ).toHaveAttribute("href", "/artists/costa-norte/luz-de-octubre");
     expect(
-      screen.getAllByRole("link", { name: "Costa Norte" })[0],
-    ).toHaveAttribute("href", "/artists/costa-norte");
+      screen.getByRole("link", { name: "Luz de octubre" }).closest("article"),
+    ).toHaveTextContent("Costa Norte");
     expect(
       document.querySelector('img[src="/sample-new-release-cover.svg"]'),
     ).toHaveAttribute("alt", "");
+    expect(screen.getByText("3 / 8 in library", {})).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-slot="upcoming-date"]'),
+    ).not.toBeNull();
+    const timelineRow = document.querySelector(
+      '[data-slot="release-radar-row"][aria-label="Luz de octubre by Costa Norte"]',
+    );
+    expect(timelineRow?.querySelector('[data-slot="upcoming-event-row"]')).toBeInTheDocument();
+    expect(timelineRow?.querySelector('[data-slot="action-group"]')).toHaveAttribute(
+      "aria-label",
+      "Actions for Luz de octubre",
+    );
     expect(
       screen.queryByRole("link", { name: "Puerto sin fecha" }),
     ).not.toBeInTheDocument();
     for (const button of screen.getAllByRole("button"))
       if (button.closest('[data-slot="admin-page-header"]'))
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+      else if (button.closest('[data-slot="action-group"]'))
         expect(button).toHaveAttribute("data-size", "icon-lg");
       else expect(button).toHaveClass("min-h-11");
     expect(mockApi).toHaveBeenCalledTimes(1);
@@ -126,12 +152,12 @@ describe("New Releases text presentation with real data hook and handlers", () =
     const search = screen.getByPlaceholderText("Search artist or album...");
     await userEvent.type(search, "  COSTA  ");
     expect(screen.queryByText("Puerto sin fecha", {})).not.toBeInTheDocument();
-    expect(screen.getByText("5 total", {})).toBeInTheDocument();
+    expect(statValue("Needs action")).toBe("3");
     expect(
       screen
         .getAllByRole("link", { name: /^(Mañana|Luz de octubre)$/ })
-        .map((el) => el.textContent),
-    ).toEqual(["Luz de octubre"]);
+        .map((el) => el.getAttribute("href")),
+    ).toEqual(["/artists/costa-norte/luz-de-octubre"]);
     expect(
       screen
         .getByText("Mañana", {})
@@ -144,7 +170,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
       "href",
       "/artists/viento-sur/horizonte",
     );
-    await userEvent.click(screen.getByRole("button", { name: "Upcoming" }));
+    await userEvent.click(screen.getByRole("button", { name: "All" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "Any date" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Upcoming" }));
     expect(screen.getByText("Mañana", {})).toBeInTheDocument();
     expect(screen.queryByText("Horizonte", {})).not.toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledTimes(1);
@@ -191,7 +219,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
     ).toHaveLength(3);
     expect(
       Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
-        (el) => !el.closest('[role="combobox"]'),
+        (el) =>
+          !el.closest('[role="combobox"]') &&
+          !el.closest('[data-testid="media-cover-fallback"]'),
       ),
     ).toHaveLength(0);
     const album = screen.getByRole("link", { name: "Luz de octubre" });
@@ -235,7 +265,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
       "POST",
     );
     expect(screen.queryByText("Mañana", {})).not.toBeInTheDocument();
-    expect(screen.getByText("4 total", {})).toBeInTheDocument();
+    expect(statValue("Needs action")).toBe("2");
     expect(mockApi).toHaveBeenCalledTimes(2);
   });
   it.each(["download", "dismiss"])(
@@ -252,7 +282,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
         action === "download" ? "Download failed" : "Dismiss failed",
       );
       expect(screen.getByText("Mañana", {})).toBeInTheDocument();
-      expect(screen.getByText("5 total", {})).toBeInTheDocument();
+      expect(statValue("Needs action")).toBe("3");
     },
   );
   it("keeps the check busy until its exact task completes then reads the snapshot", async () => {
@@ -318,12 +348,12 @@ describe("New Releases text presentation with real data hook and handlers", () =
     expect(toast.error).toHaveBeenCalledWith(
       "Failed to queue the release check",
     );
-    expect(screen.getByText("5 total")).toBeInTheDocument();
+    expect(statValue("Needs action")).toBe("3");
   });
   it("keeps existing unknown-status eligibility differences between timeline and grid", async () => {
     data.releases = [{ ...data.releases[0]!, status: "failed" }];
     mount();
-    await screen.findByRole("heading", { name: "New Releases" });
+    await screen.findByRole("heading", { name: "Release Radar" });
     await userEvent.click(screen.getByRole("button", { name: "All" }));
     expect(
       screen.getByRole("button", { name: "Download" }),
@@ -385,6 +415,38 @@ describe("New Releases text presentation with real data hook and handlers", () =
         (el) => !el.closest('[role="combobox"]'),
       ),
     ).toHaveLength(0);
+  });
+  it("uses semantic solid surfaces for timeline, grid, and empty results", async () => {
+    await ready();
+    const getReleaseArticles = () =>
+      Array.from(document.querySelectorAll("article[aria-label]"));
+    expect(getReleaseArticles()).toHaveLength(3);
+    expect(
+      getReleaseArticles().every((article) =>
+        article.classList.contains("bg-surface-object"),
+      ),
+    ).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(getReleaseArticles()).toHaveLength(3);
+    expect(
+      getReleaseArticles().every((article) =>
+        article.classList.contains("bg-raised-surface") &&
+          article.classList.contains("shadow-none"),
+      ),
+    ).toBe(true);
+
+    await userEvent.type(
+      screen.getByPlaceholderText("Search artist or album..."),
+      "no matching release",
+    );
+    const emptyTitle = await screen.findByText(
+      "No releases match the current radar",
+      {},
+    );
+    const empty = emptyTitle.closest('[role="status"]');
+    expect(empty).not.toBeNull();
+    expect(empty).toHaveClass("bg-raised-surface", "shadow-none");
   });
   it("retries a hard read error through the original snapshot hook", async () => {
     mockApi.mockRejectedValueOnce(new Error("Read unavailable"));

@@ -1374,3 +1374,63 @@ baselines change on every shell and player step.
    or out of scope for v3?
 7. **Spinners.** Remove `animate-spin` outside buttons across both apps (about 100 files), as a
    gradual migration rule?
+
+## 10. Admin inventory reconciliation — 2026-10-21
+
+This status pass checked `app/ui/src/App.tsx`, `components/layout/Sidebar.tsx`, page files and
+page-level test filenames. “Test exists” is only an inventory fact; it does not certify full
+coverage, visual completion, production data or accessibility. “Verify” means no current V3
+approval record was found in this inventory pass, not that the route is broken.
+
+| ID | Historical surface | Current route / implementation | Evidence in current source | Disposition |
+| --- | --- | --- | --- | --- |
+| A1 | Admin shell and shared ops surfaces | `Shell`, `Sidebar`, `CommandPalette`, `OpsPageHero`, `OpsStatTile` | Sidebar uses MonoLabel/accent hover; A1a solidifies both Shell headers; A1b removes shared ops Hero/stat translucency and shadows across 13 pages | Shared surface debt closed; page-specific debt stays with its owning phase |
+| A2 | Dashboard residue | `/` → `Dashboard` | 1AB approved; `Dashboard.test.tsx`; shared `InstrumentPanel` and `OpsSnapshotContext` | Complete for approved checkpoint; old PageHeading/StatStrip proposal is not pending |
+| A3 | Login / Setup | `/login`, `/setup` | Login test exists; Setup has no page-level test | Present; test Setup if changed |
+| A4 | Browse | `/browse` → `Browse` | Page test exists | Present; verify in owning phase |
+| A5 | Artist residue | `/artists/:artistSlug` → `Artist` | Page test exists; `/artists/:artistId/:slug` is another two-segment route | Verify route-shape overlap before changes |
+| A6 | Album residue | `/artists/:artistSlug/:albumSlug`, `/albums/:albumId/:slug` → `Album` | Page test exists | Present; verify in owning phase |
+| A7 | Trash, Contributions | `/trash`, `/contributions` | Both page tests exist | Present; old claim of missing Contributions test is stale |
+| A8 | Download | `/download` → `Download` | Page test exists | Verify flows in acquisition phase |
+| A9 | Upcoming calendar | `/upcoming` → `Upcoming` | Page test exists | Calendar is one part of Shows/Releases |
+| A10 | Bandcamp | `/bandcamp` → `Bandcamp` | Page test exists | Present; verify in owning phase |
+| A11 | Discover | `/discover` → `Discover` | Page test exists | Present; verify in owning phase |
+| A12 | Insights | `/insights` → `Insights` | No `Insights.test.tsx` found | Add page test when changed |
+| A13 | Analysis residue | `/analysis` → `Analysis` | Page test exists | Verify before proposing instruments |
+| A14 | Timeline | `/timeline` → `Timeline` | Route/page exist; no Sidebar entry or page test found | Unlisted; decide whether it remains supported before redesign |
+| A15 | Tasks residue | `/tasks` → `Tasks` | Page tests exist; includes queue, events and history | Reconcile old visuals against implementation |
+| A16 | System residue | `/system` → `SystemHealth` | Page test exists | Verify snapshot and stream contracts before UI work |
+| A17 | Logs | `/logs` → `Logs` | Page test exists | Verify in operations phase |
+| A18 | Users | `/users` → `Users` | Page test exists | Verify in owning phase |
+| A19 | Roles | `/roles` → `Roles` | Page test exists | Verify in owning phase |
+| A20 | Playlists, editor | `/playlists`, `/playlists/:playlistId` | Both page tests exist | Preserve editor contracts; verify in owning phase |
+| A21 | Translations | `/i18n` → `I18nReview` | Page test exists | Verify in owning phase |
+| A22 | Settings | `/settings` → `Settings` | Page test exists | Verify in owning phase |
+| A23 | Federation tabs | `/federation` → `Federation` and subpanels | Page and panel tests exist | Verify in owning phase |
+| A24 | Global catalog | `/global-catalog` → `GlobalCatalog` | Page test exists | Verify in owning phase |
+| A25 | Genres residue | `/genres`, `/genres/:slug` → `Genres` | Page test exists; taxonomy orphan count is data inside Genres | Verify before new instruments |
+| A26 | Orphans | No standalone route/page | Track/album issues live in Health; taxonomy orphan count in Genres | Retain those workflows; standalone entry is obsolete |
+
+### Current routes added or reclassified after the old matrix
+
+| Area | Current route(s) | Evidence | Disposition |
+| --- | --- | --- | --- |
+| Agents | `/agents`, `/agents/approvals`, `/agents/approvals/:planId`, `/agents/connections` | Route group and page tests exist | New surface group; include in curator/admin phase |
+| AI models | `/ai`; `/ai-agents` redirects to `/ai` | `AiModels.test.tsx` exists | Current surface; include in curator/admin phase |
+| Profile | `/profile` redirects based on user capability | `ProfileRedirect`; no distinct page | Navigation behavior, not redesign target |
+| Artist legacy route | `/artists/:artistId/:slug` | Same dynamic shape as artist/album route; route ranking needs a focused check | Preserve until deep-link contract is clear |
+
+At A0, the 13 entries in `scripts/design-system/admin-adoption-debt.json` matched current source;
+the Admin consistency policy test passed 21/21. A1a resolved the Shell entry (two backdrop
+blurs), A1b resolved shared OpsPageHero/OpsStatTile surfaces, and A2a resolved nested
+SystemHealth/Stack surfaces, leaving 9 entries. Focused policy tests run with each change. This
+registry is a narrow style guard, not a measure of total V3 page readiness. A2 remains open for
+snapshot and stream reconciliation; see `docs/plans/2026-10-21-crate-v3-admin-continuation.md`.
+
+The A2a checkpoint adds `OpsSurface` for nested operational cards and removes the two resolved
+pages from the adoption-debt registry. Validation: 66 Admin Vitest cases across the shared ops
+surface and Tasks/SystemHealth/Logs/Stack/Health pages; two Playwright checks at desktop/mobile;
+Admin and Storybook typechecks, focused ESLint, and Admin/preview/Storybook builds passed. A broad
+preview grep currently cannot collect because the unrelated Listen `focus-motion.spec.ts` throws
+at module load; the A2 preview spec passes directly. No API, snapshot, stream, permission or action
+contract changed.

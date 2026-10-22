@@ -203,7 +203,7 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
     <div className="space-y-3">
       {counts.versions && counts.versions.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
             Versions
           </span>
           {counts.versions.map((entry) => (

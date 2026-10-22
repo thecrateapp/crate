@@ -5,6 +5,11 @@
 @import "tailwindcss";
 @source "../../shared/ui";
 
+/* Keep Tailwind's explicit `font-sans` utility on the app's approved body face. */
+@theme inline {
+  --font-sans: var(--font-brand);
+}
+
 /* Surface colors as admin utilities (bg-card, bg-secondary, border-border...).
    @crate/ui/tokens/surfaces.css sets these variables per [data-surface] but
    does not register them with Tailwind, so without this block the classes

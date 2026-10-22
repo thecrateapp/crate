@@ -86,7 +86,6 @@ export function OfflineSettingsView({
               max={storageQuota}
               over={offlineSummary.totalBytes > storageQuota}
               valueText={`${bytesText} / ${quotaText}`}
-              thickness={3}
             />
           ) : (
             <StatNumber

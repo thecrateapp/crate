@@ -28,6 +28,16 @@ export function analyzeAdminConsistency(path, source, debt = [], roles = true) {
     bindings = new Map(),
     chips = new Set(),
     badges = new Set();
+  const semanticHeadings = new Set([
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "CardTitle",
+    "DialogTitle",
+  ]);
   const surfaceCounts = new Map();
   function issue(node, rule, detail) {
     const line =
@@ -174,6 +184,14 @@ export function analyzeAdminConsistency(path, source, debt = [], roles = true) {
       (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))
     ) {
       const name = node.tagName.getText(tree);
+      const isEntityTitle = node.attributes.properties.some(
+        (item) =>
+          ts.isJsxAttribute(item) &&
+          item.name.getText(tree) === "data-slot" &&
+          item.initializer &&
+          ts.isStringLiteral(item.initializer) &&
+          item.initializer.text === "entity-title",
+      );
       const attribute = node.attributes.properties.find(
         (item) =>
           ts.isJsxAttribute(item) && item.name.getText(tree) === "className",
@@ -193,7 +211,11 @@ export function analyzeAdminConsistency(path, source, debt = [], roles = true) {
           !/\bfont-normal\b/.test(classes)
         )
           issue(node, "mono-badge-weight", classes);
-        if (/\bfont-display\b/.test(classes)) {
+        if (
+          /\bfont-display\b/.test(classes) &&
+          !semanticHeadings.has(name) &&
+          !isEntityTitle
+        ) {
           const sizeClass = classes.match(
             /\btext-(xs|sm|base|lg)\b|\btext-\[(\d+(?:\.\d+)?)px\]/,
           );

@@ -76,7 +76,7 @@ export function SimilarTracksPanel({
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div>
-            <h3 className="text-sm font-semibold">Similar to "{trackTitle}"</h3>
+            <h3 className="text-sm font-semibold font-display">Similar to "{trackTitle}"</h3>
             <p className="text-xs text-muted-foreground">{artist}</p>
           </div>
           <button
@@ -136,9 +136,9 @@ export function SimilarTracksPanel({
               </div>
               {t.score != null && (
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className="w-16 h-1.5 bg-primary/10 rounded-md overflow-hidden">
+                  <div className="w-16 h-px bg-primary/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary rounded-md"
+                      className="h-full bg-primary rounded-full"
                       style={{ width: `${Math.round(t.score * 100)}%` }}
                     />
                   </div>

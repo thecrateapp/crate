@@ -1,4 +1,13 @@
 {
+  "snapshot": {
+    "scope": "ops:logs",
+    "subject_key": "global",
+    "version": 1,
+    "built_at": "2026-10-22T09:30:00Z",
+    "stale_after": "2026-10-22T09:35:00Z",
+    "stale": false,
+    "generation_ms": 3
+  },
   "logs": [
     {
       "id": 1,

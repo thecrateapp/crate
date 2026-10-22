@@ -55,7 +55,7 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Key material</CardTitle>
+            <CardTitle className="text-sm font-display">Key material</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
@@ -94,7 +94,7 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
         {selected ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Risk explanation</CardTitle>
+              <CardTitle className="text-sm font-display">Risk explanation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p>

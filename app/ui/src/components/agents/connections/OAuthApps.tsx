@@ -122,7 +122,7 @@ function OAuthAppDialog({
     >
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="font-display">
             {editing ? "Edit app permissions" : "Register OAuth app"}
           </DialogTitle>
           <DialogDescription>

@@ -1,5 +1,5 @@
 import { installRadixElementPolyfills } from "@/test/radix-element-polyfills";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   beforeAll,
@@ -49,12 +49,18 @@ const mockUseApi = vi.mocked(useApi);
 const mockApi = vi.mocked(api);
 
 class MockEventSource {
+  onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: (() => void) | null = null;
 
-  constructor(public readonly url: string) {}
+  constructor(public readonly url: string) {
+    eventSources.push(this);
+  }
 
   close = vi.fn();
 }
+
+const eventSources: MockEventSource[] = [];
 
 const editorSurface = {
   playlist: {
@@ -100,6 +106,7 @@ const editorSurface = {
 describe("PlaylistEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    eventSources.length = 0;
     vi.stubGlobal("EventSource", MockEventSource);
     mockUseApi.mockImplementation((url: string | null) => {
       if (url?.includes("/editor-snapshot")) {
@@ -159,6 +166,92 @@ describe("PlaylistEditor", () => {
     expect(
       screen.getByText(/Upload a clean image-only hero asset/i),
     ).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Playlist tracks" })).toBeVisible();
+    expect(
+      screen.getByRole("group", {
+        name: "Rule 1: Genre CONTAINS screamo",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("status", { name: "Playlist generation progress" }),
+    ).toBeVisible();
+  });
+
+  it("uses the preview endpoint count as the primary matching-track readout", async () => {
+    mockApi.mockImplementation(async (url: string) => {
+      if (url.endsWith("/preview")) {
+        return {
+          total_matching: 124,
+          tracks: [],
+          genre_distribution: {},
+          artist_distribution: {},
+          format_distribution: {},
+          duration_total_sec: 7200,
+          avg_year: null,
+          year_range: null,
+        };
+      }
+      return {};
+    });
+    render(<PlaylistEditor />);
+    await userEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    expect(await screen.findByText("124")).toBeVisible();
+    expect(screen.getByText("Matching tracks")).toBeVisible();
+    expect(mockApi).toHaveBeenCalledWith(
+      "/api/admin/system-playlists/42/preview",
+      "POST",
+      expect.objectContaining({ smart_rules: expect.any(Object) }),
+    );
+  });
+
+  it("updates the generation phase from the reconnectable playlist stream", async () => {
+    render(<PlaylistEditor />);
+    const source = eventSources[0];
+    expect(source?.url).toBe("/api/admin/system-playlists/42/stream");
+
+    const runningSurface = structuredClone(editorSurface);
+    runningSurface.playlist.generation_status = "running";
+    act(() => {
+      source?.onopen?.();
+      source?.onmessage?.(
+        new MessageEvent("message", { data: JSON.stringify(runningSurface) }),
+      );
+    });
+
+    expect(
+      await screen.findByRole("status", {
+        name: "Playlist generation progress",
+      }),
+    ).toHaveTextContent("Generating");
+    expect(
+      screen.getByRole("status", { name: "Playlist generation progress" }),
+    ).toHaveTextContent("Live updates");
+  });
+
+  it("keeps an inline busy chip visible while AI description generation is pending", async () => {
+    let resolveDescription: ((value: { description: string }) => void) | null =
+      null;
+    mockApi.mockImplementation((url: string) => {
+      if (url.endsWith("/ai-description")) {
+        return new Promise((resolve) => {
+          resolveDescription = resolve;
+        });
+      }
+      return Promise.resolve({});
+    });
+    render(<PlaylistEditor />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Generate description with AI" }),
+    );
+    const busyChip = document.querySelector("[data-ai-description-busy]");
+    expect(busyChip).toBeVisible();
+    expect(busyChip).toHaveTextContent("Generating");
+
+    await act(async () => {
+      resolveDescription?.({ description: "Generated description" });
+    });
+    expect(document.querySelector("[data-ai-description-busy]")).toBeNull();
   });
 
   it("uses the shared operator select, retains keyboard focus and resets the rule value", async () => {

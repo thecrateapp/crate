@@ -144,4 +144,51 @@ describe("Browse featured artists", () => {
       ).toBe(true);
     });
   });
+
+  it("shows a retry state when the artist request fails instead of an empty catalog", async () => {
+    let artistRequests = 0;
+    apiMock.mockImplementation((url: string) => {
+      if (url.startsWith("/api/browse/filters")) {
+        return Promise.resolve({
+          genres: [],
+          countries: [],
+          decades: [],
+          formats: [],
+        });
+      }
+      artistRequests += 1;
+      if (artistRequests === 1) return Promise.reject(new Error("offline"));
+      return Promise.resolve({
+        items: [
+          {
+            id: 7,
+            name: "Converge",
+            albums: 3,
+            tracks: 20,
+            total_size_mb: 100,
+            has_photo: false,
+            primary_format: "flac",
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 60,
+      });
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/browse"]}>
+        <Browse />
+      </MemoryRouter>,
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load artists. Try again.");
+    expect(
+      screen.queryByText("No artists in the library yet"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Converge")).toBeVisible();
+  });
 });

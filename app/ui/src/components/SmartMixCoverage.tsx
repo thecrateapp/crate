@@ -65,7 +65,7 @@ type BackfillAction = "start" | "pause" | "cancel" | "resume";
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-sm border border-white/6 bg-black/20 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
         {label}
       </div>
       <div className="mt-1 text-sm font-medium text-white/85">
@@ -221,9 +221,9 @@ export function SmartMixCoverage() {
         </div>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
+      <div className="h-px overflow-hidden rounded-full bg-white/[0.06]">
         <div
-          className="h-full rounded-sm bg-primary transition-[width] duration-500"
+          className="h-full rounded-full bg-primary transition-[width] duration-500"
           style={{ width: `${percent}%` }}
         />
       </div>

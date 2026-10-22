@@ -16,7 +16,6 @@ interface MeterProps {
   over?: boolean;
   label: ReactNode;
   valueText: string;
-  thickness?: 1 | 2 | 3 | 4;
   valueRef?: Ref<HTMLElement>;
 }
 
@@ -27,7 +26,6 @@ export function Meter({
   over = false,
   label,
   valueText,
-  thickness = 2,
   valueRef,
 }: MeterProps) {
   const labelId = useId();
@@ -74,7 +72,6 @@ export function Meter({
         </MonoLabel>
         <span
           className="crate-meter-track relative min-w-0 bg-border-quiet"
-          data-thickness={thickness}
         >
           {hasRange ? (
             <span

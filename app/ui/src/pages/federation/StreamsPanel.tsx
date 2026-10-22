@@ -21,6 +21,8 @@ export function StreamsPanel({ canManage }: { canManage: boolean }) {
     "/api/admin/federation/streaming-stats",
   );
   const tickets = useApi<Ticket[]>("/api/admin/federation/streams");
+  const peers = stats.data?.peers ?? [];
+  const activeTickets = tickets.data ?? [];
   const revoke = async (ticketUid: string) => {
     try {
       await api(`/api/admin/federation/streams/${ticketUid}/revoke`, "POST");
@@ -36,23 +38,25 @@ export function StreamsPanel({ canManage }: { canManage: boolean }) {
       error={stats.error || tickets.error}
     >
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {stats.data?.peers.map((peer) => (
-            <Card key={peer.node_uid}>
-              <CardContent className="p-4 text-sm">
-                <p>{peer.display_name}</p>
-                <p className="text-white/45">
-                  {peer.active_streams} active · {formatBytes(peer.daily_bytes)}{" "}
-                  today
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        {(tickets.data ?? []).length === 0 ? (
+        {peers.length > 0 ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {peers.map((peer) => (
+              <Card key={peer.node_uid}>
+                <CardContent className="p-4 text-sm">
+                  <p>{peer.display_name}</p>
+                  <p className="text-white/45">
+                    {peer.active_streams} active ·{" "}
+                    {formatBytes(peer.daily_bytes)} today
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : null}
+        {activeTickets.length === 0 ? (
           <p className="text-sm text-white/45">No active stream tickets.</p>
         ) : (
-          tickets.data?.map((ticket) => (
+          activeTickets.map((ticket) => (
             <Card key={ticket.ticket_uid}>
               <CardContent className="flex items-center justify-between p-3">
                 <span className="font-mono text-xs">{ticket.ticket_uid}</span>

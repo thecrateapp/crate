@@ -50,6 +50,9 @@ def row_to_import_item(row: dict[str, Any]) -> dict[str, Any]:
             "artist": row.get("artist") or payload.get("artist") or "",
             "album": row.get("album") or payload.get("album") or "",
             "status": row.get("status") or payload.get("status") or "pending",
+            "dest_album_id": row.get("dest_album_id") or payload.get("dest_album_id"),
+            "discovered_at": row.get("discovered_at") or payload.get("discovered_at"),
+            "updated_at": row.get("updated_at") or payload.get("updated_at"),
         }
     )
     payload.setdefault("track_count", 0)
@@ -61,7 +64,7 @@ def row_to_import_item(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def coerce_import_status(existing_status: str | None, discovered_status: str) -> str:
-    if existing_status in {"imported", "merged"} and discovered_status == "pending":
+    if existing_status in {"imported", "merged", "importing"} and discovered_status == "pending":
         return existing_status
     return discovered_status or existing_status or "pending"
 

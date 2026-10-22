@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Contributions } from "./Contributions";
@@ -41,8 +41,14 @@ describe("Contributions text and real contracts", () => {
   it("retains contributor precedence, source words, status and real metadata", async () => {
     renderWithAdminProviders(<Contributions />);
     await screen.findByText("Luz de octubre");
+    expect(screen.getByText("4", { exact: true })).toBeInTheDocument();
+    const contributionList = screen.getByRole("list", {
+      name: "Community library contributions",
+    });
+    expect(within(contributionList).getAllByRole("listitem")).toHaveLength(4);
     for (const text of [
       "Lucía de muestra",
+      "@lucia",
       "mar-de-muestra",
       "curadora@example.test",
       "Unknown user",
@@ -53,11 +59,16 @@ describe("Contributions text and real contracts", () => {
       "withdrawn",
       "8 tracks",
       "30:53",
-      "unknown",
       fixture.items[0]!.source_ref,
     ]) {
       expect(screen.getByText(text, { exact: true })).toBeInTheDocument();
     }
+    expect(
+      screen.getAllByText("imported")[0]?.closest("[data-tone]"),
+    ).toHaveAttribute("data-tone", "on");
+    expect(
+      screen.getByText("withdrawn").closest("[data-tone]"),
+    ).toHaveAttribute("data-tone", "off");
     expect(screen.queryByText("lucia@example.test")).not.toBeInTheDocument();
     expect(screen.queryByText("0 tracks")).not.toBeInTheDocument();
   });
@@ -85,7 +96,10 @@ describe("Contributions text and real contracts", () => {
       "src",
       "/api/albums/41/cover",
     );
-    expect(document.querySelector("img")).toHaveAttribute("alt", "");
+    expect(document.querySelector("img")).toHaveAttribute(
+      "alt",
+      "Luz de octubre",
+    );
   });
 
   it("bounds both loading glyphs and prevents overlapping refresh reads", async () => {
@@ -138,12 +152,16 @@ describe("Contributions text and real contracts", () => {
     await screen.findByText("No contributions yet");
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.queryByText(/99/)).not.toBeInTheDocument();
+    expect(screen.queryByText("99", { exact: true })).not.toBeInTheDocument();
   });
 
-  it("keeps the existing initial-error toast and empty fallback", async () => {
+  it("distinguishes an initial read error from an empty library", async () => {
     mockApi.mockRejectedValue(new Error("Sample unavailable"));
     renderWithAdminProviders(<Contributions />);
-    await screen.findByText("No contributions yet");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Contributions unavailable",
+    );
+    expect(screen.queryByText("No contributions yet")).not.toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith("Sample unavailable");
     expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
@@ -157,6 +175,9 @@ describe("Contributions text and real contracts", () => {
       expect(toast.error).toHaveBeenCalledWith("Failed to load contributions"),
     );
     expect(screen.getByText("Luz de octubre")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Refresh failed · showing last results",
+    );
     expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
   });
 

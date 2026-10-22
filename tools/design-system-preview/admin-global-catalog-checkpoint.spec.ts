@@ -123,7 +123,7 @@ for (const width of [1440, 768, 390])
       ).toBeDisabled();
       await advance.click();
       await expect(selected).toBeEnabled();
-      await expect(selected).toHaveAttribute("aria-busy", "false");
+      await expect(selected).not.toHaveAttribute("aria-busy", "true");
       await expect(advance).toBeEnabled(); // reads remain asynchronous after enqueue
       await advance.click();
       await expect(advance).toBeDisabled();

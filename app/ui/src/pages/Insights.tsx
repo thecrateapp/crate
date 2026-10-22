@@ -6,21 +6,17 @@ import { ResponsiveScatterPlot } from "@nivo/scatterplot";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
   OpsStatTile,
+  OpsSurface,
 } from "@/components/admin/ops-surfaces";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useApi } from "@/hooks/use-api";
 import { cn, formatNumber } from "@/lib/utils";
 
-interface InsightsData {
+export interface InsightsData {
   countries: Record<string, number>;
   bpm_distribution: { bpm: string; count: number }[];
   energy_danceability: {
@@ -122,9 +118,9 @@ function ChartTooltip({
   footer?: string;
 }) {
   return (
-    <div className="min-w-[220px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <div className="min-w-[220px] rounded-sm border border-border-quiet bg-panel-surface px-3 py-3 text-xs text-white shadow-none">
       {eyebrow ? (
-        <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65 font-mono">
           {eyebrow}
         </div>
       ) : null}
@@ -154,36 +150,6 @@ function ChartTooltip({
   );
 }
 
-function HeroSignalPanel({
-  items,
-}: {
-  items: { label: string; value: string; caption: string }[];
-}) {
-  return (
-    <div className="min-w-[320px] rounded-sm border border-white/10 bg-black/20 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <div className="text-[11px] uppercase tracking-[0.16em] text-accent-action-hi/70">
-        Signal Brief
-      </div>
-      <div className="mt-3 space-y-3">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="border-b border-white/8 pb-3 last:border-b-0 last:pb-0"
-          >
-            <div className="text-[11px] uppercase tracking-[0.14em] text-white/35">
-              {item.label}
-            </div>
-            <div className="mt-1 text-lg font-semibold tracking-tight text-white">
-              {item.value}
-            </div>
-            <div className="mt-1 text-xs text-white/45">{item.caption}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function InsightStoryCard({
   label,
   value,
@@ -196,24 +162,24 @@ function InsightStoryCard({
   accent?: "primary" | "muted";
 }) {
   return (
-    <div
+    <OpsSurface
       className={cn(
-        "rounded-sm border p-4 shadow-[0_18px_44px_rgba(0,0,0,0.16)] backdrop-blur-xl",
+        "p-4",
         accent === "primary"
-          ? "border-accent-action/16 bg-accent-action/[0.08]"
-          : "border-white/8 bg-black/20",
+          ? "border-accent-action/25"
+          : "border-border-quiet",
       )}
     >
-      <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
+      <MonoLabel as="div" className="text-text-muted">
         {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
+      </MonoLabel>
+      <div className="mt-2 font-display text-2xl font-semibold tracking-tight text-text-primary">
         {value}
       </div>
       <div className="mt-2 text-sm leading-relaxed text-white/55">
         {caption}
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -229,18 +195,15 @@ function InsightChartCard({
   className?: string;
 }) {
   return (
-    <Card
-      className={cn(
-        "relative gap-0 overflow-hidden border-white/10 bg-[rgba(12,12,20,0.96)] shadow-[0_18px_44px_rgba(0,0,0,0.22)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-16 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent)]",
-        className,
-      )}
-    >
-      <CardHeader className="border-b border-white/6 pb-4">
-        <CardTitle className="text-base text-white">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="pt-5">{children}</CardContent>
-    </Card>
+    <OpsSurface as="article" className={cn("overflow-hidden", className)}>
+      <header className="border-b border-border-quiet px-4 pb-4 pt-4">
+        <h3 className="font-display text-base font-semibold text-text-primary">
+          {title}
+        </h3>
+        <p className="mt-1 text-sm text-text-muted">{description}</p>
+      </header>
+      <div className="p-4">{children}</div>
+    </OpsSurface>
   );
 }
 
@@ -344,41 +307,10 @@ export function Insights() {
   const surfacedStandouts =
     (data?.popularity.length ?? 0) + (data?.top_albums.length ?? 0);
   const leadGenre = data?.top_genres[0];
-  const leadArtist = data?.popularity[0];
-  const leadAlbum = data?.top_albums[0];
   const leadFeature = [...featureCoverageData].sort(
     (a, b) => b.coverage - a.coverage,
   )[0];
   const leadDecade = [...decadeData].sort((a, b) => b.albums - a.albums)[0];
-  const heroBriefItems = [
-    {
-      label: "Dominant genre",
-      value: leadGenre?.genre ?? "No data yet",
-      caption: leadGenre
-        ? `${formatNumber(leadGenre.artists)} artists and ${formatNumber(
-            leadGenre.albums,
-          )} albums sit under this tag.`
-        : "Genre distribution will sharpen as enrichment fills in taxonomy data.",
-    },
-    {
-      label: "Catalog center",
-      value: leadDecade?.decade ?? "No decade data",
-      caption: leadDecade
-        ? `${formatNumber(
-            leadDecade.albums,
-          )} albums make this the densest release era in the library.`
-        : "Release-year density appears once enough album dates are present.",
-    },
-    {
-      label: "Strongest standout",
-      value: leadArtist?.artist ?? leadAlbum?.album ?? "No standout yet",
-      caption: leadArtist
-        ? `Leads the consolidated popularity signal across artists.`
-        : leadAlbum
-          ? `${leadAlbum.artist} currently anchors album-level standout signal.`
-          : "Popularity scoring will surface standouts as signals are computed.",
-    },
-  ];
 
   if (loading) {
     return (
@@ -402,15 +334,13 @@ export function Insights() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return <ErrorState message="Failed to load insights" onRetry={refetch} />;
   }
 
   if (!data) {
     return (
-      <div className="py-16 text-center text-sm text-white/45">
-        No insight data available yet.
-      </div>
+      <ErrorState message="No insight data available yet" onRetry={refetch} />
     );
   }
 
@@ -419,7 +349,6 @@ export function Insights() {
       <OpsPageHero
         title="Insights"
         description="A macro read on how the library is shaped, where its weight sits, and how much of the collection is analytically mapped."
-        actions={<HeroSignalPanel items={heroBriefItems} />}
       >
         <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
           Collection shape
@@ -431,6 +360,13 @@ export function Insights() {
           Audio signature
         </span>
       </OpsPageHero>
+
+      {error ? (
+        <OpsRefreshNotice
+          message="Insights could not refresh. Showing the last successful snapshot."
+          onRetry={refetch}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile

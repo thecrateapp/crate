@@ -140,7 +140,7 @@ export function TagEditor({
   return (
     <div className="bg-card border border-border rounded-md p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">Album Tags</h3>
+        <h3 className="font-semibold font-display">Album Tags</h3>
         <Button size="sm" onClick={save} disabled={saving}>
           {saving ? "Saving..." : "Save Tags"}
         </Button>
@@ -206,7 +206,7 @@ export function TagEditor({
           </button>
           {showTracks && (
             <div className="space-y-1.5">
-              <div className="flex gap-2 items-center text-[10px] text-muted-foreground uppercase tracking-wider px-1 mb-1">
+              <div className="flex gap-2 items-center text-[10px] text-muted-foreground uppercase tracking-wider px-1 mb-1 font-mono">
                 <span className="w-16">#</span>
                 <span className="flex-1">Title</span>
                 <span className="w-[120px] text-right hidden sm:block">

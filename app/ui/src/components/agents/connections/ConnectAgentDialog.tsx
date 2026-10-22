@@ -112,7 +112,7 @@ export function ConnectAgentDialog({
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Connect your agent</DialogTitle>
+          <DialogTitle className="font-display">Connect your agent</DialogTitle>
           <DialogDescription>Step {step} of 3</DialogDescription>
         </DialogHeader>
 

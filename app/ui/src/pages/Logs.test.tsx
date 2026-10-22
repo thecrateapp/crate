@@ -8,14 +8,22 @@ import { Logs } from "./Logs";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 const streams: {
   url: string;
+  onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
   close: ReturnType<typeof vi.fn>;
 }[] = [];
 beforeEach(() => {
   vi.mocked(api).mockReset().mockResolvedValue(snapshot);
   streams.length = 0;
   vi.stubGlobal("EventSource", function (url: string) {
-    const stream = { url, onmessage: null, close: vi.fn() };
+    const stream = {
+      url,
+      onopen: null,
+      onmessage: null,
+      onerror: null,
+      close: vi.fn(),
+    };
     streams.push(stream);
     return stream;
   });
@@ -102,6 +110,25 @@ describe("Logs typographic controls", () => {
     expect(screen.getByText("Updated stream sample")).toBeVisible();
     unmount();
     expect(streams[1]!.close).toHaveBeenCalledOnce();
+  });
+  it("shows stream recovery and preserves the last snapshot after refresh failure", async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path.includes("fresh=1")) throw new Error("network unavailable");
+      return snapshot;
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Logs />);
+    await screen.findByText("Sample analysis needs attention");
+
+    act(() => streams[0]!.onerror?.(new Event("error")));
+    expect(screen.getByText("Reconnecting")).toHaveAttribute(
+      "data-tone",
+      "warning",
+    );
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent("Showing the last successful snapshot.");
+    expect(screen.getByText("Sample analysis needs attention")).toBeVisible();
   });
   it("retains error retry", async () => {
     vi.mocked(api).mockRejectedValueOnce(new Error("unavailable"));

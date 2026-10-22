@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -146,10 +147,10 @@ function PipelineCoverage({
       </div>
 
       <div className="space-y-3">
-        <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
+        <div className="h-px overflow-hidden rounded-full bg-white/[0.06]">
           <div
             className={cn(
-              "h-full rounded-sm transition-[width,background-color] duration-500",
+              "h-full rounded-full transition-[width,background-color] duration-500",
               blocked
                 ? "bg-gradient-to-r from-state-warning/60 to-state-warning/70"
                 : accentClassName.replace("text-", "bg-").replace("/80", ""),
@@ -187,7 +188,7 @@ function MiniMetric({
       <MonoLabel as="div">{label}</MonoLabel>
       <div
         className={cn(
-          "font-display text-base font-bold leading-tight tabular-nums",
+          "font-mono text-base font-normal leading-tight tabular-nums",
           tone === "danger"
             ? "text-state-warning-text"
             : tone === "muted"
@@ -526,6 +527,13 @@ export function Analysis() {
         ) : null}
       </OpsPageHero>
 
+      {error ? (
+        <OpsRefreshNotice
+          message="Analysis status could not refresh. Showing the last successful snapshot."
+          onRetry={() => void refresh(true)}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <OpsStatTile
           label="Audio Coverage"
@@ -614,9 +622,9 @@ export function Analysis() {
             </div>
 
             <div className="space-y-3">
-              <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
+              <div className="h-px overflow-hidden rounded-full bg-white/[0.06]">
                 <div
-                  className="h-full rounded-sm bg-accent-action/80 transition-[width,background-color] duration-500"
+                  className="h-full rounded-full bg-accent-action/80 transition-[width,background-color] duration-500"
                   style={{
                     width: `${Math.min(metrics.fingerprintPercent, 100)}%`,
                   }}

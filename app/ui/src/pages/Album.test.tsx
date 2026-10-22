@@ -1,8 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Routes } from "react-router";
+
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
+
+const { mockUseApi } = vi.hoisted(() => ({ mockUseApi: vi.fn() }));
 
 import {
+  Album,
   MergeAlbumDialog,
   MoveAlbumToArtistDialog,
   SplitAlbumDialog,
@@ -10,6 +16,14 @@ import {
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-api", () => ({
+  useApi: mockUseApi,
+}));
+
+vi.mock("@/hooks/use-task-events", () => ({
+  useTaskEvents: () => ({ events: [], done: false }),
 }));
 
 vi.mock("sonner", () => ({
@@ -29,6 +43,12 @@ const mockApi = vi.mocked(api);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUseApi.mockReturnValue({
+    data: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
   mockApi.mockResolvedValue({
     artists: [
       {
@@ -48,6 +68,49 @@ beforeEach(() => {
         year: 2026,
       },
     ],
+  });
+});
+
+describe("Album page load state", () => {
+  it("shows a retryable error when the album request fails", async () => {
+    const refetch = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "network error",
+      refetch,
+    });
+
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug/:albumSlug" element={<Album />} />
+      </Routes>,
+      { route: "/artists/camel/mirage" },
+    );
+
+    expect(
+      screen.getByText(
+        "This album could not be loaded. Try again or return to Browse.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes a missing album from a failed request", () => {
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug/:albumSlug" element={<Album />} />
+      </Routes>,
+      { route: "/artists/camel/missing-album" },
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Album not found" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Browse artists" }),
+    ).toHaveAttribute("href", "/browse");
   });
 });
 

@@ -110,7 +110,7 @@ export function Setup() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <User size={18} className="text-primary" />
-                <h2 className="text-lg font-bold">Create Admin Account</h2>
+                <h2 className="text-lg font-bold font-display">Create Admin Account</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 This will be your login to manage Crate.
@@ -154,7 +154,7 @@ export function Setup() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Key size={18} className="text-primary" />
-                <h2 className="text-lg font-bold">API Keys</h2>
+                <h2 className="text-lg font-bold font-display">API Keys</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 Optional — enable enrichment features. You can add these later
@@ -256,7 +256,7 @@ export function Setup() {
           {step === 2 && (
             <div className="text-center">
               <Music size={40} className="text-primary mx-auto mb-4" />
-              <h2 className="text-lg font-bold mb-2">Scan Your Library</h2>
+              <h2 className="text-lg font-bold mb-2 font-display">Scan Your Library</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 Crate will scan your music collection, read tags, and build your
                 library database. This runs in the background — you can start
@@ -289,7 +289,7 @@ export function Setup() {
               <div className="w-16 h-16 rounded-md bg-accent-action/10 flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-accent-action-hi" />
               </div>
-              <h2 className="text-lg font-bold mb-2">You're all set!</h2>
+              <h2 className="text-lg font-bold mb-2 font-display">You're all set!</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 Crate is scanning your library in the background. This may take
                 a while depending on your collection size.

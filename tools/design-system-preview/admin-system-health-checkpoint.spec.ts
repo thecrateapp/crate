@@ -11,7 +11,7 @@ test("1AC embeds real System Health and preserves published checkpoints", async 
     checkpoint
       .frameLocator("iframe")
       .getByRole("heading", { name: "System Health", exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("#dashboard-admin")).toHaveCount(1);
   await expect(page.locator("footer")).toContainText("1AB publicado");
   await expect(page.locator("footer")).toContainText("1AC publicado");

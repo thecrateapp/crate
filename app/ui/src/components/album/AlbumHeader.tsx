@@ -335,7 +335,7 @@ export function AlbumHeader({
               <span className="text-white/60">{resolvedDisplayName}</span>
             </div>
 
-            <h1 className="mb-1.5 truncate text-xl font-black leading-none tracking-tight text-white md:text-4xl">
+            <h1 className="mb-1.5 truncate text-xl font-black leading-none tracking-tight text-white md:text-4xl font-display">
               {resolvedDisplayName}
             </h1>
             <Link
@@ -371,9 +371,9 @@ export function AlbumHeader({
                   <TrendingUp size={13} />
                   Popularity
                 </span>
-                <div className="h-1.5 w-[72px] overflow-hidden rounded-sm bg-white/10">
+                <div className="h-px w-[72px] overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="h-full rounded-sm"
+                    className="h-full rounded-full"
                     style={{
                       width: `${popularityPercent}%`,
                       background: "linear-gradient(90deg, #06b6d433, #06b6d4)",

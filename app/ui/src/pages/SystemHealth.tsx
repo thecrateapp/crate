@@ -3,7 +3,7 @@ import {
   PageHeaderAction,
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
-import { RefreshCw as HeaderRefreshCw } from "lucide-react";
+import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ResponsiveLine } from "@nivo/line";
@@ -11,7 +11,9 @@ import { ResponsiveLine } from "@nivo/line";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
   OpsStatTile,
+  OpsSurface,
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
@@ -20,6 +22,7 @@ import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { useApi } from "@/hooks/use-api";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 
 interface MetricSummary {
   count: number;
@@ -284,8 +287,8 @@ function ChartTooltip({
   items: { label: string; value: string }[];
 }) {
   return (
-    <div className="min-w-[180px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65">
+    <OpsSurface className="min-w-[180px] rounded-sm bg-panel-surface px-3 py-3 text-xs text-white">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65 font-mono">
         Metric slice
       </div>
       <div className="mt-2 font-medium text-white">{title}</div>
@@ -300,38 +303,42 @@ function ChartTooltip({
           </div>
         ))}
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
-function HealthSignal({ score, summary }: { score: number; summary: string }) {
+function HealthSignal({
+  score,
+  summary,
+}: {
+  score: number | null;
+  summary: string;
+}) {
   const color =
-    score >= 80
-      ? "text-accent-action-hi"
-      : score >= 50
-        ? "text-state-warning-text"
+    score == null
+      ? "text-text-subtle"
+      : score >= 80
+        ? "text-accent-action-hi"
         : "text-state-warning-text";
   const bg =
-    score >= 80
-      ? "border-accent-action/25 bg-accent-action/[0.08]"
-      : score >= 50
-        ? "border-state-warning/25 bg-state-warning/[0.08]"
+    score == null
+      ? "border-border-quiet bg-raised-surface"
+      : score >= 80
+        ? "border-accent-action/25 bg-accent-action/[0.08]"
         : "border-state-warning/25 bg-state-warning/[0.08]";
 
   return (
-    <div
-      className={`rounded-md border px-5 py-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)] ${bg}`}
-    >
+    <OpsSurface className={`px-5 py-4 ${bg}`}>
       <div className="crate-form-field">
         <MonoLabel as="div">Health Score</MonoLabel>
         <div
-          className={`font-display text-3xl font-bold tabular-nums ${color}`}
+          className={`font-mono text-3xl font-normal tabular-nums ${color}`}
         >
-          {score}
+          {score ?? "—"}
         </div>
       </div>
       <div className="mt-3 text-xs text-white/45">{summary}</div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -345,15 +352,15 @@ function ResourceCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+    <OpsSurface className="p-4">
       <div className="crate-form-field">
         <MonoLabel as="div">{label}</MonoLabel>
-        <div className="font-display text-xl font-bold text-text-primary tabular-nums break-words">
+        <div className="font-mono text-xl font-normal text-text-primary tabular-nums break-words">
           {value}
         </div>
       </div>
       <div className="mt-3 space-y-2">{children}</div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -379,7 +386,7 @@ function ProgressBar({
           </span>
         </div>
       ) : null}
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+      <div className="h-px overflow-hidden rounded-full bg-white/8">
         <div
           className={`h-full rounded-full transition-[width,background-color] ${color}`}
           style={{ width: `${pct}%` }}
@@ -435,19 +442,19 @@ function MetricChart({
 
   if (!chartData.length) {
     return (
-      <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+      <OpsSurface className="p-4">
         <div className="mb-2 font-display text-xl font-bold text-text-primary">
           {title}
         </div>
         <div className="flex h-48 items-center justify-center text-sm text-white/30">
           No data yet
         </div>
-      </div>
+      </OpsSurface>
     );
   }
 
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+    <OpsSurface className="p-4">
       <div className="mb-2 font-display text-xl font-bold text-text-primary">
         {title}
       </div>
@@ -507,7 +514,7 @@ function MetricChart({
           )}
         />
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -569,7 +576,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
           />
         </div>
 
-        <div className="overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+        <OpsSurface className="overflow-hidden">
           {visibleRoutes.length > 0 ? (
             <div className="divide-y divide-white/6">
               {visibleRoutes.map((route) => {
@@ -670,7 +677,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               No route latency samples yet
             </div>
           )}
-        </div>
+        </OpsSurface>
       </div>
     </OpsPanel>
   );
@@ -774,7 +781,6 @@ function PlaybackTranscodingOverview({
             max={runtime?.limit ?? 0}
             valueText={`${runtime?.active}/${runtime?.limit}`}
             over={runtime != null && runtime.active > runtime.limit}
-            thickness={2}
           />
           <p className="mt-2 text-xs text-text-muted">
             Active playback worker capacity
@@ -782,7 +788,7 @@ function PlaybackTranscodingOverview({
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+          <OpsSurface className="p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="font-display text-xl font-bold text-text-primary">
@@ -808,9 +814,9 @@ function PlaybackTranscodingOverview({
                 />
               ))}
             </div>
-          </div>
+          </OpsSurface>
 
-          <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+          <OpsSurface className="p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="font-display text-xl font-bold text-text-primary">
@@ -863,7 +869,7 @@ function PlaybackTranscodingOverview({
                 </div>
               )}
             </div>
-          </div>
+          </OpsSurface>
         </div>
       </div>
     </OpsPanel>
@@ -875,10 +881,14 @@ export function SystemHealth() {
   const [period, setPeriod] = useState<Period>("minute");
   const minutes = period === "minute" ? 60 : 1440;
 
-  const { data: dashboard, refetch: refetchDashboard } =
-    useApi<SystemHealthDashboardResponse>(
-      `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
-    );
+  const {
+    data: dashboard,
+    loading,
+    error,
+    refetch: refetchDashboard,
+  } = useApi<SystemHealthDashboardResponse>(
+    `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
+  );
 
   const summary = dashboard?.summary ?? null;
   const system = dashboard?.system ?? null;
@@ -904,7 +914,7 @@ export function SystemHealth() {
   const routeLatency = dashboard?.route_latency ?? [];
 
   const score = useMemo(() => {
-    if (!summary) return 100;
+    if (!summary) return null;
     let next = 100;
     if (summary.api_latency.max > 3000) next -= 15;
     if (summary.api_errors.count > 0 && summary.api_requests.count > 0) {
@@ -928,7 +938,7 @@ export function SystemHealth() {
       ? ((summary.api_errors.count / summary.api_requests.count) * 100).toFixed(
           2,
         )
-      : "0";
+      : "—";
   const homeCacheTotal =
     (summary?.home_cache_hit.count ?? 0) +
     (summary?.home_cache_miss.count ?? 0);
@@ -947,19 +957,52 @@ export function SystemHealth() {
       : 0;
 
   const scoreSummary =
-    score >= 80
-      ? "Core services look stable and current pressure is within healthy bounds."
-      : score >= 50
-        ? "The system is usable, but latency or load deserve attention before they become user-facing."
-        : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
+    score == null
+      ? "Health score unavailable: no metrics summary was returned."
+      : score >= 80
+        ? "Core services look stable and current pressure is within healthy bounds."
+        : score >= 50
+          ? "The system is usable, but latency or load deserve attention before they become user-facing."
+          : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
   const runningTasks = tasks.length;
   const queueDepth = queueTs.length
     ? (queueTs[queueTs.length - 1]?.max ?? 0)
-    : 0;
+    : null;
+
+  if (loading && !dashboard) {
+    return (
+      <div
+        role="status"
+        aria-label="Loading system health metrics"
+        aria-busy="true"
+        className="flex justify-center py-16 text-white/45"
+      >
+        <Loader2
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-primary"
+        />
+      </div>
+    );
+  }
+
+  if (error && !dashboard) {
+    return (
+      <ErrorState
+        message="Could not load system health metrics."
+        onRetry={refetchDashboard}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {error && dashboard ? (
+        <OpsRefreshNotice
+          message="Could not refresh system health metrics. Showing the last successful sample."
+          onRetry={refetchDashboard}
+        />
+      ) : null}
       <OpsPageHero
         title="System Health"
         description="Runtime pressure, API performance, queue behavior and infrastructure saturation across the stack."
@@ -994,8 +1037,8 @@ export function SystemHealth() {
             : "Metrics loading"}
         </InfoBadge>
         <InfoBadge>{runningTasks} running tasks</InfoBadge>
-        <InfoBadge>{queueDepth} queued depth</InfoBadge>
-        {summary ? (
+        <InfoBadge>{queueDepth ?? "—"} queued depth</InfoBadge>
+        {summary && errorRate !== "—" ? (
           <InfoBadge
             className={
               Number(errorRate) > 1
@@ -1053,7 +1096,7 @@ export function SystemHealth() {
         />
         <OpsStatTile
           label="Error Rate"
-          value={`${errorRate}%`}
+          value={errorRate === "—" ? "—" : `${errorRate}%`}
           caption={
             summary
               ? `${summary.api_errors.count} / ${summary.api_requests.count} requests`
@@ -1447,9 +1490,10 @@ export function SystemHealth() {
                     : `${elapsed}s`;
 
               return (
-                <div
+                <OpsSurface
+                  as="div"
                   key={task.id}
-                  className="grid min-w-0 grid-cols-2 items-center gap-3 rounded-md border border-white/8 bg-black/20 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.12)] sm:flex"
+                  className="grid grid-cols-2 items-center gap-3 px-4 py-3 sm:flex"
                 >
                   <div className="col-span-2 min-w-0 flex-1">
                     <div className="break-words text-sm font-medium text-white">
@@ -1466,7 +1510,7 @@ export function SystemHealth() {
                   </div>
                   {pct > 0 ? (
                     <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-px flex-1 overflow-hidden rounded-full bg-white/10">
                         <div
                           className="h-full rounded-full bg-primary transition-[width,background-color]"
                           style={{ width: `${pct}%` }}
@@ -1484,7 +1528,7 @@ export function SystemHealth() {
                   <span className="font-mono text-[10px] text-white/20">
                     {task.id.slice(0, 8)}
                   </span>
-                </div>
+                </OpsSurface>
               );
             })}
           </div>

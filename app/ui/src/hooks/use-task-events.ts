@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 export interface TaskEvent {
   id: number;
@@ -12,6 +12,27 @@ interface TaskDone {
   result?: Record<string, unknown>;
   error?: string;
 }
+
+interface TaskEventState {
+  events: TaskEvent[];
+  done: TaskDone | null;
+  connected: boolean;
+}
+
+interface TaskEventStreamEntry {
+  state: TaskEventState;
+  source: EventSource | null;
+  reconnectTimer: number | null;
+  subscribers: number;
+  listeners: Set<() => void>;
+}
+
+const EMPTY_TASK_EVENT_STATE: TaskEventState = {
+  events: [],
+  done: null,
+  connected: false,
+};
+const taskEventStreams = new Map<string, TaskEventStreamEntry>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -54,68 +75,158 @@ export function normalizeTaskEvent(
   };
 }
 
+function getTaskEventStream(taskId: string) {
+  let stream = taskEventStreams.get(taskId);
+  if (!stream) {
+    stream = {
+      state: EMPTY_TASK_EVENT_STATE,
+      source: null,
+      reconnectTimer: null,
+      subscribers: 0,
+      listeners: new Set(),
+    };
+    taskEventStreams.set(taskId, stream);
+  }
+  return stream;
+}
+
+function publishTaskEventState(
+  stream: TaskEventStreamEntry,
+  update: (current: TaskEventState) => TaskEventState,
+) {
+  stream.state = update(stream.state);
+  stream.listeners.forEach((listener) => listener());
+}
+
+function connectTaskEventStream(taskId: string, stream: TaskEventStreamEntry) {
+  if (stream.source || stream.state.done || stream.subscribers === 0) return;
+
+  const source = new EventSource(`/api/events/task/${taskId}?generic=1`);
+  stream.source = source;
+  source.onopen = () => {
+    if (stream.source !== source) return;
+    publishTaskEventState(stream, (current) => ({
+      ...current,
+      connected: true,
+    }));
+  };
+  source.onerror = () => {
+    if (stream.source !== source) return;
+    source.close();
+    stream.source = null;
+    publishTaskEventState(stream, (current) => ({
+      ...current,
+      connected: false,
+    }));
+    if (stream.reconnectTimer === null && stream.subscribers > 0) {
+      stream.reconnectTimer = window.setTimeout(() => {
+        stream.reconnectTimer = null;
+        connectTaskEventStream(taskId, stream);
+      }, 5000);
+    }
+  };
+
+  source.addEventListener("task_event", (event: MessageEvent) => {
+    if (stream.source !== source) return;
+    try {
+      const payload = JSON.parse(event.data);
+      const fallbackType =
+        isRecord(payload) && typeof payload.event_type === "string"
+          ? payload.event_type
+          : "info";
+      const normalized = normalizeTaskEvent(payload, fallbackType);
+      publishTaskEventState(stream, (current) => {
+        const next = [...current.events, normalized];
+        return {
+          ...current,
+          events: next.length > 200 ? next.slice(-200) : next,
+        };
+      });
+    } catch {
+      // Ignore parse errors.
+    }
+  });
+
+  source.addEventListener("task_done", (event: MessageEvent) => {
+    if (stream.source !== source) return;
+    let done: TaskDone;
+    try {
+      done = JSON.parse(event.data) as TaskDone;
+    } catch {
+      done = { status: "completed" };
+    }
+    publishTaskEventState(stream, (current) => ({
+      ...current,
+      done,
+      connected: false,
+    }));
+    if (stream.reconnectTimer !== null) {
+      window.clearTimeout(stream.reconnectTimer);
+      stream.reconnectTimer = null;
+    }
+    source.close();
+    if (stream.source === source) stream.source = null;
+  });
+}
+
+function subscribeToTaskEventStream(
+  taskId: string,
+  stream: TaskEventStreamEntry,
+  listener: () => void,
+) {
+  stream.listeners.add(listener);
+  stream.subscribers += 1;
+  if (stream.subscribers === 1) connectTaskEventStream(taskId, stream);
+
+  return () => {
+    stream.listeners.delete(listener);
+    stream.subscribers = Math.max(0, stream.subscribers - 1);
+    if (stream.subscribers !== 0) return;
+
+    stream.source?.close();
+    stream.source = null;
+    if (stream.reconnectTimer !== null) {
+      window.clearTimeout(stream.reconnectTimer);
+      stream.reconnectTimer = null;
+    }
+    stream.state = EMPTY_TASK_EVENT_STATE;
+
+    // React StrictMode briefly unsubscribes and resubscribes on mount. Delay
+    // deleting the shared entry by one microtask so both subscriptions reuse it.
+    queueMicrotask(() => {
+      if (stream.subscribers === 0 && taskEventStreams.get(taskId) === stream) {
+        taskEventStreams.delete(taskId);
+      }
+    });
+  };
+}
+
 /**
- * Hook that connects to a task's SSE stream and accumulates events.
- * Returns events array + done status. Auto-closes when task completes.
+ * Hook that shares one task SSE stream between every mounted consumer for the
+ * same task ID. The connection closes when the task completes or the last
+ * consumer unmounts.
  */
 export function useTaskEvents(taskId: string | null) {
-  const [events, setEvents] = useState<TaskEvent[]>([]);
-  const [done, setDone] = useState<TaskDone | null>(null);
-  const [connected, setConnected] = useState(false);
-  const sourceRef = useRef<EventSource | null>(null);
-
+  const stream = useMemo(
+    () => (taskId ? getTaskEventStream(taskId) : null),
+    [taskId],
+  );
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      taskId && stream
+        ? subscribeToTaskEventStream(taskId, stream, listener)
+        : () => undefined,
+    [stream, taskId],
+  );
+  const getSnapshot = useCallback(
+    () => stream?.state ?? EMPTY_TASK_EVENT_STATE,
+    [stream],
+  );
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const reset = useCallback(() => {
-    setEvents([]);
-    setDone(null);
-    setConnected(false);
-  }, []);
+    if (!stream) return;
+    publishTaskEventState(stream, () => EMPTY_TASK_EVENT_STATE);
+  }, [stream]);
 
-  useEffect(() => {
-    if (!taskId) {
-      reset();
-      return;
-    }
-
-    reset();
-    const source = new EventSource(`/api/events/task/${taskId}?generic=1`);
-    sourceRef.current = source;
-
-    source.onopen = () => setConnected(true);
-    source.onerror = () => setConnected(false);
-
-    source.addEventListener("task_event", (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data);
-        const fallbackType =
-          isRecord(payload) && typeof payload.event_type === "string"
-            ? payload.event_type
-            : "info";
-        setEvents((prev) => {
-          const next = [...prev, normalizeTaskEvent(payload, fallbackType)];
-          return next.length > 200 ? next.slice(-200) : next;
-        });
-      } catch {
-        // Ignore parse errors
-      }
-    });
-
-    // Task completion
-    source.addEventListener("task_done", (e: MessageEvent) => {
-      try {
-        const payload = JSON.parse(e.data);
-        setDone(payload);
-      } catch {
-        setDone({ status: "completed" });
-      }
-      source.close();
-      setConnected(false);
-    });
-
-    return () => {
-      source.close();
-      sourceRef.current = null;
-    };
-  }, [taskId, reset]);
-
-  return { events, done, connected, reset };
+  return { ...state, reset };
 }

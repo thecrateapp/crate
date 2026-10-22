@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from crate.db.domain_events import append_domain_event
 from crate.db.import_queue_shared import (
+    coerce_json,
     coerce_import_status,
     normalize_import_item,
     payload_for_row,
@@ -34,7 +35,7 @@ def refresh_import_queue_items(
                 for row in session.execute(
                     text(
                         """
-                        SELECT source, path, status
+                        SELECT source, path, status, payload_json
                         FROM import_queue_items
                         WHERE source = ANY(:sources)
                         """
@@ -47,6 +48,10 @@ def refresh_import_queue_items(
         existing_status = {
             (row["source"], row["path"]): row["status"] for row in existing_rows
         }
+        existing_payloads = {
+            (row["source"], row["path"]): coerce_json(row.get("payload_json"))
+            for row in existing_rows
+        }
         seen: set[tuple[str, str]] = set()
 
         upserted = 0
@@ -54,6 +59,19 @@ def refresh_import_queue_items(
             key = (item["source"], item["path"])
             seen.add(key)
             status = coerce_import_status(existing_status.get(key), item["status"])
+            payload = payload_for_row(item, status=status)
+            previous_payload = existing_payloads.get(key)
+            if isinstance(previous_payload, dict):
+                if status == "importing":
+                    for name in ("task_id", "started_at", "last_error"):
+                        if name in previous_payload:
+                            payload[name] = previous_payload[name]
+                elif status in {"imported", "merged"}:
+                    for name in ("dest", "task_id", "imported_at"):
+                        if name in previous_payload:
+                            payload[name] = previous_payload[name]
+                elif status == "pending" and "last_error" in previous_payload:
+                    payload["last_error"] = previous_payload["last_error"]
             session.execute(
                 text(
                     """
@@ -91,9 +109,7 @@ def refresh_import_queue_items(
                     "artist": item.get("artist"),
                     "album": item.get("album"),
                     "status": status,
-                    "payload_json": json.dumps(
-                        payload_for_row(item, status=status), default=str
-                    ),
+                    "payload_json": json.dumps(payload, default=str),
                 },
             )
             upserted += 1

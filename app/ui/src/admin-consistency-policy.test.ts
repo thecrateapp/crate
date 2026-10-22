@@ -28,8 +28,7 @@ describe("Admin consistency prevention", () => {
       '<span className={cn("font-mono", active && "font-bold")}/>',
       "mono-weight",
     ],
-    ['<h3 className="font-display text-sm"/>', "compact-display"],
-    ['<CardTitle className="font-display"/>', "compact-display"],
+    ['<span className="font-display text-sm"/>', "compact-display"],
     [
       'import { Badge as Tag } from "@crate/ui/shadcn/badge"; const view=<Tag className="font-mono"/>;',
       "mono-badge-weight",
@@ -50,6 +49,9 @@ describe("Admin consistency prevention", () => {
 
   it.each([
     '<h2 className="font-display text-xl"/>',
+    '<h3 className="font-display text-sm"/>',
+    '<CardTitle className="font-display"/>',
+    '<span data-slot="entity-title" className="font-display text-lg"/>',
     '<div className="font-display text-base tabular-nums">12</div>',
     '<h3 className="font-sans text-base font-semibold"/>',
     'import { Badge } from "@crate/ui/shadcn/badge"; const view=<Badge className="text-state-warning-text"/>;',

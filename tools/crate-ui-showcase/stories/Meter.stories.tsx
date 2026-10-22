@@ -15,7 +15,6 @@ export const Storage: Story = {
     value: 640,
     max: 1024,
     valueText: "640 MB / 1 GB",
-    thickness: 3,
   },
 };
 export const MissingAndZero: Story = {

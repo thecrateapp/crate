@@ -596,7 +596,7 @@ export function ArtistRepairDialog({
     >
       <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Repair {artistName}</DialogTitle>
+          <DialogTitle className="font-display">Repair {artistName}</DialogTitle>
           <DialogDescription>
             Preview the fixes Crate can execute for this artist, then run them
             one by one or all at once.

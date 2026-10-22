@@ -154,9 +154,9 @@ function EnergyBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(1, value));
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-14 overflow-hidden rounded-md bg-primary/10">
+      <div className="h-px w-14 overflow-hidden rounded-full bg-primary/10">
         <div
-          className="h-full rounded-md bg-primary"
+          className="h-full rounded-full bg-primary"
           style={{ width: `${pct * 100}%`, opacity: 0.4 + pct * 0.6 }}
         />
       </div>
@@ -183,9 +183,9 @@ function PopularityBar({
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex min-w-[104px] items-center gap-2">
-            <div className="h-1.5 w-14 overflow-hidden rounded-md bg-primary/10">
+            <div className="h-px w-14 overflow-hidden rounded-full bg-primary/10">
               <div
-                className="h-full rounded-md bg-primary"
+                className="h-full rounded-full bg-primary"
                 style={{
                   width: `${pct * 100}%`,
                   opacity: 0.45 + confidencePct * 0.45,
@@ -489,7 +489,7 @@ function MoveTrackDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Move Track to Album</DialogTitle>
+          <DialogTitle className="font-display">Move Track to Album</DialogTitle>
           <DialogDescription>
             Queue a worker task to move "{title}" into another album directory.
           </DialogDescription>
@@ -499,7 +499,7 @@ function MoveTrackDialog({
           <div className="crate-form-field">
             <label
               htmlFor="move-track-target"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
             >
               Target album
             </label>
@@ -676,9 +676,9 @@ function TrackAudioInfo({ track }: { track: AudioAnalysisTrack }) {
                   <span className="w-[70px] shrink-0 text-[10px] text-white/50">
                     {feature.label}
                   </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-md bg-primary/10">
+                  <div className="h-px flex-1 overflow-hidden rounded-full bg-primary/10">
                     <div
-                      className="h-full rounded-md bg-primary"
+                      className="h-full rounded-full bg-primary"
                       style={{
                         width: `${Math.round(value * 100)}%`,
                         opacity: 0.4 + value * 0.6,

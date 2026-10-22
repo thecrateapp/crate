@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import {
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
+  type OpsStreamStatus,
+} from "@/components/admin/ops-surfaces";
+import {
   useCallback,
   useEffect,
   useEffectEvent,
@@ -63,6 +68,7 @@ interface HealthSnapshotData {
     scope: string;
     subject_key: string;
     version: number;
+    built_at?: string | null;
     stale: boolean;
     generation_ms: number;
   };
@@ -244,8 +250,7 @@ export function latestRepairSummary(task: TaskInsightLike | null) {
   }
   if (task.type === "repair" || task.type === "fix_artist") {
     const revalidation = result.revalidation as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const remaining = count(revalidation?.issue_count);
     if (remaining != null) parts.push(`${remaining} open after revalidation`);
   }
@@ -303,6 +308,12 @@ export function Health() {
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
+  const hasSnapshotRef = useRef(false);
   const [scanning, setScanning] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -348,6 +359,8 @@ export function Health() {
 
   const fetchIssues = useCallback(
     async (fresh = false, signal?: AbortSignal) => {
+      const retainingSnapshot = hasSnapshotRef.current;
+      if (retainingSnapshot) setRefreshing(true);
       try {
         const query = new URLSearchParams();
         if (filter) query.set("check_type", filter);
@@ -364,11 +377,22 @@ export function Health() {
         setCounts(data.counts);
         setRuns(data.runs ?? {});
         setStale(data.snapshot?.stale === true);
+        hasSnapshotRef.current = true;
+        setHasSnapshot(true);
         setError(null);
+        setRefreshError(null);
       } catch {
-        setError("Failed to load health issues");
+        if (signal?.aborted) return;
+        if (hasSnapshotRef.current) {
+          setRefreshError(
+            "Could not refresh library health. Showing the last successful snapshot.",
+          );
+        } else {
+          setError("Failed to load health issues");
+        }
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
+        if (retainingSnapshot) setRefreshing(false);
       }
     },
     [filter],
@@ -396,10 +420,12 @@ export function Health() {
 
     function connect() {
       if (disposed) return;
+      setStreamStatus("connecting");
       const query = filter ? `?check_type=${encodeURIComponent(filter)}` : "";
       stream = new EventSource(`/api/admin/health-stream${query}`, {
         withCredentials: true,
       });
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as HealthSnapshotData;
@@ -407,8 +433,12 @@ export function Health() {
           setCounts(payload.counts);
           setRuns(payload.runs ?? {});
           setStale(payload.snapshot?.stale === true);
+          hasSnapshotRef.current = true;
+          setHasSnapshot(true);
           setError(null);
+          setRefreshError(null);
           setLoading(false);
+          setStreamStatus("live");
         } catch {
           // Ignore malformed payloads and wait for the next event.
         }
@@ -416,7 +446,8 @@ export function Health() {
       stream.onerror = () => {
         stream?.close();
         if (!disposed) {
-          reconnectTimerRef.current = window.setTimeout(connect, 3000);
+          setStreamStatus("reconnecting");
+          reconnectTimerRef.current = window.setTimeout(connect, 5000);
         }
       };
     }
@@ -470,8 +501,7 @@ export function Health() {
     if (!activeTaskId || !activeTaskDone) return;
     if (activeTaskDone.status === "completed") {
       const revalidation = activeTaskDone.result?.revalidation as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       const remaining = Number(revalidation?.issue_count ?? NaN);
       if (!scanning && Number.isFinite(remaining)) {
         toast.success(
@@ -628,7 +658,7 @@ export function Health() {
   });
   const grouped = groupHealthIssues(issues);
   const visibleCount = filter ? (counts[filter] ?? 0) : totalOpen;
-  if (error)
+  if (error && !hasSnapshot)
     return (
       <ErrorState message={error} onRetry={() => void fetchIssues(true)} />
     );
@@ -675,6 +705,12 @@ export function Health() {
         </div>
       </PageHeaderLayout>
       <div className="mt-6 border-b border-border-quiet pb-8 text-text-muted">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <OpsSnapshotStatus
+            snapshot={hasSnapshot ? { stale } : null}
+            streamStatus={streamStatus}
+          />
+        </div>
         <p className="font-mono text-label">
           Latest check:{" "}
           {lastScan ? (
@@ -689,6 +725,15 @@ export function Health() {
           </p>
         ) : null}
       </div>
+
+      {refreshError ? (
+        <OpsRefreshNotice
+          message={refreshError}
+          onRetry={() => void fetchIssues(true)}
+          retrying={refreshing}
+          className="mt-5"
+        />
+      ) : null}
 
       <section aria-label="Library issues" className="mt-9 min-w-0">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
@@ -799,7 +844,7 @@ export function Health() {
             const canRunGlobalFix = fixAll !== "none";
             const hasArtistReview = Boolean(
               catalogEntry?.supports_artist_scope &&
-                items.some((issue) => issue.artist_id),
+              items.some((issue) => issue.artist_id),
             );
             const recordedCount = counts[check] ?? items.length;
             return (
@@ -1055,7 +1100,7 @@ export function Health() {
             {catalogItems.map((entry) => (
               <li key={entry.check_type} className="space-y-3 py-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-3">
-                  <h3 className="font-sans text-lg font-bold">
+                  <h3 className="font-display text-lg font-bold">
                     {CHECK_LABELS[entry.check_type] ||
                       entry.check_type.replace(/_/g, " ")}
                   </h3>

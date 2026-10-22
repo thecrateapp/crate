@@ -23,7 +23,7 @@ const headers: [string, string, string[]][] = [
     ["Sync collection", "Refresh Radar", "Backfill URLs"],
   ],
   ["discovery", "Discovery", ["Refresh", "Recompute gaps", "Check releases"]],
-  ["new-releases", "New Releases", ["Timeline", "Grid", "Check now"]],
+  ["new-releases", "Release Radar", ["Timeline", "Grid", "Check now"]],
   [
     "global-catalog",
     "Global Catalog",
@@ -32,7 +32,7 @@ const headers: [string, string, string[]][] = [
   ["roles", "Roles & Permissions", []],
   ["users", "Users", ["Invite user", "Add user"]],
   ["translations", "Listen Translations", ["Refresh"]],
-  ["upcoming", "Upcoming", ["Sync shows", "Clear caches"]],
+  ["upcoming", "Show Management", ["Sync shows", "Refresh setlists"]],
   ["playlists", "System Playlists", ["New static", "New smart"]],
   [
     "playlist-editor",

@@ -102,7 +102,7 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
   return (
     <div className="mb-8 rounded-md border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 font-display">
           <Music size={14} className="text-primary" />
           Audio Profile
         </h4>
@@ -195,9 +195,9 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
                   <span className="text-[11px] text-muted-foreground w-[70px] shrink-0">
                     {d.name}
                   </span>
-                  <div className="h-2 flex-1 bg-secondary rounded-md overflow-hidden">
+                  <div className="h-px flex-1 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-md transition-[width,background-color] duration-500 bg-primary"
+                      className="h-full rounded-full transition-[width,background-color] duration-500 bg-primary"
                       style={{ width: `${d.value}%` }}
                     />
                   </div>
@@ -245,7 +245,7 @@ function StatBox({
     <div className="bg-secondary/50 rounded-md border border-border-quiet p-3">
       <div className={`flex items-center gap-1.5 mb-1 ${color}`}>
         {icon}
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
           {label}
         </span>
       </div>

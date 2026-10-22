@@ -228,7 +228,7 @@ export function ShowCandidateList({
                     )
                   }
                 />
-                <h3 className="text-sm font-medium">
+                <h3 className="text-sm font-medium font-display">
                   {dateLabel
                     ? `Show ${number} · ${dateLabel}`
                     : `Show ${number}`}

@@ -228,7 +228,7 @@ export function ShowPlanSummary({
       className="space-y-4 rounded-md border border-border p-4"
     >
       <div className="space-y-0.5">
-        <h3 className="text-sm font-medium">Review before saving</h3>
+        <h3 className="text-sm font-medium font-display">Review before saving</h3>
         <p className="text-xs text-muted-foreground">
           {`${countLabel(plan.changes.length, "show")} to save`}
         </p>
@@ -256,7 +256,7 @@ export function ShowPlanSummary({
                     : "New"}
               </StatusBadge>
               <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-medium">{view.title}</h4>
+                <h4 className="text-sm font-medium font-display">{view.title}</h4>
                 <p className="text-xs text-muted-foreground">{view.subtitle}</p>
               </div>
             </div>

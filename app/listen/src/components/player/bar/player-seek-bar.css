@@ -26,6 +26,9 @@
     var(--surface-quiet) var(--seek-progress),
     var(--surface-quiet) 100%
   );
+  background-size: 100% 1px;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .listen-player-progress-glow {

@@ -199,25 +199,49 @@ describe("I18nReview", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("article", { name: "es locale health" }),
-    ).toHaveTextContent("1 draft");
+    ).toHaveAccessibleName("es locale health");
     expect(
-      screen.getByRole("article", { name: "es locale health" }),
-    ).toHaveTextContent("1 request");
+      within(
+        screen.getByRole("article", { name: "es locale health" }),
+      ).getByRole("group", { name: "1 draft" }),
+    ).toBeVisible();
     expect(
-      screen.getByRole("article", { name: "fr locale health" }),
-    ).toHaveTextContent("1 published");
+      within(
+        screen.getByRole("article", { name: "es locale health" }),
+      ).getByRole("group", { name: "1 request" }),
+    ).toBeVisible();
+    expect(
+      within(
+        screen.getByRole("article", { name: "fr locale health" }),
+      ).getByRole("group", { name: "1 published bundle" }),
+    ).toBeVisible();
     expect(
       screen.getByRole("article", { name: "de locale health" }),
     ).toHaveTextContent("No bundle yet");
   });
 
-  it.each([
-    [0, "0 published bundles"],
-    [1, "1 published bundle"],
-    [2, "2 published bundles"],
-  ])(
-    "names %i published bundles without pluralizing an adjective",
-    async (count, label) => {
+  it("uses the shared locale filter and filters bundles without native selects", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<I18nReview />);
+
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    expect(container.querySelectorAll("select")).toHaveLength(0);
+
+    const localeFilter = screen.getByRole("combobox", { name: "Locale" });
+    await user.click(localeFilter);
+    await user.click(await screen.findByRole("option", { name: "fr" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Review es" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Review fr" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([0, 1, 2])(
+    "shows the published bundle count for %i bundles",
+    async (count) => {
       const original = mockApi.getMockImplementation()!;
       mockApi.mockImplementation((url, ...args) =>
         url === "/api/admin/i18n/listen/bundles"
@@ -234,8 +258,10 @@ describe("I18nReview", () => {
         name: "fr locale health",
       });
       expect(
-        within(health).getByText(label, { exact: true }),
-      ).toBeInTheDocument();
+        within(health).getByRole("group", {
+          name: `${count} published bundle${count === 1 ? "" : "s"}`,
+        }),
+      ).toBeVisible();
     },
   );
 
@@ -499,8 +525,6 @@ it("keeps manual review available when AI draft action is unavailable", async ()
   mockApi.mockResolvedValue({ requests: [], bundles: [], locales: [] });
   render(<I18nReview />);
   expect(
-    screen.getByText(
-      /AI draft action unavailable; requests remain available for manual translation review/,
-    ),
+    screen.getByText(/AI drafts unavailable · manual review ready/),
   ).toBeVisible();
 });

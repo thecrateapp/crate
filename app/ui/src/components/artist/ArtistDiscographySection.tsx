@@ -60,7 +60,7 @@ export function ArtistDiscographySection({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
-          <h2 className="text-lg font-semibold">{albums.length} Albums</h2>
+          <h2 className="text-lg font-semibold font-display">{albums.length} Albums</h2>
           {missingAlbums.length > 0 && (
             <button
               onClick={onToggleShowMissing}

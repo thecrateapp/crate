@@ -1,7 +1,7 @@
 import { Slider } from "@crate/ui/primitives/Slider";
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { PageHeaderLayout } from "@/components/layout/PageHeader";
 import {
   useState,
   useEffect,
@@ -9,17 +9,19 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { Card, CardContent } from "@crate/ui/shadcn/card";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Input } from "@crate/ui/shadcn/input";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 
 import {
   Table,
@@ -29,7 +31,7 @@ import {
   TableBody,
   TableCell,
 } from "@crate/ui/shadcn/table";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useActionLLMStatus, type ActionLLMStatus } from "@/hooks/use-llm";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
@@ -46,22 +48,12 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Clock,
   Play,
   Wifi,
-  Info,
   X,
   Plus,
-  Download,
-  Bell,
-  ScrollText,
-  HardDrive,
   ExternalLink,
   Activity,
-  Zap,
-  Database,
-  Bot,
-  ShieldCheck,
 } from "lucide-react";
 
 const CACHE_ACTIONS = [
@@ -227,17 +219,17 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-4">
+    <section className="space-y-4">
       <div className="space-y-1">
-        <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+        <MonoLabel as="h3" tone="accent">
           {title}
-        </h3>
+        </MonoLabel>
         {description ? (
           <p className="text-sm text-white/45">{description}</p>
         ) : null}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -260,7 +252,7 @@ function Toggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-sm border border-white/10 bg-black/20 p-0.5 transition-colors disabled:opacity-50 ${
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-sm border border-border-quiet bg-card p-0.5 transition-colors disabled:opacity-50 ${
         checked ? "border-primary/35 bg-primary/15" : "bg-white/[0.04]"
       }`}
     >
@@ -283,9 +275,9 @@ function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-x-3 gap-y-2 rounded-md border border-white/6 bg-black/15 p-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
+    <div className="grid gap-x-3 gap-y-2 border-b border-border-quiet-subtle py-3 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
       <div className="space-y-1">
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <MonoLabel as="span">{label}</MonoLabel>
         {hint && (
           <p className="text-[11px] leading-relaxed text-white/30">{hint}</p>
         )}
@@ -308,73 +300,49 @@ function StatusDot({ ok }: { ok: boolean }) {
 }
 
 function StatTile({
-  icon: Icon,
   label,
   value,
   className,
 }: {
-  icon: typeof Activity;
   label: string;
   value: string;
   className?: string;
 }) {
   return (
-    <div
+    <StatNumber
+      value={value}
+      label={label}
+      as="div"
+      size="md"
       className={cn(
-        "rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
+        "w-full min-w-0 border-t border-border-quiet py-3",
         className,
       )}
-    >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-xs uppercase tracking-[0.12em] text-white/35">
-          {label}
-        </div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-white/70">
-          <Icon size={16} />
-        </div>
-      </div>
-      <div className="text-xl font-semibold tracking-tight text-white">
-        {value}
-      </div>
-    </div>
+    />
   );
 }
 
 function PanelCard({
-  icon: Icon,
   title,
   description,
   action,
   children,
 }: {
-  icon: typeof Info;
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Card className="border-white/10 bg-panel-surface shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
-      <CardHeader className="border-b">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-              <Icon size={18} />
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-base text-white">{title}</CardTitle>
-              {description ? (
-                <CardDescription className="text-sm text-white/45">
-                  {description}
-                </CardDescription>
-              ) : null}
-            </div>
-          </div>
-          {action ? <div className="shrink-0">{action}</div> : null}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 pt-6">{children}</CardContent>
-    </Card>
+    <div
+      role="group"
+      aria-label={title}
+      aria-description={description}
+      className="min-w-0 space-y-3"
+    >
+      {action ? <div className="flex justify-end">{action}</div> : null}
+      {children}
+    </div>
   );
 }
 
@@ -393,49 +361,41 @@ const NAV_ITEMS: {
   id: SettingsSection;
   label: string;
   description: string;
-  icon: typeof Info;
 }[] = [
   {
     id: "general",
     label: "General",
     description: "Library, worker and runtime basics",
-    icon: Info,
   },
   {
     id: "downloads",
     label: "Downloads",
     description: "Tidal, Soulseek and quiet hours",
-    icon: Download,
   },
   {
     id: "schedules",
     label: "Schedules",
     description: "Recurring tasks and cadence",
-    icon: Clock,
   },
   {
     id: "enrichment",
     label: "Enrichment",
     description: "Sources, thresholds and file types",
-    icon: Zap,
   },
   {
     id: "notifications",
     label: "Notifications",
     description: "Telegram bot and alerts",
-    icon: Bell,
   },
   {
     id: "storage",
     label: "Storage",
     description: "Database footprint and cache tools",
-    icon: HardDrive,
   },
   {
     id: "audit",
     label: "Audit Log",
     description: "Operational trail and filters",
-    icon: ScrollText,
   },
 ];
 
@@ -447,155 +407,104 @@ export function Settings() {
     loading,
     refetch,
   } = useApi<SettingsData>("/api/settings");
-  const [section, setSection] = useState<SettingsSection>("general");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSection = searchParams.get("section");
+  const section = NAV_ITEMS.some((item) => item.id === requestedSection)
+    ? (requestedSection as SettingsSection)
+    : "general";
+  const selectSection = (nextSection: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (nextSection === "general") next.delete("section");
+      else next.set("section", nextSection);
+      return next;
+    });
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
+      <div
+        role="status"
+        aria-label="Loading settings"
+        className="flex items-center justify-center gap-3 py-20 text-muted-foreground"
+      >
         <Loader2 size={18} className="animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-caps">
+          Loading settings
+        </span>
       </div>
     );
   }
 
   if (!settings) {
     return (
-      <div className="text-center py-20 text-sm text-muted-foreground">
-        Failed to load settings
+      <div className="space-y-6">
+        <AdminPageHeader>
+          <h1 className="text-2xl font-semibold tracking-tight text-white font-display">
+            Settings
+          </h1>
+        </AdminPageHeader>
+        <Card className="border-border-quiet bg-card">
+          <CardContent className="flex flex-col items-start gap-4 py-8">
+            <div>
+              <MonoLabel as="h2" tone="accent">
+                Settings unavailable
+              </MonoLabel>
+              <p role="alert" className="mt-2 text-sm text-text-muted">
+                Settings could not be loaded. Your saved configuration has not
+                changed.
+              </p>
+            </div>
+            <Button
+              className="min-h-11"
+              variant="outline"
+              onClick={() => void refetch()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  const activeSchedules = Object.values(settings.schedules || {}).filter(
-    (seconds) => seconds > 0,
-  ).length;
   const currentNav =
     NAV_ITEMS.find((item) => item.id === section) ?? NAV_ITEMS[0]!;
-  const CurrentIcon = currentNav.icon;
 
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary shadow-none">
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
-                  Settings
-                </h1>
-                <p className="text-sm text-white/55">
-                  Runtime controls, acquisition policy, enrichment behavior and
-                  operational guardrails.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <InfoBadge icon={Database}>
-                {formatNumber(settings.about.tracks)} tracks indexed
-              </InfoBadge>
-              <InfoBadge icon={Clock}>
-                Uptime {formatUptime(settings.about.uptime_seconds)}
-              </InfoBadge>
-              <InfoBadge icon={Zap}>
-                {activeSchedules} active schedules
-              </InfoBadge>
-              <InfoBadge
-                icon={Bot}
-                className={
-                  settings.telegram?.enabled
-                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                    : undefined
-                }
-              >
-                Telegram {settings.telegram?.enabled ? "enabled" : "idle"}
-              </InfoBadge>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[520px]">
-            <StatTile
-              icon={Activity}
-              label="Version"
-              value={settings.about.version || "dev"}
-            />
-            <StatTile
-              icon={HardDrive}
-              label="Library"
-              value={`${settings.about.total_size_gb} GB`}
-            />
-            <StatTile
-              icon={Download}
-              label="Storage"
-              value={settings.library?.storage_layout || "artist/album"}
-            />
-            <StatTile
-              icon={ScrollText}
-              label="Commit"
-              value={settings.about.git_commit?.slice(0, 8) || "local"}
-            />
-          </div>
+      <PageHeaderLayout as="header">
+        <div>
+          <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance">
+            Settings
+          </h1>
+          <p className="mt-3 text-sm text-text-muted">
+            Runtime, library, enrichment and notification controls.
+          </p>
         </div>
-      </section>
+      </PageHeaderLayout>
 
-      <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <Card className="hidden h-fit border-white/10 bg-panel-surface xl:block">
-          <CardContent className="p-3">
-            <div className="space-y-1">
-              {NAV_ITEMS.map(({ id, label, description, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setSection(id)}
-                  className={cn(
-                    "flex w-full items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors",
-                    section === id
-                      ? "border-white/12 bg-white/[0.06] text-white shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
-                      : "border-transparent text-white/55 hover:border-white/8 hover:bg-white/[0.03] hover:text-white/80",
-                  )}
-                >
-                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
-                    <Icon size={14} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="mt-0.5 text-xs leading-relaxed text-white/35">
-                      {description}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-5">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-action/20 bg-accent-action/12 text-primary">
-                <CurrentIcon size={18} />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight text-white">
-                  {currentNav.label}
-                </h2>
-                <p className="text-sm text-white/45">
-                  {currentNav.description}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
-              {NAV_ITEMS.map(({ id, label }) => (
-                <FilterChip
-                  key={id}
-                  active={section === id}
-                  onClick={() => setSection(id)}
-                >
-                  {label}
-                </FilterChip>
-              ))}
-            </div>
-          </div>
+      <Tabs
+        value={section}
+        onValueChange={selectSection}
+        className="min-w-0 gap-5"
+      >
+        <TabsList
+          aria-label="Settings sections"
+          className="w-full min-w-0 max-w-full"
+        >
+          {NAV_ITEMS.map(({ id, label }) => (
+            <TabsTrigger key={id} value={id}>
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent
+          value={section}
+          aria-label={`${currentNav.label} settings`}
+          className="mt-0 space-y-5"
+        >
+          <p className="text-sm text-text-muted">{currentNav.description}</p>
 
           {section === "general" && <GeneralSection settings={settings} />}
           {section === "downloads" && <DownloadsSection refetch={refetch} />}
@@ -618,8 +527,8 @@ export function Settings() {
             <StorageSection dbStats={settings.db_stats} />
           )}
           {section === "audit" && <AuditSection />}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -640,7 +549,6 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         description="Core library path, storage layout and current footprint."
       >
         <PanelCard
-          icon={HardDrive}
           title="Library Runtime"
           description="Where Crate reads from and how the indexed collection is currently shaped."
         >
@@ -655,26 +563,10 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
             </span>
           </FieldRow>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile
-              icon={Info}
-              label="Artists"
-              value={formatNumber(about.artists)}
-            />
-            <StatTile
-              icon={Info}
-              label="Albums"
-              value={formatNumber(about.albums)}
-            />
-            <StatTile
-              icon={Info}
-              label="Tracks"
-              value={formatNumber(about.tracks)}
-            />
-            <StatTile
-              icon={HardDrive}
-              label="Size"
-              value={`${about.total_size_gb} GB`}
-            />
+            <StatTile label="Artists" value={formatNumber(about.artists)} />
+            <StatTile label="Albums" value={formatNumber(about.albums)} />
+            <StatTile label="Tracks" value={formatNumber(about.tracks)} />
+            <StatTile label="Size" value={`${about.total_size_gb} GB`} />
           </div>
         </PanelCard>
       </Section>
@@ -684,7 +576,6 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         description="Live execution engine status, running work and queue pressure."
       >
         <PanelCard
-          icon={Activity}
           title="Worker Engine"
           description="Background tasks, pool health and current queue state."
         >
@@ -745,7 +636,6 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         description="Runtime identity and deployment metadata for this admin instance."
       >
         <PanelCard
-          icon={Info}
           title="Build & Runtime"
           description="Version fingerprint, Python runtime and current process uptime."
         >
@@ -760,14 +650,20 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
                 mono: true,
               },
             ].map(({ label, value, mono }) => (
-              <div key={label}>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  {label}
-                </div>
-                <div className={`text-sm mt-0.5 ${mono ? "font-mono" : ""}`}>
-                  {value}
-                </div>
-              </div>
+              <StatNumber
+                key={label}
+                value={
+                  mono ? (
+                    <span className="font-mono text-sm">{value}</span>
+                  ) : (
+                    value
+                  )
+                }
+                label={label}
+                as="div"
+                size="sm"
+                className="w-full min-w-0 border-t border-border-quiet py-3"
+              />
             ))}
           </div>
         </PanelCard>
@@ -889,7 +785,6 @@ function TidalCard() {
       description="Authentication and token health for Tidal acquisition."
     >
       <PanelCard
-        icon={Download}
         title="Tidal Access"
         description="Manage the current device auth session and token refresh flow."
       >
@@ -981,7 +876,6 @@ function SoulseekCard() {
       description="Fallback acquisition quality policy and slskd connectivity."
     >
       <PanelCard
-        icon={Wifi}
         title="Soulseek Preferences"
         description="Acquisition quality defaults and current daemon connection state."
       >
@@ -1069,7 +963,6 @@ function DownloadWindowCard() {
       description="Quiet hours and concurrency limits that gate acquisition."
     >
       <PanelCard
-        icon={Clock}
         title="Quiet Hours & Limits"
         description="Keep downloads out of busy listening windows and cap concurrent activity."
       >
@@ -1224,7 +1117,6 @@ function SchedulesSection({
       description="Intervals for recurring maintenance and enrichment jobs."
     >
       <PanelCard
-        icon={Clock}
         title="Recurring Jobs"
         description="Set the cadence for background maintenance. `0` disables a schedule."
         action={
@@ -1466,7 +1358,6 @@ function EnrichmentSection({
         description="Enable or disable the remote metadata providers Crate can use."
       >
         <PanelCard
-          icon={Zap}
           title="Enrichment Sources"
           description="Toggle providers that feed artist, album and social metadata into the library."
           action={
@@ -1501,7 +1392,6 @@ function EnrichmentSection({
         description="Control the optional AI review pass used after deterministic path generation."
       >
         <PanelCard
-          icon={Bot}
           title="AI refinement"
           description="An optional AI review after Crate computes a path. Paths work without it."
         >
@@ -1521,7 +1411,6 @@ function EnrichmentSection({
         description="Thresholds and limits that shape matching and scoring behavior."
       >
         <PanelCard
-          icon={Activity}
           title="Processing Rules"
           description="Tune matcher confidence, re-enrichment freshness and popularity coverage."
         >
@@ -1612,7 +1501,6 @@ function EnrichmentSection({
         description="Recognized source formats when scanning and importing music."
       >
         <PanelCard
-          icon={HardDrive}
           title="Accepted Audio Extensions"
           description="Control which file types the library watcher and sync jobs should treat as music."
         >
@@ -1705,7 +1593,6 @@ function NotificationsSection({
       description="Outbound operational notifications and test delivery."
     >
       <PanelCard
-        icon={Bell}
         title="Telegram Notifications"
         description="Send task and system messages through a bot linked to your chat."
       >
@@ -1793,20 +1680,19 @@ function StorageSection({
         description="Table volume and on-disk footprint for the current instance."
       >
         <PanelCard
-          icon={Database}
           title="Database Footprint"
           description="Row counts and size by table to spot growth and hot spots."
         >
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-[10px] uppercase tracking-wider">
+                <TableHead className="text-[10px] uppercase tracking-wider font-mono">
                   Table
                 </TableHead>
-                <TableHead className="text-right text-[10px] uppercase tracking-wider">
+                <TableHead className="text-right text-[10px] uppercase tracking-wider font-mono">
                   Rows
                 </TableHead>
-                <TableHead className="text-right text-[10px] uppercase tracking-wider">
+                <TableHead className="text-right text-[10px] uppercase tracking-wider font-mono">
                   Size
                 </TableHead>
               </TableRow>
@@ -1835,7 +1721,6 @@ function StorageSection({
         description="Targeted eviction for stale derived data and remote metadata caches."
       >
         <PanelCard
-          icon={Trash2}
           title="Cache Controls"
           description="Clear derived data without touching the underlying library."
         >
@@ -1912,7 +1797,6 @@ function AuditSection() {
       description="Operational history of changes, jobs and admin actions."
     >
       <PanelCard
-        icon={ScrollText}
         title="Operational Timeline"
         description="Filter and inspect recent admin activity across the system."
       >
@@ -1946,16 +1830,16 @@ function AuditSection() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-[10px] uppercase tracking-wider">
+                  <TableHead className="text-[10px] uppercase tracking-wider font-mono">
                     Time
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider">
+                  <TableHead className="text-[10px] uppercase tracking-wider font-mono">
                     Action
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider">
+                  <TableHead className="text-[10px] uppercase tracking-wider font-mono">
                     Type
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-wider">
+                  <TableHead className="text-[10px] uppercase tracking-wider font-mono">
                     Target
                   </TableHead>
                 </TableRow>

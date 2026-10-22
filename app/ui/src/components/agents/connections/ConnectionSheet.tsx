@@ -112,7 +112,7 @@ function SheetSection({
   return (
     <section aria-labelledby={headingId} className="space-y-3 py-5 first:pt-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
+        <h3 id={headingId} className="text-sm font-semibold text-foreground font-display">
           {title}
         </h3>
         {action}
@@ -157,7 +157,7 @@ function GrantedPermissions({
     <div className="space-y-3">
       {groups.map((group) => (
         <div key={group.id} className="space-y-1.5">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
             {group.label}
           </p>
           <ul className="space-y-1">
@@ -177,7 +177,7 @@ function GrantedPermissions({
       ))}
       {other.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
             Other
           </p>
           <ul className="space-y-1">

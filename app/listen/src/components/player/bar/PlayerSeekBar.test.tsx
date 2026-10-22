@@ -61,10 +61,10 @@ describe("PlayerSeekBar", () => {
 });
 
 it.each([
-  [false, "h-0.5"],
+  [false, "h-px"],
   [true, "h-px"],
 ] as const)(
-  "retains the glow trail with V3 thickness (thin=%s)",
+  "keeps the progress beam at one pixel and retains its glow trail (thin=%s)",
   (thin, heightClass) => {
     const onSeek = vi.fn();
     const { container } = renderWithListenProviders(

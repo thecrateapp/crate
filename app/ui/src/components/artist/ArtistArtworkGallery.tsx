@@ -295,10 +295,10 @@ export function ArtistArtworkGallery({
     <section className="rounded-md border border-border bg-card/55 p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+          <p className="text-xs font-normal uppercase tracking-[0.18em] text-primary font-mono">
             Curated source library
           </p>
-          <h3 className="mt-1 text-xl font-semibold text-foreground">
+          <h3 className="mt-1 text-xl font-semibold text-foreground font-display">
             Artist image gallery
           </h3>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -445,7 +445,7 @@ export function ArtistArtworkGallery({
       {candidates.length > 0 ? (
         <div className="mt-7 border-t border-border pt-5">
           <div>
-            <h4 className="text-sm font-semibold text-foreground">
+            <h4 className="text-sm font-semibold text-foreground font-display">
               Available candidates
             </h4>
             <p className="mt-1 text-xs text-muted-foreground">

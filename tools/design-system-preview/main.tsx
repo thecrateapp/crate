@@ -1105,7 +1105,6 @@ function App() {
                 value={36}
                 max={48}
                 valueText="36/48"
-                thickness={2}
               />
               <Meter
                 label="Transcodificación"
@@ -1114,7 +1113,6 @@ function App() {
                 limit={3}
                 over={meterOver}
                 valueText={meterOver ? "5/4" : "2/4"}
-                thickness={2}
               />
               <Meter label="Sin datos" value={null} max={4} valueText="n/a" />
             </div>
@@ -1130,19 +1128,13 @@ function App() {
           <InstrumentPanel
             as="section"
             headingLevel={3}
-            label={{ children: "Grosores de la escala" }}
+            label={{ children: "Trazo de 1 px" }}
           >
-            <div className="meter-preview-rows">
-              {([1, 2, 3, 4] as const).map((thickness) => (
-                <Meter
-                  key={thickness}
-                  label={`Grosor ${thickness}`}
-                  value={48}
-                  max={100}
-                  valueText="48%"
-                  thickness={thickness}
-                />
-              ))}
+            <p className="admin-baseline-note">
+              Todas las barras de progreso mantienen el mismo trazo fino de 1 px.
+            </p>
+            <div className="meter-preview-rows mt-4">
+              <Meter label="Capacidad" value={48} max={100} valueText="48%" />
             </div>
           </InstrumentPanel>
         </div>

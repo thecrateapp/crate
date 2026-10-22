@@ -57,7 +57,7 @@ function Biography({
   return (
     <div className="max-w-3xl">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-white/70">Biography</h3>
+        <h3 className="text-sm font-semibold text-white/70 font-display">Biography</h3>
         {canResearch && onResearch ? (
           <AIButton
             actionId="artists.bio.research"
@@ -95,7 +95,7 @@ function TopTracks({ tracks }: { tracks: TopTrack[] }) {
   if (tracks.length === 0) return null;
   return (
     <div className="max-w-2xl">
-      <h3 className="mb-2 text-sm font-semibold text-white/70">Top Tracks</h3>
+      <h3 className="mb-2 text-sm font-semibold text-white/70 font-display">Top Tracks</h3>
       <div className="space-y-0.5">
         {tracks.slice(0, 5).map((track, index) => {
           const coverUrl =
@@ -208,7 +208,7 @@ function OverviewStats({
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Stats</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Stats</h3>
       <div className="grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {visibleStats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
@@ -222,7 +222,7 @@ function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
   if (links.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Links</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Links</h3>
       <div className="flex flex-wrap gap-2">
         {links.map((link) => (
           <a

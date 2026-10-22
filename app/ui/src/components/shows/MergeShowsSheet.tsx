@@ -48,7 +48,7 @@ function MergeReview({ plan }: { plan: ShowConsolidationPlan }) {
     >
       {view.keep ? (
         <div role="group" aria-labelledby={keepId} className="space-y-1.5">
-          <h3 id={keepId} className="text-sm font-medium">
+          <h3 id={keepId} className="text-sm font-medium font-display">
             Keep
           </h3>
           <ShowSummary show={view.keep} />
@@ -56,7 +56,7 @@ function MergeReview({ plan }: { plan: ShowConsolidationPlan }) {
       ) : null}
       {view.merge.length ? (
         <div role="group" aria-labelledby={mergeId} className="space-y-1.5">
-          <h3 id={mergeId} className="text-sm font-medium">
+          <h3 id={mergeId} className="text-sm font-medium font-display">
             Merge into it
           </h3>
           <ul className="space-y-2">

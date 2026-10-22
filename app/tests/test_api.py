@@ -1087,10 +1087,23 @@ class TestImportsAPI:
                 "status": "pending",
             }
         ]
-        with patch("crate.api.imports.list_import_queue_items", return_value=pending):
+        with patch(
+            "crate.api.imports.list_import_queue_items", return_value=pending
+        ) as mock_list:
             resp = test_app.get("/api/imports/pending")
             assert resp.status_code == 200
             assert resp.json() == pending
+            mock_list.assert_called_once_with(status="pending", limit=1000)
+
+    def test_imports_queue_lists_all_statuses_with_a_bounded_limit(self, test_app):
+        with patch(
+            "crate.api.imports.list_import_queue_items", return_value=[]
+        ) as mock_list:
+            resp = test_app.get("/api/imports/pending?status=all&limit=200")
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+        mock_list.assert_called_once_with(status=None, limit=200)
 
     def test_imports_import_queues_worker_task(self, test_app):
         with patch(
@@ -2085,7 +2098,12 @@ class TestShowsAPI:
                 "city": "Sevilla",
                 "country": "Spain",
                 "country_code": "ES",
-                "lineup": ["Converge"],
+                "lineup": [
+                    "Converge",
+                    "Support Act",
+                    "  support   act ",
+                    "CONVERGE",
+                ],
             }
         ]
         refs = {"converge": {"id": 7, "slug": "converge"}}
@@ -2099,7 +2117,21 @@ class TestShowsAPI:
             patch("crate.api.browse_artist._lookup_artist_refs", return_value=refs),
             patch(
                 "crate.api.browse_artist._show_lineup_artists",
-                return_value=[{"name": "Converge", "id": 7, "slug": "converge"}],
+                return_value=[
+                    {"name": "Converge", "id": 7, "slug": "converge"},
+                    {"name": "Support Act"},
+                ],
+            ),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={
+                    "converge": {
+                        "status": "fresh",
+                        "generated_at": "2026-10-22T10:00:00+00:00",
+                        "song_count": 12,
+                    },
+                    "support act": {"status": "stale", "song_count": 8},
+                },
             ),
         ):
             resp = test_app.get("/api/shows/cached?limit=5")
@@ -2108,6 +2140,52 @@ class TestShowsAPI:
         data = resp.json()
         assert data["events"][0]["id"] == "62"
         assert data["events"][0]["artist_slug"] == "converge"
+        assert data["setlist_coverage"] == {
+            "artist_count": 2,
+            "fresh": 1,
+            "stale": 1,
+            "missing": 0,
+            "unknown": 0,
+            "queued": None,
+        }
+        assert data["events"][0]["lineup_artists"][0]["probable_setlist_status"] == "fresh"
+        assert data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
+
+    def test_refresh_show_setlists_queues_each_non_fresh_billed_artist(self, test_app):
+        shows = [
+            {
+                "artist_name": "Main Act",
+                "lineup": ["Main Act", "Support Act", " support   act "],
+            },
+            {"artist_name": "Another Act", "lineup": ["Another Act"]},
+        ]
+        with (
+            patch("crate.api.browse_artist.db_get_shows", return_value=shows),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={
+                    "main act": {"status": "fresh"},
+                    "support act": {"status": "missing"},
+                    "another act": {"status": "stale"},
+                },
+            ),
+            patch(
+                "crate.setlistfm.queue_probable_setlist_refreshes",
+                return_value=["task-a", "task-b"],
+            ) as queue,
+        ):
+            response = test_app.post("/api/shows/probable-setlists/refresh")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "artist_count": 3,
+            "fresh": 1,
+            "stale": 1,
+            "missing": 1,
+            "unknown": 0,
+            "queued": 2,
+        }
+        queue.assert_called_once_with(["Support Act", "Another Act"], force=True)
 
 
 class TestAdminLogsAPI:
@@ -2209,6 +2287,39 @@ class TestAdminMetricsAPI:
 
 
 class TestHealthAPI:
+    def test_portable_album_metadata_reads_catalog_payload(self, test_app):
+        payload = {
+            "schema_version": 1,
+            "artist": {"name": "Artist"},
+            "album": {"id": 27, "name": "Album"},
+            "tracks": [{"title": "Track"}],
+            "portable_metadata": {
+                "sidecar_path": None,
+                "sidecar_written_at": None,
+                "audio_tags_written_at": None,
+                "tracks": 1,
+                "tags_written": 1,
+                "tag_errors": 0,
+                "export_path": None,
+                "exported_at": None,
+                "updated_at": None,
+            },
+        }
+        with patch(
+            "crate.api.management.get_portable_album_payload", return_value=payload
+        ) as mock_read:
+            response = test_app.get("/api/manage/albums/27/portable-metadata")
+
+        assert response.status_code == 200
+        assert response.json() == payload
+        mock_read.assert_called_once_with(27, include_portable_status=True)
+
+    def test_portable_album_metadata_returns_404_for_unknown_album(self, test_app):
+        with patch("crate.api.management.get_portable_album_payload", return_value=None):
+            response = test_app.get("/api/manage/albums/999999/portable-metadata")
+
+        assert response.status_code == 404
+
     def test_album_metadata_tasks_accept_entity_uid_scope(self, test_app):
         album_uid = "11111111-2222-4333-8444-555555555555"
 

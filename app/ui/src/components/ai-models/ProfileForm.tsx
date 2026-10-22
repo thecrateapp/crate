@@ -261,7 +261,7 @@ export function ProfileForm({
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="font-display">
             {profile ? `New version of ${profile.label}` : "New profile"}
           </DialogTitle>
           <DialogDescription>

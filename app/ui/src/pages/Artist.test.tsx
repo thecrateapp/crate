@@ -1,8 +1,17 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Routes } from "react-router";
 
-import { MergeArtistDialog, refreshArtistProbableSetlist } from "./Artist";
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
+
+const { mockUseApi } = vi.hoisted(() => ({ mockUseApi: vi.fn() }));
+
+import {
+  Artist,
+  MergeArtistDialog,
+  refreshArtistProbableSetlist,
+} from "./Artist";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
@@ -16,7 +25,7 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("@/hooks/use-api", () => ({
-  useApi: () => ({ data: null, loading: false, refetch: vi.fn() }),
+  useApi: mockUseApi,
 }));
 
 vi.mock("@/hooks/use-artist-data", () => ({
@@ -104,6 +113,12 @@ const mockWaitForTask = vi.mocked(waitForTask);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUseApi.mockReturnValue({
+    data: null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
   mockApi.mockResolvedValue({
     artists: [
       {
@@ -113,6 +128,62 @@ beforeEach(() => {
         name: "Target Artist",
       },
     ],
+  });
+});
+
+describe("Artist page load state", () => {
+  it("loads an artist reached through the legacy numeric-ID URL", async () => {
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug/:albumSlug" element={<Artist />} />
+      </Routes>,
+      { route: "/artists/42/the-clash" },
+    );
+
+    await waitFor(() => {
+      expect(mockUseApi).toHaveBeenCalledWith("/api/artists/42");
+    });
+  });
+
+  it("shows a retryable error when the artist request fails", async () => {
+    const refetch = vi.fn();
+    mockUseApi.mockImplementation((url: string | null) => ({
+      data: null,
+      loading: false,
+      error: url ? "network error" : null,
+      refetch,
+    }));
+
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug" element={<Artist />} />
+      </Routes>,
+      { route: "/artists/camel" },
+    );
+
+    expect(
+      screen.getByText(
+        "This artist could not be loaded. Try again or return to Browse.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes an absent artist from a failed request", () => {
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug" element={<Artist />} />
+      </Routes>,
+      { route: "/artists/missing-artist" },
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Artist not found" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Browse artists" }),
+    ).toHaveAttribute("href", "/browse");
   });
 });
 

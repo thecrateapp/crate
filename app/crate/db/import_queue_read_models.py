@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from crate.db.import_queue_mutations import (
     mark_import_queue_item_imported,
+    mark_import_queue_item_importing,
+    mark_import_queue_item_pending,
     remove_import_queue_item,
 )
 from crate.db.import_queue_queries import (
@@ -16,6 +18,8 @@ __all__ = [
     "count_import_queue_items",
     "list_import_queue_items",
     "mark_import_queue_item_imported",
+    "mark_import_queue_item_importing",
+    "mark_import_queue_item_pending",
     "refresh_import_queue_items",
     "remove_import_queue_item",
 ]

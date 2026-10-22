@@ -3,6 +3,7 @@ import {
   PageHeaderActions,
   PageHeaderLayout,
 } from "@/components/layout/PageHeader";
+import { AdminPageHeader } from "@/components/admin/ops-surfaces";
 import {
   RefreshCw as HeaderRefreshCw,
   Trash2 as HeaderTrash2,
@@ -231,7 +232,7 @@ export function Trash() {
 
   return (
     <div className="space-y-6">
-      <section className="border-b border-border-quiet pb-6">
+      <AdminPageHeader>
         <PageHeaderLayout
           actions={
             <PageHeaderActions>
@@ -299,7 +300,7 @@ export function Trash() {
             </div>
           </div>
         </PageHeaderLayout>
-      </section>
+      </AdminPageHeader>
 
       <Card className="border-border-quiet bg-card">
         {loading ? (
@@ -343,7 +344,7 @@ export function Trash() {
                     <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
                       {item.quarantine_path}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-white/40">
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-white/40 font-mono">
                       <span>{technicalLine(item)}</span>
                     </div>
                   </div>

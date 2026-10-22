@@ -86,7 +86,7 @@ for (const width of [1440, 768, 390]) {
       await page.keyboard.press("Enter");
       await expect(refresh).toBeDisabled();
       await expect(refresh).toHaveAttribute("aria-busy", "true");
-      await expect(real.locator("svg[data-admin-ux]")).toHaveCount(2);
+      await expect(real.locator("svg[data-admin-ux]")).toHaveCount(1);
       await page
         .getByRole("button", {
           name: "Completar lectura de muestra",
@@ -127,9 +127,12 @@ for (const width of [1440, 768, 390]) {
         .click();
       await expect(first).toBeVisible();
       await page.getByRole("radio", { name: "Error", exact: true }).click();
+      await expect(real.getByRole("alert")).toContainText(
+        "Contributions unavailable",
+      );
       await expect(
         real.getByText("No contributions yet", { exact: true }),
-      ).toBeVisible();
+      ).toHaveCount(0);
       await expect(
         page.getByText("Lectura de muestra no disponible", { exact: true }),
       ).toBeVisible();

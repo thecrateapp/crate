@@ -535,7 +535,7 @@ export function HeroCompositionCanvas({
           ) : null}
         </ArtistHeroFrame>
         {!previewOnly ? (
-          <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-md border border-border-quiet bg-surface-overlay px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted backdrop-blur-md">
+          <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-md border border-border-quiet bg-surface-overlay px-2.5 py-1 text-[10px] font-normal uppercase tracking-[0.16em] text-text-muted backdrop-blur-md font-mono">
             {recipe.mode === "crop" ? "Crop" : "Fill preview"} · {composition}
           </div>
         ) : null}

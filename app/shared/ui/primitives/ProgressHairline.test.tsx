@@ -73,6 +73,7 @@ describe("ProgressHairline", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "100");
     expect(bar).toHaveAttribute("aria-valuenow", "25");
     expect(bar).toHaveAttribute("aria-valuetext", "1 of 4 artists");
+    expect(bar).not.toHaveAttribute("data-thickness");
     expect(fill.style.getPropertyValue("--p")).toBe("0.25");
 
     rerender(

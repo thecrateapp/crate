@@ -68,6 +68,15 @@ src/index.css              Imports Roboto, @crate/ui tokens, Tailwind; @source "
   use its accent tone; destinations change foreground to accent on hover without a background fill.
   Keep the active marker, counters, capability gates and 44px navigation targets in all presentations.
 
+## Typography roles
+
+- Bricolage Grotesque is for page titles, section headings and entity titles.
+- Roboto is for readable copy, form values, buttons and general interface text. In Admin,
+  `font-sans` resolves to the Roboto brand face.
+- JetBrains Mono is for MonoLabel and other uppercase labels, compact metadata, numbers and
+  tables, dates, technical states and identifiers. Keep its supplied weight at400.
+- Keep these roles consistent instead of choosing a face by component or page.
+
 ## Snapshot streams and SSE
 
 Admin surfaces are snapshot-backed: REST snapshot for first paint, then an SSE stream pushes full replacement payloads.

@@ -60,3 +60,27 @@ export function useOpsSnapshot() {
   };
 }
 export function useNotifications() {}
+
+export function usePendingApprovals() {
+  return 0;
+}
+
+export function useTaskCatalog() {
+  return {
+    categories: { library: "Library" },
+    types: [],
+    actions: [
+      {
+        id: "sync-library",
+        label: "Sync Library",
+        task_type: "sync_library",
+        task_label: "Sync Library",
+        category: "library",
+        path: "/api/tasks/sync-library",
+        capability: "library.import.manage",
+        icon: "refresh",
+        body: null,
+      },
+    ],
+  };
+}

@@ -1,13 +1,20 @@
-import { EventDate } from "@/components/ui/EventDate";
-import { EventRow } from "@/components/ui/EventRow";
+import { AdminPageHeader, OpsSurface } from "@/components/admin/ops-surfaces";
 import {
-  ExternalLink as RowOpen,
-  Download as RowDownload,
-  X as RowDismiss,
+  Calendar,
+  ExternalLink,
+  UserRound,
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import {
+  ActionButton,
+  ActionGroup,
+  ActionLink,
+} from "@crate/ui/primitives/ActionGroup";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -15,7 +22,6 @@ import {
 } from "@/components/layout/PageHeader";
 import {
   CalendarSync as HeaderCalendarSync,
-  Eraser as HeaderEraser,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +44,7 @@ import { MergeShowsButton } from "@/components/shows/MergeShowsButton";
 import { MergeShowsSheet } from "@/components/shows/MergeShowsSheet";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { ListPagination } from "@/components/admin/ListPagination";
 
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
@@ -49,8 +56,11 @@ import {
 import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { albumPagePath, artistPagePath } from "@/lib/library-routes";
-import { cn } from "@/lib/utils";
+import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import { cn, timeAgo } from "@/lib/utils";
+import { UpcomingDateStamp } from "@crate/ui/domain/shows/UpcomingDateStamp";
+import { UpcomingEventRow } from "@crate/ui/domain/shows/UpcomingEventRow";
+import "./upcoming-show-ticket.css";
 import {
   buildUpcomingCityOptions,
   buildUpcomingGenreOptions,
@@ -83,7 +93,7 @@ L.Icon.Default.mergeOptions({
 });
 
 interface UpcomingItem {
-  type: "release" | "show";
+  type: "show";
   /** The canonical show ID, on show items only. */
   show_id?: number;
   date: string;
@@ -92,14 +102,9 @@ interface UpcomingItem {
   artist_id?: number;
   artist_slug?: string;
   title: string;
-  album_id?: number;
-  album_slug?: string;
   subtitle: string;
   cover_url: string | null;
   status: string;
-  is_upcoming: boolean;
-  tidal_url?: string;
-  release_id?: number;
   url?: string;
   venue?: string;
   address_line1?: string;
@@ -113,17 +118,66 @@ interface UpcomingItem {
   lineup?: string[];
   lineup_artists?: UpcomingArtistRef[];
   genres?: string[];
+  probable_setlist_status?:
+    "fresh" | "stale" | "missing" | "unknown" | "refreshing";
+  probable_setlist_generated_at?: string | null;
+  probable_setlist_song_count?: number;
+  probable_setlist_source_show_count?: number | null;
+  probable_setlist_mode?: string | null;
+  probable_setlist_tour_name?: string | null;
+}
+
+interface CachedShowEvent {
+  id: string;
+  show_id?: number | null;
+  artist_name: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  date: string;
+  local_time?: string | null;
+  venue?: string | null;
+  address_line1?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  country_code?: string | null;
+  url?: string | null;
+  image_url?: string | null;
+  lineup?: string[] | null;
+  lineup_artists?: UpcomingArtistRef[];
+  artist_genres?: string[];
+  probable_setlist_status?: UpcomingItem["probable_setlist_status"];
+  probable_setlist_generated_at?: string | null;
+  probable_setlist_song_count?: number;
+  probable_setlist_source_show_count?: number | null;
+  probable_setlist_mode?: string | null;
+  probable_setlist_tour_name?: string | null;
+}
+
+interface SetlistCoverage {
+  artist_count: number;
+  fresh: number;
+  stale: number;
+  missing: number;
+  unknown: number;
+  queued?: number | null;
 }
 
 interface UpcomingArtistRef {
   name: string;
   id?: number;
   slug?: string;
+  probable_setlist_status?: UpcomingItem["probable_setlist_status"];
+  probable_setlist_generated_at?: string | null;
+  probable_setlist_song_count?: number;
+  probable_setlist_source_show_count?: number | null;
+  probable_setlist_mode?: string | null;
+  probable_setlist_tour_name?: string | null;
 }
 
 type ViewMode = "list" | "calendar";
-type TypeFilter = "all" | "releases" | "shows";
-
+const SHOWS_PAGE_SIZE = 20;
 const NOT_LISTED_TEXT = "That show isn't in the upcoming list.";
 
 /** The DOM id a linked show scrolls to. */
@@ -136,24 +190,9 @@ function showAnchorId(showId: number): string {
  * exact twins (two saved shows with the same details) stay apart.
  */
 function itemKey(item: UpcomingItem): string {
-  if (item.type === "show" && item.show_id != null)
-    return `show-${item.show_id}`;
-  return `${item.type}-${item.artist}-${
-    item.release_id ?? item.url ?? item.venue ?? item.title
-  }-${item.date}`;
-}
-
-function buildArtistRef(
-  name?: string,
-  id?: number,
-  slug?: string,
-): UpcomingArtistRef | null {
-  if (!name) return null;
-  return { name, id, slug };
-}
-
-function getPrimaryArtist(item: UpcomingItem): UpcomingArtistRef | null {
-  return buildArtistRef(item.artist, item.artist_id, item.artist_slug);
+  return item.show_id != null
+    ? `show-${item.show_id}`
+    : `show-${item.artist}-${item.venue ?? item.title}-${item.date}`;
 }
 
 function getArtistHref(artist: UpcomingArtistRef | null | undefined) {
@@ -165,55 +204,26 @@ function getArtistHref(artist: UpcomingArtistRef | null | undefined) {
   });
 }
 
-function getReleaseAlbumHref(item: UpcomingItem) {
-  if (item.type !== "release") return undefined;
-  if (item.album_id == null && !item.album_slug) return undefined;
-  return albumPagePath({
-    albumId: item.album_id,
-    albumSlug: item.album_slug,
-    albumName: item.title,
-    artistSlug: item.artist_slug,
-    artistName: item.artist,
-  });
-}
-
-function ArtistTextLink({
-  artist,
-  className,
-  children,
-}: {
-  artist: UpcomingArtistRef | null | undefined;
-  className?: string;
-  children?: ReactNode;
-}) {
-  const href = getArtistHref(artist);
-  const content = children ?? artist?.name ?? "";
-  if (href) {
-    return (
-      <Link to={href} className={className}>
-        {content}
-      </Link>
-    );
-  }
-  return <span className={className}>{content}</span>;
-}
-
 export function Upcoming() {
-  const { isAdmin, hasCapability, hasAnyCapability } = useAuth();
+  const { hasCapability } = useAuth();
   const canCurateShows = hasCapability("curation.shows.write");
-  const canCurateReleases = hasCapability("curation.releases.write");
-  const canAcquireReleases = hasAnyCapability([
-    "curation.releases.write",
-    "library.tidal.manage",
-  ]);
+  const canRefreshSetlists = hasCapability("library.metadata.write");
   const [items, setItems] = useState<UpcomingItem[]>([]);
+  const [setlistCoverage, setSetlistCoverage] = useState<SetlistCoverage>({
+    artist_count: 0,
+    fresh: 0,
+    stale: 0,
+    missing: 0,
+    unknown: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<TypeFilter>("all");
   const [genreFilter, setGenreFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>("list");
   const [syncing, setSyncing] = useState(false);
+  const [refreshingSetlists, setRefreshingSetlists] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [calMonth, setCalMonth] = useState(() => {
     const now = new Date();
@@ -231,8 +241,63 @@ export function Upcoming() {
 
   async function fetchItems() {
     try {
-      const data = await api<{ items: UpcomingItem[] }>("/api/upcoming");
-      setItems(data.items || []);
+      const data = await api<{
+        events: CachedShowEvent[];
+        setlist_coverage?: SetlistCoverage;
+      }>("/api/shows/cached?limit=5000");
+      setItems(
+        (data.events || []).map((show) => ({
+          type: "show",
+          show_id: show.show_id ?? Number(show.id),
+          date: show.date?.slice(0, 10) || "",
+          time: show.local_time || "",
+          artist: show.artist_name,
+          artist_id: show.artist_id ?? undefined,
+          artist_slug: show.artist_slug ?? undefined,
+          title: show.venue || show.artist_name,
+          subtitle: [show.venue, show.city, show.country]
+            .filter(Boolean)
+            .join(" · "),
+          cover_url: show.image_url || null,
+          status: "onsale",
+          is_upcoming: true,
+          url: show.url || undefined,
+          venue: show.venue || "",
+          address_line1: show.address_line1 || undefined,
+          city: show.city || "",
+          region: show.region || undefined,
+          postal_code: show.postal_code || undefined,
+          country: show.country || "",
+          country_code: show.country_code || undefined,
+          latitude: undefined,
+          longitude: undefined,
+          lineup: show.lineup || [],
+          genres: show.artist_genres || [],
+          probable_setlist_status: show.probable_setlist_status || "unknown",
+          probable_setlist_generated_at:
+            show.probable_setlist_generated_at || null,
+          probable_setlist_song_count: show.probable_setlist_song_count || 0,
+          probable_setlist_source_show_count:
+            show.probable_setlist_source_show_count ?? null,
+          probable_setlist_mode: show.probable_setlist_mode ?? null,
+          probable_setlist_tour_name: show.probable_setlist_tour_name ?? null,
+          lineup_artists: (show.lineup_artists || []).map((artist) => ({
+            ...artist,
+            probable_setlist_mode: artist.probable_setlist_mode ?? null,
+            probable_setlist_tour_name:
+              artist.probable_setlist_tour_name ?? null,
+          })),
+        })),
+      );
+      setSetlistCoverage(
+        data.setlist_coverage || {
+          artist_count: 0,
+          fresh: 0,
+          stale: 0,
+          missing: 0,
+          unknown: 0,
+        },
+      );
     } catch {
       /* */
     } finally {
@@ -245,31 +310,35 @@ export function Upcoming() {
   }, []);
 
   const availableGenres = useMemo(() => {
-    return buildUpcomingGenreOptions(items, { type: filter, search });
-  }, [items, filter, search]);
+    return buildUpcomingGenreOptions(items, { type: "shows", search });
+  }, [items, search]);
 
   const availableCities = useMemo(() => {
-    return buildUpcomingCityOptions(items, { type: filter });
-  }, [items, filter]);
+    return buildUpcomingCityOptions(items, { type: "shows" });
+  }, [items]);
 
   // Reset genre/city filter if the selected value is no longer available
   useEffect(() => {
-    if (genreFilter && !availableGenres.some(([g]) => g === genreFilter))
+    if (genreFilter && !availableGenres.some(([g]) => g === genreFilter)) {
       setGenreFilter("");
+      setPage(1);
+    }
   }, [genreFilter, availableGenres]);
   useEffect(() => {
-    if (cityFilter && !availableCities.some(([c]) => c === cityFilter))
+    if (cityFilter && !availableCities.some(([c]) => c === cityFilter)) {
       setCityFilter("");
+      setPage(1);
+    }
   }, [cityFilter, availableCities]);
 
   const filtered = useMemo(() => {
     return filterUpcomingItems(items, {
-      type: filter,
+      type: "shows",
       search,
       genre: genreFilter,
       city: cityFilter,
     });
-  }, [items, filter, search, genreFilter, cityFilter]);
+  }, [items, search, genreFilter, cityFilter]);
 
   const openLinkedShow = useEffectEvent((raw: string) => {
     const next = new URLSearchParams(searchParams);
@@ -284,20 +353,31 @@ export function Upcoming() {
       return;
     }
     setLinkNotice("");
-    const type = filter === "releases" ? "shows" : filter;
-    setFilter(type);
-    if (
-      !filterUpcomingItems([item], {
-        type,
+    const isInCurrentResults =
+      filterUpcomingItems([item], {
+        type: "shows",
         search,
         genre: genreFilter,
         city: cityFilter,
-      }).length
-    ) {
+      }).length > 0;
+    const targetItems = isInCurrentResults
+      ? filtered
+      : filterUpcomingItems(items, {
+          type: "shows",
+          search: "",
+          genre: "",
+          city: "",
+        });
+    const targetIndex = targetItems.findIndex(
+      (candidate) => itemKey(candidate) === itemKey(item),
+    );
+    if (!isInCurrentResults) {
       setSearch("");
       setGenreFilter("");
       setCityFilter("");
     }
+    if (targetIndex >= 0)
+      setPage(Math.floor(targetIndex / SHOWS_PAGE_SIZE) + 1);
     setView("list");
     setExpandedId(itemKey(item));
     setScrollTo(showId);
@@ -307,42 +387,18 @@ export function Upcoming() {
   }, [loading, linkedShowId]);
   useEffect(() => {
     if (scrollTo === null) return;
-    document
-      .getElementById(showAnchorId(scrollTo))
-      ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    const anchor = document.getElementById(showAnchorId(scrollTo));
+    if (!anchor) return;
+    anchor.scrollIntoView?.({ block: "center", behavior: "smooth" });
     setScrollTo(null);
-  }, [scrollTo]);
+  }, [scrollTo, page]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = filtered.filter(
-    (i) => i.is_upcoming || (i.date && i.date >= today),
+  const pageCount = Math.max(1, Math.ceil(filtered.length / SHOWS_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const upcoming = filtered.slice(
+    (currentPage - 1) * SHOWS_PAGE_SIZE,
+    currentPage * SHOWS_PAGE_SIZE,
   );
-  const past = filtered.filter(
-    (i) => !i.is_upcoming && (!i.date || i.date < today),
-  );
-
-  async function downloadRelease(id: number) {
-    try {
-      await api(`/api/acquisition/new-releases/${id}/download`, "POST");
-      toast.success("Download started");
-      setItems((prev) =>
-        prev.map((i) =>
-          i.release_id === id ? { ...i, status: "downloading" } : i,
-        ),
-      );
-    } catch {
-      toast.error("Download failed");
-    }
-  }
-
-  async function dismissRelease(id: number) {
-    try {
-      await api(`/api/acquisition/new-releases/${id}/dismiss`, "POST");
-      setItems((prev) => prev.filter((i) => i.release_id !== id));
-    } catch {
-      toast.error("Dismiss failed");
-    }
-  }
 
   async function syncShows() {
     setSyncing(true);
@@ -359,22 +415,27 @@ export function Upcoming() {
     }
   }
 
-  async function clearCaches() {
+  async function refreshStaleSetlists() {
+    setRefreshingSetlists(true);
     try {
-      await api("/api/tasks/clean/completed", "POST");
-      toast.success("Caches cleared");
-      fetchItems();
+      const result = await api<SetlistCoverage>(
+        "/api/shows/probable-setlists/refresh",
+        "POST",
+      );
+      setSetlistCoverage(result);
+      if ((result.queued || 0) > 0) {
+        toast.success(`Queued ${result.queued} probable setlist refreshes`);
+      } else {
+        toast.success("All probable setlists are up to date");
+      }
     } catch {
-      toast.error("Failed to clear");
+      toast.error("Could not refresh probable setlists");
+    } finally {
+      setRefreshingSetlists(false);
     }
   }
 
-  const releaseCount = items.filter(
-    (i) => i.type === "release" && i.is_upcoming,
-  ).length;
   const showCount = items.filter((i) => i.type === "show").length;
-  const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
-  const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
   const showActions = canCurateShows
     ? (item: UpcomingItem) =>
         item.show_id ? (
@@ -396,7 +457,7 @@ export function Upcoming() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
+      <AdminPageHeader>
         <PageHeaderLayout
           actions={
             <PageHeaderActions>
@@ -424,12 +485,32 @@ export function Upcoming() {
                   ) : null}
                 </PageHeaderAction>
               ) : null}
-              {isAdmin ? (
-                <PageHeaderAction label="Clear caches" onClick={clearCaches}>
-                  <HeaderEraser
-                    data-admin-ux="header-clear-caches"
-                    aria-hidden="true"
-                  />
+              {canRefreshSetlists ? (
+                <PageHeaderAction
+                  label={
+                    refreshingSetlists
+                      ? "Refreshing setlists…"
+                      : "Refresh setlists"
+                  }
+                  onClick={refreshStaleSetlists}
+                  disabled={
+                    refreshingSetlists ||
+                    setlistCoverage.stale +
+                      setlistCoverage.missing +
+                      setlistCoverage.unknown ===
+                      0
+                  }
+                  aria-busy={refreshingSetlists}
+                >
+                  {refreshingSetlists ? (
+                    <Loader2
+                      aria-hidden="true"
+                      size={14}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <HeaderCalendarSync aria-hidden="true" />
+                  )}
                 </PageHeaderAction>
               ) : null}
             </PageHeaderActions>
@@ -438,8 +519,8 @@ export function Upcoming() {
           <div className="min-w-0 flex-1 space-y-4">
             <div>
               <div className="flex items-center justify-between gap-3">
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
-                  Upcoming
+                <h1 className="font-display text-2xl font-semibold tracking-tight text-text-primary">
+                  Show Management
                 </h1>
                 <div
                   role="group"
@@ -488,60 +569,87 @@ export function Upcoming() {
                   </Button>
                 </div>
               </div>
-              <p className="text-sm text-white/55">
-                Release radar and live dates, with quick triage for what lands
-                next in Crate.
+              <p className="text-sm text-text-muted">
+                Keep the live calendar clean and check that every billed artist
+                has a recent probable setlist.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <InfoBadge active>{releaseCount} releases</InfoBadge>
-              <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-                {showCount} shows
+              <InfoBadge active>{showCount} shows</InfoBadge>
+              <InfoBadge>
+                {setlistCoverage.artist_count} billed artists
               </InfoBadge>
-              <InfoBadge>{upcoming.length} upcoming</InfoBadge>
-              {past.length > 0 && <InfoBadge>{past.length} archived</InfoBadge>}
+              <InfoBadge
+                tone="success"
+                title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
+              >
+                {setlistCoverage.fresh} recent
+              </InfoBadge>
+              {setlistCoverage.stale > 0 ? (
+                <InfoBadge tone="warning">
+                  {setlistCoverage.stale} outdated
+                </InfoBadge>
+              ) : null}
+              {setlistCoverage.missing > 0 ? (
+                <InfoBadge tone="neutral">
+                  {setlistCoverage.missing} missing
+                </InfoBadge>
+              ) : null}
+              {setlistCoverage.unknown > 0 ? (
+                <InfoBadge tone="info">
+                  {setlistCoverage.unknown} without date
+                </InfoBadge>
+              ) : null}
+              {setlistCoverage.queued != null ? (
+                <InfoBadge tone="info">
+                  {setlistCoverage.queued} refreshes queued
+                </InfoBadge>
+              ) : null}
             </div>
           </div>
         </PageHeaderLayout>
 
-        <div className="mt-5 rounded-md border border-white/8 bg-white/[0.03] p-3">
+        <OpsSurface className="mt-5 p-3">
           <div className="flex flex-wrap items-start gap-4">
-            <div className="crate-form-field min-w-0 flex-1 basis-60">
+            <div className="min-w-0 flex-1 basis-60">
               <label
                 htmlFor="upcoming-artist"
-                className="font-mono text-meta text-text-muted"
+                className="crate-form-field min-w-0"
               >
-                Artist
+                <MonoLabel as="span">Artist</MonoLabel>
+                <div className="relative">
+                  <Search
+                    data-admin-ux="upcoming-search"
+                    aria-hidden="true"
+                    size={14}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+                  />
+                  <Input
+                    id="upcoming-artist"
+                    type="text"
+                    placeholder="Filter by artist..."
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                    className="h-11 border-border-quiet bg-surface-canvas pl-9 text-text-primary"
+                  />
+                </div>
               </label>
-              <div className="relative">
-                <Search
-                  data-admin-ux="upcoming-search"
-                  aria-hidden="true"
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-                />
-                <Input
-                  id="upcoming-artist"
-                  type="text"
-                  placeholder="Filter by artist..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-11 rounded-md border-white/10 bg-white/[0.04] pl-9"
-                />
-              </div>
             </div>
 
             {availableGenres.length > 0 && (
               <div className="crate-form-field">
-                <span
-                  data-slot="form-field-label"
-                  className="font-mono text-meta text-text-muted"
-                >
+                <MonoLabel as="span" data-slot="form-field-label">
                   Genre
-                </span>
+                </MonoLabel>
                 <AdminSelect
                   value={genreFilter}
-                  onChange={setGenreFilter}
+                  onChange={(value) => {
+                    setGenreFilter(value);
+                    setPage(1);
+                  }}
                   options={availableGenres.map(([name, count]) => ({
                     value: name,
                     label: name,
@@ -556,15 +664,15 @@ export function Upcoming() {
 
             {availableCities.length > 0 && (
               <div className="crate-form-field">
-                <span
-                  data-slot="form-field-label"
-                  className="font-mono text-meta text-text-muted"
-                >
+                <MonoLabel as="span" data-slot="form-field-label">
                   City
-                </span>
+                </MonoLabel>
                 <AdminSelect
                   value={cityFilter}
-                  onChange={setCityFilter}
+                  onChange={(value) => {
+                    setCityFilter(value);
+                    setPage(1);
+                  }}
                   options={availableCities.map(([name, count]) => ({
                     value: name,
                     label: name,
@@ -597,31 +705,13 @@ export function Upcoming() {
               </ActionIconButton>
             ) : null}
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(["all", "releases", "shows"] as const).map((f) => (
-              <FilterChip
-                key={f}
-                active={filter === f}
-                onClick={() => {
-                  setFilter(f);
-                  if (f !== "shows") {
-                    setGenreFilter("");
-                    setCityFilter("");
-                  }
-                }}
-              >
-                {f === "all" ? "All items" : f}
-              </FilterChip>
-            ))}
-          </div>
-        </div>
-      </section>
+        </OpsSurface>
+      </AdminPageHeader>
 
       {loading && (
         <div
           role="status"
-          aria-label="Loading upcoming items"
+          aria-label="Loading shows"
           className="flex items-center justify-center py-24"
         >
           <Loader2
@@ -633,55 +723,52 @@ export function Upcoming() {
       )}
 
       {!loading && items.length === 0 && (
-        <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-          <div className="font-sans text-lg font-semibold">
-            Nothing upcoming
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            Check for new releases or sync shows
-          </div>
-        </div>
+        <OpsSurface role="status" className="px-6 py-24 text-center">
+          <h2 className="font-display text-lg font-semibold text-text-primary">
+            No upcoming shows
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Add a show manually or sync the artists’ upcoming dates.
+          </p>
+        </OpsSurface>
       )}
+
+      {!loading && items.length > 0 && filtered.length === 0 ? (
+        <OpsSurface role="status" className="px-6 py-16 text-center">
+          <h2 className="font-display text-lg font-semibold text-text-primary">
+            No shows match these filters
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Clear the artist, genre, or city filters to see the full calendar.
+          </p>
+        </OpsSurface>
+      ) : null}
 
       {/* List View */}
       {!loading && view === "list" && (
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-4 font-sans flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
-                Coming Up
-              </h2>
+              <MonoLabel as="h2" tone="accent" className="mb-4">
+                Show calendar
+              </MonoLabel>
               {groupByMonth(upcoming).map(([month, monthItems]) => (
                 <MonthGroup
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={releaseDownload}
-                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                   showActions={showActions}
                 />
               ))}
-            </section>
-          )}
-          {past.length > 0 && (
-            <section>
-              <h2 className="mb-4 font-sans text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
-                Recently Released
-              </h2>
-              {groupByMonth(past).map(([month, monthItems]) => (
-                <MonthGroup
-                  key={month}
-                  month={month}
-                  items={monthItems}
-                  onDownload={releaseDownload}
-                  onDismiss={releaseDismiss}
-                  expandedId={expandedId}
-                  onToggleExpand={setExpandedId}
-                  showActions={showActions}
-                />
-              ))}
+              <ListPagination
+                label="shows"
+                itemCount={filtered.length}
+                page={currentPage}
+                pageSize={SHOWS_PAGE_SIZE}
+                onPageChange={setPage}
+              />
             </section>
           )}
         </div>
@@ -695,9 +782,12 @@ export function Upcoming() {
           onMonthChange={(dir) =>
             setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1))
           }
-          onDownload={releaseDownload}
-          onDismiss={releaseDismiss}
           onShowClick={(item) => {
+            const itemIndex = filtered.findIndex(
+              (candidate) => itemKey(candidate) === itemKey(item),
+            );
+            if (itemIndex >= 0)
+              setPage(Math.floor(itemIndex / SHOWS_PAGE_SIZE) + 1);
             setView("list");
             setExpandedId(itemKey(item));
           }}
@@ -721,16 +811,12 @@ export function Upcoming() {
 function MonthGroup({
   month,
   items,
-  onDownload,
-  onDismiss,
   expandedId,
   onToggleExpand,
   showActions,
 }: {
   month: string;
   items: UpcomingItem[];
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
   showActions?: (item: UpcomingItem) => ReactNode;
@@ -745,11 +831,11 @@ function MonthGroup({
 
   return (
     <div className="mb-6">
-      <div className="mb-3 flex items-center gap-2 border-b border-white/8 pb-2">
-        <div className="font-mono text-xs font-normal uppercase tracking-[0.22em] text-white/35">
+      <div className="mb-3 flex items-center gap-2 border-b border-border-quiet pb-2">
+        <MonoLabel as="div" size="eyebrow">
           {label}
-        </div>
-        <InfoBadge>{items.length} items</InfoBadge>
+        </MonoLabel>
+        <InfoBadge>{items.length} shows</InfoBadge>
       </div>
       <div className="space-y-2">
         {items.map((item) => {
@@ -760,20 +846,12 @@ function MonthGroup({
               key={key}
               id={item.show_id ? showAnchorId(item.show_id) : undefined}
             >
-              {item.type === "show" ? (
-                <ShowCard
-                  show={item}
-                  expanded={isExpanded}
-                  onToggle={() => onToggleExpand(isExpanded ? null : key)}
-                  actions={isExpanded ? showActions?.(item) : undefined}
-                />
-              ) : (
-                <EventCard
-                  item={item}
-                  onDownload={onDownload}
-                  onDismiss={onDismiss}
-                />
-              )}
+              <ShowManagementRow
+                item={item}
+                expanded={isExpanded}
+                onToggle={() => onToggleExpand(isExpanded ? null : key)}
+                actions={isExpanded ? showActions?.(item) : undefined}
+              />
             </div>
           );
         })}
@@ -782,144 +860,340 @@ function MonthGroup({
   );
 }
 
-// ── EventCard ──
-
-function EventCard({
-  item,
-  onDownload,
-  onDismiss,
-  onClick,
-}: {
-  item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
-  onClick?: () => void;
-}) {
-  const primaryArtist = getPrimaryArtist(item);
-  const timeStr = item.time ? item.time.slice(0, 5) : "";
-  const albumHref = getReleaseAlbumHref(item);
-
-  return (
-    <EventRow
-      artwork={
-        <>
-          {item.cover_url ? (
-            <img
-              src={item.cover_url}
-              alt=""
-              className="size-full object-cover"
-            />
-          ) : null}
-          {item.status === "downloading" ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-surface-canvas/60">
-              <Loader2
-                data-admin-ux="upcoming-download-loading"
-                aria-hidden="true"
-                size={16}
-                className="animate-spin text-accent-action-hi"
-              />
-            </div>
-          ) : null}
-        </>
-      }
-      date={<EventDate date={item.date} />}
-      actions={
-        <PageHeaderActions label={`Actions for ${item.title}`}>
-          {albumHref ? (
-            <PageHeaderAction asChild label="Open album" tooltip="Open album">
-              <Link to={albumHref} onClick={(event) => event.stopPropagation()}>
-                <RowOpen
-                  data-admin-ux="upcoming-open-album"
-                  aria-hidden="true"
-                  size={CRATE_ICON_SIZE.lg}
-                />
-              </Link>
-            </PageHeaderAction>
-          ) : null}
-          {item.status === "detected" &&
-          item.tidal_url &&
-          onDownload &&
-          item.release_id ? (
-            <PageHeaderAction
-              label="Download release"
-              tooltip="Download"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDownload(item.release_id!);
-              }}
-            >
-              <RowDownload
-                data-admin-ux="upcoming-download"
-                aria-hidden="true"
-                size={CRATE_ICON_SIZE.lg}
-              />
-            </PageHeaderAction>
-          ) : null}
-          {onDismiss && item.release_id && item.status === "detected" ? (
-            <PageHeaderAction
-              label="Dismiss release"
-              tooltip="Dismiss"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDismiss(item.release_id!);
-              }}
-            >
-              <RowDismiss
-                data-admin-ux="upcoming-dismiss"
-                aria-hidden="true"
-                size={CRATE_ICON_SIZE.lg}
-              />
-            </PageHeaderAction>
-          ) : null}
-        </PageHeaderActions>
-      }
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? (event) => {
-              if (event.target !== event.currentTarget) return;
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-    >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {albumHref ? (
-          <Link
-            to={albumHref}
-            className="truncate text-sm font-medium text-text-primary"
-          >
-            {item.title}
-          </Link>
-        ) : (
-          <span className="truncate text-sm font-medium text-text-primary">
-            {item.title}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-text-secondary">
-        <ArtistTextLink artist={primaryArtist}>{item.artist}</ArtistTextLink>
-        <span aria-hidden="true">·</span>
-        <span className="truncate">{item.subtitle}</span>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {item.tidal_url ? <InfoBadge tone="accent">Lossless</InfoBadge> : null}
-        <InfoBadge>{item.status}</InfoBadge>
-        {item.is_upcoming ? (
-          <InfoBadge tone="accent">Upcoming</InfoBadge>
-        ) : null}
-        {timeStr ? <InfoBadge>{timeStr}</InfoBadge> : null}
-      </div>
-    </EventRow>
-  );
+function setlistTone(
+  status: UpcomingArtistRef["probable_setlist_status"],
+): "success" | "warning" | "info" | "neutral" {
+  if (status === "fresh") return "success";
+  if (status === "stale" || status === "refreshing") return "warning";
+  if (status === "unknown") return "info";
+  return "neutral";
 }
 
-// ── Show Detail Panel (inline expansion) ──
+function setlistLabel(artist: UpcomingArtistRef) {
+  const status = artist.probable_setlist_status || "unknown";
+  if (status === "fresh") return "Current";
+  if (status === "stale") return "Outdated";
+  if (status === "refreshing") return "Refreshing";
+  if (status === "missing") return "No setlist";
+  return "Date unknown";
+}
+
+function showCountdown(item: UpcomingItem): string | null {
+  if (!item.date) return null;
+  const target = new Date(`${item.date}T${item.time || "23:59:59"}`);
+  if (
+    Number.isNaN(target.getTime()) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(item.date) ||
+    target.getMonth() + 1 !== Number(item.date.slice(5, 7)) ||
+    target.getDate() !== Number(item.date.slice(8, 10))
+  )
+    return null;
+  const millisecondsRemaining = target.getTime() - Date.now();
+  if (millisecondsRemaining <= 0) return null;
+  const hours = Math.max(1, Math.ceil(millisecondsRemaining / 3_600_000));
+  return hours < 48
+    ? `${hours} ${hours === 1 ? "hour" : "hours"} to go`
+    : `${Math.ceil(hours / 24)} days to go`;
+}
+
+function showDateLabel(item: UpcomingItem): string {
+  const date = new Date(`${item.date}T12:00:00`);
+  if (
+    Number.isNaN(date.getTime()) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(item.date) ||
+    date.getMonth() + 1 !== Number(item.date.slice(5, 7)) ||
+    date.getDate() !== Number(item.date.slice(8, 10))
+  )
+    return "";
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function ShowManagementRow({
+  item,
+  expanded,
+  onToggle,
+  actions,
+}: {
+  item: UpcomingItem;
+  expanded: boolean;
+  onToggle: () => void;
+  actions?: ReactNode;
+}) {
+  const artists = item.lineup_artists?.length
+    ? item.lineup_artists
+    : [
+        {
+          name: item.artist,
+          id: item.artist_id,
+          slug: item.artist_slug,
+          probable_setlist_status: item.probable_setlist_status,
+          probable_setlist_generated_at: item.probable_setlist_generated_at,
+          probable_setlist_song_count: item.probable_setlist_song_count,
+          probable_setlist_source_show_count:
+            item.probable_setlist_source_show_count,
+          probable_setlist_mode: item.probable_setlist_mode,
+          probable_setlist_tour_name: item.probable_setlist_tour_name,
+        },
+      ];
+  const currentCount = artists.filter(
+    (artist) => artist.probable_setlist_status === "fresh",
+  ).length;
+  const missingCount = artists.length - currentCount;
+  const primary = artists.find(
+    (artist) =>
+      artist.name.trim().toLocaleLowerCase() ===
+      item.artist.trim().toLocaleLowerCase(),
+  );
+  const artistHref = getArtistHref(primary);
+  const artworkUrl =
+    item.cover_url ||
+    artistPhotoApiUrl({
+      artistId: item.artist_id,
+      artistSlug: item.artist_slug,
+      artistName: item.artist,
+    });
+  const support = (item.lineup || []).slice(1);
+  const countdown = showCountdown(item);
+  const setlistSummary =
+    artists.length === 1
+      ? `${setlistLabel(artists[0]!)}${
+          artists[0]!.probable_setlist_song_count
+            ? ` · ${artists[0]!.probable_setlist_song_count} songs`
+            : ""
+        }${
+          artists[0]!.probable_setlist_generated_at
+            ? ` · updated ${timeAgo(artists[0]!.probable_setlist_generated_at)}`
+            : ""
+        }`
+      : `${currentCount} / ${artists.length} setlists current${
+          missingCount ? ` · ${missingCount} to review` : ""
+        }`;
+  return (
+    <div className="space-y-2">
+      {expanded ? (
+        <div
+          data-slot="show-management-ticket"
+          className="relative flex h-full flex-col"
+        >
+          <section className="admin-show-ticket-top">
+            <header className="relative px-5 pt-5 pb-6 sm:px-7 sm:pt-7">
+              <div className="absolute top-2 right-2 z-10">
+                <ActionGroup label="Show actions">
+                  <ActionButton label="Close show details" onClick={onToggle}>
+                    <X size={CRATE_ICON_SIZE.md} />
+                  </ActionButton>
+                </ActionGroup>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pr-24">
+                <MonoLabel
+                  accent={countdown}
+                  meta={[showDateLabel(item), item.time]}
+                />
+              </div>
+              {artistHref ? (
+                <Link
+                  to={artistHref}
+                  className="link-meta mt-4 block w-fit max-w-full font-display text-4xl font-extrabold leading-display tracking-display text-balance break-words text-text-primary sm:text-6xl"
+                >
+                  {item.artist}
+                </Link>
+              ) : (
+                <h2 className="mt-4 w-fit max-w-full font-display text-4xl font-extrabold leading-display tracking-display text-balance break-words text-text-primary sm:text-6xl">
+                  {item.artist}
+                </h2>
+              )}
+              {support.length > 0 ? (
+                <p className="mt-3 truncate text-sm text-text-muted">
+                  With {support.slice(0, 4).join(" · ")}
+                  {support.length > 4 ? ` +${support.length - 4}` : ""}
+                </p>
+              ) : null}
+              <MonoLabel
+                className="mt-5 text-text-secondary"
+                meta={[
+                  item.venue,
+                  [item.address_line1, item.postal_code]
+                    .filter(Boolean)
+                    .join(" "),
+                  [item.city, item.region, item.country]
+                    .filter(Boolean)
+                    .join(", "),
+                ]}
+              />
+              <GenrePillRow
+                items={(item.genres || []).map((name) => ({ name }))}
+                max={3}
+                className="mt-4"
+              />
+            </header>
+          </section>
+          <div aria-hidden="true" className="admin-show-ticket-perforation" />
+          <section className="admin-show-ticket-bottom flex-1 px-5 pt-6 pb-5 sm:px-7 sm:pb-7">
+            <MonoLabel
+              as="h3"
+              aria-label="Probable setlists by artist"
+              tone="accent"
+              meta={[
+                `${artists.length} billed artists`,
+                `${currentCount} current`,
+              ]}
+            >
+              Probable setlists by artist
+            </MonoLabel>
+            <HairlineList
+              as="ul"
+              label="Probable setlists by artist"
+              className="mt-3"
+            >
+              {artists.map((artist, index) => (
+                <HairlineRow
+                  key={`${artist.name}-${artist.id ?? "external"}`}
+                  index={index + 1}
+                  truncate={false}
+                  trailing={
+                    <InfoBadge
+                      tone={setlistTone(artist.probable_setlist_status)}
+                    >
+                      {setlistLabel(artist)}
+                    </InfoBadge>
+                  }
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-text-primary">
+                      {artist.name}
+                    </span>
+                    <MonoLabel
+                      as="span"
+                      className="mt-1 block truncate"
+                      meta={[
+                        artist.probable_setlist_song_count
+                          ? `${artist.probable_setlist_song_count} songs`
+                          : "No songs available",
+                        artist.probable_setlist_generated_at
+                          ? `Updated ${timeAgo(artist.probable_setlist_generated_at)}`
+                          : null,
+                        artist.probable_setlist_source_show_count
+                          ? `Based on ${artist.probable_setlist_source_show_count} shows`
+                          : null,
+                        artist.probable_setlist_tour_name
+                          ? artist.probable_setlist_tour_name
+                          : artist.probable_setlist_mode === "active_tour"
+                            ? "Active tour estimate"
+                            : null,
+                      ]}
+                    />
+                  </div>
+                </HairlineRow>
+              ))}
+            </HairlineList>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              <div className="flex flex-wrap gap-2">{actions}</div>
+              <ActionGroup label={`Actions for ${item.artist} show`}>
+                {artistHref ? (
+                  <ActionLink
+                    label="Open artist"
+                    href={artistHref}
+                    data-admin-ux="show-management-open-artist"
+                  >
+                    <UserRound size={CRATE_ICON_SIZE.md} />
+                  </ActionLink>
+                ) : null}
+                {item.url ? (
+                  <ActionLink
+                    label="Open show listing"
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    data-admin-ux="show-management-open-listing"
+                  >
+                    <ExternalLink size={CRATE_ICON_SIZE.md} />
+                  </ActionLink>
+                ) : null}
+              </ActionGroup>
+            </div>
+          </section>
+        </div>
+      ) : (
+        <UpcomingEventRow
+          className="item-action-target relative overflow-hidden rounded-panel border border-border-quiet transition-colors duration-300 ease-snap hover:border-border-interactive motion-reduce:transition-none"
+          actionsClassName="flex flex-col px-1.5"
+          onToggle={onToggle}
+          expanded={false}
+          artwork={
+            <MediaCover
+              src={artworkUrl}
+              alt=""
+              fallbackIcon={Calendar}
+              iconSize={CRATE_ICON_SIZE.xl}
+              className="size-[88px] shrink-0 rounded-none"
+            />
+          }
+          details={
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="truncate text-caption font-semibold text-text-primary">
+                  {item.artist}
+                </span>
+              </span>
+              <MonoLabel
+                as="span"
+                className="mt-1 block truncate"
+                meta={[item.venue, item.city]}
+              />
+              {support.length > 0 ? (
+                <MonoLabel as="span" className="mt-0.5 block truncate">
+                  With {support.slice(0, 3).join(", ")}
+                  {support.length > 3 ? ` +${support.length - 3}` : ""}
+                </MonoLabel>
+              ) : null}
+              <MonoLabel
+                as="span"
+                className="mt-1 block min-w-0 truncate"
+                accent={countdown}
+                meta={[setlistSummary]}
+                title={artists
+                  .map((artist) => `${artist.name}: ${setlistLabel(artist)}`)
+                  .join(" · ")}
+              />
+            </>
+          }
+          date={<UpcomingDateStamp date={item.date} locale="en-US" />}
+          actions={
+            <ActionGroup label={`Actions for ${item.artist} show`}>
+              {artistHref ? (
+                <ActionLink
+                  label="Open artist"
+                  href={artistHref}
+                  onClick={(event) => event.stopPropagation()}
+                  data-admin-ux="show-management-open-artist"
+                >
+                  <UserRound size={CRATE_ICON_SIZE.md} />
+                </ActionLink>
+              ) : null}
+              {item.url ? (
+                <ActionLink
+                  label="Open show listing"
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  data-admin-ux="show-management-open-listing"
+                >
+                  <ExternalLink size={CRATE_ICON_SIZE.md} />
+                </ActionLink>
+              ) : null}
+            </ActionGroup>
+          }
+        />
+      )}
+    </div>
+  );
+}
 
 // ── Calendar View ──
 
@@ -927,15 +1201,11 @@ function CalendarView({
   items,
   month,
   onMonthChange,
-  onDownload,
-  onDismiss,
   onShowClick,
 }: {
   items: UpcomingItem[];
   month: Date;
   onMonthChange: (dir: number) => void;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   onShowClick: (item: UpcomingItem) => void;
 }) {
   const year = month.getFullYear();
@@ -965,7 +1235,7 @@ function CalendarView({
   }, [items, year, m]);
 
   return (
-    <div className="rounded-md border border-white/10 bg-panel-surface p-4 shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
+    <OpsSurface className="p-4">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <Button
@@ -981,12 +1251,12 @@ function CalendarView({
             size={16}
           />
         </Button>
-        <span className="font-sans text-sm font-semibold text-white/85">
+        <MonoLabel as="h2" tone="accent" className="text-center">
           {month.toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
           })}
-        </span>
+        </MonoLabel>
         <Button
           variant="ghost"
           size="icon"
@@ -1007,12 +1277,14 @@ function CalendarView({
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-px mb-1">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div
+              <MonoLabel
                 key={d}
-                className="font-mono font-normal py-1 text-center text-[10px] uppercase tracking-[0.2em] text-white/30"
+                as="div"
+                size="eyebrow"
+                className="py-1 text-center"
               >
                 {d}
-              </div>
+              </MonoLabel>
             ))}
           </div>
 
@@ -1024,7 +1296,7 @@ function CalendarView({
             ).map((key) => (
               <div
                 key={key}
-                className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
+                className="min-h-[92px] rounded-md border border-border-quiet bg-surface-canvas"
               />
             ))}
             {Array.from({ length: daysInMonth }, (_, i) => {
@@ -1035,17 +1307,16 @@ function CalendarView({
                 <div
                   key={day}
                   className={cn(
-                    "min-h-[92px] rounded-md border p-2 shadow-[0_12px_32px_rgba(0,0,0,0.16)]",
+                    "min-h-[92px] rounded-md border border-border-quiet bg-surface-canvas p-2",
                     isToday
-                      ? "border-primary/30 bg-primary/8"
-                      : "border-white/6 bg-white/[0.03]",
-                    dayItems.length > 0 && "bg-white/[0.05]",
+                      ? "border-accent-action-hi bg-accent-action/10"
+                      : dayItems.length > 0 && "border-accent-action-hi/30",
                   )}
                 >
                   <div
                     className={cn(
                       "mb-1 font-mono font-normal text-[10px]",
-                      isToday ? "text-primary" : "text-white/35",
+                      isToday ? "text-accent-action-hi" : "text-text-muted",
                     )}
                   >
                     {day}
@@ -1055,8 +1326,6 @@ function CalendarView({
                       <CalendarPill
                         key={itemKey(item)}
                         item={item}
-                        onDownload={onDownload}
-                        onDismiss={onDismiss}
                         onShowClick={() => onShowClick(item)}
                       />
                     ))}
@@ -1072,7 +1341,7 @@ function CalendarView({
           </div>
         </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -1080,26 +1349,18 @@ function CalendarView({
 
 function CalendarPill({
   item,
-  onDownload,
-  onDismiss,
   onShowClick,
 }: {
   item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   onShowClick: () => void;
 }) {
-  const isShow = item.type === "show";
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           className={cn(
             "min-h-11 w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
-            isShow
-              ? "bg-accent-action/15 text-accent-action-hi hover:bg-accent-action/25"
-              : "bg-primary/15 text-accent-action-hi hover:bg-primary/25",
+            "bg-accent-action/15 text-accent-action-hi hover:bg-accent-action/25",
           )}
         >
           {item.artist}
@@ -1109,137 +1370,20 @@ function CalendarPill({
         className="w-[340px] max-w-[calc(100vw-2rem)] p-0"
         align="start"
       >
-        {isShow ? (
-          <div>
-            <div className="p-3">
-              <ShowCard show={item} className="w-full" />
-            </div>
-            <div className="px-3 pb-3">
-              <button
-                onClick={onShowClick}
-                className="min-h-11 w-full text-center text-xs text-accent-action-hi hover:text-accent-action-hi transition-colors py-1.5 rounded-md bg-accent-action/5 hover:bg-accent-action/10"
-              >
-                View full details
-              </button>
-            </div>
+        <div>
+          <div className="p-3">
+            <ShowCard show={item} className="w-full" />
           </div>
-        ) : (
-          <ReleasePopoverContent
-            item={item}
-            onDownload={onDownload}
-            onDismiss={onDismiss}
-          />
-        )}
+          <div className="px-3 pb-3">
+            <button
+              onClick={onShowClick}
+              className="min-h-11 w-full rounded-md bg-accent-action/5 py-1.5 text-center text-xs text-accent-action-hi transition-colors hover:bg-accent-action/10"
+            >
+              View full details
+            </button>
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ── Release Popover Content ──
-
-function ReleasePopoverContent({
-  item,
-  onDownload,
-  onDismiss,
-}: {
-  item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
-}) {
-  const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
-  const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "";
-  const albumHref = getReleaseAlbumHref(item);
-
-  return (
-    <div className="overflow-hidden rounded-md bg-transparent">
-      <div className="flex gap-3 p-3">
-        {/* Album cover */}
-        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
-          {item.cover_url ? (
-            <img
-              src={item.cover_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : null}
-        </div>
-        <div className="min-w-0 flex-1 basis-40">
-          {albumHref ? (
-            <Link
-              to={albumHref}
-              className="font-sans font-bold text-sm truncate block hover:text-foreground transition-colors"
-            >
-              {item.title}
-            </Link>
-          ) : (
-            <div className="font-sans font-bold text-sm truncate">
-              {item.title}
-            </div>
-          )}
-          <ArtistTextLink
-            artist={getPrimaryArtist(item)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {item.artist}
-          </ArtistTextLink>
-          <div className="flex items-center gap-1.5 mt-1">
-            {item.subtitle && <InfoBadge>{item.subtitle}</InfoBadge>}
-            {item.tidal_url && <InfoBadge active>LOSSLESS</InfoBadge>}
-          </div>
-        </div>
-      </div>
-
-      <div className="px-3 pb-3">
-        <div className="font-mono font-normal text-xs text-muted-foreground mb-2 flex items-center gap-1">
-          {dateStr}
-        </div>
-
-        {item.status === "detected" &&
-          item.release_id &&
-          (onDownload || onDismiss) && (
-            <div className="flex gap-2">
-              {item.tidal_url && onDownload && (
-                <button
-                  onClick={() => onDownload(item.release_id!)}
-                  className="min-h-11 flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
-                >
-                  Download
-                </button>
-              )}
-              {onDismiss ? (
-                <button
-                  onClick={() => onDismiss(item.release_id!)}
-                  className="min-h-11 px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
-                >
-                  Dismiss
-                </button>
-              ) : null}
-            </div>
-          )}
-        {item.status === "downloaded" && (
-          <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-            Downloaded
-          </InfoBadge>
-        )}
-        {item.status === "downloading" && (
-          <div className="font-mono font-normal flex items-center gap-1.5 text-xs text-primary">
-            <Loader2
-              data-admin-ux="upcoming-popover-loading"
-              aria-hidden="true"
-              size={12}
-              className="animate-spin"
-            />{" "}
-            Downloading...
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

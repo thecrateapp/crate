@@ -106,7 +106,7 @@ function ProfileItem({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-medium text-white">{profile.label}</h3>
+          <h3 className="font-medium text-white font-display">{profile.label}</h3>
           <p className="text-sm text-white/50">
             Updated{" "}
             <RelativeTime value={current?.created_at ?? profile.created_at} />

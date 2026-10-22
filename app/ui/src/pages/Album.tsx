@@ -27,6 +27,7 @@ import {
 import { Input } from "@crate/ui/shadcn/input";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
 import {
   albumApiPath,
@@ -289,7 +290,7 @@ export function MoveAlbumToArtistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Move Album to Artist</DialogTitle>
+          <DialogTitle className="font-display">Move Album to Artist</DialogTitle>
           <DialogDescription>
             Queue a worker task to move "{albumName}" from {currentArtistName}{" "}
             to another artist.
@@ -300,7 +301,7 @@ export function MoveAlbumToArtistDialog({
           <div className="crate-form-field">
             <label
               htmlFor="move-album-target"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
             >
               Target artist
             </label>
@@ -443,7 +444,7 @@ export function MergeAlbumDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Merge Duplicate Album</DialogTitle>
+          <DialogTitle className="font-display">Merge Duplicate Album</DialogTitle>
           <DialogDescription>
             Move all files from "{currentAlbumName}" by {currentArtistName} into
             another album and remove this duplicate album row.
@@ -454,7 +455,7 @@ export function MergeAlbumDialog({
           <div className="crate-form-field">
             <label
               htmlFor="merge-album-target"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
             >
               Target album
             </label>
@@ -596,7 +597,7 @@ export function SplitAlbumDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Split Album</DialogTitle>
+          <DialogTitle className="font-display">Split Album</DialogTitle>
           <DialogDescription>
             Move selected tracks from "{albumName}" into a new album folder.
           </DialogDescription>
@@ -606,7 +607,7 @@ export function SplitAlbumDialog({
           <div className="crate-form-field">
             <label
               htmlFor="split-album-name"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
             >
               New album name
             </label>
@@ -698,7 +699,7 @@ export function Album() {
     albumSlug?: string;
   }>();
   const albumId = albumIdParam ? Number(albumIdParam) : undefined;
-  const { data, loading, refetch } = useApi<AlbumData>(
+  const { data, loading, error, refetch } = useApi<AlbumData>(
     albumApiPath({
       albumId,
       artistSlug,
@@ -1046,9 +1047,30 @@ export function Album() {
     );
   }
 
+  if (error && !data) {
+    return (
+      <ErrorState
+        variant="page"
+        kind="error"
+        title="Album unavailable"
+        message="This album could not be loaded. Try again or return to Browse."
+        onRetry={refetch}
+        backTo="/browse"
+        backLabel="Browse artists"
+      />
+    );
+  }
+
   if (!data)
     return (
-      <div className="text-center py-12 text-muted-foreground">Not found</div>
+      <ErrorState
+        variant="page"
+        kind="notFound"
+        title="Album not found"
+        message="This album is not available in the catalog."
+        backTo="/browse"
+        backLabel="Browse artists"
+      />
     );
 
   const hasMusicBrainzAlbumId = Boolean(
@@ -1228,7 +1250,7 @@ export function Album() {
 
         {matches !== null && (
           <div className="mb-8">
-            <h3 className="font-semibold mb-3">MusicBrainz Matches</h3>
+            <h3 className="font-semibold mb-3 font-display">MusicBrainz Matches</h3>
             {matches.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No matches found on MusicBrainz
@@ -1315,7 +1337,7 @@ export function Album() {
           })()}
 
         <div>
-          <h3 className="font-semibold mb-3">Tracks</h3>
+          <h3 className="font-semibold mb-3 font-display">Tracks</h3>
           <TrackTable
             tracks={tableTracks}
             artist={data.artist}

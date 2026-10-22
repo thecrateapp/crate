@@ -34,6 +34,68 @@ describe("SystemHealth Resources instrument", () => {
     });
   });
 
+  it("does not render an empty dashboard as healthy while metrics are loading", () => {
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: true,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    expect(
+      screen.getByRole("status", { name: "Loading system health metrics" }),
+    ).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("Health Score")).not.toBeInTheDocument();
+  });
+
+  it("does not invent healthy or zero queue metrics when the response has no samples", () => {
+    useApiMock.mockReturnValue({
+      data: { ...dashboard, summary: null, timeseries: {} },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    expect(screen.getByText("Health Score").parentElement).toHaveTextContent(
+      "—",
+    );
+    expect(screen.getByText("— queued depth")).toBeVisible();
+    expect(screen.queryByText("100% error rate")).not.toBeInTheDocument();
+  });
+
+  it("offers recovery for a cold dashboard error and retains stale data on refresh errors", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "network unavailable",
+      refetch: refetchMock,
+    });
+    const view = renderWithAdminProviders(<SystemHealth />, {
+      route: "/system",
+    });
+    const coldError = screen.getByRole("alert");
+    expect(coldError).toHaveTextContent(
+      "Could not load system health metrics.",
+    );
+    await user.click(within(coldError).getByRole("button", { name: "Retry" }));
+    expect(refetchMock).toHaveBeenCalledOnce();
+
+    useApiMock.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: "network unavailable",
+      refetch: refetchMock,
+    });
+    view.rerender(<SystemHealth />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Showing the last successful sample.",
+    );
+    expect(screen.getByText("Health Score")).toBeVisible();
+  });
+
   it("renders a named Resources figure with its heading, rule and description", () => {
     renderWithAdminProviders(<SystemHealth />, { route: "/system" });
 
@@ -75,6 +137,22 @@ describe("SystemHealth Resources instrument", () => {
     ]) {
       expect(within(panel).getByText(value)).toBeInTheDocument();
     }
+  });
+
+  it("uses the solid operational surface for resource and chart cards", () => {
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    for (const label of ["Music Volume", "API Latency"]) {
+      const surface = screen.getByText(label).closest(".rounded-md");
+      expect(surface).toHaveClass(
+        "border-border-quiet",
+        "bg-raised-surface",
+        "shadow-none",
+      );
+      expect(surface?.className).not.toMatch(/backdrop-blur|bg-black\//);
+    }
+    const healthScore = screen.getByText("Health Score").closest(".rounded-md");
+    expect(healthScore).toHaveClass("shadow-none");
   });
 
   it("retains the metrics window and refresh controls", async () => {
@@ -154,7 +232,7 @@ describe("SystemHealth Resources instrument", () => {
     expect(score).toHaveClass("crate-form-field");
     expect(score.children[0]).toHaveTextContent("Health Score");
     expect(score.children[1]).toHaveTextContent("100");
-    expect(score.children[1]).toHaveClass("font-display");
+    expect(score.children[1]).toHaveClass("font-mono", "tabular-nums");
     const volume = screen.getByText("Music Volume").parentElement!;
     expect(volume).toHaveClass("crate-form-field");
     expect(volume.children[1]).toHaveTextContent("280 / 1000 GB");

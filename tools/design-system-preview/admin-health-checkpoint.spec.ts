@@ -32,7 +32,13 @@ for (const width of [1440, 390]) {
     });
     await expect
       .soft(nextStep)
-      .toHaveCSS("background-color", "rgb(6, 182, 212)", { timeout: 1000 });
+      .toHaveCSS("background-color", "rgba(0, 0, 0, 0)", { timeout: 1000 });
+    await expect
+      .soft(nextStep)
+      .toHaveCSS("border-top-color", "rgb(6, 182, 212)", { timeout: 1000 });
+    await expect
+      .soft(nextStep)
+      .toHaveCSS("color", "rgb(6, 182, 212)", { timeout: 1000 });
     await expect.soft(nextStep).toHaveAttribute("href", /\?repair=1$/);
     const title = real.getByRole("heading", {
       name: "Artist Layout Fix",
@@ -82,6 +88,37 @@ test("1AD embeds real Library Health and preserves the published System Health c
   await expect(page.locator("#sistema-admin")).toHaveCount(1);
   await expect(page.locator("footer")).toContainText("1AC publicado");
   await expect(page.locator("footer")).toContainText("1AD publicado");
+});
+
+test("keeps the last health snapshot when task completion cannot refresh it", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/admin-health-demo.html");
+  const real = page.getByRole("region", {
+    name: "Página real de Admin",
+    exact: true,
+  });
+  await page.getByRole("radio", { name: "Error al actualizar" }).click();
+  const issue = real.getByRole("button", {
+    name: "Review issues: Unindexed Files",
+    exact: true,
+  });
+  await expect(issue).toBeVisible();
+  await real.getByRole("button", { name: "Run scan", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Completar tarea de muestra", exact: true })
+    .click();
+  const notice = real.getByRole("alert");
+  await expect(notice).toContainText(
+    "Could not refresh library health. Showing the last successful snapshot.",
+  );
+  await expect(issue).toBeVisible();
+  await notice.getByRole("button", { name: "Retry" }).click();
+  await expect(notice).toHaveCount(0);
+  await expect(issue).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 for (const width of [1440, 768, 390])

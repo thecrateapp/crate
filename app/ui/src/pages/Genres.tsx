@@ -4,7 +4,9 @@ import { useNavigate, useParams } from "react-router";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
   OpsStatTile,
+  OpsSurface,
 } from "@/components/admin/ops-surfaces";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 
@@ -49,7 +51,6 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ErrorState } from "@crate/ui/primitives/ErrorState";
 
 interface Genre {
   id: number;
@@ -166,7 +167,10 @@ interface TaxonomyTree {
 interface TaxonomyNodeProposal {
   source_kind?: "taxonomy_node" | "raw_genre";
   recommended_action?:
-    "create_node" | "alias_existing" | "delete_marginal" | "needs_review";
+    | "create_node"
+    | "alias_existing"
+    | "delete_marginal"
+    | "needs_review";
   recommended_target_slug?: string | null;
   description: string;
   aliases: string[];
@@ -840,7 +844,7 @@ function TaxonomyNodeEditorialEditor({
                 {proposal.evidence ? (
                   <div className="grid gap-3 md:grid-cols-3">
                     <div className="rounded-md border border-white/8 bg-black/20 p-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35 font-mono">
                         Artists
                       </div>
                       <div className="mt-1 text-white/65">
@@ -850,7 +854,7 @@ function TaxonomyNodeEditorialEditor({
                       </div>
                     </div>
                     <div className="rounded-md border border-white/8 bg-black/20 p-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35 font-mono">
                         Albums
                       </div>
                       <div className="mt-1 text-white/65">
@@ -860,7 +864,7 @@ function TaxonomyNodeEditorialEditor({
                       </div>
                     </div>
                     <div className="rounded-md border border-white/8 bg-black/20 p-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35 font-mono">
                         Co-occurs with
                       </div>
                       <div className="mt-1 text-white/65">
@@ -995,7 +999,7 @@ function TaxonomyNodeEditorialEditor({
                 <label className="crate-form-field">
                   <span
                     data-slot="form-field-label"
-                    className="text-[11px] uppercase tracking-wider text-white/35"
+                    className="text-[11px] uppercase tracking-wider text-white/35 font-mono"
                   >
                     Description
                   </span>
@@ -1024,7 +1028,7 @@ function TaxonomyNodeEditorialEditor({
 
             {proposal ? (
               <div className="rounded-lg border border-accent-action/15 bg-accent-action/[0.04] p-3 text-xs text-white/55">
-                <div className="font-semibold uppercase tracking-[0.16em] text-accent-action-hi">
+                <div className="font-normal uppercase tracking-[0.16em] text-accent-action-hi font-mono">
                   AI proposal staged
                 </div>
                 {proposal.reasoning ? (
@@ -1106,6 +1110,9 @@ function TaxonomyNodeEditorialEditor({
 }
 
 // ── Genre List ──────────────────────────────────────────────────
+
+const GENRE_LIST_DESCRIPTION =
+  "Taxonomy curation, raw tag cleanup and discovery of the graph that organizes the musical vocabulary of the library.";
 
 export function Genres() {
   const { slug } = useParams<{ slug?: string }>();
@@ -1213,15 +1220,21 @@ function GenreList() {
     }
   }
 
-  if (error)
-    return <ErrorState message="Failed to load genres" onRetry={refetch} />;
-  if (loading) {
+  if (error && !genres) {
     return (
       <div className="space-y-6">
-        <OpsPageHero
-          title="Genres"
-          description="Taxonomy curation, raw tag cleanup and discovery of the genre graph that organizes the library."
-        >
+        <OpsPageHero title="Genres" description={GENRE_LIST_DESCRIPTION} />
+        <OpsRefreshNotice
+          message="Could not load the genre catalog. Try again."
+          onRetry={refetch}
+        />
+      </div>
+    );
+  }
+  if (loading && !genres) {
+    return (
+      <div className="space-y-6">
+        <OpsPageHero title="Genres" description={GENRE_LIST_DESCRIPTION}>
           <InfoBadge icon={Tag}>Loading taxonomy</InfoBadge>
         </OpsPageHero>
         <GridSkeleton count={12} columns="grid-cols-4" />
@@ -1233,7 +1246,7 @@ function GenreList() {
     <div className="space-y-6">
       <OpsPageHero
         title="Genres"
-        description="Taxonomy curation, raw tag cleanup and discovery of the graph that organizes the musical vocabulary of the library."
+        description={GENRE_LIST_DESCRIPTION}
         actions={
           canCurateGenres ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -1385,6 +1398,13 @@ function GenreList() {
         ) : null}
       </OpsPageHero>
 
+      {error ? (
+        <OpsRefreshNotice
+          message="Could not refresh the genre catalog. Showing the last successful results."
+          onRetry={refetch}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
           label="Genres"
@@ -1445,7 +1465,7 @@ function GenreList() {
                         {formatNumber(source.count)} · {source.percent}%
                       </span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+                    <div className="h-px overflow-hidden rounded-full bg-white/8">
                       <div
                         className={`h-full rounded-full ${
                           source.source === "flat"
@@ -1686,20 +1706,35 @@ function GenreList() {
               )}
 
               {filtered.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  {genres?.length === 0 ? (
-                    <div className="space-y-3">
-                      <p>No genres indexed yet.</p>
-                      {canCurateGenres ? (
-                        <Button onClick={reindex} disabled={indexing}>
-                          Index Genres
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    "No genres match your filter."
-                  )}
-                </div>
+                <OpsSurface className="px-5 py-10 text-center">
+                  <h3 className="font-display text-lg font-semibold text-text-primary">
+                    {genres?.length === 0
+                      ? "No genres indexed yet"
+                      : "No genres match this search"}
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">
+                    {genres?.length === 0
+                      ? "Index the library to build its genre catalog and taxonomy."
+                      : "Try a broader name or clear the search to see the full catalog."}
+                  </p>
+                  {genres?.length === 0 && canCurateGenres ? (
+                    <Button
+                      className="mt-4"
+                      onClick={reindex}
+                      disabled={indexing}
+                    >
+                      {indexing ? "Indexing…" : "Index Genres"}
+                    </Button>
+                  ) : filter ? (
+                    <Button
+                      className="mt-4"
+                      variant="outline"
+                      onClick={() => setFilter("")}
+                    >
+                      Clear search
+                    </Button>
+                  ) : null}
+                </OpsSurface>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {filtered.map((g) => (

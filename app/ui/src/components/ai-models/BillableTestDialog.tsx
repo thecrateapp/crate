@@ -94,7 +94,7 @@ export function BillableTestDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Run a billable test?</DialogTitle>
+          <DialogTitle className="font-display">Run a billable test?</DialogTitle>
           <DialogDescription>
             Crate sends one small synthetic request to {version.model_id}. Your
             provider may charge for it. No library data is sent, and there are

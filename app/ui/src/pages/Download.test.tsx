@@ -1,14 +1,166 @@
-import { render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const { refetch } = vi.hoisted(() => ({ refetch: vi.fn() }));
+const {
+  refetch,
+  mockApi,
+  mockSurface,
+  mockArtistAlbums,
+  mockArtistSuggestions,
+} = vi.hoisted(() => ({
+  refetch: vi.fn(),
+  mockApi: vi.fn(),
+  mockSurface: {
+    tidal_authenticated: true,
+    tidal_queue: [
+      {
+        id: 41,
+        tidal_url: "https://tidal.example/album/signal-fire",
+        title: "Signal Fire",
+        artist: "Caspian",
+        status: "downloading",
+        source: "tidal",
+        quality: "max",
+        cover_url: null,
+        created_at: "2026-10-22T09:45:00Z",
+      },
+      {
+        id: 42,
+        tidal_url: "https://tidal.example/album/on-circles",
+        title: "On Circles",
+        artist: "Caspian",
+        status: "wishlist",
+        source: "tidal",
+        quality: "high",
+        cover_url: null,
+        created_at: "2026-10-21T15:30:00Z",
+      },
+      {
+        id: 43,
+        tidal_url: "https://tidal.example/album/old-moon",
+        title: "Old Moon",
+        artist: "Caspian",
+        status: "completed",
+        source: "tidal",
+        quality: "max",
+        cover_url: null,
+        created_at: "2026-10-20T12:00:00Z",
+      },
+      {
+        id: 44,
+        tidal_url: "https://tidal.example/album/quiet-sky",
+        title: "Quiet Sky",
+        artist: "Caspian",
+        status: "failed",
+        source: "tidal",
+        quality: "high",
+        cover_url: null,
+        created_at: "2026-10-19T12:00:00Z",
+      },
+    ],
+    soulseek_queue: [
+      {
+        source: "soulseek",
+        artist: "Caspian",
+        album: "Dust and Disquiet",
+        filename: "Separation No. 2.flac",
+        status: "Downloading",
+        progress: 42,
+        username: "northstar",
+        speed: 2_097_152,
+      },
+    ],
+  },
+  mockArtistAlbums: {
+    artist_name: "Caspian",
+    albums: [
+      {
+        id: "on-circles",
+        title: "On Circles",
+        artist: "Caspian",
+        year: "2020",
+        tracks: 10,
+        cover: null,
+        url: "https://tidal.example/album/on-circles",
+        quality: ["HIRES_LOSSLESS"],
+        duration: 2700,
+        release_date: "2020-02-07",
+        type: "ALBUM",
+        status: "local",
+        local_quality: { format: "flac", bit_depth: 16, sample_rate: 44100 },
+        local_album_id: 510,
+      },
+      {
+        id: "waking-season",
+        title: "Waking Season",
+        artist: "Caspian",
+        year: "2012",
+        tracks: 10,
+        cover: null,
+        url: "https://tidal.example/album/waking-season",
+        quality: ["LOSSLESS"],
+        duration: 2600,
+        release_date: "2012-09-25",
+        type: "ALBUM",
+        status: "local",
+        local_quality: { format: "flac", bit_depth: 16, sample_rate: 44100 },
+        local_album_id: 511,
+      },
+      {
+        id: "dust-and-disquiet",
+        title: "Dust and Disquiet",
+        artist: "Caspian",
+        year: "2015",
+        tracks: 11,
+        cover: null,
+        url: "https://tidal.example/album/dust-and-disquiet",
+        quality: ["LOSSLESS"],
+        duration: 3200,
+        release_date: "2015-09-25",
+        type: "ALBUM",
+        status: "available",
+      },
+    ],
+  },
+  mockArtistSuggestions: {
+    suggestions: [
+      {
+        id: 71,
+        artist_name: "Drowse",
+        artist_url: "https://example.test/artists/drowse",
+        note: "Several listeners requested the new release.",
+        status: "open",
+        created_by_name: "Mara",
+        supporter_count: 3,
+      },
+    ],
+  },
+}));
 vi.mock("@/hooks/use-api", () => ({
-  useApi: () => ({ data: null, loading: false, error: null, refetch }),
+  useApi: (path: string) => ({
+    data:
+      path === "/api/acquisition/snapshot"
+        ? mockSurface
+        : path === "/api/tidal/artists/artist-caspian/albums"
+          ? mockArtistAlbums
+          : path === "/api/acquisition/artist-suggestions"
+            ? mockArtistSuggestions
+            : null,
+    loading: false,
+    error: null,
+    refetch,
+  }),
 }));
 vi.mock("@/lib/api", () => ({
-  api: vi.fn(),
+  api: mockApi,
   apiSseUrl: (path: string) => path,
 }));
 
@@ -16,6 +168,22 @@ import { DownloadPage } from "./Download";
 
 beforeEach(() => {
   sessionStorage.clear();
+  mockApi.mockReset();
+  mockApi.mockImplementation(async (path: string) => {
+    if (path.startsWith("/api/tidal/search") && path.includes("q=Caspian"))
+      return {
+        albums: [],
+        artists: [{ id: "artist-caspian", name: "Caspian", picture: null }],
+        tracks: [],
+      };
+    if (path.startsWith("/api/tidal/search"))
+      return { albums: [], artists: [], tracks: [] };
+    if (path === "/api/acquisition/search/soulseek")
+      return { search_id: "sample-search" };
+    if (path === "/api/acquisition/upload")
+      return { task_id: "sample-task-id" };
+    return undefined;
+  });
   vi.stubGlobal(
     "EventSource",
     class {
@@ -25,6 +193,43 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it("keeps Tidal artist browsing and release actions accessible without hover", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  await user.type(
+    screen.getByRole("textbox", { name: "Search music" }),
+    "Caspian",
+  );
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await user.click(
+    await screen.findByRole("button", { name: /browse albums/i }),
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Caspian on Tidal" }),
+  ).toBeVisible();
+  expect(screen.getByText("3 albums")).toBeVisible();
+  const localAlbum = screen.getByRole("article", {
+    name: "On Circles Tidal album",
+  });
+  expect(localAlbum).toHaveTextContent("Upgrade available");
+  expect(screen.getByRole("button", { name: "Get upgrade" })).toBeVisible();
+  expect(
+    within(localAlbum).getByRole("button", { name: "View tracks" }),
+  ).toBeVisible();
+  expect(
+    within(localAlbum).getByRole("button", { name: "Wishlist" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Download 1 missing album" }),
+  ).toBeVisible();
+});
+
 it("keeps Download's five real panels reachable after the shared tab restyle", async () => {
   const user = userEvent.setup();
   render(
@@ -32,7 +237,8 @@ it("keeps Download's five real panels reachable after the shared tab restyle", a
       <DownloadPage />
     </MemoryRouter>,
   );
-  expect(screen.getAllByRole("tab")).toHaveLength(5);
+  const workspaceTabs = within(screen.getAllByRole("tablist")[0]!);
+  expect(workspaceTabs.getAllByRole("tab")).toHaveLength(5);
   expect(
     screen.getByRole("tabpanel", { name: "Search Results" }),
   ).toBeVisible();
@@ -40,16 +246,210 @@ it("keeps Download's five real panels reachable after the shared tab restyle", a
   await user.keyboard("{ArrowRight}");
   expect(screen.getByRole("tab", { name: "Upload" })).toHaveFocus();
   expect(screen.getByRole("tabpanel", { name: "Upload" })).toHaveTextContent(
-    "Upload music into the library",
+    "Add music",
   );
   await user.keyboard("{ArrowRight}");
-  expect(screen.getByRole("tabpanel", { name: "Queue" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "Active downloads" }),
+  ).toBeVisible();
   await user.keyboard("{ArrowRight}");
-  expect(screen.getByRole("tabpanel", { name: "Wishlist" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "Download wishlist" }),
+  ).toBeVisible();
   await user.keyboard("{End}");
-  expect(screen.getByRole("tabpanel", { name: "History" })).toBeVisible();
+  expect(
+    screen.getByRole("region", { name: "Download history" }),
+  ).toBeVisible();
   await user.keyboard("{Home}");
   expect(
     screen.getByRole("tabpanel", { name: "Search Results" }),
   ).toBeVisible();
+});
+
+it("explains which sources the acquisition controls affect", async () => {
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole("heading", { name: "Acquisition" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Music search" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Search music" })).toHaveAttribute(
+    "placeholder",
+    "Artist, album, or track",
+  );
+  expect(
+    screen.getByText(/Used for Tidal downloads and wishlist items/),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("radiogroup", { name: "Tidal download quality" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("tablist", { name: "Search result provider" }),
+  ).toBeVisible();
+});
+
+it("keeps the acquisition search field, icon, and action aligned", () => {
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  const form = screen.getByRole("form", { name: "Acquisition search" });
+  const input = within(form).getByRole("textbox", { name: "Search music" });
+  const button = within(form).getByRole("button", { name: "Search" });
+  const icon = form.querySelector('[data-slot="acquisition-search-icon"]');
+
+  expect(form).toHaveClass("items-stretch");
+  expect(input).toHaveClass("h-10", "pointer-coarse:h-11");
+  expect(button).toHaveClass("h-10", "pointer-coarse:h-11");
+  expect(icon).toHaveClass("absolute", "inset-y-0", "flex", "items-center");
+});
+
+it("submits the music search from the search form", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  await user.type(
+    screen.getByRole("textbox", { name: "Search music" }),
+    "Caspian",
+  );
+  await user.click(screen.getByRole("button", { name: "Search" }));
+
+  await waitFor(() => {
+    expect(mockApi).toHaveBeenCalledWith(
+      "/api/tidal/search?q=Caspian&limit=20",
+    );
+  });
+  expect(
+    await screen.findByRole("button", { name: /browse albums/i }),
+  ).toBeVisible();
+});
+
+it("presents listener suggestions as solid, actionable acquisition cards", () => {
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  const suggestions = screen.getByRole("region", {
+    name: "Listener suggestions",
+  });
+  expect(suggestions).toHaveTextContent("1 open");
+  const drowse = within(suggestions).getByRole("article", {
+    name: "Drowse artist suggestion",
+  });
+  expect(drowse).toHaveTextContent("3 requests");
+  expect(drowse).toHaveTextContent("Suggested by Mara");
+  expect(
+    within(drowse).getByRole("button", { name: "Search artist" }),
+  ).toBeVisible();
+  expect(
+    within(drowse).getByRole("link", { name: "Open link" }),
+  ).toHaveAttribute("href", "https://example.test/artists/drowse");
+  expect(within(drowse).getByRole("button", { name: "Dismiss" })).toBeVisible();
+});
+
+it("accepts dropped files and shows a user-facing queued state", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  await user.click(screen.getByRole("tab", { name: "Upload" }));
+
+  const dropzone = screen.getByRole("group", { name: "Upload music files" });
+  const file = new File(["audio"], "Caspian.flac", { type: "audio/flac" });
+  fireEvent.drop(dropzone, { dataTransfer: { files: [file] } });
+
+  expect(screen.getByText("Caspian.flac")).toBeVisible();
+  expect(screen.getByText("1 file ready to import")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Add to library" }));
+
+  await waitFor(() => {
+    expect(mockApi).toHaveBeenCalledWith(
+      "/api/acquisition/upload",
+      "POST",
+      expect.any(FormData),
+    );
+  });
+  expect(screen.getByRole("status")).toHaveTextContent("Upload queued");
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Follow its progress from the Queue tab.",
+  );
+  expect(screen.getByRole("status")).not.toHaveTextContent("sample-task-id");
+});
+
+it("keeps queue, wishlist, and history actions attached to their existing records", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: /Queue/ }));
+  const queuePanel = screen.getByRole("region", { name: "Active downloads" });
+  expect(
+    within(queuePanel).getByRole("article", { name: "Signal Fire" }),
+  ).toBeVisible();
+  expect(
+    within(queuePanel).getByRole("progressbar", {
+      name: "Dust and Disquiet download progress",
+    }),
+  ).toHaveAttribute("aria-valuenow", "42");
+
+  await user.click(screen.getByRole("tab", { name: /Wishlist/ }));
+  const wishlistPanel = screen.getByRole("region", {
+    name: "Download wishlist",
+  });
+  expect(
+    within(wishlistPanel).getByRole("article", { name: "On Circles" }),
+  ).toBeVisible();
+  await user.click(
+    within(wishlistPanel).getByRole("button", {
+      name: "Download On Circles now",
+    }),
+  );
+  await waitFor(() => {
+    expect(mockApi).toHaveBeenCalledWith("/api/tidal/queue/42", "PUT", {
+      status: "queued",
+    });
+  });
+
+  await user.click(screen.getByRole("tab", { name: "History" }));
+  const historyPanel = screen.getByRole("region", {
+    name: "Download history",
+  });
+  expect(
+    within(historyPanel).getByRole("article", { name: "Old Moon" }),
+  ).toBeVisible();
+  expect(
+    within(historyPanel).getByRole("article", { name: "Quiet Sky" }),
+  ).toBeVisible();
+});
+
+it("uses single-selection tabs for provider results", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+
+  const providers = screen.getByRole("tablist", {
+    name: "Search result provider",
+  });
+  await user.click(within(providers).getByRole("tab", { name: "Soulseek" }));
+  expect(screen.getByRole("tabpanel", { name: "Soulseek" })).toHaveTextContent(
+    "Soulseek results",
+  );
 });

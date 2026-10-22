@@ -48,6 +48,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import {
   Dialog,
   DialogContent,
@@ -171,7 +172,7 @@ export function MergeArtistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Merge Artist Alias</DialogTitle>
+          <DialogTitle className="font-display">Merge Artist Alias</DialogTitle>
           <DialogDescription>
             Move every album from {currentArtistName} into another artist and
             remove this duplicate artist row.
@@ -182,7 +183,7 @@ export function MergeArtistDialog({
           <div className="crate-form-field">
             <label
               htmlFor="merge-artist-target"
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
             >
               Target artist
             </label>
@@ -624,11 +625,18 @@ function useArtistPageData() {
     artistSlug?: string;
   }>();
   const navigate = useNavigate();
-  const artistId = artistIdParam ? Number(artistIdParam) : undefined;
-  const { data, loading, refetch } = useApi<ArtistData>(
+  const legacyId =
+    artistIdParam ??
+    (artistSlug && /^\d+$/.test(artistSlug) ? artistSlug : undefined);
+  const parsedArtistId = legacyId ? Number(legacyId) : undefined;
+  const artistId =
+    parsedArtistId != null && Number.isSafeInteger(parsedArtistId)
+      ? parsedArtistId
+      : undefined;
+  const { data, loading, error, refetch } = useApi<ArtistData>(
     artistApiPath({
       artistId,
-      artistSlug,
+      artistSlug: artistId == null ? artistSlug : undefined,
     }) || null,
   );
   const topTracks = useTopTracks(data?.id, data?.entity_uid);
@@ -667,6 +675,7 @@ function useArtistPageData() {
   return {
     data,
     loading,
+    error,
     refetch,
     navigate,
     topTracks,
@@ -1142,7 +1151,14 @@ function useArtistPageModel() {
   });
 
   if (dataState.loading) return { loading: true as const, data: null };
-  if (!dataState.data) return { loading: false as const, data: null };
+  if (!dataState.data) {
+    return {
+      loading: false as const,
+      data: null,
+      error: dataState.error,
+      refetch: dataState.refetch,
+    };
+  }
 
   const {
     data,
@@ -1204,7 +1220,7 @@ function useArtistPageModel() {
   const bioText =
     data.bio !== null && data.bio !== undefined
       ? data.bio
-      : enrichment?.lastfm?.bio ?? "";
+      : (enrichment?.lastfm?.bio ?? "");
   const mb = enrichment?.musicbrainz;
   const spotify = enrichment?.spotify;
   const lastfm = enrichment?.lastfm;
@@ -1526,9 +1542,29 @@ type ArtistPageReadyModel = Extract<
 export function Artist() {
   const model = useArtistPageModel();
   if (model.loading) return <ArtistLoadingState />;
+  if (model.error && !model.data) {
+    return (
+      <ErrorState
+        variant="page"
+        kind="error"
+        title="Artist unavailable"
+        message="This artist could not be loaded. Try again or return to Browse."
+        onRetry={model.refetch}
+        backTo="/browse"
+        backLabel="Browse artists"
+      />
+    );
+  }
   if (!model.data) {
     return (
-      <div className="text-center py-12 text-muted-foreground">Not found</div>
+      <ErrorState
+        variant="page"
+        kind="notFound"
+        title="Artist not found"
+        message="This artist is not available in the catalog."
+        backTo="/browse"
+        backLabel="Browse artists"
+      />
     );
   }
   return <ArtistPageView model={model} />;

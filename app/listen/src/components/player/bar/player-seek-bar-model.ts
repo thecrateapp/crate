@@ -36,7 +36,6 @@ function stopEventPropagation(event: SyntheticEvent) {
 export function useSeekBarModel(
   currentTime: number,
   duration: number,
-  thin: boolean,
   onSeek: (time: number) => void,
 ): SeekBarModel {
   const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
@@ -99,7 +98,7 @@ export function useSeekBarModel(
     hoverTime,
     trackRef,
     sliderStyle,
-    glowTrackClass: thin ? "h-px" : "h-0.5",
+    glowTrackClass: "h-px",
     beginScrubbing,
     endScrubbing,
     handleHover,

@@ -33,7 +33,7 @@ function Biography({
   if (!text) return null;
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-white/70">Biography</h3>
+      <h3 className="mb-2 text-sm font-semibold text-white/70 font-display">Biography</h3>
       <p className="text-sm leading-relaxed text-white/60">
         <ArtistBioText text={text} maxChars={600} expanded={expanded} />
       </p>
@@ -65,7 +65,7 @@ function Members({
   if (members.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Members</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Members</h3>
       <div className="space-y-2">
         {members.map((member) => (
           <div
@@ -114,7 +114,7 @@ function Numbers({
 
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Numbers</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Numbers</h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {values.map((item) => (
           <div key={item.label}>
@@ -131,7 +131,7 @@ function Formation({ musicbrainz }: { musicbrainz?: MusicBrainzData }) {
   if (!musicbrainz?.begin_date && !musicbrainz?.country) return null;
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Formation</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Formation</h3>
       <div className="flex gap-6 text-sm text-white/50">
         {musicbrainz.begin_date ? (
           <div>
@@ -193,7 +193,7 @@ function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
   if (links.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-3 text-sm font-semibold text-white/70">Links</h3>
+      <h3 className="mb-3 text-sm font-semibold text-white/70 font-display">Links</h3>
       <div className="flex flex-wrap gap-2">
         {links.map((link) => (
           <a

@@ -9,6 +9,7 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
+import { OpsSurface } from "@/components/admin/ops-surfaces";
 
 const COLLAPSED_HEIGHT = 88;
 
@@ -303,7 +304,10 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="font-sans truncate text-[13px] font-semibold text-foreground">
+        <div
+          data-slot="entity-title"
+          className="font-display truncate text-[13px] font-semibold text-foreground"
+        >
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
@@ -441,7 +445,7 @@ function ExpandedShowCardBody({
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
+            className="absolute left-2.5 top-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-border-quiet bg-surface-canvas text-text-muted transition-colors hover:border-accent-action-hi hover:text-accent-action-hi"
             aria-label="Close show details"
           >
             <X data-admin-ux="show-close" aria-hidden="true" size={14} />
@@ -475,12 +479,16 @@ function ExpandedShowCardBody({
               {artistHref ? (
                 <Link
                   to={artistHref}
-                  className="block truncate font-sans text-sm font-bold text-white transition-colors hover:text-primary"
+                  data-slot="entity-title"
+                  className="block truncate font-display text-sm font-bold text-white transition-colors hover:text-primary"
                 >
                   {show.primaryArtist?.name ?? show.title}
                 </Link>
               ) : (
-                <div className="truncate font-sans text-sm font-bold text-white">
+                <div
+                  data-slot="entity-title"
+                  className="truncate font-display text-sm font-bold text-white"
+                >
                   {show.primaryArtist?.name ?? show.title}
                 </div>
               )}
@@ -573,14 +581,11 @@ export function ShowCard({
 
   if (!isInteractive) {
     return (
-      <div
-        className={cn(
-          "relative w-[340px] overflow-hidden rounded-md border border-white/[0.06] bg-panel-surface shadow-[0_20px_48px_rgba(0,0,0,0.28)]",
-          className,
-        )}
+      <OpsSurface
+        className={cn("relative w-[340px] overflow-hidden", className)}
       >
         <ExpandedShowCardBody show={normalized} />
-      </div>
+      </OpsSurface>
     );
   }
 
@@ -591,12 +596,12 @@ export function ShowCard({
     : COLLAPSED_HEIGHT;
 
   return (
-    <div
+    <OpsSurface
       className={cn(
-        "relative w-full overflow-hidden rounded-md border",
+        "relative w-full overflow-hidden transition-[height,border-color] duration-300 ease-out",
         expanded
-          ? "border-primary/20 shadow-none transition-[height,border-color,box-shadow] duration-400 ease-out"
-          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 ",
+          ? "border-accent-action-hi/40"
+          : "hover:border-accent-action-hi/40",
         className,
       )}
       style={{ height: cardHeight }}
@@ -618,9 +623,6 @@ export function ShowCard({
     >
       <div ref={contentRef}>
         {!expanded ? (
-          <div className="absolute inset-0 bg-raised-surface" />
-        ) : null}
-        {!expanded ? (
           <CollapsedShowCard show={normalized} />
         ) : (
           <ExpandedShowCardBody
@@ -631,6 +633,6 @@ export function ShowCard({
           />
         )}
       </div>
-    </div>
+    </OpsSurface>
   );
 }

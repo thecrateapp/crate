@@ -1,33 +1,46 @@
 import { act, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/lib/api";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Tasks } from "./Tasks";
 
-const taskEvents = vi.hoisted(() => ({
-  done: null as { status: string } | null,
-}));
-
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
-vi.mock("@/hooks/use-task-events", () => ({
-  useTaskEvents: () => ({
-    events: [],
-    done: taskEvents.done,
-    connected: true,
-    reset: vi.fn(),
-  }),
-}));
 vi.mock("@/lib/task-catalog", () => ({
   useTaskCatalog: () => null,
   taskLabel: (type: string) => type,
 }));
 
-let taskStream: {
-  onmessage: ((event: MessageEvent) => void) | null;
-  close: ReturnType<typeof vi.fn>;
-};
 const streamCreated = vi.fn();
+
+class TestEventSource {
+  static taskStream: TestEventSource | undefined;
+  static taskEventStream: TestEventSource | undefined;
+  onopen: ((event: Event) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  listeners: Record<string, (event: MessageEvent) => void> = {};
+  close = vi.fn();
+
+  constructor(readonly url: string) {
+    streamCreated(url);
+    if (url === "/api/admin/tasks-stream?limit=100")
+      TestEventSource.taskStream = this;
+    if (url.startsWith("/api/events/task/"))
+      TestEventSource.taskEventStream = this;
+  }
+
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    this.listeners[type] = listener;
+  }
+
+  dispatch(type: string, payload: unknown) {
+    this.listeners[type]?.(
+      new MessageEvent(type, { data: JSON.stringify(payload) }),
+    );
+  }
+}
 
 function taskSnapshot(progress: Record<string, unknown>) {
   const task = {
@@ -44,6 +57,15 @@ function taskSnapshot(progress: Record<string, unknown>) {
   };
   const queues = { fast: 0, default: 0, heavy: 0, maintenance: 0, playback: 0 };
   return {
+    snapshot: {
+      scope: "ops:tasks",
+      subject_key: "global",
+      version: 1,
+      built_at: "2026-10-22T09:30:00Z",
+      stale_after: "2026-10-22T09:35:00Z",
+      stale: false,
+      generation_ms: 2,
+    },
     live: {
       engine: "dramatiq",
       running_tasks: [task],
@@ -69,13 +91,10 @@ function serveTasks(progress: Record<string, unknown>) {
 describe("Tasks progress", () => {
   beforeEach(() => {
     vi.mocked(api).mockReset();
-    taskEvents.done = null;
+    TestEventSource.taskStream = undefined;
+    TestEventSource.taskEventStream = undefined;
     streamCreated.mockClear();
-    vi.stubGlobal("EventSource", function (url: string) {
-      streamCreated(url);
-      taskStream = { onmessage: null, close: vi.fn() };
-      return taskStream;
-    });
+    vi.stubGlobal("EventSource", TestEventSource);
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -107,20 +126,63 @@ describe("Tasks progress", () => {
         .getAllByText("Running", { exact: true })
         .some((node) => node.className.includes("text-accent-action-hi")),
     ).toBe(true);
-    act(
-      () =>
-        taskStream.onmessage?.(
-          new MessageEvent("message", {
-            data: JSON.stringify(
-              taskSnapshot({ phase: "Scanning", done: 4, total: 8 }),
-            ),
-          }),
-        ),
+    act(() =>
+      TestEventSource.taskStream?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(
+            taskSnapshot({ phase: "Scanning", done: 4, total: 8 }),
+          ),
+        }),
+      ),
     );
     expect(bar).toHaveAttribute("aria-valuenow", "50");
-    expect(streamCreated).toHaveBeenCalledExactlyOnceWith(
-      "/api/admin/tasks-stream?limit=100",
+    expect(
+      streamCreated.mock.calls.filter(
+        ([url]) => url === "/api/admin/tasks-stream?limit=100",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the last successful task snapshot visible when a manual refresh fails", async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path.startsWith("/api/admin/tasks-snapshot")) {
+        if (path.includes("fresh=1")) throw new Error("network unavailable");
+        return taskSnapshot({ phase: "Scanning", done: 2, total: 8 });
+      }
+      return null;
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Tasks />, { route: "/tasks" });
+
+    expect(await screen.findByRole("progressbar")).toBeVisible();
+    await user.click(screen.getAllByRole("button", { name: "Refresh" })[0]!);
+
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent("Showing the last successful snapshot.");
+    expect(screen.getByRole("progressbar")).toBeVisible();
+    expect(screen.getByText("Snapshot current")).toBeVisible();
+  });
+
+  it("reuses the active task stream when its live event log is expanded", async () => {
+    const user = userEvent.setup();
+    serveTasks({ phase: "Scanning", item: "Slowdive" });
+    renderWithAdminProviders(<Tasks />, { route: "/tasks" });
+
+    await screen.findByRole("progressbar");
+    const activeTaskStreams = () =>
+      streamCreated.mock.calls.filter(([url]) =>
+        String(url).startsWith("/api/events/task/active-scan"),
+      );
+    expect(activeTaskStreams()).toHaveLength(1);
+    expect(streamCreated).toHaveBeenCalledWith(
+      "/api/events/task/active-scan?generic=1",
     );
+
+    await user.click(screen.getByRole("button", { name: "Live events" }));
+    act(() => TestEventSource.taskEventStream?.onopen?.(new Event("open")));
+
+    expect(screen.getByText("Waiting for live events…")).toBeInTheDocument();
+    expect(activeTaskStreams()).toHaveLength(1);
   });
 
   it("preserves server percentage when it differs from the item ratio", async () => {
@@ -152,8 +214,8 @@ describe("Tasks progress", () => {
       expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
 
       act(() => {
-        taskEvents.done = { status };
-        taskStream.onmessage?.(
+        TestEventSource.taskEventStream?.dispatch("task_done", { status });
+        TestEventSource.taskStream?.onmessage?.(
           new MessageEvent("message", {
             data: JSON.stringify(taskSnapshot(progress)),
           }),
@@ -174,8 +236,10 @@ describe("Tasks progress", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "61");
 
     act(() => {
-      taskEvents.done = { status: "completed" };
-      taskStream.onmessage?.(
+      TestEventSource.taskEventStream?.dispatch("task_done", {
+        status: "completed",
+      });
+      TestEventSource.taskStream?.onmessage?.(
         new MessageEvent("message", {
           data: JSON.stringify(taskSnapshot(progress)),
         }),

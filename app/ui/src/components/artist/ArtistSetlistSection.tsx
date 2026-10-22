@@ -108,7 +108,7 @@ export function ArtistSetlistSection({
     <div className="max-w-3xl">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Probable Setlist</h2>
+          <h2 className="text-lg font-semibold font-display">Probable Setlist</h2>
           {probableSetlist.length > 0 ? (
             <p className="text-xs text-white/40 mt-0.5">
               Based on {totalShows} recent concerts
@@ -202,9 +202,9 @@ export function ArtistSetlistSection({
                     {song.title}
                   </span>
                   <div className="w-28 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-white/10 rounded-md overflow-hidden">
+                    <div className="flex-1 h-px bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-md"
+                        className="h-full rounded-full"
                         style={{
                           width: `${Math.round(song.frequency * 100)}%`,
                           background:

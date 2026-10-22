@@ -1,6 +1,16 @@
 import { FormField } from "@crate/ui/primitives/FormField";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@crate/ui/shadcn/dropdown-menu";
+import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { ListPagination } from "@/components/admin/ListPagination";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -10,6 +20,7 @@ import {
   FilePlus2 as HeaderFilePlus2,
   ListPlus as HeaderListPlus,
   Loader2,
+  MoreHorizontal,
   Pencil,
   Power,
   PowerOff,
@@ -26,7 +37,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import {
@@ -52,6 +63,7 @@ interface SystemPlaylist {
   generation_mode: "static" | "smart";
   is_curated: boolean;
   is_active: boolean;
+  auto_refresh_enabled?: boolean;
   featured_rank?: number | null;
   category?: string | null;
   follower_count: number;
@@ -92,6 +104,7 @@ const FILTER_OPTIONS: Array<{ key: FilterMode; label: string }> = [
   { key: "smart", label: "Smart" },
   { key: "inactive", label: "Inactive" },
 ];
+const PLAYLISTS_PAGE_SIZE = 20;
 
 const CATEGORY_OPTIONS = [
   { value: "editorial", label: "Editorial" },
@@ -172,13 +185,6 @@ const DROPDOWN_FIELDS: Record<
   },
 };
 
-function fmtDuration(totalSeconds: number): string {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-}
-
 function getFieldType(field: string): "text" | "number" {
   return SMART_FIELDS.find((item) => item.value === field)?.type === "text"
     ? "text"
@@ -189,25 +195,10 @@ function getOpsForField(field: string) {
   return getFieldType(field) === "text" ? TEXT_OPS : NUMBER_OPS;
 }
 
-function getGenerationChip(status?: string) {
-  if (status === "running") {
-    return <InfoBadge active>Generating</InfoBadge>;
-  }
-  if (status === "queued") {
-    return (
-      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-        Queued
-      </InfoBadge>
-    );
-  }
-  if (status === "failed") {
-    return (
-      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-        Failed
-      </InfoBadge>
-    );
-  }
-  return null;
+function formatPlaylistDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 function Field({
@@ -250,6 +241,7 @@ export function Playlists() {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [composerMode, setComposerMode] = useState<ComposerMode>(null);
   const [deleteTarget, setDeleteTarget] = useState<SystemPlaylist | null>(null);
 
@@ -329,6 +321,15 @@ export function Playlists() {
       return haystack.includes(normalizedQuery);
     });
   }, [categoryFilter, filter, playlists, query]);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredPlaylists.length / PLAYLISTS_PAGE_SIZE),
+  );
+  const currentPage = Math.min(page, pageCount);
+  const visiblePlaylists = filteredPlaylists.slice(
+    (currentPage - 1) * PLAYLISTS_PAGE_SIZE,
+    currentPage * PLAYLISTS_PAGE_SIZE,
+  );
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -367,7 +368,7 @@ export function Playlists() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
+      <AdminPageHeader>
         <PageHeaderLayout
           actions={
             <PageHeaderActions>
@@ -436,7 +437,10 @@ export function Playlists() {
                 <Input
                   id="playlists-search"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search playlists by name, description or category"
                   className="pl-9"
                 />
@@ -446,7 +450,10 @@ export function Playlists() {
               <MonoLabel as="span">Category</MonoLabel>
               <AdminSelect
                 value={categoryFilter}
-                onChange={setCategoryFilter}
+                onChange={(value) => {
+                  setCategoryFilter(value);
+                  setPage(1);
+                }}
                 options={categoryOptions}
                 placeholder="All categories"
                 searchable
@@ -462,7 +469,10 @@ export function Playlists() {
                 <FilterChip
                   key={item.key}
                   active={filter === item.key}
-                  onClick={() => setFilter(item.key)}
+                  onClick={() => {
+                    setFilter(item.key);
+                    setPage(1);
+                  }}
                 >
                   {item.label}
                   <span>
@@ -478,12 +488,9 @@ export function Playlists() {
               ))}
             </div>
 
-            <p className="text-sm text-muted-foreground">
-              Showing {filteredPlaylists.length} of {playlists.length} playlists
-            </p>
           </div>
         </div>
-      </section>
+      </AdminPageHeader>
 
       {composerMode === "static" ? (
         <CreateStaticPlaylistPanel
@@ -515,7 +522,7 @@ export function Playlists() {
         </div>
       ) : filteredPlaylists.length === 0 ? (
         <Card className="border-white/10 bg-card p-10 text-center">
-          <h2 className="text-lg font-medium">
+          <h2 className="text-lg font-medium font-display">
             No playlists for this view yet
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -524,138 +531,204 @@ export function Playlists() {
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredPlaylists.map((playlist) => (
-            <Card
+        <HairlineList
+          as="ul"
+          label="System playlists"
+          className="mt-3 space-y-4"
+        >
+          {visiblePlaylists.map((playlist) => (
+            <HairlineRow
               key={playlist.id}
-              className="@container overflow-hidden border-white/10 bg-card py-0"
+              truncate={false}
+              className="items-stretch gap-2 py-0 md:gap-4"
+              trailing={
+                <div className="flex h-full shrink-0 items-center">
+                  <div className="hidden md:flex">
+                    <PageHeaderActions label={`Actions for ${playlist.name}`}>
+                      <PageHeaderAction
+                        label={`Edit ${playlist.name}`}
+                        tooltip="Edit"
+                        onClick={() => navigate(`/playlists/${playlist.id}`)}
+                      >
+                        <Pencil
+                          data-admin-ux="playlists-open-editor"
+                          aria-hidden="true"
+                        />
+                      </PageHeaderAction>
+                      <PageHeaderAction
+                        label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
+                        tooltip={playlist.is_active ? "Deactivate" : "Activate"}
+                        onClick={() => void toggleActive(playlist)}
+                      >
+                        {playlist.is_active ? (
+                          <PowerOff
+                            data-admin-ux="playlists-deactivate"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Power
+                            data-admin-ux="playlists-activate"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </PageHeaderAction>
+                      <PageHeaderAction
+                        label={`Delete ${playlist.name}`}
+                        tooltip="Delete"
+                        onClick={() => setDeleteTarget(playlist)}
+                      >
+                        <Trash2
+                          data-admin-ux="playlists-delete"
+                          aria-hidden="true"
+                        />
+                      </PageHeaderAction>
+                    </PageHeaderActions>
+                  </div>
+                  <div className="md:hidden">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Actions for ${playlist.name}`}
+                          className="size-11"
+                        >
+                          <MoreHorizontal aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => navigate(`/playlists/${playlist.id}`)}
+                        >
+                          <Pencil aria-hidden="true" /> Edit playlist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => void toggleActive(playlist)}
+                        >
+                          {playlist.is_active ? (
+                            <PowerOff aria-hidden="true" />
+                          ) : (
+                            <Power aria-hidden="true" />
+                          )}
+                          {playlist.is_active ? "Deactivate" : "Activate"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => setDeleteTarget(playlist)}
+                        >
+                          <Trash2 aria-hidden="true" /> Delete playlist
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              }
             >
-              <div
-                role="link"
-                tabIndex={0}
-                className="flex cursor-pointer flex-col gap-4 p-4 @2xl:flex-row @2xl:items-start"
-                onClick={() => navigate(`/playlists/${playlist.id}`)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    navigate(`/playlists/${playlist.id}`);
-                  }
-                }}
+              <Link
+                to={`/playlists/${playlist.id}`}
+                aria-label={`Open ${playlist.name}`}
+                className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 py-0 md:min-h-44 md:gap-4"
               >
-                <PlaylistArtwork
-                  name={playlist.name}
-                  coverDataUrl={playlist.cover_data_url}
-                  tracks={playlist.artwork_tracks}
-                  className="h-24 w-24 shrink-0 rounded-md border border-white/10 bg-white/[0.03] @2xl:h-26 @2xl:w-26"
-                />
-
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-sm font-semibold md:text-base">
-                      {playlist.name}
-                    </h2>
-                    <InfoBadge>system</InfoBadge>
-                    <InfoBadge active={playlist.generation_mode === "smart"}>
-                      {playlist.generation_mode}
-                    </InfoBadge>
-                    {playlist.is_curated ? (
-                      <InfoBadge>curated</InfoBadge>
-                    ) : null}
-                    {!playlist.is_active ? (
-                      <InfoBadge>inactive</InfoBadge>
-                    ) : null}
-                    {playlist.category ? (
-                      <InfoBadge>{playlist.category}</InfoBadge>
-                    ) : null}
-                    {getGenerationChip(playlist.generation_status)}
-                  </div>
-
-                  {playlist.description ? (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                      {playlist.description}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {playlist.generation_mode === "smart"
-                        ? "Rule-driven editorial playlist."
-                        : "Static editorial playlist shell."}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <InfoBadge>{playlist.track_count} tracks</InfoBadge>
-                    <InfoBadge>
-                      {fmtDuration(playlist.total_duration)}
-                    </InfoBadge>
-                    <InfoBadge>
-                      {playlist.follower_count} follower
-                      {playlist.follower_count === 1 ? "" : "s"}
-                    </InfoBadge>
-                    {playlist.featured_rank != null ? (
-                      <InfoBadge>Rank {playlist.featured_rank}</InfoBadge>
-                    ) : null}
-                    {playlist.last_generated_at ? (
-                      <InfoBadge>
-                        Generated {timeAgo(playlist.last_generated_at)}
-                      </InfoBadge>
-                    ) : null}
-                  </div>
-                </div>
-
                 <div
-                  className="order-first min-w-0 max-w-full shrink-0 self-end @2xl:order-none @2xl:self-start"
-                  onClick={(event) => event.stopPropagation()}
+                  data-slot="playlist-row-content"
+                  className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 md:min-h-44 md:gap-4"
                 >
-                  <PageHeaderActions label={`Actions for ${playlist.name}`}>
-                    <PageHeaderAction
-                      label={`Edit ${playlist.name}`}
-                      tooltip="Edit"
-                      onClick={() => navigate(`/playlists/${playlist.id}`)}
-                    >
-                      <Pencil
-                        data-admin-ux="playlists-open-editor"
-                        aria-hidden="true"
-                      />
-                    </PageHeaderAction>
-                    <PageHeaderAction
-                      label={`${
-                        playlist.is_active ? "Deactivate" : "Activate"
-                      } ${playlist.name}`}
-                      tooltip={playlist.is_active ? "Deactivate" : "Activate"}
-                      onClick={() => {
-                        void toggleActive(playlist);
-                      }}
-                    >
-                      {playlist.is_active ? (
-                        <PowerOff
-                          data-admin-ux="playlists-deactivate"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <Power
-                          data-admin-ux="playlists-activate"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </PageHeaderAction>
-                    <PageHeaderAction
-                      label={`Delete ${playlist.name}`}
-                      tooltip="Delete"
-                      onClick={() => setDeleteTarget(playlist)}
-                    >
-                      <Trash2
-                        data-admin-ux="playlists-delete"
-                        aria-hidden="true"
-                      />
-                    </PageHeaderAction>
-                  </PageHeaderActions>
+                  <PlaylistArtwork
+                    name={playlist.name}
+                    coverDataUrl={playlist.cover_data_url}
+                    tracks={playlist.artwork_tracks}
+                    className="size-28 shrink-0 self-stretch rounded-sm border border-white/10 bg-white/[0.03] object-cover md:size-44"
+                  />
+
+                  <div
+                    data-slot="playlist-row-information"
+                    className="flex min-h-28 min-w-0 flex-1 flex-col justify-between gap-2 py-0 md:min-h-44 md:py-2"
+                  >
+                    <div className="grid min-w-0 gap-2">
+                      <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+                        <InfoBadge
+                          active={playlist.generation_mode === "smart"}
+                        >
+                          {playlist.generation_mode}
+                        </InfoBadge>
+                        <InfoBadge active={playlist.is_curated}>
+                          {playlist.is_curated ? "curated" : "internal"}
+                        </InfoBadge>
+                        <InfoBadge active={playlist.is_active}>
+                          {playlist.is_active ? "active" : "inactive"}
+                        </InfoBadge>
+                        {playlist.generation_mode === "smart" ? (
+                          <InfoBadge active={playlist.auto_refresh_enabled}>
+                            auto-refresh
+                          </InfoBadge>
+                        ) : null}
+                        {playlist.generation_status === "running" ||
+                        playlist.generation_status === "queued" ||
+                        playlist.generation_status === "failed" ? (
+                          <InfoBadge
+                            tone={
+                              playlist.generation_status === "failed"
+                                ? "danger"
+                                : playlist.generation_status === "queued"
+                                  ? "warning"
+                                  : "info"
+                            }
+                          >
+                            {playlist.generation_status === "running"
+                              ? "generating"
+                              : playlist.generation_status}
+                          </InfoBadge>
+                        ) : null}
+                      </div>
+                      <div className="grid min-w-0 gap-1">
+                        <span className="truncate text-base font-semibold text-text-primary md:text-lg">
+                          {playlist.name}
+                        </span>
+                        <p className="m-0 line-clamp-1 text-sm leading-5 text-text-muted md:line-clamp-2">
+                          {playlist.description ||
+                            "No editorial description yet."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+                      <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+                      <InfoBadge>
+                        {formatPlaylistDuration(playlist.total_duration)}
+                      </InfoBadge>
+                      <InfoBadge>
+                        {playlist.follower_count ?? 0} follower
+                        {playlist.follower_count === 1 ? "" : "s"}
+                      </InfoBadge>
+                      {playlist.category ? (
+                        <InfoBadge>{playlist.category}</InfoBadge>
+                      ) : null}
+                      {playlist.featured_rank != null ? (
+                        <InfoBadge>Rank {playlist.featured_rank}</InfoBadge>
+                      ) : null}
+                      {playlist.last_generated_at ? (
+                        <InfoBadge>
+                          Generated {timeAgo(playlist.last_generated_at)}
+                        </InfoBadge>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Link>
+            </HairlineRow>
           ))}
-        </div>
+        </HairlineList>
       )}
+
+      {!loading && filteredPlaylists.length > 0 ? (
+        <ListPagination
+          label="playlists"
+          itemCount={filteredPlaylists.length}
+          page={currentPage}
+          pageSize={PLAYLISTS_PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -724,7 +797,9 @@ function CreateStaticPlaylistPanel({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div>
-                <h2 className="text-lg font-semibold">New static playlist</h2>
+                <h2 className="text-lg font-semibold font-display">
+                  New static playlist
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   Create the editorial shell, then continue in the dedicated
                   editor.
@@ -971,7 +1046,9 @@ function CreateSmartPlaylistPanel({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div>
-                <h2 className="text-lg font-semibold">New smart playlist</h2>
+                <h2 className="text-lg font-semibold font-display">
+                  New smart playlist
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   Define the editorial shell, add rules, and jump straight into
                   the editor once generation is queued.
@@ -1055,7 +1132,9 @@ function CreateSmartPlaylistPanel({
         <div className="rounded-md border border-white/10 bg-black/10 p-4">
           <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h3 className="text-sm font-semibold">Rule composer</h3>
+              <h3 className="text-sm font-semibold font-display">
+                Rule composer
+              </h3>
               <p className="text-sm text-muted-foreground">
                 Build the first pass here, then refine in the editor after
                 creation if needed.

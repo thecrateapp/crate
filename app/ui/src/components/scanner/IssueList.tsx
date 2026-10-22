@@ -37,7 +37,7 @@ export function IssueList({ issues }: IssueListProps) {
       <p className="text-muted-foreground mb-4">{issues.length} issues found</p>
       {Object.entries(grouped).map(([type, items]) => (
         <div key={type} className="mb-8">
-          <h3 className="font-semibold mb-3">
+          <h3 className="font-semibold mb-3 font-display">
             {type.replace(/_/g, " ")} ({items.length})
           </h3>
           {items.map((issue) => (

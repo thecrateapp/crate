@@ -3,17 +3,21 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
+import { createApiProxyOptions } from "./dev-proxy";
 
 const sentryUploadEnabled = Boolean(
   process.env.SENTRY_AUTH_TOKEN &&
-    process.env.SENTRY_ORG &&
-    process.env.SENTRY_PROJECT,
+  process.env.SENTRY_ORG &&
+  process.env.SENTRY_PROJECT,
 );
 const sentryRelease =
   process.env.SENTRY_RELEASE ||
   (process.env.GITHUB_SHA ? `crate-${process.env.GITHUB_SHA}` : undefined);
 
 export default defineConfig({
+  // Admin and Listen run side by side during V3 work. Keep their optimized
+  // dependency graphs isolated so one dev server cannot invalidate the other.
+  cacheDir: path.resolve(__dirname, "../../node_modules/.vite-admin"),
   envDir: path.resolve(__dirname, "../.."),
   plugins: [
     react(),
@@ -110,11 +114,9 @@ export default defineConfig({
       allow: [path.resolve(__dirname, "../..")],
     },
     proxy: {
-      "/api": {
-        target: process.env.API_URL || "http://localhost:8585",
-        changeOrigin: true,
-        secure: false,
-      },
+      "/api": createApiProxyOptions(
+        process.env.API_URL || "http://localhost:8585",
+      ),
     },
   },
 });

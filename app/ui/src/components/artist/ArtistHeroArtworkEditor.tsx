@@ -524,10 +524,10 @@ export function ArtistHeroArtworkEditor({
       <section className="rounded-md border border-border bg-card/55 p-4 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="text-xs font-normal uppercase tracking-[0.18em] text-primary font-mono">
               Featured artist hero
             </p>
-            <h2 className="mt-1 text-xl font-semibold text-foreground">
+            <h2 className="mt-1 text-xl font-semibold text-foreground font-display">
               Desktop and mobile compositions
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -835,10 +835,10 @@ export function ArtistHeroArtworkEditor({
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="text-[11px] font-normal uppercase tracking-[0.18em] text-primary font-mono">
               {artistName}
             </p>
-            <h2 className="mt-1 text-lg font-semibold text-foreground">
+            <h2 className="mt-1 text-lg font-semibold text-foreground font-display">
               Preview hero artwork
             </h2>
           </div>

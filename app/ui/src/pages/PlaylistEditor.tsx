@@ -1,7 +1,10 @@
-import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { PageHeaderLayout } from "@crate/ui/domain/navigation/PageHeader";
 import { BackLink } from "@crate/ui/domain/navigation/BackLink";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -34,6 +37,7 @@ import { toast } from "sonner";
 
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { AIButton } from "@/components/ui/AIButton";
+import { useSnapshotStream } from "@/hooks/use-snapshot-stream";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
@@ -357,25 +361,122 @@ function TogglePill({
   );
 }
 
-function StatusChip({ status }: { status: string }) {
-  if (status === "running") {
-    return <InfoBadge active>Generating</InfoBadge>;
+function GenerationPhaseLine({
+  status,
+  lastGeneratedAt,
+  streamStatus,
+}: {
+  status: string;
+  lastGeneratedAt: string | null;
+  streamStatus: ReturnType<typeof useSnapshotStream>;
+}) {
+  const phaseIndex =
+    status === "queued"
+      ? 0
+      : status === "running" || status === "failed"
+        ? 1
+        : lastGeneratedAt
+          ? 2
+          : -1;
+  const labels = ["Queued", "Generating", "Ready"];
+  const streamCopy =
+    streamStatus === "live"
+      ? "Live updates"
+      : streamStatus === "reconnecting"
+        ? "Reconnecting"
+        : streamStatus === "connecting"
+          ? "Connecting"
+          : "Stream paused";
+
+  return (
+    <div
+      role="status"
+      aria-label="Playlist generation progress"
+      data-generation-phase-line
+      className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-border-quiet pt-4"
+    >
+      <ol className="flex min-w-0 flex-1 items-center">
+        {labels.map((label, index) => {
+          const isCurrent = index === phaseIndex;
+          const isComplete = phaseIndex > index;
+          const failed = isCurrent && status === "failed";
+          const stepLabel = failed ? "Failed" : label;
+          const tone =
+            isComplete || (isCurrent && !failed)
+              ? "on"
+              : failed
+                ? "warn"
+                : "off";
+
+          return (
+            <li
+              key={label}
+              aria-current={isCurrent ? "step" : undefined}
+              className="flex min-w-0 flex-1 items-center last:flex-none"
+            >
+              <StatusDot
+                tone={tone}
+                label={stepLabel}
+                pulse={
+                  isCurrent && (status === "queued" || status === "running")
+                }
+                className="whitespace-nowrap"
+              />
+              {index < labels.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className={`mx-3 h-px min-w-2 flex-1 ${isComplete ? "bg-accent-action/45" : "bg-border-quiet"}`}
+                />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      <StatusDot
+        label={streamCopy}
+        tone={streamStatus === "live" ? "on" : "off"}
+        pulse={streamStatus === "connecting" || streamStatus === "reconnecting"}
+      />
+    </div>
+  );
+}
+
+function formatRuleValue(rule: SmartRule): string {
+  if (Array.isArray(rule.value)) {
+    const [minimum, maximum] = rule.value;
+    return `${minimum ?? "…"}–${maximum ?? "…"}`;
   }
-  if (status === "queued") {
-    return (
-      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-        Queued
+  return String(rule.value ?? "").trim() || "Any value";
+}
+
+function RuleExpression({ rule, index }: { rule: SmartRule; index: number }) {
+  const field = RULE_FIELDS.find((candidate) => candidate.value === rule.field);
+  const operatorLabels: Record<string, string> = {
+    eq: "=",
+    neq: "≠",
+    contains: "CONTAINS",
+    not_contains: "NOT CONTAINS",
+    gte: "≥",
+    lte: "≤",
+    between: "BETWEEN",
+  };
+  const operator = operatorLabels[rule.op] ?? rule.op;
+
+  return (
+    <div
+      role="group"
+      aria-label={`Rule ${index + 1}: ${field?.label ?? rule.field} ${operator} ${formatRuleValue(rule)}`}
+      className="flex min-w-0 flex-wrap items-center gap-1.5"
+    >
+      <InfoBadge>{field?.label ?? rule.field}</InfoBadge>
+      <MonoLabel as="span" className="px-1">
+        {operator}
+      </MonoLabel>
+      <InfoBadge className="max-w-full truncate">
+        {formatRuleValue(rule)}
       </InfoBadge>
-    );
-  }
-  if (status === "failed") {
-    return (
-      <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-        Failed
-      </InfoBadge>
-    );
-  }
-  return <InfoBadge>Idle</InfoBadge>;
+    </div>
+  );
 }
 
 function MetricTile({ label, value }: { label: string; value: ReactNode }) {
@@ -441,23 +542,13 @@ export function PlaylistEditor() {
     setLiveSurface(surface);
   }, [surface]);
 
-  useEffect(() => {
-    if (!id) return;
-    const source = new EventSource(
-      apiSseUrl(`/api/admin/system-playlists/${id}/stream`),
-    );
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as PlaylistEditorSurface;
-        setLiveSurface(payload);
-      } catch {
-        // Ignore malformed frames and keep the stream alive.
-      }
-    };
-    return () => {
-      source.close();
-    };
-  }, [id]);
+  const acceptLiveSurface = useCallback((payload: PlaylistEditorSurface) => {
+    setLiveSurface(payload);
+  }, []);
+  const streamStatus = useSnapshotStream<PlaylistEditorSurface>(
+    id ? apiSseUrl(`/api/admin/system-playlists/${id}/stream`) : null,
+    acceptLiveSurface,
+  );
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -925,92 +1016,90 @@ export function PlaylistEditor() {
         label="Back to playlists"
         onClick={() => navigate("/playlists")}
       />
-      <section className="@container rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <PageHeader
-          artwork={
-            <PlaylistArtwork
-              name={playlist.name}
-              coverDataUrl={playlist.cover_data_url}
-              tracks={playlist.artwork_tracks}
-              className="h-28 w-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03]"
-              crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
-            />
-          }
-          actions={
-            <PageHeaderActions label="Playlist actions">
-              <PageHeaderAction label="Duplicate" onClick={handleDuplicate}>
-                <Copy
-                  data-admin-ux="editor-duplicate-action"
-                  aria-hidden="true"
-                />
-              </PageHeaderAction>
-              {isSmart ? (
-                <PageHeaderAction
-                  label="Preview"
-                  onClick={handlePreview}
-                  disabled={previewing}
-                  aria-busy={previewing || undefined}
-                >
-                  {previewing ? (
-                    <Loader2
-                      data-admin-ux="editor-preview"
-                      aria-hidden="true"
-                      className="animate-spin"
-                    />
-                  ) : (
-                    <Eye
-                      data-admin-ux="editor-preview-action"
-                      aria-hidden="true"
-                    />
-                  )}
-                </PageHeaderAction>
-              ) : null}
-              {isSmart ? (
-                <PageHeaderAction
-                  label={smartRulesChanged ? "Save + generate" : "Generate"}
-                  onClick={handleGenerate}
-                  disabled={generating}
-                  aria-busy={generating || undefined}
-                >
-                  {generating ? (
-                    <Loader2
-                      data-admin-ux="editor-generate"
-                      aria-hidden="true"
-                      className="animate-spin"
-                    />
-                  ) : (
-                    <ListRestart
-                      data-admin-ux="editor-generate-action"
-                      aria-hidden="true"
-                    />
-                  )}
-                </PageHeaderAction>
-              ) : null}
+      <PageHeaderLayout
+        as="header"
+        aria-labelledby="playlist-editor-title"
+        artwork={
+          <PlaylistArtwork
+            name={playlist.name}
+            coverDataUrl={playlist.cover_data_url}
+            tracks={playlist.artwork_tracks}
+            className="size-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03] object-cover md:size-56"
+            crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
+          />
+        }
+        actions={
+          <PageHeaderActions label="Playlist actions">
+            <PageHeaderAction label="Duplicate" onClick={handleDuplicate}>
+              <Copy
+                data-admin-ux="editor-duplicate-action"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            {isSmart ? (
               <PageHeaderAction
-                label="Save changes"
-                onClick={handleSave}
-                disabled={saving}
-                aria-busy={saving || undefined}
+                label="Preview"
+                onClick={handlePreview}
+                disabled={previewing}
+                aria-busy={previewing || undefined}
               >
-                {saving ? (
+                {previewing ? (
                   <Loader2
-                    data-admin-ux="editor-save"
+                    data-admin-ux="editor-preview"
                     aria-hidden="true"
                     className="animate-spin"
                   />
                 ) : (
-                  <Save data-admin-ux="editor-save-action" aria-hidden="true" />
+                  <Eye
+                    data-admin-ux="editor-preview-action"
+                    aria-hidden="true"
+                  />
                 )}
               </PageHeaderAction>
-            </PageHeaderActions>
-          }
-          title={name || playlist.name}
-          subtitle={
-            description ||
-            "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."
-          }
-          eyebrow={
-            <div className="flex flex-wrap gap-2">
+            ) : null}
+            {isSmart ? (
+              <PageHeaderAction
+                label={smartRulesChanged ? "Save + generate" : "Generate"}
+                onClick={handleGenerate}
+                disabled={generating}
+                aria-busy={generating || undefined}
+              >
+                {generating ? (
+                  <Loader2
+                    data-admin-ux="editor-generate"
+                    aria-hidden="true"
+                    className="animate-spin"
+                  />
+                ) : (
+                  <ListRestart
+                    data-admin-ux="editor-generate-action"
+                    aria-hidden="true"
+                  />
+                )}
+              </PageHeaderAction>
+            ) : null}
+            <PageHeaderAction
+              label="Save changes"
+              onClick={handleSave}
+              disabled={saving}
+              aria-busy={saving || undefined}
+            >
+              {saving ? (
+                <Loader2
+                  data-admin-ux="editor-save"
+                  aria-hidden="true"
+                  className="animate-spin"
+                />
+              ) : (
+                <Save data-admin-ux="editor-save-action" aria-hidden="true" />
+              )}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        <div className="flex min-h-28 min-w-0 flex-col justify-between gap-3 md:min-h-56 md:gap-4">
+          <div className="grid min-w-0 gap-3">
+            <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto">
               <InfoBadge active={isSmart}>
                 {isSmart ? "smart" : "static"}
               </InfoBadge>
@@ -1019,44 +1108,59 @@ export function PlaylistEditor() {
               {isSmart ? (
                 <InfoBadge active={autoRefresh}>auto-refresh</InfoBadge>
               ) : null}
-              <StatusChip status={playlist.generation_status} />
             </div>
-          }
-          meta={
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                <InfoBadge>{playlist.track_count} tracks</InfoBadge>
-                <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
-                <InfoBadge>
-                  {playlist.follower_count} follower
-                  {playlist.follower_count === 1 ? "" : "s"}
-                </InfoBadge>
-                {category ? <InfoBadge>{category}</InfoBadge> : null}
-                {featuredRank != null ? (
-                  <InfoBadge>Rank {featuredRank}</InfoBadge>
-                ) : null}
-                {playlist.last_generated_at ? (
-                  <InfoBadge>
-                    Generated {timeAgo(playlist.last_generated_at)}
-                  </InfoBadge>
-                ) : null}
-              </div>
-
-              {playlist.generation_error ? (
-                <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
-                  {playlist.generation_error}
-                </div>
-              ) : null}
-            </>
-          }
+            <div className="grid min-w-0 gap-2">
+              <h1
+                id="playlist-editor-title"
+                className="m-0 min-w-0 wrap-anywhere font-display text-2xl font-semibold leading-tight tracking-tight text-text-primary md:text-3xl"
+              >
+                {name || playlist.name}
+              </h1>
+              <p className="m-0 line-clamp-2 max-w-3xl font-[family-name:var(--font-brand)] text-sm font-normal leading-6 text-text-muted md:line-clamp-3">
+                {description ||
+                  "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
+              </p>
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+            <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+            <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
+            <InfoBadge>
+              {playlist.follower_count} follower
+              {playlist.follower_count === 1 ? "" : "s"}
+            </InfoBadge>
+            {category ? <InfoBadge>{category}</InfoBadge> : null}
+            {featuredRank != null ? (
+              <InfoBadge>Rank {featuredRank}</InfoBadge>
+            ) : null}
+            {playlist.last_generated_at ? (
+              <InfoBadge>
+                Generated {timeAgo(playlist.last_generated_at)}
+              </InfoBadge>
+            ) : null}
+          </div>
+        </div>
+      </PageHeaderLayout>
+      {playlist.generation_error ? (
+        <div className="rounded-md border border-state-warning/20 bg-state-warning/10 px-3 py-2 text-sm text-state-warning-text">
+          {playlist.generation_error}
+        </div>
+      ) : null}
+      {isSmart ? (
+        <GenerationPhaseLine
+          status={playlist.generation_status}
+          lastGeneratedAt={playlist.last_generated_at}
+          streamStatus={streamStatus}
         />
-      </section>
+      ) : null}
 
       <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
           <Card className="border-white/10 bg-card">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-base">Editorial</CardTitle>
+              <CardTitle className="text-base font-display">
+                Editorial
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Core metadata and visibility settings for how this playlist
                 behaves across the product.
@@ -1108,6 +1212,15 @@ export function PlaylistEditor() {
                   placeholder="Editorial description shown in listen"
                 />
                 <div className="flex justify-end">
+                  {describing ? (
+                    <InfoBadge
+                      active
+                      data-ai-description-busy
+                      className="mr-3 self-center"
+                    >
+                      Generating
+                    </InfoBadge>
+                  ) : null}
                   <AIButton
                     actionId="playlists.description.generate"
                     type="button"
@@ -1145,7 +1258,7 @@ export function PlaylistEditor() {
 
           <Card className="border-white/10 bg-card">
             <CardHeader className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="flex items-center gap-2 text-base font-display">
                 Cover
               </CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -1228,7 +1341,7 @@ export function PlaylistEditor() {
           {isSmart ? (
             <Card className="border-white/10 bg-card">
               <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2 text-base font-display">
                   Smart rules
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
@@ -1293,8 +1406,11 @@ export function PlaylistEditor() {
                         key={index}
                         className="@container rounded-md border border-white/10 bg-black/10 p-3"
                       >
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <InfoBadge>Rule {index + 1}</InfoBadge>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex min-w-0 flex-wrap items-center gap-3">
+                            <MonoLabel as="span">Rule {index + 1}</MonoLabel>
+                            <RuleExpression rule={rule} index={index} />
+                          </div>
                           <Button
                             type="button"
                             size="icon-lg"
@@ -1458,9 +1574,11 @@ export function PlaylistEditor() {
                 {preview ? (
                   <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <InfoBadge active>
-                        {preview.total_matching} matching tracks
-                      </InfoBadge>
+                      <StatNumber
+                        value={preview.total_matching.toLocaleString()}
+                        label="Matching tracks"
+                        size="lg"
+                      />
                       <InfoBadge>
                         {formatMinutes(preview.duration_total_sec)}
                       </InfoBadge>
@@ -1591,7 +1709,7 @@ export function PlaylistEditor() {
             <CardHeader className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2 text-base font-display">
                     Tracks
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
@@ -1724,7 +1842,7 @@ export function PlaylistEditor() {
                 <div className="rounded-md border border-primary/25 bg-primary/[0.06] p-4 shadow-none">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                      <div className="text-[11px] font-normal uppercase tracking-[0.16em] text-primary font-mono">
                         Editorial refinement proposal
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -1790,15 +1908,16 @@ export function PlaylistEditor() {
               ) : null}
 
               {playlist.tracks?.length > 0 ? (
-                <div className="space-y-1.5">
+                <HairlineList as="ol" label="Playlist tracks" className="mt-4">
                   {playlist.tracks.map((track, index) => {
                     const rowId = track.id;
                     return (
-                      <div
+                      <HairlineRow
                         key={
                           rowId ??
                           `${track.artist}-${track.album}-${track.title}`
                         }
+                        truncate={false}
                         draggable={typeof rowId === "number"}
                         onDragStart={() => {
                           if (typeof rowId === "number") {
@@ -1808,62 +1927,66 @@ export function PlaylistEditor() {
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={() => void handleTrackDrop(rowId)}
                         onDragEnd={() => setDraggedTrackId(null)}
-                        className={
-                          "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10  " +
-                          (draggedTrackId === rowId
-                            ? "bg-primary/10"
-                            : "bg-transparent")
+                        className={cn(
+                          "group items-center gap-3 py-2 transition-colors",
+                          draggedTrackId === rowId && "bg-accent-action/[0.06]",
+                        )}
+                        trailing={
+                          <div className="flex shrink-0 items-center gap-3">
+                            {track.duration != null ? (
+                              <span className="w-12 text-right font-mono text-label tabular-nums text-text-subtle">
+                                {formatTrackDuration(track.duration)}
+                              </span>
+                            ) : null}
+                            <Button
+                              type="button"
+                              size="icon-lg"
+                              variant="ghost"
+                              aria-label={`Remove ${track.title}`}
+                              onClick={() =>
+                                void handleRemoveTrack(track, index + 1)
+                              }
+                              title={`Remove ${track.title}`}
+                            >
+                              <Trash2
+                                data-admin-ux="editor-remove-track"
+                                aria-hidden="true"
+                              />
+                            </Button>
+                          </div>
                         }
                       >
-                        <GripVertical
-                          data-admin-ux="editor-drag"
-                          aria-hidden="true"
-                          size={14}
-                          className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
-                        />
-                        <span className="w-6 text-right font-mono font-normal text-xs text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">
-                            {track.title}
-                          </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {track.artist} — {track.album}
-                          </div>
-                        </div>
-                        <div className="hidden shrink-0 gap-1.5 xl:flex">
-                          <InfoBadge active={Boolean(track.locked)}>
-                            {trackSourceLabel(track)}
-                          </InfoBadge>
-                          {track.format ? (
-                            <InfoBadge>{track.format}</InfoBadge>
-                          ) : null}
-                        </div>
-                        {track.duration != null ? (
-                          <span className="w-12 text-right font-mono font-normal text-xs tabular-nums text-muted-foreground">
-                            {formatTrackDuration(track.duration)}
-                          </span>
-                        ) : null}
-                        <Button
-                          type="button"
-                          size="icon-lg"
-                          variant="ghost"
-                          aria-label={`Remove ${track.title}`}
-                          onClick={() =>
-                            void handleRemoveTrack(track, index + 1)
-                          }
-                          title={`Remove ${track.title}`}
-                        >
-                          <Trash2
-                            data-admin-ux="editor-remove-track"
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <GripVertical
+                            data-admin-ux="editor-drag"
                             aria-hidden="true"
+                            size={14}
+                            className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
                           />
-                        </Button>
-                      </div>
+                          <span className="w-6 shrink-0 text-right font-mono text-label tabular-nums text-text-subtle">
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium text-text-primary">
+                              {track.title}
+                            </div>
+                            <div className="truncate text-sm text-text-muted">
+                              {track.artist} · {track.album}
+                            </div>
+                          </div>
+                          <MonoLabel
+                            as="span"
+                            meta={[
+                              trackSourceLabel(track),
+                              track.format ?? null,
+                            ]}
+                            className="hidden shrink-0 xl:inline-flex"
+                          />
+                        </div>
+                      </HairlineRow>
                     );
                   })}
-                </div>
+                </HairlineList>
               ) : (
                 <div className="rounded-md border border-dashed border-white/10 bg-black/10 px-4 py-8 text-center text-sm text-muted-foreground">
                   {isSmart
@@ -1878,7 +2001,7 @@ export function PlaylistEditor() {
         <div className="space-y-4">
           <Card className="border-white/10 bg-card">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground">
+              <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground font-mono">
                 Status
               </CardTitle>
             </CardHeader>
@@ -1903,7 +2026,7 @@ export function PlaylistEditor() {
           {history && history.length > 0 ? (
             <Card className="border-white/10 bg-card">
               <CardHeader className="space-y-1">
-                <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground">
+                <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground font-mono">
                   Generation history
                 </CardTitle>
               </CardHeader>
@@ -1915,7 +2038,17 @@ export function PlaylistEditor() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <StatusChip status={entry.status} />
+                        <InfoBadge
+                          tone={
+                            entry.status === "failed"
+                              ? "warning"
+                              : entry.status === "completed"
+                                ? "accent"
+                                : "neutral"
+                          }
+                        >
+                          {entry.status}
+                        </InfoBadge>
                         <span className="font-mono font-normal text-sm">
                           {timeAgo(entry.started_at)}
                         </span>

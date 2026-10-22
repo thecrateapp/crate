@@ -1,29 +1,25 @@
 # Crate V3 — estado vigente
 
-Actualizado: 2026-10-19. Esta tabla es el punto de entrada para continuar el trabajo. Los
-registros cronológicos de los otros planes conservan el estado que tenían en su fecha;
-sus stops locales anteriores quedan superados por las aprobaciones y publicaciones posteriores.
+Actualizado: 2026-10-21. Esta tabla es el punto de entrada para continuar el trabajo. Los
+registros cronológicos que siguen conservan el estado que tenían en su fecha; sus paradas locales
+quedan superadas por las aprobaciones y publicaciones posteriores. La continuación actual de
+Admin está definida en [`2026-10-21-crate-v3-admin-continuation.md`](2026-10-21-crate-v3-admin-continuation.md).
 
-| Concepto                  | Estado vigente                                                                                                                                                              |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workspace                 | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                      |
-| Publicado                 | 1BA aprobado y publicado: `43e34284`; plan Listen aprobado; conserva el ancestro `53177736`                                                                                 |
-| Checkpoint local          | **1BB primer lote local para revisión**: Home y listas de Library; detalles/editores de playlists y crates siguen en el siguiente lote de1BB; sin commit/push                                                                                             |
-| Enmiendas de revisión     | Columnas fijas y QualityBadge común a hero/fila/player; porcentajes GenrePill en shows del artista. Backend local conserva calidad en Top Tracks; producción requiere desplegar esa corrección. |
-| Prioridad de continuación | **Listen primero**, por indicación de Diego; después se retoman las migraciones específicas de Admin. Inventario y plan por recorridos aprobados.                           |
-| Revisión actual           | `http://127.0.0.1:5186/review-1bb-home-library.html`; misma escena en Storybook `Reviews/1BB/Home and Library`; revisiones1BA conservadas; Listen vivo en5174 |
-| Auditoría                 | A1 contraste, A2/A3 tipografía, A4 chips, A7 copy, A6 guardas y A8 estados documentales publicados en 1AP. A5 conserva su deuda explícita por fase, según el orden aprobado |
-| Preview                   | `http://127.0.0.1:5186/`, `crate-v3-preview.service`; editor real en `/admin-playlist-editor-demo.html` y `/#editor-playlists-admin`                                        |
-| Storybook                 | `http://127.0.0.1:6006/?path=/story/reviews-1bb-home-library--complete`; `crate-ui-storybook.service`;53entradas documentadas/40pendientes                                      |
-| Próximo grupo de iconos   | Pausado por Diego: auditar sistema completo y aprobar catálogo/contratos antes de más migraciones                                                                           |
-| Identidad y referencia    | Mockup aprobado5186 y ajustes confirmados de Diego; una identidad, fuentes/excepciones nativas. Pin histórico `app/web@258bbaee` conservado                                 |
-| Evidencia canónica        | 33 PNG y manifest de 1M; comparación Linux posterior y QA nativa pendientes                                                                                                 |
-| Cierre pendiente          | Global 1b.8, migraciones de página/A20/6.8, validación completa de fase, datos vivos, AT y plataformas nativas                                                              |
-| Restricción               | 1BA publicado43e34284. Parar en el primer lote1BB para revisión antes de commit/push. Sin PR, merge, rebase, deploy ni release                                                             |
+| Concepto             | Estado vigente                                                                                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace            | `/home/diego/.codex/worktrees/crate-v3-1q/crate`; rama `feat/crate_v3`                                                                                                                                                      |
+| Rama                 | `9c14f396 fix(listen): finish web review and show locations`, sincronizada con `origin/feat/crate_v3` al actualizar este estado                                                                                             |
+| Listen               | El cierre web está prácticamente completado y los cambios recientes están en la rama. Producción/native son gates separados; no se afirma despliegue de estos cambios.                                                      |
+| Admin                | Se retoma Admin V3 con Dashboard como gramática visual. A0 reconcilió A1–A26; A1a cerró el blur de Shell, A1b normalizó Hero/StatTile y A1c abrió las cabeceras como Dashboard. A1a–A1c están para revisión local; quedan 11 entradas de deuda. |
+| Plan Admin           | [`Continuación Admin`](2026-10-21-crate-v3-admin-continuation.md); alcance y comprobaciones de A0/A1a/A1b/A1c, más los siguientes bloques. Las auditorías anteriores son inventarios, no una cola de requisitos.          |
+| Referencia visual    | [`Implementación de Dashboard`](2026-10-18-crate-v3-dashboard-implementation.md), ya aprobada. Su composición no se copia como plantilla universal.                                                                         |
+| Deuda de superficies | Los registros concretos de [`admin-adoption-debt.json`](../../scripts/design-system/admin-adoption-debt.json) se resuelven junto con sus consumidores.                                                                      |
+| Servicios            | Listen `:5174`, Admin `:5173`, Storybook `:6006` y preview `:5186` permanecen como instancias de trabajo activas.                                                                                                           |
+| Control de cambios   | A1a y A1b están implementados pero sin commit/push; ambos esperan revisión.                                                                                                                                                 |
 
-La validación vigente de la extensión de cabeceras/filas se registra al final de este documento;
-los resultados cronológicos previos no certifican los cambios posteriores. El bundle permanece
-bajo el límite de532480Bgzip. Sin suites/CI completas ni actualización de capturas canónicas.
+El plan maestro y el historial de este archivo son cronológicos y pueden acabar antes que la rama.
+Usa la tabla y el plan Admin enlazado para saber qué sigue. La evidencia antigua no certifica por
+sí sola el comportamiento de código posterior; cada grupo debe aportar sus pruebas y revisión.
 
 ## A5 — adopción pendiente con dueño y criterio de cierre
 
@@ -759,13 +755,11 @@ Listen201516/307200Bgzip,25assets; chunks de visualizador/EQ conservan su fronte
 mantiene el aviso conocido de chunks grandes; no se amplía el presupuesto. Catálogo53/93 y120
 fuentes válido. Servicios5186/6006/5174 activos y HTTP200. Stop local1AZ sin commit/push confirmado.
 
-
 ## 2026-10-19 — 1AZ aprobado; publicación autorizada
 
 Diego aprueba1AZ y autoriza commit/push del reproductor validado. El siguiente alcance es1BA,
 Álbum, acceso y primer recorrido offline, con mockup como referencia, Storybook actualizado y
 las tres instancias activas. Parar en1BA antes de commit/push para revisión; sin PR, merge o deploy.
-
 
 ## 1BA local — Álbum, acceso y primer recorrido offline
 
@@ -789,7 +783,6 @@ componentes locales reales; catálogo shared53/93/120 sin nuevas fuentes compart
 al mockup histórico. Presupuestos de raw buttons82→78 y dos excepciones tipográficas retiradas.
 Validación final y revisión independiente se registran debajo antes de la entrega. No commit1BA.
 
-
 ### Validación final1BA
 
 182pruebas Listen en34archivos,28guardas shared en4archivos y26Desktop en2archivos:236casos
@@ -812,7 +805,6 @@ No menores diferidos. Comparación/ejecución independiente, AT, dispositivos y 
 de producción no certificados por el revisor; autor verifica contratos y navegador descritos.
 Conservada composición nativa existente, pendiente QA real; ver reglas/decisiones en plan1BA.
 Tres servicios5186/6006/5174 activos.1BA sin commit/push: detenerse para revisión de Diego.
-
 
 Enmiendas de revisión1BA: metadatos de pistas en columnas reservadas y QualityBadge real;
 perfil de géneros de shows con porcentajes y8px tras el mes; EntityAvatar24px en byline de
@@ -840,7 +832,6 @@ tipos/lint/builds y catálogo53/93/120 verdes. Inicial202228Bgzip/307200. Eviden
 y player real en el plan1BA; mismas limitaciones nativas/AT/producción. Tres previews activos,
 sin commit/push y sin avanzar de checkpoint.
 
-
 ## 2026-10-19 — 1BA aprobado; publicación autorizada
 
 Diego aprueba1BA con sus enmiendas y autoriza commit/push. Continuar con1BB, Home y colecciones,
@@ -865,3 +856,17 @@ Storybook. Tres servicios activos. Stop1BB sin commit/push para Diego.
 Diego aprueba este lote y autoriza commit/push. Continuar con detalles y editores de playlists
 y crates, mockup como referencia y Storybook actualizado; mantener5186/6006/5174 y detener el
 siguiente lote para revisión antes de commit. La aprobación sustituye el stop local anterior.
+
+## 2026-10-21 — Admin V3, continuación local para revisión
+
+A0 reconcilió el inventario Admin y definió los siguientes cortes en
+[el plan de continuación](2026-10-21-crate-v3-admin-continuation.md). A1a solidificó los headers
+fijos de Shell; A1b consolidó las superficies de datos operativos; A1c quitó el marco exterior de
+los encabezados de Admin para igualarlos a Dashboard. A2a aplica `OpsSurface` a tarjetas de Stack y
+System Health y su tooltip; estados de salud, payloads, permisos, acciones y conexiones quedan
+intactos. Tasks, Logs y Health pasan sus pruebas de regresión sin cambios. Storybook
+`Reviews/Admin/A2 Operational surfaces` y el preview muestran cabeceras abiertas con paneles de
+datos sólidos. Validación actual: 16 pruebas Vitest del wrapper, 6 casos Playwright de
+escritorio/móvil, typechecks, lint focalizado y builds Admin/preview/Storybook verdes. Los servicios
+5173/5174/5186/6006 siguen activos. A2 permanece abierto para la revisión de snapshots y streams;
+no commit/push.

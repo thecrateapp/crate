@@ -49,7 +49,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     );
     expect(document.querySelectorAll(".crate-form-field")).toHaveLength(4);
     expect(screen.getByText("Artists")).toHaveClass("font-mono");
-    expect(screen.getByText("24")).toHaveClass("font-display");
+    expect(screen.getByText("24")).toHaveClass("font-mono", "tabular-nums");
     expect(screen.getByText("sample-run-20261018")).toHaveClass("font-mono");
     for (const button of screen.getAllByRole("button"))
       if (button.closest('[data-slot="admin-page-header"]'))
@@ -92,9 +92,9 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       const state = await screen.findByText(label);
       expect(state.closest("[data-tone]")).toHaveAttribute("data-tone", tone);
       expect(screen.getByText(description)).toBeInTheDocument();
-      expect(screen.getByText("Stale peers: 1")).toBeInTheDocument();
+      expect(screen.getByText("Stale peers")).toBeInTheDocument();
       expect(
-        screen.getByText("Unresolved match candidates: 2"),
+        screen.getByText("Unresolved match candidates"),
       ).toBeInTheDocument();
     },
   );
@@ -146,7 +146,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       duplicatesUrl,
       statusUrl,
     ]);
-    expect(screen.getByText("Reconciliation Runs")).toBeInTheDocument();
+    expect(screen.getByText("Reconciliation runs")).toBeInTheDocument();
   });
   it.each(["incremental", "full"] as const)(
     "retains exact %s mode, locks the POST and dispatches asynchronous refreshes",

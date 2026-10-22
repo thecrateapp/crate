@@ -3,6 +3,8 @@ import { ChevronDown } from "lucide-react";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
   OpsStatTile,
 } from "../../app/ui/src/components/admin/ops-surfaces";
 import { Button } from "@crate/ui/shadcn/button";
@@ -160,6 +162,37 @@ export function AdminOpsCheckpoint() {
             Revisar controles de Admin
           </a>
         </OpsPanel>
+        <section
+          data-testid="ops-freshness"
+          aria-label="Freshness and recovery states"
+          className="space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <MonoLabel as="h3">Freshness and recovery</MonoLabel>
+            <OpsSnapshotStatus
+              snapshot={{ stale: false, built_at: "2026-10-22T09:30:00Z" }}
+              streamStatus="live"
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-md border border-border-quiet bg-raised-surface p-4">
+              <MonoLabel as="div">Last known good snapshot</MonoLabel>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <OpsSnapshotStatus
+                  snapshot={{ stale: true, built_at: "2026-10-22T08:30:00Z" }}
+                  streamStatus="reconnecting"
+                />
+              </div>
+              <p className="mt-3 text-sm text-text-muted">
+                The stream can recover while the last snapshot remains visible.
+              </p>
+            </div>
+            <OpsRefreshNotice
+              message="Could not refresh worker logs. Showing the last successful snapshot."
+              onRetry={() => setUpdates((value) => value + 1)}
+            />
+          </div>
+        </section>
       </div>
     </section>
   );

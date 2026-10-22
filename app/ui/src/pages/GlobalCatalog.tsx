@@ -12,25 +12,21 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { OpsStatTile } from "@/components/admin/ops-surfaces";
-import { StatusDot } from "@crate/ui/primitives/StatusDot";
-import { Badge } from "@crate/ui/shadcn/badge";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+  OpsPanel,
+  OpsStatTile,
+  OpsSurface,
+} from "@/components/admin/ops-surfaces";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { Badge } from "@crate/ui/shadcn/badge";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 
 interface GlobalCatalogStatus {
   serving_mode:
-    | "global-ready"
-    | "global-refreshing"
-    | "global-degraded"
-    | "local-fallback";
+    "global-ready" | "global-refreshing" | "global-degraded" | "local-fallback";
   state: {
     status: string;
   };
@@ -159,7 +155,7 @@ export function GlobalCatalog() {
   const duplicateItems = duplicates?.items || [];
 
   return (
-    <div className="space-y-6">
+    <main className="min-w-0 space-y-6">
       <PageHeaderLayout
         actions={
           <PageHeaderActions>
@@ -227,20 +223,26 @@ export function GlobalCatalog() {
         </div>
       </PageHeaderLayout>
 
-      <div className="flex gap-2 border-b border-white/10">
+      <div
+        role="group"
+        aria-label="Global catalog views"
+        className="flex min-w-0 gap-2 overflow-x-auto border-b border-border-quiet"
+      >
         {tabs.map((item) => (
           <button
             type="button"
             aria-pressed={tab === item.key}
             key={item.key}
-            className={`min-h-11 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`min-h-11 shrink-0 border-b-2 px-3 py-2 transition-colors ${
               tab === item.key
                 ? "border-accent-action-hi text-accent-action-hi"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setTab(item.key)}
           >
-            {item.label}
+            <MonoLabel as="span" tone={tab === item.key ? "accent" : "subtle"}>
+              {item.label}
+            </MonoLabel>
           </button>
         ))}
       </div>
@@ -258,13 +260,8 @@ export function GlobalCatalog() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display text-base">
-                  Read model
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+            <OpsPanel title="Read model">
+              <div className="space-y-4 text-sm">
                 <StatusDot
                   tone={
                     status?.serving_mode === "global-degraded"
@@ -275,85 +272,86 @@ export function GlobalCatalog() {
                   }
                   label={servingModeLabel(status?.serving_mode)}
                 />
-                <p className="text-muted-foreground">
+                <p className="m-0 text-text-muted">
                   {servingModeDescription(status?.serving_mode)}
                 </p>
-                <p className="text-muted-foreground">
-                  Reconciliation state: {status?.state.status || "unknown"}
-                </p>
-                <p className="text-muted-foreground">
-                  Stale peers: {formatNumber(status?.stale_peer_count)}
-                </p>
-                <p className="text-muted-foreground">
-                  Unresolved match candidates:{" "}
-                  {formatNumber(status?.ambiguous_candidate_count)}
-                </p>
-                <p className="text-xs text-muted-foreground">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <OpsSurface className="p-3">
+                    <MonoLabel as="div">Reconciliation state</MonoLabel>
+                    <p className="mb-0 mt-1 text-text-primary">
+                      {status?.state.status || "unknown"}
+                    </p>
+                  </OpsSurface>
+                  <OpsSurface className="p-3">
+                    <MonoLabel as="div">Stale peers</MonoLabel>
+                    <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                      {status ? formatNumber(status.stale_peer_count) : "—"}
+                    </p>
+                  </OpsSurface>
+                  <OpsSurface className="p-3 sm:col-span-2">
+                    <MonoLabel as="div">Unresolved match candidates</MonoLabel>
+                    <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                      {status
+                        ? formatNumber(status.ambiguous_candidate_count)
+                        : "—"}
+                    </p>
+                  </OpsSurface>
+                </div>
+                <p className="m-0 text-xs text-text-muted">
                   Similar sources below the automatic merge threshold; they
                   remain separate until reviewed.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </OpsPanel>
 
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="font-display text-base">
-                  Last run
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {status?.last_run ? (
-                  <RunSummary run={status.last_run} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No reconciliation runs yet.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <OpsPanel title="Last run" className="lg:col-span-2">
+              {status?.last_run ? (
+                <RunSummary run={status.last_run} />
+              ) : (
+                <p className="m-0 text-sm text-text-muted">
+                  No reconciliation runs yet.
+                </p>
+              )}
+            </OpsPanel>
           </div>
         </div>
       ) : null}
 
       {tab === "runs" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display">Reconciliation Runs</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <OpsPanel title="Reconciliation runs">
+          <div className="space-y-3">
             {runItems.length ? (
               runItems.map((run) => <RunSummary key={run.run_id} run={run} />)
             ) : (
-              <p className="text-sm text-muted-foreground">No runs found.</p>
+              <p className="m-0 text-sm text-text-muted">No runs found.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </OpsPanel>
       ) : null}
 
       {tab === "duplicates" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display">Duplicate Candidates</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <OpsPanel title="Duplicate candidates">
+          <div className="space-y-3">
             {duplicateItems.length ? (
               duplicateItems.map((candidate) => (
-                <div
+                <OpsSurface
+                  as="article"
                   key={`${candidate.entity_type}-${candidate.match_key}`}
-                  className="rounded-lg border border-white/10 p-4"
+                  className="p-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{candidate.entity_type}</Badge>
-                    <span className="min-w-0 break-all font-mono">
+                    <span className="min-w-0 break-all font-mono text-sm text-text-primary">
                       {candidate.match_key}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <MonoLabel as="span">
                       {candidate.source_count} sources
-                    </span>
+                    </MonoLabel>
                   </div>
                   <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     {candidate.sources.map((source) => (
-                      <div
+                      <OpsSurface
+                        as="div"
                         key={`${source.source_kind}-${
                           source.node_uid ??
                           source.local_entity_uid ??
@@ -362,31 +360,31 @@ export function GlobalCatalog() {
                           source.match_method ??
                           "source"
                         }`}
-                        className="rounded-md bg-white/[0.03] p-3 text-xs text-muted-foreground"
+                        className="min-w-0 p-3 text-xs text-text-muted"
                       >
-                        <div className="font-medium text-foreground">
+                        <MonoLabel as="div" tone="accent">
                           {source.source_kind}
-                        </div>
+                        </MonoLabel>
                         <div className="break-all font-mono">
                           {source.node_uid || source.local_entity_uid}
                         </div>
                         <div className="break-all font-mono">
                           {source.match_method}
                         </div>
-                      </div>
+                      </OpsSurface>
                     ))}
                   </div>
-                </div>
+                </OpsSurface>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="m-0 text-sm text-text-muted">
                 No duplicate candidates above the confidence threshold.
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </OpsPanel>
       ) : null}
-    </div>
+    </main>
   );
 }
 
@@ -396,22 +394,22 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 
 function RunSummary({ run }: { run: GlobalCatalogRun }) {
   return (
-    <div className="rounded-lg border border-white/10 p-4">
+    <OpsSurface as="article" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Badge variant={run.status === "completed" ? "default" : "secondary"}>
             {run.status}
           </Badge>
-          <span className="font-mono">{run.mode}</span>
-          <span className="break-all font-mono text-xs text-muted-foreground">
+          <MonoLabel as="span" tone="accent">
+            {run.mode}
+          </MonoLabel>
+          <span className="break-all font-mono text-xs text-text-muted">
             {run.run_id}
           </span>
         </div>
-        <span className="font-mono text-xs text-muted-foreground">
-          {formatDate(run.started_at)}
-        </span>
+        <MonoLabel as="span">{formatDate(run.started_at)}</MonoLabel>
       </div>
-      <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-sm text-text-muted md:grid-cols-4">
         <span>Seen {formatNumber(run.source_rows_seen)}</span>
         <span>Upserted {formatNumber(run.sources_upserted)}</span>
         <span>Created {formatNumber(run.canonical_created)}</span>
@@ -420,6 +418,6 @@ function RunSummary({ run }: { run: GlobalCatalogRun }) {
       {run.error ? (
         <p className="mt-3 text-sm text-state-warning-text">{run.error}</p>
       ) : null}
-    </div>
+    </OpsSurface>
   );
 }

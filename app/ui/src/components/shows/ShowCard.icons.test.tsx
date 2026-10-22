@@ -80,4 +80,26 @@ describe("Admin ShowCard reviewed glyph contract", () => {
       screen.queryByRole("link", { name: "Open Artist" }),
     ).not.toBeInTheDocument();
   });
+  it("uses an opaque raised surface for both static and interactive show cards", () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <ShowCard show={show} />
+      </MemoryRouter>,
+    );
+    const staticSurface = screen
+      .getByText("Sala Puerto")
+      .closest(".bg-raised-surface");
+    expect(staticSurface).toHaveClass("shadow-none");
+    expect(container.querySelector('[class*="backdrop-blur"]')).toBeNull();
+
+    rerender(
+      <MemoryRouter>
+        <ShowCard show={show} expanded={false} onToggle={vi.fn()} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button")).toHaveClass(
+      "bg-raised-surface",
+      "shadow-none",
+    );
+  });
 });

@@ -15,7 +15,14 @@ import {
 import { Button } from "@crate/ui/shadcn/button";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { api } from "@/lib/api";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsRefreshNotice,
+  OpsSurface,
+} from "@/components/admin/ops-surfaces";
 import {
   artistActionApiPath,
   artistManagementApiPath,
@@ -26,6 +33,8 @@ import {
   LayoutGrid,
   List,
   Loader2,
+  SlidersHorizontal,
+  Users,
   Check,
   SquareCheck,
   X,
@@ -112,6 +121,7 @@ export function Browse() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState<number | null>(null);
 
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -275,6 +285,7 @@ export function Browse() {
 
   const fetchPage = useCallback(
     (page: number, reset = false) => {
+      setPageError(null);
       if (reset) setLoading(true);
       else setLoadingMore(true);
       const params = new URLSearchParams();
@@ -295,7 +306,14 @@ export function Browse() {
           setTotal(data.total);
           hasMoreRef.current = data.items.length >= PER_PAGE;
         })
-        .catch(() => {})
+        .catch(() => {
+          setPageError(page);
+          if (reset) {
+            setArtists([]);
+            setTotal(0);
+          }
+          hasMoreRef.current = false;
+        })
         .finally(() => {
           setLoading(false);
           setLoadingMore(false);
@@ -373,202 +391,291 @@ export function Browse() {
     label: option.label,
   }));
 
+  const hasActiveFilters = Boolean(
+    genre || country || decade || format || featured || hasIssues,
+  );
+
+  function clearFilters() {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      [
+        "genre",
+        "country",
+        "decade",
+        "format",
+        "featured",
+        "has_issues",
+        "page",
+      ].forEach((key) => next.delete(key));
+      return next;
+    });
+  }
+
+  function retryFailedPage() {
+    const page = pageError ?? 1;
+    hasMoreRef.current = true;
+    fetchPage(page, page === 1);
+  }
+
   return (
-    <div>
-      {/* Filter bar */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <AdminSelect
-          placeholder="All genres"
-          value={genre}
-          onChange={(nextValue) => setParam("genre", nextValue)}
-          options={genreOptions}
-          searchable
-          searchPlaceholder="Search genres..."
-        />
-        <AdminSelect
-          placeholder="All countries"
-          value={country}
-          onChange={(nextValue) => setParam("country", nextValue)}
-          options={countryOptions}
-          searchable
-          searchPlaceholder="Search countries..."
-        />
-        <AdminSelect
-          placeholder="All decades"
-          value={decade}
-          onChange={(nextValue) => setParam("decade", nextValue)}
-          options={decadeOptions}
-        />
-        <AdminSelect
-          placeholder="All formats"
-          value={format}
-          onChange={(nextValue) => setParam("format", nextValue)}
-          options={formatOptions}
-          searchable
-          searchPlaceholder="Search formats..."
-        />
+    <div className="space-y-6">
+      <OpsPageHero
+        title="Browse Artists"
+        description="Explore the artists in your library and narrow the catalog with the filters below."
+      >
+        <InfoBadge icon={Users}>
+          {loading ? "Loading artists" : `${total.toLocaleString()} artists`}
+        </InfoBadge>
+      </OpsPageHero>
 
-        <div className="crate-form-field max-w-full">
-          <MonoLabel as="span" className="block">
-            Featured
-          </MonoLabel>
-          <SegmentedControl
-            as="radio"
-            label="Featured"
-            value={featured}
-            onValueChange={(nextValue) => setParam("featured", nextValue)}
-            items={[{ value: "", label: "Featured" }, ...FEATURED_OPTIONS]}
+      <OpsPanel
+        title="Artist catalog"
+        description="Filter by sound, origin, format or library status. Your selection stays in the URL."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={selectMode ? "default" : "outline"}
+              onClick={() => {
+                setSelectMode(!selectMode);
+                if (selectMode) clearSelection();
+              }}
+            >
+              {selectMode ? (
+                <Check size={13} className="mr-1" />
+              ) : (
+                <SquareCheck size={13} className="mr-1" />
+              )}
+              {selectMode ? "Done" : "Select"}
+            </Button>
+            <div className="flex overflow-hidden rounded-md border border-border">
+              <Button
+                variant={view === "grid" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-none"
+                aria-label="Grid view"
+                aria-pressed={view === "grid"}
+                onClick={() => setView("grid")}
+              >
+                <LayoutGrid size={16} />
+              </Button>
+              <Button
+                variant={view === "list" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-9 w-9 rounded-none"
+                aria-label="List view"
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+              >
+                <List size={16} />
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <AdminSelect
+            placeholder="All genres"
+            value={genre}
+            onChange={(nextValue) => setParam("genre", nextValue)}
+            options={genreOptions}
+            searchable
+            searchPlaceholder="Search genres..."
+          />
+          <AdminSelect
+            placeholder="All countries"
+            value={country}
+            onChange={(nextValue) => setParam("country", nextValue)}
+            options={countryOptions}
+            searchable
+            searchPlaceholder="Search countries..."
+          />
+          <AdminSelect
+            placeholder="All decades"
+            value={decade}
+            onChange={(nextValue) => setParam("decade", nextValue)}
+            options={decadeOptions}
+          />
+          <AdminSelect
+            placeholder="All formats"
+            value={format}
+            onChange={(nextValue) => setParam("format", nextValue)}
+            options={formatOptions}
+            searchable
+            searchPlaceholder="Search formats..."
           />
         </div>
 
-        <div className="crate-form-field max-w-full">
-          <MonoLabel as="span" className="block">
-            Issues
-          </MonoLabel>
-          <SegmentedControl
-            as="radio"
-            label="Issues"
-            value={hasIssues}
-            onValueChange={(nextValue) => setParam("has_issues", nextValue)}
-            items={[{ value: "", label: "Issues" }, ...ISSUE_OPTIONS]}
-          />
+        <div className="mt-4 grid gap-4 border-t border-border-quiet pt-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Featured
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Featured"
+              value={featured}
+              onValueChange={(nextValue) => setParam("featured", nextValue)}
+              items={[{ value: "", label: "Featured" }, ...FEATURED_OPTIONS]}
+            />
+          </div>
+
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Issues
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Issues"
+              value={hasIssues}
+              onValueChange={(nextValue) => setParam("has_issues", nextValue)}
+              items={[{ value: "", label: "Issues" }, ...ISSUE_OPTIONS]}
+            />
+          </div>
+
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Sort artists
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Sort artists"
+              value={sort}
+              onValueChange={(nextValue) =>
+                setParam("sort", nextValue || "recent")
+              }
+              items={sortOptions}
+            />
+          </div>
         </div>
 
-        <div className="crate-form-field max-w-full">
-          <MonoLabel as="span" className="block">
-            Sort artists
-          </MonoLabel>
-          <SegmentedControl
-            as="radio"
-            label="Sort artists"
-            value={sort}
-            onValueChange={(nextValue) =>
-              setParam("sort", nextValue || "recent")
+        {/* Results count */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-quiet pt-4">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span aria-live="polite">
+              {loading
+                ? "Loading artists..."
+                : `Showing ${artists.length.toLocaleString()} of ${total.toLocaleString()} artists`}
+            </span>
+            {hasActiveFilters ? (
+              <InfoBadge icon={SlidersHorizontal}>Filtered</InfoBadge>
+            ) : null}
+          </div>
+          {hasActiveFilters ? (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+
+        {pageError !== null ? (
+          <OpsRefreshNotice
+            message={
+              pageError === 1
+                ? "Could not load artists. Try again."
+                : "Some artists could not be loaded. Your current results are still available."
             }
-            items={sortOptions}
+            onRetry={retryFailedPage}
+            retrying={loading || loadingMore}
           />
-        </div>
+        ) : null}
 
-        <Button
-          size="sm"
-          variant={selectMode ? "default" : "outline"}
-          onClick={() => {
-            setSelectMode(!selectMode);
-            if (selectMode) clearSelection();
-          }}
-        >
-          {selectMode ? (
-            <Check size={13} className="mr-1" />
+        {/* Content */}
+        {loading ? (
+          view === "grid" ? (
+            <GridSkeletonBlock />
           ) : (
-            <SquareCheck size={13} className="mr-1" />
-          )}
-          {selectMode ? "Done" : "Select"}
-        </Button>
-
-        <div className="flex border border-border rounded-md overflow-hidden ml-auto">
-          <Button
-            variant={view === "grid" ? "secondary" : "ghost"}
-            size="icon"
-            className="h-9 w-9 rounded-none"
-            aria-label="Grid view"
-            onClick={() => setView("grid")}
-          >
-            <LayoutGrid size={16} />
-          </Button>
-          <Button
-            variant={view === "list" ? "secondary" : "ghost"}
-            size="icon"
-            className="h-9 w-9 rounded-none"
-            aria-label="List view"
-            onClick={() => setView("list")}
-          >
-            <List size={16} />
-          </Button>
-        </div>
-      </div>
-
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground mb-3">
-        {loading
-          ? "Loading..."
-          : `Showing ${artists.length} of ${total} artists`}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        view === "grid" ? (
-          <GridSkeletonBlock />
+            <ListSkeletonBlock />
+          )
+        ) : artists.length === 0 ? (
+          pageError === null ? (
+            <OpsSurface className="px-5 py-12 text-center">
+              <h3 className="font-display text-lg font-semibold text-text-primary">
+                {hasActiveFilters
+                  ? "No artists match these filters"
+                  : "No artists in the library yet"}
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">
+                {hasActiveFilters
+                  ? "Try removing a filter or choose a broader set of artists."
+                  : "Artists will appear here as the library is indexed."}
+              </p>
+              {hasActiveFilters ? (
+                <Button
+                  className="mt-4"
+                  variant="outline"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </Button>
+              ) : null}
+            </OpsSurface>
+          ) : null
+        ) : view === "grid" ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {artists.map((a) => (
+              <ArtistCard
+                key={a.name}
+                artistId={a.id}
+                artistSlug={a.slug}
+                name={a.name}
+                albums={a.albums}
+                tracks={a.tracks}
+                size_mb={a.total_size_mb}
+                primary_format={a.primary_format ?? ""}
+                hasIssues={a.has_issues}
+                isFeatured={a.is_featured}
+                featuredDevices={a.featured_devices}
+                selectMode={selectMode}
+                isSelected={a.id != null ? selected.has(a.id) : false}
+                onClick={() =>
+                  selectMode
+                    ? toggleSelect(a.id)
+                    : navigate(
+                        artistPagePath({
+                          artistId: a.id,
+                          artistSlug: a.slug,
+                          artistName: a.name,
+                        }),
+                      )
+                }
+              />
+            ))}
+          </div>
         ) : (
-          <ListSkeletonBlock />
-        )
-      ) : artists.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          No artists found
-        </div>
-      ) : view === "grid" ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {artists.map((a) => (
-            <ArtistCard
-              key={a.name}
-              artistId={a.id}
-              artistSlug={a.slug}
-              name={a.name}
-              albums={a.albums}
-              tracks={a.tracks}
-              size_mb={a.total_size_mb}
-              primary_format={a.primary_format ?? ""}
-              hasIssues={a.has_issues}
-              isFeatured={a.is_featured}
-              featuredDevices={a.featured_devices}
-              selectMode={selectMode}
-              isSelected={a.id != null ? selected.has(a.id) : false}
-              onClick={() =>
-                selectMode
-                  ? toggleSelect(a.id)
-                  : navigate(
-                      artistPagePath({
-                        artistId: a.id,
-                        artistSlug: a.slug,
-                        artistName: a.name,
-                      }),
-                    )
-              }
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col divide-y divide-border">
-          {artists.map((a) => (
-            <ArtistRow
-              key={a.name}
-              name={a.name}
-              artistId={a.id}
-              artistSlug={a.slug}
-              albums={a.albums}
-              tracks={a.tracks}
-              total_size_mb={a.total_size_mb}
-              listeners={a.listeners}
-              genres={a.genres}
-              hasIssues={a.has_issues}
-              isFeatured={a.is_featured}
-              featuredDevices={a.featured_devices}
-              selectMode={selectMode}
-              isSelected={a.id != null ? selected.has(a.id) : false}
-              onClick={() =>
-                selectMode
-                  ? toggleSelect(a.id)
-                  : navigate(
-                      artistPagePath({
-                        artistId: a.id,
-                        artistSlug: a.slug,
-                        artistName: a.name,
-                      }),
-                    )
-              }
-            />
-          ))}
-        </div>
-      )}
+          <div className="flex flex-col divide-y divide-border">
+            {artists.map((a) => (
+              <ArtistRow
+                key={a.name}
+                name={a.name}
+                artistId={a.id}
+                artistSlug={a.slug}
+                albums={a.albums}
+                tracks={a.tracks}
+                total_size_mb={a.total_size_mb}
+                listeners={a.listeners}
+                genres={a.genres}
+                hasIssues={a.has_issues}
+                isFeatured={a.is_featured}
+                featuredDevices={a.featured_devices}
+                selectMode={selectMode}
+                isSelected={a.id != null ? selected.has(a.id) : false}
+                onClick={() =>
+                  selectMode
+                    ? toggleSelect(a.id)
+                    : navigate(
+                        artistPagePath({
+                          artistId: a.id,
+                          artistSlug: a.slug,
+                          artistName: a.name,
+                        }),
+                      )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </OpsPanel>
 
       {/* Infinite scroll sentinel */}
       <div ref={sentinelRef} className="h-10 flex items-center justify-center">

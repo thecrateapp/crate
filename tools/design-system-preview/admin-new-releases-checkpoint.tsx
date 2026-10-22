@@ -4,7 +4,7 @@ export function AdminNewReleasesCheckpoint() {
     <section
       id="lanzamientos-admin"
       className="admin-baseline-feature"
-      aria-label="Checkpoint 1AJ, New Releases de Admin"
+      aria-label="Checkpoint 1AJ, Release Radar de Admin"
     >
       <div className="specimen-heading">
         <div>
@@ -24,7 +24,7 @@ export function AdminNewReleasesCheckpoint() {
         permite revisar una actualización sin backend.
       </p>
       <iframe
-        title="New Releases real con datos de muestra"
+        title="Release Radar real con datos de muestra"
         src="./admin-new-releases-demo.html"
         className="mt-6 h-[1500px] w-full border border-border-quiet"
       />
@@ -34,7 +34,7 @@ export function AdminNewReleasesCheckpoint() {
         rel="noreferrer"
         className="mt-4 inline-flex min-h-11 items-center text-sm underline"
       >
-        Abrir New Releases en una pestaña
+        Abrir Release Radar en una pestaña
       </a>
     </section>
   );

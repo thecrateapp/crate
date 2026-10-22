@@ -12,6 +12,7 @@ import {
 } from "vitest";
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
+let playlistRows: Array<Record<string, unknown>> = [];
 
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({
@@ -24,6 +25,7 @@ import { Playlists } from "./Playlists";
 describe("Playlists smart rule composer", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    playlistRows = [];
     apiMock.mockImplementation((url: string, method?: string) => {
       if (url === "/api/playlists/filter-options") {
         return Promise.resolve({
@@ -35,6 +37,12 @@ describe("Playlists smart rule composer", () => {
       }
       if (url === "/api/admin/system-playlists" && method === "POST") {
         return Promise.resolve({ id: 99 });
+      }
+      if (
+        url === "/api/admin/system-playlists" &&
+        (!method || method === "GET")
+      ) {
+        return Promise.resolve(playlistRows);
       }
       return Promise.resolve([]);
     });
@@ -49,6 +57,82 @@ describe("Playlists smart rule composer", () => {
     expect(caption.closest("label")).toHaveAttribute("for", name.id);
     await userEvent.click(caption);
     expect(name).toHaveFocus();
+  });
+
+  it("shows the playlist identity, cover and information chips in the list", async () => {
+    playlistRows = [
+      {
+        id: 7,
+        name: "Screamo After Hours",
+        description: "A late-night sample playlist.",
+        generation_mode: "smart",
+        auto_refresh_enabled: true,
+        is_curated: true,
+        is_active: true,
+        category: "mood",
+        follower_count: 12,
+        track_count: 48,
+        total_duration: 7200,
+        generation_status: "idle",
+        last_generated_at: "2026-10-20T10:00:00Z",
+      },
+    ];
+    renderWithAdminProviders(<Playlists />, { route: "/playlists" });
+
+    const row = await screen.findByRole("listitem");
+    expect(row).toHaveAttribute("data-slot", "hairline-row");
+    const link = screen.getByRole("link", { name: "Open Screamo After Hours" });
+    expect(link).toHaveAttribute("href", "/playlists/7");
+    expect(link).toHaveClass("items-stretch", "py-0");
+    expect(row).toHaveTextContent(/smart.*curated.*active.*auto-refresh/i);
+    expect(row).toHaveTextContent("A late-night sample playlist.");
+    expect(row).toHaveTextContent("48 tracks");
+    expect(row).toHaveTextContent("2h 0m");
+    expect(row).toHaveTextContent("12 followers");
+    expect(row).toHaveTextContent(/generated/i);
+    const artwork = link.querySelector('[data-slot="playlist-artwork"]');
+    const content = link.querySelector('[data-slot="playlist-row-content"]');
+    const information = link.querySelector(
+      '[data-slot="playlist-row-information"]',
+    );
+    expect(artwork).toHaveClass("size-28", "md:size-44", "shrink-0");
+    expect(content?.firstElementChild).toBe(artwork);
+    expect(information?.parentElement).toBe(content);
+    expect(information).toHaveTextContent("active");
+  });
+
+  it("paginates playlist rows and opens the next page", async () => {
+    playlistRows = Array.from({ length: 21 }, (_, index) => ({
+      id: index + 1,
+      name: `Playlist ${index + 1}`,
+      description: "A sample playlist.",
+      generation_mode: "static",
+      is_curated: true,
+      is_active: true,
+      follower_count: 0,
+      track_count: 12,
+      total_duration: 1800,
+    }));
+    renderWithAdminProviders(<Playlists />, { route: "/playlists" });
+
+    expect(
+      await screen.findByRole("link", { name: "Open Playlist 20" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Open Playlist 21" })).toBeNull();
+    expect(
+      screen.queryByText("Showing 21 of 21 playlists", { exact: true }),
+    ).toBeNull();
+    expect(screen.getByText("1–20 of 21 · page 1 of 2")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Next playlists page" }),
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Open Playlist 21" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Open Playlist 1" })).toBeNull();
+    expect(screen.getByText("21–21 of 21 · page 2 of 2")).toBeInTheDocument();
   });
 
   it("keeps operator select focus across keyboard choices and submits the current rule", async () => {

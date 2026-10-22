@@ -75,6 +75,11 @@ function Demo() {
                 },
                 { value: "empty", label: "Vacío", disabled: state.pending > 0 },
                 { value: "error", label: "Error", disabled: state.pending > 0 },
+                {
+                  value: "partial-error",
+                  label: "Cobertura no disponible",
+                  disabled: state.pending > 0,
+                },
               ]}
             />
           </div>

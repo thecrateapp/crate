@@ -126,6 +126,7 @@ class NewReleaseResponse(BaseModel):
     cover_url: str | None = None
     year: str | int | None = None
     tracks: int | None = None
+    available_tracks: int | None = None
     quality: str | None = None
     release_date: str | None = None
     release_type: str | None = None

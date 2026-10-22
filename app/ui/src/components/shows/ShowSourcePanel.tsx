@@ -288,7 +288,7 @@ export function ShowSourcePanel({
       </p>
       {source.warnings.length ? (
         <div className="space-y-1">
-          <h3 className="text-xs font-medium text-muted-foreground">Notes</h3>
+          <h3 className="text-xs font-medium text-muted-foreground font-display">Notes</h3>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
             {source.warnings.map((warning) => (
               <li key={warning}>{warning}</li>

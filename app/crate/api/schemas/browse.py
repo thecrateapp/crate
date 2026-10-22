@@ -259,6 +259,12 @@ class ArtistShowEventResponse(BaseModel):
     longitude: float | int | None = None
     artist_genres: list[str] = Field(default_factory=list)
     probable_setlist: list[dict[str, Any]] = Field(default_factory=list)
+    probable_setlist_status: str = "unknown"
+    probable_setlist_generated_at: str | None = None
+    probable_setlist_song_count: int = 0
+    probable_setlist_source_show_count: int | None = None
+    probable_setlist_mode: str | None = None
+    probable_setlist_tour_name: str | None = None
     user_attending: bool = False
     artist_listeners: int | None = None
 
@@ -289,10 +295,25 @@ class ShowArtistRefResponse(BaseModel):
     name: str
     id: int | None = None
     slug: str | None = None
+    probable_setlist_status: str = "unknown"
+    probable_setlist_generated_at: str | None = None
+    probable_setlist_song_count: int = 0
+    probable_setlist_source_show_count: int | None = None
+    probable_setlist_mode: str | None = None
+    probable_setlist_tour_name: str | None = None
 
 
 class CachedShowEventResponse(ArtistShowEventResponse):
     lineup_artists: list[ShowArtistRefResponse] = Field(default_factory=list)
+
+
+class ProbableSetlistCoverageResponse(BaseModel):
+    artist_count: int = 0
+    fresh: int = 0
+    stale: int = 0
+    missing: int = 0
+    unknown: int = 0
+    queued: int | None = None
 
 
 class ArtistsWithShowsResponse(BaseModel):
@@ -301,6 +322,9 @@ class ArtistsWithShowsResponse(BaseModel):
 
 class CachedShowsResponse(BaseModel):
     events: list[CachedShowEventResponse] = Field(default_factory=list)
+    setlist_coverage: ProbableSetlistCoverageResponse = Field(
+        default_factory=ProbableSetlistCoverageResponse
+    )
 
 
 class ShowFiltersResponse(BaseModel):

@@ -95,10 +95,11 @@ for (const width of [1440, 768, 390]) {
       await page.keyboard.press("Enter");
       await expect(sync).toBeEnabled();
       await expect(
-        page.getByText("Bandcamp sync queued (sample-bandcamp-task)", {
+        page.getByText("Bandcamp sync queued", {
           exact: true,
         }),
       ).toBeVisible();
+      await expect(page.getByText(/sample-bandcamp-task/)).toHaveCount(0);
       await page
         .getByRole("checkbox", {
           name: "Fallar la siguiente acción",

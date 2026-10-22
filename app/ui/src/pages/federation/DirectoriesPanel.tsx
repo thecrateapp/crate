@@ -96,7 +96,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Signed directories</CardTitle>
+            <CardTitle className="text-sm font-display">Signed directories</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-2 md:grid-cols-2">
             <Input

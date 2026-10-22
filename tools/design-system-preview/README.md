@@ -525,6 +525,16 @@ Admin entry is also checked with existing API fixtures and one Playwright worker
 are advisory; no canonical 1M baselines or full CI/suites are regenerated. Stop for Diego at 1W
 before publication/next group, keeping :5186 active. Listen/Desktop sources remain untouched.
 
+## Admin shell solid surface — 2026-10-21
+
+The isolated [`review-admin-shell.html`](http://127.0.0.1:5186/review-admin-shell.html) and
+Storybook `Reviews/Admin/Shell` mount the same `AdminNavigationReview` scene with the real Admin
+Shell, Sidebar and CommandPalette. This small follow-up removes the translucent blur from both
+fixed headers and uses the solid app surface. Account details, logout and permission preview now
+live in a circular avatar menu beside global search on desktop and in the mobile header; the
+sidebar is dedicated to navigation. The earlier 1W navigation specimen remains intact. The browser
+check verifies the menu and its placement at desktop/mobile widths alongside the solid headers.
+
 ## Admin reusable controls / Checkpoint 1X — local review
 
 1W is approved/published as `52eaa6a5`. Open <http://127.0.0.1:5186/#controles-admin>.
@@ -565,6 +575,14 @@ Run `admin-ops-checkpoint.spec.ts` and the affected `status-colour-checkpoint.sp
 `ops-surfaces.spec.ts` covers Tasks/SystemHealth at three widths; `instrument-panel.spec.ts`
 checks the affected panel spacing. These checks do not regenerate the canonical 1M PNGs/manifest.
 Keep the preview alive and stop at 1Y before commit/push or another migration group.
+
+## Admin page headers — Dashboard surface alignment
+
+The shared `OpsPageHero` and remaining legacy page-header wrappers now use an open layout
+matching Dashboard: no outer border, background surface, shadow or card padding. Content panels
+and data cards retain their own surfaces. Storybook `Reviews/Admin/A2 Operational surfaces` and
+`review-admin-operations.html` show the actual Admin components; the browser test checks the
+System Health and Stack headers alongside their solid operational cards.
 
 ## Checkpoint 1Z — Logs and Stack
 
@@ -796,3 +814,87 @@ matching Reviews/1BE/Listen web closure in Storybook. Playback/Actions/Feedback/
 compose actual components with local callbacks. Coverage distinguishes 25 route groups,
 11 read-only live observations and14 source/automated inspections; native and production-write
 limits stay explicit. See `../crate-ui-showcase/LISTEN_WEB_CLOSURE.md`. Approved by Diego for commit and push.
+
+## Admin A1b — solid operations surfaces
+
+Open <http://127.0.0.1:5186/review-admin-operations.html> or Storybook
+`Reviews/Admin/Operations`. Both mount the actual Admin operational-surface checkpoint. Hero and
+stat tiles use the Dashboard-aligned open header and opaque shared panel tokens without decorative
+shadow or blur; the fixture actions remain local. `admin-operations-checkpoint.spec.ts` verifies
+the header and surface styles at desktop and mobile widths. This review does not change operations
+data or page actions.
+
+## Admin A2c — operational freshness and recovery
+
+Open <http://127.0.0.1:5186/review-admin-operations.html> or Storybook
+`Reviews/Admin/A2 operational surfaces` → `FreshnessAndRecovery`. Tasks, Logs, Stack and System
+Health distinguish snapshot age from stream status. Refresh failures preserve the last successful
+snapshot and expose Retry; the preview includes current, stale, reconnecting and recovered states.
+
+## Admin A2d — Library Health recovery
+
+Open <http://127.0.0.1:5186/review-admin-health-recovery.html> or Storybook
+`Reviews/Admin/Health recovery`. Both use the same review scene. The full local Library Health
+page is available at <http://127.0.0.1:5186/admin-health-demo.html>; choose “Error al actualizar”,
+run and complete a sample scan to verify that an unavailable refresh preserves the loaded issues
+and that Retry recovers them. All preview actions use fictional data and remain local.
+
+## Admin A3a — Browse and Genres
+
+Open <http://127.0.0.1:5186/review-admin-catalog.html> or Storybook
+`Reviews/Admin/A3 Catalog`. Both routes mount the real Browse and Genres pages with local
+catalog fixtures. Browse groups artist filters with the current result view, distinguishes an
+empty catalog from a failed request and offers retry; Genres retains its page identity on an
+initial load error and gives filtered-empty results a direct clear-search action. Preview data is
+fictional and no API calls or library mutations are made.
+
+## Admin A3b — Artist and Album recovery
+
+Open <http://127.0.0.1:5186/review-admin-entity-recovery.html> or Storybook
+`Reviews/Admin/A3 Entity Recovery`. The scene demonstrates the shared page-level error and
+not-found states used by the Artist and Album routes, including retry and return-to-Browse actions.
+Artist and Album keep their domain-specific identity order. The overlapping two-segment routes are
+resolved explicitly: a numeric first segment loads the legacy Artist ID and redirects to its
+canonical slug; two text slugs load Album. This fixes the previously shadowed artist deep link.
+
+## Admin A3c — Discover and Insights/Analysis
+
+Open <http://127.0.0.1:5186/admin-discovery-demo.html> to exercise Discovery's independent
+feeds and local actions, or <http://127.0.0.1:5186/admin-insights-demo.html> to see Insights keep
+its last successful snapshot when refresh fails. The Storybook scenes are `Reviews/Admin/A3
+Discovery` → `PartialFeedFailure` and `Reviews/Admin/A3 Insights` → `RetainedSnapshot`.
+
+In the partial Discovery scenario, catalogue coverage and acquisition opportunities are unavailable
+while release radar and momentum feeds remain visible. The page distinguishes that condition from
+an empty catalog and offers a retry in the affected panel. The full-workspace failure remains
+separate. Insights shows stale-data status with the previous chart data retained; Analysis reports a
+failed refresh without implying a healthy response. All preview mutations use fictional data and
+local callbacks.
+
+## Admin A4a — Acquisition search workspace
+
+Open <http://127.0.0.1:5186/admin-acquisition-demo.html> or Storybook
+`Reviews/Admin/A4 Acquisition` → `SearchWorkspace`. Both mount the real Admin Acquisition page with
+local Tidal/Soulseek results. Search is a full-width task panel; its query, provider results and
+Tidal-only quality setting now read as one flow. Provider output uses proper single-selection tabs,
+and the empty and short-query states explain what can be searched. The preview fixtures never call
+the API or queue a real download. Upload and queue workflows remain unchanged in this first A4
+subcut.
+
+## Admin A5c — Settings and Translations
+
+Open <http://127.0.0.1:5186/review-admin-settings-translations.html> or Storybook
+`Reviews/Admin/A5 Settings and Translations`. Both mount the real Settings and Listen Translations
+pages with local fixtures. Settings sections use one responsive, URL-backed tab strip and can
+recover from an unavailable settings snapshot. Translation locale health uses aligned status rows
+with compact draft, published-bundle and request counts; its tabs stay on one scrollable line on
+small screens. Switch pages and sample states in the preview controls. All API-like actions and
+data stay local to the specimen.
+
+## Admin A5d — Federation
+
+Open <http://127.0.0.1:5186/review-admin-federation.html> or Storybook
+`Reviews/Admin/A5 Federation`. Both mount the real Federation page with a local node, trusted and
+pending peers, a sample import, streaming activity, risk data and audit events. Use the controls to
+review loading, empty, unavailable and read-only states. Peer and policy actions are simulated in
+memory; no requests reach the API or another node.

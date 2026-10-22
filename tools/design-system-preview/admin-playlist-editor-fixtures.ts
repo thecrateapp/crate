@@ -62,12 +62,68 @@ export function useLLMStatus() {
     error: llm ? null : "IA no disponible en la muestra",
   };
 }
+export function useActionLLMStatus(actionId: string) {
+  const { llm } = useSyncExternalStore(subscribe, snapshot);
+  return {
+    action_id: actionId,
+    available: llm,
+    status: llm ? ("configured" as const) : ("unavailable" as const),
+    provider: llm ? "local" : null,
+    model_id: llm ? "sample" : null,
+    fingerprint: llm ? "sample" : null,
+    error_code: llm ? null : "unavailable",
+  };
+}
+
+export function useSnapshotStream<T>(
+  url: string | null,
+  onPayload: (payload: T) => void,
+): "idle" | "connecting" | "live" | "reconnecting" {
+  const onPayloadRef = useRef(onPayload);
+  const [status, setStatus] = useState<
+    "idle" | "connecting" | "live" | "reconnecting"
+  >(url ? "connecting" : "idle");
+
+  useEffect(() => {
+    onPayloadRef.current = onPayload;
+  }, [onPayload]);
+
+  useEffect(() => {
+    if (!url) {
+      setStatus("idle");
+      return;
+    }
+
+    let disposed = false;
+    const stream = new EditorEventSource(url);
+    stream.onopen = () => {
+      if (!disposed) setStatus("live");
+    };
+    stream.onmessage = (event) => {
+      if (disposed) return;
+      try {
+        onPayloadRef.current(JSON.parse(event.data) as T);
+      } catch {
+        // Invalid fixture frames leave the last snapshot visible.
+      }
+    };
+    queueMicrotask(() => stream.onopen?.());
+
+    return () => {
+      disposed = true;
+      stream.close();
+    };
+  }, [url]);
+
+  return status;
+}
 export function setSample(sample: Sample) {
   if (state.pending) throw new Error("Complete the pending sample first");
   state = {
     ...state,
     sample,
     failNext: false,
+    llm: true,
     action: "Sin acciones de muestra.",
   };
   surface = structuredClone(fixture.surface);
@@ -92,6 +148,7 @@ export const apiSseUrl = (path: string) => path;
 const streams = new Set<EditorEventSource>();
 // Constructor injected only into the preview's real PlaylistEditor module, never window.
 export class EditorEventSource {
+  onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   constructor(public url: string) {
     if (url !== `${prefix}/stream`)

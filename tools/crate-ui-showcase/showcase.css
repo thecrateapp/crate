@@ -4,9 +4,16 @@
 @import "../../app/shared/ui/tokens/index.css";
 @import "tailwindcss";
 @source '../../app/shared/ui';
+@source '../../app/ui/src/components/layout';
+@source '../../app/ui/src/components/admin/ops-surfaces.tsx';
+@source '../../app/ui/src/pages/PlaylistEditor.tsx';
+@source '../../app/ui/src/pages/Playlists.tsx';
+@source '../../app/ui/src/components/admin/ListPagination.tsx';
+@source '../../app/ui/src/components/ui/AdminSelect.tsx';
 @source './stories';
 @source './components';
 @source './reviews';
+@source '../design-system-preview/admin-ops-checkpoint.tsx';
 @source '../../app/listen-desktop/src/components';
 @source '../../app/listen/src/components/dev';
 :root {

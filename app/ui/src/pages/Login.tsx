@@ -71,7 +71,7 @@ export function Login() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-4">
           <CrateLogo title="Crate" className="mb-2 h-16 w-16" />
-          <h1 className="text-2xl font-bold text-white">Crate</h1>
+          <h1 className="text-2xl font-bold text-white font-display">Crate</h1>
           <p className="-mt-0.5 text-sm text-white/40">Own your music</p>
         </div>
 

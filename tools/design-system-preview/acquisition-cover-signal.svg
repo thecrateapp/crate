@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <linearGradient id="ground" x2="0.9" y2="1">
+      <stop stop-color="#25212b" />
+      <stop offset=".55" stop-color="#7c4a3b" />
+      <stop offset="1" stop-color="#191c22" />
+    </linearGradient>
+    <radialGradient id="moon">
+      <stop stop-color="#f2c881" />
+      <stop offset="1" stop-color="#d97c4d" stop-opacity=".2" />
+    </radialGradient>
+  </defs>
+  <rect width="320" height="320" fill="url(#ground)" />
+  <circle cx="230" cy="95" r="63" fill="url(#moon)" />
+  <path d="M0 182 42 156l39 31 46-61 50 71 39-42 44 47 60-40v158H0z" fill="#141a20" />
+  <path d="M0 238 54 214l43 27 57-40 59 48 49-37 58 27v81H0z" fill="#202b31" />
+  <path d="M20 0v320M299 0v320" stroke="#efb772" stroke-opacity=".22" />
+  <text x="23" y="282" fill="#fff1dd" font-family="sans-serif" font-size="15" font-weight="700" letter-spacing="3">DUST AND</text>
+  <text x="23" y="302" fill="#fff1dd" font-family="sans-serif" font-size="15" font-weight="700" letter-spacing="3">DISQUIET</text>
+</svg>

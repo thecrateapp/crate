@@ -154,7 +154,7 @@ function UserDetails({
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-md border border-white/8 bg-black/15 p-2">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
             Last activity
           </div>
           <div className="mt-1 text-white/75">
@@ -162,7 +162,7 @@ function UserDetails({
           </div>
         </div>
         <div className="rounded-md border border-white/8 bg-black/15 p-2">
-          <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+          <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
             Footprint
           </div>
           <div className="mt-1 text-white/75">
@@ -174,7 +174,7 @@ function UserDetails({
 
       {track ? (
         <div className="rounded-md border border-accent-action/15 bg-accent-action/8 p-2 text-xs">
-          <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-accent-action-hi/60">
+          <div className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-accent-action-hi/60 font-mono">
             <Headphones size={10} />
             {user.listening_now ? "Currently playing" : "Latest track"}
           </div>

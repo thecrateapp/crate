@@ -50,7 +50,27 @@ def list_portable_album_ids(
     return [int(row["id"]) for row in rows]
 
 
-def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
+def get_portable_album_payload(
+    album_id: int, *, include_portable_status: bool = False
+) -> dict[str, Any] | None:
+    portable_status_columns = (
+        ", pm.sidecar_path AS _portable_sidecar_path"
+        ", pm.sidecar_written_at AS _portable_sidecar_written_at"
+        ", pm.audio_tags_written_at AS _portable_audio_tags_written_at"
+        ", pm.tracks AS _portable_tracks"
+        ", pm.tags_written AS _portable_tags_written"
+        ", pm.tag_errors AS _portable_tag_errors"
+        ", pm.export_path AS _portable_export_path"
+        ", pm.exported_at AS _portable_exported_at"
+        ", pm.updated_at AS _portable_updated_at"
+        if include_portable_status
+        else ""
+    )
+    portable_status_join = (
+        "LEFT JOIN album_portable_metadata pm ON pm.album_id = alb.id"
+        if include_portable_status
+        else ""
+    )
     with read_scope() as session:
         album_row = (
             session.execute(
@@ -80,7 +100,9 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                     alb.popularity,
                     alb.slug,
                     alb.updated_at
+                    {portable_status_columns}
                 FROM library_albums alb
+                {portable_status_join}
                 WHERE alb.id = :album_id
                 LIMIT 1
                 """
@@ -219,6 +241,21 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
         )
 
     album = _row_dict(album_row)
+    portable_status = None
+    if include_portable_status:
+        portable_status = {
+            "sidecar_path": album.pop("_portable_sidecar_path", None),
+            "sidecar_written_at": album.pop("_portable_sidecar_written_at", None),
+            "audio_tags_written_at": album.pop(
+                "_portable_audio_tags_written_at", None
+            ),
+            "tracks": album.pop("_portable_tracks", 0) or 0,
+            "tags_written": album.pop("_portable_tags_written", 0) or 0,
+            "tag_errors": album.pop("_portable_tag_errors", 0) or 0,
+            "export_path": album.pop("_portable_export_path", None),
+            "exported_at": album.pop("_portable_exported_at", None),
+            "updated_at": album.pop("_portable_updated_at", None),
+        }
     artist_payload = _row_dict(artist_row)
     tracks = []
     album_path = str(album.get("path") or "")
@@ -295,12 +332,15 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
             }
         )
 
-    return {
+    payload = {
         "schema_version": 1,
         "artist": artist_payload,
         "album": album,
         "tracks": tracks,
     }
+    if portable_status is not None:
+        payload["portable_metadata"] = portable_status
+    return payload
 
 
 def get_portable_track_payload_by_path(track_path: str) -> dict[str, Any] | None:

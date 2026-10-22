@@ -1,5 +1,6 @@
 """Schema models for utility, infrastructure, metadata, and SSE endpoints."""
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
@@ -28,6 +29,11 @@ class ImportPendingItemResponse(BaseModel):
     dest_path: str
     dest_exists: bool
     status: str
+    dest_album_id: int | None = None
+    task_id: str | None = None
+    last_error: str | None = None
+    discovered_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ImportPendingResponse(RootModel[list[ImportPendingItemResponse]]):

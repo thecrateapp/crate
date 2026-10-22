@@ -38,9 +38,9 @@ export function AdminNavigationCheckpoint() {
       </a>
       <p className="mt-4 text-sm text-text-muted">
         Puedes contraer la columna, cambiar de destino, probar la paleta o abrir
-        la ayuda con ?. El buscador y el selector de permisos se revisan en 1X.
-        Sus glifos funcionales de UX se conservan. La preferencia de anchura se
-        guarda como en Admin.
+        la ayuda con ?. El avatar del encabezado agrupa la cuenta, el cierre de
+        sesión y la vista previa de permisos junto a la búsqueda global. La
+        preferencia de anchura se guarda como en Admin.
       </p>
     </section>
   );

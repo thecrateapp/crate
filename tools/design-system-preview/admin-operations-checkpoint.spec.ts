@@ -1,4 +1,59 @@
 import { expect, test } from "@playwright/test";
+
+test("A1b operational surfaces use solid shared tokens", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await page.goto("/review-admin-operations.html");
+    const hero = page
+      .getByTestId("ops-hero")
+      .locator('[data-slot="admin-page-header-container"]');
+    const tile = page
+      .getByTestId("ops-stats")
+      .locator("[data-sample-stat]")
+      .first()
+      .locator("div")
+      .first();
+    await expect(hero).toBeVisible();
+    await expect(tile).toBeVisible();
+    const freshness = page.getByTestId("ops-freshness");
+    await expect(freshness.getByText("Snapshot current")).toBeVisible();
+    await expect(freshness.getByText("Live updates")).toBeVisible();
+    await expect(freshness.getByText("Snapshot stale")).toBeVisible();
+    await expect(freshness.getByText("Reconnecting")).toBeVisible();
+    await expect(freshness.getByRole("alert")).toContainText(
+      "Showing the last successful snapshot.",
+    );
+    await freshness.getByRole("button", { name: "Retry" }).click();
+    await expect(page.getByRole("status")).toContainText("Muestra actualizada");
+    const appearance = async (surface: typeof hero) =>
+      surface.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          boxShadow: style.boxShadow,
+          backdropFilter: style.backdropFilter,
+        };
+      });
+    expect(await appearance(hero)).toMatchObject({
+      background: "rgba(0, 0, 0, 0)",
+      boxShadow: "none",
+      backdropFilter: "none",
+    });
+    const tileAppearance = await appearance(tile);
+    expect(tileAppearance.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(tileAppearance.boxShadow).toContain("rgba(0, 0, 0, 0)");
+    expect(tileAppearance.backdropFilter).toBe("none");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
+
 for (const width of [1440, 768, 390])
   for (const view of ["logs", "stack"] as const) {
     test.describe(`Admin ${view} operations ${width}`, () => {
@@ -263,7 +318,7 @@ for (const touch of [false, true]) {
         isMobile: touch,
         hasTouch: touch,
       });
-      test("keeps the summary row at one informational size in live and frozen states", async ({
+      test("keeps the summary row at one informational size in live and paused states", async ({
         page,
       }) => {
         await page.goto(`/admin-operations-demo.html?page=${view}`);
@@ -293,7 +348,7 @@ for (const touch of [false, true]) {
           );
         const assertUniform = async () => {
           const items = await geometry();
-          expect(items).toHaveLength(view === "logs" ? 5 : 3);
+          expect(items).toHaveLength(view === "logs" ? 6 : 5);
           const { label: referenceLabel, ...reference } = items[0]!;
           for (const { label, ...current } of items)
             expect(
@@ -309,7 +364,7 @@ for (const touch of [false, true]) {
             .getByRole("button", { name: "Pause live", exact: true })
             .click();
           await expect(
-            row.getByText("Frozen snapshot", { exact: true }),
+            row.getByText("Live updates paused", { exact: true }),
           ).toBeVisible();
           await assertUniform();
         }

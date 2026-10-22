@@ -21,10 +21,10 @@ createRoot(document.getElementById("root")!).render(
     fallback={(error, onReset) => (
       <div className="flex min-h-screen items-center justify-center bg-app-surface px-6 text-foreground">
         <div className="w-full max-w-lg rounded-lg border border-white/10 bg-white/[0.04] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.42)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+          <p className="text-sm font-normal uppercase tracking-[0.16em] text-primary font-mono">
             Admin crashed
           </p>
-          <h1 className="mt-3 text-2xl font-semibold">
+          <h1 className="mt-3 text-2xl font-semibold font-display">
             Something went wrong while rendering.
           </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">

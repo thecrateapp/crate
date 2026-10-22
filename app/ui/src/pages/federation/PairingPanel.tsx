@@ -46,20 +46,22 @@ export function PairingPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Pairing</CardTitle>
+        <CardTitle className="text-sm font-display">Pairing</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-2">
+        <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
           <Input
             aria-label="Probe URL"
             value={probeUrl}
             onChange={(event) => setProbeUrl(event.target.value)}
             placeholder="https://node.example"
+            className="min-w-0"
           />
           <Button
             variant="secondary"
             disabled={busy || !probeUrl}
             onClick={() => void run("probe")}
+            className="w-full"
           >
             Probe
           </Button>
@@ -70,16 +72,18 @@ export function PairingPanel({
           </pre>
         ) : null}
         {canManage ? (
-          <div className="flex gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
             <Input
               aria-label="Pairing URL"
               value={pairingUrl}
               onChange={(event) => setPairingUrl(event.target.value)}
               placeholder="https://node.example"
+              className="min-w-0"
             />
             <Button
               disabled={busy || !pairingUrl}
               onClick={() => void run("pair")}
+              className="w-full"
             >
               Pair
             </Button>

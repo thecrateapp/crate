@@ -209,7 +209,7 @@ function PlanDetail({ planId }: { planId?: string }) {
           <section aria-labelledby={changesHeadingId} className="space-y-2">
             <h3
               id={changesHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
+              className="text-xs font-normal uppercase tracking-[0.12em] text-white/40 font-mono"
             >
               Changes
             </h3>
@@ -235,7 +235,7 @@ function PlanDetail({ planId }: { planId?: string }) {
             <section aria-labelledby={conflictsHeadingId} className="space-y-2">
               <h3
                 id={conflictsHeadingId}
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
+                className="text-xs font-normal uppercase tracking-[0.12em] text-white/40 font-mono"
               >
                 Conflicts
               </h3>
@@ -250,7 +250,7 @@ function PlanDetail({ planId }: { planId?: string }) {
           >
             <h3
               id={reversibilityHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
+              className="text-xs font-normal uppercase tracking-[0.12em] text-white/40 font-mono"
             >
               Reversibility
             </h3>

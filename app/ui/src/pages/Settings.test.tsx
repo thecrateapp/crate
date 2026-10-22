@@ -1,7 +1,8 @@
 import { renderWithAdminProviders as render } from "@/test/render-with-admin-providers";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocation } from "react-router";
 
 const { apiMock, refetchMock, useApiMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
@@ -98,6 +99,11 @@ const settingsData = {
   },
 };
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
+
 describe("Settings", () => {
   beforeEach(() => {
     apiMock.mockReset();
@@ -114,6 +120,99 @@ describe("Settings", () => {
       loading: false,
       refetch: refetchMock,
     });
+    useApiMock.mockImplementation((path: string) => ({
+      data:
+        path === "/api/settings"
+          ? settingsData
+          : path === "/api/acquisition/status"
+            ? {
+                tidal: { authenticated: false },
+                soulseek: { connected: false, state: "offline" },
+              }
+            : path === "/api/admin/download-policy"
+              ? {
+                  downloads_allowed_now: true,
+                  active_users: 0,
+                  active_streams: 0,
+                  time_window: {
+                    enabled: false,
+                    in_window: false,
+                    start: "02:00",
+                    end: "06:00",
+                  },
+                  user_limit: { enabled: false, max: 0 },
+                  stream_limit: { enabled: false, max: 0 },
+                }
+              : null,
+      loading: false,
+      refetch: refetchMock,
+    }));
+  });
+
+  it("keeps the selected section in the URL and removes the default section", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(settingsData);
+    render(
+      <>
+        <Settings />
+        <LocationProbe />
+      </>,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Downloads" }));
+    expect(screen.getByTestId("location-search")).toHaveTextContent(
+      "?section=downloads",
+    );
+    expect(
+      screen.getByRole("group", { name: "Tidal Access" }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "General" }));
+    expect(screen.getByTestId("location-search")).toHaveTextContent("");
+    expect(
+      screen.getByRole("group", { name: "Worker Engine" }),
+    ).toBeVisible();
+  });
+
+  it("opens the Settings section requested by the URL", () => {
+    render(<Settings />, { route: "/?section=storage" });
+
+    expect(screen.getByRole("tab", { name: "Storage" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(
+      screen.getByRole("group", { name: "Database Footprint" }),
+    ).toBeVisible();
+  });
+
+  it("uses the shared StatNumber treatment for library and runtime metrics", () => {
+    render(<Settings />);
+
+    const artistsLabel = screen.getByText("Artists");
+    expect(artistsLabel.parentElement).toHaveClass("inline-flex", "flex-col");
+    expect(within(artistsLabel.parentElement!).getByText("10")).toBeVisible();
+
+    const versionLabel = screen.getByText("Version");
+    expect(versionLabel.parentElement).toHaveClass("inline-flex", "flex-col");
+    expect(within(versionLabel.parentElement!).getByText("dev")).toBeVisible();
+  });
+
+  it("offers a retry when the settings snapshot is unavailable", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: false,
+      refetch: refetchMock,
+    });
+
+    render(<Settings />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Settings could not be loaded",
+    );
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetchMock).toHaveBeenCalledOnce();
   });
 
   it("shows one AI refinement state after setup", async () => {
@@ -121,9 +220,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(
       screen.getByText(/AI refinement: On · uses paths-model/),
@@ -146,9 +243,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(screen.getByText(/AI refinement: Off/)).toBeVisible();
   });
@@ -165,9 +260,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
     await user.click(screen.getByRole("switch", { name: /ai refinement/i }));
 
     await waitFor(() => {
@@ -192,9 +285,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(
       screen.getByRole("link", { name: "Manage in AI models" }),
@@ -214,9 +305,7 @@ describe("Settings", () => {
       auth: { hasCapability: (cap) => cap !== "ai.config.read" },
     });
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(screen.getByText("Manage in AI models")).toBeVisible();
     expect(
@@ -230,7 +319,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(screen.getAllByRole("button", { name: /storage/i })[0]!);
+    await user.click(screen.getByRole("tab", { name: /storage/i }));
     await user.click(screen.getByRole("button", { name: /music paths ai/i }));
 
     await waitFor(() => {
@@ -268,7 +357,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(screen.getAllByRole("button", { name: /schedules/i })[0]!);
+    await user.click(screen.getByRole("tab", { name: /schedules/i }));
     await user.click(
       await screen.findByRole("button", { name: "Run Library Scan now" }),
     );
@@ -284,9 +373,7 @@ describe("Settings", () => {
   it("names the processing range and preserves its numeric persistence on mouse release", async () => {
     apiMock.mockResolvedValue({ ok: true });
     render(<Settings />);
-    await userEvent.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await userEvent.click(screen.getByRole("tab", { name: /enrichment/i }));
     const slider = screen.getByRole("slider", { name: "MB auto-apply" });
     fireEvent.change(slider, { target: { value: "90" } });
     fireEvent.mouseUp(slider);
@@ -300,9 +387,7 @@ describe("Settings", () => {
   it("persists a processing range change committed with the keyboard", async () => {
     apiMock.mockResolvedValue({ ok: true });
     render(<Settings />);
-    await userEvent.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await userEvent.click(screen.getByRole("tab", { name: /enrichment/i }));
     const slider = screen.getByRole("slider", { name: "MB auto-apply" });
     fireEvent.change(slider, { target: { value: "96" } });
     fireEvent.keyUp(slider, { key: "ArrowRight" });

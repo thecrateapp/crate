@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
@@ -9,7 +10,7 @@ import { Federation } from "../Federation";
 vi.mock("@/hooks/use-api", () => ({ useApi: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 
-it("keeps the page as tab composition instead of a monolithic operations form", () => {
+it("keeps the page as tab composition instead of a monolithic operations form", async () => {
   vi.mocked(useApi).mockImplementation((path: string | null) => ({
     data: path?.endsWith("status")
       ? {
@@ -27,6 +28,6 @@ it("keeps the page as tab composition instead of a monolithic operations form", 
     refetch: vi.fn(),
   }));
   renderWithAdminProviders(<Federation />);
-  fireEvent.click(screen.getByRole("tab", { name: "Security" }));
+  await userEvent.setup().click(screen.getByRole("tab", { name: "Security" }));
   expect(screen.getByText("Key material")).toBeInTheDocument();
 });

@@ -51,7 +51,7 @@ function OutcomeGroup({
   if (items.length === 0) return null;
   return (
     <section aria-labelledby={headingId} className="space-y-2">
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">
+      <h3 id={headingId} className="text-sm font-semibold text-foreground font-display">
         {title}
       </h3>
       <ul role="list" className="space-y-1 text-sm">
@@ -129,7 +129,7 @@ export function AssignmentDialog({
     >
       <DialogContent aria-describedby={undefined} className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Use {modelId} for all features?</DialogTitle>
+          <DialogTitle className="font-display">Use {modelId} for all features?</DialogTitle>
         </DialogHeader>
 
         {result?.activation && connections.length > 0 ? (

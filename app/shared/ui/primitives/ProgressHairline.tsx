@@ -2,14 +2,12 @@ interface ProgressHairlineProps {
   value?: number;
   label: string;
   valueText?: string;
-  thickness?: 1 | 2;
 }
 
 export function ProgressHairline({
   value,
   label,
   valueText,
-  thickness = 2,
 }: ProgressHairlineProps) {
   const determinate = value !== undefined && Number.isFinite(value);
   const ratio = determinate ? Math.max(0, Math.min(value, 1)) : 0;
@@ -48,7 +46,6 @@ export function ProgressHairline({
       aria-valuenow={determinate ? ratio * 100 : undefined}
       aria-valuetext={valueText}
       className="crate-progress-hairline"
-      data-thickness={thickness}
       data-indeterminate={!determinate || undefined}
       data-animated={(!determinate && visible && motionAllowed) || undefined}
     >

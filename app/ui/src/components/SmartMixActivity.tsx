@@ -104,7 +104,7 @@ export function SmartMixActivity({
   return (
     <div className="space-y-2 rounded-sm border border-white/6 bg-black/20 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+        <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
           {activity.running.length > 0 ? "Analyzing now" : "Recent activity"}
         </span>
         <CrateChip className="text-[10px]">

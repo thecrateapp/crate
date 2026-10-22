@@ -48,7 +48,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
           {sc}
         </div>
         <div className="flex-1">
-          <h3 className="font-medium">{match.title}</h3>
+          <h3 className="font-medium font-display">{match.title}</h3>
           <div className="text-sm text-muted-foreground">
             {match.artist} &middot; {match.date || "?"} &middot;{" "}
             {match.track_count} tracks{" "}

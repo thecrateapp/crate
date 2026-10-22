@@ -40,8 +40,8 @@ export function RelatedAlbums({ albumId }: { albumId?: number }) {
   return (
     <div className="mt-8">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white/70">Related Albums</h3>
-        <span className="text-[11px] uppercase tracking-[0.16em] text-white/30">
+        <h3 className="text-sm font-semibold text-white/70 font-display">Related Albums</h3>
+        <span className="text-[11px] uppercase tracking-[0.16em] text-white/30 font-mono">
           Editorial context
         </span>
       </div>

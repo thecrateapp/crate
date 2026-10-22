@@ -306,7 +306,7 @@ function NodeDetailPanel({
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground capitalize">
+        <h3 className="text-lg font-semibold text-foreground capitalize font-display">
           {node.name}
         </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -365,7 +365,7 @@ function NodeDetailPanel({
         <div className="space-y-3 rounded-xl border border-accent-action/15 bg-accent-action/[0.035] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent-action-hi">
+              <div className="text-[11px] font-normal uppercase tracking-[0.2em] text-accent-action-hi font-mono">
                 Editorial node
               </div>
               <p className="mt-1 text-xs text-white/45">
@@ -415,7 +415,7 @@ function NodeDetailPanel({
           <label htmlFor="genre-description" className="crate-form-field">
             <span
               data-slot="form-field-label"
-              className="text-[11px] uppercase tracking-wider text-white/35"
+              className="text-[11px] uppercase tracking-wider text-white/35 font-mono"
             >
               Description
             </span>
@@ -443,7 +443,7 @@ function NodeDetailPanel({
           </label>
           {proposal ? (
             <div className="rounded-lg border border-accent-action/15 bg-black/25 p-3 text-xs text-white/55">
-              <div className="font-semibold uppercase tracking-[0.16em] text-accent-action-hi">
+              <div className="font-normal uppercase tracking-[0.16em] text-accent-action-hi font-mono">
                 AI proposal staged
               </div>
               <p className="mt-1">
@@ -485,7 +485,7 @@ function NodeDetailPanel({
 
       {/* References */}
       <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+        <div className="mb-2 text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
           References
         </div>
         <div className="space-y-1.5">
@@ -544,7 +544,7 @@ function NodeDetailPanel({
 
       {/* Actions */}
       <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+        <div className="mb-2 text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
           Actions
         </div>
         <div className="flex flex-wrap gap-2">
@@ -599,7 +599,7 @@ function NodeDetailPanel({
       {/* Aliases */}
       {node.alias_names.length > 0 && (
         <div>
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+          <div className="mb-2 text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
             Aliases ({node.alias_names.length})
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -643,7 +643,7 @@ function NodeDetailPanel({
       {/* Parent chain */}
       {canCurate ? (
         <div className="space-y-3">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-white/35">
+          <div className="text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
             Relationship editor
           </div>
           {RELATION_EDITOR_CONFIG.map((config) => {
@@ -729,7 +729,7 @@ function NodeDetailPanel({
 
       {node.parent_slugs.length > 0 && (
         <div>
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+          <div className="mb-2 text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
             Parent genres
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -753,7 +753,7 @@ function NodeDetailPanel({
       {/* Subgenres */}
       {node.children_slugs.length > 0 && (
         <div>
-          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+          <div className="mb-2 text-[11px] font-normal uppercase tracking-wider text-white/35 font-mono">
             Subgenres ({node.children_slugs.length})
           </div>
           <div className="flex flex-wrap gap-1.5">

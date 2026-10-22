@@ -2,6 +2,7 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import { ArtistAlbumRoute } from "@/pages/ArtistAlbumRoute";
 import { api } from "@/lib/api";
 import { Toaster } from "sonner";
 import { toasterConfig } from "@crate/ui/lib/toaster-config";
@@ -41,6 +42,9 @@ const Trash = lazy(() =>
 );
 const Contributions = lazy(() =>
   import("@/pages/Contributions").then((m) => ({ default: m.Contributions })),
+);
+const Imports = lazy(() =>
+  import("@/pages/Imports").then((m) => ({ default: m.Imports })),
 );
 const Playlists = lazy(() =>
   import("@/pages/Playlists").then((m) => ({ default: m.Playlists })),
@@ -218,11 +222,11 @@ const ACQUISITION_MANAGE = [
   "library.tidal.manage",
 ] as const;
 const CONTRIBUTION_REVIEW = ["library.import.manage"] as const;
+const IMPORTS_MANAGE = ["library.import.manage"] as const;
 const BANDCAMP_MANAGE = ["library.bandcamp.manage"] as const;
 const UPCOMING_CURATION = [
   "curation.shows.write",
-  "curation.releases.write",
-  "library.tidal.manage",
+  "library.metadata.write",
 ] as const;
 const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
 const FEDERATION_NODES_VIEW = ["federation.nodes.view"] as const;
@@ -302,20 +306,12 @@ export default function App() {
                   path="artists/:artistSlug/:albumSlug"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <Album />
+                      <ArtistAlbumRoute artist={<Artist />} album={<Album />} />
                     </RequireCapabilities>
                   }
                 />
                 <Route
                   path="artists/:artistSlug"
-                  element={
-                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <Artist />
-                    </RequireCapabilities>
-                  }
-                />
-                <Route
-                  path="artists/:artistId/:slug"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
                       <Artist />
@@ -359,6 +355,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={CONTRIBUTION_REVIEW}>
                       <Contributions />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="imports"
+                  element={
+                    <RequireCapabilities anyOf={IMPORTS_MANAGE}>
+                      <Imports />
                     </RequireCapabilities>
                   }
                 />

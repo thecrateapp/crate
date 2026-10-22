@@ -44,7 +44,7 @@ function Destination() {
         className="inline-flex min-h-11 items-center underline"
         to="/admin-new-releases-demo.html"
       >
-        Volver a New Releases de muestra
+        Volver a Release Radar de muestra
       </Link>
     </div>
   );
@@ -172,7 +172,7 @@ function Demo() {
           </p>
         </header>
         <AuthContext.Provider value={auth}>
-          <section aria-label="Página real de New Releases">
+          <section aria-label="Página real de Release Radar">
             <Routes>
               <Route
                 path="/admin-new-releases-demo.html"

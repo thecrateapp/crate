@@ -9,7 +9,8 @@ export type HealthSample =
   | "unknown"
   | "stale"
   | "limited"
-  | "mixed";
+  | "mixed"
+  | "refresh-error";
 const listeners = new Set<() => void>();
 let health = {
   ...structuredClone(fixture.health),
@@ -25,6 +26,7 @@ type SampleTask = Omit<(typeof fixture.tasks.history)[number], "result"> & {
 let tasks: { history: SampleTask[] } = structuredClone(fixture.tasks);
 let pending: { id: string; check: string | null; type: string } | null = null,
   counter = 0;
+let refreshFailuresRemaining = 0;
 let state: {
   sample: HealthSample;
   generation: number;
@@ -57,6 +59,7 @@ export function setHealthSample(sample: HealthSample) {
   };
   tasks = structuredClone(fixture.tasks);
   pending = null;
+  refreshFailuresRemaining = sample === "refresh-error" ? 1 : 0;
   if (sample === "empty" || sample === "unknown") {
     health.issues = [];
     health.counts = {};
@@ -177,6 +180,14 @@ export async function api<T>(
       if (state.sample === "loading") return new Promise<T>(() => {});
       if (state.sample === "offline")
         throw new Error("Sample health unavailable");
+      if (
+        state.sample === "refresh-error" &&
+        url.searchParams.get("fresh") === "1" &&
+        refreshFailuresRemaining > 0
+      ) {
+        refreshFailuresRemaining -= 1;
+        throw new Error("Sample refresh unavailable");
+      }
       const check = url.searchParams.get("check_type");
       return {
         ...structuredClone(health),
@@ -228,6 +239,7 @@ export async function api<T>(
 // Only the isolated document installs this inert stream boundary.
 export class HealthSampleEventSource {
   readonly readyState = 1;
+  onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   constructor(readonly url: string) {
@@ -236,6 +248,7 @@ export class HealthSampleEventSource {
       !url.startsWith("/api/admin/tasks-stream")
     )
       throw new Error("Unexpected sample stream");
+    queueMicrotask(() => this.onopen?.(new Event("open")));
   }
   close() {}
 }

@@ -80,7 +80,7 @@ function Demo() {
           {state.action}
         </p>
       </header>
-      <section aria-label="Página real de Translations">
+      <section aria-label="Página real de Translations" className="min-w-0">
         <I18nReview key={state.sample + String(state.workspace)} />
       </section>
       <Toaster {...toasterConfig} />

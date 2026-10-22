@@ -1,9 +1,12 @@
 from datetime import date
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from crate.setlistfm import (
     _predict_setlist,
     get_cached_probable_setlist_context,
+    get_probable_setlist_health,
+    get_probable_setlist,
     get_upcoming_shows,
     is_shows_sync_enabled,
     normalize_upcoming_show,
@@ -235,6 +238,72 @@ def test_cached_probable_setlist_context_validates_the_model_version():
         context = get_cached_probable_setlist_context("Placebo")
 
     assert context == payload["context"]
+
+
+def test_probable_setlist_health_classifies_recent_stale_missing_and_legacy():
+    from crate.setlistfm import _probable_cache_key
+
+    now = datetime.now(timezone.utc)
+    cached = {
+        _probable_cache_key("Fresh Artist"): {
+            "songs": [{"title": "Current"}],
+            "generated_at": now.isoformat(),
+            "context": {"mode": "active_tour", "source_show_count": 3},
+        },
+        _probable_cache_key("Stale Artist"): {
+            "songs": [{"title": "Old"}],
+            "generated_at": (now - timedelta(days=8)).isoformat(),
+            "context": {"mode": "catalog", "source_show_count": 4},
+        },
+        _probable_cache_key("Tour Artist"): {
+            "songs": [{"title": "Old tour"}],
+            "generated_at": (now - timedelta(days=2)).isoformat(),
+            "context": {"mode": "active_tour", "source_show_count": 2},
+        },
+        _probable_cache_key("Legacy Artist"): {
+            "songs": [{"title": "No timestamp"}],
+            "context": {"mode": "catalog"},
+        },
+    }
+    with patch("crate.setlistfm.get_caches", return_value=cached) as read_batch:
+        health = get_probable_setlist_health(
+            [" Fresh   Artist ", "Stale Artist", "Tour Artist", "Legacy Artist", "Missing Artist"]
+        )
+
+    assert [health[key]["status"] for key in (
+        "fresh artist", "stale artist", "tour artist", "legacy artist", "missing artist"
+    )] == ["fresh", "stale", "stale", "unknown", "missing"]
+    assert health["fresh artist"]["song_count"] == 1
+    assert health["fresh artist"]["source_show_count"] == 3
+    read_batch.assert_called_once()
+
+
+def test_probable_setlist_persists_generation_time_and_prediction_context(monkeypatch):
+    from crate.setlistfm import _probable_cache_key
+
+    writes = []
+    monkeypatch.setattr("crate.setlistfm.get_cached_probable_setlist", lambda _name: None)
+    monkeypatch.setattr("crate.setlistfm.search_artist", lambda _name: "artist-mbid")
+    monkeypatch.setattr("crate.setlistfm._fetch_raw_setlists", lambda *_args: [object()])
+    monkeypatch.setattr(
+        "crate.setlistfm._predict_setlist_with_context",
+        lambda _setlists: (
+            [{"title": "Opening song"}],
+            {"mode": "active_tour", "source_show_count": 2},
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.setlistfm.set_cache",
+        lambda key, value, ttl=None: writes.append((key, value, ttl)),
+    )
+
+    songs = get_probable_setlist("The Example", force=True)
+
+    assert songs == [{"title": "Opening song"}]
+    assert writes[0][0] == _probable_cache_key("The Example")
+    assert datetime.fromisoformat(writes[0][1]["generated_at"]).tzinfo is not None
+    assert writes[0][1]["songs"] == songs
+    assert writes[0][2] == 24 * 60 * 60
 
 
 def test_normalize_upcoming_show_does_not_trust_invalid_coordinates():

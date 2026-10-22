@@ -38,7 +38,7 @@ function Destination() {
         className="inline-flex min-h-11 items-center underline"
         to="/admin-upcoming-demo.html"
       >
-        Volver a Upcoming de muestra
+        Volver a Show Management de muestra
       </Link>
     </section>
   );
@@ -52,6 +52,7 @@ function Demo() {
           "curation.shows.write",
           "curation.releases.write",
           "library.tidal.manage",
+          "library.metadata.write",
         ]
       : state.access === "shows"
         ? ["curation.shows.write"]
@@ -83,7 +84,7 @@ function Demo() {
   );
   if (destination)
     return (
-      <main className="grid gap-4 p-6">
+      <main className="grid grid-cols-1 gap-4 p-6">
         <h1 className="font-display text-3xl">Entradas de muestra</h1>
         <p>Este destino es local y no contacta al proveedor real.</p>
         <p className="break-all font-mono">{destination}</p>
@@ -91,20 +92,20 @@ function Demo() {
           className="inline-flex min-h-11 items-center underline"
           href="./admin-upcoming-demo.html"
         >
-          Volver a Upcoming de muestra
+          Volver a Show Management de muestra
         </a>
       </main>
     );
   return (
     <BrowserRouter>
       <AuthContext.Provider value={auth}>
-        <main className="grid min-w-0 gap-6 p-4 sm:p-6">
-          <header className="grid gap-4 border-b border-border-quiet pb-6">
+        <main className="grid grid-cols-1 min-w-0 gap-6 p-4 sm:p-6">
+          <header className="grid min-w-0 gap-4 border-b border-border-quiet pb-6">
             <p className="text-sm text-text-muted">
-              Upcoming y tarjetas reales de Admin · datos, imágenes, permisos y
-              tareas ficticios. Sin backend ni destinos externos. El refresco de
-              conciertos conserva la espera real de 10 segundos después de
-              completar el envío de muestra.
+              Show Management real de Admin · calendario, cartel, cobertura y
+              acciones con datos ficticios. Sin backend ni destinos externos. El
+              refresco de setlists simula el encolado sin consultar al
+              proveedor.
             </p>
             <div className="crate-form-field">
               <MonoLabel as="span">Estado de muestra</MonoLabel>
@@ -175,7 +176,7 @@ function Demo() {
             <Route
               path="/admin-upcoming-demo.html"
               element={
-                <section aria-label="Página real de Upcoming">
+                <section aria-label="Página real de Show Management">
                   <Upcoming key={state.sample} />
                 </section>
               }

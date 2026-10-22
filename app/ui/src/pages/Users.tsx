@@ -1,5 +1,7 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { AdminPageHeader } from "@/components/admin/ops-surfaces";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -131,12 +133,7 @@ interface UserSession {
   device_model?: string | null;
   device_fingerprint?: string | null;
   activity_state?:
-    | "active"
-    | "recent"
-    | "history"
-    | "expired"
-    | "revoked"
-    | null;
+    "active" | "recent" | "history" | "expired" | "revoked" | null;
   is_active?: boolean | null;
   is_recent?: boolean | null;
 }
@@ -689,6 +686,7 @@ export function Users() {
   const { user: currentUser, hasCapability } = useAuth();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
@@ -729,11 +727,17 @@ export function Users() {
     try {
       const data = await api<UserRecord[]>("/api/auth/users");
       setUsers(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch {
-      toast.error("Failed to load users");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retryUsers() {
+    setLoading(true);
+    await fetchUsers();
   }
 
   useEffect(() => {
@@ -850,9 +854,44 @@ export function Users() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <AdminPageHeader>
+          <PageHeaderLayout>
+            <div>
+              <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
+                Users
+              </h1>
+              <p className="text-sm text-white/55">
+                Account access, presence and listening activity.
+              </p>
+            </div>
+          </PageHeaderLayout>
+        </AdminPageHeader>
+        <Card className="border-white/10 bg-panel-surface">
+          <CardContent className="flex flex-col items-start gap-4 py-8">
+            <div>
+              <MonoLabel as="h2" tone="accent">
+                Users unavailable
+              </MonoLabel>
+              <p role="alert" className="mt-2 text-sm text-text-muted">
+                The user directory could not be loaded. Your filters and access
+                settings have not changed.
+              </p>
+            </div>
+            <Button className="min-h-11" variant="outline" onClick={retryUsers}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+      <AdminPageHeader>
         <PageHeaderLayout
           actions={
             <PageHeaderActions>
@@ -917,9 +956,9 @@ export function Users() {
             </div>
           </div>
         </PageHeaderLayout>
-      </section>
+      </AdminPageHeader>
 
-      <Card className="border-white/10 bg-panel-surface shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
+      <Card className="border-white/10 bg-panel-surface">
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-md">
@@ -940,7 +979,10 @@ export function Users() {
                 className="pl-10"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div
+              aria-label="Filter users"
+              className="flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1 lg:flex-wrap"
+            >
               {[
                 { key: "all", label: "All", count: users.length },
                 {
@@ -985,6 +1027,7 @@ export function Users() {
               ].map((item) => (
                 <FilterChip
                   key={item.key}
+                  className="shrink-0 whitespace-nowrap"
                   active={filter === item.key}
                   onClick={() => {
                     setFilter(item.key as UserFilter);
@@ -1001,87 +1044,80 @@ export function Users() {
             Showing {showingStart}-{showingEnd} of {filteredUsers.length} users
           </div>
 
-          <table
-            aria-label="Users"
-            className="w-full table-fixed text-left text-sm"
-          >
-            <thead className="border-b border-border-quiet font-mono text-[10px] uppercase tracking-[0.12em] text-text-subtle">
-              <tr>
-                <th scope="col" className="w-[46%] py-3 pr-3 md:w-[36%]">
-                  User
-                </th>
-                <th scope="col" className="w-[27%] py-3 pr-2 md:w-[20%]">
-                  Status
-                </th>
-                <th
-                  scope="col"
-                  className="hidden py-3 pr-3 md:table-cell md:w-[26%]"
-                >
-                  Presence
-                </th>
-                <th scope="col" className="py-3 text-right">
+          <div role="table" aria-label="Users" className="min-w-0 text-sm">
+            <div role="rowgroup">
+              <div
+                role="row"
+                className="hidden grid-cols-[minmax(0,2.2fr)_minmax(7.5rem,.8fr)_minmax(12rem,1.2fr)_auto] gap-4 border-b border-border-quiet py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-text-subtle lg:grid"
+              >
+                <span role="columnheader">User</span>
+                <span role="columnheader">Status</span>
+                <span role="columnheader">Presence</span>
+                <span role="columnheader" className="text-right">
                   Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-quiet">
+                </span>
+              </div>
+            </div>
+            <div role="rowgroup" className="border-t border-border-quiet">
               {paginatedUsers.map((user) => (
-                <tr key={user.id}>
-                  <td className="py-4 pr-3 align-top">
-                    <div className="flex min-w-0 flex-col items-start gap-3 sm:flex-row">
-                      <div className="shrink-0">
-                        <UserAvatar user={user} />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="crate-form-field">
-                          <h2 className="break-words font-sans text-base font-semibold text-text-main">
-                            {user.name || user.email}
-                          </h2>
-                          <span className="break-all text-xs text-text-muted">
-                            {user.email}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {rolesForUser(user).map((role) => (
-                            <Badge key={role} variant="outline">
-                              {roleLabel(role)}
-                            </Badge>
-                          ))}
-                          {user.username ? (
-                            <span className="break-all font-mono text-[10px] text-text-subtle">
-                              @{user.username}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-xs text-text-muted md:hidden">
-                          {user.listening_now
-                            ? "Listening now"
-                            : user.online_now
-                              ? "Active now"
-                              : "Offline"}
-                        </div>
-                      </div>
+                <div
+                  key={user.id}
+                  role="row"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 border-b border-border-quiet-subtle py-4 last:border-b-0 lg:grid-cols-[minmax(0,2.2fr)_minmax(7.5rem,.8fr)_minmax(12rem,1.2fr)_auto] lg:items-center lg:gap-4"
+                >
+                  <div role="cell" className="flex min-w-0 items-start gap-3">
+                    <div className="shrink-0">
+                      <UserAvatar user={user} />
                     </div>
-                  </td>
-                  <td className="py-4 pr-2 align-top">
-                    <div className="flex flex-col items-start gap-2">
-                      <Badge
-                        variant="outline"
-                        className={statusBadgeClass(userStatus(user))}
-                      >
-                        {statusLabel(userStatus(user))}
-                      </Badge>
-                      {userActivityStatus(user) !== "active" ? (
-                        <span
-                          className={`text-xs ${activityBadgeClass(userActivityStatus(user))}`}
-                        >
-                          {activityLabel(userActivityStatus(user))}
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="crate-form-field">
+                        <h2 className="break-words font-display text-base font-semibold text-text-main">
+                          {user.name || user.email}
+                        </h2>
+                        <span className="break-all text-xs text-text-muted">
+                          {user.email}
                         </span>
-                      ) : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        {rolesForUser(user).map((role) => (
+                          <Badge key={role} variant="outline">
+                            {roleLabel(role)}
+                          </Badge>
+                        ))}
+                        {user.username ? (
+                          <span className="break-all font-mono text-[10px] text-text-subtle">
+                            @{user.username}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
-                  </td>
-                  <td className="hidden py-4 pr-3 align-top md:table-cell">
-                    <div className="space-y-2">
+                  </div>
+                  <div
+                    role="cell"
+                    className="flex flex-col items-end gap-1.5 lg:items-start"
+                  >
+                    <MonoLabel as="span" className="lg:hidden">
+                      Status
+                    </MonoLabel>
+                    <Badge
+                      variant="outline"
+                      className={statusBadgeClass(userStatus(user))}
+                    >
+                      {statusLabel(userStatus(user))}
+                    </Badge>
+                    {userActivityStatus(user) !== "active" ? (
+                      <span
+                        className={`text-xs ${activityBadgeClass(userActivityStatus(user))}`}
+                      >
+                        {activityLabel(userActivityStatus(user))}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div role="cell" className="col-span-2 min-w-0 lg:col-span-1">
+                    <MonoLabel as="span" className="lg:hidden">
+                      Presence
+                    </MonoLabel>
+                    <div className="mt-1.5 space-y-1.5 lg:mt-0">
                       <span className="flex items-center gap-2 text-text-main">
                         <span
                           aria-hidden="true"
@@ -1101,41 +1137,45 @@ export function Users() {
                         Seen {formatRelativeTimestamp(user.last_seen_at)}
                       </div>
                     </div>
-                  </td>
-                  <td className="py-4 align-top">
-                    <div className="flex flex-col items-end gap-2 lg:flex-row lg:justify-end">
+                  </div>
+                  <div
+                    role="cell"
+                    className="col-span-2 flex flex-wrap justify-end gap-2 lg:col-span-1"
+                  >
+                    <Button
+                      className="min-h-11"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openUserDetail(user)}
+                    >
+                      Inspect
+                    </Button>
+                    {canDeleteUsers ? (
                       <Button
                         className="min-h-11"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => openUserDetail(user)}
+                        onClick={() => setDeleteTarget(user)}
+                        disabled={userStatus(user) === "deleted"}
                       >
-                        Inspect
+                        Delete
                       </Button>
-                      {canDeleteUsers ? (
-                        <Button
-                          className="min-h-11"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteTarget(user)}
-                          disabled={userStatus(user) === "deleted"}
-                        >
-                          Delete
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
+                    ) : null}
+                  </div>
+                </div>
               ))}
               {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="py-10 text-center text-text-muted">
+                <div
+                  role="row"
+                  className="py-10 text-center text-sm text-text-muted"
+                >
+                  <span role="cell">
                     No users match the current search or filter.
-                  </td>
-                </tr>
+                  </span>
+                </div>
               ) : null}
-            </tbody>
-          </table>
+            </div>
+          </div>
 
           {filteredUsers.length > 0 && pageCount > 1 ? (
             <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
@@ -1462,7 +1502,7 @@ function UserDetailDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           data-overlay-size={undefined}
-          className="flex max-h-[90vh] max-w-none flex-col overflow-hidden"
+          className="flex max-h-[90vh] max-w-7xl flex-col overflow-hidden"
         >
           <DialogHeader>
             <DialogTitle className="font-display">User Detail</DialogTitle>
@@ -1680,7 +1720,7 @@ function UserDetailDialog({
 
                 <Card className="border-white/10 bg-panel-surface">
                   <CardHeader>
-                    <CardTitle className="font-sans text-base text-white">
+                    <CardTitle className="font-display text-base text-white">
                       Presence
                     </CardTitle>
                     <CardDescription>
@@ -1722,7 +1762,7 @@ function UserDetailDialog({
 
                 <Card className="border-white/10 bg-panel-surface">
                   <CardHeader>
-                    <CardTitle className="font-sans text-base text-white">
+                    <CardTitle className="font-display text-base text-white">
                       Access & session footprint
                     </CardTitle>
                     <CardDescription>
@@ -1884,7 +1924,7 @@ function UserDetailDialog({
                 <CardHeader>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <CardTitle className="font-sans text-base text-white">
+                      <CardTitle className="font-display text-base text-white">
                         Sessions
                       </CardTitle>
                       <CardDescription>
@@ -2281,7 +2321,7 @@ function AddUserDialog({
           </div>
           {canAssignRoles ? (
             <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-              <div className=" text-[11px] uppercase tracking-[0.12em] text-white/30">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-white/30 font-mono">
                 Roles
               </div>
               <RolePicker value={roles} onChange={setRoles} />

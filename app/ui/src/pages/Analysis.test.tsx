@@ -9,6 +9,9 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Analysis } from "./Analysis";
 vi.mock("@/contexts/OpsSnapshotContext", () => ({ useOpsSnapshot: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/components/SmartMixCoverage", () => ({
+  SmartMixCoverage: () => <div>Smart Mix coverage sample</div>,
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const refresh = vi.fn(async () => {});
 function snapshot(overrides: Partial<ReturnType<typeof useOpsSnapshot>> = {}) {
@@ -105,7 +108,7 @@ describe("Analysis typographic controls", () => {
       );
     for (const field of container.querySelectorAll(".crate-form-field")) {
       expect(field.children[0]).toHaveClass("font-mono", "font-normal");
-      expect(field.children[1]).toHaveClass("font-display", "tabular-nums");
+      expect(field.children[1]).toHaveClass("font-mono", "tabular-nums");
     }
     const latest = screen.getByRole("article", {
       name: "Last audio fingerprint",
@@ -124,6 +127,21 @@ describe("Analysis typographic controls", () => {
     });
     expect(loading).toHaveAttribute("aria-busy", "true");
     expect(loading.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+  it("keeps the last analysis snapshot visible when a refresh fails", async () => {
+    snapshot({ error: "Snapshot refresh failed" });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Analysis />);
+
+    expect(
+      screen.getByText(
+        "Analysis status could not refresh. Showing the last successful snapshot.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("1,200 tracks")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refresh).toHaveBeenCalledWith(true);
   });
   it("keeps named header actions and text coverage, sections and recent outputs", () => {
     const { container } = renderWithAdminProviders(<Analysis />);

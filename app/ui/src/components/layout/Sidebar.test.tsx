@@ -29,6 +29,7 @@ describe("Sidebar", () => {
         <Sidebar presentation={mode === "drawer" ? "drawer" : "rail"} />,
       );
       const nav = screen.getByRole("navigation", { name: "Admin navigation" });
+      expect(nav).toHaveClass("overflow-y-auto");
       for (const link of within(nav).getAllByRole("link")) {
         expect(link.querySelector(".crate-mono-label")).toHaveClass(
           "font-mono",
@@ -43,11 +44,8 @@ describe("Sidebar", () => {
         "uppercase",
         "text-accent-action-hi",
       );
-      expect(
-        screen
-          .getByRole("button", { name: "Logout" })
-          .querySelector(".crate-mono-label"),
-      ).toHaveClass("uppercase");
+      expect(screen.queryByRole("button", { name: "Logout" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Admin profile" })).toBeNull();
     },
   );
   it("keeps library destinations without the retired Timeline page", () => {
@@ -81,7 +79,6 @@ describe("Sidebar", () => {
   it("keeps complete text destinations, callbacks and user actions in the compact rail", async () => {
     const user = userEvent.setup(),
       onNavigate = vi.fn(),
-      logout = vi.fn(),
       sync = vi.fn();
     window.addEventListener(SIDEBAR_EVENT, sync);
     const { container } = renderWithAdminProviders(
@@ -89,7 +86,7 @@ describe("Sidebar", () => {
         <Sidebar onNavigate={onNavigate} />
         <Location />
       </>,
-      { auth: { ...only("admin.access"), logout } },
+      { auth: only("admin.access") },
     );
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
     expect(localStorage.getItem(SIDEBAR_KEY)).toBe("false");
@@ -97,17 +94,11 @@ describe("Sidebar", () => {
     const link = screen.getByRole("link", { name: "Translations" });
     expect(link).toHaveTextContent("Translations");
     expect(container.querySelectorAll("nav svg")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Logout" })).toHaveTextContent(
-      "Logout",
-    );
-    expect(
-      screen.getByRole("link", { name: "Admin profile" }),
-    ).toHaveTextContent("Admin");
+    expect(screen.queryByRole("button", { name: "Logout" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Admin profile" })).toBeNull();
     await user.click(link);
     expect(onNavigate).toHaveBeenCalledOnce();
     expect(screen.getByLabelText("Current route")).toHaveTextContent("/i18n");
-    await user.click(screen.getByRole("button", { name: "Logout" }));
-    expect(logout).toHaveBeenCalledOnce();
     await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
     expect(localStorage.getItem(SIDEBAR_KEY)).toBe("true");
     window.removeEventListener(SIDEBAR_EVENT, sync);

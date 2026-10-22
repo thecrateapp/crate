@@ -31,13 +31,13 @@ function BeforeAfter({
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
       <div className="min-w-0 rounded-md border border-white/8 bg-black/10 p-3">
-        <dt className="text-[11px] uppercase tracking-[0.12em] text-white/40">
+        <dt className="text-[11px] uppercase tracking-[0.12em] text-white/40 font-mono">
           Current
         </dt>
         <dd className="mt-1 text-sm text-white/70">{current}</dd>
       </div>
       <div className="min-w-0 rounded-md border border-cyan-400/20 bg-cyan-400/[0.06] p-3">
-        <dt className="flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70">
+        <dt className="flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70 font-mono">
           <ArrowRight aria-hidden="true" className="size-3" />
           Proposed
         </dt>
@@ -224,7 +224,7 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
           >
             <div className="space-y-1">
               {view.numbered ? (
-                <p className="text-[11px] uppercase tracking-[0.12em] text-white/40">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-white/40 font-mono">
                   Change {view.number}
                 </p>
               ) : null}

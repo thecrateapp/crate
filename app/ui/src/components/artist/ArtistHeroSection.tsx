@@ -248,7 +248,7 @@ export function ArtistHeroSection({
               <span className="text-white/60">{artistName}</span>
             </div>
 
-            <h1 className="text-2xl md:text-5xl font-black tracking-tight text-white leading-none mb-2 truncate">
+            <h1 className="text-2xl md:text-5xl font-black tracking-tight text-white leading-none mb-2 truncate font-display">
               {artistName}
             </h1>
 
@@ -327,9 +327,9 @@ export function ArtistHeroSection({
             {popularityScore > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs text-white/40">Popularity</span>
-                <div className="w-[60px] h-1.5 bg-white/10 rounded-md overflow-hidden">
+                <div className="w-[60px] h-px bg-white/10 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-md"
+                    className="h-full rounded-full"
                     style={{
                       width: `${popularityScore}%`,
                       background: "linear-gradient(90deg, #06b6d433, #06b6d4)",

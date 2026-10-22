@@ -115,6 +115,28 @@ describe("Users", () => {
     expect(screen.getByText("user-21@example.com")).toBeInTheDocument();
   });
 
+  it("keeps each user readable in the responsive directory and retries a failed load", async () => {
+    const user = userEvent.setup();
+    apiMock.mockRejectedValueOnce(new Error("temporary failure"));
+
+    render(
+      <MemoryRouter>
+        <Users />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "user directory could not be loaded",
+    );
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(
+      await screen.findByText("Showing 1-20 of 21 users"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getAllByText("Offline").length).toBeGreaterThan(0);
+  });
+
   it("does not report an aborted user detail request as a failure", async () => {
     const user = userEvent.setup();
     let detailSignal: AbortSignal | undefined;

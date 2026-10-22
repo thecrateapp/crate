@@ -258,7 +258,7 @@ function FeatureArea({
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="space-y-3">
-      <h3 id={headingId} className="text-sm font-semibold text-white/80">
+      <h3 id={headingId} className="text-sm font-semibold text-white/80 font-display">
         {featureAreaLabel(area)}
       </h3>
       <ul role="list" className="divide-y divide-white/8">

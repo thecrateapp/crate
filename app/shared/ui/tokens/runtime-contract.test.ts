@@ -117,6 +117,19 @@ describe("runtime token bridge", () => {
     expect(typography).toContain("--text-counter--line-height: 1");
   });
 
+  it("keeps progress and meter rails at one pixel", () => {
+    const recipes = readTokenFile("recipes.css");
+
+    expect(recipes).toMatch(
+      /\.crate-progress-hairline\s*\{[^}]*height:\s*1px/s,
+    );
+    expect(recipes).toMatch(/\.crate-meter-track\s*\{[^}]*height:\s*1px/s);
+    expect(recipes).toMatch(
+      /\.stats-digging-progress span\s*\{[^}]*height:\s*1px/s,
+    );
+    expect(recipes).not.toMatch(/\.crate-(?:progress-hairline|meter-track)\[data-thickness=/);
+  });
+
   it("keeps the legacy focus utility bridge without a redundant semantic alias", () => {
     const semantic = readTokenFile("semantic.css");
 

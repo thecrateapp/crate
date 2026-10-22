@@ -1,8 +1,9 @@
+import { AdminPageHeader } from "@/components/admin/ops-surfaces";
 import { PageHeaderLayout } from "@/components/layout/PageHeader";
-import { useEffect, useMemo, useState } from "react";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { api } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Badge } from "@crate/ui/shadcn/badge";
+import { Button } from "@crate/ui/shadcn/button";
 import {
   Card,
   CardContent,
@@ -10,7 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@crate/ui/shadcn/card";
-import { api } from "@/lib/api";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 interface RolePreset {
   slug: string;
@@ -28,129 +30,242 @@ function capabilityGroup(capability: string) {
   return capability.split(".")[0] || "other";
 }
 
+function groupCapabilities(capabilities: string[]) {
+  const groups = new Map<string, string[]>();
+  for (const capability of capabilities) {
+    const group = capabilityGroup(capability);
+    groups.set(group, [...(groups.get(group) ?? []), capability]);
+  }
+  return [...groups.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
+}
+
 export function Roles() {
   const [data, setData] = useState<RolesPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    api<RolesPayload>("/api/auth/roles")
-      .then(setData)
-      .finally(() => setLoading(false));
+  const loadRoles = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const payload = await api<RolesPayload>("/api/auth/roles");
+      setData(payload);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const groupedCapabilities = useMemo(() => {
-    const groups = new Map<string, string[]>();
-    for (const capability of data?.capabilities ?? []) {
-      const group = capabilityGroup(capability);
-      groups.set(group, [...(groups.get(group) ?? []), capability]);
-    }
-    return [...groups.entries()].sort(([left], [right]) =>
-      left.localeCompare(right),
-    );
-  }, [data?.capabilities]);
+  useEffect(() => {
+    void loadRoles();
+  }, [loadRoles]);
+
+  const groupedCapabilities = useMemo(
+    () => groupCapabilities(data?.capabilities ?? []),
+    [data?.capabilities],
+  );
+  const roles = data?.roles ?? [];
+  const capabilities = data?.capabilities ?? [];
 
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+      <AdminPageHeader>
         <PageHeaderLayout>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
-              Roles & Permissions
+              Roles &amp; Permissions
             </h1>
             <p className="text-sm text-white/55">
-              System role presets mapped to explicit backend capabilities.
+              Compare the system presets against the capabilities they grant.
             </p>
           </div>
         </PageHeaderLayout>
-      </section>
+      </AdminPageHeader>
 
-      <Card className="border-white/10 bg-panel-surface">
-        <CardHeader>
-          <CardTitle className="font-sans">Role presets</CardTitle>
-          <CardDescription>
-            These presets are code-defined for now. Custom role editing can come
-            later without changing the authorization model.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div
-              role="status"
-              aria-label="Loading roles"
-              className="py-12 text-sm text-white/45"
-            >
-              Loading roles...
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {(data?.roles ?? []).map((role) => (
-                <div
-                  key={role.slug}
-                  className="rounded-md border border-white/8 bg-black/15 p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="crate-form-field min-w-0">
-                      <div className="font-sans text-lg font-semibold text-white">
-                        {role.name}
-                      </div>
-                      <MonoLabel as="div" className="break-all text-white/35">
-                        {role.slug}
-                      </MonoLabel>
-                    </div>
-                    <Badge variant="outline">
-                      {role.capabilities.length} capabilities
-                    </Badge>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    {role.capabilities.map((capability) => (
-                      <Badge
-                        key={capability}
-                        variant="secondary"
-                        className="max-w-full"
-                      >
-                        {capability}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-white/10 bg-panel-surface">
-        <CardHeader>
-          <CardTitle className="font-sans">Capability catalog</CardTitle>
-          <CardDescription>
-            The backend primitive is the capability. Roles are just readable
-            presets over this list.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {groupedCapabilities.map(([group, capabilities]) => (
-            <div
-              key={group}
-              className="crate-form-field min-w-0 rounded-md border border-white/8 bg-black/15 p-4"
-            >
-              <MonoLabel as="div" className="text-accent-action-hi">
-                {group}
+      {loading ? (
+        <Card className="border-white/10 bg-panel-surface">
+          <CardContent
+            role="status"
+            aria-label="Loading roles"
+            className="py-12 text-sm text-text-muted"
+          >
+            Loading role presets and capabilities...
+          </CardContent>
+        </Card>
+      ) : loadError ? (
+        <Card className="border-white/10 bg-panel-surface">
+          <CardContent className="flex flex-col items-start gap-4 py-8">
+            <div>
+              <MonoLabel as="h2" tone="accent">
+                Permissions unavailable
               </MonoLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {capabilities.map((capability) => (
-                  <Badge
-                    key={capability}
-                    variant="outline"
-                    className="max-w-full text-white/68"
-                  >
-                    {capability}
-                  </Badge>
-                ))}
+              <p role="alert" className="mt-2 text-sm text-text-muted">
+                The role and capability catalog could not be loaded.
+              </p>
+            </div>
+            <Button
+              className="min-h-11"
+              variant="outline"
+              onClick={() => void loadRoles()}
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <section aria-labelledby="role-presets-heading" className="space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <MonoLabel as="h2" id="role-presets-heading" tone="accent">
+                  Preset roles
+                </MonoLabel>
+                <p className="mt-2 text-sm text-text-muted">
+                  These presets are defined by the system. Role editing is not
+                  available here.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <InfoBadge>{roles.length} roles</InfoBadge>
+                <InfoBadge>{capabilities.length} capabilities</InfoBadge>
               </div>
             </div>
-          ))}
-        </CardContent>
-      </Card>
+
+            {roles.length > 0 ? (
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {roles.map((role) => (
+                  <article
+                    key={role.slug}
+                    className="min-w-0 border-t border-border-quiet px-1 py-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="break-words font-display text-base font-semibold text-text-primary">
+                          {role.name}
+                        </h3>
+                        <MonoLabel as="div" className="mt-1 break-all">
+                          {role.slug}
+                        </MonoLabel>
+                      </div>
+                      <InfoBadge className="shrink-0">
+                        {role.capabilities.length} grants
+                      </InfoBadge>
+                    </div>
+                    <p className="mt-3 text-xs text-text-muted">
+                      {role.system ? "System preset" : "Custom role"}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="border-t border-border-quiet py-6 text-sm text-text-muted">
+                No role presets are currently defined.
+              </div>
+            )}
+          </section>
+
+          <Card className="border-white/10 bg-panel-surface">
+            <CardHeader>
+              <CardTitle className="font-display">Capability matrix</CardTitle>
+              <CardDescription>
+                Each row is a backend capability. The columns show which presets
+                include it; this catalog is read-only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {groupedCapabilities.length > 0 && roles.length > 0 ? (
+                <>
+                  <p className="text-xs text-text-muted lg:hidden">
+                    Scroll horizontally to compare every role.
+                  </p>
+                  {groupedCapabilities.map(([group, grouped]) => (
+                    <section
+                      key={group}
+                      aria-labelledby={`capability-group-${group}`}
+                      className="min-w-0"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <MonoLabel
+                          as="h3"
+                          id={`capability-group-${group}`}
+                          tone="accent"
+                        >
+                          {group}
+                        </MonoLabel>
+                        <InfoBadge>{grouped.length} capabilities</InfoBadge>
+                      </div>
+                      <div className="max-w-full overflow-x-auto rounded-md border border-border-quiet">
+                        <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
+                          <caption className="sr-only">
+                            {group} capabilities by role
+                          </caption>
+                          <thead className="bg-raised-surface text-text-subtle">
+                            <tr>
+                              <th
+                                scope="col"
+                                className="sticky left-0 z-10 min-w-56 border-b border-border-quiet bg-raised-surface px-3 py-3 font-mono text-[10px] uppercase tracking-[0.12em]"
+                              >
+                                Capability
+                              </th>
+                              {roles.map((role) => (
+                                <th
+                                  key={role.slug}
+                                  scope="col"
+                                  className="min-w-28 border-b border-border-quiet px-3 py-3 text-center font-mono text-[10px] uppercase tracking-[0.12em]"
+                                >
+                                  {role.name}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {grouped.map((capability) => (
+                              <tr
+                                key={capability}
+                                className="border-b border-border-quiet-subtle last:border-0"
+                              >
+                                <th
+                                  scope="row"
+                                  className="sticky left-0 bg-card px-3 py-3 text-left font-mono text-xs font-normal text-text-primary"
+                                >
+                                  {capability}
+                                </th>
+                                {roles.map((role) => {
+                                  const granted =
+                                    role.capabilities.includes(capability);
+                                  return (
+                                    <td
+                                      key={role.slug}
+                                      className="px-3 py-3 text-center"
+                                    >
+                                      <span
+                                        className={`font-mono text-[10px] uppercase tracking-[0.08em] ${granted ? "text-accent-action-hi" : "text-text-subtle"}`}
+                                      >
+                                        {granted ? "Yes" : "—"}
+                                      </span>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  ))}
+                </>
+              ) : (
+                <div className="border-t border-border-quiet py-6 text-sm text-text-muted">
+                  No capability data is available for this role catalog.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

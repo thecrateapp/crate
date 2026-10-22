@@ -4,7 +4,51 @@ import { cleanup, render, screen } from "@testing-library/react";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { OpsPageHero, OpsPanel, OpsStatTile } from "./ops-surfaces";
+import {
+  AdminPageHeader,
+  OpsPageHero,
+  OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
+  OpsStatTile,
+  OpsSurface,
+} from "./ops-surfaces";
+
+describe("operational snapshot status", () => {
+  it("distinguishes freshness from a reconnecting stream", () => {
+    render(
+      <OpsSnapshotStatus
+        snapshot={{ stale: true, built_at: "2026-10-22T09:30:00Z" }}
+        streamStatus="reconnecting"
+      />,
+    );
+
+    expect(screen.getByText("Snapshot stale")).toHaveAttribute(
+      "data-tone",
+      "warning",
+    );
+    expect(screen.getByText("Reconnecting")).toHaveAttribute(
+      "data-tone",
+      "warning",
+    );
+  });
+
+  it("offers an accessible retry action while keeping the last snapshot notice", async () => {
+    const retry = vi.fn();
+    render(
+      <OpsRefreshNotice
+        message="Could not refresh. Showing the last successful snapshot."
+        onRetry={retry}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Showing the last successful snapshot.");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+});
 
 describe("OpsStatTile status colours", () => {
   it.each([
@@ -49,7 +93,7 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     "uppercase",
   );
   expect(screen.getByText("Tracks")).toHaveClass("font-mono", "font-normal");
-  expect(screen.getByText("1,200")).toHaveClass("font-display", "tabular-nums");
+  expect(screen.getByText("1,200")).toHaveClass("font-mono", "tabular-nums");
   expect(screen.getByText("Body copy")).not.toHaveClass(
     "font-display",
     "font-mono",
@@ -57,6 +101,68 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
 });
 
 describe("Admin operational surfaces without decorative glyphs", () => {
+  it("gives nested status cards one opaque surface while keeping semantic tones", () => {
+    render(
+      <>
+        <OpsSurface aria-label="Worker service">Worker</OpsSurface>
+        <OpsSurface
+          as="article"
+          aria-label="Health score"
+          className="border-state-warning/25 bg-state-warning/[0.08] p-4"
+        >
+          Degraded
+        </OpsSurface>
+      </>,
+    );
+    const worker = screen.getByText("Worker");
+    const health = screen.getByRole("article", { name: "Health score" });
+    expect(worker).toHaveClass(
+      "border-border-quiet",
+      "bg-raised-surface",
+      "shadow-none",
+    );
+    expect(health).toHaveClass(
+      "border-state-warning/25",
+      "bg-state-warning/[0.08]",
+      "shadow-none",
+    );
+    for (const surface of [worker, health])
+      expect(surface.className).not.toMatch(/backdrop-blur|bg-black\//);
+  });
+
+  it("keeps page headers open while data cards remain solid", () => {
+    const { container } = render(
+      <>
+        <OpsPageHero title="Tasks" description="Background jobs" />
+        <OpsStatTile label="Queued" value="3" />
+      </>,
+    );
+    const [hero, tile] = Array.from(container.children);
+    expect(hero).toHaveAttribute("data-slot", "admin-page-header-container");
+    expect(hero).toHaveClass("min-w-0");
+    expect(hero?.className).not.toMatch(/border|bg-|shadow|p-5/);
+    expect(tile).toHaveClass(
+      "border-border-quiet",
+      "bg-raised-surface",
+      "shadow-none",
+    );
+    for (const surface of [hero!, tile!])
+      expect(surface.className).not.toMatch(/backdrop-blur|bg-black\//);
+  });
+
+  it("provides one unboxed header wrapper for legacy page headers", () => {
+    render(
+      <AdminPageHeader className="custom-header" aria-label="Page heading">
+        <h1>Settings</h1>
+      </AdminPageHeader>,
+    );
+    const header = screen.getByLabelText("Page heading");
+    expect(header).toHaveAttribute("data-slot", "admin-page-header-container");
+    expect(header).toHaveClass("min-w-0", "custom-header");
+    expect(header.className).not.toMatch(/border|bg-|shadow|p-5/);
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeVisible();
+  });
+
   it("uses the shared named ruled panel with associated description", () => {
     render(
       <OpsPanel

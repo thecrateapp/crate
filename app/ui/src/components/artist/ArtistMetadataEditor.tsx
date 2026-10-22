@@ -165,7 +165,7 @@ export function ArtistMetadataEditor({
       <Dialog open={open} onOpenChange={closeEditor}>
         <DialogContent className="flex max-h-[min(92dvh,960px)] max-w-3xl flex-col overflow-hidden">
           <DialogHeader className="shrink-0">
-            <DialogTitle>Edit artist metadata</DialogTitle>
+            <DialogTitle className="font-display">Edit artist metadata</DialogTitle>
             <DialogDescription>
               Update descriptive library metadata for {artist.name}. Audio files
               are not modified by this action.
@@ -201,7 +201,7 @@ export function ArtistMetadataEditor({
 
             <section className="crate-form-field">
               <div>
-                <h3 className="text-sm font-medium text-white/75">Genres</h3>
+                <h3 className="text-sm font-medium text-white/75 font-display">Genres</h3>
                 <p className="mt-1 text-xs text-white/40">
                   Choose canonical taxonomy genres. Provider tags remain stored
                   separately.
@@ -215,7 +215,7 @@ export function ArtistMetadataEditor({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-medium text-white/75">Identity</h3>
+              <h3 className="text-sm font-medium text-white/75 font-display">Identity</h3>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="crate-form-field text-sm">
                   <span
@@ -324,7 +324,7 @@ export function ArtistMetadataEditor({
 
             <section className="crate-form-field">
               <div>
-                <h3 className="text-sm font-medium text-white/75">
+                <h3 className="text-sm font-medium text-white/75 font-display">
                   External links
                 </h3>
                 <p className="mt-1 text-xs text-white/40">

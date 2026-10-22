@@ -13,7 +13,7 @@ export function ImpactSummary({ impact }: { impact: Record<string, unknown> }) {
     <section aria-labelledby={headingId} className="space-y-2">
       <h3
         id={headingId}
-        className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
+        className="text-xs font-normal uppercase tracking-[0.12em] text-white/40 font-mono"
       >
         Impact
       </h3>

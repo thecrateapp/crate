@@ -70,7 +70,7 @@ export function ArtistArtworkSection({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-foreground">Artwork</h2>
+          <h2 className="text-2xl font-semibold text-foreground font-display">Artwork</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Manage each artist image by its intended surface and aspect ratio.
           </p>
@@ -163,7 +163,7 @@ function ArtworkCard({
   return (
     <section className="rounded-md border border-border bg-card/55 p-4">
       <div className="mb-3">
-        <h3 className="font-medium text-foreground">{title}</h3>
+        <h3 className="font-medium text-foreground font-display">{title}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="group/cover relative overflow-hidden rounded-md border border-border bg-black/40">

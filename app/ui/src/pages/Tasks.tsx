@@ -27,7 +27,10 @@ import { toast } from "sonner";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
   OpsStatTile,
+  type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -118,6 +121,15 @@ interface DbHeavyGate {
 }
 
 interface TasksSnapshotData {
+  snapshot: {
+    scope: string;
+    subject_key: string;
+    version: number;
+    built_at?: string | null;
+    stale_after?: string | null;
+    stale: boolean;
+    generation_ms: number;
+  };
   live: {
     engine?: string;
     running_tasks: Array<{
@@ -635,8 +647,19 @@ function TaskDoneBanner({
   );
 }
 
-function LiveTaskEvents({ taskId }: { taskId: string }) {
-  const { events, connected, done } = useTaskEvents(taskId);
+type TaskEventViewState = Pick<
+  ReturnType<typeof useTaskEvents>,
+  "events" | "connected" | "done"
+>;
+
+function LiveTaskEvents({
+  taskId,
+  stream,
+}: {
+  taskId: string;
+  stream: TaskEventViewState;
+}) {
+  const { events, connected, done } = stream;
 
   if (events.length === 0) {
     if (done) {
@@ -1201,7 +1224,8 @@ function ActiveTaskCard({
   onExpand: () => void;
   onCancel: () => void;
 }) {
-  const { events, done } = useTaskEvents(task.id);
+  const taskEventStream = useTaskEvents(task.id);
+  const { events, done } = taskEventStream;
   const liveStatus = done?.status || task.status;
   const status = getStatusMeta(liveStatus);
   const Icon = status.icon;
@@ -1293,7 +1317,7 @@ function ActiveTaskCard({
 
       {expanded && (liveStatus === "running" || Boolean(done)) ? (
         <div className="mt-4 border-t border-white/8 pt-3">
-          <LiveTaskEvents taskId={task.id} />
+          <LiveTaskEvents taskId={task.id} stream={taskEventStream} />
         </div>
       ) : null}
     </div>
@@ -1425,7 +1449,7 @@ function HistoryTaskRow({
 
           {task.params && Object.keys(task.params).length > 0 ? (
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/35">
+              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
                 Params
               </div>
               <pre className="overflow-x-auto rounded-sm border border-white/6 bg-black/20 p-3 text-xs text-white/60">
@@ -1436,7 +1460,7 @@ function HistoryTaskRow({
 
           {task.error ? (
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-state-warning-text">
+              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-state-warning-text font-mono">
                 Error
               </div>
               <pre className="overflow-x-auto rounded-sm border border-state-warning/12 bg-state-warning/[0.05] p-3 text-xs text-state-warning-text">
@@ -1447,7 +1471,7 @@ function HistoryTaskRow({
 
           {showHumanLog ? (
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/35">
+              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
                 Task log
               </div>
               <div className="rounded-sm border border-white/6 bg-black/20 px-3">
@@ -1456,7 +1480,7 @@ function HistoryTaskRow({
             </div>
           ) : task.result ? (
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/35">
+              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
                 Result
               </div>
               <pre className="max-h-[320px] overflow-auto rounded-sm border border-white/6 bg-black/20 p-3 text-xs text-white/60">
@@ -1483,6 +1507,8 @@ export function Tasks() {
   >(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
   const [searchParams] = useSearchParams();
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [filterFamily, setFilterFamily] = useState("all");
@@ -1560,11 +1586,13 @@ export function Tasks() {
       stream = new EventSource("/api/admin/tasks-stream?limit=100", {
         withCredentials: true,
       });
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as TasksSnapshotData;
           setTasksSnapshot(payload);
           setError(null);
+          setStreamStatus("live");
           setLoading(false);
           loadedRef.current = true;
         } catch {
@@ -1574,6 +1602,7 @@ export function Tasks() {
       stream.onerror = () => {
         stream?.close();
         stream = null;
+        setStreamStatus("reconnecting");
         if (!disposed) {
           reconnectTimerRef.current = window.setTimeout(connect, 5000);
         }
@@ -1943,7 +1972,18 @@ export function Tasks() {
             {stats.needsAttention} need attention
           </InfoBadge>
         ) : null}
+        <OpsSnapshotStatus
+          snapshot={tasksSnapshot?.snapshot}
+          streamStatus={streamStatus}
+        />
       </OpsPageHero>
+
+      {error && tasksSnapshot ? (
+        <OpsRefreshNotice
+          message="Could not refresh task orchestration. Showing the last successful snapshot."
+          onRetry={() => void fetchSnapshot(true)}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <OpsStatTile

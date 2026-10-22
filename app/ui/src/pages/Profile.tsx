@@ -92,7 +92,7 @@ export function Profile() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold mb-6">Profile</h1>
+      <h1 className="text-2xl font-bold mb-6 font-display">Profile</h1>
 
       {/* Profile info */}
       <div className="bg-card border border-border rounded-md p-6 mb-6">
@@ -163,7 +163,7 @@ export function Profile() {
 
       {/* Change password */}
       <div className="bg-card border border-border rounded-md p-6 mb-6">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
+        <h2 className="font-semibold mb-4 flex items-center gap-2 font-display">
           <Lock size={16} /> Change Password
         </h2>
         <form onSubmit={handleChangePassword} className="space-y-3">
@@ -197,7 +197,7 @@ export function Profile() {
 
       {/* Connected accounts */}
       <div className="bg-card border border-border rounded-md p-6">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
+        <h2 className="font-semibold mb-4 flex items-center gap-2 font-display">
           <Link2 size={16} /> Connected Accounts
         </h2>
 

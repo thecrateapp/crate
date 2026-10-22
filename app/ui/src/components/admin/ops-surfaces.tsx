@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
-import { PageHeaderLayout } from "@/components/layout/PageHeader";
+import type { ComponentProps, ReactNode } from "react";
+import { PageHeaderLayout } from "../layout/PageHeader";
 
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { Button } from "@crate/ui/shadcn/button";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
@@ -37,10 +39,10 @@ export function OpsPageHero({
   const identity = (
     <div className="space-y-4">
       <div>
-        <h1 className="font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
+        <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
           {title}
         </h1>
-        <p className="text-sm text-white/55">{description}</p>
+        <p className="mt-3 text-sm text-white/55">{description}</p>
       </div>
       {children ? (
         <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -48,12 +50,7 @@ export function OpsPageHero({
     </div>
   );
   return (
-    <section
-      className={cn(
-        "rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl",
-        className,
-      )}
-    >
+    <AdminPageHeader className={className}>
       {compactActions ? (
         <PageHeaderLayout actions={actions}>{identity}</PageHeaderLayout>
       ) : (
@@ -66,7 +63,20 @@ export function OpsPageHero({
           ) : null}
         </div>
       )}
-    </section>
+    </AdminPageHeader>
+  );
+}
+
+export function AdminPageHeader({
+  className,
+  ...props
+}: ComponentProps<"header">) {
+  return (
+    <header
+      {...props}
+      data-slot="admin-page-header-container"
+      className={cn("min-w-0", className)}
+    />
   );
 }
 
@@ -86,7 +96,7 @@ export function OpsStatTile({
   return (
     <div
       className={cn(
-        "@container rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
+        "@container rounded-md border border-border-quiet bg-raised-surface p-4 shadow-none",
         className,
       )}
     >
@@ -94,7 +104,7 @@ export function OpsStatTile({
         <MonoLabel as="div">{label}</MonoLabel>
         <div
           className={cn(
-            "font-display text-numeral-md font-bold leading-none tabular-nums",
+            "font-mono text-numeral-md font-normal leading-none tabular-nums",
             valueToneClass(tone),
           )}
         >
@@ -105,6 +115,26 @@ export function OpsStatTile({
         <div className="mt-1 text-xs text-white/40">{caption}</div>
       ) : null}
     </div>
+  );
+}
+
+type OpsSurfaceProps = ComponentProps<"div"> & {
+  as?: "article" | "div";
+};
+
+export function OpsSurface({
+  as: Element = "div",
+  className,
+  ...props
+}: OpsSurfaceProps) {
+  return (
+    <Element
+      {...props}
+      className={cn(
+        "min-w-0 rounded-md border border-border-quiet bg-raised-surface shadow-none",
+        className,
+      )}
+    />
   );
 }
 
@@ -132,5 +162,87 @@ export function OpsPanel({
     >
       {children}
     </InstrumentPanel>
+  );
+}
+
+export type OpsStreamStatus = "connecting" | "live" | "reconnecting" | "paused";
+
+export function OpsSnapshotStatus({
+  snapshot,
+  streamStatus,
+}: {
+  snapshot: { stale?: boolean; built_at?: string | null } | null | undefined;
+  streamStatus: OpsStreamStatus;
+}) {
+  const freshnessLabel = snapshot?.stale
+    ? "Snapshot stale"
+    : "Snapshot current";
+  const freshnessTitle = snapshot?.built_at
+    ? `Snapshot built ${new Date(snapshot.built_at).toLocaleString()}`
+    : undefined;
+  const streamLabel = {
+    connecting: "Connecting",
+    live: "Live updates",
+    reconnecting: "Reconnecting",
+    paused: "Live updates paused",
+  }[streamStatus];
+
+  return (
+    <>
+      {snapshot ? (
+        <InfoBadge
+          tone={snapshot.stale ? "warning" : "neutral"}
+          title={freshnessTitle}
+        >
+          {freshnessLabel}
+        </InfoBadge>
+      ) : null}
+      <InfoBadge
+        tone={
+          streamStatus === "live"
+            ? "success"
+            : streamStatus === "reconnecting"
+              ? "warning"
+              : "neutral"
+        }
+      >
+        {streamLabel}
+      </InfoBadge>
+    </>
+  );
+}
+
+export function OpsRefreshNotice({
+  message,
+  onRetry,
+  retrying = false,
+  className,
+}: {
+  message: string;
+  onRetry: () => void;
+  retrying?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      data-slot="ops-refresh-notice"
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-3 rounded-md border border-state-warning/25 bg-state-warning/[0.06] px-4 py-3 text-sm text-text-secondary",
+        className,
+      )}
+    >
+      <span>{message}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="min-h-11"
+        onClick={onRetry}
+        disabled={retrying}
+        aria-busy={retrying || undefined}
+      >
+        {retrying ? "Retrying" : "Retry"}
+      </Button>
+    </div>
   );
 }

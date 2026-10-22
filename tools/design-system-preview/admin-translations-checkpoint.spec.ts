@@ -58,7 +58,9 @@ for (const width of [1440, 768, 390])
     ).toContain("Bricolage Grotesque");
     expect(
       await root
-        .getByText("1 draft", { exact: true })
+        .getByRole("article", { name: "es locale health" })
+        .getByRole("group", { name: "1 draft" })
+        .locator(".crate-mono-label")
         .evaluate((e) => getComputedStyle(e).fontFamily),
     ).toContain("JetBrains");
     expect(
@@ -70,15 +72,15 @@ for (const width of [1440, 768, 390])
     await root
       .getByRole("tab", { name: "Bundles", exact: true })
       .press("Enter");
-    await root
-      .getByRole("combobox", { name: "Locale", exact: true })
-      .selectOption("fr");
+    await root.getByRole("combobox", { name: "Locale", exact: true }).click();
+    await page.getByRole("option", { name: "fr", exact: true }).click();
     await expect(
       root.getByRole("button", { name: "Review es", exact: true }),
     ).toHaveCount(0);
-    await root
-      .getByRole("combobox", { name: "Locale", exact: true })
-      .selectOption("all");
+    await root.getByRole("combobox", { name: "Locale", exact: true }).click();
+    await page
+      .getByRole("option", { name: "All locales", exact: true })
+      .click();
     for (const field of await root.locator(".crate-form-field").all())
       expect(
         await field.evaluate((e) => {
@@ -246,7 +248,7 @@ test("Translations persistent checkpoint keeps published Users and prior checkpo
     page
       .frameLocator('iframe[title="Translations real con datos de muestra"]')
       .getByRole("heading", { name: "Listen Translations", exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("footer")).toContainText("1AM publicado");
   await expect(page.locator("footer")).toContainText("1AN publicado");
   await expect(

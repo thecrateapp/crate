@@ -70,3 +70,15 @@ it("updates the content offset when the sidebar preference event changes", () =>
   fireEvent(window, new Event("crate-admin-sidebar-changed"));
   expect(main).toHaveClass("md:ml-36");
 });
+
+it("uses a solid app surface for both fixed shell headers", () => {
+  const { container } = renderWithAdminProviders(<Shell />);
+  for (const slot of ["mobile-shell-header", "desktop-shell-header"]) {
+    const header = container.querySelector(`[data-admin-ux="${slot}"]`);
+    expect(header).toHaveClass("bg-app-surface");
+    expect(header).not.toHaveClass("backdrop-blur-xl");
+  }
+  expect(
+    screen.getAllByRole("button", { name: "Admin account menu" }),
+  ).toHaveLength(2);
+});

@@ -348,9 +348,34 @@ def test_portable_album_payload_contains_cached_lyrics_analysis_and_bliss(
         track_entity_uid=track_uid,
     )
 
+    sidecar_path = str(album_dir / ".crate" / "album.json")
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO album_portable_metadata (
+                    album_id, sidecar_path, sidecar_written_at,
+                    audio_tags_written_at, tracks, tags_written, tag_errors
+                )
+                VALUES (:album_id, :sidecar_path, NOW(), NOW(), 1, 1, 0)
+                """
+            ),
+            {"album_id": album_id, "sidecar_path": sidecar_path},
+        )
+
     payload = get_portable_album_payload(album_id)
+    payload_with_status = get_portable_album_payload(
+        album_id,
+        include_portable_status=True,
+    )
 
     assert payload is not None
+    assert payload_with_status is not None
+    assert "portable_metadata" not in payload
+    assert payload_with_status["portable_metadata"]["sidecar_path"] == sidecar_path
+    assert payload_with_status["portable_metadata"]["tracks"] == 1
+    assert payload_with_status["portable_metadata"]["tags_written"] == 1
+    assert payload_with_status["portable_metadata"]["tag_errors"] == 0
     track = payload["tracks"][0]
     assert str(payload["artist"]["entity_uid"]) == artist_uid
     assert str(payload["album"]["entity_uid"]) == album_uid

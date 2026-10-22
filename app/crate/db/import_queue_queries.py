@@ -14,13 +14,27 @@ from crate.db.tx import read_scope
 def list_import_queue_items(
     *, status: str | None = "pending", limit: int = 500
 ) -> list[dict[str, Any]]:
-    query = (
-        "SELECT source, path, artist, album, status, payload_json, discovered_at, updated_at "
-        "FROM import_queue_items "
-    )
+    query = """
+        SELECT queue.source, queue.path, queue.artist, queue.album, queue.status,
+               queue.payload_json, queue.discovered_at, queue.updated_at,
+               album.id AS dest_album_id
+        FROM import_queue_items AS queue
+        LEFT JOIN LATERAL (
+            SELECT id
+            FROM library_albums
+            WHERE path = COALESCE(
+                NULLIF(queue.payload_json->>'dest', ''),
+                NULLIF(queue.payload_json->>'dest_path', '')
+            )
+            ORDER BY id
+            LIMIT 1
+        ) AS album ON TRUE
+    """
     params: dict[str, Any] = {"limit": max(1, limit)}
-    if status is not None:
-        query += "WHERE status = :status "
+    if status == "completed":
+        query += "WHERE queue.status IN ('imported', 'merged') "
+    elif status is not None:
+        query += "WHERE queue.status = :status "
         params["status"] = status
     query += "ORDER BY updated_at DESC, discovered_at DESC LIMIT :limit"
 

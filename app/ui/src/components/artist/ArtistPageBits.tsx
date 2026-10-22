@@ -26,7 +26,7 @@ export function StatCard({
 export function PopularityBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-1">
-      <div className="w-[40px] h-1 bg-white/10 rounded-md overflow-hidden">
+      <div className="w-[40px] h-px bg-white/10 rounded-full overflow-hidden">
         <div
           className="h-full rounded-md"
           style={{

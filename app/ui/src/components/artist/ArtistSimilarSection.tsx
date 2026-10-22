@@ -26,7 +26,7 @@ export function ArtistSimilarSection({
   return (
     <div>
       <div className="bg-card border border-border rounded-md overflow-hidden mb-6">
-        <h4 className="text-sm font-semibold px-4 pt-4 pb-2">Artist Network</h4>
+        <h4 className="text-sm font-semibold px-4 pt-4 pb-2 font-display">Artist Network</h4>
         <ArtistNetworkGraph
           centerArtist={artistName}
           centerArtistId={artistId}

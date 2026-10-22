@@ -69,7 +69,7 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
 
   return (
     <section aria-label="Complete editorial details" className="space-y-4">
-      <h3 className="font-medium text-white">Editorial playlist content</h3>
+      <h3 className="font-medium text-white font-display">Editorial playlist content</h3>
       {selection.length > 0 ? (
         <Table>
           <TableCaption className="sr-only">

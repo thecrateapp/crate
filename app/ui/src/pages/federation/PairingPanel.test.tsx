@@ -8,6 +8,21 @@ import { PairingPanel } from "./PairingPanel";
 
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 
+it("uses matching input and action columns for probe and pairing", () => {
+  renderWithAdminProviders(<PairingPanel canManage onChanged={vi.fn()} />);
+
+  const probeInput = screen.getByLabelText("Probe URL");
+  const pairingInput = screen.getByLabelText("Pairing URL");
+  const probeRow = probeInput.parentElement;
+  const pairingRow = pairingInput.parentElement;
+
+  expect(probeRow).toHaveClass("grid-cols-[minmax(0,1fr)_5rem]");
+  expect(pairingRow).toHaveClass("grid-cols-[minmax(0,1fr)_5rem]");
+  expect(probeRow?.className).toBe(pairingRow?.className);
+  expect(probeRow?.querySelector("button")).toHaveClass("w-full");
+  expect(pairingRow?.querySelector("button")).toHaveClass("w-full");
+});
+
 it("starts pairing through the verified pairing endpoint", async () => {
   vi.mocked(api).mockResolvedValue({});
   renderWithAdminProviders(<PairingPanel canManage onChanged={vi.fn()} />);

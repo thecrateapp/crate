@@ -7,7 +7,9 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Stack } from "./Stack";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 let stream: {
+  onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
   close: ReturnType<typeof vi.fn>;
 };
 const created = vi.fn();
@@ -22,7 +24,7 @@ beforeEach(() => {
   created.mockClear();
   vi.stubGlobal("EventSource", function (url: string) {
     created(url);
-    stream = { onmessage: null, close: vi.fn() };
+    stream = { onopen: null, onmessage: null, onerror: null, close: vi.fn() };
     return stream;
   });
   vi.spyOn(window, "setTimeout");
@@ -41,12 +43,48 @@ describe("Stack typographic controls", () => {
       screen.getByRole("status", { name: "Loading stack services" }),
     ).toHaveAttribute("aria-busy", "true");
   });
+  it("does not turn a failed fetch into a false Docker-unavailable snapshot", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("network unavailable"));
+    renderWithAdminProviders(<Stack />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Failed to load Docker stack status",
+    );
+    expect(screen.queryByText("Docker unavailable")).not.toBeInTheDocument();
+  });
+  it("keeps the last stack snapshot visible when refresh fails and marks SSE recovery", async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path.includes("fresh=1")) throw new Error("network unavailable");
+      return path.includes("/logs?")
+        ? { name: "worker", logs: "Sample service log" }
+        : snapshot;
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("heading", { name: "Stack" });
+
+    act(() => stream.onerror?.(new Event("error")));
+    expect(screen.getByText("Reconnecting")).toHaveAttribute(
+      "data-tone",
+      "warning",
+    );
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Showing the last successful snapshot.",
+    );
+    expect(screen.getByText("Docker available")).toBeVisible();
+  });
   it("names service actions, removes redundant summary/refresh/restart glyphs and preserves UX", async () => {
     renderWithAdminProviders(<Stack />);
     await screen.findByRole("heading", { name: "Stack" });
     expect(
       screen.getByRole("button", { name: "Refresh" }).querySelector("svg"),
     ).toHaveAttribute("data-admin-ux", "header-refresh");
+    expect(screen.getByRole("article", { name: "Service worker" })).toHaveClass(
+      "border-border-quiet",
+      "bg-raised-surface",
+      "shadow-none",
+    );
     expect(screen.getByText("2/3 running").querySelector("svg")).toBeNull();
     expect(screen.getByText("1 public routes").querySelector("svg")).toBeNull();
     const restart = screen.getByRole("button", {

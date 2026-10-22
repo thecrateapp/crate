@@ -121,9 +121,7 @@ describe("Bandcamp text presentation and real contracts", () => {
       ).toHaveLength(1);
       await complete({ task_id: "sample-task" });
       await waitFor(() => expect(button).toBeEnabled());
-      expect(toast.success).toHaveBeenCalledWith(
-        `${label} queued (sample-task)`,
-      );
+      expect(toast.success).toHaveBeenCalledWith(`${label} queued`);
       expect(
         mockApi.mock.calls
           .filter(([, method]) => method !== "POST")

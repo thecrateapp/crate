@@ -62,7 +62,7 @@ function ScopeColumn({
   if (scopes.length === 0) return null;
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
         {title}
       </p>
       <div className="space-y-1.5">

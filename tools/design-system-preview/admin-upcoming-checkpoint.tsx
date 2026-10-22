@@ -4,7 +4,7 @@ export function AdminUpcomingCheckpoint() {
     <section
       id="proximamente-admin"
       className="admin-baseline-feature"
-      aria-label="Checkpoint 1AO, Upcoming de Admin"
+      aria-label="Checkpoint 1AO, Show Management de Admin"
     >
       <div className="specimen-heading">
         <div>
@@ -14,18 +14,16 @@ export function AdminUpcomingCheckpoint() {
           <h2>Lo que viene, por su nombre.</h2>
         </div>
         <p>
-          Lanzamientos y conciertos con sus datos y acciones reales. Calendario,
-          búsqueda, navegación, cierre y enlaces externos conservan sus glifos
-          de UX.
+          Shows en una superficie propia, con navegación por fecha, artista,
+          venue y setlists recientes para cada integrante del cartel.
         </p>
       </div>
       <p className="mt-6 text-sm text-text-muted">
-        Página real con datos ficticios. Conserva filtros, lista, calendario y
-        acciones. Los cambios se completan manualmente y son locales a esta
-        muestra.
+        Página real con datos ficticios. Permite revisar la cobertura de
+        setlists, abrir el detalle de cada show y probar acciones locales.
       </p>
       <iframe
-        title="Upcoming real con datos de muestra"
+        title="Show Management real con datos de muestra"
         src="./admin-upcoming-demo.html"
         className="mt-6 h-[1200px] w-full border border-border-quiet"
       />
@@ -35,7 +33,7 @@ export function AdminUpcomingCheckpoint() {
         rel="noreferrer"
         className="mt-4 inline-flex min-h-11 items-center text-sm underline"
       >
-        Abrir Upcoming en una pestaña
+        Abrir Show Management en una pestaña
       </a>
     </section>
   );

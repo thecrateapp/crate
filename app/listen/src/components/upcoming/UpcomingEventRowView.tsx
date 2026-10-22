@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
 import {
   MediaCover,
   type MediaCoverProps,
@@ -11,7 +10,10 @@ import {
   MoreHorizontal,
 } from "@crate/ui/icons";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { UpcomingEventRow } from "@crate/ui/domain/shows/UpcomingEventRow";
 import type { ActionMenuSlot } from "./UpcomingShowCardViewTypes";
+
+export { UpcomingEventRow };
 
 export function UpcomingEventArtwork({
   kind,
@@ -65,6 +67,7 @@ export function UpcomingEventRowView({
   href,
   openLabel,
   onToggle,
+  expanded,
 }: {
   artwork: ReactNode;
   details: ReactNode;
@@ -73,38 +76,18 @@ export function UpcomingEventRowView({
   href?: string | null;
   openLabel?: string;
   onToggle?: () => void;
+  expanded?: boolean;
 }) {
-  const content = (
-    <>
-      {artwork}
-      <span className="block min-w-0 flex-1 px-3 py-2.5">{details}</span>
-      {date}
-    </>
-  );
-  const identityClass =
-    "flex min-w-0 flex-1 items-center text-left crate-focus-inset";
   return (
-    <div
-      data-slot="upcoming-event-row"
-      className="flex min-h-[88px] min-w-0 items-center bg-surface-object"
-    >
-      {onToggle ? (
-        <button
-          type="button"
-          aria-expanded={false}
-          onClick={onToggle}
-          className={identityClass}
-        >
-          {content}
-        </button>
-      ) : href ? (
-        <Link to={href} aria-label={openLabel} className={identityClass}>
-          {content}
-        </Link>
-      ) : (
-        <div className={identityClass}>{content}</div>
-      )}
-      <div className="shrink-0">{actions}</div>
-    </div>
+    <UpcomingEventRow
+      artwork={artwork}
+      details={details}
+      date={date}
+      actions={actions}
+      href={href}
+      openLabel={openLabel}
+      onToggle={onToggle}
+      expanded={expanded}
+    />
   );
 }

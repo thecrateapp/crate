@@ -384,7 +384,7 @@ export function ProviderCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-medium text-white">{name}</h3>
+          <h3 className="font-medium text-white font-display">{name}</h3>
           <p className="text-sm text-white/50">
             {providerLabel(connection.provider)}
           </p>

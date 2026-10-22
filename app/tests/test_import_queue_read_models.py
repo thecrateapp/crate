@@ -69,6 +69,8 @@ class TestImportQueueReadModels:
             count_import_queue_items,
             list_import_queue_items,
             mark_import_queue_item_imported,
+            mark_import_queue_item_importing,
+            mark_import_queue_item_pending,
             refresh_import_queue_items,
             remove_import_queue_item,
         )
@@ -105,6 +107,55 @@ class TestImportQueueReadModels:
         assert current["album"] == f"Album {suffix}"
         assert current["track_count"] == 12
         assert current["formats"] == ["flac"]
+
+        claimed = mark_import_queue_item_importing(
+            source_path,
+            source="tidal",
+            task_id=f"import-{suffix}",
+        )
+        assert claimed is True
+        importing = next(
+            item
+            for item in list_import_queue_items(status="importing")
+            if item["source_path"] == source_path
+        )
+        assert importing["task_id"] == f"import-{suffix}"
+
+        # A filesystem rescan must not erase the live worker state.
+        refresh_import_queue_items(
+            [
+                {
+                    "source": "tidal",
+                    "source_path": source_path,
+                    "artist": f"Artist {suffix}",
+                    "album": f"Album {suffix}",
+                    "track_count": 12,
+                    "formats": ["flac"],
+                    "total_size_mb": 512,
+                    "dest_path": dest_path,
+                    "dest_exists": False,
+                    "status": "pending",
+                }
+            ],
+            scanned_sources=["tidal"],
+        )
+        assert any(
+            item["source_path"] == source_path
+            for item in list_import_queue_items(status="importing")
+        )
+
+        returned_to_pending = mark_import_queue_item_pending(
+            source_path,
+            source="tidal",
+            error="temporary filesystem error",
+        )
+        assert returned_to_pending is True
+        failed = next(
+            item
+            for item in list_import_queue_items(status="pending")
+            if item["source_path"] == source_path
+        )
+        assert failed["last_error"] == "temporary filesystem error"
 
         changed = mark_import_queue_item_imported(
             source_path,

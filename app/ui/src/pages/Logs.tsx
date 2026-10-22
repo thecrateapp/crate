@@ -20,7 +20,10 @@ import { Link } from "react-router";
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
   OpsStatTile,
+  type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 
@@ -47,6 +50,15 @@ interface WorkerInfo {
 }
 
 interface LogsSnapshotData {
+  snapshot: {
+    scope: string;
+    subject_key: string;
+    version: number;
+    built_at?: string | null;
+    stale_after?: string | null;
+    stale: boolean;
+    generation_ms: number;
+  };
   logs: LogEntry[];
   workers: WorkerInfo[];
 }
@@ -183,6 +195,8 @@ export function Logs() {
   const [workerId, setWorkerId] = useState("");
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
   const loadedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
 
@@ -208,7 +222,11 @@ export function Logs() {
   }, [fetchSnapshot]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh) {
+      setStreamStatus("paused");
+      return;
+    }
+    setStreamStatus("connecting");
     let disposed = false;
     let stream: EventSource | null = null;
 
@@ -217,11 +235,13 @@ export function Logs() {
       stream = new EventSource("/api/admin/logs-stream?limit=100", {
         withCredentials: true,
       });
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as LogsSnapshotData;
           setSnapshot(payload);
           setError(null);
+          setStreamStatus("live");
           setLoading(false);
           loadedRef.current = true;
         } catch {
@@ -231,6 +251,7 @@ export function Logs() {
       stream.onerror = () => {
         stream?.close();
         stream = null;
+        setStreamStatus("reconnecting");
         if (!disposed) {
           reconnectTimerRef.current = window.setTimeout(connect, 5000);
         }
@@ -361,8 +382,18 @@ export function Logs() {
         {summary.warnings > 0 ? (
           <InfoBadge tone="warning">{summary.warnings} warnings</InfoBadge>
         ) : null}
-        <InfoBadge>{autoRefresh ? "Live mode" : "Frozen snapshot"}</InfoBadge>
+        <OpsSnapshotStatus
+          snapshot={snapshot?.snapshot}
+          streamStatus={streamStatus}
+        />
       </OpsPageHero>
+
+      {error && snapshot ? (
+        <OpsRefreshNotice
+          message="Could not refresh worker logs. Showing the last successful snapshot."
+          onRetry={() => void fetchSnapshot(true)}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile

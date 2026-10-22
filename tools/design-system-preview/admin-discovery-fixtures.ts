@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createUseApi } from "../../app/shared/web/use-api";
 import fixture from "../../tests/admin-e2e/fixtures/discovery-1ai.json";
-export type Sample = "ready" | "loading" | "empty" | "error";
+export type Sample = "ready" | "loading" | "empty" | "error" | "partial-error";
 export type Outcome = "complete" | "partial" | "skipped" | "failed";
 type Entry = { kind: "read" | "request" | "task"; finish: () => void };
 let state = {
@@ -56,6 +56,8 @@ export function setFailure(failNext: boolean) {
 function result(path: string): unknown {
   if (state.sample === "error")
     throw new Error("Lectura de muestra no disponible");
+  if (state.sample === "partial-error" && path === "/api/discover/completeness")
+    throw new Error("Lectura de cobertura de muestra no disponible");
   if (state.sample === "empty") {
     if (path === "/api/discover/completeness") return [];
     if (path.startsWith("/api/acquisition/")) return { releases: [] };

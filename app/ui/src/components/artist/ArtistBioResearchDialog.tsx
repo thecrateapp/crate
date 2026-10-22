@@ -258,7 +258,7 @@ function ReviewSummary({ result }: { result: ResearchResult }) {
                 finding.source_ids?.join(",") ?? ""
               }`}
             >
-              <span className="mr-2 text-xs font-medium uppercase tracking-wide text-accent-action">
+              <span className="mr-2 text-xs font-normal uppercase tracking-wide text-accent-action font-mono">
                 {finding.kind.split("_").join(" ")}
               </span>
               {finding.summary}
@@ -603,7 +603,7 @@ export function ArtistBioResearchDialog({
         onOpenAutoFocus={() => void runResearch()}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle>Research biography with AI</DialogTitle>
+          <DialogTitle className="font-display">Research biography with AI</DialogTitle>
           <DialogDescription>
             Internet sources are collected and consolidated into an editable
             proposal for {artist.name}. Nothing is saved until you apply it.

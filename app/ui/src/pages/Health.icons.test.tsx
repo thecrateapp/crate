@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { AuthContext } from "@/contexts/AuthContext";
 import userEvent from "@testing-library/user-event";
@@ -21,8 +21,10 @@ let sampleHealth = {
   >,
 };
 let missingCatalog = false;
+let failNextFreshSnapshot = false;
 const streams: LocalSource[] = [];
 class LocalSource {
+  onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
   close = vi.fn();
@@ -49,6 +51,7 @@ beforeEach(() => {
     runs: { ...fixture.health.runs },
   };
   missingCatalog = false;
+  failNextFreshSnapshot = false;
   streams.length = 0;
   vi.stubGlobal("EventSource", LocalSource);
   vi.mocked(useTaskEvents).mockReturnValue({
@@ -71,15 +74,22 @@ beforeEach(() => {
     }
     if (path.startsWith("/api/admin/tasks-snapshot"))
       return structuredClone(fixture.tasks) as never;
-    const check = new URL(path, "http://sample.test").searchParams.get(
-      "check_type",
-    );
-    return {
-      ...structuredClone(sampleHealth),
-      issues: sampleHealth.issues.filter(
-        (i) => !check || i.check_type === check,
-      ),
-    } as never;
+    if (path.startsWith("/api/admin/health-snapshot")) {
+      if (path.includes("fresh=1") && failNextFreshSnapshot) {
+        failNextFreshSnapshot = false;
+        throw new Error("snapshot unavailable");
+      }
+      const check = new URL(path, "http://sample.test").searchParams.get(
+        "check_type",
+      );
+      return {
+        ...structuredClone(sampleHealth),
+        issues: sampleHealth.issues.filter(
+          (i) => !check || i.check_type === check,
+        ),
+      } as never;
+    }
+    throw new Error(`Unexpected Health API request: ${path}`);
   });
 });
 afterEach(() => {
@@ -286,6 +296,62 @@ describe("Library Health text controls and preserved UX", () => {
     );
     view.unmount();
     expect(streams.every((s) => s.close.mock.calls.length > 0)).toBe(true);
+  });
+  it("keeps the last snapshot visible and recoverable when a post-scan refresh fails", async () => {
+    const user = userEvent.setup();
+    const view = mount();
+    await ready();
+    failNextFreshSnapshot = true;
+    await user.click(screen.getByRole("button", { name: "Run scan" }));
+    vi.mocked(useTaskEvents).mockReturnValue({
+      events: [],
+      done: { status: "completed" },
+      connected: false,
+      reset,
+    });
+    view.rerender(
+      <MemoryRouter>
+        <AuthContext.Provider value={view.authValue}>
+          <Health />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText(
+        "Could not refresh library health. Showing the last successful snapshot.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Review issues: Unindexed Files" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Error" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          "Could not refresh library health. Showing the last successful snapshot.",
+        ),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Review issues: Unindexed Files" }),
+    ).toBeVisible();
+  });
+  it("reports Library Health stream connection and reconnection without dropping its snapshot", async () => {
+    const view = mount();
+    await ready();
+    const healthStream = streams.find((stream) =>
+      stream.url.startsWith("/api/admin/health-stream"),
+    )!;
+    act(() => healthStream.onopen?.(new Event("open")));
+    expect(screen.getByText("Live updates")).toBeVisible();
+    act(() => healthStream.onerror?.());
+    expect(screen.getByText("Reconnecting")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Review issues: Unindexed Files" }),
+    ).toBeVisible();
+    view.unmount();
   });
   it("keeps the existing scan role gate and neutral risk instruments", async () => {
     mount(false);

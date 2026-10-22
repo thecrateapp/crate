@@ -1,9 +1,11 @@
 # Crate v3: Admin app audit (`app/ui`)
 
 Date: 2026-10-14
-Status: analysis for `feat/crate_v3` (read-only pass, nothing implemented, no test, build or
-bundle check run). Visual reference: the new site only (`worktrees/website/app/web`). Paths are
-relative to the `crate-v3` worktree unless prefixed with `site:`. Companion docs in this folder:
+Status: historical analysis for `feat/crate_v3`, not a current implementation status or backlog.
+The current route reconciliation is in [`coverage.md` §10](coverage.md#10-admin-inventory-reconciliation--2026-10-21)
+and the [Admin continuation plan](../2026-10-21-crate-v3-admin-continuation.md). Visual reference
+for the original pass was the new site only (`worktrees/website/app/web`). Paths were relative to
+the `crate-v3` worktree unless prefixed with `site:`. Companion docs in this folder:
 `site-language.md` (tokens, SVG recipes, motion), `genres.md` (wheel and EQ inheritance in depth),
 `v3-state.md` (what the branch already ships).
 

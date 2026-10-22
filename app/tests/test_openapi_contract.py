@@ -1591,6 +1591,9 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     analysis_status_operation = data["paths"]["/api/manage/analysis-status"]["get"]
     audit_log_operation = data["paths"]["/api/manage/audit-log"]["get"]
     storage_status_operation = data["paths"]["/api/manage/storage-v2-status"]["get"]
+    portable_album_sidecar_operation = data["paths"][
+        "/api/manage/albums/{album_id}/portable-metadata"
+    ]["get"]
     portable_metadata_operation = data["paths"]["/api/manage/portable-metadata"]["post"]
     portable_rehydrate_operation = data["paths"][
         "/api/manage/portable-metadata/rehydrate"
@@ -1670,6 +1673,14 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     assert storage_status_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/StorageV2StatusResponse")
+
+    assert portable_album_sidecar_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert portable_album_sidecar_operation["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"].endswith("/PortableAlbumSidecarResponse")
 
     assert portable_metadata_operation["security"] == [
         {"cookieAuth": []},

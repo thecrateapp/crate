@@ -15,25 +15,86 @@ export default defineConfig({
         if (
           id ===
           fileURLToPath(
-            new URL(
-              "../../app/ui/src/pages/PlaylistEditor.tsx",
-              import.meta.url,
-            ),
+            new URL("../../app/ui/src/pages/Download.tsx", import.meta.url),
           )
         )
           return {
-            code: `import { EditorEventSource as EventSource } from ${JSON.stringify(
+            code: `import { AcquisitionEventSource as EventSource } from ${JSON.stringify(
               fileURLToPath(
-                new URL("admin-playlist-editor-fixtures.ts", import.meta.url),
+                new URL("admin-acquisition-fixtures.ts", import.meta.url),
               ),
             )};\n${code}`,
             map: null,
           };
       },
       resolveId(source, importer) {
+        if (
+          (importer?.endsWith("/app/ui/src/pages/Federation.tsx") ||
+            importer?.includes("/app/ui/src/pages/federation/")) &&
+          ["@/lib/api", "@/hooks/use-api"].includes(source)
+        )
+          return fileURLToPath(
+            new URL("admin-federation-fixtures.ts", import.meta.url),
+          );
+        if (importer?.endsWith("/app/ui/src/pages/Imports.tsx")) {
+          if (
+            [
+              "@/lib/api",
+              "@/hooks/use-task-events",
+              "@/lib/library-routes",
+            ].includes(source)
+          )
+            return fileURLToPath(
+              new URL("admin-imports-fixtures.ts", import.meta.url),
+            );
+        }
+        if (importer?.endsWith("/app/ui/src/pages/Download.tsx")) {
+          if (["@/lib/api", "@/hooks/use-api"].includes(source))
+            return fileURLToPath(
+              new URL("admin-acquisition-fixtures.ts", import.meta.url),
+            );
+        }
+        if (
+          importer?.endsWith("/app/ui/src/pages/Browse.tsx") &&
+          source === "@/lib/api"
+        )
+          return fileURLToPath(
+            new URL("admin-catalog-fixtures.ts", import.meta.url),
+          );
+        if (
+          importer?.endsWith("/app/ui/src/pages/Genres.tsx") &&
+          ["@/lib/api", "@/hooks/use-api", "@/hooks/use-task-poll"].includes(
+            source,
+          )
+        )
+          return fileURLToPath(
+            new URL("admin-catalog-fixtures.ts", import.meta.url),
+          );
+        if (
+          importer?.includes("/app/ui/src/components/genres/") &&
+          source === "@/lib/api"
+        )
+          return fileURLToPath(
+            new URL("admin-catalog-fixtures.ts", import.meta.url),
+          );
+        if (
+          [
+            "/app/ui/src/components/artist/ArtistCard.tsx",
+            "/app/ui/src/components/artist/ArtistRow.tsx",
+          ].some((file) => importer?.endsWith(file)) &&
+          source === "@/lib/library-routes"
+        )
+          return fileURLToPath(
+            new URL("admin-catalog-fixtures.ts", import.meta.url),
+          );
         if (importer?.endsWith("/app/ui/src/pages/PlaylistEditor.tsx")) {
           if (
-            ["@/lib/api", "@/hooks/use-api", "@/hooks/use-llm"].includes(source)
+            [
+              "@/lib/api",
+              "@/hooks/use-api",
+              "@/hooks/use-llm",
+              "@/hooks/use-snapshot-stream",
+            ].includes(source)
           )
             return fileURLToPath(
               new URL("admin-playlist-editor-fixtures.ts", import.meta.url),
@@ -78,26 +139,42 @@ export default defineConfig({
             new URL("admin-upcoming-fixtures.ts", import.meta.url),
           );
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
+        if (importer.endsWith("/app/ui/src/pages/I18nReview.tsx")) {
+          if (source === "@/lib/api")
+            return fileURLToPath(
+              new URL("admin-translations-fixtures.ts", import.meta.url),
+            );
+          if (source === "@/hooks/use-llm")
+            return fileURLToPath(
+              new URL("admin-settings-fixtures.ts", import.meta.url),
+            );
+        }
         if (
-          importer.endsWith("/app/ui/src/pages/I18nReview.tsx") &&
-          source === "@/lib/api"
+          importer.endsWith("/app/ui/src/pages/Settings.tsx") &&
+          [
+            "@/hooks/use-api",
+            "@/lib/api",
+            "@/hooks/use-llm",
+            "@/contexts/OpsSnapshotContext",
+            "@/lib/task-catalog",
+          ].includes(source)
         )
           return fileURLToPath(
-            new URL("admin-translations-fixtures.ts", import.meta.url),
+            new URL("admin-settings-fixtures.ts", import.meta.url),
           );
         if (
           importer.endsWith("/app/ui/src/pages/Users.tsx") &&
           source === "@/lib/api"
         )
           return fileURLToPath(
-            new URL("admin-users-fixtures.ts", import.meta.url),
+            new URL("admin-users-roles-fixtures.ts", import.meta.url),
           );
         if (
           importer.endsWith("/app/ui/src/pages/Roles.tsx") &&
           source === "@/lib/api"
         )
           return fileURLToPath(
-            new URL("admin-roles-fixtures.ts", import.meta.url),
+            new URL("admin-users-roles-fixtures.ts", import.meta.url),
           );
         if (
           importer.endsWith("/app/ui/src/pages/GlobalCatalog.tsx") &&
@@ -121,6 +198,13 @@ export default defineConfig({
         )
           return fileURLToPath(
             new URL("admin-discovery-fixtures.ts", import.meta.url),
+          );
+        if (
+          importer.endsWith("/app/ui/src/pages/Insights.tsx") &&
+          source === "@/hooks/use-api"
+        )
+          return fileURLToPath(
+            new URL("admin-insights-fixtures.ts", import.meta.url),
           );
         if (
           importer.endsWith("/app/ui/src/pages/Bandcamp.tsx") &&
@@ -317,8 +401,44 @@ export default defineConfig({
         adminNavigation: fileURLToPath(
           new URL("admin-navigation-demo.html", import.meta.url),
         ),
+        reviewAdminShell: fileURLToPath(
+          new URL("review-admin-shell.html", import.meta.url),
+        ),
+        reviewAdminOperations: fileURLToPath(
+          new URL("review-admin-operations.html", import.meta.url),
+        ),
+        reviewAdminHealthRecovery: fileURLToPath(
+          new URL("review-admin-health-recovery.html", import.meta.url),
+        ),
+        reviewAdminCatalog: fileURLToPath(
+          new URL("review-admin-catalog.html", import.meta.url),
+        ),
+        reviewAdminEntityRecovery: fileURLToPath(
+          new URL("review-admin-entity-recovery.html", import.meta.url),
+        ),
+        reviewAdminPlaylists: fileURLToPath(
+          new URL("review-admin-playlists.html", import.meta.url),
+        ),
+        reviewAdminUsersRoles: fileURLToPath(
+          new URL("review-admin-users-roles.html", import.meta.url),
+        ),
+        reviewAdminSettingsTranslations: fileURLToPath(
+          new URL("review-admin-settings-translations.html", import.meta.url),
+        ),
+        reviewAdminFederation: fileURLToPath(
+          new URL("review-admin-federation.html", import.meta.url),
+        ),
+        reviewAdminAcquisition: fileURLToPath(
+          new URL("admin-acquisition-demo.html", import.meta.url),
+        ),
+        reviewAdminImports: fileURLToPath(
+          new URL("admin-imports-demo.html", import.meta.url),
+        ),
         adminAnalysis: fileURLToPath(
           new URL("admin-analysis-demo.html", import.meta.url),
+        ),
+        adminInsights: fileURLToPath(
+          new URL("admin-insights-demo.html", import.meta.url),
         ),
         adminDashboard: fileURLToPath(
           new URL("admin-dashboard-demo.html", import.meta.url),

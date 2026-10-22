@@ -341,10 +341,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   }
 
   return (
-    <div
-      ref={wrapperRef}
-      className="relative flex-1 md:flex-none md:w-[420px] lg:w-[500px]"
-    >
+    <div ref={wrapperRef} className="relative min-w-0 w-full">
       <Popover
         open={showResults || showRecents || Boolean(showNoResults)}
         onOpenChange={setOpen}
@@ -430,7 +427,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
         >
           {showResults ? (
             <div className="py-1">
-              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+              <div className="px-3 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/40 font-mono">
                 In Library
               </div>
               {items.map((item, index) => (
@@ -461,7 +458,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
           {showRecents ? (
             <div className="py-1">
-              <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+              <p className="px-3 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/40 font-mono">
                 Recent
               </p>
               {recents.map((recent, index) => (

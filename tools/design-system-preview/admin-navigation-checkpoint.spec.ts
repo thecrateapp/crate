@@ -111,6 +111,94 @@ for (const width of [1440, 768, 390]) {
         await expect(route).toHaveText("/playlists");
         await page.getByRole("button", { name: "Expand sidebar" }).click();
         await expect(main).toHaveCSS("margin-left", "240px");
+        const sidebarNav = page.getByRole("navigation", {
+          name: "Admin navigation",
+        });
+        await sidebarNav.evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await expect
+          .poll(() => sidebarNav.evaluate((element) => element.scrollTop))
+          .toBe(0);
+        await sidebarNav.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
+        await expect
+          .poll(() =>
+            sidebarNav.evaluate((element) =>
+              getComputedStyle(element).getPropertyValue(
+                "--crate-scrollbar-trail-angle-y",
+              ),
+            ),
+          )
+          .toBe("180deg");
+        await expect
+          .poll(() => sidebarNav.evaluate((element) => element.scrollTop))
+          .toBeGreaterThan(0);
+        const scrollbarStyle = await sidebarNav.evaluate((element) => {
+          const track = getComputedStyle(element, "::-webkit-scrollbar-track");
+          const style = getComputedStyle(element);
+          return {
+            backgroundImage: track.backgroundImage,
+            backgroundSize: track.backgroundSize,
+            scrollbarColor: style.scrollbarColor,
+            dotPosition: style.getPropertyValue(
+              "--crate-scrollbar-dot-position-y",
+            ),
+            trailPosition: style.getPropertyValue(
+              "--crate-scrollbar-trail-position-y",
+            ),
+            trailAngle: style.getPropertyValue(
+              "--crate-scrollbar-trail-angle-y",
+            ),
+            clientHeight: element.clientHeight,
+          };
+        });
+        expect(scrollbarStyle.backgroundImage).toContain("radial-gradient");
+        expect(scrollbarStyle.backgroundImage).toContain("linear-gradient");
+        expect(scrollbarStyle.backgroundSize).toContain("4px 14px");
+        expect(scrollbarStyle.scrollbarColor).toBe("auto");
+        expect(Number.parseFloat(scrollbarStyle.dotPosition)).toBeCloseTo(
+          scrollbarStyle.clientHeight - 6,
+          1,
+        );
+        expect(scrollbarStyle.trailPosition).toBe(
+          `${scrollbarStyle.clientHeight - 17}px`,
+        );
+        expect(scrollbarStyle.trailAngle).toBe("180deg");
+        await sidebarNav.evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await expect
+          .poll(() =>
+            sidebarNav.evaluate((element) =>
+              getComputedStyle(element).getPropertyValue(
+                "--crate-scrollbar-trail-position-y",
+              ),
+            ),
+          )
+          .toBe("3px");
+        await expect
+          .poll(() =>
+            sidebarNav.evaluate((element) =>
+              getComputedStyle(element).getPropertyValue(
+                "--crate-scrollbar-trail-angle-y",
+              ),
+            ),
+          )
+          .toBe("0deg");
+        await sidebarNav.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
+        await expect
+          .poll(() =>
+            sidebarNav.evaluate((element) =>
+              getComputedStyle(element).getPropertyValue(
+                "--crate-scrollbar-trail-angle-y",
+              ),
+            ),
+          )
+          .toBe("180deg");
         const search = page.getByPlaceholder("Search library…");
         const searchBox = await search.boundingBox();
         expect(searchBox!.x + searchBox!.width).toBeLessThanOrEqual(width);
@@ -206,6 +294,46 @@ for (const width of [1440, 768, 390]) {
         body: await page.screenshot(),
         contentType: "image/png",
       });
+    });
+    test("solid shell review uses opaque, blur-free headers", async ({
+      page,
+    }) => {
+      await page.goto("/review-admin-shell.html");
+      await expect(
+        page.getByRole("heading", { name: "Navegación de Admin" }),
+      ).toBeVisible();
+      for (const slot of ["mobile-shell-header", "desktop-shell-header"]) {
+        const header = page.locator(`[data-admin-ux="${slot}"]`);
+        await expect(header).toHaveClass(/bg-app-surface/);
+        await expect(header).not.toHaveClass(/backdrop-blur-xl/);
+        await expect(header).toHaveCSS("backdrop-filter", "none");
+      }
+      const account = page.getByRole("button", { name: "Diego account menu" });
+      await expect(account).toBeVisible();
+      await expectTouchTarget(account);
+      if (width >= 768) {
+        const search = page.getByPlaceholder("Search library…");
+        const searchBox = await search.boundingBox();
+        const accountBox = await account.boundingBox();
+        expect(searchBox).not.toBeNull();
+        expect(accountBox).not.toBeNull();
+        expect(accountBox!.x).toBeGreaterThanOrEqual(
+          searchBox!.x + searchBox!.width,
+        );
+        expect(
+          accountBox!.x - (searchBox!.x + searchBox!.width),
+        ).toBeLessThanOrEqual(20);
+      }
+      await account.click();
+      await expect(
+        page.getByRole("menuitemradio", { name: "Curator" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("menuitem", { name: "Profile" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("menuitem", { name: "Log out" }),
+      ).toBeVisible();
     });
     test("counters have balanced ink spacing and the current destination stays marked", async ({
       page,

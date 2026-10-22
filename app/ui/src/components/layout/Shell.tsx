@@ -28,6 +28,7 @@ import { useKeyboard } from "@/hooks/use-keyboard";
 import { useNotifications } from "@/hooks/use-notifications";
 
 import { CommandPalette } from "./CommandPalette";
+import { HeaderUserMenu } from "./HeaderUserMenu";
 import { SearchBar } from "./SearchBar";
 import {
   Sidebar,
@@ -115,7 +116,10 @@ export function Shell() {
       </div>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <div className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface/75 px-4 py-3 backdrop-blur-xl md:hidden">
+        <div
+          data-admin-ux="mobile-shell-header"
+          className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface px-4 py-3 md:hidden"
+        >
           <SheetTrigger asChild>
             <Button
               variant="ghost"
@@ -130,6 +134,9 @@ export function Shell() {
             </Button>
           </SheetTrigger>
           <div className="text-sm font-bold text-white">Crate Admin</div>
+          <div className="pointer-events-auto ml-auto">
+            <HeaderUserMenu />
+          </div>
         </div>
 
         <SheetContent
@@ -148,7 +155,8 @@ export function Shell() {
       </Sheet>
 
       <div
-        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface/68 backdrop-blur-xl transition-[left] duration-200 md:block ${sidebarLeftClass}`}
+        data-admin-ux="desktop-shell-header"
+        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface transition-[left] duration-200 md:block ${sidebarLeftClass}`}
       >
         <div className="flex h-16 w-full items-center gap-4 px-4 pointer-events-none">
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
@@ -180,8 +188,11 @@ export function Shell() {
 
           <div className="hidden flex-1 lg:block" />
 
-          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:gap-4 lg:w-[500px] lg:flex-none [&>div]:w-full">
-            <SearchBar inputRef={searchInputRef} />
+          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:gap-4 lg:w-[560px] lg:flex-none">
+            <div className="min-w-0 flex-1">
+              <SearchBar inputRef={searchInputRef} />
+            </div>
+            <HeaderUserMenu />
           </div>
         </div>
       </div>
@@ -225,7 +236,7 @@ export function Shell() {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+            <DialogTitle className="font-display">Keyboard Shortcuts</DialogTitle>
             <DialogDescription>
               Navigate the admin console quickly with your keyboard.
             </DialogDescription>

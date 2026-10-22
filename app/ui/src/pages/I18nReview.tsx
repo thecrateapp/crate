@@ -1,8 +1,8 @@
 import { useActionLLMStatus } from "@/hooks/use-llm";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
@@ -14,8 +14,17 @@ import { toast } from "sonner";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
+import { AdminSelect } from "@/components/ui/AdminSelect";
 
 interface TranslationRequest {
   id: string;
@@ -486,129 +495,116 @@ export function I18nReview() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              <PageHeaderAction
-                label="Refresh"
-                onClick={loadReviewData}
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2
-                    data-admin-ux="translations-refresh"
-                    aria-hidden="true"
-                    size={15}
-                    className="animate-spin"
-                  />
-                ) : null}
-                {!loading ? (
-                  <HeaderRefreshCw
-                    data-admin-ux="header-refresh"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </PageHeaderAction>
-            </PageHeaderActions>
-          }
-        >
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-white">
-              Listen Translations
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Manage Listen language bundles, review draft quality, and publish
-              remote translations.
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {draftAI?.available
-                ? `AI drafts: ${draftAI.model_id}.`
-                : "AI draft action unavailable; requests remain available for manual translation review."}
-            </p>
-          </div>
-        </PageHeaderLayout>
+      <OpsPageHero
+        title="Listen Translations"
+        description="Manage Listen language bundles, review draft quality, and publish remote translations."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={loadReviewData}
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2
+                  data-admin-ux="translations-refresh"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!loading ? (
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge tone={draftAI?.available ? "success" : "warning"}>
+          {draftAI?.available
+            ? `AI drafts: ${draftAI.model_id}`
+            : "AI drafts unavailable · manual review ready"}
+        </InfoBadge>
+      </OpsPageHero>
 
-        <div
-          role="tablist"
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ManagerTab)}
+        className="min-w-0 gap-5"
+      >
+        <TabsList
           aria-label="Listen translation manager sections"
-          className="mt-5 flex flex-wrap gap-2"
+          className="w-full min-w-0 max-w-full"
         >
           {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "min-h-11 rounded-md border px-3 py-2 text-sm font-semibold transition-colors",
-                activeTab === tab.id
-                  ? "border-accent-action/35 bg-accent-action/12 text-accent-action-hi"
-                  : "border-white/10 bg-white/[0.03] text-white/58 hover:border-accent-action/25 hover:text-accent-action-hi",
-              )}
-            >
+            <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
-      </section>
+        </TabsList>
 
-      {activeTab === "overview" ? (
-        <OverviewSection
-          loading={loading}
-          error={error}
-          localeHealth={localeHealth}
-          needsReviewCount={needsReviewCount}
-          requestCount={requests.length}
-          aiConfigured={aiConfigured}
-          draftBusyLocale={draftBusyLocale}
-          onDraftMissing={draftMissingForLocale}
-        />
-      ) : null}
+        <TabsContent value="overview" className="mt-0">
+          <OverviewSection
+            loading={loading}
+            error={error}
+            localeHealth={localeHealth}
+            needsReviewCount={needsReviewCount}
+            requestCount={requests.length}
+            aiConfigured={aiConfigured}
+            draftBusyLocale={draftBusyLocale}
+            onDraftMissing={draftMissingForLocale}
+          />
+        </TabsContent>
 
-      {activeTab === "bundles" ? (
-        <BundlesSection
-          loading={loading}
-          error={error}
-          bundles={filteredBundles}
-          requestsByBundle={requestsByBundle}
-          localeOptions={localeOptions}
-          sourceOptions={sourceOptions}
-          localeFilter={localeFilter}
-          statusFilter={statusFilter}
-          sourceFilter={sourceFilter}
-          setLocaleFilter={setLocaleFilter}
-          setStatusFilter={setStatusFilter}
-          setSourceFilter={setSourceFilter}
-          selectedBundleId={selectedBundle?.id ?? null}
-          onSelectBundle={selectBundle}
-        />
-      ) : null}
+        <TabsContent value="bundles" className="mt-0">
+          <BundlesSection
+            loading={loading}
+            error={error}
+            bundles={filteredBundles}
+            requestsByBundle={requestsByBundle}
+            localeOptions={localeOptions}
+            sourceOptions={sourceOptions}
+            localeFilter={localeFilter}
+            statusFilter={statusFilter}
+            sourceFilter={sourceFilter}
+            setLocaleFilter={setLocaleFilter}
+            setStatusFilter={setStatusFilter}
+            setSourceFilter={setSourceFilter}
+            selectedBundleId={selectedBundle?.id ?? null}
+            onSelectBundle={selectBundle}
+          />
+        </TabsContent>
 
-      {activeTab === "editor" ? (
-        <EditorSection
-          selectedBundle={selectedBundle}
-          detailLoading={detailLoading}
-          actionBusy={actionBusy}
-          savingKey={savingKey}
-          workspaceSavingKey={workspaceSavingKey}
-          canSaveWorkspaceJson={localCatalogOrigin !== null}
-          exportBusy={exportBusy}
-          qualityReport={qualityReport}
-          exportedJson={exportedJson}
-          messageRows={messageRows}
-          onDraftChange={(key, value) =>
-            setMessageDrafts((current) => ({ ...current, [key]: value }))
-          }
-          onSaveMessage={saveBundleMessage}
-          onSaveWorkspaceMessage={saveWorkspaceMessage}
-          onExportBundle={exportSelectedBundle}
-          onReviewAction={reviewAction}
-        />
-      ) : null}
+        <TabsContent value="editor" className="mt-0">
+          <EditorSection
+            selectedBundle={selectedBundle}
+            detailLoading={detailLoading}
+            actionBusy={actionBusy}
+            savingKey={savingKey}
+            workspaceSavingKey={workspaceSavingKey}
+            canSaveWorkspaceJson={localCatalogOrigin !== null}
+            exportBusy={exportBusy}
+            qualityReport={qualityReport}
+            exportedJson={exportedJson}
+            messageRows={messageRows}
+            onDraftChange={(key, value) =>
+              setMessageDrafts((current) => ({ ...current, [key]: value }))
+            }
+            onSaveMessage={saveBundleMessage}
+            onSaveWorkspaceMessage={saveWorkspaceMessage}
+            onExportBundle={exportSelectedBundle}
+            onReviewAction={reviewAction}
+          />
+        </TabsContent>
 
-      {activeTab === "import-export" ? <ImportExportSection /> : null}
+        <TabsContent value="import-export" className="mt-0">
+          <ImportExportSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -640,11 +636,11 @@ function OverviewSection({
   onDraftMissing: (locale: string, sourceVersion: string) => Promise<void>;
 }) {
   return (
-    <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+    <Card className="gap-0 overflow-hidden border-border-quiet bg-card p-0">
+      <div className="border-b border-border-quiet px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-sans text-sm font-semibold text-white">
+            <h2 className="font-display text-sm font-semibold text-white">
               Locale health
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -661,45 +657,51 @@ function OverviewSection({
       ) : error ? (
         <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : (
-        <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+        <div>
           {localeHealth.map((health) => (
             <article
               key={health.locale}
               aria-label={`${health.locale} locale health`}
-              className="rounded-md border border-white/8 bg-white/[0.03] p-4"
+              className="grid min-w-0 gap-4 border-b border-border-quiet-subtle p-4 last:border-b-0 sm:p-5 md:grid-cols-[minmax(9rem,1.15fr)_repeat(3,minmax(5rem,0.7fr))_minmax(12rem,1.3fr)] md:items-center"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-display text-xl font-bold text-white">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="font-display text-xl font-bold text-text-primary">
                     {health.locale}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {health.bundleCount === 0 ? "No bundle yet" : "Configured"}
-                  </div>
+                  <StatusDot
+                    tone={
+                      health.draftCount > 0
+                        ? "warn"
+                        : health.bundleCount > 0
+                          ? "on"
+                          : "off"
+                    }
+                    label={
+                      health.draftCount > 0
+                        ? "Needs review"
+                        : health.bundleCount > 0
+                          ? "Stable"
+                          : "No bundle"
+                    }
+                  />
                 </div>
-                <Badge
-                  variant="outline"
-                  className={
-                    health.draftCount > 0
-                      ? statusBadgeClass("needs_review")
-                      : statusBadgeClass("published")
-                  }
-                >
-                  {health.draftCount > 0 ? "Review" : "Stable"}
-                </Badge>
+                <p className="mt-1 text-xs text-text-muted">
+                  {health.bundleCount === 0
+                    ? "No bundle yet"
+                    : `${health.bundleCount} bundle${health.bundleCount === 1 ? "" : "s"} available`}
+                </p>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                <HealthMetric label="draft" value={health.draftCount} />
-                <HealthMetric
-                  label="published bundle"
-                  value={health.publishedCount}
-                />
-                <HealthMetric label="request" value={health.requestCount} />
-              </div>
+              <HealthMetric label="Drafts" value={health.draftCount} />
+              <HealthMetric
+                label="Published bundles"
+                value={health.publishedCount}
+              />
+              <HealthMetric label="Requests" value={health.requestCount} />
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4 min-h-11 w-full"
+                className="min-h-11 w-full md:w-auto"
                 aria-label={`Draft missing/stale with AI for ${health.locale}`}
                 disabled={
                   !aiConfigured ||
@@ -765,7 +767,7 @@ function BundlesSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="font-sans text-sm font-semibold text-white">
+            <h2 className="font-display text-sm font-semibold text-white">
               Bundles
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -844,7 +846,10 @@ function BundlesSection({
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-sans text-lg font-bold text-white">
+                      <span
+                        data-slot="entity-title"
+                        className="font-display text-lg font-bold text-white"
+                      >
                         {bundle.locale}
                       </span>
                       <Badge
@@ -863,7 +868,7 @@ function BundlesSection({
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="font-sans text-sm font-semibold text-white">
+                    <div className="font-mono text-sm font-normal text-white tabular-nums">
                       {bundle.messageCount} strings
                     </div>
                     <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/35">
@@ -918,7 +923,7 @@ function EditorSection({
       <div className="border-b border-white/8 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="font-sans text-sm font-semibold text-white">
+            <h2 className="font-display text-sm font-semibold text-white">
               Editor
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -1088,7 +1093,7 @@ function EditorSection({
           {exportedJson ? (
             <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
               <div className="border-b border-white/8 px-4 py-3">
-                <h3 className="font-sans text-sm font-semibold text-white">
+                <h3 className="font-display text-sm font-semibold text-white">
                   Exported JSON
                 </h3>
               </div>
@@ -1125,7 +1130,7 @@ function QualityIssues({
     <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.03]">
       <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
         <div>
-          <h3 className="font-sans text-sm font-semibold text-white">
+          <h3 className="font-display text-sm font-semibold text-white">
             Quality issues
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -1223,7 +1228,7 @@ function ImportExportSection() {
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="border-b border-white/8 px-5 py-4">
-        <h2 className="font-sans text-sm font-semibold text-white">
+        <h2 className="font-display text-sm font-semibold text-white">
           Import / Export
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1261,39 +1266,49 @@ function FilterSelect({
   options: string[];
   formatOption: (value: string) => string;
 }) {
+  const selectId = `translation-filter-${label.toLowerCase()}`;
+
   return (
-    <label className="crate-form-field">
-      <span
+    <div className="crate-form-field">
+      <label
+        htmlFor={selectId}
         data-slot="form-field-label"
         className="block font-mono text-meta uppercase tracking-[0.12em] text-text-muted"
       >
         {label}
-      </span>
-      <select
+      </label>
+      <AdminSelect
+        id={selectId}
+        ariaLabel={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 min-w-0 w-full rounded-md border border-border bg-input px-3 text-sm text-foreground transition-colors"
-      >
-        {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-            className="bg-card text-foreground"
-          >
-            {formatOption(option)}
-          </option>
-        ))}
-      </select>
-    </label>
+        onChange={onChange}
+        options={options.map((option) => ({
+          value: option,
+          label: formatOption(option),
+        }))}
+        placeholder={formatOption(options[0] ?? "")}
+        allowClear={false}
+        triggerClassName="h-11 w-full max-w-none"
+      />
+    </div>
   );
 }
 
 function HealthMetric({ label, value }: { label: string; value: number }) {
+  const accessibleLabel =
+    label === "Drafts"
+      ? `${value} draft${value === 1 ? "" : "s"}`
+      : label === "Requests"
+        ? `${value} request${value === 1 ? "" : "s"}`
+        : `${value} published bundle${value === 1 ? "" : "s"}`;
+
   return (
-    <div className="rounded-md border border-white/6 bg-black/10 px-2 py-2">
-      <div className="font-mono font-normal text-white">
-        {value} {label}
-        {value === 1 ? "" : "s"}
+    <div role="group" aria-label={accessibleLabel} className="min-w-0">
+      <MonoLabel as="div" size="eyebrow">
+        {label}
+      </MonoLabel>
+      <div className="mt-1 font-mono text-xl font-normal tabular-nums text-text-primary">
+        {value}
       </div>
     </div>
   );

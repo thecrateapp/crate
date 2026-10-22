@@ -26,7 +26,7 @@ export function PlayerSeekBar({
   variant = "default",
   disabled = false,
 }: PlayerSeekBarProps) {
-  const model = useSeekBarModel(currentTime, duration, thin, onSeek);
+  const model = useSeekBarModel(currentTime, duration, onSeek);
 
   return variant === "glow" ? (
     <GlowSeekBar

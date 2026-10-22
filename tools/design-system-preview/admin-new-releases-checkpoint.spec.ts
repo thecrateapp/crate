@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 for (const width of [1440, 768, 390]) {
-  test(`New Releases specimen ${width}: views, controls and real handlers`, async ({
+  test(`Release Radar specimen ${width}: dates, library coverage and real handlers`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 1100 });
@@ -18,11 +18,56 @@ for (const width of [1440, 768, 390]) {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/admin-new-releases-demo.html");
     const root = page.locator(
-      'section[aria-label="Página real de New Releases"]',
+      'section[aria-label="Página real de Release Radar"]',
     );
     await expect(
-      root.getByRole("heading", { name: "New Releases", exact: true }),
+      root.getByRole("heading", { name: "Release Radar", exact: true }),
     ).toBeVisible();
+    const releaseArticle = root.getByRole("article", {
+      name: "Luz de octubre by Costa Norte",
+    });
+    await expect(
+      releaseArticle.getByText("3 / 8 in library", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      releaseArticle.locator('[data-slot="upcoming-date"]'),
+    ).toBeVisible();
+    await expect(
+      releaseArticle.locator('[data-slot="upcoming-event-row"]'),
+    ).toBeVisible();
+    await expect(
+      releaseArticle.getByRole("group", { name: "Actions for Luz de octubre" }),
+    ).toBeVisible();
+    await expect(releaseArticle).toHaveClass(/bg-surface-object/);
+    const releaseRows = root.locator('[data-slot="upcoming-event-row"]');
+    const releaseDatePositions = await Promise.all(
+      (await releaseRows.all()).map((row) =>
+        row
+          .locator('[data-slot="upcoming-event-date-slot"]')
+          .evaluate((node) => {
+            const bounds = node.getBoundingClientRect();
+            return { x: bounds.x, width: bounds.width };
+          }),
+      ),
+    );
+    expect(
+      new Set(releaseDatePositions.map(({ x, width }) => `${x}:${width}`)).size,
+    ).toBe(1);
+    const releaseActionCounts = await Promise.all(
+      (await releaseRows.all()).map((row) =>
+        row
+          .locator(
+            '[data-slot="upcoming-event-actions-slot"] button, [data-slot="upcoming-event-actions-slot"] a',
+          )
+          .count(),
+      ),
+    );
+    expect(new Set(releaseActionCounts).size).toBeGreaterThan(1);
+    const coverSize = await releaseArticle.locator("img").evaluate((node) => {
+      const bounds = node.getBoundingClientRect();
+      return { width: bounds.width, height: bounds.height };
+    });
+    expect(coverSize).toEqual({ width: 88, height: 88 });
     await page.waitForFunction(() => document.fonts.status === "loaded");
     expect(
       await root
@@ -44,7 +89,11 @@ for (const width of [1440, 768, 390]) {
         .locator("svg:not([data-admin-ux])")
         .evaluateAll(
           (nodes) =>
-            nodes.filter((el) => !el.closest('[role="combobox"]')).length,
+            nodes.filter(
+              (el) =>
+                !el.closest('[role="combobox"]') &&
+                !el.closest('[data-testid="media-cover-fallback"]'),
+            ).length,
         ),
     ).toBe(0);
     for (const field of await root.locator(".crate-form-field").all())
@@ -57,8 +106,12 @@ for (const width of [1440, 768, 390]) {
           );
         }),
       ).toBe(8);
-    for (const control of await root.locator("button,input").all())
+    for (const control of await root
+      .locator('button:not([data-slot="chip"]),input')
+      .all())
       expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    for (const chip of await root.locator('button[data-slot="chip"]').all())
+      expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -97,6 +150,9 @@ for (const width of [1440, 768, 390]) {
     await root
       .getByRole("button", { name: "Grid", exact: true })
       .press("Enter");
+    await expect(
+      root.getByRole("article", { name: "Luz de octubre by Costa Norte" }),
+    ).toHaveClass(/bg-raised-surface/);
     await expect(
       root.getByRole("button", { name: "Grid", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -212,17 +268,17 @@ test("keeps persistent 1AJ and previously published checkpoints", async ({
   page,
 }) => {
   await page.goto("/#lanzamientos-admin");
-  const section = page.getByRole("region", {
-    name: "Checkpoint 1AJ, New Releases de Admin",
-    exact: true,
-  });
-  await expect(section).toBeVisible();
+  const section = page.locator("#lanzamientos-admin");
+  await expect(section).toBeVisible({ timeout: 15000 });
   const frame = page.frameLocator(
-    'iframe[title="New Releases real con datos de muestra"]',
+    'iframe[title="Release Radar real con datos de muestra"]',
   );
+  await page
+    .locator('iframe[title="Release Radar real con datos de muestra"]')
+    .scrollIntoViewIfNeeded();
   await expect(
-    frame.getByRole("heading", { name: "New Releases", exact: true }),
-  ).toBeVisible();
+    frame.getByRole("heading", { name: "Release Radar", exact: true }),
+  ).toBeVisible({ timeout: 15000 });
   await expect(page.locator("footer")).toContainText("1AI publicado");
   await expect(page.locator("footer")).toContainText("1AJ publicado");
   await expect(

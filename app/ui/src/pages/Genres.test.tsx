@@ -124,6 +124,16 @@ function renderGenrePage() {
   );
 }
 
+function renderGenreList() {
+  return render(
+    <MemoryRouter initialEntries={["/genres"]}>
+      <Routes>
+        <Route path="/genres" element={<Genres />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe("Genres page", () => {
   beforeEach(() => {
     apiMock.mockReset();
@@ -186,5 +196,57 @@ describe("Genres page", () => {
         ),
       ),
     );
+  });
+
+  it("keeps the Genres heading and a retry action when its first load fails", async () => {
+    const refetch = vi.fn();
+    useApiMock.mockImplementation((url: string | null) =>
+      url === "/api/genres"
+        ? { data: null, loading: false, error: "offline", refetch }
+        : { data: null, loading: false, error: null, refetch: vi.fn() },
+    );
+
+    renderGenreList();
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Genres" }),
+    ).toBeVisible();
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Could not load the genre catalog.");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("offers a clear-search action when the genre filter has no matches", () => {
+    useApiMock.mockImplementation((url: string | null) =>
+      url === "/api/genres"
+        ? {
+            data: [
+              {
+                id: 4,
+                name: "Mathcore",
+                slug: "mathcore",
+                artist_count: 2,
+                album_count: 3,
+                mapped: true,
+              },
+            ],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+          }
+        : { data: null, loading: false, error: null, refetch: vi.fn() },
+    );
+
+    renderGenreList();
+    fireEvent.change(screen.getByPlaceholderText("Filter genres..."), {
+      target: { value: "ambient" },
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "No genres match this search" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByText("Mathcore")).toBeVisible();
   });
 });
