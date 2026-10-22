@@ -167,6 +167,11 @@ export function CommandPalette() {
       capabilities: ["ops.health.view"],
     },
     {
+      label: "Playback Delivery",
+      path: "/playback",
+      capabilities: ["ops.health.view"],
+    },
+    {
       label: "Analysis",
       path: "/analysis",
       capabilities: ["library.analysis.manage"],
@@ -307,7 +312,9 @@ export function CommandPalette() {
         }}
         className="top-[18vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl"
       >
-        <DialogTitle className="sr-only font-display">Command palette</DialogTitle>
+        <DialogTitle className="sr-only font-display">
+          Command palette
+        </DialogTitle>
         <DialogDescription className="sr-only">
           Search pages, run actions or find artists and albums.
         </DialogDescription>

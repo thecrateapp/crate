@@ -94,6 +94,42 @@ def test_resource_governor_defers_above_default_listener_budget(monkeypatch):
     assert "11 active listener(s)>10" in decision.reason
 
 
+def test_governor_surface_uses_worker_limits_and_swap_gate(monkeypatch):
+    from crate import resource_governor as governor
+
+    monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
+    monkeypatch.setenv("CRATE_MAINTENANCE_WINDOW_ENABLED", "false")
+    monkeypatch.setenv("CRATE_RESOURCE_MAX_LOAD_RATIO", "0.85")
+    monkeypatch.setenv("CRATE_RESOURCE_MAX_IOWAIT_PERCENT", "25")
+    monkeypatch.setenv("CRATE_RESOURCE_MAX_SWAP_PERCENT", "30")
+    snapshot = governor.ResourceSnapshot(
+        cpu_count=4,
+        load_1m=3.72,
+        load_ratio=0.93,
+        iowait_percent=28.0,
+        swap_used_percent=55.0,
+        swap_used_mb=100.0,
+        memory_available_percent=80.0,
+        active_users=2,
+        active_streams=3,
+    )
+    monkeypatch.setattr(
+        governor, "build_snapshot", lambda include_playback=True: snapshot
+    )
+
+    surface = governor.build_governor_surface()
+    gauges = {gauge["id"]: gauge for gauge in surface["gauges"]}
+
+    assert surface["sampled_by"] == "crate-worker"
+    assert surface["enabled"] is True
+    assert surface["allowed"] is False
+    assert "load 0.93>0.85" in surface["reason"]
+    assert "iowait 28.0%>25.0%" in surface["reason"]
+    assert gauges["load_ratio"]["over"] is True
+    assert gauges["swap_used_percent"]["over"] is False
+    assert gauges["active_users"]["limit"] == governor.DEFAULT_MAX_ACTIVE_USERS
+
+
 def test_resource_governor_allows_non_governed_tasks_without_sampling(monkeypatch):
     from crate import resource_governor as governor
 

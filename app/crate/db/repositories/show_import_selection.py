@@ -1,12 +1,14 @@
 """Atomic show selections consumed by the shared immutable operation engine."""
 
 import json
+
 from pydantic import ValidationError
 from sqlalchemy import text
 
 from crate.agent_diagnostics import DiagnosticError
 from crate.api.schemas.show_imports import ShowCandidate
 from crate.db.repositories import show_identities as identities
+from crate.db.repositories.tasks_shared import _register_task_transition_signal
 from crate.db.tx import optional_scope, read_scope
 
 
@@ -255,10 +257,18 @@ def apply_exact_show_import(execution: dict, task_id: str, *, session=None) -> d
                 raise DiagnosticError(
                     "CANCELLED", "Show operation was cancelled before effects"
                 )
-            current.execute(
-                text("UPDATE tasks SET status='completing' WHERE id=:id"),
-                {"id": task_id},
+            transition = (
+                current.execute(
+                    text(
+                        "UPDATE tasks SET status='completing' WHERE id=:id RETURNING *"
+                    ),
+                    {"id": task_id},
+                )
+                .mappings()
+                .first()
             )
+            if transition is not None:
+                _register_task_transition_signal(current, dict(transition))
             for key in sorted(
                 {
                     key

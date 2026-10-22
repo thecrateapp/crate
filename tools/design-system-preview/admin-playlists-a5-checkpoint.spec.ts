@@ -89,6 +89,23 @@ async function expectPlaylistArtworkRows(page: Page) {
   }
 }
 
+async function expectFlatPlaylistComposer(
+  page: Page,
+  trigger: string,
+  headingText: string,
+) {
+  await page.getByRole("button", { name: trigger, exact: true }).click();
+  const heading = page.getByRole("heading", {
+    name: headingText,
+    exact: true,
+  });
+  await expect(heading).toBeVisible();
+  await expect(
+    heading.locator("xpath=ancestor::*[@data-slot='card'][1]"),
+  ).toHaveCSS("box-shadow", "none");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+}
+
 async function expectPlaylistEditorIdentity(page: Page, width: number) {
   const header = page.locator('header[data-slot="page-header-layout"]');
   const artwork = header.locator('[data-slot="playlist-artwork"]');
@@ -191,4 +208,13 @@ test("editor review scene exposes loading, missing and stream controls", async (
   ).toBeEnabled();
   await page.getByRole("button", { name: "Enviar cambio SSE" }).click();
   await expect(controls.getByRole("status")).toContainText("SSE local");
+});
+
+test("static and smart playlist composers use the flat shared card surface", async ({
+  page,
+}) => {
+  const { controls } = await open(page, 1440);
+  await controls.getByRole("radio", { name: "Playlists" }).click();
+  await expectFlatPlaylistComposer(page, "New static", "New static playlist");
+  await expectFlatPlaylistComposer(page, "New smart", "New smart playlist");
 });

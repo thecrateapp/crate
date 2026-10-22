@@ -577,7 +577,9 @@ class TestArtistDetailAPI:
         mock_artist.assert_called_once()
         mock_info.assert_called_once_with("Tool")
         mock_top_tracks.assert_called_once_with("Tool", count=12)
-        mock_shows.assert_called_once_with(user_id=1, name="Tool", limit=12, country="", location=None)
+        mock_shows.assert_called_once_with(
+            user_id=1, name="Tool", limit=12, country="", location=None
+        )
         mock_top_artists.assert_called_once_with(1, window="30d", limit=12)
         mock_enrichment.assert_called_once_with("Tool")
         mock_set_cache.assert_called_once()
@@ -2148,8 +2150,12 @@ class TestShowsAPI:
             "unknown": 0,
             "queued": None,
         }
-        assert data["events"][0]["lineup_artists"][0]["probable_setlist_status"] == "fresh"
-        assert data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
+        assert (
+            data["events"][0]["lineup_artists"][0]["probable_setlist_status"] == "fresh"
+        )
+        assert (
+            data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
+        )
 
     def test_refresh_show_setlists_queues_each_non_fresh_billed_artist(self, test_app):
         shows = [
@@ -2231,6 +2237,86 @@ class TestAdminLogsAPI:
 
 
 class TestAdminMetricsAPI:
+    def test_governor_snapshot_reads_the_persisted_worker_sample(self, test_app):
+        sample = {
+            "enabled": True,
+            "allowed": False,
+            "reason": "load 0.93>0.85",
+            "defer_seconds": 300,
+            "sampled_by": "crate-worker",
+            "snapshot": {"load_ratio": 0.93},
+            "limits": {"load_ratio": 0.85},
+            "gauges": [
+                {
+                    "id": "load_ratio",
+                    "label": "Load ratio",
+                    "value": 0.93,
+                    "unit": "",
+                    "limit": 0.85,
+                    "scale": 1.2,
+                    "over": True,
+                }
+            ],
+            "updated_at": "2026-10-22T09:30:00+00:00",
+        }
+
+        with patch(
+            "crate.db.ops_runtime.get_ops_runtime_state", return_value=sample
+        ) as read_sample:
+            response = test_app.get("/api/admin/governor")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["available"] is True
+        assert data["stale"] is False
+        assert data["sampled_by"] == "crate-worker"
+        assert data["gauges"][0]["over"] is True
+        read_sample.assert_called_once_with("resource_governor", max_age_seconds=45)
+
+    def test_governor_snapshot_marks_last_known_worker_sample_stale(self, test_app):
+        sample = {
+            "enabled": True,
+            "allowed": True,
+            "sampled_by": "crate-worker",
+            "gauges": [],
+            "updated_at": "2026-10-22T09:00:00+00:00",
+        }
+
+        with patch(
+            "crate.db.ops_runtime.get_ops_runtime_state",
+            side_effect=[None, sample],
+        ) as read_sample:
+            response = test_app.get("/api/admin/governor")
+
+        assert response.status_code == 200
+        assert response.json()["available"] is True
+        assert response.json()["stale"] is True
+        assert read_sample.call_count == 2
+
+    def test_system_metrics_use_the_persisted_governor_sample(self):
+        from crate.api.admin_metrics import _build_metrics_system
+
+        sample = {
+            "enabled": True,
+            "allowed": True,
+            "snapshot": {"load_ratio": 0.12},
+        }
+        with (
+            patch("crate.storage_health.collect_storage_health", return_value={}),
+            patch(
+                "crate.db.engine.get_pool_runtime", return_value={"configured": False}
+            ),
+            patch("crate.analysis_daemon.get_analysis_status", return_value={}),
+            patch("crate.db.ops_runtime.get_ops_runtime_state", return_value=sample),
+            patch(
+                "crate.media_worker_progress.get_media_worker_runtime", return_value={}
+            ),
+            patch("crate.health_check.artwork_variant_health_sample", return_value={}),
+        ):
+            result = _build_metrics_system()
+
+        assert result["resource_pressure"] == sample
+
     def test_metrics_dashboard_uses_clean_http_metric_series(self, test_app):
         summary_specs: dict[str, tuple[str, int]] = {}
         recent_calls: list[str] = []
@@ -2315,7 +2401,9 @@ class TestHealthAPI:
         mock_read.assert_called_once_with(27, include_portable_status=True)
 
     def test_portable_album_metadata_returns_404_for_unknown_album(self, test_app):
-        with patch("crate.api.management.get_portable_album_payload", return_value=None):
+        with patch(
+            "crate.api.management.get_portable_album_payload", return_value=None
+        ):
             response = test_app.get("/api/manage/albums/999999/portable-metadata")
 
         assert response.status_code == 404

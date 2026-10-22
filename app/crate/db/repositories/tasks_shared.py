@@ -59,6 +59,41 @@ def publish_tasks_surface_signal() -> None:
         log.debug("Failed to publish tasks surface signal", exc_info=True)
 
 
+def _publish_task_transition_signal(task: dict) -> None:
+    try:
+        from crate.db.admin_tasks_surface import TASKS_SURFACE_STREAM_CHANNEL
+        from crate.db.cache_runtime import get_redis
+
+        redis = get_redis()
+        if not redis:
+            return
+        redis.publish(
+            TASKS_SURFACE_STREAM_CHANNEL,
+            json.dumps({"kind": "task_transition", "task": task}, default=json_default),
+        )
+    except Exception:
+        log.debug("Failed to publish task transition", exc_info=True)
+
+
+def _register_task_transition_signal(session, task: dict) -> None:
+    transition = {
+        key: task.get(key)
+        for key in (
+            "id",
+            "type",
+            "status",
+            "pool",
+            "created_at",
+            "started_at",
+            "updated_at",
+        )
+    }
+    register_after_commit(
+        session,
+        lambda transition=transition: _publish_task_transition_signal(transition),
+    )
+
+
 def register_tasks_surface_signal(session) -> None:
     if session.info.get(TASKS_SURFACE_AFTER_COMMIT_KEY):
         return

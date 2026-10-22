@@ -176,6 +176,27 @@ beforeEach(() => {
 });
 
 describe("CommandPalette", () => {
+  it("offers Playback Delivery to operators with health access", async () => {
+    const user = userEvent.setup();
+    mockAuth(["ops.health.view"]);
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Control>}k{/Control}");
+
+    const dialog = screen.getByRole("dialog", { name: "Command palette" });
+    expect(
+      await within(dialog).findByRole("option", { name: "Playback Delivery" }),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByRole("option", { name: "System Health" }),
+    ).toBeVisible();
+  });
+
   it("offers named icon-free commands, keyboard selection and an explicit close action", async () => {
     const user = userEvent.setup();
     mockAuth(["admin.access", "library.import.manage"]);
@@ -311,7 +332,7 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Health")).toBeInTheDocument();
     expect(screen.getByText("Acquisition")).toBeInTheDocument();
     expect(screen.getByText("Bandcamp")).toBeInTheDocument();
-    expect(screen.getByText("New Releases")).toBeInTheDocument();
+    expect(screen.getByText("Release Radar")).toBeInTheDocument();
     expect(await screen.findByText("Sync Library")).toBeInTheDocument();
     expect(await screen.findByText("Run Health Check")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
@@ -439,8 +460,8 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
 
-    expect(screen.getByText("Upcoming")).toBeInTheDocument();
-    expect(screen.queryByText("New Releases")).not.toBeInTheDocument();
+    expect(screen.getByText("Show Management")).toBeInTheDocument();
+    expect(screen.queryByText("Release Radar")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
@@ -476,8 +497,8 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
 
-    expect(screen.getByText("Upcoming")).toBeInTheDocument();
-    expect(screen.getByText("New Releases")).toBeInTheDocument();
+    expect(screen.getByText("Show Management")).toBeInTheDocument();
+    expect(screen.getByText("Release Radar")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 

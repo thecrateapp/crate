@@ -3,7 +3,11 @@ import { expect, test } from "@playwright/test";
 test("A1b operational surfaces use solid shared tokens", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const width of [1440, 390]) {
+  const apiRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/")) apiRequests.push(request.url());
+  });
+  for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 1100 });
     await page.goto("/review-admin-operations.html");
     const hero = page
@@ -17,6 +21,58 @@ test("A1b operational surfaces use solid shared tokens", async ({ page }) => {
       .first();
     await expect(hero).toBeVisible();
     await expect(tile).toBeVisible();
+    const queues = page.getByRole("region", { name: "Worker queue lanes" });
+    await expect(queues.getByRole("listitem")).toHaveCount(5);
+    const defaultFlow = queues.getByRole("group", {
+      name: "default task flow",
+    });
+    expect(
+      await defaultFlow.evaluate((lane) => lane.getBoundingClientRect().height),
+    ).toBeGreaterThanOrEqual(48);
+    const governor = page.getByRole("region", { name: "Resource governor" });
+    await expect(governor.getByRole("meter")).toHaveCount(5);
+    await expect(governor).toContainText("ALLOWED · BACKGROUND WORK RUNS");
+    await expect(
+      queues.getByRole("listitem", { name: "maintenance queue" }),
+    ).toContainText("metadata_enrichment");
+    await expect(
+      queues.getByRole("group", { name: "playback task flow" }),
+    ).toContainText("playback_prepare");
+    await expect(
+      queues.getByRole("group", { name: "heavy task flow" }),
+    ).toContainText("audio_analysis");
+    const demoChip = queues.locator('[data-queue-task-id="queue-flow-demo"]');
+    await expect(demoChip).toHaveAttribute("data-queue-state", "queued");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await demoChip.evaluate(
+        (element) => getComputedStyle(element).transitionProperty,
+      ),
+    ).toBe("none");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await demoChip.evaluate((element) => {
+      (window as Window & { queueDemoChip?: Element }).queueDemoChip = element;
+    });
+    await page
+      .getByRole("button", { name: "Advance sample task from queued" })
+      .click();
+    const runningChip = queues.locator(
+      '[data-queue-task-id="queue-flow-demo"]',
+    );
+    await expect(runningChip).toHaveAttribute("data-queue-state", "running");
+    await expect(runningChip).toHaveAttribute("style", /left: 36%/);
+    expect(
+      await runningChip.evaluate(
+        (element) =>
+          element ===
+          (window as Window & { queueDemoChip?: Element }).queueDemoChip,
+      ),
+    ).toBe(true);
+    await page
+      .getByRole("button", { name: "Advance sample task from running" })
+      .click();
+    await expect(demoChip).toHaveAttribute("data-queue-state", "done");
+    await expect(demoChip).toHaveAttribute("style", /left: 86%/);
     const freshness = page.getByTestId("ops-freshness");
     await expect(freshness.getByText("Snapshot current")).toBeVisible();
     await expect(freshness.getByText("Live updates")).toBeVisible();
@@ -26,7 +82,7 @@ test("A1b operational surfaces use solid shared tokens", async ({ page }) => {
       "Showing the last successful snapshot.",
     );
     await freshness.getByRole("button", { name: "Retry" }).click();
-    await expect(page.getByRole("status")).toContainText("Muestra actualizada");
+    await expect(hero.getByRole("status")).toContainText("Muestra actualizada");
     const appearance = async (surface: typeof hero) =>
       surface.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -52,6 +108,7 @@ test("A1b operational surfaces use solid shared tokens", async ({ page }) => {
     ).toBe(true);
   }
   expect(errors).toEqual([]);
+  expect(apiRequests).toEqual([]);
 });
 
 for (const width of [1440, 768, 390])

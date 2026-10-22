@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
 import {
   OpsPageHero,
   OpsPanel,
@@ -7,6 +6,11 @@ import {
   OpsSnapshotStatus,
   OpsStatTile,
 } from "../../app/ui/src/components/admin/ops-surfaces";
+import { QueueLanes } from "../../app/ui/src/components/admin/QueueLanes";
+import {
+  GovernorGauges,
+  type GovernorSurface,
+} from "../../app/ui/src/components/admin/GovernorGauges";
 import { Button } from "@crate/ui/shadcn/button";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
@@ -48,10 +52,158 @@ const figures = [
     tone: "default",
   },
 ] as const;
+
+const queueSample = {
+  breakdown: {
+    running: { maintenance: 1, default: 0, fast: 2, heavy: 1, playback: 0 },
+    pending: { maintenance: 3, default: 1, fast: 0, heavy: 2, playback: 1 },
+  },
+  runningTasks: [
+    { id: "task-1", type: "metadata_enrichment", pool: "maintenance" },
+    { id: "task-2", type: "artist_refresh", pool: "fast" },
+    { id: "task-3", type: "album_refresh", pool: "fast" },
+    { id: "task-4", type: "audio_analysis", pool: "heavy" },
+  ],
+  pendingTasks: [
+    { id: "task-5", type: "metadata_enrichment", pool: "maintenance" },
+    { id: "task-6", type: "library_scan", pool: "maintenance" },
+    { id: "task-7", type: "quality_check", pool: "maintenance" },
+    { id: "task-8", type: "playlist_rebuild", pool: "default" },
+    { id: "task-9", type: "bliss_analysis", pool: "heavy" },
+    { id: "task-10", type: "bliss_analysis", pool: "heavy" },
+    { id: "task-11", type: "playback_prepare", pool: "playback" },
+  ],
+  doneTasks: [
+    {
+      id: "task-12",
+      type: "cover_fetch",
+      pool: "maintenance",
+      status: "completed",
+    },
+    { id: "task-13", type: "audio_analysis", pool: "heavy", status: "failed" },
+    {
+      id: "task-14",
+      type: "stream_variant_prepare",
+      pool: "playback",
+      status: "completed",
+    },
+  ],
+};
+
+const governorSample: GovernorSurface = {
+  available: true,
+  stale: false,
+  sampled_at: "2026-10-22T09:30:00+02:00",
+  sampled_by: "crate-worker",
+  enabled: true,
+  allowed: true,
+  defer_seconds: 300,
+  gauges: [
+    {
+      id: "load_ratio",
+      label: "Load ratio",
+      value: 0.46,
+      unit: "",
+      limit: 0.85,
+      scale: 1.2,
+      over: false,
+    },
+    {
+      id: "iowait_percent",
+      label: "I/O wait",
+      value: 6.2,
+      unit: "%",
+      limit: 25,
+      scale: 40,
+      over: false,
+    },
+    {
+      id: "swap_used_percent",
+      label: "Swap used",
+      value: 18,
+      unit: "%",
+      limit: 30,
+      scale: 60,
+      over: false,
+    },
+    {
+      id: "active_users",
+      label: "Listeners",
+      value: 4,
+      unit: "",
+      limit: 10,
+      scale: 14,
+      over: false,
+    },
+    {
+      id: "active_streams",
+      label: "Streams",
+      value: 3,
+      unit: "",
+      limit: 10,
+      scale: 14,
+      over: false,
+    },
+  ],
+  window: {
+    enabled: true,
+    start: "02:00",
+    end: "07:00",
+    in_window: false,
+  },
+};
+
+type QueueDemoState = "queued" | "running" | "done";
+
+const QUEUE_DEMO_STATES: QueueDemoState[] = ["queued", "running", "done"];
+
 export function AdminOpsCheckpoint() {
   const [busy, setBusy] = useState(false);
   const [updates, setUpdates] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [queueDemoState, setQueueDemoState] =
+    useState<QueueDemoState>("queued");
+  const queueDemoTask = {
+    id: "queue-flow-demo",
+    type: "process_new_content",
+    pool: "default",
+    status:
+      queueDemoState === "queued"
+        ? "pending"
+        : queueDemoState === "done"
+          ? "completed"
+          : "running",
+  };
+  const queueBreakdown = {
+    running: {
+      ...queueSample.breakdown.running,
+      default:
+        queueSample.breakdown.running.default +
+        (queueDemoState === "running" ? 1 : 0),
+    },
+    pending: {
+      ...queueSample.breakdown.pending,
+      default:
+        queueSample.breakdown.pending.default +
+        (queueDemoState === "queued" ? 1 : 0),
+    },
+  };
+  const queuePendingTasks = [
+    ...(queueDemoState === "queued" ? [queueDemoTask] : []),
+    ...queueSample.pendingTasks,
+  ];
+  const queueRunningTasks = [
+    ...(queueDemoState === "running" ? [queueDemoTask] : []),
+    ...queueSample.runningTasks,
+  ];
+  const queueDoneTasks = [
+    ...(queueDemoState === "done" ? [queueDemoTask] : []),
+    ...queueSample.doneTasks,
+  ];
+  const advanceQueueDemo = () =>
+    setQueueDemoState((current) => {
+      const currentIndex = QUEUE_DEMO_STATES.indexOf(current);
+      return QUEUE_DEMO_STATES[(currentIndex + 1) % QUEUE_DEMO_STATES.length]!;
+    });
   return (
     <section
       id="superficies-admin"
@@ -124,36 +276,27 @@ export function AdminOpsCheckpoint() {
         </div>
         <OpsPanel
           title="Estado de las colas"
-          description="Títulos y contenido completos. Los controles funcionales permanecen en su contexto."
+          description="Cada carril separa tareas activas y pendientes por pool, con los datos que llegan en el snapshot operativo."
           action={
             <Button
               variant="outline"
-              className="min-h-11"
-              aria-expanded={expanded}
-              aria-controls="sample-queue-details"
-              onClick={() => setExpanded((value) => !value)}
+              size="sm"
+              aria-label={`Advance sample task from ${queueDemoState}`}
+              onClick={advanceQueueDemo}
             >
-              Detalles de las colas
-              <ChevronDown
-                size={16}
-                aria-hidden="true"
-                className={expanded ? "rotate-180" : undefined}
-              />
+              Advance sample task
             </Button>
           }
         >
-          <p className="text-sm text-text-muted">
-            Las superficies no añaden iconos al título ni a las métricas.
-          </p>
-          <div
-            id="sample-queue-details"
-            role="region"
-            aria-label="Detalle de colas de muestra"
-            hidden={!expanded}
-            className="mt-4 border-t border-border-quiet pt-4 text-sm"
-          >
-            Sin tareas en espera. El control de despliegue mantiene su glifo, su
-            nombre y su teclado.
+          <QueueLanes
+            breakdown={queueBreakdown}
+            runningTasks={queueRunningTasks}
+            pendingTasks={queuePendingTasks}
+            doneTasks={queueDoneTasks}
+            taskTypeCount={125}
+          />
+          <div className="mt-4" data-testid="ops-governor">
+            <GovernorGauges surface={governorSample} />
           </div>
           <a
             href="#controles-admin"

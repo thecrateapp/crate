@@ -6,6 +6,8 @@
 @source '../../app/shared/ui';
 @source '../../app/ui/src/components/layout';
 @source '../../app/ui/src/components/admin/ops-surfaces.tsx';
+@source '../../app/ui/src/components/admin/QueueLanes.tsx';
+@source '../../app/ui/src/components/admin/DbHeavyGate.tsx';
 @source '../../app/ui/src/pages/PlaylistEditor.tsx';
 @source '../../app/ui/src/pages/Playlists.tsx';
 @source '../../app/ui/src/components/admin/ListPagination.tsx';
@@ -14,6 +16,8 @@
 @source './components';
 @source './reviews';
 @source '../design-system-preview/admin-ops-checkpoint.tsx';
+@source '../design-system-preview/admin-task-playback-review.tsx';
+@source '../../app/ui/src/pages/PlaybackDelivery.tsx';
 @source '../../app/listen-desktop/src/components';
 @source '../../app/listen/src/components/dev';
 :root {

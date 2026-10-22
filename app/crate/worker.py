@@ -297,6 +297,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_shadow_backfill = 0
     last_media_worker_bridge = 0
     last_jam_auto_dj = 0
+    last_governor_sample = 0
 
     while not stop_event.is_set():
         now = _time.time()
@@ -468,6 +469,18 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                     pass
             except Exception:
                 pass
+
+        # Sample the governor in the worker process so the UI sees the same
+        # runtime policy and resource limits that gate background work.
+        if now - last_governor_sample > 15:
+            last_governor_sample = now
+            try:
+                from crate.db.ops_runtime import set_ops_runtime_state
+                from crate.resource_governor import build_governor_surface
+
+                set_ops_runtime_state("resource_governor", build_governor_surface())
+            except Exception:
+                log.debug("Resource governor sample failed", exc_info=True)
 
         # Analysis coverage is expensive to compute; refresh it off the HTTP path.
         if now - last_analysis_status_update > 120:

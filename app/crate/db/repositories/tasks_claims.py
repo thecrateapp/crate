@@ -7,6 +7,7 @@ from sqlalchemy import text
 from crate.db.queries.tasks import task_row_to_dict
 from crate.db.repositories.tasks_shared import (
     DB_HEAVY_TASKS,
+    _register_task_transition_signal,
     register_tasks_surface_signal,
 )
 from crate.db.tx import transaction_scope
@@ -71,9 +72,10 @@ def claim_next_task(
         if not row:
             return None
 
-        session.execute(
-            text(
-                """
+        started = (
+            session.execute(
+                text(
+                    """
                 UPDATE tasks
                 SET status = 'running',
                     started_at = COALESCE(started_at, :now),
@@ -82,15 +84,21 @@ def claim_next_task(
                     worker_id = :worker_id
                 WHERE id = :id
                   AND status = 'pending'
+                RETURNING *
                 """
-            ),
-            {
-                "now": datetime.now(timezone.utc).isoformat(),
-                "worker_id": worker_id,
-                "id": row["id"],
-            },
+                ),
+                {
+                    "now": datetime.now(timezone.utc).isoformat(),
+                    "worker_id": worker_id,
+                    "id": row["id"],
+                },
+            )
+            .mappings()
+            .first()
         )
-    return task_row_to_dict(row) if row else None
+        if started is not None:
+            _register_task_transition_signal(session, dict(started))
+    return task_row_to_dict(started) if started else None
 
 
 __all__ = ["claim_next_task"]

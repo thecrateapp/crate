@@ -1,24 +1,34 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { SeverityMeter } from "@/components/admin/status-indicators";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import {
-  Activity,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@crate/ui/shadcn/dropdown-menu";
+import {
   Ban,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
-  Cpu,
   Loader2,
   Minus,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
-  Trash2,
+  ScrollText,
   Zap,
   XCircle,
 } from "lucide-react";
@@ -29,9 +39,17 @@ import {
   OpsPanel,
   OpsRefreshNotice,
   OpsSnapshotStatus,
-  OpsStatTile,
   type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
+import { PageHeaderAction } from "@/components/layout/PageHeader";
+import {
+  QueueLanes,
+  type QueueLaneBreakdown,
+  type QueueLaneTask,
+  type QueueLaneTransition,
+} from "@/components/admin/QueueLanes";
+import { DbHeavyGate } from "@/components/admin/DbHeavyGate";
+import { ResourceGovernorMonitor } from "@/components/admin/GovernorGauges";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 
@@ -92,27 +110,8 @@ interface SettledTaskHighlight {
   status: string;
 }
 
-interface WorkerPoolBreakdown {
-  fast: number;
-  default: number;
-  heavy: number;
-  maintenance: number;
-  playback: number;
-}
-
 const EMPTY_TASKS: Task[] = [];
-const POOL_KEYS: Array<keyof WorkerPoolBreakdown> = [
-  "fast",
-  "default",
-  "heavy",
-  "maintenance",
-  "playback",
-];
-
-interface WorkerQueueBreakdown {
-  running: WorkerPoolBreakdown;
-  pending: WorkerPoolBreakdown;
-}
+type WorkerQueueBreakdown = QueueLaneBreakdown;
 
 interface DbHeavyGate {
   active: number;
@@ -169,56 +168,6 @@ interface TasksSnapshotData {
     systems: { postgres: boolean; watcher: boolean };
   };
   history: Task[];
-}
-
-interface PlaybackDeliveryVariant {
-  id: string;
-  track_id: number | null;
-  preset: string;
-  status: string;
-  delivery_format: string;
-  delivery_codec: string;
-  delivery_bitrate: number;
-  source_format: string | null;
-  source_bitrate: number | null;
-  source_size: number | null;
-  bytes: number | null;
-  task_id: string | null;
-  task_status: string | null;
-  title: string | null;
-  artist: string | null;
-  album: string | null;
-  updated_at: string | null;
-  completed_at: string | null;
-  error: string | null;
-}
-
-interface PlaybackDeliverySnapshot {
-  stats: {
-    tracks: number;
-    lossless_tracks: number;
-    hires_tracks: number;
-    variants: number;
-    variant_tracks: number;
-    ready: number;
-    pending: number;
-    pending_active?: number;
-    pending_unassigned?: number;
-    pending_stale?: number;
-    running: number;
-    failed: number;
-    ready_tracks: number;
-    cached_bytes: number;
-    ready_source_bytes: number;
-    estimated_saved_bytes: number;
-    coverage_percent: number;
-    avg_prepare_seconds: number | null;
-  };
-  runtime: {
-    active: number;
-    limit: number;
-  };
-  recent_variants: PlaybackDeliveryVariant[];
 }
 
 const STATUS_META: Record<
@@ -279,37 +228,6 @@ function getStatusMeta(status: string) {
     }
   );
 }
-
-const POOL_META: Record<
-  keyof WorkerPoolBreakdown,
-  { label: string; tone: string; accent: string }
-> = {
-  fast: {
-    label: "Fast",
-    tone: "border-accent-action/20 bg-accent-action/[0.05]",
-    accent: "text-accent-action-hi",
-  },
-  default: {
-    label: "Default",
-    tone: "border-accent-action/20 bg-accent-action/[0.05]",
-    accent: "text-accent-action-hi",
-  },
-  heavy: {
-    label: "Heavy",
-    tone: "border-border-quiet/20 bg-surface-card/[0.05]",
-    accent: "text-text-secondary",
-  },
-  maintenance: {
-    label: "Maintenance",
-    tone: "border-accent-action/20 bg-accent-action/[0.05]",
-    accent: "text-accent-action-hi",
-  },
-  playback: {
-    label: "Playback",
-    tone: "border-accent-action/20 bg-accent-action/[0.05]",
-    accent: "text-accent-action-hi",
-  },
-};
 
 const FAMILY_META: Record<string, { label: string; chip: string }> = {
   repair: {
@@ -468,21 +386,6 @@ function formatDuration(start: string, end: string) {
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m ${sec % 60}s`;
   return `${Math.floor(min / 60)}h ${min % 60}m`;
-}
-
-function formatBytes(bytes: number | null | undefined) {
-  const value = Number(bytes || 0);
-  if (value < 1024) return `${value} B`;
-  const units = ["KB", "MB", "GB", "TB"];
-  let size = value / 1024;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${
-    units[unitIndex]
-  }`;
 }
 
 function ProgressSummary({
@@ -787,6 +690,12 @@ function WorkerControlPanel({
   queueBreakdown,
   dbHeavyGate,
   activeTasks,
+  runningTasks,
+  pendingTasks,
+  doneTasks,
+  taskTransitions,
+  taskTypeCount,
+  onTaskSelect,
   refreshTasks,
 }: {
   engine: string;
@@ -796,12 +705,15 @@ function WorkerControlPanel({
   queueBreakdown: WorkerQueueBreakdown;
   dbHeavyGate: DbHeavyGate;
   activeTasks: { id: string; type: string; pool?: string | null }[];
+  runningTasks: QueueLaneTask[];
+  pendingTasks: QueueLaneTask[];
+  doneTasks: QueueLaneTask[];
+  taskTransitions: QueueLaneTransition[];
+  taskTypeCount?: number;
+  onTaskSelect: (taskId: string) => void;
   refreshTasks: (fresh?: boolean) => Promise<void>;
 }) {
   const [restarting, setRestarting] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
-  const [logs, setLogs] = useState<string | null>(null);
-  const [logsLoading, setLogsLoading] = useState(false);
 
   async function setSlots(next: number) {
     try {
@@ -818,9 +730,9 @@ function WorkerControlPanel({
     try {
       await api("/api/worker/restart", "POST");
       await refreshTasks(true);
-      toast.success("Worker restarting…");
+      toast.success("crate-worker is restarting…");
     } catch {
-      toast.error("Worker restart failed");
+      toast.error("Failed to restart crate-worker");
     } finally {
       setTimeout(() => setRestarting(false), 5000);
     }
@@ -850,34 +762,6 @@ function WorkerControlPanel({
     }
   }
 
-  async function toggleLogs() {
-    if (showLogs) {
-      setShowLogs(false);
-      return;
-    }
-    setShowLogs(true);
-    setLogsLoading(true);
-    try {
-      const response = await api<{ name: string; logs: string }>(
-        "/api/stack/container/crate-worker/logs?tail=40",
-      );
-      setLogs(response.logs);
-    } catch {
-      setLogs("Failed to load worker logs");
-    } finally {
-      setLogsLoading(false);
-    }
-  }
-
-  const hasQueuedDbHeavy = dbHeavyGate.pending > 0;
-  const gateMessage = dbHeavyGate.blocking
-    ? `DB-heavy work is serialized right now: ${dbHeavyGate.active} running, ${dbHeavyGate.pending} waiting. Free Dramatiq slots will stay idle until the gate clears.`
-    : hasQueuedDbHeavy
-      ? `${dbHeavyGate.pending} DB-heavy task${
-          dbHeavyGate.pending === 1 ? "" : "s"
-        } queued. They will run one at a time once a DB-heavy slot is free.`
-      : "No DB-heavy serialization pressure right now.";
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -889,15 +773,16 @@ function WorkerControlPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border border-white/10 bg-black/20 p-1">
+          <div className="flex h-11 items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1">
             <Button
               size="sm"
               variant="ghost"
               className="h-8 px-2"
+              aria-label="Decrease worker concurrency"
               onClick={() => setSlots(Math.max(1, slotLimit - 1))}
               disabled={slotLimit <= 1}
             >
-              <Minus size={12} />
+              <Minus size={12} aria-hidden="true" />
             </Button>
             <span className="w-8 text-center text-sm font-medium text-white/80">
               {slotLimit}
@@ -906,44 +791,31 @@ function WorkerControlPanel({
               size="sm"
               variant="ghost"
               className="h-8 px-2"
+              aria-label="Increase worker concurrency"
               onClick={() => setSlots(Math.min(64, slotLimit + 1))}
               disabled={slotLimit >= 64}
             >
-              <Plus size={12} />
+              <Plus size={12} aria-hidden="true" />
             </Button>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2"
-            onClick={toggleLogs}
-          >
-            <Cpu size={14} />
-            {showLogs ? "Hide logs" : "Worker logs"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2 "
-            onClick={cancelAll}
-          >
-            <Ban size={14} />
-            Cancel all
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-2"
+          <PageHeaderAction asChild label="Worker logs">
+            <Link to="/logs">
+              <ScrollText aria-hidden="true" />
+            </Link>
+          </PageHeaderAction>
+          <PageHeaderAction label="Cancel all tasks" onClick={cancelAll}>
+            <Ban aria-hidden="true" />
+          </PageHeaderAction>
+          <PageHeaderAction
+            label={
+              restarting ? "Restarting crate-worker" : "Restart crate-worker"
+            }
+            tooltip="Restarts crate-worker: default and fast queues plus its service loop."
             onClick={restartWorker}
-            disabled={restarting}
+            loading={restarting}
           >
-            {restarting ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <RotateCcw size={14} />
-            )}
-            Restart
-          </Button>
+            <RotateCcw aria-hidden="true" />
+          </PageHeaderAction>
         </div>
       </div>
 
@@ -973,241 +845,20 @@ function WorkerControlPanel({
         ))}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]">
-        <div className="grid gap-2 md:grid-cols-5">
-          {POOL_KEYS.map((pool) => {
-            const meta = POOL_META[pool];
-            const runningForPool = queueBreakdown.running[pool] ?? 0;
-            const pendingForPool = queueBreakdown.pending[pool] ?? 0;
-            return (
-              <div
-                key={pool}
-                className={cn("rounded-md border px-3 py-3", meta.tone)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className={cn("text-sm font-medium", meta.accent)}>
-                    {meta.label}
-                  </span>
-                  <InfoBadge className="border-white/10 bg-black/20 text-white/70">
-                    {runningForPool} active
-                  </InfoBadge>
-                </div>
-                <div className="mt-2 text-xs text-white/45">
-                  {pendingForPool} queued
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div
-          className={cn(
-            "rounded-md border px-4 py-3 text-sm",
-            dbHeavyGate.blocking
-              ? "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text"
-              : hasQueuedDbHeavy
-                ? "border-white/10 bg-black/15 text-white/80"
-                : "border-white/8 bg-black/15 text-white/65",
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <Zap
-              size={14}
-              className={
-                dbHeavyGate.blocking
-                  ? "text-state-warning-text"
-                  : "text-white/45"
-              }
-            />
-            <span className="font-medium">DB-heavy gate</span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-white/75">
-            {gateMessage}
-          </p>
-        </div>
-      </div>
-
-      {showLogs ? (
-        <div className="rounded-md border border-white/8 bg-[#06080c] px-4 py-4">
-          {logsLoading ? (
-            <div className="flex items-center gap-2 text-sm text-white/45">
-              <Loader2 size={14} className="animate-spin text-primary" />
-              Loading worker logs…
-            </div>
-          ) : (
-            <pre className="max-h-[260px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-white/55">
-              {logs || "No logs available"}
-            </pre>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function variantStatusClass(status: string) {
-  if (status === "ready" || status === "running")
-    return "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi";
-  if (status === "failed")
-    return "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text";
-  if (status === "pending")
-    return "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text";
-  return "border-white/10 bg-white/[0.04] text-white/60";
-}
-
-function PlaybackDeliveryPanel({
-  delivery,
-  loading,
-  error,
-  onRefresh,
-}: {
-  delivery: PlaybackDeliverySnapshot | null;
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
-}) {
-  const stats = delivery?.stats;
-  const runtime = delivery?.runtime;
-  const variants = delivery?.recent_variants ?? [];
-  const avgPrepare =
-    stats?.avg_prepare_seconds != null
-      ? `${stats.avg_prepare_seconds.toFixed(1)}s`
-      : "n/a";
-
-  if (loading && !delivery) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-white/45">
-        <Loader2 size={14} className="animate-spin text-primary" />
-        Loading playback delivery…
-      </div>
-    );
-  }
-
-  if (error && !delivery) {
-    return (
-      <ErrorState
-        message="Failed to load playback delivery"
-        onRetry={onRefresh}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <InfoBadge
-            className={
-              (runtime?.active ?? 0) > 0
-                ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                : undefined
-            }
-          >
-            {runtime?.active ?? 0}/{runtime?.limit ?? 1} transcodes
-          </InfoBadge>
-          <InfoBadge>
-            {stats?.pending_active ?? stats?.pending ?? 0} active pending
-          </InfoBadge>
-          {(stats?.pending_unassigned ?? 0) > 0 ? (
-            <InfoBadge>{stats?.pending_unassigned} unassigned</InfoBadge>
-          ) : null}
-          {(stats?.pending_stale ?? 0) > 0 ? (
-            <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-              {stats?.pending_stale} stale
-            </InfoBadge>
-          ) : null}
-          <InfoBadge>{stats?.failed ?? 0} failed</InfoBadge>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-2"
-          onClick={onRefresh}
-        >
-          <RefreshCw size={13} />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <OpsStatTile
-          label="Lossless coverage"
-          value={`${stats?.coverage_percent ?? 0}%`}
-          caption={`${(stats?.ready_tracks ?? 0).toLocaleString()} of ${(
-            stats?.lossless_tracks ?? 0
-          ).toLocaleString()} lossless tracks`}
-          tone={(stats?.coverage_percent ?? 0) > 0 ? "success" : "default"}
+      <div className="space-y-3">
+        <QueueLanes
+          breakdown={queueBreakdown}
+          runningTasks={runningTasks}
+          pendingTasks={pendingTasks}
+          doneTasks={doneTasks}
+          transitions={taskTransitions}
+          taskTypeCount={taskTypeCount}
+          onTaskSelect={onTaskSelect}
         />
-        <OpsStatTile
-          label="Ready variants"
-          value={(stats?.ready ?? 0).toLocaleString()}
-          caption={`${(stats?.variants ?? 0).toLocaleString()} variant records`}
-          tone={(stats?.ready ?? 0) > 0 ? "success" : "default"}
-        />
-        <OpsStatTile
-          label="Cache size"
-          value={formatBytes(stats?.cached_bytes)}
-          caption={`${formatBytes(
-            stats?.estimated_saved_bytes,
-          )} avoided vs source`}
-        />
-        <OpsStatTile
-          label="Avg prepare"
-          value={avgPrepare}
-          caption={`${(
-            stats?.hires_tracks ?? 0
-          ).toLocaleString()} hi-res source tracks`}
-        />
-      </div>
-
-      <div className="overflow-hidden rounded-md border border-white/8">
-        {variants.length > 0 ? (
-          variants.map((variant) => {
-            const track =
-              [variant.artist, variant.title].filter(Boolean).join(" - ") ||
-              `Track ${variant.track_id ?? "unknown"}`;
-            const reduction =
-              variant.source_size && variant.bytes
-                ? `${Math.max(
-                    0,
-                    Math.round((1 - variant.bytes / variant.source_size) * 100),
-                  )}% smaller`
-                : null;
-            return (
-              <div
-                key={variant.id}
-                className="grid gap-3 border-b border-white/6 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_150px_150px_120px] lg:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-white/85">
-                    {track}
-                  </div>
-                  <div className="mt-1 truncate text-xs text-white/35">
-                    {variant.album || "No album"} ·{" "}
-                    {variant.source_format || "source"} →{" "}
-                    {variant.delivery_format} {variant.delivery_bitrate}k
-                  </div>
-                </div>
-                <InfoBadge className={variantStatusClass(variant.status)}>
-                  {variant.status}
-                </InfoBadge>
-                <div className="text-xs text-white/45">
-                  {formatBytes(variant.bytes)}
-                  {reduction ? (
-                    <span className="text-white/28"> · {reduction}</span>
-                  ) : null}
-                </div>
-                <div className="text-xs text-white/35">
-                  {variant.updated_at ? timeAgo(variant.updated_at) : "n/a"}
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="px-4 py-6 text-sm text-white/40">
-            No playback variants prepared yet.
-          </div>
-        )}
+        <div className="flex flex-col gap-10">
+          <ResourceGovernorMonitor />
+          <DbHeavyGate gate={dbHeavyGate} />
+        </div>
       </div>
     </div>
   );
@@ -1499,17 +1150,17 @@ export function Tasks() {
   const [tasksSnapshot, setTasksSnapshot] = useState<TasksSnapshotData | null>(
     null,
   );
-  const [playbackDelivery, setPlaybackDelivery] =
-    useState<PlaybackDeliverySnapshot | null>(null);
-  const [playbackDeliveryLoading, setPlaybackDeliveryLoading] = useState(true);
-  const [playbackDeliveryError, setPlaybackDeliveryError] = useState<
-    string | null
-  >(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] =
     useState<OpsStreamStatus>("connecting");
+  const [taskTransitions, setTaskTransitions] = useState<QueueLaneTransition[]>(
+    [],
+  );
   const [searchParams] = useSearchParams();
+  const [taskTab, setTaskTab] = useState<"active" | "attention" | "history">(
+    () => (searchParams.has("task") ? "history" : "active"),
+  );
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [filterFamily, setFilterFamily] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -1519,6 +1170,7 @@ export function Tasks() {
   const loadedRef = useRef(false);
   const autoExpandedRepairRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
+  const taskTransitionSequenceRef = useRef(0);
   const previousActiveIdsRef = useRef<Set<string>>(new Set());
   const highlightTimersRef = useRef<Record<string, number>>({});
   const [settledHighlights, setSettledHighlights] = useState<
@@ -1548,34 +1200,9 @@ export function Tasks() {
     }
   }, []);
 
-  const fetchPlaybackDelivery = useCallback(async () => {
-    setPlaybackDeliveryLoading(true);
-    try {
-      const snapshot = await api<PlaybackDeliverySnapshot>(
-        "/api/admin/playback-delivery?limit=8",
-      );
-      setPlaybackDelivery(snapshot);
-      setPlaybackDeliveryError(null);
-    } catch (err) {
-      setPlaybackDeliveryError(
-        err instanceof Error ? err.message : "Failed to load playback delivery",
-      );
-    } finally {
-      setPlaybackDeliveryLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void fetchSnapshot();
   }, [fetchSnapshot]);
-
-  useEffect(() => {
-    void fetchPlaybackDelivery();
-    const timer = window.setInterval(() => {
-      void fetchPlaybackDelivery();
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [fetchPlaybackDelivery]);
 
   useEffect(() => {
     let disposed = false;
@@ -1599,6 +1226,29 @@ export function Tasks() {
           // Ignore malformed snapshots.
         }
       };
+      stream.addEventListener("task_transition", (event) => {
+        try {
+          const task = JSON.parse(
+            (event as MessageEvent<string>).data,
+          ) as QueueLaneTask | null;
+          if (
+            !task ||
+            typeof task.id !== "string" ||
+            typeof task.type !== "string" ||
+            typeof task.status !== "string"
+          ) {
+            return;
+          }
+          const transition: QueueLaneTransition = {
+            ...task,
+            sequence: ++taskTransitionSequenceRef.current,
+          };
+          setTaskTransitions((current) => [...current.slice(-99), transition]);
+          setStreamStatus("live");
+        } catch {
+          // Ignore malformed lifecycle events; snapshots remain authoritative.
+        }
+      });
       stream.onerror = () => {
         stream?.close();
         stream = null;
@@ -1624,9 +1274,17 @@ export function Tasks() {
 
   useEffect(() => {
     const highlightedTask = searchParams.get("task");
-    if (highlightedTask && tasks.some((task) => task.id === highlightedTask)) {
+    if (!highlightedTask) return;
+    const historicalTask = tasks.find((task) => task.id === highlightedTask);
+    if (historicalTask) {
       setExpandedId(highlightedTask);
-      setFilterStatus("all");
+      setTaskTab(
+        ["running", "pending"].includes(historicalTask.status)
+          ? "active"
+          : taskNeedsAttention(historicalTask)
+            ? "attention"
+            : "history",
+      );
     }
   }, [searchParams, tasks]);
 
@@ -1686,6 +1344,22 @@ export function Tasks() {
     }
   }
 
+  function selectQueueTask(taskId: string) {
+    setExpandedId(taskId);
+    const selectedTask = tasks.find((task) => task.id === taskId);
+    if (!selectedTask) {
+      setTaskTab("active");
+      return;
+    }
+    setTaskTab(
+      ["running", "pending"].includes(selectedTask.status)
+        ? "active"
+        : taskNeedsAttention(selectedTask)
+          ? "attention"
+          : "history",
+    );
+  }
+
   const taskTypes = useMemo(() => {
     return Array.from(new Set(tasks.map((task) => task.type)))
       .sort()
@@ -1740,6 +1414,19 @@ export function Tasks() {
       tasks.filter(
         (task) => task.status !== "running" && task.status !== "pending",
       ),
+    [tasks],
+  );
+
+  const recentQueueTasks = useMemo(
+    () =>
+      [...tasks]
+        .filter((task) =>
+          ["completed", "failed", "cancelled"].includes(task.status),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        ),
     [tasks],
   );
 
@@ -1822,6 +1509,7 @@ export function Tasks() {
     if (!candidate) return;
     autoExpandedRepairRef.current = true;
     setExpandedId((current) => current ?? candidate.id);
+    setTaskTab("attention");
   }, [recentRepairTasks, searchParams]);
 
   useEffect(() => {
@@ -1838,9 +1526,7 @@ export function Tasks() {
       if (filterFamily !== "all" && taskFamily(task.type) !== filterFamily)
         return false;
       if (filterType !== "all" && task.type !== filterType) return false;
-      if (filterStatus === "attention") {
-        if (!taskNeedsAttention(task)) return false;
-      } else if (filterStatus !== "all" && task.status !== filterStatus) {
+      if (filterStatus !== "all" && task.status !== filterStatus) {
         return false;
       }
       if (!normalized) return true;
@@ -1850,6 +1536,20 @@ export function Tasks() {
       return haystack.includes(normalized);
     });
   }, [completedTasks, filterFamily, filterStatus, filterType, search]);
+
+  const filteredAttention = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    return needsAttentionTasks.filter((task) => {
+      if (filterFamily !== "all" && taskFamily(task.type) !== filterFamily)
+        return false;
+      if (filterType !== "all" && task.type !== filterType) return false;
+      if (!normalized) return true;
+      const haystack = `${getTaskLabel(task)} ${task.id} ${
+        task.type
+      } ${JSON.stringify(task.params || {})}`.toLowerCase();
+      return haystack.includes(normalized);
+    });
+  }, [filterFamily, filterType, needsAttentionTasks, search]);
 
   const visibleActive = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -1864,47 +1564,6 @@ export function Tasks() {
       return haystack.includes(normalized);
     });
   }, [activeTasks, filterFamily, filterType, search]);
-
-  const stats = useMemo(() => {
-    const today = new Date().toDateString();
-    const todayTasks = tasks.filter(
-      (task) => new Date(task.created_at).toDateString() === today,
-    );
-    const todayCompleted = todayTasks.filter(
-      (task) => task.status === "completed",
-    ).length;
-    const todayFailed = todayTasks.filter(
-      (task) => task.status === "failed",
-    ).length;
-    const completed = tasks
-      .filter((task) => task.status === "completed")
-      .slice(0, 20);
-    const avgDurationMs = completed.reduce(
-      (sum, task) =>
-        sum +
-        (new Date(task.updated_at).getTime() -
-          new Date(task.started_at || task.created_at).getTime()),
-      0,
-    );
-
-    return {
-      todayTotal: todayTasks.length,
-      todayCompleted,
-      todayFailed,
-      needsAttention: needsAttentionTasks.length,
-      successRate:
-        todayTasks.length > 0
-          ? Math.round(
-              (todayCompleted / Math.max(todayCompleted + todayFailed, 1)) *
-                100,
-            )
-          : 100,
-      avgDurationSec:
-        completed.length > 0
-          ? Math.round(avgDurationMs / completed.length / 1000)
-          : 0,
-    };
-  }, [needsAttentionTasks.length, tasks]);
 
   if (loading && !tasksSnapshot) {
     return (
@@ -1929,49 +1588,14 @@ export function Tasks() {
         title="Tasks"
         description="Background orchestration for enrichment, analysis, sync, repair and acquisition jobs across the whole stack."
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={cleanupOlder}
-            >
-              <Trash2 size={14} />
-              Cleanup old
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                void fetchSnapshot(true);
-              }}
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </Button>
-          </>
+          <PageHeaderAction
+            label="Refresh"
+            onClick={() => void fetchSnapshot(true)}
+          >
+            <RefreshCw aria-hidden="true" />
+          </PageHeaderAction>
         }
       >
-        <InfoBadge active icon={Activity}>
-          {tasks.length} tasks
-        </InfoBadge>
-        <InfoBadge icon={Loader2}>{activeTasks.length} active</InfoBadge>
-        <InfoBadge icon={Clock}>
-          {activeTasks.filter((task) => task.status === "pending").length}{" "}
-          queued
-        </InfoBadge>
-        <InfoBadge icon={CheckCircle2}>
-          {tasks.filter((task) => task.status === "completed").length} completed
-        </InfoBadge>
-        <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-          {tasks.filter((task) => task.status === "failed").length} failed
-        </InfoBadge>
-        {stats.needsAttention > 0 ? (
-          <InfoBadge className="border-state-warning/25 bg-state-warning/10 text-state-warning-text">
-            {stats.needsAttention} need attention
-          </InfoBadge>
-        ) : null}
         <OpsSnapshotStatus
           snapshot={tasksSnapshot?.snapshot}
           streamStatus={streamStatus}
@@ -1985,136 +1609,10 @@ export function Tasks() {
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        <OpsStatTile
-          label="Today"
-          value={stats.todayTotal.toLocaleString()}
-          caption="Tasks created today"
-        />
-        <OpsStatTile
-          label="Completed today"
-          value={stats.todayCompleted.toLocaleString()}
-          caption="Successful jobs in the current day"
-          tone={stats.todayCompleted > 0 ? "success" : "default"}
-        />
-        <OpsStatTile
-          label="Failed today"
-          value={stats.todayFailed.toLocaleString()}
-          caption="Tasks that need operator attention"
-          tone={stats.todayFailed > 0 ? "danger" : "default"}
-        />
-        <OpsStatTile
-          label="Needs attention"
-          value={stats.needsAttention.toLocaleString()}
-          caption="Recent failed, cancelled or partially-resolved work"
-          tone={stats.needsAttention > 0 ? "warning" : "default"}
-        />
-        <OpsStatTile
-          label="Success rate"
-          value={`${stats.successRate}%`}
-          caption="Completed vs failed, same-day only"
-          tone={stats.successRate >= 90 ? "success" : "warning"}
-        />
-        <OpsStatTile
-          label="Avg duration"
-          value={`${stats.avgDurationSec}s`}
-          caption="Last 20 completed tasks"
-        />
-      </div>
-
       <OpsPanel
-        title="Task filters"
-        description="Slice active and historical tasks by type, final status or free-text search on labels, ids and params."
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => cleanStatus("completed")}
-            >
-              <Trash2 size={13} />
-              Clean completed
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => cleanStatus("failed")}
-            >
-              <Trash2 size={13} />
-              Clean failed
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => cleanStatus("cancelled")}
-            >
-              <Trash2 size={13} />
-              Clean cancelled
-            </Button>
-          </div>
-        }
-      >
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="relative min-w-[260px] flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-            />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search labels, ids or params..."
-              className="pl-9"
-            />
-          </div>
-          <div className="crate-form-field max-w-full">
-            <MonoLabel as="span" className="block">
-              Task family
-            </MonoLabel>
-            <SegmentedControl
-              as="radio"
-              label="Task family"
-              value={filterFamily === "all" ? "" : filterFamily}
-              onValueChange={(value) => setFilterFamily(value || "all")}
-              items={[{ value: "", label: "All families" }, ...taskFamilies]}
-            />
-          </div>
-          <AdminSelect
-            value={filterType === "all" ? "" : filterType}
-            onChange={(value) => setFilterType(value || "all")}
-            options={taskTypes}
-            placeholder="All task types"
-            searchable
-            searchPlaceholder="Filter task types..."
-            triggerClassName="min-w-[200px]"
-          />
-          <div className="crate-form-field max-w-full">
-            <MonoLabel as="span" className="block">
-              Final task state
-            </MonoLabel>
-            <SegmentedControl
-              as="radio"
-              label="Final task state"
-              value={filterStatus === "all" ? "" : filterStatus}
-              onValueChange={(value) => setFilterStatus(value || "all")}
-              items={[
-                { value: "", label: "All final states" },
-                { value: "attention", label: "Needs attention" },
-                { value: "completed", label: "Completed" },
-                { value: "failed", label: "Failed" },
-                { value: "cancelled", label: "Cancelled" },
-              ]}
-            />
-          </div>
-        </div>
-      </OpsPanel>
-
-      <OpsPanel
-        title="Worker control"
-        description="Queue depth, concurrency slots and quick access to worker logs when orchestration starts to stall."
+        title="Worker runtime"
+        titleTone="accent"
+        description="Queue lanes, concurrency controls and resource pressure for background work."
       >
         <WorkerControlPanel
           engine={live?.engine || "dramatiq"}
@@ -2149,131 +1647,206 @@ export function Tasks() {
             type: task.type,
             pool: task.pool,
           }))}
+          runningTasks={live?.running_tasks ?? []}
+          pendingTasks={live?.pending_tasks ?? []}
+          doneTasks={recentQueueTasks}
+          taskTransitions={taskTransitions}
+          taskTypeCount={taskCatalog?.types.length}
+          onTaskSelect={selectQueueTask}
           refreshTasks={fetchSnapshot}
         />
       </OpsPanel>
 
       <OpsPanel
-        title="Playback delivery"
-        description="Dedicated stream-preparation lane, cached AAC variants and recent transcode outcomes for Listen."
+        title="Task desk"
+        titleTone="accent"
+        description="Review live work, resolve failures and inspect recent task results."
+        action={
+          taskTab === "history" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  aria-label="Task cleanup actions"
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => void cleanStatus("completed")}
+                >
+                  Clean completed tasks
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void cleanStatus("failed")}>
+                  Clean failed tasks
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void cleanStatus("cancelled")}
+                >
+                  Clean cancelled tasks
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => void cleanupOlder()}>
+                  Clean tasks older than 7 days
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null
+        }
       >
-        <PlaybackDeliveryPanel
-          delivery={playbackDelivery}
-          loading={playbackDeliveryLoading}
-          error={playbackDeliveryError}
-          onRefresh={() => void fetchPlaybackDelivery()}
-        />
-      </OpsPanel>
+        <Tabs
+          value={taskTab}
+          onValueChange={(value) => setTaskTab(value as typeof taskTab)}
+          className="min-w-0 gap-5"
+        >
+          <TabsList aria-label="Task views" className="w-full max-w-full">
+            <TabsTrigger value="active">Active &amp; queued</TabsTrigger>
+            <TabsTrigger value="attention">Needs attention</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
 
-      <OpsPanel
-        title="Running and queued"
-        description="Current work in flight, with live event streams for long-running tasks."
-      >
-        {visibleActive.length > 0 ? (
-          <div className="space-y-3">
-            {visibleActive.map((task) => (
-              <ActiveTaskCard
-                key={task.id}
-                task={task}
-                expanded={expandedId === task.id}
-                onExpand={() =>
-                  setExpandedId((current) =>
-                    current === task.id ? null : task.id,
-                  )
-                }
-                onCancel={() => setCancelId(task.id)}
+          <div
+            className={cn(
+              "grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2",
+              taskTab === "history"
+                ? "xl:grid-cols-[minmax(0,1.2fr)_minmax(160px,0.8fr)_minmax(200px,1fr)_minmax(160px,0.8fr)]"
+                : "lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(200px,1fr)]",
+            )}
+          >
+            <div
+              className={cn(
+                "relative min-w-0",
+                taskTab === "history"
+                  ? "md:col-span-2 xl:col-span-1"
+                  : "md:col-span-2 lg:col-span-1",
+              )}
+            >
+              <Search
+                size={14}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
               />
-            ))}
+              <Input
+                aria-label="Search tasks"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search labels, ids or params..."
+                className="pl-9"
+              />
+            </div>
+            <AdminSelect
+              ariaLabel="Task family"
+              value={filterFamily}
+              onChange={setFilterFamily}
+              options={[
+                { value: "all", label: "All families" },
+                ...taskFamilies,
+              ]}
+              placeholder="All families"
+              allowClear={false}
+              triggerClassName="w-full min-w-0 max-w-none"
+            />
+            <AdminSelect
+              value={filterType === "all" ? "" : filterType}
+              onChange={(value) => setFilterType(value || "all")}
+              options={taskTypes}
+              placeholder="All task types"
+              searchable
+              searchPlaceholder="Filter task types..."
+              triggerClassName="w-full min-w-0 max-w-none"
+            />
+            {taskTab === "history" ? (
+              <AdminSelect
+                ariaLabel="Filter task outcomes"
+                value={filterStatus === "all" ? "" : filterStatus}
+                onChange={(value) => setFilterStatus(value || "all")}
+                options={[
+                  { value: "completed", label: "Completed" },
+                  { value: "failed", label: "Failed" },
+                  { value: "cancelled", label: "Cancelled" },
+                ]}
+                placeholder="All outcomes"
+                triggerClassName="w-full min-w-0 max-w-none"
+              />
+            ) : null}
           </div>
-        ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-            No active tasks match the current filters.
-          </div>
-        )}
-      </OpsPanel>
 
-      <OpsPanel
-        title="Needs attention"
-        description="Failures, cancelled jobs, and repairs that completed with manual follow-up or partial problems."
-      >
-        {needsAttentionTasks.length > 0 ? (
-          <div className="space-y-2">
-            {needsAttentionTasks.slice(0, 8).map((task) => (
-              <HistoryTaskRow
-                key={`attention-${task.id}`}
-                task={task}
-                expanded={expandedId === task.id}
-                onToggle={() =>
-                  setExpandedId((current) =>
-                    current === task.id ? null : task.id,
-                  )
-                }
-                onRetry={() => handleRetry(task)}
-                highlightStatus={settledHighlights[task.id]?.status ?? null}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-            No tasks need attention right now.
-          </div>
-        )}
-      </OpsPanel>
+          <TabsContent value="active" className="mt-0">
+            {visibleActive.length > 0 ? (
+              <div className="space-y-3">
+                {visibleActive.map((task) => (
+                  <ActiveTaskCard
+                    key={task.id}
+                    task={task}
+                    expanded={expandedId === task.id}
+                    onExpand={() =>
+                      setExpandedId((current) =>
+                        current === task.id ? null : task.id,
+                      )
+                    }
+                    onCancel={() => setCancelId(task.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
+                No active tasks match the current filters.
+              </div>
+            )}
+          </TabsContent>
 
-      <OpsPanel
-        title="Recent repair runs"
-        description="Latest repair, fix-artist and health-repair jobs, with quick access to item logs and partial failures."
-      >
-        {recentRepairTasks.length > 0 ? (
-          <div className="space-y-2">
-            {recentRepairTasks.slice(0, 8).map((task) => (
-              <HistoryTaskRow
-                key={`repair-${task.id}`}
-                task={task}
-                expanded={expandedId === task.id}
-                onToggle={() =>
-                  setExpandedId((current) =>
-                    current === task.id ? null : task.id,
-                  )
-                }
-                onRetry={() => handleRetry(task)}
-                highlightStatus={settledHighlights[task.id]?.status ?? null}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-            No repair runs recorded yet.
-          </div>
-        )}
-      </OpsPanel>
+          <TabsContent value="attention" className="mt-0">
+            {filteredAttention.length > 0 ? (
+              <div className="space-y-2">
+                {filteredAttention.map((task) => (
+                  <HistoryTaskRow
+                    key={`attention-${task.id}`}
+                    task={task}
+                    expanded={expandedId === task.id}
+                    onToggle={() =>
+                      setExpandedId((current) =>
+                        current === task.id ? null : task.id,
+                      )
+                    }
+                    onRetry={() => handleRetry(task)}
+                    highlightStatus={settledHighlights[task.id]?.status ?? null}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
+                No tasks need attention right now.
+              </div>
+            )}
+          </TabsContent>
 
-      <OpsPanel
-        title="Task history"
-        description="Recent finished jobs, with drill-down access to payloads, results and failure traces."
-      >
-        {filteredHistory.length > 0 ? (
-          <div className="space-y-2">
-            {filteredHistory.map((task) => (
-              <HistoryTaskRow
-                key={task.id}
-                task={task}
-                expanded={expandedId === task.id}
-                onToggle={() =>
-                  setExpandedId((current) =>
-                    current === task.id ? null : task.id,
-                  )
-                }
-                onRetry={() => handleRetry(task)}
-                highlightStatus={settledHighlights[task.id]?.status ?? null}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-            No historical tasks match the current filters.
-          </div>
-        )}
+          <TabsContent value="history" className="mt-0">
+            {filteredHistory.length > 0 ? (
+              <div className="space-y-2">
+                {filteredHistory.map((task) => (
+                  <HistoryTaskRow
+                    key={task.id}
+                    task={task}
+                    expanded={expandedId === task.id}
+                    onToggle={() =>
+                      setExpandedId((current) =>
+                        current === task.id ? null : task.id,
+                      )
+                    }
+                    onRetry={() => handleRetry(task)}
+                    highlightStatus={settledHighlights[task.id]?.status ?? null}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
+                No historical tasks match the current filters.
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </OpsPanel>
 
       <ConfirmDialog

@@ -59,6 +59,27 @@ describe("Playlists smart rule composer", () => {
     expect(name).toHaveFocus();
   });
 
+  it.each([
+    ["New static", "New static playlist"],
+    ["New smart", "New smart playlist"],
+  ])(
+    "keeps the %s composer on the shared flat card surface",
+    async (trigger, title) => {
+      renderWithAdminProviders(<Playlists />, { route: "/playlists" });
+      await screen.findByText("No playlists for this view yet");
+      await userEvent.click(screen.getByRole("button", { name: trigger }));
+
+      const heading = await screen.findByRole("heading", { name: title });
+      const card = heading.closest('[data-slot="card"]');
+      expect(card).not.toBeNull();
+      expect(
+        card?.className
+          .split(/\s+/)
+          .filter((className) => className.startsWith("shadow-")),
+      ).toEqual([]);
+    },
+  );
+
   it("shows the playlist identity, cover and information chips in the list", async () => {
     playlistRows = [
       {

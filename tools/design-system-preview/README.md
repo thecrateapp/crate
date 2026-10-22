@@ -831,6 +831,15 @@ Open <http://127.0.0.1:5186/review-admin-operations.html> or Storybook
 Health distinguish snapshot age from stream status. Refresh failures preserve the last successful
 snapshot and expose Retry; the preview includes current, stale, reconnecting and recovered states.
 
+## Admin — Tasks and Playback Delivery
+
+Open <http://127.0.0.1:5186/review-admin-tasks.html> or Storybook
+`Reviews/Admin/Tasks and Playback Delivery`. The review keeps queue lanes and the Resource
+Governor together under Worker runtime, groups task lifecycle into three views, and shows the
+dedicated Playback Delivery page. It uses the actual QueueLanes, GovernorGauges, Ops surfaces and
+PlaybackDelivery page content with local sample data only. Run
+`admin-task-playback-review.spec.ts` in either the preview or Storybook Playwright suite.
+
 ## Admin A2d — Library Health recovery
 
 Open <http://127.0.0.1:5186/review-admin-health-recovery.html> or Storybook

@@ -95,19 +95,30 @@ TASKS_STREAM_REFRESH_SECONDS = 2
 
 
 async def _tasks_stream(limit: int) -> AsyncIterator[str]:
-    yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
     pubsub = None
     try:
         pubsub = await open_pubsub(TASKS_SURFACE_STREAM_CHANNEL)
         heartbeat_counter = 0
         pending = False
-        last_sent = 0.0
+        yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
+        last_sent = time.monotonic()
         while True:
             message = await pubsub.get_message(
                 ignore_subscribe_messages=True, timeout=1.0
             )
             if message and message.get("type") == "message":
                 pending = True
+                try:
+                    signal = _json.loads(message.get("data") or "{}")
+                except (TypeError, ValueError):
+                    signal = {}
+                transition = signal.get("task") if isinstance(signal, dict) else None
+                if (
+                    isinstance(signal, dict)
+                    and signal.get("kind") == "task_transition"
+                    and isinstance(transition, dict)
+                ):
+                    yield f"event: task_transition\ndata: {json_dumps(transition)}\n\n"
             now = time.monotonic()
             if pending and now - last_sent >= TASKS_STREAM_REFRESH_SECONDS:
                 snapshot = await asyncio.to_thread(

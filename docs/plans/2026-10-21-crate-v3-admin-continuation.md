@@ -122,10 +122,11 @@ acciones ficticias. Comprobación focalizada: `Shell.test.tsx` y
 **Revisión local actualizada (2026-10-22):** `admin-shell-review.spec.ts` pasa 3/3 en 1440, 768
 y 390 px. Los dos tamaños mayores comprueban la cabecera desktop y el drawer se abre y conserva la
 navegación a 390 px. Las capturas están en `.artifacts/review/admin-shell-{1440,768,390}.png`;
-la vista real montada en Storybook y `review-admin-shell.html` siguen disponibles. La inspección de
-Storybook también confirma que el punto y su estela avanzan por el carril transparente del sidebar
-con el scroll. Falta la aprobación visual del usuario; no commit/push. OpsPageHero/OpsStatTile y
-adopción en páginas operativas continúan pendientes dentro de A1.
+la vista real montada en Storybook y `review-admin-shell.html` siguen disponibles. El checkpoint
+completo de navegación pasa 10/10 y verifica el scrollbar fino/oscuro aprobado; se retiró del test
+una aserción residual del efecto de punto y estela que ya no forma parte de la interfaz. Falta la
+aprobación visual del usuario; no commit/push. OpsPageHero/OpsStatTile y adopción en páginas
+operativas continúan pendientes dentro de A1.
 
 #### A1b — Superficies operativas sólidas · local para revisión
 
@@ -442,6 +443,15 @@ Playwright del preview y tres de Storybook. Las pruebas de layout y navegación 
 `/playlists/27` abrió el editor de Loma Prieta con 43 pistas. Solo se inspeccionaron datos; no se
 guardaron cambios. Sin commit/push.
 
+**A5a — limpieza visual de los compositores (2026-10-22):** los paneles de creación estática e
+inteligente dejan de añadir sombras locales a `Card`. Se retira la deuda registrada en
+`admin-adoption-debt.json`; las superficies conservan sus campos, reglas, acciones y envío. La
+prueba de Playlists cubre ambas variantes y preview/Storybook comprueban que su `box-shadow` es
+ninguno. Playlists y la política de consistencia pasan 29/29; el inventario revisa 13 archivos con
+cero violaciones y cero deudas pendientes. Preview y Storybook pasan 5/5 cada uno; typecheck y lint
+de Admin, build de preview, build de Storybook y `git diff --check` pasan. Captura:
+`.artifacts/review/admin-playlist-composer-flat.png`. Se mantiene sin commit para revisión.
+
 **Revisión:** la revisión visual de A5a está aprobada; el listado y el editor también se comprobaron
 en sesión autenticada contra la API de producción. A5b y A5c cuentan con aprobación visual.
 Federation y Contributions quedan pendientes de revisión. Orphans se mantiene como dato/issues bajo
@@ -580,6 +590,73 @@ reintento 1/1, la escena 4/4 a 1440/768/390 px y 7/7 checks restantes de la pág
 typecheck/build de Admin, typecheck/build de Storybook, build del preview y `git diff --check` pasan.
 Una aserción histórica del CTA se alineó con el Button primario aprobado: fondo transparente,
 borde y texto accent. Los servicios existentes siguen activos. Sin commit/push.
+
+#### A2e — QueueLanes en Tasks · local para revisión
+
+`WorkerControlPanel` presenta las cinco colas como carriles visuales con zonas de queued, running y
+done, conteos y etiquetas de workers. Los chips representan tareas concretas del snapshot, así que
+cuando el snapshot cambia una tarea de estado, el mismo chip se desplaza por el carril. Las tareas
+gobernadas conservan su borde discontinuo y el progreso de las que están ejecutándose rellena el
+chip. Conservar concurrencia, reinicio, cancelación, logs y DB-heavy gate.
+
+Storybook `Reviews/Admin/Operations` y `review-admin-operations.html` montan `QueueLanes` con
+fixtures locales. El botón `Advance sample task` recorre queued → running → done para comprobar el
+movimiento sin simular actividad de servidor. Playwright comprueba los cinco carriles, el cambio de
+estado y la identidad del mismo nodo de chip, el ajuste a 1440/768/390 px y la ausencia de llamadas
+a la API; los tests de Tasks verifican el enlace del snapshot real con sus carriles.
+
+**Validación local:** 11 pruebas Vitest; typecheck, lint y build de Admin; typecheck y build de
+Storybook; build del preview; checkpoint de operaciones 14/14; Storybook 1/1; `git diff --check`.
+Los cuatro servicios locales siguen activos. Sin commit/push.
+
+**Actualización de comportamiento (2026-10-22):** el cliente no espera a que llegue otro snapshot
+para mover una tarea. La ruta SSE existente `tasks-stream` se suscribe a Redis antes de enviar su
+primer snapshot y emite el evento nombrado `task_transition` cuando un cambio de ciclo de vida que
+afecta a los carriles confirma su transacción. `Tasks` escucha ese evento con `EventSource` y
+`QueueLanes` aplica la transición al mismo chip, incluida la permanencia mínima en running para
+trabajos muy breves. Los
+snapshots ordinarios siguen reconciliando estado y progreso, agrupados cada dos segundos; un fallo
+de la suscripción conserva snapshots de recuperación y el cliente vuelve a conectar. No se añade
+otra ruta ni otro `EventSource`, pero sí se amplía el flujo SSE existente con eventos nombrados.
+
+**Validación del flujo:** Vitest de `QueueLanes` y Tasks 19/19; typecheck/lint Admin y typecheck de
+Storybook; preview 2/2 a desktop/móvil; Storybook Operations 1/1; build de Admin, Storybook y
+preview. El intérprete Python 3.13 de `.venv` local apunta a un binario inexistente, así que los
+tests backend se ejecutaron en un contenedor aislado con Python 3.13 y PostgreSQL de Testcontainers:
+27 pruebas de `tasks-stream`, ciclo de vida, recuperación y cancelación pasan. A2e queda local para
+revisión; no commit/push.
+
+**Auditoría de transiciones (2026-10-22):** el barrido de escrituras directas encontró tres cambios
+a `completing` fuera de `update_task`: finalización de tareas padre, importación exacta de shows y
+consolidación de shows. Los tres ahora registran `task_transition` con el registro actualizado en la
+misma transacción; el evento solo se publica tras el commit. Las suites completas de cancelación
+cooperativa y planes de shows pasan 53/53, incluidos los casos que afirman la transición
+`completing` antes de `completed`. A2e sigue local para revisión; sin commit/push.
+
+**Ajuste visual (2026-10-22):** el contador grande de cada cola recibe una corrección óptica de 2 px
+hacia abajo en escritorio y tablet, porque su cifra se percibía alta aun con las cajas centradas.
+En móvil, la información del lane ocupa la primera fila y el contador queda a la izquierda de la
+pista, centrado con ella. Playwright comprueba la diferencia deliberada de 2 px en 1440/768 y la
+alineación de 0 px en 390. Capturas: `.artifacts/review/queue-count-lane-{1440,390}.png`. Vitest de
+`QueueLanes` 8/8, Playwright del preview 2/2 y Storybook 1/1; sin commit/push.
+
+**Cierre de Tasks (2026-10-22):** `Worker Runtime` y `Task Desk` usan el mismo tono accent. Refresh,
+logs, cancelación global y reinicio siguen la receta de icon-only con nombres accesibles y targets
+compartidos; el tooltip del reinicio explica que actúa sobre `crate-worker` (colas default/fast y su
+service loop). Los logs inline se retiran de Tasks y el botón lleva al pane dedicado de Logs. El
+filtro de familia pasa a Select, alineado con la búsqueda y el selector de tipos. Los mensajes de
+Resource Governor y DB-heavy gate conservan jerarquía y espaciado comunes; el estado de reintento
+rota en la etiqueta de Worker Sample en vez de añadir una línea suelta. Playback Delivery vive en
+su pane propio, fuera del Task Desk. La suite focalizada de estas áreas pasa 88/88; typecheck, lint y
+build de Admin, typecheck/build de Storybook y build de preview pasan. Las builds señalan los chunks
+grandes habituales; no hay fallos de compilación. A2e queda en revisión visual; sin commit/push.
+
+**Movimiento reducido (2026-10-22):** `QueueLanes` usa el gate de movimiento compartido. Con
+`prefers-reduced-motion` activo, las transiciones se asientan sin retener artificialmente una tarea
+rápida en `running`; si la preferencia cambia durante esa retención, el chip se asienta de inmediato.
+El checkpoint verifica `transition-property: none` y el flujo en 1440, 768 y 390 px. QueueLanes pasa
+8/8; operaciones en preview 14/14 y Storybook 1/1. Los tres builds y checks de Admin pasan de nuevo;
+el único aviso es el tamaño de algunos chunks. Sin commit/push.
 
 ### A5d — Federation · aprobado visualmente
 

@@ -13,6 +13,7 @@ from crate.db.repositories.task_control import (
     record_task_provenance,
     request_cancellation,
 )
+from crate.db.repositories.tasks_shared import _register_task_transition_signal
 from crate.db.tx import optional_scope, register_after_commit, transaction_scope
 
 
@@ -108,6 +109,17 @@ def create_task(
                 "dedup_key": (dedup_key or "").strip(),
                 "max_duration": max_duration,
                 "max_retries": max_retries,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+        _register_task_transition_signal(
+            s,
+            {
+                "id": task_id,
+                "type": task_type,
+                "status": "pending",
+                "pool": pool,
                 "created_at": now,
                 "updated_at": now,
             },
@@ -289,6 +301,17 @@ def create_task_dedup(
                 )
             return None
 
+        _register_task_transition_signal(
+            current,
+            {
+                "id": task_id,
+                "type": task_type,
+                "status": "pending",
+                "pool": pool,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
         record_task_provenance(
             task_id,
             origin=origin,

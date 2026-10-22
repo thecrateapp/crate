@@ -5,6 +5,7 @@ import json
 from sqlalchemy import text
 
 from crate.db.repositories.tasks_shared import (
+    _register_task_transition_signal,
     dispatch_task,
     log,
     register_tasks_surface_signal,
@@ -72,12 +73,15 @@ def check_siblings_complete(parent_task_id: str) -> dict:
                     SET status = 'completing',
                         updated_at = NOW()
                     WHERE id = :pid AND status IN ('running', 'delegated')
+                    RETURNING *
                     """
                 ),
                 {"pid": parent_task_id},
-            )
-            if _rowcount(claimed) == 0:
+            ).mappings().first()
+            if claimed is None:
                 all_done = False
+            else:
+                _register_task_transition_signal(session, dict(claimed))
 
     return {
         "all_done": all_done,
@@ -170,7 +174,7 @@ def cleanup_zombie_tasks(
                     worker_id = NULL
                 FROM stale
                 WHERE t.id = stale.id
-                RETURNING t.id, t.type, t.status
+                RETURNING t.*
                 """
                 ),
                 {
@@ -181,6 +185,8 @@ def cleanup_zombie_tasks(
             .mappings()
             .all()
         )
+        for row in rows:
+            _register_task_transition_signal(s, dict(row))
         recovered = [
             {
                 "id": str(row["id"]),
@@ -288,9 +294,10 @@ def cleanup_orphaned_tasks(*, pools: list[str] | None = None, session=None) -> i
         params["pools"] = pools
     with optional_scope(session) as s:
         register_tasks_surface_signal(s)
-        result = s.execute(
-            text(
-                f"""
+        rows = (
+            s.execute(
+                text(
+                    f"""
                 UPDATE tasks
                 SET status = 'failed',
                     error = 'Orphaned: worker restarted',
@@ -299,11 +306,17 @@ def cleanup_orphaned_tasks(*, pools: list[str] | None = None, session=None) -> i
                     worker_id = NULL
                 WHERE status = 'running'
                   {pool_filter}
+                RETURNING *
                 """
-            ),
-            params,
+                ),
+                params,
+            )
+            .mappings()
+            .all()
         )
-    count = _rowcount(result)
+        for row in rows:
+            _register_task_transition_signal(s, dict(row))
+    count = len(rows)
     if count > 0:
         log.warning("Marked %d orphaned tasks as failed", count)
     return count

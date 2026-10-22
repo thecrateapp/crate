@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-10-22",
-  "basis": "Reconciled the source inventory after A1–A5 migrations: A1a resolves Shell headers, A1b OpsPageHero/OpsStatTile, A2a nested SystemHealth/Stack surfaces, and A3c Discover OpportunityCard. Only the two playlist-creation shadows remain as unowned surfaces; no drift-budget increase.",
+  "basis": "Reconciled the source inventory after A1–A5 migrations: A1a resolves Shell headers, A1b OpsPageHero/OpsStatTile, A2a nested SystemHealth/Stack surfaces, A3c Discover OpportunityCard, and A5a removes the playlist-creation shadows. No pending Admin surface debt remains.",
   "scope": [
     "app/ui/src/components/layout/Sidebar.tsx",
     "app/ui/src/components/shows/ShowCard.tsx",
@@ -16,15 +16,5 @@
     "app/ui/src/pages/Health.tsx",
     "app/ui/src/pages/PlaylistEditor.tsx"
   ],
-  "pending": [
-    {
-      "path": "app/ui/src/pages/Playlists.tsx",
-      "owner": "Admin UI / design-system maintainer",
-      "phase": "6.8",
-      "reason": "Two playlist-creation cards still add a bespoke shadow to the shared Card surface; remove the shadows in the owning playlist phase. No additions permitted.",
-      "tokens": {
-        "shadow-[0_20px_60px_rgba(0,0,0,0.2)]": 2
-      }
-    }
-  ]
+  "pending": []
 }

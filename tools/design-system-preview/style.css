@@ -13,6 +13,8 @@
 @source "./admin-navigation-checkpoint.tsx";
 @source "./admin-controls-checkpoint.tsx";
 @source "./admin-ops-checkpoint.tsx";
+@source "./admin-task-playback-review.tsx";
+@source "./admin-task-playback-review-demo.tsx";
 @source "./admin-operations-checkpoint.tsx";
 @source "./admin-analysis-checkpoint.tsx";
 @source "./admin-insights-demo.tsx";
@@ -23,6 +25,11 @@
 @source "./tracks-checkpoint.tsx";
 @source "./status-colour-checkpoint.tsx";
 @source "../../app/ui/src/components/admin/ops-surfaces.tsx";
+@source "../../app/ui/src/components/admin/QueueLanes.tsx";
+@source "../../app/ui/src/components/admin/GovernorGauges.tsx";
+@source "../../app/ui/src/components/admin/DbHeavyGate.tsx";
+@source "../../app/ui/src/pages/PlaybackDelivery.tsx";
+@source "../../app/ui/src/pages/Tasks.tsx";
 @source "../../app/ui/src/components/admin/ListPagination.tsx";
 @source "../../app/ui/src/pages/PlaylistEditor.tsx";
 @source "../../app/ui/src/pages/Playlists.tsx";

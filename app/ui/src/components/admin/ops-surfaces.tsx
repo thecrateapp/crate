@@ -140,12 +140,14 @@ export function OpsSurface({
 
 export function OpsPanel({
   title,
+  titleTone,
   description,
   action,
   children,
   className,
 }: {
   title: string;
+  titleTone?: ComponentProps<typeof MonoLabel>["tone"];
   description?: string;
   action?: ReactNode;
   children: ReactNode;
@@ -155,7 +157,7 @@ export function OpsPanel({
     <InstrumentPanel
       as="section"
       headingLevel={2}
-      label={{ children: title }}
+      label={{ children: title, tone: titleTone }}
       description={description}
       actions={action}
       className={className}

@@ -1804,3 +1804,15 @@ def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app)
                 ]
                 == f"#/components/schemas/{model}"
             )
+
+
+def test_openapi_exposes_typed_authenticated_resource_governor_snapshot(test_app):
+    schema = test_app.get("/openapi.json").json()
+    operation = schema["paths"]["/api/admin/governor"]["get"]
+
+    assert operation["tags"] == ["admin-metrics"]
+    assert operation["security"]
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/AdminGovernorSnapshotResponse"
+    )

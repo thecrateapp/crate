@@ -1,4 +1,5 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { Button } from "@crate/ui/shadcn/button";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -19,10 +20,10 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
-import { Meter } from "@crate/ui/primitives/Meter";
 import { useApi } from "@/hooks/use-api";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { Link } from "react-router";
 
 interface MetricSummary {
   count: number;
@@ -331,9 +332,7 @@ function HealthSignal({
     <OpsSurface className={`px-5 py-4 ${bg}`}>
       <div className="crate-form-field">
         <MonoLabel as="div">Health Score</MonoLabel>
-        <div
-          className={`font-mono text-3xl font-normal tabular-nums ${color}`}
-        >
+        <div className={`font-mono text-3xl font-normal tabular-nums ${color}`}>
           {score ?? "—"}
         </div>
       </div>
@@ -683,199 +682,6 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
   );
 }
 
-function PlaybackTranscodingOverview({
-  delivery,
-  durationSummary,
-  completedSummary,
-  failedSummary,
-}: {
-  delivery: PlaybackDeliverySnapshot | undefined;
-  durationSummary: MetricSummary | undefined;
-  completedSummary: MetricSummary | undefined;
-  failedSummary: MetricSummary | undefined;
-}) {
-  const stats = delivery?.stats;
-  const runtime = delivery?.runtime;
-  const variantsTotal = Math.max(1, stats?.variants ?? 0);
-  const statuses = [
-    { label: "Ready", value: stats?.ready ?? 0, color: "bg-accent-action" },
-    { label: "Running", value: stats?.running ?? 0, color: "bg-accent-action" },
-    {
-      label: "Active pending",
-      value: stats?.pending_active ?? stats?.pending ?? 0,
-      color: "bg-state-warning",
-    },
-    {
-      label: "Unassigned",
-      value: stats?.pending_unassigned ?? 0,
-      color: "bg-state-warning",
-    },
-    {
-      label: "Stale pending",
-      value: stats?.pending_stale ?? 0,
-      color: "bg-state-warning",
-    },
-    { label: "Failed", value: stats?.failed ?? 0, color: "bg-state-warning" },
-    { label: "Missing", value: stats?.missing ?? 0, color: "bg-white/35" },
-  ];
-  const completed = completedSummary?.count ?? 0;
-  const failed = failedSummary?.count ?? 0;
-  const failRate =
-    completed + failed > 0 ? (failed / (completed + failed)) * 100 : 0;
-  const avgTranscode =
-    durationSummary && durationSummary.count > 0
-      ? `${durationSummary.avg.toFixed(1)}s`
-      : "—";
-  const avgPrepare =
-    stats?.avg_prepare_seconds != null
-      ? `${stats.avg_prepare_seconds.toFixed(1)}s`
-      : "—";
-
-  return (
-    <OpsPanel
-      title="Playback Transcoding"
-      description="Cached AAC delivery coverage, playback worker slots and recent transcode health for Listen."
-    >
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <OpsStatTile
-            label="Lossless Coverage"
-            value={stats ? `${stats.coverage_percent}%` : "—"}
-            caption={
-              stats
-                ? `${stats.ready_tracks.toLocaleString()} / ${stats.lossless_tracks.toLocaleString()} tracks`
-                : "Waiting for cache stats"
-            }
-            tone={stats && stats.coverage_percent > 0 ? "success" : "default"}
-          />
-          <OpsStatTile
-            label="Cache Size"
-            value={formatBytes(stats?.cached_bytes)}
-            caption={`${formatBytes(
-              stats?.estimated_saved_bytes,
-            )} avoided vs source`}
-          />
-          <OpsStatTile
-            label="Avg Prepare"
-            value={avgPrepare}
-            caption={`${avgTranscode} worker avg in current metrics window`}
-          />
-          <OpsStatTile
-            label="Transcode Failures"
-            value={`${failRate.toFixed(0)}%`}
-            caption={`${failed} failed / ${completed} completed samples`}
-            tone={
-              failRate > 5 || (stats?.failed ?? 0) > 0 ? "warning" : "default"
-            }
-          />
-        </div>
-
-        <div className="min-w-0">
-          <Meter
-            label="Transcode Slots"
-            value={
-              runtime?.active != null && runtime?.limit != null
-                ? runtime.active
-                : null
-            }
-            max={runtime?.limit ?? 0}
-            valueText={`${runtime?.active}/${runtime?.limit}`}
-            over={runtime != null && runtime.active > runtime.limit}
-          />
-          <p className="mt-2 text-xs text-text-muted">
-            Active playback worker capacity
-          </p>
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <OpsSurface className="p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="font-display text-xl font-bold text-text-primary">
-                  Variant Status
-                </div>
-                <div className="mt-1 text-xs text-white/35">
-                  {(stats?.variants ?? 0).toLocaleString()} cached variant
-                  records
-                </div>
-              </div>
-              <InfoBadge>
-                {(stats?.variant_tracks ?? 0).toLocaleString()} tracks
-              </InfoBadge>
-            </div>
-            <div className="space-y-3">
-              {statuses.map((status) => (
-                <ProgressBar
-                  key={status.label}
-                  value={status.value}
-                  max={variantsTotal}
-                  color={status.color}
-                  label={`${status.label} ${status.value.toLocaleString()}`}
-                />
-              ))}
-            </div>
-          </OpsSurface>
-
-          <OpsSurface className="p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="font-display text-xl font-bold text-text-primary">
-                  Recent Variants
-                </div>
-                <div className="mt-1 text-xs text-white/35">
-                  Latest playback cache writes and retries.
-                </div>
-              </div>
-              <InfoBadge>
-                {(stats?.hires_tracks ?? 0).toLocaleString()} hi-res sources
-              </InfoBadge>
-            </div>
-            <div className="space-y-2">
-              {(delivery?.recent_variants ?? []).length > 0 ? (
-                delivery?.recent_variants.map((variant) => (
-                  <div
-                    key={variant.id}
-                    className="flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.03] px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-white/80">
-                        {[variant.artist, variant.title]
-                          .filter(Boolean)
-                          .join(" - ") || variant.id}
-                      </div>
-                      <div className="mt-0.5 text-xs text-white/35">
-                        {variant.preset} · {variant.delivery_format}{" "}
-                        {variant.delivery_bitrate}k ·{" "}
-                        {formatBytes(variant.bytes)}
-                      </div>
-                    </div>
-                    <InfoBadge
-                      className={
-                        variant.status === "ready" ||
-                        variant.status === "running"
-                          ? "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
-                          : variant.status === "failed"
-                            ? "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text"
-                            : "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text"
-                      }
-                    >
-                      {variant.status}
-                    </InfoBadge>
-                  </div>
-                ))
-              ) : (
-                <div className="flex min-h-[118px] items-center justify-center text-sm text-white/30">
-                  No playback variants prepared yet
-                </div>
-              )}
-            </div>
-          </OpsSurface>
-        </div>
-      </div>
-    </OpsPanel>
-  );
-}
-
 export function SystemHealth() {
   useTaskCatalog();
   const [period, setPeriod] = useState<Period>("minute");
@@ -1057,11 +863,6 @@ export function SystemHealth() {
             {homeEndpointCacheHitRate.toFixed(0)}% home endpoint hit
           </InfoBadge>
         ) : null}
-        {playbackDelivery?.stats ? (
-          <InfoBadge>
-            {playbackDelivery.stats.coverage_percent}% playback coverage
-          </InfoBadge>
-        ) : null}
         {summary?.worker_resource_deferred?.count ? (
           <InfoBadge>
             {summary.worker_resource_deferred.count} batch deferrals
@@ -1156,12 +957,35 @@ export function SystemHealth() {
 
       <RouteLatencyOverview routes={routeLatency} />
 
-      <PlaybackTranscodingOverview
-        delivery={playbackDelivery}
-        durationSummary={summary?.stream_transcode_duration}
-        completedSummary={summary?.stream_transcode_completed}
-        failedSummary={summary?.stream_transcode_failed}
-      />
+      <OpsPanel
+        title="Playback delivery"
+        description="A concise view of cached audio readiness. Open the dedicated page for variants and worker capacity."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/playback">Open playback delivery</Link>
+          </Button>
+        }
+      >
+        {playbackDelivery?.stats && playbackDelivery.runtime ? (
+          <div className="flex flex-wrap gap-2">
+            <InfoBadge>
+              {playbackDelivery.stats.coverage_percent}% lossless coverage
+            </InfoBadge>
+            <InfoBadge>
+              {playbackDelivery.stats.ready_tracks.toLocaleString()} tracks
+              ready
+            </InfoBadge>
+            <InfoBadge>
+              {playbackDelivery.runtime.active}/{playbackDelivery.runtime.limit}{" "}
+              transcodes
+            </InfoBadge>
+          </div>
+        ) : (
+          <p className="m-0 text-sm text-text-muted">
+            Playback delivery metrics are unavailable in this sample.
+          </p>
+        )}
+      </OpsPanel>
 
       {system ? (
         <InstrumentPanel

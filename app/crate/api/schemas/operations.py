@@ -164,6 +164,31 @@ class AdminLogsSnapshotResponse(BaseModel):
     workers: list[WorkerLogWorkerResponse] = Field(default_factory=list)
 
 
+class AdminGovernorGaugeResponse(BaseModel):
+    id: str
+    label: str
+    value: int | float | None = None
+    unit: str = ""
+    limit: int | float
+    scale: int | float
+    over: bool = False
+
+
+class AdminGovernorSnapshotResponse(BaseModel):
+    available: bool = False
+    stale: bool = False
+    sampled_at: datetime | str | None = None
+    sampled_by: str | None = None
+    enabled: bool | None = None
+    allowed: bool | None = None
+    reason: str = ""
+    defer_seconds: int = 0
+    snapshot: dict[str, Any] | None = None
+    limits: dict[str, int | float] = Field(default_factory=dict)
+    gauges: list[AdminGovernorGaugeResponse] = Field(default_factory=list)
+    window: dict[str, Any] | None = None
+
+
 class ScanIssueResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 

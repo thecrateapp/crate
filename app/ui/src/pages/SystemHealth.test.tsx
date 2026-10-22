@@ -89,7 +89,8 @@ describe("SystemHealth Resources instrument", () => {
       error: "network unavailable",
       refetch: refetchMock,
     });
-    view.rerender(<SystemHealth />);
+    view.unmount();
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Showing the last successful sample.",
     );
@@ -236,9 +237,6 @@ describe("SystemHealth Resources instrument", () => {
     const volume = screen.getByText("Music Volume").parentElement!;
     expect(volume).toHaveClass("crate-form-field");
     expect(volume.children[1]).toHaveTextContent("280 / 1000 GB");
-    expect(
-      screen.getByRole("meter", { name: "Transcode Slots" }),
-    ).toHaveAttribute("aria-valuenow", "1");
     expect(screen.getByText("Elapsed", { exact: true })).toHaveTextContent(
       /Elapsed.*\d/,
     );
@@ -266,12 +264,17 @@ describe("SystemHealth Resources instrument", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses actual playback worker activity and capacity for the transcoding meter", () => {
+  it("keeps a concise playback signal and links to its dedicated page", () => {
     useApiMock.mockReturnValue({
       data: {
         ...dashboard,
         playback_delivery: {
           ...dashboard.playback_delivery,
+          stats: {
+            ...dashboard.playback_delivery.stats,
+            coverage_percent: 82,
+            ready_tracks: 410,
+          },
           runtime: { active: 3, limit: 5 },
         },
       },
@@ -281,66 +284,14 @@ describe("SystemHealth Resources instrument", () => {
     });
     renderWithAdminProviders(<SystemHealth />, { route: "/system" });
 
-    const meter = screen.getByRole("meter", { name: "Transcode Slots" });
-    expect(meter).toHaveAttribute("aria-valuemin", "0");
-    expect(meter).toHaveAttribute("aria-valuenow", "3");
-    expect(meter).toHaveAttribute("aria-valuemax", "5");
-    expect(meter).toHaveAttribute(
-      "aria-valuetext",
-      expect.stringMatching(/3\s*\/\s*5/),
-    );
+    expect(screen.getByText("82% lossless coverage")).toBeVisible();
+    expect(screen.getByText("410 tracks ready")).toBeVisible();
+    expect(screen.getByText("3/5 transcodes")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Open playback delivery" }),
+    ).toHaveAttribute("href", "/playback");
+    expect(
+      screen.queryByRole("meter", { name: "Transcode slots" }),
+    ).not.toBeInTheDocument();
   });
-
-  it("keeps an oversubscribed worker measurement in text while clamping its accessible range", () => {
-    useApiMock.mockReturnValue({
-      data: {
-        ...dashboard,
-        playback_delivery: {
-          ...dashboard.playback_delivery,
-          runtime: { active: 5, limit: 4 },
-        },
-      },
-      loading: false,
-      error: null,
-      refetch: refetchMock,
-    });
-    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
-
-    const meter = screen.getByRole("meter", { name: /Transcode Slots.*over/ });
-    expect(meter).toHaveAttribute("aria-valuenow", "4");
-    expect(meter).toHaveAttribute("aria-valuemax", "4");
-    expect(meter).toHaveAttribute(
-      "aria-valuetext",
-      expect.stringMatching(/5\s*\/\s*4/),
-    );
-    expect(screen.getByText("over · max 4")).toBeInTheDocument();
-  });
-
-  it.each([undefined, { active: 0 }, { limit: 4 }])(
-    "does not invent playback capacity when the runtime is incomplete (%j)",
-    (runtime) => {
-      useApiMock.mockReturnValue({
-        data: {
-          ...dashboard,
-          playback_delivery: { ...dashboard.playback_delivery, runtime },
-        },
-        loading: false,
-        error: null,
-        refetch: refetchMock,
-      });
-      renderWithAdminProviders(<SystemHealth />, { route: "/system" });
-
-      const unavailable = screen.getByRole("group", {
-        name: "Transcode Slots",
-      });
-      expect(unavailable).toHaveAccessibleDescription("n/a");
-      expect(unavailable).not.toHaveAttribute("aria-valuenow");
-      expect(
-        screen.queryByRole("meter", { name: "Transcode Slots" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("0/1", { exact: true }),
-      ).not.toBeInTheDocument();
-    },
-  );
 });

@@ -112,6 +112,11 @@ const navItems = [
     capabilities: ["ops.health.view"],
   },
   {
+    to: "/playback",
+    label: "Playback Delivery",
+    capabilities: ["ops.health.view"],
+  },
+  {
     to: "/analysis",
     label: "Analysis",
     capabilities: ["library.analysis.manage"],

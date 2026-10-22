@@ -129,3 +129,38 @@ test("list pagination Storybook example navigates and announces its range", asyn
   await pagination.getByRole("button", { name: "Next playlists page" }).click();
   await expect(pagination).toContainText("41–43 of 43 · page 3 of 3");
 });
+
+test("playlist composer stories keep both creation cards flat", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  const requests: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/") || url.hostname !== "127.0.0.1")
+      requests.push(request.url());
+  });
+  await page.goto(
+    "/iframe.html?id=reviews-admin-a5-playlists--playlist-list&viewMode=story",
+  );
+
+  for (const [trigger, headingText] of [
+    ["New static", "New static playlist"],
+    ["New smart", "New smart playlist"],
+  ]) {
+    await page.getByRole("button", { name: trigger, exact: true }).click();
+    const heading = page.getByRole("heading", {
+      name: headingText,
+      exact: true,
+    });
+    await expect(heading).toBeVisible();
+    await expect(
+      heading.locator("xpath=ancestor::*[@data-slot='card'][1]"),
+    ).toHaveCSS("box-shadow", "none");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+  }
+
+  expect(errors).toEqual([]);
+  expect(requests).toEqual([]);
+});

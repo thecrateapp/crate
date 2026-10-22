@@ -14,7 +14,10 @@ from crate.api._deps import json_dumps
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.permissions import require_any_permission, require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
-from crate.api.schemas.operations import AdminLogsSnapshotResponse
+from crate.api.schemas.operations import (
+    AdminGovernorSnapshotResponse,
+    AdminLogsSnapshotResponse,
+)
 from crate.db.admin_logs_surface import (
     LOGS_SURFACE_STREAM_CHANNEL,
     get_cached_logs_surface,
@@ -93,6 +96,10 @@ _SUMMARY_METRICS = {
 
 def _require_ops_health(request: Request) -> dict:
     return require_permission(request, "ops.health.view")
+
+
+def _require_governor_view(request: Request) -> dict:
+    return require_any_permission(request, ("ops.health.view", "ops.tasks.manage"))
 
 
 def _require_ops_logs(request: Request) -> dict:
@@ -190,31 +197,11 @@ def _build_metrics_system() -> dict:
 
     resource_pressure = {}
     try:
-        from crate.db.cache_store import get_cache
-        from crate.resource_governor import (
-            evaluate_maintenance_window,
-            evaluate_resources,
-        )
+        from crate.db.ops_runtime import get_ops_runtime_state
 
-        decision = evaluate_resources(label="admin metrics", listener_sensitive=True)
-        resource_pressure = decision.to_dict()
-        window_decision = evaluate_maintenance_window(task_type="library_pipeline")
-        if window_decision.window:
-            resource_pressure["window"] = window_decision.window
-        if not window_decision.allowed:
-            resource_pressure["allowed"] = False
-            resource_pressure["reason"] = (
-                window_decision.reason
-                if decision.allowed
-                else f"{window_decision.reason}, {decision.reason}"
-            )
-            resource_pressure["defer_seconds"] = max(
-                int(resource_pressure.get("defer_seconds") or 0),
-                window_decision.defer_seconds,
-            )
-        last_defer = get_cache("resource_pressure", max_age_seconds=600)
-        if isinstance(last_defer, dict) and not last_defer.get("allowed", True):
-            resource_pressure["last_defer"] = last_defer
+        resource_pressure = (
+            get_ops_runtime_state("resource_governor", max_age_seconds=45) or {}
+        )
     except Exception:
         resource_pressure = {}
 
@@ -410,6 +397,29 @@ def metrics_dashboard(
     _require_ops_health(request)
     safe_period = period if period in {"minute", "hour", "day"} else "minute"
     return _build_metrics_dashboard(safe_period, minutes)
+
+
+@router.get(
+    "/governor",
+    response_model=AdminGovernorSnapshotResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get the latest worker resource governor sample",
+)
+def governor_snapshot(request: Request):
+    _require_governor_view(request)
+    from crate.db.ops_runtime import get_ops_runtime_state
+
+    current = get_ops_runtime_state("resource_governor", max_age_seconds=45)
+    stale = current is None
+    sample = current or get_ops_runtime_state("resource_governor")
+    if sample is None:
+        return {"available": False, "stale": False}
+    return {
+        **sample,
+        "available": True,
+        "stale": stale,
+        "sampled_at": sample.get("updated_at"),
+    }
 
 
 @router.get(

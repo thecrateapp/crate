@@ -149,11 +149,18 @@ describe("Admin consistency prevention", () => {
     ).toContain("unowned-surface");
   });
 
-  it("checks actual reconciled consumers and keeps pending adoption visible", () => {
+  it("checks reconciled consumers and matches the registered adoption debt", () => {
     const inventory = buildAdminConsistencyInventory(repo);
     expect(inventory.filesScanned).toBeGreaterThanOrEqual(10);
     expect(inventory.violations).toEqual([]);
-    expect(inventory.pending.length).toBeGreaterThan(0);
+    expect(inventory.pending).toEqual(
+      JSON.parse(
+        readFileSync(
+          resolve(repo, "scripts/design-system/admin-adoption-debt.json"),
+          "utf8",
+        ),
+      ).pending,
+    );
     for (const item of inventory.pending) {
       expect(item.owner).toBeTruthy();
       expect(item.phase).toBeTruthy();

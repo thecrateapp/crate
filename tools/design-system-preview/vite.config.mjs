@@ -407,6 +407,9 @@ export default defineConfig({
         reviewAdminOperations: fileURLToPath(
           new URL("review-admin-operations.html", import.meta.url),
         ),
+        reviewAdminTasks: fileURLToPath(
+          new URL("review-admin-tasks.html", import.meta.url),
+        ),
         reviewAdminHealthRecovery: fileURLToPath(
           new URL("review-admin-health-recovery.html", import.meta.url),
         ),

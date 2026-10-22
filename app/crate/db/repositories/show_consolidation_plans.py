@@ -1,8 +1,10 @@
 """Explicit consolidation is an approved variant of the shared show operation."""
 
 from sqlalchemy import text
+
 from crate.agent_diagnostics import DiagnosticError
 from crate.api.schemas.show_imports import ShowConsolidationInput
+from crate.db.repositories.tasks_shared import _register_task_transition_signal
 from crate.db.tx import optional_scope, read_scope
 
 
@@ -101,11 +103,11 @@ def compile_show_consolidation(parameters: dict, *, session=None) -> dict:
 
 def apply_show_consolidation(execution: dict, task_id: str, *, session=None) -> dict:
     from crate.db.repositories.agent_operation_jobs import (
-        with_operation_authority,
         finish_operation,
+        with_operation_authority,
     )
-    from crate.db.repositories.agent_requests import _job
     from crate.db.repositories.agent_plans import _get
+    from crate.db.repositories.agent_requests import _job
     from crate.db.repositories.show_consolidation import consolidate_shows
 
     with optional_scope(session) as current:
@@ -132,9 +134,18 @@ def apply_show_consolidation(execution: dict, task_id: str, *, session=None) -> 
             raise DiagnosticError(
                 "CANCELLED", "Consolidation was cancelled before effects"
             )
-        current.execute(
-            text("UPDATE tasks SET status='completing' WHERE id=:id"), {"id": task_id}
+        transition = (
+            current.execute(
+                text(
+                    "UPDATE tasks SET status='completing' WHERE id=:id RETURNING *"
+                ),
+                {"id": task_id},
+            )
+            .mappings()
+            .first()
         )
+        if transition is not None:
+            _register_task_transition_signal(current, dict(transition))
         selected = execution["selection"]
         result = consolidate_shows(
             selected["canonical_show_id"],
@@ -164,7 +175,7 @@ def apply_show_consolidation(execution: dict, task_id: str, *, session=None) -> 
 
 
 __all__ = [
-    "read_consolidation_shows",
-    "compile_show_consolidation",
     "apply_show_consolidation",
+    "compile_show_consolidation",
+    "read_consolidation_shows",
 ]

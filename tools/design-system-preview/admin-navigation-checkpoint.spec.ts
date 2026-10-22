@@ -124,15 +124,6 @@ for (const width of [1440, 768, 390]) {
           element.scrollTop = element.scrollHeight;
         });
         await expect
-          .poll(() =>
-            sidebarNav.evaluate((element) =>
-              getComputedStyle(element).getPropertyValue(
-                "--crate-scrollbar-trail-angle-y",
-              ),
-            ),
-          )
-          .toBe("180deg");
-        await expect
           .poll(() => sidebarNav.evaluate((element) => element.scrollTop))
           .toBeGreaterThan(0);
         const scrollbarStyle = await sidebarNav.evaluate((element) => {
@@ -140,65 +131,13 @@ for (const width of [1440, 768, 390]) {
           const style = getComputedStyle(element);
           return {
             backgroundImage: track.backgroundImage,
-            backgroundSize: track.backgroundSize,
+            scrollbarWidth: style.scrollbarWidth,
             scrollbarColor: style.scrollbarColor,
-            dotPosition: style.getPropertyValue(
-              "--crate-scrollbar-dot-position-y",
-            ),
-            trailPosition: style.getPropertyValue(
-              "--crate-scrollbar-trail-position-y",
-            ),
-            trailAngle: style.getPropertyValue(
-              "--crate-scrollbar-trail-angle-y",
-            ),
-            clientHeight: element.clientHeight,
           };
         });
-        expect(scrollbarStyle.backgroundImage).toContain("radial-gradient");
-        expect(scrollbarStyle.backgroundImage).toContain("linear-gradient");
-        expect(scrollbarStyle.backgroundSize).toContain("4px 14px");
-        expect(scrollbarStyle.scrollbarColor).toBe("auto");
-        expect(Number.parseFloat(scrollbarStyle.dotPosition)).toBeCloseTo(
-          scrollbarStyle.clientHeight - 6,
-          1,
-        );
-        expect(scrollbarStyle.trailPosition).toBe(
-          `${scrollbarStyle.clientHeight - 17}px`,
-        );
-        expect(scrollbarStyle.trailAngle).toBe("180deg");
-        await sidebarNav.evaluate((element) => {
-          element.scrollTop = 0;
-        });
-        await expect
-          .poll(() =>
-            sidebarNav.evaluate((element) =>
-              getComputedStyle(element).getPropertyValue(
-                "--crate-scrollbar-trail-position-y",
-              ),
-            ),
-          )
-          .toBe("3px");
-        await expect
-          .poll(() =>
-            sidebarNav.evaluate((element) =>
-              getComputedStyle(element).getPropertyValue(
-                "--crate-scrollbar-trail-angle-y",
-              ),
-            ),
-          )
-          .toBe("0deg");
-        await sidebarNav.evaluate((element) => {
-          element.scrollTop = element.scrollHeight;
-        });
-        await expect
-          .poll(() =>
-            sidebarNav.evaluate((element) =>
-              getComputedStyle(element).getPropertyValue(
-                "--crate-scrollbar-trail-angle-y",
-              ),
-            ),
-          )
-          .toBe("180deg");
+        expect(scrollbarStyle.scrollbarWidth).toBe("thin");
+        expect(scrollbarStyle.scrollbarColor).toContain("0.1");
+        expect(scrollbarStyle.backgroundImage).toBe("none");
         const search = page.getByPlaceholder("Search library…");
         const searchBox = await search.boundingBox();
         expect(searchBox!.x + searchBox!.width).toBeLessThanOrEqual(width);

@@ -487,7 +487,6 @@ export function Playlists() {
                 </FilterChip>
               ))}
             </div>
-
           </div>
         </div>
       </AdminPageHeader>
@@ -791,7 +790,7 @@ function CreateStaticPlaylistPanel({
   }
 
   return (
-    <Card className="border-white/10 bg-card p-5 shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
+    <Card className="border-white/10 bg-card p-5">
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -1040,7 +1039,7 @@ function CreateSmartPlaylistPanel({
   }
 
   return (
-    <Card className="border-white/10 bg-card p-5 shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
+    <Card className="border-white/10 bg-card p-5">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">

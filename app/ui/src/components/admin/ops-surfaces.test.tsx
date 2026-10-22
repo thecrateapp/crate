@@ -91,12 +91,26 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     "font-mono",
     "font-normal",
     "uppercase",
+    "text-text-subtle",
   );
   expect(screen.getByText("Tracks")).toHaveClass("font-mono", "font-normal");
   expect(screen.getByText("1,200")).toHaveClass("font-mono", "tabular-nums");
   expect(screen.getByText("Body copy")).not.toHaveClass(
     "font-display",
     "font-mono",
+  );
+});
+
+it("supports accent section headings for operational surfaces", () => {
+  render(
+    <OpsPanel title="Worker runtime" titleTone="accent">
+      Content
+    </OpsPanel>,
+  );
+
+  expect(screen.getByRole("heading", { name: "Worker runtime" })).toHaveClass(
+    "font-mono",
+    "text-accent-action-hi",
   );
 });
 
