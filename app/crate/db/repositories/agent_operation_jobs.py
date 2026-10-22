@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from uuid import uuid4
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.agent_access import AgentPrincipal
 from crate.agent_diagnostics import DiagnosticError
@@ -18,7 +19,9 @@ from crate.db.repositories.agent_plans import (
 )
 from crate.db.tx import optional_scope
 
-_ACTIVE_AUTHORITY = ContextVar("crate_operation_authority", default=None)
+_ACTIVE_AUTHORITY: ContextVar[tuple[str, Session] | None] = ContextVar(
+    "crate_operation_authority", default=None
+)
 
 _MUTATES_QUALITY = {
     "acquisition_publish",

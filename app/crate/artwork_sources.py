@@ -341,9 +341,10 @@ def freeze_album_artwork_source(
         source = extract_embedded_artwork(path) if embedded else _file_source(path)
         if source is None:
             continue
-        content, media_type = (
-            source if embedded else (source.content, source.media_type)
-        )
+        if isinstance(source, ArtworkSource):
+            content, media_type = source.content, source.media_type
+        else:
+            content, media_type = source
         if len(content) > _MAX_SOURCE_BYTES or source_identity(str(path)) != before:
             raise ValueError("Artwork source changed or exceeds its bound")
         return {
@@ -368,9 +369,10 @@ def read_bound_artwork_source(reference: dict) -> ArtworkSource:
     )
     if source is None:
         raise ValueError("Reviewed artwork is unavailable")
-    content, media_type = (
-        source if reference["embedded"] else (source.content, source.media_type)
-    )
+    if isinstance(source, ArtworkSource):
+        content, media_type = source.content, source.media_type
+    else:
+        content, media_type = source
     if (
         len(content) > _MAX_SOURCE_BYTES
         or hashlib.sha256(content).hexdigest() != reference["sha256"]

@@ -942,6 +942,8 @@ def move_to_library_detailed(
                 if placement is None:
                     file_path.unlink(missing_ok=True)
                     continue
+                assert placement is not None
+                managed_placement = placement
             else:
                 placement = None
             try:
@@ -954,7 +956,7 @@ def move_to_library_detailed(
                 else:
                     apply(
                         lambda: install_managed_track(
-                            file_path, placement, library_root=dst
+                            file_path, managed_placement, library_root=dst
                         )
                     )
                 moved += 1
@@ -1047,6 +1049,8 @@ def move_to_library_detailed(
                 if is_managed_audio and placement is None:
                     album_item.unlink(missing_ok=True)
                     continue
+                assert placement is not None
+                managed_placement = placement
                 try:
                     if authorize:
                         authorize()
@@ -1059,7 +1063,7 @@ def move_to_library_detailed(
                     else:
                         apply(
                             lambda: install_managed_track(
-                                album_item, placement, library_root=dst
+                                album_item, managed_placement, library_root=dst
                             )
                         )
                     key = (artist_name, album_name, str(target_album_dir))

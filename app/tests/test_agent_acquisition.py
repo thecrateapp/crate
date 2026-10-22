@@ -13,7 +13,10 @@ from crate.agent_diagnostics import DiagnosticError
 from crate.db.repositories import agent_acquisition as store
 from crate.db.repositories.tasks_updates import start_task
 from crate.db.tx import read_scope
-from crate.worker_handlers.acquisition import _handle_soulseek_download
+from crate.worker_handlers.acquisition import (
+    _coerce_moved_count,
+    _handle_soulseek_download,
+)
 from mutagen.flac import FLAC
 from sqlalchemy import text
 
@@ -723,6 +726,9 @@ def test_transfer_history_reads_only_urlencoded_selected_peer(world, monkeypatch
         ({"username": "peer", "directories": []}, True),
         ([], False),
         ({"username": "other", "directories": []}, False),
+        ({"username": "peer", "directories": [None]}, False),
+        ({"username": "peer", "directories": [{"files": None}]}, False),
+        ({"username": "peer", "directories": [{"files": [None]}]}, False),
     ],
 )
 def test_selected_peer_history_normalizes_404_and_rejects_wrong_peer(
@@ -734,3 +740,11 @@ def test_selected_peer_history_normalizes_404_and_rejects_wrong_peer(
     else:
         with pytest.raises(DiagnosticError):
             acquisition._downloads("peer")
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [(0, 0), (4, 4), (True, 1), (4.0, 4), (4.5, 0), ("4", 4), ("bad", 0), (None, 0)],
+)
+def test_moved_count_accepts_only_safely_coercible_values(value, expected):
+    assert _coerce_moved_count(value) == expected

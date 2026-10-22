@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -178,7 +179,7 @@ def get_confirmation_status(principal, confirmation_id, *, session=None):
             raise DiagnosticError("NOT_FOUND", "Owned confirmation is unavailable")
         requests._authorize(current, principal, row["required_grants"])
         result = row["result"]
-        monitoring = dict(
+        monitoring: dict[str, Any] = dict(
             (result or {}).get("monitoring")
             or {
                 "state": "unverified"
@@ -188,11 +189,16 @@ def get_confirmation_status(principal, confirmation_id, *, session=None):
             }
         )
         exhausted = row["delivery_attempts"] >= 20
-        if (
-            monitoring["state"] == "confirmed"
-            and monitoring["expires_at"] <= datetime.now(UTC).timestamp()
-        ):
-            monitoring.update(state="unavailable", reason="Enrollment receipt expired")
+        if monitoring["state"] == "confirmed":
+            expires_at = monitoring.get("expires_at")
+            if (
+                isinstance(expires_at, bool)
+                or not isinstance(expires_at, (int, float))
+                or expires_at <= datetime.now(UTC).timestamp()
+            ):
+                monitoring.update(
+                    state="unavailable", reason="Enrollment receipt expired or invalid"
+                )
         if exhausted and monitoring["state"] == "unverified":
             monitoring.update(
                 state="unavailable",
@@ -535,7 +541,7 @@ def native_event(event, transport_nonce, *, session=None):
             **row["identity"],
             session=current,
         )
-        result = {"state": decision, "plan_id": str(row["plan_id"])}
+        result: dict[str, Any] = {"state": decision, "plan_id": str(row["plan_id"])}
         if decision == "approved" and row["apply_after_approval"]:
             try:
                 # A savepoint preserves the human decision on a revoked originating

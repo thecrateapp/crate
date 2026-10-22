@@ -27,10 +27,10 @@ from tests.test_agent_acquisition import (
 from tests.test_agent_analysis_sync import _processing, _seed_track, _store
 from tests.test_operator_provenance import drift, evidence
 
-acquisition_world = acquisition_fixtures.world
-
 from tests.test_agent_telegram import button, show_all
 from tests.test_task_control_actor import actor_world as actor_world  # noqa: PLC0414
+
+acquisition_world = acquisition_fixtures.world
 
 pytest_plugins = ["tests.agent_command_fixtures", "tests.test_agent_admin"]
 

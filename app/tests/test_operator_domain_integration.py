@@ -11,10 +11,10 @@ from crate.worker_handlers.agent_library import _handle_agent_maintenance
 from tests import test_agent_library_operations as operation_fixtures
 from tests.agent_command_fixtures import change, scalar
 from tests.test_agent_library_operations import _apply, _prepared
-
-operation_world = operation_fixtures.operation_world
 from tests.test_agent_telegram import button, show_all
 from tests.test_operator_provenance import drift, evidence
+
+operation_world = operation_fixtures.operation_world
 
 pytest_plugins = [
     "tests.agent_command_fixtures",

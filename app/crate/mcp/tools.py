@@ -6,7 +6,7 @@ from time import perf_counter
 from uuid import UUID
 
 import anyio
-from mcp import types
+import mcp.types as types
 from pydantic import ValidationError
 
 from crate import (

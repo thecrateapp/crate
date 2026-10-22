@@ -54,6 +54,8 @@ from crate.db.tidal import (
     has_new_release_preview_download,
     update_tidal_download,
 )
+
+
 from crate.db.repositories.user_library import follow_artist, like_track, save_album
 from crate.task_progress import (
     TaskProgress,
@@ -71,6 +73,22 @@ from crate.storage_import import (
 from crate.worker_handlers import TaskHandler, is_cancelled, start_scan
 
 log = logging.getLogger(__name__)
+
+
+def _coerce_moved_count(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else 0
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
+
 
 NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 PRERELEASE_PROMOTION_LOOKBACK_DAYS = 60
@@ -1070,7 +1088,7 @@ def _tidal_download_inner(
             {
                 "artist": str(item.get("artist") or ""),
                 "album": str(item.get("album") or ""),
-                "moved": int(item.get("moved") or 0),
+                "moved": _coerce_moved_count(item.get("moved")),
             }
             for item in moved_albums
         ],

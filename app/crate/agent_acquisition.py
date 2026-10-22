@@ -5,6 +5,7 @@ import json
 import re
 import time
 import unicodedata
+from typing import Any
 from urllib.parse import quote
 from uuid import UUID
 
@@ -44,7 +45,7 @@ def _identifier(value, *, path=False):
     return value
 
 
-def _transport(method, endpoint, body=None):
+def _transport(method: str, endpoint: str, body: Any = None) -> Any:
     """Bounded body and generic failures; never log credential-bearing provider URLs."""
     from crate import soulseek
 
@@ -96,12 +97,21 @@ def _provider_version():
 
 def _supported_provider():
     application = _transport("GET", "application")
-    version = (application.get("version") or {}).get("current")
+    if not isinstance(application, dict):
+        raise DiagnosticError(
+            "PROVIDER_UNAVAILABLE", "Soulseek application state unavailable"
+        )
+    version_info = application.get("version")
+    server = application.get("server")
+    if not isinstance(version_info, dict) or not isinstance(server, dict):
+        raise DiagnosticError(
+            "PROVIDER_UNAVAILABLE", "Soulseek application state unavailable"
+        )
+    version = version_info.get("current")
     if version not in {"0.26.1", "0.26.1.0"}:
         raise DiagnosticError(
             "NOT_EXECUTABLE", "Only the reviewed slskd 0.26.1 batch API is executable"
         )
-    server = application.get("server") or {}
     if not server.get("isConnected") or not server.get("isLoggedIn"):
         raise DiagnosticError(
             "NOT_EXECUTABLE", "Soulseek is not connected and logged in"
@@ -242,6 +252,8 @@ def search_acquisition(principal, *, provider, query, limit=5, trace_id=None):
         },
     )
     try:
+        if not isinstance(response, dict):
+            raise TypeError
         search_id = str(UUID(response["id"]))
     except (ValueError, KeyError, TypeError):
         raise DiagnosticError(
@@ -425,7 +437,9 @@ def search_tidal_missing_albums(principal, *, artist, limit=10, trace_id=None):
     )
 
 
-def _resolve_local_tidal_artist(artist_name):
+def _resolve_local_tidal_artist(
+    artist_name: str,
+) -> tuple[tuple[dict[str, Any], dict[str, Any]] | None, dict[str, Any]]:
     from crate.db.queries import agent_library
 
     evidence = agent_library.read_artist_evidence(name=artist_name, limit=20)
@@ -471,7 +485,7 @@ def _resolve_local_tidal_artist(artist_name):
                 for row in matches[:5]
             ],
         }
-    return (local_artist, matches[0]), []
+    return (local_artist, matches[0]), {}
 
 
 def _tidal_discography(artist_id):
@@ -1056,11 +1070,21 @@ def _downloads(peer):
         raise DiagnosticError(
             "PROVIDER_UNAVAILABLE", "Selected peer transfer state unavailable"
         )
-    return [
-        {**file, "username": peer}
-        for directory in raw["directories"]
-        for file in directory.get("files", [])
-    ]
+    transfers = []
+    for directory in raw["directories"]:
+        if not isinstance(directory, dict) or not isinstance(
+            directory.get("files", []), list
+        ):
+            raise DiagnosticError(
+                "PROVIDER_UNAVAILABLE", "Selected peer transfer state unavailable"
+            )
+        for file in directory.get("files", []):
+            if not isinstance(file, dict):
+                raise DiagnosticError(
+                    "PROVIDER_UNAVAILABLE", "Selected peer transfer state unavailable"
+                )
+            transfers.append({**file, "username": peer})
+    return transfers
 
 
 def apply_operation(operation, execution, config, *, task_id, authorize):
@@ -1342,7 +1366,11 @@ def apply_operation(operation, execution, config, *, task_id, authorize):
 def _batch_state(execution):
     source = execution["source"]
     batch = _transport("GET", f"transfers/downloads/batches/{execution['batch_id']}")
+    if not isinstance(batch, dict):
+        return "conflict", []
     rows = batch.get("transfers", [])
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        return "conflict", []
     expected = {f["filename"]: f["size"] for f in source["files"]}
     if (
         batch.get("id") != execution["batch_id"]

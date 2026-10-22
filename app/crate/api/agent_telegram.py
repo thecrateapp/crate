@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import TypeAdapter, ValidationError
@@ -43,7 +44,7 @@ def _verified_event(body, headers):
             .strip()
         )
         nonce = verify_transport(body, headers, key)
-        event = TypeAdapter(NativeEvent).validate_json(body).model_dump()
+        event = TypeAdapter(cast(Any, NativeEvent)).validate_json(body).model_dump()
         return native_event(event, nonce)
     except (OSError, DiagnosticError, ValidationError) as error:
         code = error.code if isinstance(error, DiagnosticError) else "FORBIDDEN"

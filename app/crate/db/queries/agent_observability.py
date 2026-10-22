@@ -50,7 +50,7 @@ PIPELINE_TASK_TYPES = {
 
 
 def read_observation_evidence(
-    *, track_uids=None, pipeline=None, session: Session | None = None
+    *, track_uids=None, pipeline: str | None = None, session: Session | None = None
 ) -> dict:
     """One read transaction, fixed keys, at most 50 exact tracks and 21 task rows."""
     if pipeline is not None and pipeline not in PIPELINES:
@@ -60,6 +60,11 @@ def read_observation_evidence(
     ):
         raise ValueError("At most 50 exact track UUIDs")
     uids = list(dict.fromkeys(str(UUID(value)) for value in (track_uids or [])))
+    task_types = (
+        sorted({task for tasks in PIPELINE_TASK_TYPES.values() for task in tasks})
+        if pipeline is None
+        else list(PIPELINE_TASK_TYPES[pipeline])
+    )
 
     def _impl(current):
         current.execute(text("SET LOCAL statement_timeout = '5s'"))
@@ -113,7 +118,7 @@ def read_observation_evidence(
         """),
                 {
                     "uids": uids,
-                    "types": list(PIPELINE_TASK_TYPES.get(pipeline, ())),
+                    "types": task_types,
                     "fields": [
                         "engine",
                         "running_count",

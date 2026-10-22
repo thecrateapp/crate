@@ -83,7 +83,8 @@ def _bounded(value, depth=0):
     if isinstance(value, list):
         return [_bounded(v, depth + 1) for v in value[:20]]
     if isinstance(value, str):
-        return _safe(value)[:512]
+        sanitized = _safe(value)
+        return sanitized[:512] if isinstance(sanitized, str) else str(sanitized)[:512]
     return _safe(value)
 
 
