@@ -34,7 +34,7 @@ def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
     docker = fake_bin / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
-        "printf '%s' \"$*\" > \"$FAKE_DOCKER_ARGS\"\n"
+        'printf \'%s\' "$*" > "$FAKE_DOCKER_ARGS"\n'
         "printf '%s\\n' \"$FAKE_COMPOSE_SERVICES\"\n"
     )
     docker.chmod(0o755)
@@ -51,7 +51,7 @@ def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
             "-euo",
             "pipefail",
             "-c",
-            compose_setup + 'printf \'%s\\n\' "${COMPOSE[@]}"\n',
+            compose_setup + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
         ],
         cwd=tmp_path,
         check=True,
