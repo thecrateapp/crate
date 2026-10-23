@@ -1,9 +1,11 @@
 """The existing agent job/plan engine, extended to closed library operations."""
 
 import json
+from contextvars import ContextVar
 from uuid import uuid4
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.agent_access import AgentPrincipal
 from crate.agent_diagnostics import DiagnosticError
@@ -17,7 +19,12 @@ from crate.db.repositories.agent_plans import (
 )
 from crate.db.tx import optional_scope
 
+_ACTIVE_AUTHORITY: ContextVar[tuple[str, Session] | None] = ContextVar(
+    "crate_operation_authority", default=None
+)
+
 _MUTATES_QUALITY = {
+    "acquisition_publish",
     "repairs",
     "metadata_update",
     "enrichment",
@@ -46,6 +53,11 @@ def prepare_operation(
         "required_grants": [grant],
         "target_keys": [],
     }
+    from crate.operator_provenance import capture
+
+    provenance = capture(principal.id)
+    if provenance is not None:
+        payload["operator_provenance"] = provenance
     control = operation in {"job_retry", "job_cancel"}
     request_hash = (
         requests._hash({"domain_operation": operation, "parameters": parameters})
@@ -107,6 +119,13 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
             raise DiagnosticError(
                 "STATE_CONFLICT", "Compiled operation does not match its job"
             )
+        from crate.operator_provenance import validate
+
+        reviewed = job["payload"].get("operator_provenance")
+        validate(job["principal_id"], reviewed)
+        if reviewed is not None:
+            document = {**document, "operator_provenance": reviewed}
+            execution = {**execution, "operator_provenance": reviewed}
         policy = (
             current.execute(
                 text(
@@ -118,7 +137,8 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
             .one()
         )
         mandatory = (
-            document.get("risk") in {"high", "destructive"}
+            reviewed is not None
+            or document.get("risk") in {"high", "destructive"}
             or document.get("impact", {}).get("scope") == "global"
         )
         approval = bool(mandatory or policy["require_approval"])
@@ -328,7 +348,11 @@ def with_operation_authority(task_id: str, effect, *, session=None):
             raise DiagnosticError("STATE_CONFLICT", "Operation is no longer running")
         plan = _get(current, job["payload"]["plan_id"])
         _validate_execution(current, job, plan)
-        return effect() if effect is not None else None
+        token = _ACTIVE_AUTHORITY.set((task_id, current))
+        try:
+            return effect() if effect is not None else None
+        finally:
+            _ACTIVE_AUTHORITY.reset(token)
 
 
 def finish_operation(task_id: str, result: dict, *, session=None) -> dict:
@@ -369,11 +393,11 @@ def finish_operation(task_id: str, result: dict, *, session=None) -> dict:
 
 
 __all__ = [
+    "apply_operation",
+    "finish_operation",
+    "load_operation_job",
     "prepare_operation",
     "publish_plan",
-    "apply_operation",
-    "load_operation_job",
     "start_operation_effect",
     "with_operation_authority",
-    "finish_operation",
 ]

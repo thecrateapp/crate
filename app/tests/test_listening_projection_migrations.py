@@ -80,14 +80,14 @@ def test_health_identity_migration_matches_its_schema_section(monkeypatch):
     assert "CREATE TABLE IF NOT EXISTS health_check_runs" in joined
 
 
-def test_v132_creates_instance_rollups_and_indexes(monkeypatch):
+def test_v135_creates_instance_rollups_and_indexes(monkeypatch):
     from contextlib import nullcontext
 
     migration = import_module(
-        "crate.db.migrations.versions.132_instance_listening_rollups"
+        "crate.db.migrations.versions.135_instance_listening_rollups"
     )
-    assert migration.revision == "132"
-    assert migration.down_revision == "131"
+    assert migration.revision == "135"
+    assert migration.down_revision == "134"
     section = import_module("crate.db.schema_sections.activity_v132")
     executor = RecordingExecutor()
     blocks: list[int] = []
@@ -140,11 +140,11 @@ def test_instance_rollup_bootstrap_matches_its_schema_section():
     assert bootstrap.statements[-len(section.statements) :] == section.statements
 
 
-def test_v132_downgrade_removes_only_instance_rollups_and_its_indexes(monkeypatch):
+def test_v135_downgrade_removes_only_instance_rollups_and_its_indexes(monkeypatch):
     from contextlib import nullcontext
 
     migration = import_module(
-        "crate.db.migrations.versions.132_instance_listening_rollups"
+        "crate.db.migrations.versions.135_instance_listening_rollups"
     )
     executor = RecordingExecutor()
     executor.get_context = lambda: type(

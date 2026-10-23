@@ -28,6 +28,7 @@ def apply_sync_album(
     expected_version: str,
     prepared: dict,
     validate_source: Callable[[], bool],
+    operator_task_id=None,
     session=None,
 ) -> dict:
     uid = str(UUID(str(album_uid)))
@@ -101,7 +102,12 @@ def apply_sync_album(
             frozen = {**track, "album_id": album_id}
             if track["path"] in existing:
                 frozen["entity_uid"] = existing[track["path"]]["entity_uid"]
-            upsert_track(frozen, session=current, strict_identity=True)
+            upsert_track(
+                frozen,
+                session=current,
+                strict_identity=True,
+                operator_task_id=operator_task_id,
+            )
         removed = [t for t in state["tracks"] if t["path"] not in set(paths)]
         if removed:
             current.execute(
@@ -169,16 +175,52 @@ def apply_sync_album(
         if not valid:
             raise RuntimeError("Strict sync postcondition failed")
         if prepared.get("has_cover"):
-            create_task_dedup(
+            context = None
+            grants = None
+            if operator_task_id:
+                from crate.db.repositories.agent_descendants import (
+                    parent_reference,
+                    validate_parent,
+                )
+                from crate.db.repositories.agent_requests import _principal_for_job
+                from crate.db.repositories.agent_task_control import principal_context
+
+                reference = parent_reference(operator_task_id, session=current)
+                parent = validate_parent(reference, session=current)
+                context = {
+                    **principal_context(_principal_for_job(parent)),
+                    "parent_authority": reference,
+                }
+                grants = parent["required_grants"]
+                if not prepared.get("artwork_source"):
+                    raise ValueError(
+                        "Operator artwork requires an exact reviewed source"
+                    )
+            artwork_task = create_task_dedup(
                 "materialize_artwork_variants",
                 {
                     "kind": "album-cover",
                     "entity_key": uid,
                     "reason": "planned-library-sync",
+                    **(
+                        {"source": prepared["artwork_source"]}
+                        if prepared.get("artwork_source")
+                        else {}
+                    ),
                 },
-                dedup_key=f"artwork:album-cover:{uid}",
+                dedup_key=f"artwork:album-cover:{uid}:operator:{operator_task_id}"
+                if operator_task_id
+                else f"artwork:album-cover:{uid}",
+                origin="agent" if operator_task_id else "worker",
+                agent_context=context,
+                required_grants=grants,
                 session=current,
             )
+            if operator_task_id and artwork_task:
+                current.execute(
+                    text("UPDATE tasks SET max_retries=0 WHERE id=:id"),
+                    {"id": artwork_task},
+                )
         enqueue_local_dirty_source(
             "artist", str(state["artist"]["entity_uid"]), "upsert", session=current
         )

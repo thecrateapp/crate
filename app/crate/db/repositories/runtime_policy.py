@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 
@@ -247,7 +247,7 @@ def mark_schedule_enqueued(task_type: str, *, session=None) -> None:
         _setting(
             current,
             f"schedule:last_run:{task_type}",
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
         )
 
 
@@ -259,6 +259,7 @@ def enqueue_schedule(
     agent_context,
     required_grants,
     decision,
+    expected_schedule_revision=None,
     session=None,
 ) -> dict:
     from crate.db.repositories.tasks import create_task_dedup
@@ -273,7 +274,17 @@ def enqueue_schedule(
                 "SELECT pg_advisory_xact_lock_shared(hashtextextended('crate:runtime-policy',0))"
             )
         )
-        schedules = read_schedules_state(session=current)["schedules"]
+        schedule_state = read_schedules_state(session=current)
+        if (
+            expected_schedule_revision is not None
+            and schedule_state["revision"] != expected_schedule_revision
+        ):
+            from crate.agent_diagnostics import DiagnosticError
+
+            raise DiagnosticError(
+                "PLAN_STALE", "Schedule configuration changed after approval"
+            )
+        schedules = schedule_state["schedules"]
         if schedules[task_type] <= 0:
             return {
                 "status": "disabled",
@@ -301,6 +312,10 @@ def enqueue_schedule(
             session=current,
         )
         if task_id:
+            if (agent_context or {}).get("parent_authority"):
+                current.execute(
+                    text("UPDATE tasks SET max_retries=0 WHERE id=:id"), {"id": task_id}
+                )
             mark_schedule_enqueued(task_type, session=current)
         record_runtime_adoption(
             "scheduler",
@@ -312,13 +327,13 @@ def enqueue_schedule(
 
 
 __all__ = [
+    "admit_task_start",
+    "enqueue_schedule",
+    "mark_schedule_enqueued",
     "read_runtime_policy_state",
     "read_schedules_state",
-    "update_schedules",
-    "update_runtime_policy",
     "record_runtime_adoption",
-    "admit_task_start",
-    "mark_schedule_enqueued",
-    "enqueue_schedule",
     "update_admission_slots",
+    "update_runtime_policy",
+    "update_schedules",
 ]

@@ -6,6 +6,10 @@ from collections import Counter
 from uuid import UUID
 
 OPERATIONS = {
+    "acquisition": ("library.acquisition.write", "library.import.manage"),
+    "acquisition_publish": ("library.acquisition.write", "library.import.manage"),
+    "tidal_acquisition": ("library.acquisition.write", "library.import.manage"),
+    "tidal_artist_acquisition": ("library.acquisition.write", "library.import.manage"),
     "shows_import": ("curation.shows.write", "curation.shows.write"),
     "editorial_change": ("editorial.prepare", "curation.playlists.write"),
     "job_retry": ("ops.jobs.retry", "ops.tasks.manage"),
@@ -40,7 +44,14 @@ def public_operation_result(result: dict) -> dict:
     execution = result.get("execution") or {}
     public = {
         key: execution[key]
-        for key in ("status", "plan_id", "plan_version", "error_code")
+        for key in (
+            "status",
+            "plan_id",
+            "plan_version",
+            "error_code",
+            "completed_count",
+            "requested_count",
+        )
         if key in execution
     }
     if execution.get("error"):
@@ -66,6 +77,8 @@ _OUTCOME_IDENTITIES = (
     "provider",
     "facet",
     "pipeline",
+    "tidal_album_id",
+    "album",
 )
 _OUTCOME_FIELDS = _OUTCOME_IDENTITIES + (
     "revision",

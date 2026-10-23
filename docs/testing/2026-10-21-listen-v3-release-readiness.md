@@ -99,12 +99,13 @@ CI del futuro merge, QA de accesibilidad manual ni pruebas en dispositivos físi
 
 El gate web continúa abierto. Listen, Admin, Storybook y preview siguen activos y no se ha desplegado.
 
-1. **Integración local con main resuelta.** Se integra `origin/main` en `d3e6ef6b`
-   (326 commits de main), conservando la identidad y componentes V3 y los nuevos contratos
-   de Smart Mix, shows y agentes. La revisión publicada `109` de Smart Mix y la cadena
-   `110`–`131` quedan intactas. Stats pasa a `132_instance_listening_rollups.py`, con padre
-   `131`, helper/bootstrap y tests actualizados; Alembic debe tener un único head `132`.
-   Esta integración en la rama de trabajo no publica cambios en main ni en producción.
+1. **Integración local con main resuelta.** Se había integrado `origin/main` en `d3e6ef6b`
+   (326 commits de main), conservando la identidad y componentes V3 y los contratos de Smart Mix,
+   shows y agentes. Tras el release de octubre, `origin/main` añadió las revisiones `132`–`134`;
+   la migración de stats se conserva como `135_instance_listening_rollups.py`, con padre `134`.
+   La revisión publicada `109` de Smart Mix y las migraciones `110`–`134` quedan intactas y
+   Alembic debe tener un único head `135`. Esta integración de la rama de trabajo no publica
+   cambios en main ni en producción.
 2. **Validar el SHA integrado.** Pasar CI/cierre completo de frontend, contratos backend/readplane
    afectados y revisión de diferencias visuales. No actualizar baselines automáticamente para
    ocultar drift. En pruebas más amplias del preview Admin se observaron un `System` embebido

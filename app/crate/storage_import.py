@@ -375,11 +375,19 @@ def move_album_tree(
     album_name: str,
     replace_existing_audio: bool = False,
     library_root: str | Path | None = None,
+    authorize=None,
 ) -> int:
     moved = 0
+
+    def apply(effect):
+        if authorize:
+            authorize(effect)
+        else:
+            effect()
+
     if managed_track_names:
         root = Path(library_root) if library_root else target_album_dir.parent.parent
-        target_album_dir.mkdir(parents=True, exist_ok=True)
+        apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))
         album_entity_uid = target_album_dir.name
         for src in sorted(staged_album_dir.rglob("*")):
             if not src.is_file():
@@ -400,28 +408,44 @@ def move_album_tree(
             if is_audio and placement is None:
                 continue
             try:
-                if placement is None:
-                    move_file(src, target_album_dir / src.name)
-                else:
-                    install_managed_track(src, placement, library_root=root)
+                if authorize:
+                    authorize()
+
+                def effect():
+                    if placement is None:
+                        move_file(src, target_album_dir / src.name)
+                    else:
+                        install_managed_track(src, placement, library_root=root)
+
+                apply(effect)
                 moved += 1
-            except Exception:
+            except Exception as exc:
+                from crate.agent_diagnostics import DiagnosticError
+
+                if isinstance(exc, DiagnosticError):
+                    raise
                 log.warning(
                     "Failed to move %s into %s", src, target_album_dir, exc_info=True
                 )
         shutil.rmtree(staged_album_dir, ignore_errors=True)
         return moved
 
-    target_album_dir.mkdir(parents=True, exist_ok=True)
+    apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))
     for src in sorted(staged_album_dir.rglob("*")):
         if not src.is_file():
             continue
         relative = src.relative_to(staged_album_dir)
         dest = target_album_dir / relative
         try:
-            move_file(src, dest)
+            if authorize:
+                authorize()
+            apply(lambda: move_file(src, dest))
             moved += 1
-        except Exception:
+        except Exception as exc:
+            from crate.agent_diagnostics import DiagnosticError
+
+            if isinstance(exc, DiagnosticError):
+                raise
             log.warning("Failed to move %s -> %s", src, dest, exc_info=True)
     shutil.rmtree(staged_album_dir, ignore_errors=True)
     return moved

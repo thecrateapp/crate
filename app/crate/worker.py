@@ -723,7 +723,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.agent_library",
         "AGENT_LIBRARY_TASK_HANDLERS",
-        ("agent_maintenance", "agent_control"),
+        ("agent_maintenance", "agent_tidal_download", "agent_control"),
     ),
     (
         "crate.worker_handlers.management",

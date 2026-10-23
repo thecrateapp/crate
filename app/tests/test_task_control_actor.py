@@ -279,3 +279,53 @@ def test_control_handler_rejects_every_non_cancellation_operation(
 
     assert error.value.code == "FORBIDDEN"
     execute.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "domain_operation, allowed",
+    [
+        ("tidal_acquisition", True),
+        ("tidal_artist_acquisition", True),
+        ("acquisition", False),
+    ],
+)
+def test_agent_tidal_download_cancellation_is_limited_to_owned_tidal_plans(
+    monkeypatch, domain_operation, allowed
+):
+    from crate.agent_access import AgentPrincipal
+    from crate.db.repositories import agent_task_control
+
+    principal = AgentPrincipal(
+        id="principal-1",
+        credential_id="credential-1",
+        name="Hermes",
+        grants=frozenset({"library.acquisition.write", "ops.jobs.cancel"}),
+    )
+    task_id = "tidal-task-1"
+    row = {
+        "id": task_id,
+        "type": "agent_tidal_download",
+        "origin": "agent",
+        "origin_principal_id": principal.id,
+        "origin_context": {"authorization_context": {}},
+        "required_grants": ["library.acquisition.write"],
+        "params_json": {"agent_command": True},
+    }
+    job = {
+        "principal_id": principal.id,
+        "operation": "apply_operation",
+        "payload": {"domain_operation": domain_operation},
+    }
+    monkeypatch.setattr(
+        agent_task_control.requests, "_job", lambda _current, _task_id: job
+    )
+
+    if allowed:
+        grants = agent_task_control._grants(
+            row, principal, "job_cancel", "own", object()
+        )
+        assert "ops.jobs.cancel" in grants
+    else:
+        with pytest.raises(DiagnosticError) as error:
+            agent_task_control._grants(row, principal, "job_cancel", "own", object())
+        assert error.value.code == "NOT_EXECUTABLE"

@@ -1816,3 +1816,16 @@ def test_openapi_exposes_typed_authenticated_resource_governor_snapshot(test_app
         operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
         == "#/components/schemas/AdminGovernorSnapshotResponse"
     )
+
+
+def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
+    data = test_app.get("/openapi.json").json()
+    native = data["paths"]["/api/internal/agent-telegram/events"]["post"]
+    bind = data["paths"]["/api/admin/agent-telegram/bind"]["post"]
+    assert native["tags"] == ["agents"]
+    assert native["security"] == [{"nativeTelegramHmac": []}]
+    assert bind["security"] == [{"cookieAuth": []}]
+    assert (
+        data["components"]["securitySchemes"]["nativeTelegramHmac"]["name"]
+        == "X-Crate-Signature"
+    )

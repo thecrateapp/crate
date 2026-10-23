@@ -44,7 +44,7 @@ def _group_for(scope: str) -> str:
 
 
 def _access_for(scope: str) -> Literal["read", "change"]:
-    return "read" if scope.endswith(".read") else "change"
+    return "read" if scope.endswith((".read", ".search")) else "change"
 
 
 _LABELS: dict[str, str] = {
@@ -59,6 +59,8 @@ _LABELS: dict[str, str] = {
     "library.sync.run": "Synchronize selected library albums",
     "library.metadata.export": "Export library metadata",
     "library.metadata.rehydrate": "Import portable metadata",
+    "library.acquisition.search": "Search supported catalogs for missing releases",
+    "library.acquisition.write": "Acquire and import approved releases",
     "ops.status.read": "Read instance status",
     "ops.jobs.read": "Read job history",
     "ops.jobs.retry": "Retry reviewed maintenance jobs",

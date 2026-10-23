@@ -23,6 +23,10 @@ def preview_repair(
         raise DiagnosticError("INVALID_ARGUMENT", "Issue ID must be a positive integer")
     with optional_scope(session) as current:
         _authorize(current, principal, {"library.repair.photo_flag"})
+        from crate.operator_provenance import capture
+
+        reviewed = capture(principal.id)
+        execution = {"operator_provenance": reviewed} if reviewed is not None else None
         policy = (
             current.execute(
                 text(
@@ -34,6 +38,7 @@ def preview_repair(
             .one()
         )
         context = authorization_context(principal)
+        approval = bool(policy["require_approval"] or reviewed is not None)
         row = (
             current.execute(
                 text("""
@@ -78,14 +83,15 @@ def preview_repair(
                 "observation": value,
                 "policy_revision": policy["policy_revision"],
                 "authorization_context": context,
+                **({"operator_provenance": reviewed} if reviewed is not None else {}),
             }
         )
         saved = (
             current.execute(
                 text("""
             INSERT INTO agent_repair_plans (id, principal_id, artist_uid, issue_id, observation_id,
-                version, before_value, after_value, expires_at, state, approval_required, policy_revision, authorization_context)
-            VALUES (:id, :principal_id, :artist_uid, :issue_id, :observation_id, :version, :before, :after, LEAST(NOW() + INTERVAL '15 minutes', :observed_at + INTERVAL '15 minutes'), :state, :approval_required, :policy_revision, CAST(:context AS jsonb))
+                version, before_value, after_value, expires_at, state, approval_required, mandatory_approval, policy_revision, authorization_context, execution_data)
+            VALUES (:id, :principal_id, :artist_uid, :issue_id, :observation_id, :version, :before, :after, LEAST(NOW() + INTERVAL '15 minutes', :observed_at + INTERVAL '15 minutes'), :state, :approval_required, :mandatory, :policy_revision, CAST(:context AS jsonb), CAST(:execution AS jsonb))
             RETURNING created_at, expires_at
         """),
                 {
@@ -98,12 +104,14 @@ def preview_repair(
                     "observed_at": row["observed_at"],
                     "before": value["db_has_photo"],
                     "after": value["fs_has_photo"],
-                    "state": "awaiting_approval"
-                    if policy["require_approval"]
-                    else "ready",
-                    "approval_required": policy["require_approval"],
+                    "state": "awaiting_approval" if approval else "ready",
+                    "approval_required": approval,
+                    "mandatory": reviewed is not None,
                     "policy_revision": policy["policy_revision"],
                     "context": json.dumps(context),
+                    "execution": json.dumps(execution)
+                    if execution is not None
+                    else None,
                 },
             )
             .mappings()
@@ -128,7 +136,7 @@ def preview_repair(
             "check_type": "has_photo_desync",
             "before": {"has_photo": value["db_has_photo"]},
             "after": {"has_photo": value["fs_has_photo"]},
-            "state": "awaiting_approval" if policy["require_approval"] else "ready",
+            "state": "awaiting_approval" if approval else "ready",
             "created_at": saved["created_at"].isoformat(),
             "expires_at": saved["expires_at"].isoformat(),
             "observation_id": row["id"],

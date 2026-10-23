@@ -39,7 +39,12 @@ def test_projector_refreshes_ops_for_global_catalog_reconcile_event(monkeypatch)
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 2}
+    assert result == {
+        "processed": 1,
+        "failed": 0,
+        "ops_refreshes": 1,
+        "home_refreshes": 2,
+    }
     assert calls["ops"] == [True]
     assert calls["home"] == [(3, True), (4, True)]
     assert calls["processed"] == [["1682349000100-0"]]
@@ -92,7 +97,12 @@ def test_projector_refreshes_home_for_global_source_changed(monkeypatch):
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "failed": 0,
+        "ops_refreshes": 1,
+        "home_refreshes": 1,
+    }
     assert calls["ops"] == [True]
     assert calls["home"] == [(7, True)]
     assert calls["processed"] == [["1682349000200-0"]]

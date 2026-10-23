@@ -2,71 +2,125 @@
 
 import json
 from functools import partial
-from uuid import UUID
 from time import perf_counter
+from uuid import UUID
 
 import anyio
 import mcp.types as types
 from pydantic import ValidationError
 
 from crate import (
+    agent_acquisition,
     agent_diagnostics,
     agent_discovery,
-    agent_maintenance,
     agent_editorial,
+    agent_maintenance,
+    agent_observability,
+    agent_operations,
     agent_shows,
+    agent_telegram,
 )
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.audit import log_audit
+from crate.mcp.acquisition_schemas import (
+    AcquisitionPreview,
+    AcquisitionPublication,
+    AcquisitionReadiness,
+    AcquisitionSearch,
+    TidalAcquisitionPreview,
+    TidalArtistAcquisitionPreview,
+    TidalArtistMissingSearch,
+    TidalMissingSearch,
+)
+from crate.mcp.editorial_schemas import (
+    EditorialCandidates,
+    EditorialGet,
+    EditorialList,
+    EditorialOptions,
+    EditorialPlanApply,
+    EditorialPlanRead,
+    EditorialPrepare,
+    EditorialPublication,
+)
 from crate.mcp.limits import admission
+from crate.mcp.operation_schemas import (
+    AuditInput,
+    JobControlApply,
+    JobControlPreview,
+    RuntimeUpdatePreview,
+    ScheduleRun,
+    ScheduleUpdatePreview,
+)
 from crate.mcp.schemas import (
+    AnalysisPlanInput,
+    AnalysisStatusInput,
     ArtistInput,
+    ConfirmationInput,
+    ConfirmationStatusInput,
     DiagnosticOutput,
     DiagnosticsInput,
+    EnrichmentPlanInput,
     HealthCheckInput,
     InstanceInput,
     IssuesInput,
     JobInput,
     JobRetryInput,
     JobsInput,
-    PlanInput,
-    QualityInput,
-    RepairApplyInput,
-    RepairPreviewInput,
-    AnalysisPlanInput,
-    AnalysisStatusInput,
-    EnrichmentPlanInput,
     LibrarySyncPlanInput,
     MetadataExportPlanInput,
-    MetadataRehydratePlanInput,
     MetadataPreviewInput,
+    MetadataRehydratePlanInput,
+    PipelineInput,
+    PlanInput,
+    QualityInput,
     QualityRunInput,
+    RepairApplyInput,
+    RepairPreviewInput,
+    SmartMixStatusInput,
 )
+from crate.mcp.show_schemas import ShowsApply, ShowsPrepare, ShowsSearch
 
-from crate import agent_operations
-from crate.mcp.operation_schemas import (
-    JobControlPreview,
-    JobControlApply,
-    ScheduleRun,
-    ScheduleUpdatePreview,
-    RuntimeUpdatePreview,
-    AuditInput,
-)
-from crate.mcp.editorial_schemas import (
-    EditorialList,
-    EditorialGet,
-    EditorialOptions,
-    EditorialCandidates,
-    EditorialPrepare,
-    EditorialPlanRead,
-    EditorialPlanApply,
-    EditorialPublication,
-)
-
-from crate.mcp.show_schemas import ShowsSearch, ShowsPrepare, ShowsApply
+OBSERVATION_TOOLS = {
+    "get_instance_inventory": (
+        InstanceInput,
+        "ops.status.read",
+        "Read bounded persisted service image references and schema/MCP versions. Release/context provenance and live image IDs remain explicitly unknown when unavailable.",
+    ),
+    "get_observability_summary": (
+        InstanceInput,
+        "ops.status.read",
+        "Read per-subsystem persisted source coverage, independent timestamps and unavailable signals. No refresh or live probes.",
+    ),
+    "get_pipeline_status": (
+        PipelineInput,
+        "ops.status.read",
+        "Read a closed pipeline's persisted counters and newest 20 matching tasks created within 24 hours. Partial evidence is not a complete backlog or functional health.",
+    ),
+    "get_smart_mix_status": (
+        SmartMixStatusInput,
+        "library.health.read",
+        "Read stored Smart Mix coverage, campaign and version evidence for up to 50 exact track UUIDs. No scan, profile calculation or coverage refresh.",
+    ),
+}
 
 CATALOG = {
+    "get_confirmation_status": (
+        ConfirmationStatusInput,
+        None,
+        "Read one originating integration native confirmation: admitted result/job, bounded delivery attempts and actual supervisor enrollment receipt. No approval or retry; reads remain available during release drift.",
+    ),
+    "get_confirmation_policy": (
+        InstanceInput,
+        None,
+        "Read current integration approval requirement, policy revision and grants; no decisions.",
+    ),
+    **OBSERVATION_TOOLS,
+    "get_acquisition_readiness": (
+        AcquisitionReadiness,
+        "library.acquisition.search",
+        "Check supported provider configuration and exact batch API readiness; no download.",
+    ),
     "search_shows": (
         ShowsSearch,
         "curation.shows.read",
@@ -170,6 +224,66 @@ CATALOG = {
 }
 
 ACTION_CATALOG = {
+    "request_plan_confirmation": (
+        ConfirmationInput,
+        None,
+        "Request bounded exact-plan presentation to the independently bound human. Cannot approve. Optionally bind deterministic apply on the human button.",
+    ),
+    "search_acquisition": (
+        AcquisitionSearch,
+        "library.acquisition.search",
+        "Search up to five exact zero-cost FLAC selections and mint owned source receipts. Never download automatically.",
+    ),
+    "search_tidal_missing_albums": (
+        TidalMissingSearch,
+        "library.acquisition.search",
+        "Compare one exact local artist's bounded Tidal discography with Crate and mint receipts for missing releases. Search and receipt creation never download.",
+    ),
+    "search_tidal_missing_artist": (
+        TidalArtistMissingSearch,
+        "library.acquisition.search",
+        "Read the complete paginated Tidal discography for one exact local artist. If every missing release fits the bounded batch, mint one exact receipt; otherwise report the limit without starting downloads.",
+    ),
+    "preview_tidal_acquisition": (
+        TidalAcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare one exact Tidal release for a mandatory Telegram approval. The plan binds album identity, quality and new-album-only import; no download starts.",
+    ),
+    "apply_tidal_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Download and import the exact approved Tidal album through Crate's worker. Revalidates source, authority and absent destination; never overwrites or upgrades.",
+    ),
+    "preview_tidal_artist_acquisition": (
+        TidalArtistAcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare one high-risk plan listing every missing release in a complete Tidal artist discography; one Telegram approval covers only that exact list. No download starts.",
+    ),
+    "apply_tidal_artist_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Download and import the exact approved missing Tidal discography through Crate workers, sequentially. Stops at the first failed release, reports partial progress and never overwrites existing albums.",
+    ),
+    "preview_acquisition": (
+        AcquisitionPreview,
+        "library.acquisition.write",
+        "Prepare a mandatory human-approved exact transfer plan from a server receipt and explicit caps.",
+    ),
+    "apply_acquisition": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Apply an exact approved transfer plan through download admission; library publication needs a second plan.",
+    ),
+    "preview_acquisition_publication": (
+        AcquisitionPublication,
+        "library.acquisition.write",
+        "Prepare new-album publication from an owned transfer, binding actual staged audio hashes and destination.",
+    ),
+    "apply_acquisition_publication": (
+        RepairApplyInput,
+        "library.acquisition.write",
+        "Publish only the exact approved staged audio to an absent album; never overwrite or upgrade.",
+    ),
     "preview_shows_import": (
         ShowsPrepare,
         "curation.shows.write",
@@ -377,7 +491,12 @@ def _allowed(principal, name, arguments=None):
         return bool(principal.grants)
     if name == "read_diagnostics" and arguments is None:
         return bool(principal.grants & {"ops.status.read", "ops.logs.read"})
-    if name == "get_plan":
+    if name in {
+        "get_plan",
+        "get_confirmation_policy",
+        "get_confirmation_status",
+        "request_plan_confirmation",
+    }:
         from crate.agent_operation_catalog import OPERATIONS
 
         return bool(
@@ -418,10 +537,20 @@ async def list_tools(context, params):
                         in {
                             "apply_repairs",
                             "apply_shows_import",
+                            "apply_tidal_acquisition",
+                            "apply_tidal_artist_acquisition",
                             "run_library_sync",
                             "run_metadata_rehydrate",
                         },
-                        idempotent_hint=name != "preview_repairs",
+                        idempotent_hint=name
+                        not in {
+                            "preview_repairs",
+                            "search_acquisition",
+                            "search_tidal_missing_albums",
+                            "search_tidal_missing_artist",
+                            "preview_tidal_acquisition",
+                            "preview_tidal_artist_acquisition",
+                        },
                         open_world_hint=False,
                     ),
                 )
@@ -435,7 +564,11 @@ def _execute(principal, name, arguments, trace_id):
         with admission(principal.id):
             if name in ACTION_CATALOG:
                 module = (
-                    agent_shows
+                    agent_telegram
+                    if name == "request_plan_confirmation"
+                    else agent_acquisition
+                    if hasattr(agent_acquisition, name)
+                    else agent_shows
                     if name in {"preview_shows_import", "apply_shows_import"}
                     else agent_editorial
                     if name.startswith("editorial_")
@@ -448,6 +581,28 @@ def _execute(principal, name, arguments, trace_id):
                 )
                 action_finished = True
                 return result
+            if name == "get_confirmation_status":
+                from crate.db.repositories.agent_telegram import get_confirmation_status
+
+                return {
+                    "schema_version": "1",
+                    "availability": "available",
+                    "source": "durable_native_confirmation",
+                    "data": get_confirmation_status(principal, **arguments),
+                }
+            if name == "get_confirmation_policy":
+                from crate.db.repositories.agent_telegram import approval_policy
+
+                return {
+                    "schema_version": "1",
+                    "availability": "available",
+                    "source": "current_approval_policy",
+                    "data": approval_policy(principal),
+                }
+            if name == "get_acquisition_readiness":
+                return agent_acquisition.get_acquisition_readiness(
+                    principal, **arguments
+                )
             if name == "search_shows":
                 return agent_shows.search_shows(principal, **arguments)
             artist_uid = arguments.get("artist_uid")
@@ -472,6 +627,8 @@ def _execute(principal, name, arguments, trace_id):
                     **({"artist_uid": artist_uid} if artist_uid else {}),
                 },
             )
+            if name in OBSERVATION_TOOLS:
+                return getattr(agent_observability, name)(**arguments)
             if name in {"get_operation_catalog", "get_plan", "get_analysis_status"}:
                 return getattr(agent_discovery, name)(principal, **arguments)
             if name.startswith("editorial_"):
@@ -553,6 +710,10 @@ async def _call_tool(context, params):
             raise DiagnosticError(
                 "FORBIDDEN", "Integration is not permitted to perform this operation"
             )
+        if params.name in ACTION_CATALOG:
+            from crate.operator_provenance import capture
+
+            await anyio.to_thread.run_sync(capture, principal.id)
         trace_id = context.request.scope.get("trace_id")
         try:
             _request_limiter.acquire_nowait()

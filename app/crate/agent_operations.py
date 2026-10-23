@@ -1,7 +1,7 @@
 """Transport-independent instance tools using the existing plan engine."""
 
-from crate.agent_library_operations import apply_operation, prepare_operation
 from crate.agent_diagnostics import _envelope
+from crate.agent_library_operations import apply_operation, prepare_operation
 from crate.db.queries.agent_runtime_policy import (
     read_runtime_policy_state,
     read_schedules_state,
@@ -59,12 +59,23 @@ def apply_job_cancel(
 
 
 def list_schedules():
-    from crate.agent_instance_operations import MCP_RUNNABLE_SCHEDULES
+    from crate.agent_instance_operations import (
+        MCP_RUNNABLE_SCHEDULES,
+        MCP_SCHEDULE_REASONS,
+    )
 
     state = read_schedules_state()
     state["readiness"] = {
         name: {
             "run": name in MCP_RUNNABLE_SCHEDULES and interval > 0,
+            "update": name in MCP_RUNNABLE_SCHEDULES,
+            "minimum_nonzero_interval_seconds": 600
+            if name in MCP_RUNNABLE_SCHEDULES
+            else None,
+            "reason": MCP_SCHEDULE_REASONS.get(
+                name,
+                "Reviewed analytics rebuild through scheduler dedup, governor and runtime admission",
+            ),
             "missing": []
             if name in MCP_RUNNABLE_SCHEDULES and interval > 0
             else [
@@ -172,15 +183,15 @@ def apply_runtime_update(
 
 
 __all__ = [
-    "preview_job_retry",
-    "preview_job_cancel",
-    "apply_job_retry",
     "apply_job_cancel",
-    "list_schedules",
-    "get_runtime_policy",
-    "run_schedule",
-    "preview_schedule_update",
-    "apply_schedule_update",
-    "preview_runtime_update",
+    "apply_job_retry",
     "apply_runtime_update",
+    "apply_schedule_update",
+    "get_runtime_policy",
+    "list_schedules",
+    "preview_job_cancel",
+    "preview_job_retry",
+    "preview_runtime_update",
+    "preview_schedule_update",
+    "run_schedule",
 ]

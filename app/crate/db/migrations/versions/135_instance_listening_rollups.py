@@ -7,8 +7,8 @@ from crate.db.schema_sections.activity_v132 import (
 )
 
 
-revision = "132"
-down_revision = "131"
+revision = "135"
+down_revision = "134"
 branch_labels = None
 depends_on = None
 

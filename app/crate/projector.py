@@ -145,7 +145,7 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
     """Consume events, coalesce projections, and acknowledge only successful work."""
     events = list_domain_events(limit=max(1, min(limit, 1000)), unprocessed_only=True)
     if not events:
-        return {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0}
+        return {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0, "failed": 0}
 
     event_by_id: dict[str, dict[str, Any]] = {}
     actions_by_event: dict[str, set[tuple[str, int | None]]] = {}
@@ -212,6 +212,7 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
     )
     return {
         "processed": len(processed_ids),
+        "failed": len(failures),
         "ops_refreshes": ops_refreshes,
         "home_refreshes": home_refreshes,
     }

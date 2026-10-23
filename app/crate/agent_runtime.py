@@ -7,6 +7,25 @@ from crate.runtime_policy_contract import (
 )
 
 
+def _reviewed_schedule(name, interval):
+    from crate.agent_diagnostics import DiagnosticError
+    from crate.agent_instance_operations import MCP_RUNNABLE_SCHEDULES
+
+    if name not in MCP_RUNNABLE_SCHEDULES:
+        raise DiagnosticError(
+            "NOT_EXECUTABLE", "This schedule has no reviewed MCP update contract"
+        )
+    if (
+        type(interval) is not int
+        or interval != 0
+        and not 600 <= interval <= SCHEDULE_MAX_INTERVAL
+    ):
+        raise DiagnosticError(
+            "NOT_EXECUTABLE",
+            "Reviewed analytics interval must be zero (disabled) or at least 600 seconds",
+        )
+
+
 def compile_operation(operation: str, parameters: dict, config: dict) -> dict:
     from crate.agent_diagnostics import DiagnosticError
     from crate.db.repositories.runtime_policy import (
@@ -27,6 +46,7 @@ def compile_operation(operation: str, parameters: dict, config: dict) -> dict:
             or not 0 <= interval <= SCHEDULE_MAX_INTERVAL
         ):
             raise ValueError("Invalid schedule name or interval")
+        _reviewed_schedule(name, interval)
         if parameters["expected_revision"] != state["revision"]:
             raise DiagnosticError("PLAN_STALE", "Schedule revision changed")
         before, after = state["schedules"][name], interval
@@ -99,6 +119,7 @@ def apply_operation(
             raise DiagnosticError("PLAN_STALE", str(error)) from None
 
     if operation == "schedule_update":
+        _reviewed_schedule(execution["schedule"], execution["interval_seconds"])
         state = apply(
             lambda: update_schedules(
                 {execution["schedule"]: execution["interval_seconds"]},
@@ -136,4 +157,4 @@ def apply_operation(
     raise ValueError("Unsupported runtime operation")
 
 
-__all__ = ["compile_operation", "apply_operation"]
+__all__ = ["apply_operation", "compile_operation"]

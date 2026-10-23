@@ -1,11 +1,21 @@
 """Fresh cookie-session identity for consent and human integration decisions."""
 
+import os
+
 from sqlalchemy import text
 
 from crate.agent_diagnostics import DiagnosticError
 from crate.api.permissions import get_user_capabilities
 from crate.db.repositories.auth_user_accounts import get_user_by_id
 from crate.db.tx import read_scope
+
+
+class ApprovedHuman(dict):
+    """Durable decision: current account authority, independent of browser lifetime."""
+
+
+class TelegramHuman(dict):
+    """Internal provenance minted only from a persisted native binding."""
 
 
 def get_agent_human_session(
@@ -48,6 +58,38 @@ def require_agent_human_capabilities(
         text("SELECT role FROM user_roles WHERE user_id = :id FOR SHARE"),
         {"id": actor["id"]},
     ).all()
+    if isinstance(actor, ApprovedHuman):
+        user = get_user_by_id(actor["id"], session=session)
+        if (
+            user is None
+            or (user.get("status") or "active") != "active"
+            or not capabilities <= get_user_capabilities(user)
+        ):
+            raise DiagnosticError(
+                "FORBIDDEN", "The approving human no longer permits this decision"
+            )
+        return {**user, "capabilities": sorted(get_user_capabilities(user))}
+    if isinstance(actor, TelegramHuman):
+        binding = session.execute(
+            text(
+                "SELECT user_id FROM agent_telegram_bindings WHERE id=:id AND user_id=:user AND revoked_at IS NULL AND instance_id=:instance FOR SHARE"
+            ),
+            {
+                "id": actor["telegram_binding_id"],
+                "user": actor["id"],
+                "instance": os.environ.get("CRATE_AGENT_INSTANCE_ID", ""),
+            },
+        ).first()
+        user = get_user_by_id(actor["id"], session=session) if binding else None
+        if (
+            user is None
+            or (user.get("status") or "active") != "active"
+            or not capabilities <= get_user_capabilities(user)
+        ):
+            raise DiagnosticError(
+                "FORBIDDEN", "The linked native human no longer permits this decision"
+            )
+        return {**user, "capabilities": sorted(get_user_capabilities(user))}
     session.execute(
         text("SELECT id FROM sessions WHERE id = :sid FOR SHARE"),
         {"sid": actor["session_id"]},

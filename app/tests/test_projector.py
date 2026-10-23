@@ -41,7 +41,12 @@ def test_process_domain_events_refreshes_ops_and_home(monkeypatch):
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 2, "ops_refreshes": 1, "home_refreshes": 1}
+    assert result == {
+        "processed": 2,
+        "ops_refreshes": 1,
+        "home_refreshes": 1,
+        "failed": 0,
+    }
     assert calls["ops"] == [True]
     assert calls["home"] == [(7, True)]
     assert calls["processed"] == [["1682349000000-0", "1682349000001-0"]]
@@ -56,7 +61,12 @@ def test_process_domain_events_noops_when_empty(monkeypatch):
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0}
+    assert result == {
+        "processed": 0,
+        "ops_refreshes": 0,
+        "home_refreshes": 0,
+        "failed": 0,
+    }
 
 
 def test_process_domain_events_isolates_poison_projection(monkeypatch):
@@ -104,7 +114,12 @@ def test_process_domain_events_isolates_poison_projection(monkeypatch):
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 0,
+        "home_refreshes": 1,
+        "failed": 1,
+    }
     assert processed == ["2-0"]
     assert failed == [("1-0", "poison projection")]
 
@@ -145,7 +160,12 @@ def test_process_domain_events_refreshes_home_for_semantic_user_event(monkeypatc
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 0,
+        "home_refreshes": 1,
+        "failed": 0,
+    }
     assert calls["ops"] == []
     assert calls["home"] == [(3, True)]
     assert calls["processed"] == [["1682349000010-0"]]
@@ -211,7 +231,12 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 2, "ops_refreshes": 0, "home_refreshes": 2}
+    assert result == {
+        "processed": 2,
+        "ops_refreshes": 0,
+        "home_refreshes": 2,
+        "failed": 0,
+    }
     assert calls["ops"] == []
     assert calls["home"] == [(3, True)]
     assert calls["recent"] == [3]
@@ -257,7 +282,12 @@ def test_process_domain_events_does_not_refresh_ops_for_home_only_invalidation(
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 0,
+        "home_refreshes": 1,
+        "failed": 0,
+    }
     assert calls["ops"] == []
     assert calls["home"] == [(7, True)]
     assert calls["processed"] == [["1682349000020-0"]]
@@ -302,7 +332,12 @@ def test_process_domain_events_refreshes_ops_and_recent_home_for_catalog_invalid
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 1,
+        "home_refreshes": 1,
+        "failed": 0,
+    }
     assert calls["ops"] == [True]
     assert calls["home"] == [(5, True)]
     assert calls["processed"] == [["1682349000021-0"]]
@@ -347,7 +382,12 @@ def test_process_domain_events_refreshes_recent_home_for_global_home_invalidatio
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 2}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 0,
+        "home_refreshes": 2,
+        "failed": 0,
+    }
     assert calls["ops"] == []
     assert calls["home"] == [(7, True), (9, True)]
     assert calls["processed"] == [["1682349000022-0"]]
@@ -411,7 +451,12 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 1}
+    assert result == {
+        "processed": 1,
+        "ops_refreshes": 1,
+        "home_refreshes": 1,
+        "failed": 0,
+    }
     assert queued == [("Terror", True)]
     assert calls["ops"] == [True]
     assert calls["home"] == [(7, True)]
@@ -470,6 +515,11 @@ def test_process_domain_events_skips_post_acquisition_processing_when_artist_sti
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0}
+    assert result == {
+        "processed": 0,
+        "ops_refreshes": 0,
+        "home_refreshes": 0,
+        "failed": 0,
+    }
     assert queued == []
     assert processed == []

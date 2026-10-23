@@ -17,13 +17,13 @@ from crate.artist_hero_publication import (
 from crate.artwork_variants import ArtworkAsset
 from crate.audio import get_audio_files
 from crate.config import load_config
+from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.library import (
     get_library_album_by_entity_uid,
     get_library_artist,
     get_library_artist_by_entity_uid,
 )
 from crate.db.repositories.playlists_collection_reads import get_playlist_cover_path
-from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.external_artist_artwork import external_artist_artwork_path_from_key
 from crate.genre_covers import genre_cover_abspath
 from crate.playlist_covers import playlist_cover_abspath
@@ -321,3 +321,63 @@ def resolve_artwork_source(
     if source is not None and len(source.content) > _MAX_SOURCE_BYTES:
         return None
     return source
+
+
+def freeze_album_artwork_source(
+    directory: Path, audio_extensions: set[str]
+) -> dict | None:
+    import hashlib
+
+    from crate.analysis_provenance import source_identity
+
+    candidates = [(directory / name, False) for name in COVER_NAMES]
+    candidates += [
+        (path, True) for path in get_audio_files(directory, audio_extensions)
+    ]
+    for path, embedded in candidates:
+        if not path.is_file():
+            continue
+        before = source_identity(str(path))
+        source = extract_embedded_artwork(path) if embedded else _file_source(path)
+        if source is None:
+            continue
+        if isinstance(source, ArtworkSource):
+            content, media_type = source.content, source.media_type
+        else:
+            content, media_type = source
+        if len(content) > _MAX_SOURCE_BYTES or source_identity(str(path)) != before:
+            raise ValueError("Artwork source changed or exceeds its bound")
+        return {
+            "source": before,
+            "embedded": embedded,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "media_type": media_type,
+        }
+    return None
+
+
+def read_bound_artwork_source(reference: dict) -> ArtworkSource:
+    import hashlib
+
+    from crate.analysis_provenance import source_identity
+
+    path = Path(reference["source"]["path"])
+    if source_identity(str(path)) != reference["source"]:
+        raise ValueError("Reviewed artwork source changed")
+    source = (
+        extract_embedded_artwork(path) if reference["embedded"] else _file_source(path)
+    )
+    if source is None:
+        raise ValueError("Reviewed artwork is unavailable")
+    if isinstance(source, ArtworkSource):
+        content, media_type = source.content, source.media_type
+    else:
+        content, media_type = source
+    if (
+        len(content) > _MAX_SOURCE_BYTES
+        or hashlib.sha256(content).hexdigest() != reference["sha256"]
+        or media_type != reference["media_type"]
+        or source_identity(str(path)) != reference["source"]
+    ):
+        raise ValueError("Reviewed artwork content changed")
+    return ArtworkSource(content, media_type, "reviewed-local-source")

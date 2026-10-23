@@ -63,6 +63,8 @@ def test_agent_schema_real_downgrade_upgrade_and_idempotency(pg_db, monkeypatch)
             "123_agent_admin",
             "124_agent_library_operations",
             "125_agent_instance_operations",
+            "132_agent_acquisition",
+            "133_agent_telegram",
         )
     ]
     migration = migrations[0]

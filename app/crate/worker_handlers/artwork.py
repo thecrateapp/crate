@@ -1,11 +1,10 @@
-from collections.abc import Callable, Iterable, Iterator
-
 import base64
 import hashlib
 import io as _io
 import logging
 import tempfile
 import time
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal, Mapping, cast
@@ -13,34 +12,16 @@ from typing import Literal, Mapping, cast
 from PIL import Image, ImageOps
 from PIL.Image import Image as PILImage
 
-from crate.artwork_materializer import materialize_artwork
-from crate.artwork_maintenance import (
-    cleanup_artwork_variants,
-    find_corrupt_artwork_assets,
-    repair_artwork_manifest_permissions,
-)
-from crate.artwork_sources import resolve_artwork_source
-from crate.artwork_tasks import queue_artwork_materialization
-from crate.artwork_tasks import (
-    ARTWORK_BACKFILL_VERSION,
-    ARTWORK_MANIFEST_PERMISSIONS_VERSION,
-)
-from crate.artwork_variants import (
-    ARTWORK_KINDS,
-    ArtworkAsset,
-    ArtworkKind,
-    external_artist_asset,
-)
 from crate.artist_hero_artwork import (
+    ARTIST_HERO_RENDER_VERSION,
     DESKTOP_HERO_RENDER_SIZE,
     MOBILE_HERO_RENDER_SIZE,
-    ARTIST_HERO_RENDER_VERSION,
     artist_hero_revision,
     render_artist_hero_composition,
     render_artist_hero_compositions,
 )
-from crate.artist_hero_contract import artist_hero_recipe_hash
 from crate.artist_hero_candidates import load_candidate_content
+from crate.artist_hero_contract import artist_hero_recipe_hash
 from crate.artist_hero_migration import (
     migration_task_dedup_key,
     plan_artist_hero_migration,
@@ -56,19 +37,43 @@ from crate.artist_hero_publication import (
     publish_artist_hero_artifact,
     resolve_artist_hero_publication_path,
 )
+from crate.artwork_maintenance import (
+    cleanup_artwork_variants,
+    find_corrupt_artwork_assets,
+    repair_artwork_manifest_permissions,
+)
+from crate.artwork_materializer import materialize_artwork
+from crate.artwork_sources import resolve_artwork_source
+from crate.artwork_tasks import (
+    ARTWORK_BACKFILL_VERSION,
+    ARTWORK_MANIFEST_PERMISSIONS_VERSION,
+    queue_artwork_materialization,
+)
+from crate.artwork_variants import (
+    ARTWORK_KINDS,
+    ArtworkAsset,
+    ArtworkKind,
+    external_artist_asset,
+)
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
+from crate.db.jobs.artwork import (
+    set_album_has_cover,
+    set_artist_has_photo,
+    touch_artist_artwork,
+)
 from crate.db.queries.artwork_backfill import (
     list_artwork_backfill_albums,
     list_artwork_backfill_artists,
     list_artwork_backfill_genres,
 )
-from crate.db.repositories.library import (
-    get_library_album,
-    get_library_album_by_id,
-    get_library_artist,
-    get_library_artist_by_id,
-    get_library_artist_by_entity_uid,
+from crate.db.releases import update_new_release_cover
+from crate.db.repositories.artist_artwork_assets import (
+    ARTIST_ARTWORK_SLOTS,
+    assign_artist_artwork_slot,
+    create_or_get_artist_artwork_asset,
+    delete_artist_artwork_asset,
+    get_artist_artwork_asset,
 )
 from crate.db.repositories.artist_hero_artwork import (
     artist_hero_manifest_id,
@@ -82,25 +87,19 @@ from crate.db.repositories.artist_hero_artwork import (
     rollback_artist_hero_manifest,
     upsert_artist_hero_artwork,
 )
-from crate.db.repositories.artist_artwork_assets import (
-    ARTIST_ARTWORK_SLOTS,
-    assign_artist_artwork_slot,
-    create_or_get_artist_artwork_asset,
-    delete_artist_artwork_asset,
-    get_artist_artwork_asset,
+from crate.db.repositories.library import (
+    get_library_album,
+    get_library_album_by_id,
+    get_library_artist,
+    get_library_artist_by_entity_uid,
+    get_library_artist_by_id,
 )
 from crate.db.repositories.tasks import create_task_dedup
-from crate.db.releases import update_new_release_cover
-from crate.release_covers import release_cover_abspath, release_cover_public_url
 from crate.metrics import record_later
-from crate.task_progress import TaskProgress, emit_progress, entity_label
-from crate.db.jobs.artwork import (
-    set_album_has_cover,
-    set_artist_has_photo,
-    touch_artist_artwork,
-)
+from crate.release_covers import release_cover_abspath, release_cover_public_url
 from crate.storage_layout import resolve_artist_dir
 from crate.streaming.paths import cache_root
+from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.worker_handlers import (
     DEFAULT_AUDIO_EXTENSIONS,
     TaskHandler,
@@ -537,7 +536,7 @@ def _handle_materialize_artwork_variants(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del config
-    allowed_params = {"kind", "entity_key", "reason"}
+    allowed_params = {"kind", "entity_key", "reason", "source"}
     if set(params) - allowed_params:
         return {"error": "Unsupported artwork task parameters"}
 
@@ -565,9 +564,21 @@ def _handle_materialize_artwork_variants(
         }
 
     def materialize_resolved_source() -> dict:
-        source = resolve_artwork_source(
-            asset,
-            allow_provider=reason not in {"backfill", "integrity-repair"},
+        from crate.artwork_sources import read_bound_artwork_source
+        from crate.db.repositories.agent_task_control import with_task_authority
+
+        def authorize(effect=None):
+            return with_task_authority(task_id, effect or (lambda: None))
+
+        if params.get("source"):
+            authorize()
+        source = (
+            read_bound_artwork_source(params["source"])
+            if params.get("source")
+            else resolve_artwork_source(
+                asset,
+                allow_provider=reason not in {"backfill", "integrity-repair"},
+            )
         )
         if source is None:
             return missing_result()
@@ -576,6 +587,7 @@ def _handle_materialize_artwork_variants(
             asset,
             source.content,
             source_media_type=source.media_type,
+            **({"authorize": authorize} if params.get("source") else {}),
         )
         emit_progress(
             task_id,
@@ -939,9 +951,9 @@ def _handle_fetch_cover(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_fetch_artist_covers(task_id: str, params: dict, config: dict) -> dict:
-    from crate.audio import read_tags as _read_tags
-    from crate.audio import get_audio_files
     from crate.artwork import fetch_cover_from_caa, save_cover
+    from crate.audio import get_audio_files
+    from crate.audio import read_tags as _read_tags
 
     artist_name = params.get("artist", "")
     lib = Path(config["library_path"])
@@ -1045,8 +1057,9 @@ def _fetch_itunes_cover(artist: str, album: str) -> bytes | None:
 
 def _fetch_lastfm_cover(artist: str, album: str) -> bytes | None:
     try:
-        from crate.popularity import _lastfm_get
         import requests as _requests
+
+        from crate.popularity import _lastfm_get
 
         data = _lastfm_get("album.getinfo", artist=artist, album=album, autocorrect="1")
         if not data or "album" not in data:
@@ -1066,6 +1079,7 @@ def _fetch_lastfm_cover(artist: str, album: str) -> bytes | None:
 def _search_musicbrainz_cover(artist: str, album: str) -> bytes | None:
     try:
         import musicbrainzngs
+
         from crate.artwork import fetch_cover_from_caa
 
         results = musicbrainzngs.search_releases(artist=artist, release=album, limit=3)

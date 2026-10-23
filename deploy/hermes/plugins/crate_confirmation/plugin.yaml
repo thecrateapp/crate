@@ -1,0 +1,5 @@
+name: crate-confirmation
+version: 1.0.0
+description: Native exact-plan Telegram review for the managed Crate operator
+provides_tools: []
+provides_hooks: []

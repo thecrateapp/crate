@@ -105,6 +105,12 @@ def compile_operation(operation: str, parameters: dict, config: dict) -> dict:
         directory = _directory(album["path"], config)
         manifest = _manifest(directory)
         prepared = sync.prepare_album_sync(directory, album["artist"])
+        if prepared.get("has_cover"):
+            from crate.artwork_sources import freeze_album_artwork_source
+
+            prepared["artwork_source"] = freeze_album_artwork_source(
+                directory, sync.extensions
+            )
         if _manifest(directory) != manifest:
             raise ValueError("Sync source changed while preparing the plan")
         targets[("album", uid)] = {"entity_type": "album", "entity_uid": uid}
@@ -280,6 +286,9 @@ def apply_operation(
                     expected_version=album["database_version"],
                     prepared=album["prepared"],
                     validate_source=validate_source,
+                    operator_task_id=task_id
+                    if execution.get("operator_provenance")
+                    else None,
                 )
             )
         except (ValueError, OSError):
@@ -314,4 +323,4 @@ def apply_operation(
     }
 
 
-__all__ = ["compile_operation", "apply_operation"]
+__all__ = ["apply_operation", "compile_operation"]

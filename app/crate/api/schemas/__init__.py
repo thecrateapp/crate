@@ -2,6 +2,13 @@
 """Response-oriented Pydantic models for the HTTP API contract."""
 
 from crate.api.schemas import ai_agents as ai_agents
+from crate.api.schemas.agent_telegram import (
+    NativeCallback,
+    NativeDelivery,
+    NativeOutcomeDelivery,
+    NativePoll,
+    TelegramBindingInput,
+)
 from crate.api.schemas.show_imports import (
     ShowCandidate,
     ShowConsolidationInput,
@@ -440,6 +447,11 @@ from crate.api.schemas.utility import (
 )
 
 __all__ = [
+    "NativeCallback",
+    "NativeDelivery",
+    "NativeOutcomeDelivery",
+    "NativePoll",
+    "TelegramBindingInput",
     "ai_agents",
     "ShowCandidate",
     "ShowConsolidationInput",

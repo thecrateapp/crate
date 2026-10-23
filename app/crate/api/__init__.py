@@ -621,6 +621,9 @@ def create_app() -> FastAPI:
     app.include_router(ai_agents_router)
     app.include_router(agent_integrations_router)
     app.include_router(agent_plans_router)
+    from crate.api.agent_telegram import router as agent_telegram_router
+
+    app.include_router(agent_telegram_router)
     app.include_router(show_imports_router)
 
     # Static files

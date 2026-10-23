@@ -87,6 +87,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "fix_artist": TaskTypeInfo("Artist Fix", "library"),
     "verify_storage_v2": TaskTypeInfo("Verify Storage v2", "library"),
     "tidal_download": TaskTypeInfo("Tidal Download", "acquisition"),
+    "agent_tidal_download": TaskTypeInfo("Hermes Tidal Import", "acquisition"),
     "soulseek_download": TaskTypeInfo("Soulseek Download", "acquisition"),
     "check_new_releases": TaskTypeInfo("Check New Releases", "acquisition"),
     "promote_due_releases": TaskTypeInfo(
@@ -428,6 +429,7 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "sync_lyrics": "\U0001f4dd",
     "backfill_track_audio_fingerprints": "\U0001f9ec",
     "tidal_download": "\U0001f4e5",
+    "agent_tidal_download": "\U0001f4e5",
     "soulseek_download": "\U0001f4e5",
     "bandcamp_backfill_entity_urls": "\U0001f517",
     "index_genres": "\U0001f3f7\ufe0f",
