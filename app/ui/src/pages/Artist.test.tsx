@@ -203,7 +203,11 @@ describe("MergeArtistDialog", () => {
 
     await userEvent.type(screen.getByRole("textbox"), "target");
 
-    await screen.findByText("Target Artist");
+    const result = await screen.findByText("Target Artist");
+    const resultButton = result.closest("button");
+    expect(resultButton).toHaveClass("hover:bg-accent-action/8");
+    expect(resultButton).not.toHaveClass("text-white/88");
+
     await userEvent.click(screen.getByText("Target Artist"));
 
     await waitFor(() => {

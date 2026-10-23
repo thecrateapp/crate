@@ -1,7 +1,9 @@
 import { Slider } from "@crate/ui/primitives/Slider";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
-import { PageHeaderLayout } from "@/components/layout/PageHeader";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { Switch } from "@crate/ui/primitives/Switch";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
   useState,
   useEffect,
@@ -225,7 +227,7 @@ function Section({
           {title}
         </MonoLabel>
         {description ? (
-          <p className="text-sm text-white/45">{description}</p>
+          <p className="text-sm text-text-muted">{description}</p>
         ) : null}
       </div>
       {children}
@@ -245,23 +247,12 @@ function Toggle({
   ariaLabel?: string;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-sm border border-border-quiet bg-card p-0.5 transition-colors disabled:opacity-50 ${
-        checked ? "border-primary/35 bg-primary/15" : "bg-white/[0.04]"
-      }`}
-    >
-      <span
-        className={`pointer-events-none block h-4 w-4 rounded-[2px] bg-white shadow-sm transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
+      aria-label={ariaLabel}
+    />
   );
 }
 
@@ -279,23 +270,13 @@ function FieldRow({
       <div className="space-y-1">
         <MonoLabel as="span">{label}</MonoLabel>
         {hint && (
-          <p className="text-[11px] leading-relaxed text-white/30">{hint}</p>
+          <p className="text-[11px] leading-relaxed text-text-subtle">{hint}</p>
         )}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {children}
       </div>
     </div>
-  );
-}
-
-function StatusDot({ ok }: { ok: boolean }) {
-  return (
-    <div
-      className={`w-2 h-2 rounded-full ${
-        ok ? "bg-accent-action" : "bg-state-warning"
-      }`}
-    />
   );
 }
 
@@ -422,28 +403,16 @@ export function Settings() {
   };
 
   if (loading) {
-    return (
-      <div
-        role="status"
-        aria-label="Loading settings"
-        className="flex items-center justify-center gap-3 py-20 text-muted-foreground"
-      >
-        <Loader2 size={18} className="animate-spin" />
-        <span className="font-mono text-xs uppercase tracking-caps">
-          Loading settings
-        </span>
-      </div>
-    );
+    return <LoadingState label="Loading settings" className="py-20" />;
   }
 
   if (!settings) {
     return (
       <div className="space-y-6">
-        <AdminPageHeader>
-          <h1 className="text-2xl font-semibold tracking-tight text-white font-display">
-            Settings
-          </h1>
-        </AdminPageHeader>
+        <OpsPageHero
+          title="Settings"
+          description="Runtime, library, enrichment and notification controls."
+        />
         <Card className="border-border-quiet bg-card">
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
@@ -473,16 +442,10 @@ export function Settings() {
 
   return (
     <div className="space-y-6">
-      <PageHeaderLayout as="header">
-        <div>
-          <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance">
-            Settings
-          </h1>
-          <p className="mt-3 text-sm text-text-muted">
-            Runtime, library, enrichment and notification controls.
-          </p>
-        </div>
-      </PageHeaderLayout>
+      <OpsPageHero
+        title="Settings"
+        description="Runtime, library, enrichment and notification controls."
+      />
 
       <Tabs
         value={section}
@@ -553,7 +516,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
           description="Where Crate reads from and how the indexed collection is currently shaped."
         >
           <FieldRow label="Path">
-            <code className="rounded-md border border-white/8 bg-black/25 px-3 py-2 font-mono text-sm">
+            <code className="rounded-md border border-border-quiet bg-card px-3 py-2 font-mono text-sm">
               {settings.library?.path || "/music"}
             </code>
           </FieldRow>
@@ -580,7 +543,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
           description="Background tasks, pool health and current queue state."
         >
           <FieldRow label="Engine">
-            <span className="rounded-md border border-white/8 bg-black/25 px-3 py-2 font-mono text-sm">
+            <span className="rounded-md border border-border-quiet bg-card px-3 py-2 font-mono text-sm">
               {worker?.engine || "dramatiq"}
             </span>
           </FieldRow>
@@ -607,7 +570,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
           </FieldRow>
           {dbHeavyGate &&
             (dbHeavyGate.active > 0 || dbHeavyGate.pending > 0) && (
-              <div className="rounded-md border border-white/6 bg-black/15 px-3 py-2 text-xs text-muted-foreground">
+              <div className="rounded-md border border-border-quiet-subtle bg-card px-3 py-2 text-xs text-muted-foreground">
                 DB-heavy tasks are serialized. Free worker slots can still
                 appear idle while a heavy task is queued behind another heavy
                 task.
@@ -618,11 +581,11 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
               {worker.running_tasks.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center gap-2 rounded-md border border-white/6 bg-black/15 px-3 py-2 text-xs text-muted-foreground"
+                  className="flex items-center gap-2 rounded-md border border-border-quiet-subtle bg-card px-3 py-2 text-xs text-muted-foreground"
                 >
                   <Loader2 size={10} className="animate-spin text-primary" />
                   <span className="font-mono">{t.type}</span>
-                  <span className="text-white/20">{t.id}</span>
+                  <span className="text-text-subtle">{t.id}</span>
                   <Badge variant="outline">{t.pool}</Badge>
                 </div>
               ))}
@@ -789,7 +752,10 @@ function TidalCard() {
         description="Manage the current device auth session and token refresh flow."
       >
         <FieldRow label="Status">
-          <StatusDot ok={authenticated} />
+          <StatusDot
+            tone={authenticated ? "on" : "warn"}
+            title={authenticated ? "Connected" : "Not connected"}
+          />
           <span className="text-sm">
             {authenticated ? "Authenticated" : "Not authenticated"}
           </span>
@@ -880,12 +846,15 @@ function SoulseekCard() {
         description="Acquisition quality defaults and current daemon connection state."
       >
         <FieldRow label="Status">
-          <StatusDot ok={connected} />
+          <StatusDot
+            tone={connected ? "on" : "warn"}
+            title={connected ? "Connected" : "Not connected"}
+          />
           <span className="text-sm">
             {connected ? `Connected (${slsk?.state})` : "Disconnected"}
           </span>
           {!connected && (
-            <span className="text-[10px] text-white/30">
+            <span className="text-[10px] text-text-subtle">
               slskd container not running
             </span>
           )}
@@ -993,6 +962,7 @@ function DownloadWindowCard() {
         >
           <Toggle
             checked={windowEnabled}
+            ariaLabel="Time window"
             onChange={(v) => {
               setWindowEnabled(v);
               save({ window_enabled: v });
@@ -1030,7 +1000,7 @@ function DownloadWindowCard() {
             onChange={(e) => setMaxUsers(e.target.value)}
             onBlur={() => save({ max_active_users: parseInt(maxUsers) || 0 })}
           />
-          <span className="text-[10px] text-white/30">0 = no limit</span>
+          <span className="text-[10px] text-text-subtle">0 = no limit</span>
         </FieldRow>
         <FieldRow
           label="Max active streams"
@@ -1046,7 +1016,7 @@ function DownloadWindowCard() {
               save({ max_active_streams: parseInt(maxStreams) || 0 })
             }
           />
-          <span className="text-[10px] text-white/30">0 = no limit</span>
+          <span className="text-[10px] text-text-subtle">0 = no limit</span>
         </FieldRow>
       </PanelCard>
     </Section>
@@ -1197,7 +1167,7 @@ function AIRefinementStatus({
   cacheTtlHours: number;
 }) {
   if (!pathAI) {
-    return <p className="text-sm text-white/45">Checking AI refinement…</p>;
+    return <p className="text-sm text-text-muted">Checking AI refinement…</p>;
   }
 
   if (pathAI.status === "legacy") {
@@ -1376,11 +1346,12 @@ function EnrichmentSection({
               <Toggle
                 checked={draft[key] ?? false}
                 onChange={(v) => setDraft((prev) => ({ ...prev, [key]: v }))}
+                ariaLabel={ENRICHMENT_LABELS[key] ?? key}
               />
               {draft[key] ? (
                 <CheckCircle2 size={13} className="text-accent-action-hi/70" />
               ) : (
-                <XCircle size={13} className="text-white/20" />
+                <XCircle size={13} className="text-text-subtle" />
               )}
             </FieldRow>
           ))}
@@ -1597,7 +1568,11 @@ function NotificationsSection({
         description="Send task and system messages through a bot linked to your chat."
       >
         <FieldRow label="Enabled">
-          <Toggle checked={enabled} onChange={setEnabled} />
+          <Toggle
+            checked={enabled}
+            onChange={setEnabled}
+            ariaLabel="Telegram notifications"
+          />
           <Badge variant={enabled ? "default" : "secondary"}>
             {enabled ? "Active" : "Disabled"}
           </Badge>
@@ -1644,7 +1619,7 @@ function NotificationsSection({
             Send Test
           </Button>
         </div>
-        <p className="text-[10px] text-white/30 md:pl-[212px]">
+        <p className="text-[10px] text-text-subtle md:pl-[212px]">
           Create a bot via @BotFather, paste the token, then send /start to it.
         </p>
       </PanelCard>
@@ -1699,7 +1674,7 @@ function StorageSection({
             </TableHeader>
             <TableBody>
               {Object.entries(dbStats).map(([name, stats]) => (
-                <TableRow key={name} className="border-white/5">
+                <TableRow key={name} className="border-border-quiet-subtle">
                   <TableCell className="text-sm font-mono py-1.5">
                     {name}
                   </TableCell>
@@ -1846,7 +1821,10 @@ function AuditSection() {
               </TableHeader>
               <TableBody>
                 {entries.map((entry) => (
-                  <TableRow key={entry.id} className="border-white/5">
+                  <TableRow
+                    key={entry.id}
+                    className="border-border-quiet-subtle"
+                  >
                     <TableCell
                       className="text-xs text-muted-foreground whitespace-nowrap py-1.5"
                       title={new Date(entry.timestamp).toLocaleString()}

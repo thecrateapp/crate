@@ -7,6 +7,9 @@ const catalogFixture = fileURLToPath(
     import.meta.url,
   ),
 );
+const adminUseApi = fileURLToPath(
+  new URL("../../../app/ui/src/hooks/use-api.ts", import.meta.url),
+);
 const discoveryFixture = fileURLToPath(
   new URL(
     "../../design-system-preview/admin-discovery-fixtures.ts",
@@ -119,6 +122,12 @@ const catalogReviewFixture = {
     );
     const isDiscovery = importerPath.includes("app/ui/src/pages/Discover.tsx");
     const isInsights = importerPath.includes("app/ui/src/pages/Insights.tsx");
+    const isGenreWheel = importerPath.includes(
+      "app/ui/src/components/genres/GenreWheel.tsx",
+    );
+    const isGenreExplorer = importerPath.includes(
+      "app/ui/src/components/genres/GenreTaxonomyExplorer.tsx",
+    );
     const isAcquisition = importerPath.includes(
       "app/ui/src/pages/Download.tsx",
     );
@@ -217,22 +226,24 @@ const catalogReviewFixture = {
                                             "app/ui/src/pages/Browse.tsx",
                                           )
                                         ? ["@/lib/api"]
-                                        : importerPath.includes(
-                                              "app/ui/src/pages/Genres.tsx",
-                                            )
-                                          ? [
-                                              "@/lib/api",
-                                              "@/hooks/use-api",
-                                              "@/hooks/use-task-poll",
-                                            ]
+                                        : isGenreWheel || isGenreExplorer
+                                          ? ["@/hooks/use-api"]
                                           : importerPath.includes(
-                                                "app/ui/src/components/artist/ArtistCard.tsx",
-                                              ) ||
-                                              importerPath.includes(
-                                                "app/ui/src/components/artist/ArtistRow.tsx",
+                                                "app/ui/src/pages/Genres.tsx",
                                               )
-                                            ? ["@/lib/library-routes"]
-                                            : [];
+                                            ? [
+                                                "@/lib/api",
+                                                "@/hooks/use-api",
+                                                "@/hooks/use-task-poll",
+                                              ]
+                                            : importerPath.includes(
+                                                  "app/ui/src/components/artist/ArtistCard.tsx",
+                                                ) ||
+                                                importerPath.includes(
+                                                  "app/ui/src/components/artist/ArtistRow.tsx",
+                                                )
+                                              ? ["@/lib/library-routes"]
+                                              : [];
     if (imports.length === 0) return null;
     const fixture = isAdminShell
       ? adminNavigationFixture
@@ -277,6 +288,11 @@ const catalogReviewFixture = {
         'from "@/components/ui/AIButton"',
         'from "@/components/ui/AIButton?playlist-editor-review"',
       );
+    if (isGenreWheel)
+      transformed = transformed.replaceAll(
+        `from "/@fs${adminUseApi}"`,
+        `from "${catalogFixture}"`,
+      );
     if (transformed === code) return null;
     if (isAcquisition)
       transformed = `import { AcquisitionEventSource as EventSource } from ${JSON.stringify(acquisitionFixture)};\n${transformed}`;
@@ -287,6 +303,12 @@ const catalogReviewFixture = {
   resolveId(source: string, importer?: string) {
     const importerPath =
       importer?.split(/[?#]/)[0]?.replaceAll("\\", "/") ?? "";
+    if (
+      importerPath.endsWith("/app/ui/src/components/genres/GenreWheel.tsx") &&
+      (source.endsWith("/hooks/use-api") ||
+        source.endsWith("/hooks/use-api.ts"))
+    )
+      return catalogFixture;
     if (
       importerPath.includes(
         "tools/crate-ui-showcase/reviews/AdminPlaylistsReview.tsx",

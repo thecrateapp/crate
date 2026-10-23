@@ -660,7 +660,7 @@ export function QueueLanes({
                 </MonoLabel>
                 <span
                   data-testid="queue-total-count"
-                  className="row-span-3 self-center translate-y-0.5 font-display text-[clamp(1.7rem,3vw,2.65rem)] font-extrabold leading-none tracking-[-0.045em] tabular-nums text-text-primary max-[760px]:hidden"
+                  className="row-span-3 self-center translate-y-0.5 font-mono text-[clamp(1.7rem,3vw,2.65rem)] font-extrabold leading-none tracking-[-0.045em] tabular-nums text-text-primary max-[760px]:hidden"
                 >
                   {running + queued}
                 </span>
@@ -687,7 +687,7 @@ export function QueueLanes({
               <span
                 data-testid="queue-total-count-mobile"
                 aria-hidden="true"
-                className="hidden self-center font-display text-[1.6rem] font-extrabold leading-none tracking-[-0.045em] tabular-nums text-text-primary max-[760px]:col-start-1 max-[760px]:row-start-2 max-[760px]:block"
+                className="hidden self-center font-mono text-[1.6rem] font-extrabold leading-none tracking-[-0.045em] tabular-nums text-text-primary max-[760px]:col-start-1 max-[760px]:row-start-2 max-[760px]:block"
               >
                 {running + queued}
               </span>

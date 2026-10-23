@@ -1,7 +1,6 @@
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import {
   RefreshCw as HeaderRefreshCw,
@@ -13,6 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import {
+  OpsPageHero,
   OpsPanel,
   OpsStatTile,
   OpsSurface,
@@ -20,6 +20,12 @@ import {
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Badge } from "@crate/ui/shadcn/badge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -156,7 +162,10 @@ export function GlobalCatalog() {
 
   return (
     <main className="min-w-0 space-y-6">
-      <PageHeaderLayout
+      <OpsPageHero
+        title="Global Catalog"
+        description="Canonical deduped collection built from local library and trusted federated catalogs."
+        compactActions
         actions={
           <PageHeaderActions>
             <PageHeaderAction
@@ -211,43 +220,25 @@ export function GlobalCatalog() {
             </PageHeaderAction>
           </PageHeaderActions>
         }
-      >
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">
-            Global Catalog
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Canonical deduped collection built from local library and trusted
-            federated catalogs.
-          </p>
-        </div>
-      </PageHeaderLayout>
+      />
 
-      <div
-        role="group"
-        aria-label="Global catalog views"
-        className="flex min-w-0 gap-2 overflow-x-auto border-b border-border-quiet"
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as Tab)}
+        className="min-w-0 gap-5"
       >
-        {tabs.map((item) => (
-          <button
-            type="button"
-            aria-pressed={tab === item.key}
-            key={item.key}
-            className={`min-h-11 shrink-0 border-b-2 px-3 py-2 transition-colors ${
-              tab === item.key
-                ? "border-accent-action-hi text-accent-action-hi"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => setTab(item.key)}
-          >
-            <MonoLabel as="span" tone={tab === item.key ? "accent" : "subtle"}>
+        <TabsList
+          aria-label="Global catalog views"
+          className="w-full min-w-0 max-w-full"
+        >
+          {tabs.map((item) => (
+            <TabsTrigger key={item.key} value={item.key}>
               {item.label}
-            </MonoLabel>
-          </button>
-        ))}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {tab === "overview" ? (
+        <TabsContent value="overview" className="mt-0">
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Artists" value={formatNumber(counts?.artists)} />
@@ -315,9 +306,9 @@ export function GlobalCatalog() {
             </OpsPanel>
           </div>
         </div>
-      ) : null}
+        </TabsContent>
 
-      {tab === "runs" ? (
+        <TabsContent value="runs" className="mt-0">
         <OpsPanel title="Reconciliation runs">
           <div className="space-y-3">
             {runItems.length ? (
@@ -327,9 +318,9 @@ export function GlobalCatalog() {
             )}
           </div>
         </OpsPanel>
-      ) : null}
+        </TabsContent>
 
-      {tab === "duplicates" ? (
+        <TabsContent value="duplicates" className="mt-0">
         <OpsPanel title="Duplicate candidates">
           <div className="space-y-3">
             {duplicateItems.length ? (
@@ -383,7 +374,8 @@ export function GlobalCatalog() {
             )}
           </div>
         </OpsPanel>
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

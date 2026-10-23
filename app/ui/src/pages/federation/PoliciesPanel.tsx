@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { PanelState } from "./PanelState";
 import type { FederationStatus } from "./types";
@@ -38,7 +39,9 @@ function PeerPolicy({
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
-        <p className="font-mono text-xs text-white/45">{nodeUid}</p>
+        <MonoLabel as="p" size="eyebrow" className="break-all">
+          {nodeUid}
+        </MonoLabel>
         <div className="flex flex-wrap gap-2">
           {PRESETS.map((value) => (
             <Button
@@ -105,7 +108,7 @@ export function PoliciesPanel({ canManage }: { canManage: boolean }) {
     <PanelState loading={status.loading} error={status.error}>
       <div className="space-y-3">
         {peers.length === 0 ? (
-          <p className="text-sm text-white/45">No approved peers.</p>
+          <p className="text-sm text-text-muted">No approved peers.</p>
         ) : (
           peers.map((peer) => (
             <PeerPolicy

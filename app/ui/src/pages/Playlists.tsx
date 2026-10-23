@@ -1,5 +1,6 @@
 import { FormField } from "@crate/ui/primitives/FormField";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import {
@@ -9,12 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@crate/ui/shadcn/dropdown-menu";
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { ListPagination } from "@/components/admin/ListPagination";
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import {
   FilePlus2 as HeaderFilePlus2,
@@ -368,128 +368,115 @@ export function Playlists() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              <PageHeaderAction
-                label="New static"
-                onClick={() =>
-                  setComposerMode((current) =>
-                    current === "static" ? null : "static",
-                  )
-                }
-                aria-pressed={composerMode === "static"}
-              >
-                <HeaderFilePlus2
-                  data-admin-ux="header-new-static"
-                  aria-hidden="true"
-                />
-              </PageHeaderAction>
-              <PageHeaderAction
-                label="New smart"
-                onClick={() =>
-                  setComposerMode((current) =>
-                    current === "smart" ? null : "smart",
-                  )
-                }
-                aria-pressed={composerMode === "smart"}
-              >
-                <HeaderListPlus
-                  data-admin-ux="header-new-smart"
-                  aria-hidden="true"
-                />
-              </PageHeaderAction>
-            </PageHeaderActions>
-          }
-        >
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <h1 className="font-display text-2xl font-semibold tracking-tight">
-                  System Playlists
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Editorial playlists for Listen, with smart generation and
-                  Admin controls.
-                </p>
-              </div>
-            </div>
-          </div>
-        </PageHeaderLayout>
+      <OpsPageHero
+        title="System Playlists"
+        description="Editorial playlists for Listen, with smart generation and Admin controls."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="New static"
+              onClick={() =>
+                setComposerMode((current) =>
+                  current === "static" ? null : "static",
+                )
+              }
+              aria-pressed={composerMode === "static"}
+            >
+              <HeaderFilePlus2
+                data-admin-ux="header-new-static"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="New smart"
+              onClick={() =>
+                setComposerMode((current) =>
+                  current === "smart" ? null : "smart",
+                )
+              }
+              aria-pressed={composerMode === "smart"}
+            >
+              <HeaderListPlus
+                data-admin-ux="header-new-smart"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      />
 
-        <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-            <div className="crate-form-field min-w-0 flex-1">
-              <label
-                htmlFor="playlists-search"
-                className="font-mono font-normal text-meta text-text-muted"
-              >
-                Search playlists
-              </label>
-              <div className="relative">
-                <Search
-                  data-admin-ux="playlists-search"
-                  aria-hidden="true"
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                  id="playlists-search"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Search playlists by name, description or category"
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <div className="crate-form-field">
-              <MonoLabel as="span">Category</MonoLabel>
-              <AdminSelect
-                value={categoryFilter}
-                onChange={(value) => {
-                  setCategoryFilter(value);
+      <div className="space-y-3 border-t border-border-quiet pt-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+          <div className="crate-form-field min-w-0 flex-1">
+            <label
+              htmlFor="playlists-search"
+              className="font-mono font-normal text-meta text-text-muted"
+            >
+              Search playlists
+            </label>
+            <div className="relative">
+              <Search
+                data-admin-ux="playlists-search"
+                aria-hidden="true"
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                id="playlists-search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
                   setPage(1);
                 }}
-                options={categoryOptions}
-                placeholder="All categories"
-                searchable
-                searchPlaceholder="Search categories..."
-                triggerClassName="w-full lg:w-[220px]"
+                placeholder="Search playlists by name, description or category"
+                className="pl-9"
               />
             </div>
           </div>
-
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {FILTER_OPTIONS.map((item) => (
-                <FilterChip
-                  key={item.key}
-                  active={filter === item.key}
-                  onClick={() => {
-                    setFilter(item.key);
-                    setPage(1);
-                  }}
-                >
-                  {item.label}
-                  <span>
-                    {item.key === "all"
-                      ? counts.all
-                      : item.key === "curated"
-                        ? counts.curated
-                        : item.key === "smart"
-                          ? counts.smart
-                          : counts.inactive}
-                  </span>
-                </FilterChip>
-              ))}
-            </div>
+          <div className="crate-form-field">
+            <MonoLabel as="span">Category</MonoLabel>
+            <AdminSelect
+              value={categoryFilter}
+              onChange={(value) => {
+                setCategoryFilter(value);
+                setPage(1);
+              }}
+              options={categoryOptions}
+              placeholder="All categories"
+              searchable
+              searchPlaceholder="Search categories..."
+              triggerClassName="w-full lg:w-[220px]"
+            />
           </div>
         </div>
-      </AdminPageHeader>
+
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {FILTER_OPTIONS.map((item) => (
+              <FilterChip
+                key={item.key}
+                active={filter === item.key}
+                onClick={() => {
+                  setFilter(item.key);
+                  setPage(1);
+                }}
+              >
+                {item.label}
+                <span>
+                  {item.key === "all"
+                    ? counts.all
+                    : item.key === "curated"
+                      ? counts.curated
+                      : item.key === "smart"
+                        ? counts.smart
+                        : counts.inactive}
+                </span>
+              </FilterChip>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {composerMode === "static" ? (
         <CreateStaticPlaylistPanel
@@ -520,7 +507,7 @@ export function Playlists() {
           Loading playlists…
         </div>
       ) : filteredPlaylists.length === 0 ? (
-        <Card className="border-white/10 bg-card p-10 text-center">
+        <Card className="p-10 text-center">
           <h2 className="text-lg font-medium font-display">
             No playlists for this view yet
           </h2>
@@ -636,7 +623,7 @@ export function Playlists() {
                     name={playlist.name}
                     coverDataUrl={playlist.cover_data_url}
                     tracks={playlist.artwork_tracks}
-                    className="size-28 shrink-0 self-stretch rounded-sm border border-white/10 bg-white/[0.03] object-cover md:size-44"
+                    className="size-28 shrink-0 self-stretch rounded-sm border border-border-quiet bg-canvas-surface object-cover md:size-44"
                   />
 
                   <div
@@ -680,9 +667,9 @@ export function Playlists() {
                         ) : null}
                       </div>
                       <div className="grid min-w-0 gap-1">
-                        <span className="truncate text-base font-semibold text-text-primary md:text-lg">
+                        <h2 className="m-0 truncate font-display text-base font-semibold text-text-primary md:text-lg">
                           {playlist.name}
-                        </span>
+                        </h2>
                         <p className="m-0 line-clamp-1 text-sm leading-5 text-text-muted md:line-clamp-2">
                           {playlist.description ||
                             "No editorial description yet."}
@@ -789,7 +776,7 @@ function CreateStaticPlaylistPanel({
   }
 
   return (
-    <Card className="border-white/10 bg-card p-5">
+    <Card className="p-5">
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -873,7 +860,7 @@ function CreateStaticPlaylistPanel({
           </FormField>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border-quiet pt-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">
             Static playlists open in the editor right after creation so cover
             and editorial metadata stay in the same workflow.
@@ -1038,7 +1025,7 @@ function CreateSmartPlaylistPanel({
   }
 
   return (
-    <Card className="border-white/10 bg-card p-5">
+    <Card className="p-5">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -1127,7 +1114,7 @@ function CreateSmartPlaylistPanel({
           </FormField>
         </div>
 
-        <div className="rounded-md border border-white/10 bg-black/10 p-4">
+        <div className="rounded-md border border-border-quiet bg-canvas-surface p-4">
           <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h3 className="text-sm font-semibold font-display">
@@ -1190,14 +1177,11 @@ function CreateSmartPlaylistPanel({
               return (
                 <div
                   key={index}
-                  className="@container rounded-md border border-white/10 bg-card/60 p-3"
+                  className="@container rounded-md border border-border-quiet bg-canvas-surface p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <InfoBadge>Rule {index + 1}</InfoBadge>
-                    <Button
-                      size="icon-lg"
-                      variant="ghost"
-                      aria-label={`Remove rule ${index + 1}`}
+                    <ActionIconButton
                       onClick={() => removeRule(index)}
                       disabled={rules.length === 1}
                       title={`Remove rule ${index + 1}`}
@@ -1206,7 +1190,7 @@ function CreateSmartPlaylistPanel({
                         data-admin-ux="playlists-remove-rule"
                         aria-hidden="true"
                       />
-                    </Button>
+                    </ActionIconButton>
                   </div>
 
                   <div className="grid gap-3 @xl:grid-cols-[180px_160px_minmax(0,1fr)]">
@@ -1296,7 +1280,7 @@ function CreateSmartPlaylistPanel({
             })}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border-quiet pt-4">
             <p className="text-sm text-muted-foreground">
               Prefer one condition per rule. If you need multiple buckets,
               create more rules and switch match mode to `Any`.
@@ -1312,7 +1296,7 @@ function CreateSmartPlaylistPanel({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-t border-border-quiet pt-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">
             Smart playlists queue their first generation immediately, then you
             continue in the editor for cover, status and later refinements.

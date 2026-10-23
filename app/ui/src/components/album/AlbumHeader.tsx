@@ -1,19 +1,7 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { Link } from "react-router";
-import {
-  BrainCircuit,
-  Disc3,
-  Download,
-  Archive,
-  FileJson,
-  HardDrive,
-  Loader2,
-  Music,
-  Clock,
-  Tags,
-  TrendingUp,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ImageLightbox } from "@crate/ui/primitives/ImageLightbox";
@@ -288,7 +276,7 @@ export function AlbumHeader({
                       coverLoaded && !coverError ? "opacity-0" : "opacity-100"
                     }`}
                   >
-                    <span className="text-5xl font-black text-white/40">
+                    <span className="text-5xl font-black text-text-subtle">
                       {letter}
                     </span>
                   </div>
@@ -313,10 +301,10 @@ export function AlbumHeader({
           </div>
 
           <div className="min-w-0 flex-1 pb-1">
-            <div className="mb-2 text-xs text-white/40">
+            <div className="mb-2 text-xs text-text-subtle">
               <Link
                 to="/browse"
-                className="transition-colors hover:text-white/70"
+                className="transition-colors hover:text-accent-action-hi"
               >
                 Browse
               </Link>
@@ -327,50 +315,40 @@ export function AlbumHeader({
                   artistSlug,
                   artistName: artist,
                 })}
-                className="transition-colors hover:text-white/70"
+                className="transition-colors hover:text-accent-action-hi"
               >
                 {artist}
               </Link>
               <span className="mx-1.5">/</span>
-              <span className="text-white/60">{resolvedDisplayName}</span>
+              <span className="text-text-muted">{resolvedDisplayName}</span>
             </div>
 
-            <h1 className="mb-1.5 truncate text-xl font-black leading-none tracking-tight text-white md:text-4xl font-display">
+            <h1 className="mb-1.5 truncate text-xl font-black leading-none tracking-tight text-text-primary md:text-4xl font-display">
               {resolvedDisplayName}
             </h1>
             <Link
               to={artistPagePath({ artistId, artistSlug, artistName: artist })}
-              className="text-base text-white/60 transition-colors hover:text-white"
+              className="text-base text-text-muted transition-colors hover:text-accent-action-hi"
             >
               {displayArtist}
             </Link>
 
-            <div className="mb-3 mt-3 flex flex-wrap items-center gap-4 text-sm text-white/50">
+            <div className="mb-3 mt-3 flex flex-wrap items-center gap-4 text-sm text-text-muted">
               {albumTags.year ? (
-                <span className="font-medium text-white/72">
+                <span className="font-medium text-text-primary">
                   {albumTags.year}
                 </span>
               ) : null}
               <span className="flex items-center gap-1.5">
-                <Disc3 size={14} />
                 {trackCount} tracks
               </span>
-              <span className="flex items-center gap-1.5">
-                <Clock size={14} />
-                {formatDuration(totalLengthSec)}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <HardDrive size={14} />
-                {formatSize(totalSizeMb)}
-              </span>
+              <span>{formatDuration(totalLengthSec)}</span>
+              <span>{formatSize(totalSizeMb)}</span>
             </div>
 
             {popularityPercent > 0 ? (
               <div className="mb-3 flex items-center gap-2">
-                <span className="flex items-center gap-1.5 text-xs text-white/40">
-                  <TrendingUp size={13} />
-                  Popularity
-                </span>
+                <span className="text-xs text-text-subtle">Popularity</span>
                 <div className="h-px w-[72px] overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full"
@@ -380,7 +358,7 @@ export function AlbumHeader({
                     }}
                   />
                 </div>
-                <span className="text-xs text-white/40">
+                <span className="text-xs text-text-subtle">
                   {popularityPercent}%
                 </span>
               </div>
@@ -392,7 +370,7 @@ export function AlbumHeader({
 
             <div className="mb-4 flex flex-wrap gap-2">
               {hasCover ? (
-                <InfoBadge icon={Music}>Cover</InfoBadge>
+                <InfoBadge>Cover</InfoBadge>
               ) : (
                 <InfoBadge active>No cover</InfoBadge>
               )}
@@ -419,10 +397,7 @@ export function AlbumHeader({
                       Enriching...
                     </>
                   ) : (
-                    <>
-                      <BrainCircuit size={14} className="mr-1" />
-                      Enrich
-                    </>
+                    <>Enrich</>
                   )}
                 </Button>
               ) : null}
@@ -437,7 +412,6 @@ export function AlbumHeader({
                     }
                     download
                   >
-                    <Download size={14} className="mr-1" />
                     Download
                   </a>
                 </Button>
@@ -452,9 +426,7 @@ export function AlbumHeader({
                   >
                     {metadataAction === "lyrics" ? (
                       <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : (
-                      <FileJson size={14} className="mr-1" />
-                    )}
+                    ) : null}
                     Lyrics
                   </Button>
                   <Button
@@ -465,9 +437,7 @@ export function AlbumHeader({
                   >
                     {metadataAction === "portable" ? (
                       <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : (
-                      <Tags size={14} className="mr-1" />
-                    )}
+                    ) : null}
                     Metadata
                   </Button>
                   <Button
@@ -478,9 +448,7 @@ export function AlbumHeader({
                   >
                     {metadataAction === "export" ? (
                       <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : (
-                      <Archive size={14} className="mr-1" />
-                    )}
+                    ) : null}
                     Export
                   </Button>
                 </>

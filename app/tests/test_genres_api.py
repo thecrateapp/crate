@@ -196,6 +196,54 @@ class TestGenreGraphAPI:
 
 
 class TestGenreTaxonomyAPI:
+    def test_taxonomy_tree_distinguishes_core_from_overlays(self, test_app):
+        catalog = {
+            "rock": {"name": "Rock", "parents": [], "top_level": True},
+            "microgenre": {
+                "name": "Microgenre",
+                "parents": ["rock"],
+                "top_level": False,
+            },
+        }
+        descriptor = {
+            "taxonomy_id": "crate-core",
+            "version": "1.0.0",
+            "digest": "sha256:core-digest",
+            "genres": [{"slug": "rock"}],
+            "release": {"valid": True, "key_id": "crate-test-root"},
+        }
+        with (
+            patch("crate.genre_taxonomy.get_genre_catalog", return_value=catalog),
+            patch(
+                "crate.genre_taxonomy.get_core_taxonomy_descriptor",
+                return_value=descriptor,
+            ),
+            patch("crate.db.genres.get_all_genres", return_value=[]),
+            patch(
+                "crate.db.queries.genres_taxonomy_admin_stats.get_genre_taxonomy_admin_stats",
+                return_value={},
+            ),
+            patch(
+                "crate.genre_taxonomy.resolve_genre_eq_preset",
+                return_value=None,
+            ),
+        ):
+            resp = test_app.get("/api/genres/taxonomy/tree")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        origins = {node["slug"]: node["origin"] for node in data["nodes"]}
+        assert origins == {"rock": "core", "microgenre": "overlay"}
+        assert data["core_taxonomy"] == {
+            "taxonomy_id": "crate-core",
+            "version": "1.0.0",
+            "digest": "sha256:core-digest",
+            "signature_valid": True,
+            "key_id": "crate-test-root",
+        }
+        rock = next(node for node in data["nodes"] if node["slug"] == "rock")
+        assert rock["cover_url"] == "/api/genres/rock/cover?size=640&format=webp"
+
     def test_taxonomy_tree_returns_nodes_and_top_level(self, test_app):
         catalog = {
             "post-hardcore": {
@@ -225,6 +273,21 @@ class TestGenreTaxonomyAPI:
             patch("crate.genre_taxonomy.get_genre_catalog", return_value=catalog),
             patch("crate.db.genres.get_all_genres", return_value=genre_list),
             patch(
+                "crate.db.queries.genres_taxonomy_admin_stats.get_genre_taxonomy_admin_stats",
+                return_value={
+                    "post-hardcore": {
+                        "artist_count": 3,
+                        "album_count": 6,
+                        "track_count": 18,
+                        "raw_tag_count": 2,
+                        "mapped_raw_tags": ["post hardcore", "post-hardcore"],
+                        "catalog_track_count": 180,
+                        "catalog_track_share_pct": 10,
+                        "listening_share_90d_pct": 4.5,
+                    },
+                },
+            ),
+            patch(
                 "crate.genre_taxonomy.resolve_genre_eq_preset",
                 return_value=None,
             ),
@@ -236,6 +299,13 @@ class TestGenreTaxonomyAPI:
         assert "top_level_slugs" in data
         assert len(data["nodes"]) == 2
         assert data["top_level_slugs"] == ["post-hardcore"]
+        post_hardcore = next(
+            node for node in data["nodes"] if node["slug"] == "post-hardcore"
+        )
+        assert post_hardcore["track_count"] == 18
+        assert post_hardcore["mapped_raw_tags"] == ["post hardcore", "post-hardcore"]
+        assert post_hardcore["catalog_track_share_pct"] == 10
+        assert post_hardcore["listening_share_90d_pct"] == 4.5
 
     def test_taxonomy_tree_node_has_children(self, test_app):
         catalog = {
@@ -253,6 +323,10 @@ class TestGenreTaxonomyAPI:
         with (
             patch("crate.genre_taxonomy.get_genre_catalog", return_value=catalog),
             patch("crate.db.genres.get_all_genres", return_value=[]),
+            patch(
+                "crate.db.queries.genres_taxonomy_admin_stats.get_genre_taxonomy_admin_stats",
+                return_value={},
+            ),
             patch(
                 "crate.genre_taxonomy.resolve_genre_eq_preset",
                 return_value=None,
@@ -290,6 +364,10 @@ class TestGenreTaxonomyAPI:
         with (
             patch("crate.genre_taxonomy.get_genre_catalog", return_value=catalog),
             patch("crate.db.genres.get_all_genres", return_value=[]),
+            patch(
+                "crate.db.queries.genres_taxonomy_admin_stats.get_genre_taxonomy_admin_stats",
+                return_value={},
+            ),
             patch("crate.genre_taxonomy.resolve_genre_eq_preset", return_value=None),
         ):
             resp = test_app.get("/api/genres/taxonomy/tree")
@@ -375,6 +453,8 @@ class TestGenreTaxonomyAPI:
                     "reasoning": "The genre emerged from hardcore.",
                 }
             ],
+            "eq_gains": [0, 1, 2, 1, 0, -1, -2, -1, 0, 1],
+            "eq_reasoning": "A modest low-mid cut with a restrained presence lift.",
             "reasoning": "Local artists and lineage match the node.",
             "current_relations": {"parent": ["rock"]},
         }
@@ -392,6 +472,8 @@ class TestGenreTaxonomyAPI:
         assert data["slug"] == "post-hardcore"
         assert data["description"].startswith("Angular")
         assert data["relations"][0]["relation_type"] == "parent"
+        assert data["eq_gains"] == [0, 1, 2, 1, 0, -1, -2, -1, 0, 1]
+        assert data["eq_reasoning"].startswith("A modest low-mid cut")
         build_proposal.assert_called_once_with("post-hardcore", ai_call=ANY)
 
     def test_infer_taxonomy_node_proposal_allows_raw_unmapped_genres(
@@ -426,6 +508,44 @@ class TestGenreTaxonomyAPI:
         assert data["evidence"]["seed_artists"] == ["Mogwai"]
         build_proposal.assert_called_once_with("instrumental", ai_call=ANY)
 
+    def test_infer_taxonomy_node_proposal_returns_raw_facet_recommendation(
+        self, test_app, monkeypatch, pg_db
+    ):
+        pin_actions(monkeypatch)
+        proposal = {
+            "ok": True,
+            "slug": "instrumental",
+            "name": "Instrumental",
+            "source_kind": "raw_genre",
+            "recommended_action": "classify_facet",
+            "recommended_target_slug": None,
+            "facets": [
+                {
+                    "dimension": "vocals",
+                    "slug": "instrumental",
+                    "name": "Instrumental",
+                }
+            ],
+            "description": "",
+            "aliases": [],
+            "relations": [],
+            "eq_gains": [],
+            "reasoning": "This tag describes vocal presence rather than a genre.",
+            "current_relations": {},
+            "evidence": {"seed_artists": ["Mogwai"]},
+        }
+        with patch(
+            "crate.api.genres.build_genre_taxonomy_node_proposal",
+            return_value=proposal,
+        ):
+            resp = test_app.post("/api/genres/taxonomy/instrumental/proposal")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source_kind"] == "raw_genre"
+        assert data["recommended_action"] == "classify_facet"
+        assert data["facets"] == proposal["facets"]
+
     def test_apply_taxonomy_proposal_maps_raw_genre_as_alias(self, test_app):
         with (
             patch("crate.api.genres.get_genre_taxonomy_node_id", return_value=12),
@@ -433,6 +553,7 @@ class TestGenreTaxonomyAPI:
                 "crate.api.genres.assign_genre_alias_value",
                 side_effect=[True, True, False],
             ) as assign_alias,
+            patch("crate.api.genres.clear_raw_genre_classification") as clear_classification,
             patch("crate.api.genres.invalidate_runtime_taxonomy_cache") as invalidate,
             patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
         ):
@@ -456,8 +577,90 @@ class TestGenreTaxonomyAPI:
         assert data["applied_aliases"] == ["crank-wave", "crank wave"]
         assign_alias.assert_any_call("crank-wave", "post-punk")
         assign_alias.assert_any_call("crank wave", "post-punk")
+        clear_classification.assert_called_once_with("crank-wave")
         invalidate.assert_called_once_with(broadcast=True)
         broadcast.assert_called_once_with("genre:crank-wave", "genre:post-punk")
+
+    def test_apply_taxonomy_proposal_classifies_raw_tag_as_facet(self, test_app):
+        normalized_facets = [
+            {"dimension": "vocals", "slug": "instrumental", "name": "Instrumental"}
+        ]
+        with (
+            patch(
+                "crate.api.genres.save_raw_genre_classification",
+                return_value={
+                    "slug": "instrumental",
+                    "classification": "facet",
+                    "facets": normalized_facets,
+                },
+            ) as save_classification,
+            patch("crate.api.genres.upsert_genre_taxonomy_node") as upsert_node,
+            patch("crate.api.genres.assign_genre_alias_value") as assign_alias,
+            patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
+        ):
+            resp = test_app.post(
+                "/api/genres/taxonomy/instrumental/proposal/apply",
+                json={
+                    "source_kind": "raw_genre",
+                    "recommended_action": "classify_facet",
+                    "facets": [{"dimension": "vocals", "name": "Instrumental"}],
+                },
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["action"] == "classify_facet"
+        assert data["classification"] == "facet"
+        assert data["facets"] == normalized_facets
+        assert data["applied_aliases"] == []
+        save_classification.assert_called_once_with(
+            "instrumental",
+            "facet",
+            [{"dimension": "vocals", "name": "Instrumental"}],
+        )
+        upsert_node.assert_not_called()
+        assign_alias.assert_not_called()
+        broadcast.assert_called_once_with("genre-tag:instrumental")
+
+    def test_apply_taxonomy_proposal_rejects_facet_action_without_facets(
+        self, test_app
+    ):
+        with patch("crate.api.genres.save_raw_genre_classification") as save:
+            resp = test_app.post(
+                "/api/genres/taxonomy/instrumental/proposal/apply",
+                json={
+                    "source_kind": "raw_genre",
+                    "recommended_action": "classify_facet",
+                },
+            )
+
+        assert resp.status_code == 422
+        save.assert_not_called()
+
+    def test_manual_raw_tag_facet_classification_can_start_without_values(
+        self, test_app
+    ):
+        with (
+            patch(
+                "crate.api.genres.save_raw_genre_classification",
+                return_value={
+                    "slug": "instrumental",
+                    "classification": "facet",
+                    "facets": [],
+                },
+            ) as save_classification,
+            patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
+        ):
+            resp = test_app.put(
+                "/api/genres/taxonomy/raw-tags/instrumental/classification",
+                json={"classification": "facet", "facets": []},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["classification"] == "facet"
+        assert resp.json()["facets"] == []
+        save_classification.assert_called_once_with("instrumental", "facet", [])
+        broadcast.assert_called_once_with("genre-tag:instrumental")
 
     def test_apply_taxonomy_proposal_creates_node_and_relations(self, test_app):
         with (
@@ -469,6 +672,7 @@ class TestGenreTaxonomyAPI:
                 "crate.api.genres.assign_genre_alias_value",
                 return_value=True,
             ) as assign_alias,
+            patch("crate.api.genres.clear_raw_genre_classification") as clear_classification,
             patch(
                 "crate.api.genres.replace_genre_taxonomy_edges",
                 return_value={"updated": True, "added": ["post-punk"], "missing": []},
@@ -506,6 +710,7 @@ class TestGenreTaxonomyAPI:
             description="Angular punk pressure with post-punk edges.",
             is_top_level=False,
         )
+        clear_classification.assert_called_once_with("crank-wave")
         assign_alias.assert_any_call("crank-wave", "crank-wave")
         assign_alias.assert_any_call("crank wave", "crank-wave")
         replace_edges.assert_called_once_with(
@@ -705,12 +910,12 @@ class TestInvalidTaxonomyAPI:
             "crate.api.genres.get_sound_intelligence_health",
             return_value={
                 "eq": {
-                    "total_tracks": 2,
+                    "total_genres": 3,
                     "sources": [
                         {
-                            "source": "audio_analysis_preset",
+                            "source": "genre_taxonomy_preset",
                             "count": 2,
-                            "percent": 100.0,
+                            "percent": 66.7,
                         }
                     ],
                 },
@@ -720,18 +925,20 @@ class TestInvalidTaxonomyAPI:
                     "orphan_count": 0,
                     "missing_description_count": 1,
                     "missing_direct_eq_count": 2,
+                    "missing_effective_eq_count": 1,
                     "unmapped_raw_count": 4,
                     "edge_count": 5,
                     "locked_edge_count": 1,
                     "manual_edge_count": 5,
                     "ai_edge_count": 0,
                 },
+                "listening_priorities": [],
             },
         ):
             resp = test_app.get("/api/genres/sound-intelligence/health")
 
         assert resp.status_code == 200
-        assert resp.json()["eq"]["total_tracks"] == 2
+        assert resp.json()["eq"]["total_genres"] == 3
         assert resp.json()["taxonomy"]["unmapped_raw_count"] == 4
 
 

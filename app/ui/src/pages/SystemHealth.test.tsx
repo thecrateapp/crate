@@ -141,7 +141,9 @@ describe("SystemHealth Resources instrument", () => {
   });
 
   it("uses the solid operational surface for resource and chart cards", () => {
-    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+    const { container } = renderWithAdminProviders(<SystemHealth />, {
+      route: "/system",
+    });
 
     for (const label of ["Music Volume", "API Latency"]) {
       const surface = screen.getByText(label).closest(".rounded-md");
@@ -154,6 +156,12 @@ describe("SystemHealth Resources instrument", () => {
     }
     const healthScore = screen.getByText("Health Score").closest(".rounded-md");
     expect(healthScore).toHaveClass("shadow-none");
+    expect(
+      container.querySelector(
+        '[class*="border-white/"], [class*="bg-black/"], [class*="text-white/"], [class*="bg-primary"]',
+      ),
+    ).toBeNull();
+    expect(container.querySelector('[data-testid="empty-state"]')).toBeInTheDocument();
   });
 
   it("retains the metrics window and refresh controls", async () => {

@@ -1,8 +1,7 @@
-import {} from "lucide-react";
-
 import { OpsPageHero, OpsStatTile } from "@/components/admin/ops-surfaces";
-import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { ActivityPanel } from "@/components/ai-models/ActivityPanel";
 import { AdvancedPanel } from "@/components/ai-models/AdvancedPanel";
 import { AI_ROOT } from "@/components/ai-models/api";
@@ -56,15 +55,15 @@ export function AiModels() {
       >
         {snapshot ? (
           <>
-            <span className="text-sm text-white/55">
+            <InfoBadge>
               {summaryModel(snapshot)} · {activeFeatureCount(snapshot)}/
               {snapshot.actions.length} features active
-            </span>
+            </InfoBadge>
             {!snapshot.migrated ? (
-              <StatusBadge tone="neutral">Using server settings</StatusBadge>
+              <InfoBadge>Using server settings</InfoBadge>
             ) : null}
             {snapshot.default_model?.available === false ? (
-              <StatusBadge tone="danger">Default model unavailable</StatusBadge>
+              <InfoBadge tone="danger">Default model unavailable</InfoBadge>
             ) : null}
           </>
         ) : null}
@@ -77,7 +76,9 @@ export function AiModels() {
         </p>
       ) : null}
 
-      {loading ? <p>Loading AI settings…</p> : null}
+      {loading ? (
+        <LoadingState label="Loading AI settings" />
+      ) : null}
       {error ? <ErrorState message={LOAD_ERROR} onRetry={refetch} /> : null}
 
       {usage && today ? (

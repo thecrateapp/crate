@@ -116,7 +116,14 @@ describe("Playlists smart rule composer", () => {
     const information = link.querySelector(
       '[data-slot="playlist-row-information"]',
     );
-    expect(artwork).toHaveClass("size-28", "md:size-44", "shrink-0");
+    expect(artwork).toHaveClass(
+      "size-28",
+      "md:size-44",
+      "shrink-0",
+      "border-border-quiet",
+      "bg-canvas-surface",
+    );
+    expect(artwork?.className).not.toContain("border-white");
     expect(content?.firstElementChild).toBe(artwork);
     expect(information?.parentElement).toBe(content);
     expect(information).toHaveTextContent("active");
@@ -160,6 +167,8 @@ describe("Playlists smart rule composer", () => {
     renderWithAdminProviders(<Playlists />, { route: "/playlists" });
     await screen.findByText("No playlists for this view yet");
     await userEvent.click(screen.getByRole("button", { name: "New smart" }));
+    const removeRule = screen.getByRole("button", { name: "Remove rule 1" });
+    expect(removeRule).not.toHaveAttribute("title");
     await userEvent.type(
       screen.getByPlaceholderText("Playlist name"),
       "Keyboard mix",

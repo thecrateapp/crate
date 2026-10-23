@@ -42,16 +42,8 @@ import {
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { waitForTask } from "@/lib/tasks";
 import { Badge } from "@crate/ui/shadcn/badge";
-import {
-  AudioWaveform,
-  Disc3,
-  Loader2,
-  GitMerge,
-  MoveRight,
-  Scissors,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { Disc3, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -290,7 +282,9 @@ export function MoveAlbumToArtistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-display">Move Album to Artist</DialogTitle>
+          <DialogTitle className="font-display">
+            Move Album to Artist
+          </DialogTitle>
           <DialogDescription>
             Queue a worker task to move "{albumName}" from {currentArtistName}{" "}
             to another artist.
@@ -299,16 +293,13 @@ export function MoveAlbumToArtistDialog({
 
         <div className="space-y-3">
           <div className="crate-form-field">
-            <label
-              htmlFor="move-album-target"
-              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
-            >
-              Target artist
+            <label htmlFor="move-album-target" data-slot="form-field-label">
+              <MonoLabel as="span">Target artist</MonoLabel>
             </label>
             <div className="relative">
               <Search
                 size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 id="move-album-target"
@@ -321,14 +312,14 @@ export function MoveAlbumToArtistDialog({
             </div>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
             {searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
                 <Loader2 size={15} className="animate-spin" />
                 Searching artists...
               </div>
             ) : results.length ? (
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-border-quiet">
                 {results.map((artist) => {
                   const isCurrentArtist =
                     currentArtistId != null && artist.id === currentArtistId;
@@ -338,9 +329,9 @@ export function MoveAlbumToArtistDialog({
                       type="button"
                       disabled={busy || isCurrentArtist || artist.id == null}
                       onClick={() => onMove(artist)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <span className="truncate text-sm font-medium text-white/88">
+                      <span className="truncate text-sm font-medium">
                         {artist.name}
                       </span>
                       {isCurrentArtist ? (
@@ -444,7 +435,9 @@ export function MergeAlbumDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-display">Merge Duplicate Album</DialogTitle>
+          <DialogTitle className="font-display">
+            Merge Duplicate Album
+          </DialogTitle>
           <DialogDescription>
             Move all files from "{currentAlbumName}" by {currentArtistName} into
             another album and remove this duplicate album row.
@@ -453,16 +446,13 @@ export function MergeAlbumDialog({
 
         <div className="space-y-3">
           <div className="crate-form-field">
-            <label
-              htmlFor="merge-album-target"
-              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
-            >
-              Target album
+            <label htmlFor="merge-album-target" data-slot="form-field-label">
+              <MonoLabel as="span">Target album</MonoLabel>
             </label>
             <div className="relative">
               <Search
                 size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 id="merge-album-target"
@@ -475,14 +465,14 @@ export function MergeAlbumDialog({
             </div>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
             {searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
                 <Loader2 size={15} className="animate-spin" />
                 Searching albums...
               </div>
             ) : results.length ? (
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-border-quiet">
                 {results.map((album) => {
                   const isCurrentAlbum =
                     currentAlbumId != null && album.id === currentAlbumId;
@@ -494,13 +484,13 @@ export function MergeAlbumDialog({
                       type="button"
                       disabled={busy || isCurrentAlbum || album.id == null}
                       onClick={() => onMerge(album)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/45">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border-quiet bg-surface-object text-text-subtle">
                         <Disc3 size={16} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-white/88">
+                        <div className="truncate text-sm font-medium">
                           {album.name}
                         </div>
                         <div className="truncate text-xs text-muted-foreground">
@@ -605,11 +595,8 @@ export function SplitAlbumDialog({
 
         <div className="space-y-4">
           <div className="crate-form-field">
-            <label
-              htmlFor="split-album-name"
-              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
-            >
-              New album name
+            <label htmlFor="split-album-name" data-slot="form-field-label">
+              <MonoLabel as="span">New album name</MonoLabel>
             </label>
             <Input
               id="split-album-name"
@@ -620,7 +607,7 @@ export function SplitAlbumDialog({
             />
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+          <div className="max-h-[360px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
             {tracks.map((track, index) => {
               const trackId = track.id;
               const title = track.tags.title || track.filename;
@@ -628,7 +615,7 @@ export function SplitAlbumDialog({
               return (
                 <label
                   key={track.entity_uid ?? String(track.id ?? track.filename)}
-                  className="flex cursor-pointer items-center gap-3 border-b border-white/8 px-4 py-3 last:border-b-0 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45"
+                  className="flex cursor-pointer items-center gap-3 border-b border-border-quiet px-4 py-3 last:border-b-0 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-45"
                 >
                   <input
                     type="checkbox"
@@ -642,7 +629,7 @@ export function SplitAlbumDialog({
                   </span>
                   <span
                     data-slot="form-field-value"
-                    className="min-w-0 flex-1 truncate text-sm font-medium text-white/88"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary"
                   >
                     {title}
                   </span>
@@ -1138,7 +1125,6 @@ export function Album() {
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => setShowTags(!showTags)}
           >
             Edit Tags
@@ -1148,37 +1134,33 @@ export function Album() {
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => setShowMoveAlbum(true)}
           >
-            <MoveRight size={14} className="mr-1" /> Move Album
+            Move Album
           </Button>
         ) : null}
         {canMoveAlbum ? (
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => setShowMergeAlbum(true)}
           >
-            <GitMerge size={14} className="mr-1" /> Merge Duplicate
+            Merge Duplicate
           </Button>
         ) : null}
         {canMoveAlbum ? (
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => setShowSplitAlbum(true)}
           >
-            <Scissors size={14} className="mr-1" /> Split Album
+            Split Album
           </Button>
         ) : null}
         {canEditMetadata && !hasMusicBrainzAlbumId ? (
           <Button
             size="sm"
             variant="outline"
-            className="border-accent-action/30 text-accent-action-hi hover:bg-accent-action/10"
             onClick={findMatches}
             disabled={matching}
           >
@@ -1196,7 +1178,6 @@ export function Album() {
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
             onClick={async () => {
               try {
                 const endpoint = albumReanalyzeApiPath({
@@ -1213,7 +1194,7 @@ export function Album() {
               }
             }}
           >
-            <AudioWaveform size={14} className="mr-1" /> Analyze
+            Analyze
           </Button>
         ) : null}
         {canDeleteAlbum && (
@@ -1222,7 +1203,7 @@ export function Album() {
             variant="outline"
             onClick={() => setShowDeleteConfirm(true)}
           >
-            <Trash2 size={14} className="mr-1" /> Delete
+            Delete
           </Button>
         )}
       </AlbumHeader>
@@ -1250,7 +1231,9 @@ export function Album() {
 
         {matches !== null && (
           <div className="mb-8">
-            <h3 className="font-semibold mb-3 font-display">MusicBrainz Matches</h3>
+            <h3 className="font-semibold mb-3 font-display">
+              MusicBrainz Matches
+            </h3>
             {matches.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No matches found on MusicBrainz

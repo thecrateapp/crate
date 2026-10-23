@@ -2,6 +2,7 @@ import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { UpcomingEventRow } from "@crate/ui/domain/shows/UpcomingEventRow";
 import { UpcomingDateStamp } from "@crate/ui/domain/shows/UpcomingDateStamp";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
@@ -128,14 +129,15 @@ function ReleaseDateBadge({ release }: { release: Release }) {
     if (valid)
       return <UpcomingDateStamp date={release.release_date} locale="en-US" />;
     return (
-      <span
-        data-slot="upcoming-date-invalid"
-        aria-label="Unknown release date"
-        title={release.release_date}
-        className="w-14 shrink-0 truncate px-1 text-center font-mono text-label text-text-secondary"
-      >
-        {release.release_date}
-      </span>
+      <TooltipHint content={release.release_date}>
+        <span
+          data-slot="upcoming-date-invalid"
+          aria-label="Unknown release date"
+          className="w-14 shrink-0 truncate px-1 text-center font-mono text-label text-text-secondary"
+        >
+          {release.release_date}
+        </span>
+      </TooltipHint>
     );
   }
   return (
@@ -176,11 +178,7 @@ function ReleaseRowActions({
   const downloaded = release.status === "downloaded";
   return (
     <div className="flex flex-col items-end gap-1">
-      {downloaded ? (
-        <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-          Downloaded
-        </InfoBadge>
-      ) : null}
+      {downloaded ? <InfoBadge tone="success">Downloaded</InfoBadge> : null}
       {downloading ? (
         <InfoBadge active>
           <Loader2
@@ -225,14 +223,12 @@ function ReleaseRowActions({
 
 function ReleaseMeta({ release }: { release: Release }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+    <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
       {release.release_type ? (
         <InfoBadge>{release.release_type}</InfoBadge>
       ) : null}
       {release.quality ? (
-        <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-          {release.quality}
-        </InfoBadge>
+        <InfoBadge tone="accent">{release.quality}</InfoBadge>
       ) : null}
       {!release.release_date && release.year ? (
         <InfoBadge>{release.year}</InfoBadge>
@@ -305,17 +301,20 @@ function ReleaseTimelineRow({
                 release.tracks != null ? `${release.tracks} tracks` : null,
               ]}
             />
-            <MonoLabel
-              as="span"
-              className="mt-1 block truncate"
-              accent={releaseTimingLabel(release)}
-              meta={[release.status, availability]}
-              title={
+            <TooltipHint
+              content={
                 release.detected_at
                   ? `Detected ${timeAgo(release.detected_at)}`
                   : undefined
               }
-            />
+            >
+              <MonoLabel
+                as="span"
+                className="mt-1 block truncate"
+                accent={releaseTimingLabel(release)}
+                meta={[release.status, availability]}
+              />
+            </TooltipHint>
           </>
         }
         date={<ReleaseDateBadge release={release} />}
@@ -351,15 +350,13 @@ function ReleaseGridCard({
       className="group overflow-hidden p-0"
     >
       <div className="relative aspect-square bg-surface-canvas">
-        {release.cover_url ? (
-          <img
-            src={release.cover_url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center"></div>
-        )}
+        <MediaCover
+          src={release.cover_url}
+          alt=""
+          fallbackIcon={Disc3}
+          iconSize={CRATE_ICON_SIZE.xl}
+          className="h-full w-full rounded-none"
+        />
 
         <div className="absolute left-3 top-3">
           {release.status === "detected" ? (
@@ -369,9 +366,7 @@ function ReleaseGridCard({
             <InfoBadge active>Downloading</InfoBadge>
           ) : null}
           {release.status === "downloaded" ? (
-            <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
-              Downloaded
-            </InfoBadge>
+            <InfoBadge tone="success">Downloaded</InfoBadge>
           ) : null}
         </div>
       </div>
@@ -417,20 +412,16 @@ function ReleaseGridCard({
             </Button>
           ) : null}
           {release.status === "detected" && onDismiss ? (
-            <Button
-              variant="outline"
-              size="icon"
+            <ActionButton
+              label="Dismiss release"
               onClick={() => onDismiss(release.id)}
-              title="Dismiss release"
-              aria-label="Dismiss release"
-              className="h-11 min-h-11 w-11 min-w-11 md:min-h-11 md:min-w-11"
             >
               <X
-                size={15}
+                size={CRATE_ICON_SIZE.md}
                 aria-hidden="true"
                 data-admin-ux="releases-grid-dismiss"
               />
-            </Button>
+            </ActionButton>
           ) : null}
         </div>
       </div>
@@ -727,7 +718,7 @@ export function NewReleases() {
                 aria-hidden="true"
                 data-admin-ux="releases-search"
                 size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 id="releases-search"
@@ -826,12 +817,12 @@ export function NewReleases() {
           <div
             role="status"
             aria-label="Loading releases"
-            className="flex items-center justify-center gap-2 py-16 text-white/45"
+            className="flex items-center justify-center gap-2 py-16 text-text-muted"
           >
             <Loader2
               aria-hidden="true"
               data-admin-ux="releases-loading"
-              className="h-5 w-5 animate-spin text-primary"
+              className="h-5 w-5 animate-spin text-accent-action-hi"
             />
             Loading releases
           </div>

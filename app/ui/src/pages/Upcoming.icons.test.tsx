@@ -1,173 +1,110 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
-import fixture from "../../../../tests/admin-e2e/fixtures/upcoming-1ao.json";
+import { api } from "@/lib/api";
+import { Upcoming } from "./Upcoming";
+
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-import { api } from "@/lib/api";
-import { toast } from "sonner";
-import { Upcoming } from "./Upcoming";
-const mockedApi = vi.mocked(api);
-describe("Upcoming bounded icon retirement", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedApi.mockImplementation(async (path) => {
-      if (path === "/api/upcoming") return structuredClone(fixture);
-      return { task_id: "sample-task" };
-    });
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-  it("uses display headings, labelled search and named text actions while retaining UX glyphs", async () => {
-    const { container } = renderWithAdminProviders(<Upcoming />);
-    await screen.findByRole("link", { name: "Luz de octubre" });
-    expect(screen.getByRole("heading", { name: "Upcoming" })).toHaveClass(
-      "font-display",
-    );
-    expect(
-      screen
-        .getByRole("textbox", { name: "Artist" })
-        .closest(".crate-form-field"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Clear caches" }),
-    ).not.toHaveAttribute("title");
-    expect(
-      screen.getByRole("button", { name: "Download release" }),
-    ).toHaveTextContent("");
-    expect(
-      screen
-        .getByRole("button", { name: "Download release" })
-        .querySelector("svg"),
-    ).toHaveAttribute("data-admin-ux", "upcoming-download");
-    expect(
-      container.querySelector('[data-admin-ux="upcoming-search"]'),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector(".mt-5.bg-raised-surface"),
-    ).toBeInTheDocument();
-    for (const icon of container.querySelectorAll("svg")) {
-      if (!icon.hasAttribute("data-admin-ux"))
-        expect(icon.closest("button[role=combobox]")).toBeInTheDocument();
-    }
-  });
-  it("preserves download and dismissal endpoint behavior and real item status", async () => {
-    const user = userEvent.setup();
-    renderWithAdminProviders(<Upcoming />);
-    await user.click(
-      await screen.findByRole("button", { name: "Download release" }),
-    );
-    expect(mockedApi).toHaveBeenCalledWith(
-      "/api/acquisition/new-releases/71/download",
-      "POST",
-    );
-    expect(toast.success).toHaveBeenCalledWith("Download started");
-    await user.click(screen.getByRole("button", { name: "Dismiss release" }));
-    expect(mockedApi).toHaveBeenCalledWith(
-      "/api/acquisition/new-releases/72/dismiss",
-      "POST",
-    );
-    expect(
-      screen.queryByText("Niebla", { exact: true }),
-    ).not.toBeInTheDocument();
-  });
-  it("keeps curation/acquisition and legacy administrator action gates", async () => {
-    renderWithAdminProviders(<Upcoming />, {
-      auth: {
-        isAdmin: false,
-        hasCapability: () => false,
-        hasAnyCapability: () => false,
-      },
-    });
-    await screen.findByRole("link", { name: "Luz de octubre" });
-    for (const name of [
-      "Clear caches",
-      "Sync shows",
-      "Download release",
-      "Dismiss release",
-    ])
-      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Calendar" })).toBeEnabled();
-  });
-  it("preserves search, strict type filters and calendar back/next UX", async () => {
-    const user = userEvent.setup();
-    const { container } = renderWithAdminProviders(<Upcoming />);
-    const artist = await screen.findByRole("textbox", { name: "Artist" });
-    await user.type(artist, "Luz Polar");
-    expect(
-      screen.queryByText("Luz de octubre", { exact: true }),
-    ).not.toBeInTheDocument();
-    await user.clear(artist);
-    await user.click(screen.getByRole("button", { name: "shows" }));
-    expect(
-      screen.queryByText("Luz de octubre", { exact: true }),
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Calendar" }));
-    expect(
-      screen
-        .getByRole("button", { name: "Previous month" })
-        .querySelector("svg"),
-    ).toHaveAttribute("data-admin-ux", "upcoming-previous");
-    await user.click(screen.getByRole("button", { name: "Next month" }));
-    expect(
-      container.querySelector(".p-4.bg-raised-surface"),
-    ).toBeInTheDocument();
-  });
-  it("keeps existing ten-second sync busy/refetch timer and failure feedback", async () => {
-    vi.useFakeTimers();
-    renderWithAdminProviders(<Upcoming />);
-    await act(async () => {});
-    fireEvent.click(screen.getByRole("button", { name: "Sync shows" }));
-    await act(async () => {});
-    expect(screen.getByRole("button", { name: "Sync shows" })).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Sync shows" }).querySelector("svg"),
-    ).toHaveAttribute("data-admin-ux", "upcoming-sync");
-    await act(async () => vi.advanceTimersByTimeAsync(10000));
-    expect(screen.getByRole("button", { name: "Sync shows" })).toBeEnabled();
-    mockedApi.mockRejectedValueOnce(new Error("sample failure"));
-    fireEvent.click(screen.getByRole("button", { name: "Sync shows" }));
-    await act(async () => {});
-    expect(toast.error).toHaveBeenCalledWith("Failed to sync shows");
-  });
-  it("uses accessible loading and textual empty state without redundant glyphs", async () => {
-    let finish!: (data: unknown) => void;
-    mockedApi.mockImplementationOnce(
-      () =>
-        new Promise((r) => {
-          finish = r;
-        }),
-    );
-    const { container } = renderWithAdminProviders(<Upcoming />);
-    expect(
-      screen.getByRole("status", { name: "Loading upcoming items" }),
-    ).toBeInTheDocument();
-    await act(async () => finish({ items: [] }));
-    expect(screen.getByText("Nothing upcoming")).toBeInTheDocument();
-    const empty = screen
-      .getByText("Nothing upcoming")
-      .closest('[role="status"]');
-    expect(empty).toHaveClass("bg-raised-surface", "shadow-none");
-    expect(container.querySelectorAll("svg")).toHaveLength(5); // Search, two view controls and two compact header actions.
-  });
 
-  it("uses named icon-only view buttons with pressed state", async () => {
+const mockApi = vi.mocked(api);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockApi.mockImplementation(async (path, method) => {
+    if (path === "/api/shows/cached?limit=5000") {
+      return {
+        events: [
+          {
+            id: "7",
+            show_id: 7,
+            artist_name: "Costa Norte",
+            artist_id: 23,
+            artist_slug: "costa-norte",
+            date: "2099-05-15",
+            venue: "Sala Norte",
+            city: "Madrid",
+            country: "Spain",
+            image_url: null,
+            url: "https://tickets.example/shows/7",
+            lineup: ["Costa Norte"],
+            lineup_artists: [
+              {
+                name: "Costa Norte",
+                id: 23,
+                slug: "costa-norte",
+                probable_setlist_status: "fresh",
+                probable_setlist_song_count: 10,
+              },
+            ],
+            artist_genres: ["alternative rock"],
+          },
+        ],
+        setlist_coverage: {
+          artist_count: 1,
+          fresh: 0,
+          stale: 1,
+          missing: 0,
+          unknown: 0,
+        },
+      };
+    }
+    if (path === "/api/tasks/sync-shows" && method === "POST")
+      return { task_id: "sync-shows" };
+    if (path === "/api/shows/probable-setlists/refresh" && method === "POST")
+      return { artist_count: 1, fresh: 1, stale: 0, missing: 0, unknown: 0 };
+    return {};
+  });
+});
+
+describe("Show Management visual contract", () => {
+  it("uses the shared header actions and does not decorate text actions with icons", async () => {
     const user = userEvent.setup();
-    renderWithAdminProviders(<Upcoming />);
-    await screen.findByRole("link", { name: "Luz de octubre" });
-    const list = screen.getByRole("button", { name: "List" });
-    const calendar = screen.getByRole("button", { name: "Calendar" });
-    expect(list.textContent).toBe("");
-    expect(calendar.textContent).toBe("");
-    expect(list).toHaveAttribute("aria-pressed", "true");
-    expect(list.querySelector("svg")).toHaveAttribute(
-      "data-admin-ux",
-      "upcoming-view-list",
-    );
-    await user.click(calendar);
-    expect(calendar).toHaveAttribute("aria-pressed", "true");
-    expect(list).toHaveAttribute("aria-pressed", "false");
+    const { container } = renderWithAdminProviders(<Upcoming />);
+    await screen.findByRole("heading", { name: "Show Management" });
+    const actions = screen.getByRole("group", {
+      name: "Show management actions",
+    });
+
+    for (const label of ["List view", "Calendar view", "Sync shows"]) {
+      const action = within(actions).getByRole("button", { name: label });
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).toHaveAttribute("data-variant", "ghost");
+      expect(action).not.toHaveAttribute("title");
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+    }
+
+    for (const label of ["Add show", "Merge duplicates"]) {
+      const action = within(actions).getByRole("button", { name: label });
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).toHaveAttribute("data-variant", "ghost");
+      expect(action).not.toHaveAttribute("title");
+      expect(action.textContent).toBe("");
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "data-admin-ux",
+        label === "Add show" ? "show-add" : "show-merge",
+      );
+    }
+
+    await user.click(screen.getByRole("button", { name: /Costa Norte/ }));
+    const mergeRowAction = await screen.findByRole("button", {
+      name: "Merge duplicates of this show",
+    });
+    expect(mergeRowAction).toHaveTextContent("Merge duplicates");
+    expect(mergeRowAction.querySelector("svg")).toBeNull();
+
+    for (const icon of container.querySelectorAll("svg")) {
+      if (!icon.hasAttribute("data-admin-ux")) {
+        expect(icon.closest("button, a, [role=combobox]")).toBeInTheDocument();
+      }
+    }
   });
 });

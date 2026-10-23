@@ -22,6 +22,8 @@ def test_genre_taxonomy_node_proposal_prompt_limits_allowed_targets():
     assert "Current parent: rock." in prompt
     assert "Known aliases/raw tags: instrumental." in prompt
     assert "Representative artists: Mogwai, Explosions in the Sky." in prompt
+    assert "Return exactly ten gains in dB ordered 32, 64, 125" in prompt
+    assert "complete EQ suggestion even when the node currently inherits" in prompt
 
 
 def test_raw_genre_taxonomy_node_prompt_includes_local_evidence_and_merge_guidance():
@@ -49,7 +51,17 @@ def test_raw_genre_taxonomy_node_prompt_includes_local_evidence_and_merge_guidan
         "Local co-occurring canonical genres: instrumental-rock, post-rock." in prompt
     )
     assert "Use delete_marginal when the tag looks noisy or marginal" in prompt
-    assert (
-        "Only use create_node when the tag represents a meaningful genre/scene"
-        in prompt
+    assert "Only use create_node when the tag represents a meaningful musical" in prompt
+    assert "Use classify_facet for non-genre descriptors" in prompt
+    assert "dimension/name pairs" in prompt
+    assert "leave EQ gains empty" in prompt
+
+
+def test_taxonomy_node_prompt_does_not_reclassify_a_canonical_node_as_facet():
+    prompt = build_genre_taxonomy_node_proposal_prompt(
+        genre_name="Dark Ambient",
+        slug="dark-ambient",
+        source_kind="taxonomy_node",
     )
+
+    assert "Never use classify_facet" in prompt

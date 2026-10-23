@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Link } from "react-router";
 
 import { Button } from "@crate/ui/shadcn/button";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -78,7 +80,7 @@ function ConnectionRow({
         aria-labelledby={nameId}
         aria-describedby={`${detailsId} ${statusId}`}
         onClick={onOpen}
-        className="flex w-full flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring md:flex-row md:items-center md:justify-between"
+        className="flex w-full flex-col gap-2 rounded-md border border-border-quiet bg-card p-4 text-left transition-colors hover:bg-accent-action/[0.04] focus-visible:bg-accent-action/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring md:flex-row md:items-center md:justify-between"
       >
         <span className="block min-w-0 space-y-1">
           <span
@@ -201,16 +203,10 @@ export function AgentConnections() {
               <Link to="/agents/approvals">Review plans</Link>
             </Button>
           ) : null}
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Refresh connections"
-            onClick={refreshAll}
-          >
+          <ActionButton label="Refresh connections" onClick={refreshAll}>
             <RefreshCw className="size-4" aria-hidden="true" />
-          </Button>
+          </ActionButton>
           <Button disabled={!catalog.data} onClick={() => setConnectOpen(true)}>
-            <Plus className="size-4" aria-hidden="true" />
             Connect an agent
           </Button>
         </div>
@@ -228,9 +224,7 @@ export function AgentConnections() {
       >
         <div className="space-y-3">
           {listLoading ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading connections…
-            </p>
+            <LoadingState label="Loading connections" />
           ) : null}
           {!listLoading && !error && connections.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">

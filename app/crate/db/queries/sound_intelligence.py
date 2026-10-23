@@ -5,12 +5,9 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 
 EQ_SOURCE_ORDER = [
-    "user_track_preset",
-    "instance_track_preset",
-    "instance_album_preset",
     "genre_taxonomy_preset",
-    "audio_analysis_preset",
-    "flat",
+    "genre_taxonomy_inherited_preset",
+    "no_genre_eq",
 ]
 
 
@@ -19,77 +16,55 @@ def get_sound_intelligence_health(*, session=None) -> dict:
         with read_scope() as s:
             return get_sound_intelligence_health(session=s)
 
-    eq_rows = (
-        session.execute(
-            text(
-                """
-                WITH track_sources AS (
-                    SELECT
-                        t.id,
-                        CASE
-                            WHEN EXISTS (
-                                SELECT 1 FROM equalizer_presets ep
-                                WHERE ep.scope = 'user'
-                                  AND ep.target_type = 'track'
-                                  AND ep.target_entity_uid = t.entity_uid
-                            ) THEN 'user_track_preset'
-                            WHEN EXISTS (
-                                SELECT 1 FROM equalizer_presets ep
-                                WHERE ep.scope = 'instance'
-                                  AND ep.target_type = 'track'
-                                  AND ep.target_entity_uid = t.entity_uid
-                            ) THEN 'instance_track_preset'
-                            WHEN EXISTS (
-                                SELECT 1
-                                FROM library_albums a
-                                JOIN equalizer_presets ep
-                                  ON ep.scope = 'instance'
-                                 AND ep.target_type = 'album'
-                                 AND ep.target_entity_uid = a.entity_uid
-                                WHERE a.id = t.album_id
-                            ) THEN 'instance_album_preset'
-                            WHEN EXISTS (
-                                SELECT 1
-                                FROM album_genres ag
-                                JOIN genres g ON g.id = ag.genre_id
-                                JOIN genre_taxonomy_aliases alias
-                                  ON alias.alias_slug = g.slug
-                                JOIN genre_taxonomy_nodes node
-                                  ON node.id = alias.genre_id
-                                WHERE ag.album_id = t.album_id
-                                  AND node.eq_gains IS NOT NULL
-                            ) THEN 'genre_taxonomy_preset'
-                            WHEN (
-                                t.analysis_state = 'complete'
-                                OR t.energy IS NOT NULL
-                                OR t.danceability IS NOT NULL
-                                OR t.loudness IS NOT NULL
-                                OR t.dynamic_range IS NOT NULL
-                            ) THEN 'audio_analysis_preset'
-                            ELSE 'flat'
-                        END AS source
-                    FROM library_tracks t
-                    WHERE t.entity_uid IS NOT NULL
-                )
-                SELECT source, COUNT(*)::INTEGER AS count
-                FROM track_sources
-                GROUP BY source
-                """
-            )
-        )
-        .mappings()
-        .all()
-    )
-    counts = {source: 0 for source in EQ_SOURCE_ORDER}
-    for row in eq_rows:
-        counts[str(row["source"])] = int(row["count"] or 0)
-    total_tracks = sum(counts.values())
-
     taxonomy_row = (
         session.execute(
             text(
                 """
-                WITH node_stats AS (
+                WITH RECURSIVE parent_walk AS (
+                    SELECT
+                        edge.source_genre_id AS node_id,
+                        edge.target_genre_id AS ancestor_id,
+                        1 AS depth,
+                        ARRAY[edge.source_genre_id, edge.target_genre_id] AS path
+                    FROM genre_taxonomy_edges edge
+                    WHERE edge.relation_type = 'parent'
+                    UNION ALL
+                    SELECT
+                        walk.node_id,
+                        edge.target_genre_id,
+                        walk.depth + 1,
+                        walk.path || edge.target_genre_id
+                    FROM parent_walk walk
+                    JOIN genre_taxonomy_edges edge
+                      ON edge.source_genre_id = walk.ancestor_id
+                     AND edge.relation_type = 'parent'
+                    WHERE walk.depth < 32
+                      AND NOT edge.target_genre_id = ANY(walk.path)
+                ),
+                effective_genre_eq AS (
+                    SELECT
+                        node.id,
+                        node.slug,
+                        node.name,
+                        node.eq_gains,
+                        CASE
+                            WHEN node.eq_gains IS NOT NULL THEN 'direct'
+                            WHEN inherited.slug IS NOT NULL THEN 'inherited'
+                            ELSE 'none'
+                        END AS preset_source
+                    FROM genre_taxonomy_nodes node
+                    LEFT JOIN LATERAL (
+                        SELECT ancestor.slug
+                        FROM parent_walk walk
+                        JOIN genre_taxonomy_nodes ancestor
+                          ON ancestor.id = walk.ancestor_id
+                        WHERE walk.node_id = node.id
+                          AND ancestor.eq_gains IS NOT NULL
+                        ORDER BY walk.depth, ancestor.slug
+                        LIMIT 1
+                    ) inherited ON TRUE
+                ),
+                node_stats AS (
                     SELECT
                         n.id,
                         n.slug,
@@ -118,6 +93,68 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                         COUNT(*) FILTER (WHERE source = 'manual')::INTEGER AS manual_edges,
                         COUNT(*) FILTER (WHERE source IN ('llm', 'ai'))::INTEGER AS ai_edges
                     FROM genre_taxonomy_edges
+                ),
+                listening_genres AS (
+                    SELECT genre_name, SUM(play_count)::numeric AS play_count
+                    FROM user_genre_stats
+                    WHERE stat_window = '90d' AND play_count > 0
+                    GROUP BY genre_name
+                ),
+                listening_tokens AS (
+                    SELECT DISTINCT
+                        listening.genre_name,
+                        listening.play_count,
+                        trim(both '-' FROM regexp_replace(
+                            lower(trim(token.value)), '[^a-z0-9]+', '-', 'g'
+                        )) AS token_slug
+                    FROM listening_genres listening
+                    CROSS JOIN LATERAL regexp_split_to_table(
+                        listening.genre_name, '[,;]'
+                    ) AS token(value)
+                ),
+                tokens_with_count AS (
+                    SELECT
+                        genre_name,
+                        play_count,
+                        token_slug,
+                        COUNT(*) OVER (PARTITION BY genre_name) AS token_count
+                    FROM listening_tokens
+                    WHERE token_slug <> ''
+                ),
+                listening_by_node AS (
+                    SELECT
+                        alias.genre_id AS node_id,
+                        SUM(tokens.play_count / tokens.token_count)::numeric
+                            AS weighted_play_count
+                    FROM tokens_with_count tokens
+                    JOIN genre_taxonomy_aliases alias
+                      ON alias.alias_slug = tokens.token_slug
+                    GROUP BY alias.genre_id
+                ),
+                listening_total AS (
+                    SELECT COALESCE(SUM(play_count), 0)::numeric AS play_count
+                    FROM listening_genres
+                ),
+                listening_priorities AS (
+                    SELECT
+                        effective.slug,
+                        effective.name,
+                        listening.weighted_play_count,
+                        CASE WHEN total.play_count > 0 THEN
+                            ROUND(
+                                100 * listening.weighted_play_count
+                                    / total.play_count,
+                                1
+                            )::float
+                        ELSE 0 END AS listening_share_90d_pct
+                    FROM effective_genre_eq effective
+                    JOIN listening_by_node listening
+                      ON listening.node_id = effective.id
+                    CROSS JOIN listening_total total
+                    WHERE effective.preset_source = 'none'
+                      AND listening.weighted_play_count > 0
+                    ORDER BY listening.weighted_play_count DESC, effective.name
+                    LIMIT 6
                 )
                 SELECT
                     COUNT(*)::INTEGER AS node_count,
@@ -129,11 +166,31 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                         WHERE description IS NULL OR trim(description) = ''
                     )::INTEGER AS missing_description_count,
                     COUNT(*) FILTER (WHERE eq_gains IS NULL)::INTEGER AS missing_direct_eq_count,
+                    (SELECT COUNT(*)::INTEGER FROM effective_genre_eq
+                     WHERE preset_source = 'direct') AS direct_eq_count,
+                    (SELECT COUNT(*)::INTEGER FROM effective_genre_eq
+                     WHERE preset_source = 'inherited') AS inherited_eq_count,
+                    (SELECT COUNT(*)::INTEGER FROM effective_genre_eq
+                     WHERE preset_source = 'none') AS missing_effective_eq_count,
                     (SELECT count FROM raw_unmapped)::INTEGER AS unmapped_raw_count,
                     (SELECT total_edges FROM edge_stats)::INTEGER AS edge_count,
                     (SELECT locked_edges FROM edge_stats)::INTEGER AS locked_edge_count,
                     (SELECT manual_edges FROM edge_stats)::INTEGER AS manual_edge_count,
-                    (SELECT ai_edges FROM edge_stats)::INTEGER AS ai_edge_count
+                    (SELECT ai_edges FROM edge_stats)::INTEGER AS ai_edge_count,
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'slug', slug,
+                                    'name', name,
+                                    'weighted_play_count', ROUND(weighted_play_count, 1),
+                                    'listening_share_90d_pct', listening_share_90d_pct
+                                ) ORDER BY weighted_play_count DESC, name
+                            )
+                            FROM listening_priorities
+                        ),
+                        '[]'::jsonb
+                    ) AS listening_priorities
                 FROM node_stats
                 """
             )
@@ -142,15 +199,24 @@ def get_sound_intelligence_health(*, session=None) -> dict:
         .first()
     ) or {}
 
+    node_count = int(taxonomy_row.get("node_count") or 0)
+    counts = {
+        "genre_taxonomy_preset": int(taxonomy_row.get("direct_eq_count") or 0),
+        "genre_taxonomy_inherited_preset": int(
+            taxonomy_row.get("inherited_eq_count") or 0
+        ),
+        "no_genre_eq": int(taxonomy_row.get("missing_effective_eq_count") or 0),
+    }
+
     return {
         "eq": {
-            "total_tracks": total_tracks,
+            "total_genres": node_count,
             "sources": [
                 {
                     "source": source,
                     "count": counts[source],
-                    "percent": round((counts[source] / total_tracks) * 100, 1)
-                    if total_tracks
+                    "percent": round((counts[source] / node_count) * 100, 1)
+                    if node_count
                     else 0.0,
                 }
                 for source in EQ_SOURCE_ORDER
@@ -164,6 +230,7 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                 "orphan_count",
                 "missing_description_count",
                 "missing_direct_eq_count",
+                "missing_effective_eq_count",
                 "unmapped_raw_count",
                 "edge_count",
                 "locked_edge_count",
@@ -171,6 +238,15 @@ def get_sound_intelligence_health(*, session=None) -> dict:
                 "ai_edge_count",
             )
         },
+        "listening_priorities": [
+            {
+                "slug": str(item["slug"]),
+                "name": str(item["name"]),
+                "weighted_play_count": float(item["weighted_play_count"] or 0),
+                "listening_share_90d_pct": float(item["listening_share_90d_pct"] or 0),
+            }
+            for item in (taxonomy_row.get("listening_priorities") or [])
+        ],
     }
 
 

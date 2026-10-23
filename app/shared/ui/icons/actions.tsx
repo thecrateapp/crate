@@ -11,6 +11,7 @@ import {
   GalleryAdd as SolarGalleryAdd,
   MagicStick as SolarMagicStick,
   MenuDots as SolarMenuDots,
+  MinusSquare as SolarMinusSquare,
   Pen as SolarPen,
   Pin as SolarPin,
   Power as SolarPower,
@@ -41,6 +42,7 @@ export const Eye = createIcon(SolarEye, "Eye");
 export const GripVertical = createIcon(SolarReorder2, "GripVertical");
 export const ImagePlus = createIcon(SolarGalleryAdd, "ImagePlus");
 export const MoreHorizontal = createIcon(SolarMenuDots, "MoreHorizontal");
+export const Minus = createIcon(SolarMinusSquare, "Minus");
 export const Pencil = createIcon(SolarPen, "Pencil");
 export const Pin = createIcon(SolarPin, "Pin");
 export const Plus = createIcon(SolarAddCircle, "Plus");

@@ -46,6 +46,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     );
     expect(screen.getByRole("heading", { name: "Global Catalog" })).toHaveClass(
       "font-display",
+      "font-extrabold",
     );
     expect(document.querySelectorAll(".crate-form-field")).toHaveLength(4);
     expect(screen.getByText("Artists")).toHaveClass("font-mono");
@@ -98,14 +99,14 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       ).toBeInTheDocument();
     },
   );
-  it("keeps native view selection, data order and duplicate source details without new reads", async () => {
+  it("uses shared tabs while preserving data order and duplicate source details without new reads", async () => {
     await ready();
-    const runs = screen.getByRole("button", { name: "Runs" });
+    const runs = screen.getByRole("tab", { name: "Runs" });
     runs.focus();
     await userEvent.keyboard("{Enter}");
-    expect(runs).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute(
-      "aria-pressed",
+    expect(runs).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
       "false",
     );
     expect(
@@ -113,7 +114,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     ).toEqual(["sample-run-20261018", "sample-run-older"]);
     expect(screen.getByText("Sample peer unavailable")).toBeInTheDocument();
     expect(screen.getAllByText("Seen 118")).toHaveLength(2);
-    await userEvent.click(screen.getByRole("button", { name: "Duplicates" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Duplicates" }));
     expect(
       screen.getByText("sample-album:uncertain-match"),
     ).toBeInTheDocument();
@@ -138,7 +139,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
   });
   it("refreshes only status and preserves the selected view", async () => {
     await ready();
-    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
     expect(mockApi.mock.calls.map(([path]) => path)).toEqual([
       statusUrl,
@@ -223,9 +224,9 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     data[duplicatesUrl] = { items: [] };
     await ready();
     expect(screen.getByText("No reconciliation runs yet.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
     expect(screen.getByText("No runs found.")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Duplicates" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Duplicates" }));
     expect(
       screen.getByText(
         "No duplicate candidates above the confidence threshold.",

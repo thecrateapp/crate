@@ -49,6 +49,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   Dialog,
   DialogContent,
@@ -181,16 +182,13 @@ export function MergeArtistDialog({
 
         <div className="space-y-3">
           <div className="crate-form-field">
-            <label
-              htmlFor="merge-artist-target"
-              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
-            >
-              Target artist
+            <label htmlFor="merge-artist-target" data-slot="form-field-label">
+              <MonoLabel as="span">Target artist</MonoLabel>
             </label>
             <div className="relative">
               <Search
                 size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 id="merge-artist-target"
@@ -203,14 +201,14 @@ export function MergeArtistDialog({
             </div>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
             {searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
                 <Loader2 size={15} className="animate-spin" />
                 Searching artists...
               </div>
             ) : results.length ? (
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-border-quiet">
                 {results.map((artist) => {
                   const isCurrentArtist =
                     currentArtistId != null && artist.id === currentArtistId;
@@ -220,9 +218,9 @@ export function MergeArtistDialog({
                       type="button"
                       disabled={busy || isCurrentArtist || artist.id == null}
                       onClick={() => onMerge(artist)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <span className="truncate text-sm font-medium text-white/88">
+                      <span className="truncate text-sm font-medium">
                         {artist.name}
                       </span>
                       {isCurrentArtist ? (

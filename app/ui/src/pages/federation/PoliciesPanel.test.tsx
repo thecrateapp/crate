@@ -27,6 +27,7 @@ it("updates typed peer limits without a raw JSON editor", async () => {
   });
   vi.mocked(api).mockResolvedValue({});
   renderWithAdminProviders(<PoliciesPanel canManage />);
+  expect(screen.getByText("node-b")).toHaveClass("crate-mono-label");
   fireEvent.change(screen.getByLabelText("Maximum streams"), {
     target: { value: "4" },
   });

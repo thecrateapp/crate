@@ -46,4 +46,30 @@ describe("AlbumHeader", () => {
     expect(screen.queryByText("Lyrics")).not.toBeInTheDocument();
     expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
   });
+
+  it("keeps labeled album actions free of decorative glyphs", () => {
+    renderHeader(
+      <AlbumHeader
+        {...baseProps}
+        canEditArtwork={false}
+        canEnrich
+        canDownload
+        canQueueMetadata
+      />,
+    );
+
+    for (const label of [
+      "Enrich",
+      "Download",
+      "Lyrics",
+      "Metadata",
+      "Export",
+    ]) {
+      const action =
+        label === "Download"
+          ? screen.getByRole("link", { name: label })
+          : screen.getByRole("button", { name: label });
+      expect(action.querySelector("svg")).toBeNull();
+    }
+  });
 });

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/lib/api";
@@ -27,6 +28,22 @@ describe("GenreEqEditor", () => {
     const heading = screen.getByRole("heading", { level: 2 });
     expect(heading).toHaveTextContent("Equalizer preset Shoegaze");
     expect(heading).toHaveClass("font-mono", "uppercase");
+  });
+
+  it("supports an embedded presentation without a duplicate card heading", () => {
+    const { container } = render(
+      <GenreEqEditor
+        canonicalSlug="shoegaze"
+        canonicalName="Shoegaze"
+        initialGains={FLAT}
+        initialResolved={null}
+        embedded
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+    expect(screen.getByText("10-band curve · Shoegaze")).toBeVisible();
+    expect(container.firstElementChild).toHaveClass("min-w-0");
   });
 
   it("marks a direct preset with the accent status dot", () => {
@@ -178,12 +195,75 @@ describe("GenreEqEditor", () => {
     fireEvent.blur(slider);
     expect(live).toHaveTextContent(/^Unsaved changes$/);
 
-    fireEvent.click(screen.getByTitle("Reset sliders to flat"));
+    const reset = screen.getByRole("button", {
+      name: "Reset sliders to flat",
+    });
+    expect(reset).not.toHaveAttribute("title");
+    fireEvent.click(reset);
 
     expect(screen.getByRole("status")).toBe(live);
     expect(live).toHaveTextContent(/^In sync with database$/);
     expect(slider).toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByRole("button", { name: "Save preset" })).toBeDisabled();
     expect(api).not.toHaveBeenCalled();
+  });
+
+  it("shows the shared tooltip for the reset icon", async () => {
+    render(
+      <GenreEqEditor
+        canonicalSlug="shoegaze"
+        canonicalName="Shoegaze"
+        initialGains={[1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
+        initialResolved={null}
+      />,
+    );
+
+    await userEvent.hover(
+      screen.getByRole("button", { name: "Reset sliders to flat" }),
+    );
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Reset sliders to flat",
+    );
+  });
+
+  it("stages the EQ from the full AI proposal until the curator saves it", async () => {
+    const proposed = [2, 1, 0, -1, -2, -1, 0, 1, 2, 1];
+    vi.mocked(api).mockResolvedValue({});
+    const onSaved = vi.fn();
+    render(
+      <GenreEqEditor
+        canonicalSlug="shoegaze"
+        canonicalName="Shoegaze"
+        initialGains={FLAT}
+        initialResolved={null}
+        aiProposalGains={proposed}
+        aiProposalReasoning="Lift the presence gently."
+        embedded
+        onSaved={onSaved}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "AI proposal · unsaved",
+      ),
+    );
+    expect(
+      screen
+        .getAllByRole("slider")
+        .map((slider) => slider.getAttribute("aria-valuenow")),
+    ).toEqual(proposed.map(String));
+    expect(screen.getByText("Lift the presence gently.")).toBeVisible();
+    expect(api).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save preset" }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
+    expect(api).toHaveBeenCalledWith(
+      "/api/genres/shoegaze/eq-preset",
+      "PATCH",
+      { gains: proposed },
+    );
   });
 });

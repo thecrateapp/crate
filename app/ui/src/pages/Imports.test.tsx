@@ -146,6 +146,40 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Imports", () => {
+  it("uses the shared hero and standardized page actions", async () => {
+    renderWithAdminProviders(<Imports />);
+
+    await screen.findByText("Moss On Stone", { exact: true });
+    expect(screen.getByRole("heading", { name: "Staged Imports" })).toHaveClass(
+      "font-display",
+      "font-extrabold",
+    );
+    const actions = screen.getByRole("group", {
+      name: "Staged import actions",
+    });
+    const refresh = within(actions).getByRole("button", {
+      name: "Refresh queue",
+    });
+    expect(refresh).toHaveAttribute("data-size", "icon-lg");
+    expect(refresh).toHaveAttribute("data-variant", "ghost");
+    expect(refresh).not.toHaveAttribute("title");
+    const importAll = within(actions).getByRole("button", {
+      name: "Import all pending",
+    });
+    expect(importAll).toHaveAttribute("data-size", "icon-lg");
+    expect(importAll).toHaveAttribute("data-variant", "ghost");
+    expect(importAll).not.toHaveAttribute("title");
+    expect(importAll.textContent).toBe("");
+    expect(importAll.querySelector("svg")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(importAll.querySelector("svg")).toHaveAttribute(
+      "data-admin-ux",
+      "imports-import-all",
+    );
+  });
+
   it("shows queue states, keeps source paths compact, and hides raw worker errors", async () => {
     queue[0]!.last_error = "/srv/private/music/mount failed";
     renderWithAdminProviders(<Imports />);

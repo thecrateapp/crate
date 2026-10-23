@@ -1,15 +1,12 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   PageHeaderAction,
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
 import {
   RefreshCw as HeaderRefreshCw,
-  ChevronDown,
-  ExternalLink,
   Loader2,
-  Play,
-  Square,
   Search,
 } from "lucide-react";
 import {
@@ -37,6 +34,7 @@ import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -84,28 +82,23 @@ const SERVICE_URLS: Record<string, string> = {
 const STATE_STYLES: Record<
   string,
   {
-    chip: string;
     dot: string;
-    tone: "default" | "success" | "warning" | "danger";
+    tone: "neutral" | "success" | "warning" | "danger";
   }
 > = {
   running: {
-    chip: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
     dot: "bg-accent-action",
     tone: "success",
   },
   restarting: {
-    chip: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
     dot: "bg-state-warning",
     tone: "warning",
   },
   exited: {
-    chip: "border-border-quiet bg-surface-card text-text-subtle",
     dot: "bg-text-subtle",
-    tone: "default",
+    tone: "neutral",
   },
   dead: {
-    chip: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
     dot: "bg-state-warning",
     tone: "danger",
   },
@@ -170,9 +163,8 @@ function formatLogTimestamp(line: string) {
 function stateMeta(state: string) {
   return (
     STATE_STYLES[state] ?? {
-      chip: "border-white/10 bg-white/[0.04] text-white/60",
-      dot: "bg-white/35",
-      tone: "default" as const,
+      dot: "bg-text-subtle",
+      tone: "neutral" as const,
     }
   );
 }
@@ -181,9 +173,9 @@ function StackLogLine({ line }: { line: string }) {
   const timestamp = formatLogTimestamp(line);
 
   return (
-    <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60 ">
+    <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-label text-text-secondary">
       {timestamp ? (
-        <span className="w-[78px] shrink-0 text-white/20 tabular-nums">
+        <span className="w-[78px] shrink-0 text-text-subtle tabular-nums">
           {timestamp}
         </span>
       ) : null}
@@ -227,16 +219,16 @@ function ServiceCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-semibold tracking-tight text-white">
+              <span className="font-display text-base font-semibold tracking-tight text-text-primary">
                 {container.name}
               </span>
-              <InfoBadge className={state.chip}>
+              <InfoBadge tone={state.tone}>
                 <span className={cn("h-2 w-2 rounded-full", state.dot)} />
                 {container.state}
               </InfoBadge>
               {hostname ? <InfoBadge>{hostname}</InfoBadge> : null}
             </div>
-            <div className="text-sm text-white/40">
+            <div className="text-sm text-text-muted">
               {displayImage(container.image)}
             </div>
           </div>
@@ -252,12 +244,6 @@ function ServiceCard({
               aria-controls={logsId}
             >
               Logs
-              <ChevronDown
-                data-admin-ux="service-logs-toggle"
-                aria-hidden="true"
-                size={15}
-                className={expanded ? "rotate-180" : undefined}
-              />
             </Button>
             <Button
               variant="outline"
@@ -275,21 +261,7 @@ function ServiceCard({
                   size={15}
                   className="animate-spin"
                 />
-              ) : isRunning ? (
-                <Square
-                  data-admin-ux="service-stop"
-                  aria-hidden="true"
-                  size={15}
-                  fill="currentColor"
-                />
-              ) : (
-                <Play
-                  data-admin-ux="service-start"
-                  aria-hidden="true"
-                  size={15}
-                  fill="currentColor"
-                />
-              )}
+              ) : null}
               {isRunning ? "Stop" : "Start"}
             </Button>
             <Button
@@ -303,48 +275,39 @@ function ServiceCard({
               Restart
             </Button>
             {serviceUrl ? (
-              <a
-                href={serviceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-control px-3 text-sm text-text-primary hover:bg-surface-control-hover"
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="min-h-11"
                 aria-label={`Open service ${container.name}`}
               >
-                Open service
-                <ExternalLink
-                  data-admin-ux="service-external"
-                  aria-hidden="true"
-                  size={15}
-                />
-              </a>
+                <a href={serviceUrl} target="_blank" rel="noreferrer">
+                  Open service
+                </a>
+              </Button>
             ) : null}
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
-              Status
-            </div>
-            <div className="text-sm font-medium text-white/85">
+          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
+            <MonoLabel as="div">Status</MonoLabel>
+            <div className="text-sm font-medium text-text-primary">
               {container.status}
             </div>
           </div>
-          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
-              Ports
-            </div>
-            <div className="text-sm font-medium text-white/85">
+          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
+            <MonoLabel as="div">Ports</MonoLabel>
+            <div className="text-sm font-medium text-text-primary">
               {container.ports.length > 0
                 ? container.ports.join(", ")
                 : "No exposed ports"}
             </div>
           </div>
-          <div className="crate-form-field rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
-              Public route
-            </div>
-            <div className="text-sm font-medium text-white/85">
+          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
+            <MonoLabel as="div">Public route</MonoLabel>
+            <div className="text-sm font-medium text-text-primary">
               {hostname ?? "Internal only"}
             </div>
           </div>
@@ -356,10 +319,12 @@ function ServiceCard({
           id={logsId}
           role="region"
           aria-label={`Logs for ${container.name}`}
-          className="border-t border-white/8 bg-[#06080c] px-4 py-4"
+          className="border-t border-border-quiet bg-app-surface px-4 py-4"
         >
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-white">Recent logs</div>
+            <MonoLabel as="div" tone="accent">
+              Recent logs
+            </MonoLabel>
             <InfoBadge>{container.name}</InfoBadge>
           </div>
           {logsLoading ? (
@@ -367,18 +332,18 @@ function ServiceCard({
               role="status"
               aria-label={`Loading logs for ${container.name}`}
               aria-busy="true"
-              className="flex items-center gap-2 py-6 text-sm text-white/45"
+              className="flex items-center gap-2 py-6 text-sm text-text-muted"
             >
               <Loader2
                 data-admin-ux="service-logs-loading"
                 aria-hidden="true"
                 size={14}
-                className="animate-spin text-primary"
+                className="animate-spin text-accent-action-hi"
               />
               Loading service logs…
             </div>
           ) : logs?.logs ? (
-            <div className="max-h-[320px] overflow-y-auto rounded-sm border border-white/6 bg-black/20 py-2">
+            <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-panel-surface py-2">
               {logs.logs
                 .split("\n")
                 .filter(Boolean)
@@ -387,7 +352,7 @@ function ServiceCard({
                 ))}
             </div>
           ) : (
-            <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-6 text-sm text-white/35">
+            <div className="rounded-md border border-dashed border-border-quiet bg-panel-surface px-4 py-6 text-sm text-text-muted">
               No logs available for this service.
             </div>
           )}
@@ -567,12 +532,12 @@ export function Stack() {
         role="status"
         aria-label="Loading stack services"
         aria-busy="true"
-        className="flex justify-center py-16 text-white/45"
+        className="flex justify-center py-16 text-text-muted"
       >
         <Loader2
           data-admin-ux="stack-loading"
           aria-hidden="true"
-          className="h-5 w-5 animate-spin text-primary"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
         />
       </div>
     );
@@ -629,13 +594,19 @@ export function Stack() {
           title="Docker not available"
           description="The API container cannot see the Docker socket, so stack inspection and service controls are disabled."
         >
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-8 text-center text-sm text-white/35">
-            Mount{" "}
-            <code className="rounded-sm bg-white/[0.05] px-1.5 py-0.5 text-white/65">
-              /var/run/docker.sock
-            </code>{" "}
-            into the API container to restore stack operations.
-          </div>
+          <EmptyState
+            title="Docker socket unavailable"
+            description={
+              <>
+                Mount{" "}
+                <code className="rounded-sm bg-raised-surface px-1.5 py-0.5 text-text-secondary">
+                  /var/run/docker.sock
+                </code>{" "}
+                into the API container to restore stack operations.
+              </>
+            }
+            className="items-center py-8 text-center"
+          />
         </OpsPanel>
       ) : (
         <>
@@ -676,7 +647,7 @@ export function Stack() {
                   data-admin-ux="stack-search"
                   aria-hidden="true"
                   size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
                 />
                 <Input
                   aria-label="Search stack services"
@@ -723,9 +694,10 @@ export function Stack() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-8 text-center text-sm text-white/35">
-                No services match the current filters.
-              </div>
+              <EmptyState
+                message="No services match the current filters."
+                className="py-8"
+              />
             )}
           </OpsPanel>
         </>

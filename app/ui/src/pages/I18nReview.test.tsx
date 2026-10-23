@@ -303,7 +303,7 @@ describe("I18nReview", () => {
         .getAllByText("Needs review")
         .some((node) =>
           node
-            .closest('[data-slot="badge"]')
+            .closest('[data-slot="info-badge"]')
             ?.className.includes("text-state-warning-text"),
         ),
     ).toBe(true);

@@ -38,3 +38,20 @@ it("starts pairing through the verified pairing endpoint", async () => {
     ),
   );
 });
+
+it("renders probe details on the shared token surface", async () => {
+  vi.mocked(api).mockResolvedValue({ node_uid: "peer-one" });
+  renderWithAdminProviders(<PairingPanel canManage onChanged={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText("Probe URL"), {
+    target: { value: "https://peer.example" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Probe" }));
+
+  await waitFor(() =>
+    expect(document.querySelector("pre")).toHaveClass(
+      "border-border-quiet",
+      "bg-card",
+      "font-mono",
+    ),
+  );
+});

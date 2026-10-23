@@ -121,6 +121,93 @@ class TestGenresShared:
             assert "nonexistent-genre-333" in stats
             assert stats["nonexistent-genre-333"]["artist_count"] == 0
 
+    def test_genre_taxonomy_admin_stats_aggregate_catalog_and_listening(self, pg_db):
+        from uuid import uuid4
+
+        from sqlalchemy import text
+
+        from crate.db.queries.genres_taxonomy_admin_stats import (
+            get_genre_taxonomy_admin_stats,
+        )
+        from crate.db.tx import read_scope, transaction_scope
+
+        token = uuid4().hex[:10]
+        slug = f"admin-stats-{token}"
+        artist_name = f"Taxonomy Admin Stats Artist {token}"
+        alias_name = f"admin stats {token}"
+        raw_genre = f"{alias_name}; unlinked tag"
+        pg_db.upsert_artist({"name": artist_name})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": artist_name,
+                "name": f"Taxonomy Admin Stats Album {token}",
+                "path": f"/music/{artist_name}/album-{token}",
+                "track_count": 3,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+
+        with transaction_scope() as session:
+            node_id = session.execute(
+                text(
+                    "INSERT INTO genre_taxonomy_nodes (slug, name) VALUES (:slug, :name) RETURNING id"
+                ),
+                {"slug": slug, "name": f"Admin Stats {token}"},
+            ).scalar_one()
+            genre_id = session.execute(
+                text(
+                    "INSERT INTO genres (name, slug) VALUES (:name, :slug) RETURNING id"
+                ),
+                {"name": alias_name, "slug": slug},
+            ).scalar_one()
+            session.execute(
+                text(
+                    "INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id, origin) VALUES (:slug, :name, :node_id, 'manual')"
+                ),
+                {"slug": slug, "name": alias_name, "node_id": node_id},
+            )
+            session.execute(
+                text(
+                    "INSERT INTO artist_genres (artist_name, genre_id, source) VALUES (:artist, :genre_id, 'test')"
+                ),
+                {"artist": artist_name, "genre_id": genre_id},
+            )
+            session.execute(
+                text(
+                    "INSERT INTO album_genres (album_id, genre_id, source) VALUES (:album_id, :genre_id, 'test')"
+                ),
+                {"album_id": album_id, "genre_id": genre_id},
+            )
+            user_id = session.execute(
+                text(
+                    "INSERT INTO users (email, created_at) VALUES (:email, NOW()) RETURNING id"
+                ),
+                {"email": f"genre-stats-{token}@example.test"},
+            ).scalar_one()
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_genre_stats (
+                        user_id, stat_window, genre_name, play_count
+                    ) VALUES (:user_id, '90d', :genre_name, 10)
+                    """
+                ),
+                {"user_id": user_id, "genre_name": raw_genre},
+            )
+
+        with read_scope() as session:
+            stats = get_genre_taxonomy_admin_stats([slug], session=session)[slug]
+
+        assert stats["artist_count"] == 1
+        assert stats["album_count"] == 1
+        assert stats["track_count"] == 3
+        assert stats["raw_tag_count"] == 1
+        assert stats["mapped_raw_tags"] == [alias_name]
+        assert stats["catalog_track_share_pct"] == 100
+        assert stats["listening_share_90d_pct"] == 50
+
 
 class TestGenresGraphRelated:
     def _setup_genre_data(self, pg_db):

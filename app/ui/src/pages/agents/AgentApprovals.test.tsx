@@ -57,6 +57,9 @@ describe("AgentApprovals", () => {
     expect(screen.getByText("Local lab MCP · Token")).toBeInTheDocument();
     expect(screen.getByText("Needs approval")).toBeInTheDocument();
     expect(screen.getByText("Safe")).toBeInTheDocument();
+    expect(screen.getByText("Local lab MCP · Token")).toHaveClass(
+      "text-text-muted",
+    );
     expect(String(apiMock.mock.calls[0]?.[0])).toContain("view=pending");
     expect(document.body.textContent ?? "").not.toMatch(/[0-9a-f]{64}/i);
   });

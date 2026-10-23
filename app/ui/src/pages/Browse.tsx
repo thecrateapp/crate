@@ -33,8 +33,6 @@ import {
   LayoutGrid,
   List,
   Loader2,
-  SlidersHorizontal,
-  Users,
   Check,
   SquareCheck,
   X,
@@ -423,7 +421,7 @@ export function Browse() {
         title="Browse Artists"
         description="Explore the artists in your library and narrow the catalog with the filters below."
       >
-        <InfoBadge icon={Users}>
+        <InfoBadge>
           {loading ? "Loading artists" : `${total.toLocaleString()} artists`}
         </InfoBadge>
       </OpsPageHero>
@@ -557,9 +555,7 @@ export function Browse() {
                 ? "Loading artists..."
                 : `Showing ${artists.length.toLocaleString()} of ${total.toLocaleString()} artists`}
             </span>
-            {hasActiveFilters ? (
-              <InfoBadge icon={SlidersHorizontal}>Filtered</InfoBadge>
-            ) : null}
+            {hasActiveFilters ? <InfoBadge>Filtered</InfoBadge> : null}
           </div>
           {hasActiveFilters ? (
             <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -680,7 +676,7 @@ export function Browse() {
       {/* Infinite scroll sentinel */}
       <div ref={sentinelRef} className="h-10 flex items-center justify-center">
         {loadingMore && (
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <Loader2 className="h-5 w-5 animate-spin text-accent-action-hi" />
         )}
         {!hasMoreRef.current && artists.length > 0 && (
           <span className="text-xs text-muted-foreground">{total} artists</span>

@@ -1,11 +1,10 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import {
   MailPlus as HeaderMailPlus,
@@ -232,20 +231,14 @@ function RolePicker({
       {ROLE_OPTIONS.map((option) => {
         const active = value.includes(option.value);
         return (
-          <button
+          <FilterChip
             key={option.value}
-            type="button"
             disabled={disabled}
-            aria-pressed={active}
+            active={active}
             onClick={() => onChange(toggleRole(value, option.value))}
-            className={`min-h-11 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-              active
-                ? "border-accent-action/35 bg-accent-action/12 text-accent-action-hi"
-                : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/80"
-            } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
             {option.label}
-          </button>
+          </FilterChip>
         );
       })}
     </div>
@@ -287,7 +280,7 @@ function UserAvatar({
 
   return (
     <div
-      className={`${dim} rounded-md border border-white/10 bg-white/[0.04] flex items-center justify-center shrink-0 font-medium text-white/60`}
+      className={`${dim} rounded-md border border-border-quiet bg-raised-surface flex items-center justify-center shrink-0 font-medium text-text-secondary`}
     >
       {initial}
     </div>
@@ -364,7 +357,7 @@ function statusBadgeClass(status: string) {
   if (status === "suspended")
     return "border-state-warning/25 text-state-warning-text";
   if (status === "deleted") return "border-border-quiet text-text-subtle";
-  return "border-white/10 text-white/55";
+  return "border-border-quiet text-text-muted";
 }
 
 function statusLabel(status: string) {
@@ -447,7 +440,7 @@ function getSessionStatus(session: UserSession) {
       return {
         key: "revoked",
         label: "Revoked",
-        className: "border-white/12 bg-transparent text-white/60",
+        className: "border-border-quiet bg-transparent text-text-secondary",
       };
     case "expired":
       return {
@@ -474,7 +467,7 @@ function getSessionStatus(session: UserSession) {
       return {
         key: "history",
         label: "History",
-        className: "border-white/8 bg-black/15 text-white/45",
+        className: "border-border-quiet bg-card text-text-muted",
       };
   }
 }
@@ -581,7 +574,7 @@ function UserPresence({
         className={
           user.online_now
             ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-            : "border-white/10 bg-white/[0.04] text-white/55"
+            : "border-border-quiet bg-raised-surface text-text-muted"
         }
       >
         {user.online_now
@@ -594,7 +587,7 @@ function UserPresence({
         className={
           user.listening_now
             ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-            : "border-white/10 bg-white/[0.04] text-white/55"
+            : "border-border-quiet bg-raised-surface text-text-muted"
         }
       >
         {user.listening_now ? "Listening now" : "Not playing"}
@@ -632,13 +625,13 @@ function CurrentTrackLine({ track }: { track?: CurrentTrack | null }) {
       : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-sm text-white/65">
-      <span className="text-white/82">{track.title}</span>
+    <div className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
+      <span className="text-text-primary">{track.title}</span>
       {track.artist ? (
         <>
-          <span className="text-white/28">by</span>
+          <span className="text-text-subtle">by</span>
           {artistHref ? (
-            <Link to={artistHref} className="hover:text-white">
+            <Link to={artistHref} className="hover:text-text-primary">
               {track.artist}
             </Link>
           ) : (
@@ -648,9 +641,9 @@ function CurrentTrackLine({ track }: { track?: CurrentTrack | null }) {
       ) : null}
       {track.album ? (
         <>
-          <span className="text-white/28">on</span>
+          <span className="text-text-subtle">on</span>
           {albumHref ? (
-            <Link to={albumHref} className="hover:text-white">
+            <Link to={albumHref} className="hover:text-text-primary">
               {track.album}
             </Link>
           ) : (
@@ -857,19 +850,11 @@ export function Users() {
   if (loadError) {
     return (
       <div className="space-y-6">
-        <AdminPageHeader>
-          <PageHeaderLayout>
-            <div>
-              <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
-                Users
-              </h1>
-              <p className="text-sm text-white/55">
-                Account access, presence and listening activity.
-              </p>
-            </div>
-          </PageHeaderLayout>
-        </AdminPageHeader>
-        <Card className="border-white/10 bg-panel-surface">
+        <OpsPageHero
+          title="Users"
+          description="Account access, presence and listening activity."
+        />
+        <Card className="border-border-quiet bg-card">
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
               <MonoLabel as="h2" tone="accent">
@@ -891,74 +876,60 @@ export function Users() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              {canCreateUsers ? (
-                <>
-                  <PageHeaderAction
-                    label="Invite user"
-                    onClick={() => setInviteOpen(true)}
-                  >
-                    <HeaderMailPlus
-                      data-admin-ux="header-invite-user"
-                      aria-hidden="true"
-                    />
-                  </PageHeaderAction>
-                  <PageHeaderAction
-                    label="Add user"
-                    onClick={() => setAddOpen(true)}
-                  >
-                    <HeaderUserPlus
-                      data-admin-ux="header-add-user"
-                      aria-hidden="true"
-                    />
-                  </PageHeaderAction>
-                </>
-              ) : null}
-            </PageHeaderActions>
+      <OpsPageHero
+        title="Users"
+        description="Presence, linked identities, active devices and recent listening activity across the system."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            {canCreateUsers ? (
+              <>
+                <PageHeaderAction
+                  label="Invite user"
+                  onClick={() => setInviteOpen(true)}
+                >
+                  <HeaderMailPlus
+                    data-admin-ux="header-invite-user"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+                <PageHeaderAction
+                  label="Add user"
+                  onClick={() => setAddOpen(true)}
+                >
+                  <HeaderUserPlus
+                    data-admin-ux="header-add-user"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+              </>
+            ) : null}
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge>{counts.total} total users</InfoBadge>
+        <InfoBadge
+          className={
+            counts.online > 0
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : undefined
           }
         >
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
-                  Users
-                </h1>
-                <p className="text-sm text-white/55">
-                  Presence, linked identities, active devices and recent
-                  listening activity across the system.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <InfoBadge>{counts.total} total users</InfoBadge>
-              <InfoBadge
-                className={
-                  counts.online > 0
-                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                    : undefined
-                }
-              >
-                {counts.online} active now
-              </InfoBadge>
-              <InfoBadge
-                className={
-                  counts.listening > 0
-                    ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                    : undefined
-                }
-              >
-                {counts.listening} listening
-              </InfoBadge>
-              <InfoBadge>{counts.devices} active devices</InfoBadge>
-            </div>
-          </div>
-        </PageHeaderLayout>
-      </AdminPageHeader>
+          {counts.online} active now
+        </InfoBadge>
+        <InfoBadge
+          className={
+            counts.listening > 0
+              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+              : undefined
+          }
+        >
+          {counts.listening} listening
+        </InfoBadge>
+        <InfoBadge>{counts.devices} active devices</InfoBadge>
+      </OpsPageHero>
 
-      <Card className="border-white/10 bg-panel-surface">
+      <Card className="border-border-quiet bg-card">
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-md">
@@ -966,7 +937,7 @@ export function Users() {
                 data-admin-ux="users-search"
                 aria-hidden="true"
                 size={14}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 value={query}
@@ -1040,7 +1011,7 @@ export function Users() {
             </div>
           </div>
 
-          <div className="text-sm text-white/45">
+          <div className="text-sm text-text-muted">
             Showing {showingStart}-{showingEnd} of {filteredUsers.length} users
           </div>
 
@@ -1178,7 +1149,7 @@ export function Users() {
           </div>
 
           {filteredUsers.length > 0 && pageCount > 1 ? (
-            <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
+            <div className="flex items-center justify-between gap-3 border-t border-border-quiet pt-4">
               <Button
                 className="min-h-11"
                 size="sm"
@@ -1195,7 +1166,7 @@ export function Users() {
                 />
                 Previous
               </Button>
-              <span className="text-xs text-white/45">
+              <span className="text-xs text-text-muted">
                 Page {page} of {pageCount}
               </span>
               <Button
@@ -1527,13 +1498,13 @@ function UserDetailDialog({
           ) : detail ? (
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
-                <Card className="border-white/10 bg-panel-surface">
+                <Card className="border-border-quiet bg-card">
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <UserAvatar user={detail} size="md" />
                       <div className="crate-form-field min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-display text-xl font-semibold tracking-tight text-white">
+                          <h3 className="font-display text-xl font-semibold tracking-tight text-text-primary">
                             {detail.name || detail.email}
                           </h3>
                           {rolesForUser(detail).map((role) => (
@@ -1558,21 +1529,21 @@ function UserDetailDialog({
                             <Badge variant="outline">@{detail.username}</Badge>
                           ) : null}
                         </div>
-                        <div className="break-all text-sm text-white/45">
+                        <div className="break-all text-sm text-text-muted">
                           {detail.email}
                         </div>
                       </div>
                     </div>
                     {detail.bio ? (
-                      <p className="mt-4 text-sm leading-relaxed text-white/58">
+                      <p className="mt-4 text-sm leading-relaxed text-text-muted">
                         {detail.bio}
                       </p>
                     ) : null}
-                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
+                    <div className="mt-4 rounded-md border border-border-quiet bg-card p-3">
                       <div className="crate-form-field">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        <MonoLabel as="div" size="eyebrow">
                           Roles
-                        </div>
+                        </MonoLabel>
                         {canAssignRoles ? (
                           <div className="space-y-3">
                             <RolePicker
@@ -1603,7 +1574,7 @@ function UserDetailDialog({
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex flex-wrap gap-2 text-sm text-white/70">
+                          <div className="flex flex-wrap gap-2 text-sm text-text-secondary">
                             {rolesForUser(detail).map((role) => (
                               <InfoBadge key={role}>
                                 {roleLabel(role)}
@@ -1618,23 +1589,27 @@ function UserDetailDialog({
                           .map((capability) => (
                             <InfoBadge
                               key={capability}
-                              className="text-white/55"
+                              className="text-text-muted"
                             >
                               {capability}
                             </InfoBadge>
                           ))}
                         {(detail.capabilities?.length ?? 0) > 8 ? (
-                          <InfoBadge className="text-white/40">
+                          <InfoBadge className="text-text-subtle">
                             +{(detail.capabilities?.length ?? 0) - 8} more
                           </InfoBadge>
                         ) : null}
                       </div>
                     </div>
-                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
+                    <div className="mt-4 rounded-md border border-border-quiet bg-card p-3">
                       <div className="crate-form-field">
-                        <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        <MonoLabel
+                          as="div"
+                          size="eyebrow"
+                          className="flex items-center gap-2"
+                        >
                           Account status
-                        </div>
+                        </MonoLabel>
                         {canManageStatus ? (
                           <div className="space-y-3">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
@@ -1686,31 +1661,31 @@ function UserDetailDialog({
                             ) : null}
                           </div>
                         ) : (
-                          <div className="text-sm text-white/70">
+                          <div className="text-sm text-text-secondary">
                             {statusLabel(userStatus(detail))}
                           </div>
                         )}
                       </div>
                       {detail.status_reason ? (
-                        <div className="mt-3 text-xs text-white/42">
+                        <div className="mt-3 text-xs text-text-muted">
                           Reason: {detail.status_reason}
                         </div>
                       ) : null}
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Created
-                        </div>
-                        <div className="text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.created_at)}
                         </div>
                       </div>
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last login
-                        </div>
-                        <div className="text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_login)}
                         </div>
                       </div>
@@ -1718,9 +1693,9 @@ function UserDetailDialog({
                   </CardContent>
                 </Card>
 
-                <Card className="border-white/10 bg-panel-surface">
+                <Card className="border-border-quiet bg-card">
                   <CardHeader>
-                    <CardTitle className="font-display text-base text-white">
+                    <CardTitle className="font-display text-base text-text-primary">
                       Presence
                     </CardTitle>
                     <CardDescription>
@@ -1730,39 +1705,39 @@ function UserDetailDialog({
                   <CardContent className="space-y-4">
                     <UserPresence user={detail} />
                     <div className="grid gap-3">
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last seen
-                        </div>
-                        <div className="text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_seen_at)}
                         </div>
                       </div>
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last play event
-                        </div>
-                        <div className="text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_played_at)}
                         </div>
                       </div>
                     </div>
                     {detail.current_track ? (
                       <div className="crate-form-field rounded-md border border-accent-action/15 bg-accent-action/8 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-accent-action-hi/70">
+                        <MonoLabel as="div" size="eyebrow" tone="accent">
                           {detail.listening_now
                             ? "Currently playing"
                             : "Latest track"}
-                        </div>
+                        </MonoLabel>
                         <CurrentTrackLine track={detail.current_track} />
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className="border-white/10 bg-panel-surface">
+                <Card className="border-border-quiet bg-card">
                   <CardHeader>
-                    <CardTitle className="font-display text-base text-white">
+                    <CardTitle className="font-display text-base text-text-primary">
                       Access & session footprint
                     </CardTitle>
                     <CardDescription>
@@ -1782,43 +1757,43 @@ function UserDetailDialog({
                           </InfoBadge>
                         ))
                       ) : (
-                        <InfoBadge className="text-white/45">
+                        <InfoBadge className="text-text-muted">
                           No linked providers
                         </InfoBadge>
                       )}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Active footprint
-                        </div>
-                        <div className="text-lg font-semibold text-white">
+                        </MonoLabel>
+                        <div className="text-lg font-semibold text-text-primary">
                           {detail.active_devices ?? 0} device
                           {(detail.active_devices ?? 0) === 1 ? "" : "s"}
                         </div>
-                        <div className="text-xs text-white/38">
+                        <div className="text-xs text-text-subtle">
                           {detail.active_sessions ?? 0} active session token
                           {(detail.active_sessions ?? 0) === 1 ? "" : "s"}
                         </div>
                       </div>
-                      <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Historical tokens
-                        </div>
-                        <div className="text-lg font-semibold text-white">
+                        </MonoLabel>
+                        <div className="text-lg font-semibold text-text-primary">
                           {detail.sessions.length}
                         </div>
-                        <div className="text-xs text-white/38">
+                        <div className="text-xs text-text-subtle">
                           {sessionStatusCounts.history} stale/history ·{" "}
                           {sessionStatusCounts.revoked} revoked
                         </div>
                       </div>
                     </div>
-                    <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                    <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                      <MonoLabel as="div" size="eyebrow">
                         Security
-                      </div>
-                      <div className="text-sm text-white/78">
+                      </MonoLabel>
+                      <div className="text-sm text-text-primary">
                         {authModeSummary(detail)}
                       </div>
                       {canManagePasswords ? (
@@ -1838,21 +1813,21 @@ function UserDetailDialog({
                     </div>
                     {sessionSourceSummary.length > 0 ? (
                       <div className="space-y-2">
-                        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        <MonoLabel as="div" size="eyebrow">
                           Top clients
-                        </div>
+                        </MonoLabel>
                         <div className="space-y-2">
                           {sessionSourceSummary.slice(0, 4).map((source) => (
                             <div
                               key={source.key}
-                              className="rounded-md border border-white/8 bg-black/15 p-3"
+                              className="rounded-md border border-border-quiet bg-card p-3"
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="crate-form-field min-w-0">
-                                  <div className="truncate text-sm font-medium text-white">
+                                  <div className="truncate text-sm font-medium text-text-primary">
                                     {source.label}
                                   </div>
-                                  <div className="text-xs text-white/38">
+                                  <div className="text-xs text-text-subtle">
                                     {source.app_id || "web"} · last seen{" "}
                                     {formatRelativeTimestamp(
                                       source.last_seen_at,
@@ -1871,12 +1846,12 @@ function UserDetailDialog({
                                     </InfoBadge>
                                   ) : null}
                                   {source.history > 0 ? (
-                                    <InfoBadge className="text-white/55">
+                                    <InfoBadge className="text-text-muted">
                                       {source.history} history
                                     </InfoBadge>
                                   ) : null}
                                   {source.revoked > 0 ? (
-                                    <InfoBadge className="text-white/45">
+                                    <InfoBadge className="text-text-muted">
                                       {source.revoked} revoked
                                     </InfoBadge>
                                   ) : null}
@@ -1920,11 +1895,11 @@ function UserDetailDialog({
                 </Card>
               </div>
 
-              <Card className="border-white/10 bg-panel-surface">
+              <Card className="border-border-quiet bg-card">
                 <CardHeader>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <CardTitle className="font-display text-base text-white">
+                      <CardTitle className="font-display text-base text-text-primary">
                         Sessions
                       </CardTitle>
                       <CardDescription>
@@ -1955,12 +1930,12 @@ function UserDetailDialog({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="text-sm text-white/45">
+                  <div className="text-sm text-text-muted">
                     Showing {visibleSessions.length} of {detail.sessions.length}{" "}
                     recorded sessions
                   </div>
                   {sessionFilter !== "all" && hiddenSessionsCount > 0 ? (
-                    <div className="rounded-md border border-white/8 bg-black/15 px-4 py-3 text-sm text-white/55">
+                    <div className="rounded-md border border-border-quiet bg-card px-4 py-3 text-sm text-text-muted">
                       {hiddenSessionsCount} historical or stale session
                       {hiddenSessionsCount === 1 ? "" : "s"} hidden to keep the
                       view focused on real devices and recent sign-ins.
@@ -1974,11 +1949,11 @@ function UserDetailDialog({
                       return (
                         <div
                           key={session.id}
-                          className="flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 lg:flex-row lg:items-start lg:justify-between"
+                          className="flex flex-col gap-3 rounded-md border border-border-quiet bg-card p-4 lg:flex-row lg:items-start lg:justify-between"
                         >
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-medium text-white">
+                              <div className="text-sm font-medium text-text-primary">
                                 {sessionDisplayName(session)}
                               </div>
                               <Badge className={status.className}>
@@ -1986,7 +1961,7 @@ function UserDetailDialog({
                               </Badge>
                               <InfoBadge>{session.app_id || "web"}</InfoBadge>
                             </div>
-                            <div className="flex flex-wrap gap-4 text-sm text-white/45">
+                            <div className="flex flex-wrap gap-4 text-sm text-text-muted">
                               <span>
                                 Seen{" "}
                                 {formatRelativeTimestamp(
@@ -2000,18 +1975,18 @@ function UserDetailDialog({
                               <span>IP {session.last_seen_ip || "—"}</span>
                             </div>
                             {metaLine ? (
-                              <div className="text-xs text-white/28">
+                              <div className="text-xs text-text-subtle">
                                 {metaLine}
                               </div>
                             ) : null}
                             {session.device_brand || session.device_model ? (
-                              <div className="text-xs text-white/36">
+                              <div className="text-xs text-text-subtle">
                                 {[session.device_brand, session.device_model]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </div>
                             ) : null}
-                            <div className="text-xs font-mono text-white/20">
+                            <div className="text-xs font-mono text-text-subtle">
                               {session.id}
                             </div>
                           </div>
@@ -2044,7 +2019,7 @@ function UserDetailDialog({
                       );
                     })
                   ) : (
-                    <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-6 py-10 text-center text-sm text-white/45">
+                    <div className="rounded-md border border-dashed border-border-quiet bg-card px-6 py-10 text-center text-sm text-text-muted">
                       No sessions match the current visibility filter.
                     </div>
                   )}
@@ -2145,7 +2120,7 @@ function SetPasswordDialog({
           <div className="crate-form-field">
             <div className="flex items-end justify-between gap-3">
               <label
-                className="text-sm font-medium text-white/80"
+                className="text-sm font-medium text-text-primary"
                 htmlFor="admin-user-password"
               >
                 New password
@@ -2154,7 +2129,7 @@ function SetPasswordDialog({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="min-h-11 h-auto px-2 py-1 text-xs text-white/60 hover:text-white"
+                className="min-h-11 h-auto px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
                 onClick={() => setNewPassword(generatePassword())}
               >
                 Generate
@@ -2169,12 +2144,12 @@ function SetPasswordDialog({
               required
             />
           </div>
-          <label className="flex items-start gap-3 rounded-md border border-white/8 bg-black/15 p-3 text-sm text-white/72">
+          <label className="flex items-start gap-3 rounded-md border border-border-quiet bg-card p-3 text-sm text-text-secondary">
             <input
               type="checkbox"
               checked={revokeAllSessions}
               onChange={(event) => setRevokeAllSessions(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-white/20 bg-transparent"
+              className="mt-0.5 h-4 w-4 rounded border-border-quiet bg-transparent"
             />
             <span>Revoke other sessions after changing the password</span>
           </label>
@@ -2320,10 +2295,10 @@ function AddUserDialog({
             />
           </div>
           {canAssignRoles ? (
-            <div className="crate-form-field rounded-md border border-white/8 bg-black/15 p-3">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-white/30 font-mono">
+            <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+              <MonoLabel as="div" size="eyebrow">
                 Roles
-              </div>
+              </MonoLabel>
               <RolePicker value={roles} onChange={setRoles} />
             </div>
           ) : null}
@@ -2427,7 +2402,7 @@ function InviteUserDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="crate-form-field">
             <label
-              className="text-sm font-medium text-white/80"
+              className="text-sm font-medium text-text-primary"
               htmlFor="invite-email"
             >
               Email
@@ -2443,7 +2418,7 @@ function InviteUserDialog({
           </div>
           <div className="crate-form-field">
             <label
-              className="text-sm font-medium text-white/80"
+              className="text-sm font-medium text-text-primary"
               htmlFor="invite-expiry"
             >
               Expires in days
@@ -2465,11 +2440,11 @@ function InviteUserDialog({
                 <div className="font-mono text-xs uppercase tracking-[0.12em] text-accent-action-hi/70">
                   Invite link
                 </div>
-                <div className="break-all rounded-md border border-white/8 bg-black/25 p-3 font-mono text-xs text-white/72">
+                <div className="break-all rounded-md border border-border-quiet bg-card p-3 font-mono text-xs text-text-secondary">
                   {inviteUrl}
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/42">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
                 <span>
                   Locked to {invite.email || email.trim().toLowerCase()} ·
                   single use

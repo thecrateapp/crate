@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -256,7 +257,10 @@ describe("PlaylistEditor text actions with real consumers", () => {
     render(<PlaylistEditor />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Preview" }));
-    expect(await screen.findByText("3 matching tracks")).toBeInTheDocument();
+    const matchingTracks = await screen.findByText("Matching tracks");
+    expect(
+      within(matchingTracks.parentElement!).getByText("3", { exact: true }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Marea", { exact: true })).toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledWith(
       "/api/admin/system-playlists/42/preview",
@@ -420,19 +424,18 @@ describe("PlaylistEditor text actions with real consumers", () => {
     const { unmount } = render(<PlaylistEditor />);
     expect(streams).toHaveLength(1);
     expect(streams[0]!.url).toBe("/api/admin/system-playlists/42/stream");
-    act(
-      () =>
-        streams[0]!.onmessage?.(
-          new MessageEvent("message", {
-            data: JSON.stringify({
-              ...fixture.surface,
-              playlist: {
-                ...fixture.surface.playlist,
-                generation_status: "running",
-              },
-            }),
+    act(() =>
+      streams[0]!.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            ...fixture.surface,
+            playlist: {
+              ...fixture.surface.playlist,
+              generation_status: "running",
+            },
           }),
-        ),
+        }),
+      ),
     );
     expect(screen.getByText("Generating")).toBeInTheDocument();
     expect(streams).toHaveLength(1);

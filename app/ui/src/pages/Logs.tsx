@@ -29,6 +29,7 @@ import { AdminSelect } from "@/components/ui/AdminSelect";
 
 import { Input } from "@crate/ui/shadcn/input";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -116,18 +117,18 @@ function WorkerTile({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-md border bg-black/20 p-3 text-left transition-colors",
+        "rounded-md border bg-raised-surface p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action-hi",
         active
           ? "border-accent-action/25 bg-accent-action/10"
-          : "border-white/8 hover:border-white/16 hover:bg-white/[0.04]",
+          : "border-border-quiet hover:bg-surface-control",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <div className="text-sm font-medium text-white">
+          <div className="text-sm font-medium text-text-primary">
             {worker.worker_id}
           </div>
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-text-muted">
             {worker.log_count} log lines seen
           </div>
         </div>
@@ -136,7 +137,7 @@ function WorkerTile({
           label={online ? "Online" : "Idle"}
         />
       </div>
-      <div className="mt-3 text-xs text-white/35">
+      <div className="mt-3 text-xs text-text-subtle">
         Last seen {timeAgo(worker.last_seen)}
       </div>
     </button>
@@ -152,10 +153,10 @@ function LogRow({ entry }: { entry: LogEntry }) {
   return (
     <div
       className={cn(
-        "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors  md:grid-cols-[78px_68px_minmax(0,1fr)]",
+        "grid gap-3 border-b border-border-quiet px-4 py-3 font-mono text-label transition-colors md:grid-cols-[78px_68px_minmax(0,1fr)]",
       )}
     >
-      <div className="text-white/25 tabular-nums">
+      <div className="text-text-subtle tabular-nums">
         {formatLogTimestamp(entry.created_at)}
       </div>
       <SeverityMeter level={level} label={level} />
@@ -163,13 +164,13 @@ function LogRow({ entry }: { entry: LogEntry }) {
         <div className={cn("break-words leading-5", messageTone)}>
           {entry.message}
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/35">
+        <div className="flex flex-wrap items-center gap-2 text-label text-text-muted">
           <InfoBadge>{entry.category}</InfoBadge>
           <InfoBadge>{entry.worker_id}</InfoBadge>
           {entry.task_id ? (
             <Link
               to={`/tasks?task=${entry.task_id}`}
-              className="font-sans text-primary/70 hover:text-primary"
+              className="font-sans text-accent-action-hi hover:underline"
             >
               Task {entry.task_id.slice(0, 8)}
             </Link>
@@ -177,7 +178,7 @@ function LogRow({ entry }: { entry: LogEntry }) {
           <span>{timeAgo(entry.created_at)}</span>
         </div>
         {metadata ? (
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-white/30">
+          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-label text-text-subtle">
             {metadata}
           </div>
         ) : null}
@@ -315,12 +316,12 @@ export function Logs() {
         role="status"
         aria-label="Loading worker logs"
         aria-busy="true"
-        className="flex justify-center py-16 text-white/45"
+        className="flex justify-center py-16 text-text-muted"
       >
         <Loader2
           data-admin-ux="logs-loading"
           aria-hidden="true"
-          className="h-5 w-5 animate-spin text-primary"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
         />
       </div>
     );
@@ -377,7 +378,7 @@ export function Logs() {
           {summary.onlineWorkers}/{workers.length} workers online
         </InfoBadge>
         {summary.errors > 0 ? (
-          <InfoBadge tone="warning">{summary.errors} errors</InfoBadge>
+          <InfoBadge tone="danger">{summary.errors} errors</InfoBadge>
         ) : null}
         {summary.warnings > 0 ? (
           <InfoBadge tone="warning">{summary.warnings} warnings</InfoBadge>
@@ -434,7 +435,7 @@ export function Logs() {
               data-admin-ux="logs-search"
               aria-hidden="true"
               size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
             />
             <Input
               aria-label="Search worker logs"
@@ -510,9 +511,10 @@ export function Logs() {
             ))}
           </div>
         ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-8 text-center text-sm text-white/35">
-            No worker heartbeat data available yet.
-          </div>
+          <EmptyState
+            message="No worker heartbeat data available yet."
+            className="py-8"
+          />
         )}
       </OpsPanel>
 
@@ -520,8 +522,8 @@ export function Logs() {
         title="Incident stream"
         description="Newest lines first. The console stays readable even when filtered down to one worker or one category."
       >
-        <div className="overflow-hidden rounded-md border border-white/8 bg-[#06080c]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3">
+        <div className="overflow-hidden rounded-md border border-border-quiet bg-panel-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-quiet px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
               {level ? (
                 <InfoBadge>
@@ -535,15 +537,16 @@ export function Logs() {
                 <InfoBadge>All filters open</InfoBadge>
               ) : null}
             </div>
-            <div className="text-xs text-white/35">
+            <div className="text-xs text-text-muted">
               Showing {visibleLogs.length} of {logs.length} lines
             </div>
           </div>
 
           {visibleLogs.length === 0 ? (
-            <div className="px-4 py-12 text-center text-sm text-white/40">
-              No log lines match the current filters.
-            </div>
+            <EmptyState
+              message="No log lines match the current filters."
+              className="px-4 py-12"
+            />
           ) : (
             <div className="max-h-[70vh] overflow-y-auto">
               {visibleLogs.map((entry) => (

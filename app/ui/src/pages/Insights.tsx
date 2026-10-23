@@ -11,6 +11,7 @@ import {
   OpsSurface,
 } from "@/components/admin/ops-surfaces";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useApi } from "@/hooks/use-api";
@@ -60,16 +61,21 @@ export interface InsightsData {
 }
 
 const NIVO_THEME = {
-  text: { fill: "#9ca3af" },
+  text: { fill: "var(--text-muted)" },
   axis: {
-    ticks: { text: { fill: "#6b7280", fontSize: 11 } },
-    legend: { text: { fill: "#9ca3af", fontSize: 12 } },
+    ticks: { text: { fill: "var(--text-subtle)", fontSize: 11 } },
+    legend: { text: { fill: "var(--text-muted)", fontSize: 12 } },
   },
-  grid: { line: { stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 } },
+  grid: {
+    line: {
+      stroke: "color-mix(in srgb, var(--text-primary) 8%, transparent)",
+      strokeWidth: 1,
+    },
+  },
   tooltip: {
     container: {
       background: "transparent",
-      color: "#f5f7fb",
+      color: "var(--text-primary)",
       borderRadius: "0px",
       fontSize: 12,
       border: "none",
@@ -78,8 +84,8 @@ const NIVO_THEME = {
       backdropFilter: "none",
     },
   },
-  labels: { text: { fill: "#f3f4f6", fontSize: 11 } },
-  legends: { text: { fill: "#9ca3af", fontSize: 11 } },
+  labels: { text: { fill: "var(--text-primary)", fontSize: 11 } },
+  legends: { text: { fill: "var(--text-muted)", fontSize: 11 } },
 };
 
 function truncateLabel(value: string, max = 24) {
@@ -93,7 +99,7 @@ function coveragePct(value: number, total: number) {
 
 function ChartEmpty({ message }: { message: string }) {
   return (
-    <div className="flex h-full items-center justify-center text-center text-sm text-white/35">
+    <div className="flex h-full items-center justify-center text-center text-sm text-text-subtle">
       {message}
     </div>
   );
@@ -118,31 +124,35 @@ function ChartTooltip({
   footer?: string;
 }) {
   return (
-    <div className="min-w-[220px] rounded-sm border border-border-quiet bg-panel-surface px-3 py-3 text-xs text-white shadow-none">
+    <div className="min-w-[220px] rounded-sm border border-border-quiet bg-card px-3 py-3 text-xs text-text-primary shadow-none">
       {eyebrow ? (
-        <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65 font-mono">
+        <MonoLabel as="div" size="eyebrow" tone="accent" className="opacity-70">
           {eyebrow}
-        </div>
+        </MonoLabel>
       ) : null}
       <div className={cn("space-y-0.5", eyebrow ? "mt-2" : "")}>
-        <div className="font-medium leading-tight text-white">{title}</div>
+        <div className="font-medium leading-tight text-text-primary">
+          {title}
+        </div>
         {subtitle ? (
-          <div className="text-[11px] text-white/45">{subtitle}</div>
+          <div className="text-[11px] text-text-muted">{subtitle}</div>
         ) : null}
       </div>
       <div className="mt-3 space-y-1.5">
         {metrics.map((metric) => (
           <div
             key={`${metric.label}-${metric.value}`}
-            className="flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0"
+            className="flex items-center justify-between gap-4 border-b border-border-quiet-subtle pb-1 last:border-b-0 last:pb-0"
           >
-            <span className="text-white/45">{metric.label}</span>
-            <span className="font-medium text-white">{metric.value}</span>
+            <span className="text-text-muted">{metric.label}</span>
+            <span className="font-medium text-text-primary">
+              {metric.value}
+            </span>
           </div>
         ))}
       </div>
       {footer ? (
-        <div className="mt-3 border-t border-white/6 pt-2 text-[10px] text-white/35">
+        <div className="mt-3 border-t border-border-quiet-subtle pt-2 text-[10px] text-text-subtle">
           {footer}
         </div>
       ) : null}
@@ -176,7 +186,7 @@ function InsightStoryCard({
       <div className="mt-2 font-display text-2xl font-semibold tracking-tight text-text-primary">
         {value}
       </div>
-      <div className="mt-2 text-sm leading-relaxed text-white/55">
+      <div className="mt-2 text-sm leading-relaxed text-text-muted">
         {caption}
       </div>
     </OpsSurface>
@@ -319,15 +329,9 @@ export function Insights() {
           title="Insights"
           description="Macro patterns across the library, with a cleaner split between collection shape, standouts and audio signature."
         >
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-            Collection shape
-          </span>
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-            Standouts
-          </span>
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-            Audio signature
-          </span>
+          <InfoBadge>Collection shape</InfoBadge>
+          <InfoBadge>Standouts</InfoBadge>
+          <InfoBadge>Audio signature</InfoBadge>
         </OpsPageHero>
         <GridSkeleton count={6} columns="grid-cols-1 xl:grid-cols-2" />
       </div>
@@ -350,15 +354,9 @@ export function Insights() {
         title="Insights"
         description="A macro read on how the library is shaped, where its weight sits, and how much of the collection is analytically mapped."
       >
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-          Collection shape
-        </span>
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-          Standouts
-        </span>
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
-          Audio signature
-        </span>
+        <InfoBadge>Collection shape</InfoBadge>
+        <InfoBadge>Standouts</InfoBadge>
+        <InfoBadge>Audio signature</InfoBadge>
       </OpsPageHero>
 
       {error ? (

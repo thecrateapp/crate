@@ -48,6 +48,25 @@ describe("QueueLanes", () => {
     vi.useRealTimers();
   });
 
+  it("uses the mono readout role for large lane totals at every breakpoint", () => {
+    render(
+      <QueueLanes
+        breakdown={breakdown({ running: { fast: 2 }, pending: { fast: 3 } })}
+        runningTasks={[]}
+        pendingTasks={[]}
+      />,
+    );
+
+    for (const testId of ["queue-total-count", "queue-total-count-mobile"]) {
+      const readouts = screen.getAllByTestId(testId);
+      expect(readouts).toHaveLength(5);
+      for (const readout of readouts) {
+        expect(readout).toHaveClass("font-mono", "tabular-nums");
+        expect(readout).not.toHaveClass("font-display");
+      }
+    }
+  });
+
   it("renders the five original site lanes with live tasks in their status zones", () => {
     render(
       <QueueLanes

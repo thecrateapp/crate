@@ -1,14 +1,16 @@
-import { AdminPageHeader, OpsSurface } from "@/components/admin/ops-surfaces";
+import { OpsPageHero, OpsSurface } from "@/components/admin/ops-surfaces";
 import {
   Calendar,
   ExternalLink,
   UserRound,
+  ListOrdered as HeaderList,
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import {
   ActionButton,
@@ -18,7 +20,6 @@ import {
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import {
   CalendarSync as HeaderCalendarSync,
@@ -26,10 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  List,
-  CalendarDays,
   X,
-  Merge,
 } from "lucide-react";
 import {
   useState,
@@ -449,7 +447,6 @@ export function Upcoming() {
               setMergeOpen(true);
             }}
           >
-            <Merge size={14} className="mr-1" />
             Merge duplicates
           </Button>
         ) : null
@@ -457,256 +454,213 @@ export function Upcoming() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              <AddShowButton onSaved={() => void fetchItems()} />
-              <MergeShowsButton onMerged={() => void fetchItems()} />
-              {canCurateShows ? (
-                <PageHeaderAction
-                  label="Sync shows"
-                  onClick={syncShows}
-                  disabled={syncing}
-                >
-                  {syncing ? (
-                    <Loader2
-                      data-admin-ux="upcoming-sync"
-                      aria-hidden="true"
-                      size={14}
-                      className="animate-spin"
-                    />
-                  ) : null}
-                  {!syncing ? (
-                    <HeaderCalendarSync
-                      data-admin-ux="header-sync-shows"
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                </PageHeaderAction>
-              ) : null}
-              {canRefreshSetlists ? (
-                <PageHeaderAction
-                  label={
-                    refreshingSetlists
-                      ? "Refreshing setlists…"
-                      : "Refresh setlists"
-                  }
-                  onClick={refreshStaleSetlists}
-                  disabled={
-                    refreshingSetlists ||
-                    setlistCoverage.stale +
-                      setlistCoverage.missing +
-                      setlistCoverage.unknown ===
-                      0
-                  }
-                  aria-busy={refreshingSetlists}
-                >
-                  {refreshingSetlists ? (
-                    <Loader2
-                      aria-hidden="true"
-                      size={14}
-                      className="animate-spin"
-                    />
-                  ) : (
-                    <HeaderCalendarSync aria-hidden="true" />
-                  )}
-                </PageHeaderAction>
-              ) : null}
-            </PageHeaderActions>
-          }
-        >
-          <div className="min-w-0 flex-1 space-y-4">
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-text-primary">
-                  Show Management
-                </h1>
-                <div
-                  role="group"
-                  aria-label="View"
-                  className="flex shrink-0 items-center gap-1"
-                >
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="List"
-                    title="List"
-                    aria-pressed={view === "list"}
-                    onClick={() => setView("list")}
-                    className={cn(
-                      "size-11 min-h-11 min-w-11 border",
-                      view === "list"
-                        ? "border-accent-action-hi bg-accent-action/10 text-accent-action-hi"
-                        : "border-transparent text-text-muted",
-                    )}
-                  >
-                    <List
-                      data-admin-ux="upcoming-view-list"
-                      aria-hidden="true"
-                      size={18}
-                    />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    aria-label="Calendar"
-                    title="Calendar"
-                    aria-pressed={view === "calendar"}
-                    onClick={() => setView("calendar")}
-                    className={cn(
-                      "size-11 min-h-11 min-w-11 border",
-                      view === "calendar"
-                        ? "border-accent-action-hi bg-accent-action/10 text-accent-action-hi"
-                        : "border-transparent text-text-muted",
-                    )}
-                  >
-                    <CalendarDays
-                      data-admin-ux="upcoming-view-calendar"
-                      aria-hidden="true"
-                      size={18}
-                    />
-                  </Button>
-                </div>
-              </div>
-              <p className="text-sm text-text-muted">
-                Keep the live calendar clean and check that every billed artist
-                has a recent probable setlist.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <InfoBadge active>{showCount} shows</InfoBadge>
-              <InfoBadge>
-                {setlistCoverage.artist_count} billed artists
-              </InfoBadge>
-              <InfoBadge
-                tone="success"
-                title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
+      <OpsPageHero
+        title="Show Management"
+        description="Keep the live calendar clean and check that every billed artist has a recent probable setlist."
+        compactActions
+        actions={
+          <PageHeaderActions label="Show management actions">
+            <AddShowButton onSaved={() => void fetchItems()} />
+            <MergeShowsButton onMerged={() => void fetchItems()} />
+            {canCurateShows ? (
+              <PageHeaderAction
+                label="Sync shows"
+                onClick={syncShows}
+                disabled={syncing}
+                aria-busy={syncing}
               >
-                {setlistCoverage.fresh} recent
-              </InfoBadge>
-              {setlistCoverage.stale > 0 ? (
-                <InfoBadge tone="warning">
-                  {setlistCoverage.stale} outdated
-                </InfoBadge>
-              ) : null}
-              {setlistCoverage.missing > 0 ? (
-                <InfoBadge tone="neutral">
-                  {setlistCoverage.missing} missing
-                </InfoBadge>
-              ) : null}
-              {setlistCoverage.unknown > 0 ? (
-                <InfoBadge tone="info">
-                  {setlistCoverage.unknown} without date
-                </InfoBadge>
-              ) : null}
-              {setlistCoverage.queued != null ? (
-                <InfoBadge tone="info">
-                  {setlistCoverage.queued} refreshes queued
-                </InfoBadge>
-              ) : null}
-            </div>
-          </div>
-        </PageHeaderLayout>
-
-        <OpsSurface className="mt-5 p-3">
-          <div className="flex flex-wrap items-start gap-4">
-            <div className="min-w-0 flex-1 basis-60">
-              <label
-                htmlFor="upcoming-artist"
-                className="crate-form-field min-w-0"
-              >
-                <MonoLabel as="span">Artist</MonoLabel>
-                <div className="relative">
-                  <Search
-                    data-admin-ux="upcoming-search"
+                {syncing ? (
+                  <Loader2
+                    data-admin-ux="upcoming-sync"
                     aria-hidden="true"
                     size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+                    className="animate-spin"
                   />
-                  <Input
-                    id="upcoming-artist"
-                    type="text"
-                    placeholder="Filter by artist..."
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setPage(1);
-                    }}
-                    className="h-11 border-border-quiet bg-surface-canvas pl-9 text-text-primary"
+                ) : null}
+                {!syncing ? (
+                  <HeaderCalendarSync
+                    data-admin-ux="header-sync-shows"
+                    aria-hidden="true"
                   />
-                </div>
-              </label>
-            </div>
-
-            {availableGenres.length > 0 && (
-              <div className="crate-form-field">
-                <MonoLabel as="span" data-slot="form-field-label">
-                  Genre
-                </MonoLabel>
-                <AdminSelect
-                  value={genreFilter}
-                  onChange={(value) => {
-                    setGenreFilter(value);
-                    setPage(1);
-                  }}
-                  options={availableGenres.map(([name, count]) => ({
-                    value: name,
-                    label: name,
-                    count,
-                  }))}
-                  placeholder="All genres"
-                  searchable
-                  searchPlaceholder="Search genres..."
-                />
-              </div>
-            )}
-
-            {availableCities.length > 0 && (
-              <div className="crate-form-field">
-                <MonoLabel as="span" data-slot="form-field-label">
-                  City
-                </MonoLabel>
-                <AdminSelect
-                  value={cityFilter}
-                  onChange={(value) => {
-                    setCityFilter(value);
-                    setPage(1);
-                  }}
-                  options={availableCities.map(([name, count]) => ({
-                    value: name,
-                    label: name,
-                    count,
-                  }))}
-                  placeholder="All cities"
-                  searchable
-                  searchPlaceholder="Search cities..."
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Always mounted, so a screen reader hears the notice arrive. */}
-          <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
-            <p
-              role="status"
-              aria-label="Show link status"
-              className="text-sm text-white/70 empty:sr-only"
-            >
-              {linkNotice}
-            </p>
-            {linkNotice ? (
-              <ActionIconButton
-                onClick={() => setLinkNotice("")}
-                title="Dismiss"
-                aria-label="Dismiss"
-              >
-                <X size={14} />
-              </ActionIconButton>
+                ) : null}
+              </PageHeaderAction>
             ) : null}
+            {canRefreshSetlists ? (
+              <PageHeaderAction
+                label={
+                  refreshingSetlists
+                    ? "Refreshing setlists…"
+                    : "Refresh setlists"
+                }
+                onClick={refreshStaleSetlists}
+                disabled={
+                  refreshingSetlists ||
+                  setlistCoverage.stale +
+                    setlistCoverage.missing +
+                    setlistCoverage.unknown ===
+                    0
+                }
+                aria-busy={refreshingSetlists}
+              >
+                {refreshingSetlists ? (
+                  <Loader2
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <HeaderCalendarSync aria-hidden="true" />
+                )}
+              </PageHeaderAction>
+            ) : null}
+            <PageHeaderAction
+              label="List view"
+              aria-pressed={view === "list"}
+              onClick={() => setView("list")}
+            >
+              <HeaderList
+                data-admin-ux="upcoming-view-list"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Calendar view"
+              aria-pressed={view === "calendar"}
+              onClick={() => setView("calendar")}
+            >
+              <Calendar
+                data-admin-ux="upcoming-view-calendar"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge active>{showCount} shows</InfoBadge>
+        <InfoBadge>{setlistCoverage.artist_count} billed artists</InfoBadge>
+        <InfoBadge
+          tone="success"
+          title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
+        >
+          {setlistCoverage.fresh} recent
+        </InfoBadge>
+        {setlistCoverage.stale > 0 ? (
+          <InfoBadge tone="warning">{setlistCoverage.stale} outdated</InfoBadge>
+        ) : null}
+        {setlistCoverage.missing > 0 ? (
+          <InfoBadge tone="neutral">
+            {setlistCoverage.missing} missing
+          </InfoBadge>
+        ) : null}
+        {setlistCoverage.unknown > 0 ? (
+          <InfoBadge tone="info">
+            {setlistCoverage.unknown} without date
+          </InfoBadge>
+        ) : null}
+        {setlistCoverage.queued != null ? (
+          <InfoBadge tone="info">
+            {setlistCoverage.queued} refreshes queued
+          </InfoBadge>
+        ) : null}
+      </OpsPageHero>
+
+      <OpsSurface className="p-3">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-1 basis-60">
+            <label
+              htmlFor="upcoming-artist"
+              className="crate-form-field min-w-0"
+            >
+              <MonoLabel as="span">Artist</MonoLabel>
+              <div className="relative">
+                <Search
+                  data-admin-ux="upcoming-search"
+                  aria-hidden="true"
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+                />
+                <Input
+                  id="upcoming-artist"
+                  type="text"
+                  placeholder="Filter by artist..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="h-11 border-border-quiet bg-surface-canvas pl-9 text-text-primary"
+                />
+              </div>
+            </label>
           </div>
-        </OpsSurface>
-      </AdminPageHeader>
+
+          {availableGenres.length > 0 && (
+            <div className="crate-form-field">
+              <MonoLabel as="span" data-slot="form-field-label">
+                Genre
+              </MonoLabel>
+              <AdminSelect
+                value={genreFilter}
+                onChange={(value) => {
+                  setGenreFilter(value);
+                  setPage(1);
+                }}
+                options={availableGenres.map(([name, count]) => ({
+                  value: name,
+                  label: name,
+                  count,
+                }))}
+                placeholder="All genres"
+                searchable
+                searchPlaceholder="Search genres..."
+              />
+            </div>
+          )}
+
+          {availableCities.length > 0 && (
+            <div className="crate-form-field">
+              <MonoLabel as="span" data-slot="form-field-label">
+                City
+              </MonoLabel>
+              <AdminSelect
+                value={cityFilter}
+                onChange={(value) => {
+                  setCityFilter(value);
+                  setPage(1);
+                }}
+                options={availableCities.map(([name, count]) => ({
+                  value: name,
+                  label: name,
+                  count,
+                }))}
+                placeholder="All cities"
+                searchable
+                searchPlaceholder="Search cities..."
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Always mounted, so a screen reader hears the notice arrive. */}
+        <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
+          <p
+            role="status"
+            aria-label="Show link status"
+            className="text-sm text-text-muted empty:sr-only"
+          >
+            {linkNotice}
+          </p>
+          {linkNotice ? (
+            <ActionIconButton
+              onClick={() => setLinkNotice("")}
+              title="Dismiss"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </ActionIconButton>
+          ) : null}
+        </div>
+      </OpsSurface>
 
       {loading && (
         <div
@@ -717,7 +671,7 @@ export function Upcoming() {
           <Loader2
             data-admin-ux="upcoming-loading"
             aria-hidden="true"
-            className="h-6 w-6 animate-spin text-primary"
+            className="h-6 w-6 animate-spin text-accent-action-hi"
           />
         </div>
       )}
@@ -1151,15 +1105,18 @@ function ShowManagementRow({
                   {support.length > 3 ? ` +${support.length - 3}` : ""}
                 </MonoLabel>
               ) : null}
-              <MonoLabel
-                as="span"
-                className="mt-1 block min-w-0 truncate"
-                accent={countdown}
-                meta={[setlistSummary]}
-                title={artists
+              <TooltipHint
+                content={artists
                   .map((artist) => `${artist.name}: ${setlistLabel(artist)}`)
                   .join(" · ")}
-              />
+              >
+                <MonoLabel
+                  as="span"
+                  className="mt-1 block min-w-0 truncate"
+                  accent={countdown}
+                  meta={[setlistSummary]}
+                />
+              </TooltipHint>
             </>
           }
           date={<UpcomingDateStamp date={item.date} locale="en-US" />}
@@ -1238,38 +1195,26 @@ function CalendarView({
     <OpsSurface className="p-4">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="min-h-11 min-w-11"
-          onClick={() => onMonthChange(-1)}
-          title="Previous month"
-        >
+        <ActionButton label="Previous month" onClick={() => onMonthChange(-1)}>
           <ChevronLeft
             data-admin-ux="upcoming-previous"
             aria-hidden="true"
             size={16}
           />
-        </Button>
+        </ActionButton>
         <MonoLabel as="h2" tone="accent" className="text-center">
           {month.toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
           })}
         </MonoLabel>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="min-h-11 min-w-11"
-          onClick={() => onMonthChange(1)}
-          title="Next month"
-        >
+        <ActionButton label="Next month" onClick={() => onMonthChange(1)}>
           <ChevronRight
             data-admin-ux="upcoming-next"
             aria-hidden="true"
             size={16}
           />
-        </Button>
+        </ActionButton>
       </div>
 
       <div className="overflow-x-auto">

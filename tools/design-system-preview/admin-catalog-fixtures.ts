@@ -1,4 +1,5 @@
 import type { UseApiState } from "../../app/shared/web/use-api";
+import genreWheelTaxonomy from "./admin-genre-wheel-fixture.json";
 
 export class ApiError extends Error {
   constructor(
@@ -197,6 +198,71 @@ const filterOptions = {
   ],
 };
 
+const taxonomyTree = {
+  ...genreWheelTaxonomy,
+  nodes: [
+    ...genreWheelTaxonomy.nodes.map((node) => ({
+      ...node,
+      ...(node.slug === "rock"
+        ? {
+            artist_count: 126,
+            album_count: 248,
+            track_count: 3298,
+            raw_tag_count: 3,
+            mapped_raw_tags: ["rock", "hard rock", "classic rock"],
+            catalog_track_count: 18500,
+            catalog_track_share_pct: 17.8,
+            listening_share_90d_pct: 14.2,
+          }
+        : node.slug === "punk"
+          ? {
+              artist_count: 52,
+              album_count: 94,
+              track_count: 1216,
+              raw_tag_count: 2,
+              mapped_raw_tags: ["punk", "punk rock"],
+              catalog_track_count: 18500,
+              catalog_track_share_pct: 6.6,
+              listening_share_90d_pct: 8.1,
+            }
+          : {
+              track_count: 0,
+              raw_tag_count: 0,
+              mapped_raw_tags: [],
+              catalog_track_count: 18500,
+              catalog_track_share_pct: 0,
+              listening_share_90d_pct: null,
+            }),
+      cover_url: null,
+      children_slugs:
+        node.slug === "rock"
+          ? [...node.children_slugs, "local-scene-tag"]
+          : node.children_slugs,
+    })),
+    {
+      slug: "local-scene-tag",
+      name: "Local scene tag",
+      origin: "overlay",
+      description: "A local tag related to the rock family.",
+      cover_url: null,
+      top_level: false,
+      parent_slugs: ["rock"],
+      related_slugs: [],
+      artist_count: 2,
+      album_count: 4,
+      track_count: 38,
+      raw_tag_count: 1,
+      mapped_raw_tags: ["local scene tag"],
+      catalog_track_count: 18500,
+      catalog_track_share_pct: 0.2,
+      listening_share_90d_pct: null,
+      eq_gains: null,
+      eq_preset_source: null,
+      eq_preset_inherited_from: null,
+    },
+  ],
+};
+
 export async function api<T>(url: string): Promise<T> {
   if (url.startsWith("/api/browse/filters")) return filterOptions as T;
   if (url.startsWith("/api/artists?"))
@@ -212,11 +278,13 @@ export async function api<T>(url: string): Promise<T> {
 
 export function useApi<T>(url: string | null): UseApiState<T> {
   const data =
-    url === "/api/genres"
-      ? genres
-      : url === "/api/genres/unmapped?limit=100"
-        ? genres.filter((genre) => !genre.mapped)
-        : null;
+    url === "/api/genres/taxonomy/tree"
+      ? taxonomyTree
+      : url === "/api/genres"
+        ? genres
+        : url === "/api/genres/unmapped?limit=100"
+          ? genres.filter((genre) => !genre.mapped)
+          : null;
   return {
     data: data as T | null,
     loading: false,
@@ -249,4 +317,4 @@ export function artistPhotoApiUrl({ artistName }: { artistName?: string }) {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-export const catalogPreviewData = { artists, genres };
+export const catalogPreviewData = { artists, genres, taxonomyTree };

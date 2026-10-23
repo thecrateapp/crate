@@ -1,6 +1,12 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import {
+  CRATE_ICON_SIZE,
+  Download as DownloadActionIcon,
+  Heart as HeartIcon,
+} from "@crate/ui/icons";
 import { OpsPageHero, OpsSurface } from "@/components/admin/ops-surfaces";
 import {
   useState,
@@ -35,17 +41,13 @@ import {
   Download,
   Disc3,
   Music,
-  Users,
   Loader2,
   CheckCircle2,
-  Heart,
   Trash2,
   ArrowUp,
   RotateCcw,
   Upload,
   ArrowLeft,
-  Gauge,
-  Zap,
   List,
 } from "lucide-react";
 // encPath available if needed for navigation
@@ -906,16 +908,16 @@ export function DownloadPage() {
                   {/* Artists */}
                   {(results.artists ?? []).length > 0 && (
                     <div>
-                      <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2 font-display">
-                        <Users size={14} /> Artists
-                      </h2>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Artists
+                      </MonoLabel>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {results.artists!.map((artist) => (
                           <div
                             role="button"
                             tabIndex={0}
                             key={artist.id}
-                            className="bg-card border border-border rounded-md p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
+                            className="group min-h-11 cursor-pointer rounded-md border border-border-quiet bg-raised-surface p-4 text-center transition-colors pointer-fine:hover:bg-accent-action/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
                             onClick={() =>
                               setBrowsingArtist({
                                 id: artist.id,
@@ -934,31 +936,25 @@ export function DownloadPage() {
                               }
                             }}
                           >
-                            <div className="w-full aspect-square rounded-md mb-3 overflow-hidden bg-secondary mx-auto">
+                            <div className="relative mx-auto mb-3 aspect-square w-full overflow-hidden rounded-md bg-canvas-surface">
+                              <span className="absolute inset-0 grid place-items-center font-mono text-xl text-text-subtle">
+                                {artist.name.slice(0, 1).toUpperCase()}
+                              </span>
                               {artist.picture ? (
                                 <img
                                   src={artist.picture}
                                   alt={artist.name}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (
-                                      e.target as HTMLImageElement
-                                    ).style.display = "none";
+                                  className="relative h-full w-full object-cover"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
                                   }}
                                 />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <Users
-                                    size={32}
-                                    className="text-muted-foreground"
-                                  />
-                                </div>
-                              )}
+                              ) : null}
                             </div>
-                            <div className="font-semibold text-sm truncate mb-1">
+                            <div className="mb-1 truncate text-sm font-semibold text-text-primary group-hover:text-accent-action-hi">
                               {artist.name}
                             </div>
-                            <div className="text-[10px] text-muted-foreground">
+                            <div className="text-xs text-text-muted">
                               Click to browse albums
                             </div>
                           </div>
@@ -970,9 +966,9 @@ export function DownloadPage() {
                   {/* Albums */}
                   {(results.albums ?? []).length > 0 && (
                     <div>
-                      <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2 font-display">
-                        <Disc3 size={14} /> Albums
-                      </h2>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Albums
+                      </MonoLabel>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         {results.albums!.map((album) => (
                           <TidalAlbumCard
@@ -1006,31 +1002,30 @@ export function DownloadPage() {
                   {/* Tracks */}
                   {(results.tracks ?? []).length > 0 && (
                     <div>
-                      <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2 font-display">
-                        <Music size={14} /> Tracks
-                      </h2>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Tracks
+                      </MonoLabel>
                       <div className="space-y-1">
                         {results.tracks!.map((track) => (
                           <div
                             key={track.id}
-                            className="flex items-center gap-3 px-3 py-2 rounded-md  transition-colors group"
+                            className="group flex items-center gap-3 rounded-md px-3 py-2 transition-colors pointer-fine:hover:bg-accent-action/[0.04]"
                           >
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm truncate">
+                              <div className="truncate text-sm text-text-primary">
                                 {track.title}
                               </div>
-                              <div className="text-xs text-muted-foreground truncate">
+                              <div className="truncate text-xs text-text-muted">
                                 {track.artist} — {track.album}
                               </div>
                             </div>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-text-muted">
                               {fmtDuration(track.duration)}
                             </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                            <ActionIconButton
+                              title="Add to wishlist"
                               aria-label={`Add ${track.title} to wishlist`}
+                              className="text-text-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                               onClick={() =>
                                 addToWishlist({
                                   url: track.url,
@@ -1041,13 +1036,15 @@ export function DownloadPage() {
                                 })
                               }
                             >
-                              <Heart size={13} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
+                              <HeartIcon
+                                size={CRATE_ICON_SIZE.sm}
+                                aria-hidden="true"
+                              />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              title="Download"
                               aria-label={`Download ${track.title}`}
+                              className="text-text-muted"
                               onClick={() =>
                                 startDownload(
                                   track.url,
@@ -1055,8 +1052,11 @@ export function DownloadPage() {
                                 )
                               }
                             >
-                              <Download size={14} />
-                            </Button>
+                              <DownloadActionIcon
+                                size={CRATE_ICON_SIZE.sm}
+                                aria-hidden="true"
+                              />
+                            </ActionIconButton>
                           </div>
                         ))}
                       </div>
@@ -1648,27 +1648,19 @@ function QueueRow({
         <InfoBadge tone={statusTone}>{item.status}</InfoBadge>
         <div className="flex items-center gap-1">
           {onPromote && item.status === "wishlist" ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="min-h-11 min-w-11"
-              aria-label={`Download ${item.title} now`}
-              onClick={() => onPromote(item.id)}
+            <ActionIconButton
               title={`Download ${item.title} now`}
+              onClick={() => onPromote(item.id)}
             >
               <ArrowUp size={15} />
-            </Button>
+            </ActionIconButton>
           ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="min-h-11 min-w-11 text-text-muted hover:text-text-primary"
-            aria-label={`Remove ${item.title} from acquisition`}
-            onClick={() => onRemove(item.id)}
+          <ActionIconButton
             title={`Remove ${item.title} from acquisition`}
+            onClick={() => onRemove(item.id)}
           >
             <Trash2 size={15} />
-          </Button>
+          </ActionIconButton>
         </div>
       </div>
     </OpsSurface>
@@ -1892,7 +1884,7 @@ function TidalAlbumCard({
       <OpsSurface
         as="article"
         aria-label={`${album.title} Tidal album`}
-        className={`overflow-hidden p-0 transition-colors hover:border-accent-action/45 ${
+        className={`overflow-hidden p-0 ${
           isLocal && hasUpgrade ? "border-state-warning/40" : ""
         }`}
       >
@@ -1907,12 +1899,8 @@ function TidalAlbumCard({
               }}
             />
           ) : (
-            <div className="grid h-full w-full place-items-center">
-              <Disc3
-                size={32}
-                aria-hidden="true"
-                className="text-text-subtle"
-              />
+            <div className="grid h-full w-full place-items-center font-mono text-2xl text-text-subtle">
+              {album.title.slice(0, 1).toUpperCase()}
             </div>
           )}
         </div>
@@ -1996,7 +1984,9 @@ function TidalAlbumCard({
                 />
               )}
               <div className="min-w-0">
-                <DialogTitle className="truncate font-display">{album.title}</DialogTitle>
+                <DialogTitle className="truncate font-display">
+                  {album.title}
+                </DialogTitle>
                 <p className="m-0 text-sm text-text-muted">
                   {album.artist} {album.year && `(${album.year})`}
                 </p>
@@ -2029,17 +2019,18 @@ function TidalAlbumCard({
                     <span className="text-[11px] text-muted-foreground">
                       {fmtDuration(t.duration)}
                     </span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 opacity-0 group-hover/track:opacity-100 transition-opacity"
+                    <ActionIconButton
                       onClick={() =>
                         onDownloadTrack(t.url, `${t.artist} - ${t.title}`)
                       }
-                      title="Download track"
+                      title="Download"
+                      aria-label={`Download ${t.title}`}
                     >
-                      <Download size={12} />
-                    </Button>
+                      <DownloadActionIcon
+                        size={CRATE_ICON_SIZE.sm}
+                        aria-hidden="true"
+                      />
+                    </ActionIconButton>
                   </div>
                 ))}
               </div>
@@ -2084,7 +2075,7 @@ function SlskResultCard({
 
   return (
     <>
-      <div className="bg-card border border-border rounded-md overflow-hidden hover:border-primary/30 transition-colors group">
+      <article className="group overflow-hidden rounded-md border border-border-quiet bg-surface-object transition-colors hover:border-accent-action/30">
         <div className="flex gap-3 p-3">
           <div className="w-14 h-14 rounded bg-secondary flex-shrink-0 overflow-hidden relative">
             {cover ? (
@@ -2094,17 +2085,19 @@ function SlskResultCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Disc3 size={20} className="text-muted-foreground" />
+              <div className="flex h-full w-full items-center justify-center bg-canvas-surface">
+                <span className="font-display text-2xl font-semibold text-text-subtle">
+                  {r.album.slice(0, 1).toUpperCase()}
+                </span>
               </div>
             )}
-            <button
+            <ActionIconButton
               onClick={() => setOpen(true)}
-              className="absolute inset-0 bg-black/0 hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100"
               title="View files"
+              className="absolute bottom-1 right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
             >
-              <List size={14} className="text-white" />
-            </button>
+              <List size={14} />
+            </ActionIconButton>
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <div>
@@ -2114,51 +2107,36 @@ function SlskResultCard({
               </div>
             </div>
             <div className="flex flex-wrap gap-1">
-              <span
-                className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
-                  r.quality.toLowerCase().includes("flac 24")
-                    ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
-                    : r.quality.toLowerCase().includes("flac")
-                      ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
-                      : "border-white/15 text-muted-foreground"
-                }`}
+              <InfoBadge
+                tone={
+                  r.quality.toLowerCase().includes("flac")
+                    ? "accent"
+                    : "neutral"
+                }
               >
                 {r.quality}
-              </span>
-              <Badge variant="secondary">{r.files.length} tracks</Badge>
-              <Badge variant="secondary">
-                {Math.round(r.totalSize / 1048576)} MB
-              </Badge>
-              {r.freeSlot && (
-                <Badge className="bg-accent-action/10 text-accent-action-hi border-accent-action/20">
-                  <Zap size={8} className="mr-0.5" /> Free
-                </Badge>
-              )}
+              </InfoBadge>
+              <InfoBadge>{r.files.length} tracks</InfoBadge>
+              <InfoBadge>{Math.round(r.totalSize / 1048576)} MB</InfoBadge>
+              {r.freeSlot && <InfoBadge tone="success">Free slot</InfoBadge>}
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <Users size={10} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-text-muted">
                 <span className="font-mono">{r.username}</span>
-                <span className="text-white/20">|</span>
-                <Gauge size={10} />
+                <span aria-hidden="true">·</span>
                 <span>
                   {r.speed > 1048576
                     ? `${(r.speed / 1048576).toFixed(1)} MB/s`
                     : `${Math.round(r.speed / 1024)} KB/s`}
                 </span>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={onDownload}
-              >
-                <Download size={12} className="mr-1" /> Get
+              <Button size="sm" variant="outline" onClick={onDownload}>
+                Download
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
@@ -2171,25 +2149,23 @@ function SlskResultCard({
                   className="w-12 h-12 rounded object-cover"
                 />
               ) : (
-                <div className="w-12 h-12 rounded bg-secondary flex items-center justify-center">
-                  <Disc3 size={20} className="text-muted-foreground" />
+                <div className="flex h-12 w-12 items-center justify-center rounded bg-canvas-surface font-display text-xl font-semibold text-text-subtle">
+                  {r.album.slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div>
                 <DialogTitle className="font-display">{r.album}</DialogTitle>
                 <p className="text-sm text-muted-foreground">{r.artist}</p>
                 <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-                  <span
-                    className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
-                      r.quality.toLowerCase().includes("flac 24")
-                        ? "border-accent-action/40 text-accent-action-hi bg-accent-action/10"
-                        : r.quality.toLowerCase().includes("flac")
-                          ? "border-accent-action/40 text-accent-action-hi bg-accent-action/8"
-                          : "border-white/15 text-muted-foreground"
-                    }`}
+                  <InfoBadge
+                    tone={
+                      r.quality.toLowerCase().includes("flac")
+                        ? "accent"
+                        : "neutral"
+                    }
                   >
                     {r.quality}
-                  </span>
+                  </InfoBadge>
                   <span>{Math.round(r.totalSize / 1048576)} MB</span>
                   <span>from {r.username}</span>
                   <span>

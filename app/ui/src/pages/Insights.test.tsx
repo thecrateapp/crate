@@ -47,6 +47,13 @@ describe("Insights refresh recovery", () => {
     const { container } = render(<Insights />);
 
     expect(screen.getByRole("heading", { name: "Insights" })).toBeVisible();
+    for (const label of ["Collection shape", "Standouts", "Audio signature"]) {
+      expect(
+        screen
+          .getAllByText(label, { exact: true })
+          .some((element) => element.closest('[data-slot="info-badge"]')),
+      ).toBe(true);
+    }
     expect(
       screen.getByText(
         "Insights could not refresh. Showing the last successful snapshot.",

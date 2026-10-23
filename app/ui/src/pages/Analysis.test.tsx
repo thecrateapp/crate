@@ -118,6 +118,9 @@ describe("Analysis typographic controls", () => {
       "font-normal",
     );
     expect(within(latest).getByText("Bruma")).toHaveClass("font-display");
+    expect(latest).toHaveClass("border-border-quiet", "bg-raised-surface");
+    expect(container.querySelector('[class*="bg-black/"], [class*="border-white/"]')).toBeNull();
+    expect(container.querySelector('[class*="text-white/"]')).toBeNull();
   });
   it("names initial loading and retains its functional glyph", () => {
     snapshot({ data: null, loading: true });
@@ -164,7 +167,7 @@ describe("Analysis typographic controls", () => {
       expect(screen.getByText(text).querySelector("svg")).toBeNull();
     expect(screen.getByText("4 failed")).toHaveAttribute(
       "data-tone",
-      "warning",
+      "danger",
     );
     expect(
       screen.getByRole("heading", { name: "Audio features" }),

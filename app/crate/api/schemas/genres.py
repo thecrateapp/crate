@@ -1,6 +1,6 @@
 """Schema models for genre endpoints."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -189,11 +189,59 @@ class GenreTaxonomyInvalidStatusResponse(BaseModel):
     items: list[InvalidGenreTaxonomyNodeResponse] = Field(default_factory=list)
 
 
+GenreFacetDimension = Literal[
+    "era",
+    "instrumentation",
+    "language",
+    "mood",
+    "origin",
+    "rhythm",
+    "scene",
+    "sound",
+    "vocals",
+]
+
+
+class GenreTaxonomyFacetValue(BaseModel):
+    dimension: GenreFacetDimension
+    slug: str
+    name: str
+
+
+class GenreTaxonomyFacetInput(BaseModel):
+    dimension: GenreFacetDimension
+    name: str = Field(min_length=1, max_length=64)
+
+
+class GenreTaxonomyFacetsUpdateRequest(BaseModel):
+    facets: list[GenreTaxonomyFacetInput] = Field(max_length=32)
+
+
+class GenreTaxonomyFacetsUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    facets: list[GenreTaxonomyFacetValue] = Field(default_factory=list)
+
+
+class GenreTaxonomyRawTagClassificationUpdateRequest(BaseModel):
+    classification: Literal["genre", "facet", "hybrid", "ignore"]
+    facets: list[GenreTaxonomyFacetInput] = Field(default_factory=list, max_length=32)
+
+
+class GenreTaxonomyRawTagClassificationUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    classification: Literal["genre", "facet", "hybrid", "ignore"]
+    facets: list[GenreTaxonomyFacetValue] = Field(default_factory=list)
+
+
 class GenreTaxonomyTreeNodeResponse(IdentityFieldsMixin):
     entity_uid: str | None = None
     slug: str
     name: str
+    origin: Literal["core", "overlay"] = "overlay"
     description: str | None = None
+    cover_url: str | None = None
     musicbrainz_mbid: str | None = None
     wikidata_url: str | None = None
     top_level: bool = False
@@ -207,14 +255,30 @@ class GenreTaxonomyTreeNodeResponse(IdentityFieldsMixin):
     alias_names: list[str] = Field(default_factory=list)
     artist_count: int = 0
     album_count: int = 0
+    track_count: int = 0
+    raw_tag_count: int = 0
+    mapped_raw_tags: list[str] = Field(default_factory=list)
+    catalog_track_count: int = 0
+    catalog_track_share_pct: float = 0
+    listening_share_90d_pct: float | None = None
     eq_gains: list[float] | None = None
     eq_preset_source: str | None = None
     eq_preset_inherited_from: str | None = None
+    facets: list[GenreTaxonomyFacetValue] = Field(default_factory=list)
+
+
+class GenreTaxonomyCoreResponse(BaseModel):
+    taxonomy_id: str
+    version: str
+    digest: str
+    signature_valid: bool
+    key_id: str | None = None
 
 
 class GenreTaxonomyTreeResponse(BaseModel):
     nodes: list[GenreTaxonomyTreeNodeResponse]
     top_level_slugs: list[str] = Field(default_factory=list)
+    core_taxonomy: GenreTaxonomyCoreResponse
 
 
 class GenreTaxonomyNodeUpdateRequest(BaseModel):
@@ -287,6 +351,9 @@ class GenreTaxonomyNodeProposalResponse(BaseModel):
     description: str = ""
     aliases: list[str] = Field(default_factory=list)
     relations: list[GenreTaxonomyRelationProposalResponse] = Field(default_factory=list)
+    facets: list[GenreTaxonomyFacetValue] = Field(default_factory=list)
+    eq_gains: list[float] = Field(default_factory=list, max_length=10)
+    eq_reasoning: str = ""
     reasoning: str = ""
     current_relations: dict[str, list[str]] = Field(default_factory=dict)
     evidence: dict[str, Any] = Field(default_factory=dict)
@@ -300,6 +367,7 @@ class GenreTaxonomyNodeProposalApplyRequest(BaseModel):
     description: str = ""
     aliases: list[str] = Field(default_factory=list, max_length=24)
     relations: list[GenreTaxonomyRelationProposalResponse] = Field(default_factory=list)
+    facets: list[GenreTaxonomyFacetInput] = Field(default_factory=list, max_length=32)
     reasoning: str = ""
 
 
@@ -308,6 +376,8 @@ class GenreTaxonomyNodeProposalApplyResponse(BaseModel):
     slug: str
     action: str
     target_slug: str | None = None
+    classification: Literal["genre", "facet", "hybrid", "ignore"] | None = None
+    facets: list[GenreTaxonomyFacetValue] = Field(default_factory=list)
     applied_aliases: list[str] = Field(default_factory=list)
     skipped_aliases: list[str] = Field(default_factory=list)
     relation_results: list[GenreTaxonomyRelationsUpdateResponse] = Field(
@@ -322,7 +392,7 @@ class EqCoverageSourceResponse(BaseModel):
 
 
 class EqCoverageResponse(BaseModel):
-    total_tracks: int = 0
+    total_genres: int = 0
     sources: list[EqCoverageSourceResponse] = Field(default_factory=list)
 
 
@@ -332,6 +402,7 @@ class TaxonomyHealthResponse(BaseModel):
     orphan_count: int = 0
     missing_description_count: int = 0
     missing_direct_eq_count: int = 0
+    missing_effective_eq_count: int = 0
     unmapped_raw_count: int = 0
     edge_count: int = 0
     locked_edge_count: int = 0
@@ -339,9 +410,17 @@ class TaxonomyHealthResponse(BaseModel):
     ai_edge_count: int = 0
 
 
+class GenreEqPriorityResponse(BaseModel):
+    slug: str
+    name: str
+    weighted_play_count: float = 0.0
+    listening_share_90d_pct: float = 0.0
+
+
 class SoundIntelligenceHealthResponse(BaseModel):
     eq: EqCoverageResponse
     taxonomy: TaxonomyHealthResponse
+    listening_priorities: list[GenreEqPriorityResponse] = Field(default_factory=list)
 
 
 class GenreTaxonomyRebuildProposalRequest(BaseModel):

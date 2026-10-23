@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -38,6 +38,15 @@ describe("HeaderUserMenu", () => {
     await user.click(
       screen.getByRole("button", { name: "Admin account menu" }),
     );
+    const menu = screen.getByRole("menu");
+    for (const item of [
+      within(menu).getByRole("menuitemradio", { name: "Actual permissions" }),
+      within(menu).getByRole("menuitemradio", { name: "Curator" }),
+      within(menu).getByRole("menuitem", { name: "Profile" }),
+      within(menu).getByRole("menuitem", { name: "Log out" }),
+    ]) {
+      expect(item.querySelector(".crate-mono-label")).not.toBeNull();
+    }
     expect(screen.getByText("admin@cratemusic.app")).toBeVisible();
     expect(
       screen.getByRole("menuitemradio", { name: "Curator" }),

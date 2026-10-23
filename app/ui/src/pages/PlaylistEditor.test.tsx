@@ -172,6 +172,12 @@ describe("PlaylistEditor", () => {
         name: "Rule 1: Genre CONTAINS screamo",
       }),
     ).toBeVisible();
+    const removeRule = screen.getByRole("button", { name: "Remove rule 1" });
+    expect(removeRule).not.toHaveAttribute("title");
+    expect(removeRule.closest("[data-slot='card']")).toHaveClass(
+      "border-border-quiet",
+      "bg-surface-object",
+    );
     expect(
       screen.getByRole("status", { name: "Playlist generation progress" }),
     ).toBeVisible();

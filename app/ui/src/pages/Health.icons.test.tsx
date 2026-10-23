@@ -102,6 +102,12 @@ describe("Library Health text controls and preserved UX", () => {
     const user = userEvent.setup(),
       { container } = mount(),
       toggle = await ready();
+    const pageContent = container.querySelector(
+      '[data-slot="library-health-page"]',
+    );
+    expect(pageContent).toHaveClass("min-w-0", "space-y-6");
+    expect(pageContent).not.toHaveClass("max-w-[70.5rem]");
+    expect(container.querySelector("[title]")).toBeNull();
     expect(container.querySelector("button button,button a")).toBeNull();
     expect(
       container.querySelector(
@@ -110,7 +116,11 @@ describe("Library Health text controls and preserved UX", () => {
     ).toBeNull();
     expect(screen.getByRole("heading", { name: "Library Health" })).toHaveClass(
       "font-display",
+      "font-extrabold",
     );
+    const scanAction = screen.getByRole("button", { name: "Run scan" });
+    expect(scanAction).toHaveAttribute("data-size", "icon-lg");
+    expect(scanAction).toHaveAttribute("data-variant", "ghost");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAccessibleDescription(
       /Unindexed Files 1 issue medium Safe Database.*Checked/,
@@ -254,9 +264,7 @@ describe("Library Health text controls and preserved UX", () => {
     const user = userEvent.setup();
     const view = mount();
     await ready();
-    await user.click(
-      screen.getByText("Filter issues", { selector: "summary" }),
-    );
+    await user.click(screen.getByText("Filter issues").closest("summary")!);
     await user.click(
       screen.getByRole("button", { name: /^Unindexed Files\s*1$/ }),
     );
@@ -414,18 +422,16 @@ describe("Health issue queue composition", () => {
     );
     expect(screen.queryByText("Repair lanes")).not.toBeInTheDocument();
     expect(screen.queryByText("Latest repair impact")).not.toBeInTheDocument();
-    const activity = screen.getByText("Latest activity", {
-      selector: "summary",
-    });
+    const activity = screen.getByText("Latest activity");
     expect(activity.closest("details")).not.toHaveAttribute("open");
-    await user.click(activity);
+    await user.click(activity.closest("summary")!);
     expect(screen.getByText("4 issues found")).toBeVisible();
     expect(screen.getByRole("link", { name: "View task log" })).toHaveAttribute(
       "href",
       "/tasks?task=sample-health-repair",
     );
     await user.click(
-      screen.getByText("Available checks (4)", { selector: "summary" }),
+      screen.getByText("Available checks (4)").closest("summary")!,
     );
     expect(screen.queryByText("Healthy")).not.toBeInTheDocument();
   });
@@ -436,7 +442,7 @@ describe("Health issue queue composition", () => {
     mount();
     await screen.findByRole("heading", { name: "No check result available" });
     expect(screen.queryByText(/Library is healthy/)).not.toBeInTheDocument();
-    expect(screen.getByText("Latest check: unavailable")).toBeVisible();
+    expect(screen.getByText("No check recorded")).toBeVisible();
   });
   it("distinguishes explicit no-open-issues records and stale data from healthy coverage", async () => {
     sampleHealth.issues = [];
@@ -444,9 +450,7 @@ describe("Health issue queue composition", () => {
     sampleHealth.snapshot.stale = true;
     mount();
     await screen.findByRole("heading", { name: "No open issues recorded" });
-    expect(
-      screen.getByText("Recorded results may be out of date."),
-    ).toBeVisible();
+    expect(screen.getByText("Snapshot stale")).toBeVisible();
     expect(
       screen.queryByText(/Library is healthy|Healthy checks/),
     ).not.toBeInTheDocument();
@@ -518,9 +522,7 @@ describe("Health issue queue composition", () => {
       name: "Review issues: Artist Layout Fix",
     });
     const user = userEvent.setup();
-    await user.click(
-      screen.getByText("Filter issues", { selector: "summary" }),
-    );
+    await user.click(screen.getByText("Filter issues").closest("summary")!);
     await user.click(
       screen.getByRole("button", { name: /^Unindexed Files\s*1$/ }),
     );

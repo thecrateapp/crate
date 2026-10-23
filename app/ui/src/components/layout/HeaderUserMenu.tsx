@@ -85,7 +85,9 @@ export function HeaderUserMenu() {
         {auth.actualUser && previewableRolePresets.length > 0 ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Permission preview</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <MonoLabel as="span">Permission preview</MonoLabel>
+            </DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={selectedRole}
               onValueChange={(value) =>
@@ -95,11 +97,11 @@ export function HeaderUserMenu() {
               }
             >
               <DropdownMenuRadioItem value={ACTUAL_PERMISSIONS}>
-                Actual permissions
+                <MonoLabel as="span">Actual permissions</MonoLabel>
               </DropdownMenuRadioItem>
               {previewableRolePresets.map((role) => (
                 <DropdownMenuRadioItem key={role.slug} value={role.slug}>
-                  {role.name}
+                  <MonoLabel as="span">{role.name}</MonoLabel>
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -107,9 +109,11 @@ export function HeaderUserMenu() {
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => navigate(profileHref)}>
-          Profile
+          <MonoLabel as="span">Profile</MonoLabel>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={auth.logout}>Log out</DropdownMenuItem>
+        <DropdownMenuItem onSelect={auth.logout}>
+          <MonoLabel as="span">Log out</MonoLabel>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

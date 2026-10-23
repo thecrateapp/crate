@@ -138,6 +138,19 @@ it("opens a linked show's detail, scrolls to it and drops the link", async () =>
 
 it("matches Listen's collapsed show row pattern and replaces it with the ticket detail", async () => {
   renderWithAdminProviders(<Upcoming />, { route: "/upcoming" });
+  expect(screen.getByRole("heading", { name: "Show Management" })).toHaveClass(
+    "font-display",
+    "font-extrabold",
+  );
+  const headerActions = screen.getByRole("group", {
+    name: "Show management actions",
+  });
+  for (const name of ["List view", "Calendar view", "Sync shows"]) {
+    const action = within(headerActions).getByRole("button", { name });
+    expect(action).toHaveAttribute("data-size", "icon-lg");
+    expect(action).toHaveAttribute("data-variant", "ghost");
+    expect(action).not.toHaveAttribute("title");
+  }
   await screen.findAllByRole("button", { name: /Band|Other Act/ });
   const row = document.querySelector('[data-slot="upcoming-event-row"]');
   expect(row).toHaveClass("rounded-panel", "border-border-quiet");
@@ -163,6 +176,18 @@ it("matches Listen's collapsed show row pattern and replaces it with the ticket 
   expect(
     document.querySelector(".admin-show-ticket-perforation"),
   ).toBeInTheDocument();
+});
+
+it("uses accessible shared actions for calendar month navigation", async () => {
+  renderWithAdminProviders(<Upcoming />, { route: "/upcoming" });
+  await screen.findAllByRole("button", { name: /Band|Other Act/ });
+  await userEvent.click(screen.getByRole("button", { name: "Calendar view" }));
+
+  for (const label of ["Previous month", "Next month"]) {
+    const action = screen.getByRole("button", { name: label });
+    expect(action).toHaveAttribute("aria-label", label);
+    expect(action).not.toHaveAttribute("title");
+  }
 });
 
 it("paginates the show list without changing calendar data", async () => {

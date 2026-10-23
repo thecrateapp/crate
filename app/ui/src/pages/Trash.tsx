@@ -1,9 +1,8 @@
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
   RefreshCw as HeaderRefreshCw,
   Trash2 as HeaderTrash2,
@@ -232,75 +231,64 @@ export function Trash() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              <PageHeaderAction
-                label="Refresh"
-                type="button"
-                disabled={loading || bulkDeleting}
-                aria-busy={loading}
-                onClick={() => void load()}
-              >
-                {loading ? (
-                  <Loader2
-                    data-admin-ux="trash-refresh-loading"
-                    aria-hidden="true"
-                    size={15}
-                    className="animate-spin"
-                  />
-                ) : null}
-                {!loading ? (
-                  <HeaderRefreshCw
-                    data-admin-ux="header-refresh"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </PageHeaderAction>
-              <PageHeaderAction
-                label="Empty trash"
-                type="button"
-                aria-busy={bulkDeleting}
-                disabled={
-                  loading ||
-                  items.length === 0 ||
-                  busyPath !== null ||
-                  bulkDeleting
-                }
-                onClick={() => setBulkDeleteOpen(true)}
-              >
-                {bulkDeleting ? (
-                  <Loader2
-                    data-admin-ux="trash-empty-loading"
-                    aria-hidden="true"
-                    size={15}
-                    className="animate-spin"
-                  />
-                ) : null}
-                {!bulkDeleting ? (
-                  <HeaderTrash2
-                    data-admin-ux="header-empty-trash"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </PageHeaderAction>
-            </PageHeaderActions>
-          }
-        >
-          <div className="flex items-start gap-4">
-            <div>
-              <h1 className="font-display text-3xl font-bold text-text-primary">
-                Library Trash
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Reversible track quarantine. Files live under .crate-trash until
-                restored or deleted permanently.
-              </p>
-            </div>
-          </div>
-        </PageHeaderLayout>
-      </AdminPageHeader>
+      <OpsPageHero
+        title="Library Trash"
+        description="Reversible track quarantine. Files live under .crate-trash until restored or deleted permanently."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              type="button"
+              disabled={loading || bulkDeleting}
+              aria-busy={loading}
+              onClick={() => void load()}
+            >
+              {loading ? (
+                <Loader2
+                  data-admin-ux="trash-refresh-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!loading ? (
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Empty trash"
+              type="button"
+              aria-busy={bulkDeleting}
+              disabled={
+                loading ||
+                items.length === 0 ||
+                busyPath !== null ||
+                bulkDeleting
+              }
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              {bulkDeleting ? (
+                <Loader2
+                  data-admin-ux="trash-empty-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!bulkDeleting ? (
+                <HeaderTrash2
+                  data-admin-ux="header-empty-trash"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      />
 
       <Card className="border-border-quiet bg-card">
         {loading ? (
@@ -324,7 +312,7 @@ export function Trash() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-border-quiet">
             {items.map((item) => {
               const busy = busyPath === item.quarantine_path;
               return (
@@ -333,19 +321,19 @@ export function Trash() {
                   className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold text-white/90">
+                    <div className="truncate text-sm font-semibold text-text-primary">
                       {displayTitle(item)}
                     </div>
                     {metadataLine(item) ? (
-                      <div className="mt-1 truncate text-xs text-white/55">
+                      <div className="mt-1 truncate text-xs text-text-muted">
                         {metadataLine(item)}
                       </div>
                     ) : null}
-                    <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    <div className="mt-1 truncate font-mono text-label text-text-subtle">
                       {item.quarantine_path}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-white/40 font-mono">
-                      <span>{technicalLine(item)}</span>
+                    <div className="mt-2 font-mono text-label text-text-subtle">
+                      {technicalLine(item)}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">

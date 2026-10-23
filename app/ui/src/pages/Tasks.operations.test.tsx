@@ -278,9 +278,43 @@ describe("Tasks operational controls", () => {
 
     await user.click(screen.getByRole("tab", { name: "History" }));
     expect(screen.getByText("Finished sync")).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "Task cleanup actions" }),
-    ).toBeVisible();
+    const cleanupActions = screen.getByRole("button", {
+      name: "Task cleanup actions",
+    });
+    expect(cleanupActions).toBeVisible();
+    expect(cleanupActions).not.toHaveAttribute("title");
+  });
+
+  it("keeps task error details on the approved warning palette", async () => {
+    const user = userEvent.setup();
+    mockSnapshot(
+      snapshot({
+        history: [
+          task({
+            id: "failed-task",
+            label: "Failed import",
+            status: "failed",
+            error: "Import failed",
+            started_at: timestamp,
+          }),
+        ],
+      }),
+    );
+    renderWithAdminProviders(<Tasks />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Needs attention" }),
+    );
+    await user.click(screen.getByText("Failed import"));
+
+    const errorDetails = await screen.findByText("Import failed", {
+      selector: "pre",
+    });
+    expect(errorDetails).toHaveClass(
+      "border-state-warning/20",
+      "bg-state-warning/[0.05]",
+      "text-state-warning-text",
+    );
   });
 
   it("uses aligned family filters and the compact page-header refresh action", async () => {
@@ -335,6 +369,17 @@ describe("Tasks operational controls", () => {
     expect(
       screen.getByRole("button", { name: "Increase worker concurrency" }),
     ).toBeVisible();
+    expect(
+      screen.getByRole("group", { name: "Worker concurrency controls" }),
+    ).toBeVisible();
+    await user.hover(
+      screen.getByRole("button", { name: "Increase worker concurrency" }),
+    );
+    expect(
+      await screen.findByRole("tooltip", {
+        name: "Increase worker concurrency",
+      }),
+    ).toBeVisible();
 
     expect(await screen.findByText("Analysis work")).toBeVisible();
     expect(screen.getByText("Repair work")).toBeVisible();
@@ -355,7 +400,10 @@ describe("Tasks operational controls", () => {
     renderWithAdminProviders(<Tasks />);
 
     expect(await screen.findByText("7 concurrent tasks")).toBeInTheDocument();
-    expect(screen.getAllByTitle("Idle slot")).toHaveLength(7);
+    expect(
+      screen.getAllByRole("img", { name: /Worker slot \d+: Idle/ }),
+    ).toHaveLength(7);
+    expect(screen.queryAllByTitle("Idle slot")).toHaveLength(0);
     expect(screen.queryByText("32 concurrent tasks")).not.toBeInTheDocument();
   });
 
@@ -364,6 +412,66 @@ describe("Tasks operational controls", () => {
     renderWithAdminProviders(<Tasks />);
 
     expect(await screen.findByText("5 concurrent tasks")).toBeInTheDocument();
+  });
+
+  it("uses shared status badges and an accessible retry action in attention rows", async () => {
+    const user = userEvent.setup();
+    mockSnapshot(
+      snapshot({
+        history: [
+          task({
+            id: "failed-repair",
+            type: "repair",
+            label: "Failed quality check",
+            status: "failed",
+            params: { artist: "Slowdive" },
+          }),
+        ],
+      }),
+    );
+    renderWithAdminProviders(<Tasks />);
+
+    await user.click(
+      await screen.findByRole("tab", { name: "Needs attention" }),
+    );
+    const failedBadge = screen
+      .getByText("Failed", { exact: true })
+      .closest('[data-slot="info-badge"]');
+    const familyBadge = screen
+      .getByText("Repair", { exact: true })
+      .closest('[data-slot="info-badge"]');
+    expect(failedBadge).toHaveAttribute("data-tone", "danger");
+    expect(familyBadge).toHaveAttribute("data-tone", "neutral");
+
+    const retry = screen.getByRole("button", {
+      name: "Retry Failed quality check: Slowdive",
+    });
+    expect(retry).toHaveAttribute("data-size", "icon-lg");
+    expect(retry).not.toHaveAttribute("title");
+    expect(retry.parentElement?.closest("button")).toBeNull();
+    await user.hover(retry);
+    expect(
+      await screen.findByRole("tooltip", { name: "Retry task" }),
+    ).toBeVisible();
+
+    const expand = screen.getByRole("button", {
+      name: /Failed quality check: SlowdiveFailedRepair/,
+    });
+    expect(expand).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Params")).toBeVisible();
+    await user.click(expand!);
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("uses the shared inline empty state when active tasks are filtered out", async () => {
+    mockSnapshot();
+    renderWithAdminProviders(<Tasks />);
+
+    const emptyState = await screen.findByTestId("empty-state");
+    expect(emptyState).toHaveTextContent(
+      "No active tasks match the current filters.",
+    );
+    expect(emptyState).not.toHaveClass("border-dashed");
   });
 
   it("keeps a running task active while cancellation awaits acknowledgement", async () => {

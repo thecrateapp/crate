@@ -20,24 +20,18 @@ afterEach(cleanup);
 describe("Roles text catalog with the real component and mount request", () => {
   it("retires the decorative header glyph and keeps the catalog read-only", async () => {
     render(<Roles />);
-    await screen.findByText("Librarian");
+    await screen.findByRole("heading", { name: "Librarian", level: 3 });
     expect(document.querySelectorAll("svg")).toHaveLength(0);
     expect(
       screen.getByRole("heading", { name: "Roles & Permissions" }),
     ).toHaveClass("font-display");
     expect(screen.getByText("Preset roles")).toHaveClass("font-mono");
     expect(screen.getByText("Capability matrix")).toHaveClass("font-display");
-    expect(screen.getByText("Librarian")).toHaveClass("font-display");
-    expect(screen.getByText("librarian")).toHaveClass("font-mono");
-    expect(screen.getByText("librarian").parentElement).toHaveClass(
-      "crate-form-field",
-    );
-    expect(screen.getByText("library", { exact: true })).toHaveClass(
-      "font-mono",
-    );
     expect(
-      screen.getByText("library", { exact: true }).parentElement,
-    ).toHaveClass("crate-form-field");
+      screen.getByRole("heading", { name: "Librarian", level: 3 }),
+    ).toHaveClass("font-display");
+    expect(screen.getByText("librarian")).toHaveClass("font-mono");
+    expect(screen.getByText("librarian").parentElement).toHaveClass("min-w-0");
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
     expect(screen.queryAllByRole("link")).toHaveLength(0);
@@ -45,37 +39,39 @@ describe("Roles text catalog with the real component and mount request", () => {
   });
   it("preserves API role order, labels, slugs, capability order and counts", async () => {
     render(<Roles />);
-    await screen.findByText("Librarian");
+    await screen.findByRole("heading", { name: "Librarian", level: 3 });
     expect(
       screen
-        .getByText("Librarian")
-        .compareDocumentPosition(screen.getByText("Observer")) &
+        .getByRole("heading", { name: "Librarian", level: 3 })
+        .compareDocumentPosition(
+          screen.getByRole("heading", { name: "Observer", level: 3 }),
+        ) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(screen.getByText("3 capabilities")).toBeInTheDocument();
-    expect(screen.getByText("2 capabilities")).toBeInTheDocument();
+    expect(screen.getByText("3 grants")).toBeInTheDocument();
+    expect(screen.getByText("2 grants")).toBeInTheDocument();
     expect(screen.getAllByText("library.view", { exact: true })).toHaveLength(
-      3,
+      1,
     );
     expect(
       screen.getAllByText("library.metadata.write", { exact: true }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(screen.getByText("observer")).toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledTimes(1);
   });
   it("sorts group names while preserving source order inside each group", async () => {
     render(<Roles />);
-    await screen.findByText("Librarian");
-    const library = screen.getByText("library", { exact: true }),
-      roles = screen.getByText("roles", { exact: true }),
-      users = screen.getByText("users", { exact: true });
+    await screen.findByRole("heading", { name: "Librarian", level: 3 });
+    const library = screen.getByRole("heading", { name: "library" }),
+      roles = screen.getByRole("heading", { name: "roles" }),
+      users = screen.getByRole("heading", { name: "users" });
     expect(
       library.compareDocumentPosition(roles) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       roles.compareDocumentPosition(users) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    const group = within(users.parentElement!);
+    const group = within(users.closest("section")!);
     expect(
       group
         .getByText("users.view")
@@ -93,14 +89,18 @@ describe("Roles text catalog with the real component and mount request", () => {
     );
     render(<Roles />);
     expect(
-      screen.getByRole("status", { name: "Loading roles" }),
-    ).toHaveTextContent("Loading roles...");
+      screen.getByRole("status", {
+        name: "Loading role presets and capabilities",
+      }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Librarian")).not.toBeInTheDocument();
     expect(document.querySelectorAll("svg")).toHaveLength(0);
     await act(async () => finish(structuredClone(fixture)));
-    await screen.findByText("Librarian");
+    await screen.findByRole("heading", { name: "Librarian", level: 3 });
     expect(
-      screen.queryByRole("status", { name: "Loading roles" }),
+      screen.queryByRole("status", {
+        name: "Loading role presets and capabilities",
+      }),
     ).not.toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledExactlyOnceWith("/api/auth/roles");
   });
@@ -113,12 +113,18 @@ describe("Roles text catalog with the real component and mount request", () => {
       mockApi.mockResolvedValueOnce(value);
       render(<Roles />);
       await waitFor(() =>
-        expect(screen.queryByText("Loading roles...")).not.toBeInTheDocument(),
+        expect(
+          screen.queryByRole("status", {
+            name: "Loading role presets and capabilities",
+          }),
+        ).not.toBeInTheDocument(),
       );
-      expect(screen.getByText("Role presets")).toBeInTheDocument();
-      expect(screen.getByText("Capability catalog")).toBeInTheDocument();
-      expect(screen.queryByText("Librarian")).not.toBeInTheDocument();
-      expect(screen.queryByText(/capabilities$/)).not.toBeInTheDocument();
+      expect(screen.getByText("Preset roles")).toBeInTheDocument();
+      expect(screen.getByText("Capability matrix")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Librarian", level: 3 }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("0 capabilities")).toBeInTheDocument();
       expect(mockApi).toHaveBeenCalledExactlyOnceWith("/api/auth/roles");
     },
   );

@@ -6,6 +6,14 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  ArrowDownToLine as HeaderImport,
+  RefreshCw as HeaderRefreshCw,
+} from "@crate/ui/icons";
+import {
   OpsPageHero,
   OpsStatTile,
   OpsSurface,
@@ -555,23 +563,33 @@ export function Imports() {
       <OpsPageHero
         title="Staged Imports"
         description="Review albums waiting in staging, follow active imports, and inspect portable metadata recorded in the catalog."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
+          <PageHeaderActions label="Staged import actions">
+            <PageHeaderAction
+              label="Refresh queue"
               onClick={() => void load()}
               disabled={loading}
+              aria-busy={loading}
             >
-              Refresh queue
-            </Button>
-            <Button
-              onClick={() => void enqueueAll()}
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh-queue"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Import all pending"
+              type="button"
               loading={busyAll}
               disabled={counts.pending === 0}
+              onClick={() => void enqueueAll()}
             >
-              Import all pending
-            </Button>
-          </>
+              <HeaderImport
+                data-admin-ux="imports-import-all"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       />
 

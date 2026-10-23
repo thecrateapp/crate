@@ -1,5 +1,4 @@
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
-import { PageHeaderLayout } from "@/components/layout/PageHeader";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { api } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -13,6 +12,7 @@ import {
 } from "@crate/ui/shadcn/card";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 interface RolePreset {
   slug: string;
@@ -72,31 +72,15 @@ export function Roles() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout>
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-white">
-              Roles &amp; Permissions
-            </h1>
-            <p className="text-sm text-white/55">
-              Compare the system presets against the capabilities they grant.
-            </p>
-          </div>
-        </PageHeaderLayout>
-      </AdminPageHeader>
+      <OpsPageHero
+        title="Roles & Permissions"
+        description="Compare the system presets against the capabilities they grant."
+      />
 
       {loading ? (
-        <Card className="border-white/10 bg-panel-surface">
-          <CardContent
-            role="status"
-            aria-label="Loading roles"
-            className="py-12 text-sm text-text-muted"
-          >
-            Loading role presets and capabilities...
-          </CardContent>
-        </Card>
+        <LoadingState label="Loading role presets and capabilities" />
       ) : loadError ? (
-        <Card className="border-white/10 bg-panel-surface">
+        <Card className="border-border-quiet bg-card">
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
               <MonoLabel as="h2" tone="accent">
@@ -167,7 +151,7 @@ export function Roles() {
             )}
           </section>
 
-          <Card className="border-white/10 bg-panel-surface">
+          <Card className="border-border-quiet bg-card">
             <CardHeader>
               <CardTitle className="font-display">Capability matrix</CardTitle>
               <CardDescription>

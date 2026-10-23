@@ -16,22 +16,17 @@ import {
   DropdownMenuTrigger,
 } from "@crate/ui/shadcn/dropdown-menu";
 import {
-  Ban,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
-  Loader2,
+  ListOrdered,
   Minus,
   MoreHorizontal,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
-  ScrollText,
-  Zap,
-  XCircle,
-} from "lucide-react";
+  X,
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import {
@@ -41,7 +36,10 @@ import {
   OpsSnapshotStatus,
   type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
-import { PageHeaderAction } from "@/components/layout/PageHeader";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
 import {
   QueueLanes,
   type QueueLaneBreakdown,
@@ -55,8 +53,12 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 
 import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { Input } from "@crate/ui/shadcn/input";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { api } from "@/lib/api";
 import {
@@ -173,91 +175,49 @@ interface TasksSnapshotData {
 const STATUS_META: Record<
   string,
   {
-    icon: typeof Clock;
     label: string;
-    pill: string;
-    iconClass: string;
-    cardClass: string;
+    tone: "neutral" | "accent" | "success" | "warning" | "danger";
   }
 > = {
   running: {
-    icon: Loader2,
     label: "Running",
-    pill: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
-    iconClass: "text-primary",
-    cardClass: "border-accent-action/12 bg-accent-action/[0.04]",
+    tone: "accent",
   },
   pending: {
-    icon: Clock,
     label: "Pending",
-    pill: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
-    iconClass: "text-state-warning-text",
-    cardClass: "border-state-warning/12 bg-state-warning/[0.04]",
+    tone: "warning",
   },
   completed: {
-    icon: CheckCircle2,
     label: "Completed",
-    pill: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
-    iconClass: "text-accent-action-hi",
-    cardClass: "border-white/8 bg-black/15",
+    tone: "success",
   },
   failed: {
-    icon: XCircle,
     label: "Failed",
-    pill: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
-    iconClass: "text-state-warning-text",
-    cardClass: "border-state-warning/12 bg-state-warning/[0.04]",
+    tone: "danger",
   },
   cancelled: {
-    icon: Ban,
     label: "Cancelled",
-    pill: "border-white/10 bg-white/[0.04] text-white/55",
-    iconClass: "text-white/45",
-    cardClass: "border-white/8 bg-black/15",
+    tone: "neutral",
   },
 };
 
 function getStatusMeta(status: string) {
   return (
     STATUS_META[status] ?? {
-      icon: Clock,
       label: status,
-      pill: "border-white/10 bg-white/[0.04] text-white/60",
-      iconClass: "text-white/50",
-      cardClass: "border-white/8 bg-black/15",
+      tone: "neutral",
     }
   );
 }
 
-const FAMILY_META: Record<string, { label: string; chip: string }> = {
-  repair: {
-    label: "Repair",
-    chip: "border-border-quiet/20 bg-surface-card/[0.06] text-text-secondary",
-  },
-  acquisition: {
-    label: "Acquisition",
-    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
-  },
-  analysis: {
-    label: "Analysis",
-    chip: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
-  },
-  sync: {
-    label: "Sync",
-    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
-  },
-  enrichment: {
-    label: "Enrichment",
-    chip: "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
-  },
-  playback: {
-    label: "Playback",
-    chip: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
-  },
-  other: {
-    label: "Other",
-    chip: "border-white/10 bg-white/[0.04] text-white/55",
-  },
+const FAMILY_META: Record<string, { label: string }> = {
+  repair: { label: "Repair" },
+  acquisition: { label: "Acquisition" },
+  analysis: { label: "Analysis" },
+  sync: { label: "Sync" },
+  enrichment: { label: "Enrichment" },
+  playback: { label: "Playback" },
+  other: { label: "Other" },
 };
 
 function getTaskLabel(task: Task): string {
@@ -397,7 +357,7 @@ function ProgressSummary({
 }) {
   if (typeof progress === "string") {
     return progress ? (
-      <div className="text-xs text-white/40">{progress}</div>
+      <div className="text-xs text-text-muted">{progress}</div>
     ) : null;
   }
 
@@ -418,27 +378,31 @@ function ProgressSummary({
           value={percent / 100}
           valueText={`${done}/${total} (${percent}%)`}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/40">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
           <div className="flex flex-wrap items-center gap-2">
             {progress.phase ? (
               <InfoBadge>{String(progress.phase)}</InfoBadge>
             ) : null}
             {progress.item ? (
-              <span className="text-white/65">{String(progress.item)}</span>
+              <span className="text-text-secondary">
+                {String(progress.item)}
+              </span>
             ) : null}
             {!progress.item && progress.artist ? (
-              <span className="text-white/65">{String(progress.artist)}</span>
+              <span className="text-text-secondary">
+                {String(progress.artist)}
+              </span>
             ) : null}
           </div>
           <div className="tabular-nums">
             {done}/{total} ({percent}%)
             {progress.rate != null && Number(progress.rate) > 0 ? (
-              <span className="ml-2 text-white/25">
+              <span className="ml-2 text-text-subtle">
                 {Number(progress.rate).toFixed(1)}/s
               </span>
             ) : null}
             {progress.eta_sec != null && Number(progress.eta_sec) > 0 ? (
-              <span className="ml-2 text-white/25">
+              <span className="ml-2 text-text-subtle">
                 ETA {Number(progress.eta_sec)}s
               </span>
             ) : null}
@@ -456,28 +420,16 @@ function ProgressSummary({
       {active ? (
         <ProgressHairline label="Task progress" valueText={description} />
       ) : null}
-      <div className="text-xs text-white/40">{description}</div>
+      <div className="text-xs text-text-muted">{description}</div>
     </div>
   ) : null;
 }
 
-const EVENT_BADGE_COLORS: Record<string, string> = {
-  item: "bg-slate-500/10 text-slate-300 border-slate-500/30",
-  artist_enriched:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-  artist_skipped: "bg-zinc-500/10 text-zinc-400 border-zinc-500/30",
-  track_analyzed: "bg-primary/10 text-primary border-primary/30",
-  album_matched:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-  cover_found:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-  cover_applied:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-  new_release_found:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-  step_done:
-    "bg-accent-action/10 text-accent-action-hi border-accent-action/30",
-};
+function eventTone(eventType: string) {
+  if (eventType.includes("fail") || eventType === "error") return "danger";
+  if (eventType.includes("warn")) return "warning";
+  return "neutral";
+}
 
 function eventMessage(event: { type: string; data?: Record<string, unknown> }) {
   if (event.type === "item" && event.data) {
@@ -532,20 +484,14 @@ function TaskDoneBanner({
 }) {
   if (!done) return null;
   const status = getStatusMeta(done.status);
-  const Icon = status.icon;
   const message = taskDoneMessage(done);
   return (
     <div
-      className={cn(
-        "mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs",
-        status.cardClass,
-      )}
+      role="status"
+      className="mb-3 flex flex-wrap items-center gap-2 text-xs"
     >
-      <Icon size={14} className={status.iconClass} />
-      <span className={cn("font-medium", status.iconClass)}>
-        {status.label}
-      </span>
-      {message ? <span className="text-white/70">{message}</span> : null}
+      <InfoBadge tone={status.tone}>{status.label}</InfoBadge>
+      {message ? <span className="text-text-secondary">{message}</span> : null}
     </div>
   );
 }
@@ -573,7 +519,7 @@ function LiveTaskEvents({
       );
     }
     return (
-      <div className="py-3 text-xs text-white/40">
+      <div className="py-3 text-xs text-text-muted">
         {connected ? "Waiting for live events…" : "Connecting to task stream…"}
       </div>
     );
@@ -592,7 +538,7 @@ function LiveTaskEvents({
           }`}
           className="flex items-start gap-2 text-xs"
         >
-          <span className="w-16 shrink-0 text-[10px] text-white/20">
+          <span className="w-16 shrink-0 text-[10px] text-text-subtle">
             {new Date(event.timestamp || Date.now()).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -602,16 +548,11 @@ function LiveTaskEvents({
           {["info", "warning", "warn", "error"].includes(event.type) ? (
             <SeverityMeter level={event.type} label={event.type} />
           ) : (
-            <InfoBadge
-              className={
-                EVENT_BADGE_COLORS[event.type] ||
-                "border-white/10 bg-white/[0.04] text-white/60"
-              }
-            >
+            <InfoBadge tone={eventTone(event.type)}>
               {event.type.replace(/_/g, " ")}
             </InfoBadge>
           )}
-          <span className="text-white/70">{eventMessage(event)}</span>
+          <span className="text-text-secondary">{eventMessage(event)}</span>
         </div>
       ))}
     </div>
@@ -637,10 +578,10 @@ function TaskEventLog({
     }
     if (connected && !done) {
       return (
-        <div className="py-3 text-xs text-white/40">Loading task log…</div>
+        <div className="py-3 text-xs text-text-muted">Loading task log…</div>
       );
     }
-    return <div className="py-3 text-xs text-white/40">{emptyMessage}</div>;
+    return <div className="py-3 text-xs text-text-muted">{emptyMessage}</div>;
   }
 
   return (
@@ -656,7 +597,7 @@ function TaskEventLog({
           }`}
           className="flex items-start gap-2 text-xs"
         >
-          <span className="w-16 shrink-0 text-[10px] text-white/20">
+          <span className="w-16 shrink-0 text-[10px] text-text-subtle">
             {new Date(event.timestamp || Date.now()).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -666,16 +607,11 @@ function TaskEventLog({
           {["info", "warning", "warn", "error"].includes(event.type) ? (
             <SeverityMeter level={event.type} label={event.type} />
           ) : (
-            <InfoBadge
-              className={
-                EVENT_BADGE_COLORS[event.type] ||
-                "border-white/10 bg-white/[0.04] text-white/60"
-              }
-            >
+            <InfoBadge tone={eventTone(event.type)}>
               {event.type.replace(/_/g, " ")}
             </InfoBadge>
           )}
-          <span className="text-white/70">{eventMessage(event)}</span>
+          <span className="text-text-secondary">{eventMessage(event)}</span>
         </div>
       ))}
     </div>
@@ -773,38 +709,34 @@ function WorkerControlPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex h-11 items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 px-2"
-              aria-label="Decrease worker concurrency"
+          <div
+            role="group"
+            aria-label="Worker concurrency controls"
+            className="flex items-center gap-1"
+          >
+            <PageHeaderAction
+              label="Decrease worker concurrency"
               onClick={() => setSlots(Math.max(1, slotLimit - 1))}
               disabled={slotLimit <= 1}
             >
-              <Minus size={12} aria-hidden="true" />
-            </Button>
-            <span className="w-8 text-center text-sm font-medium text-white/80">
-              {slotLimit}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 px-2"
-              aria-label="Increase worker concurrency"
+              <Minus aria-hidden="true" />
+            </PageHeaderAction>
+            <InfoBadge variant="counter">{slotLimit}</InfoBadge>
+            <PageHeaderAction
+              label="Increase worker concurrency"
               onClick={() => setSlots(Math.min(64, slotLimit + 1))}
               disabled={slotLimit >= 64}
             >
-              <Plus size={12} aria-hidden="true" />
-            </Button>
+              <Plus aria-hidden="true" />
+            </PageHeaderAction>
           </div>
           <PageHeaderAction asChild label="Worker logs">
             <Link to="/logs">
-              <ScrollText aria-hidden="true" />
+              <ListOrdered aria-hidden="true" />
             </Link>
           </PageHeaderAction>
           <PageHeaderAction label="Cancel all tasks" onClick={cancelAll}>
-            <Ban aria-hidden="true" />
+            <X aria-hidden="true" />
           </PageHeaderAction>
           <PageHeaderAction
             label={
@@ -823,25 +755,34 @@ function WorkerControlPanel({
         {Array.from({ length: slotLimit }, (_, slot) => ({
           key: `slot-${slot}`,
           task: activeTasks[slot],
-        })).map(({ key, task }) => (
-          <div
+        })).map(({ key, task }, slot) => (
+          <TooltipHint
             key={key}
-            className={cn(
-              "flex h-9 flex-1 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors",
-              task
-                ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-white/8 bg-black/15 text-white/30",
-            )}
-            title={
+            content={
               task
                 ? `${taskLabel(task.type)}${task.pool ? ` · ${task.pool}` : ""}`
-                : "Idle slot"
+                : "Idle worker slot"
             }
           >
-            <span className="truncate">
-              {task ? taskLabel(task.type) : "idle"}
-            </span>
-          </div>
+            <div
+              role="img"
+              aria-label={`Worker slot ${slot + 1}: ${
+                task
+                  ? `${taskLabel(task.type)}${task.pool ? ` · ${task.pool}` : ""}`
+                  : "Idle"
+              }`}
+              className={cn(
+                "flex h-9 min-w-0 flex-1 items-center justify-center rounded-md border px-2 text-xs transition-colors",
+                task
+                  ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
+                  : "border-border-quiet bg-app-surface text-text-subtle",
+              )}
+            >
+              <span className="truncate">
+                {task ? taskLabel(task.type) : "idle"}
+              </span>
+            </div>
+          </TooltipHint>
         ))}
       </div>
 
@@ -879,7 +820,6 @@ function ActiveTaskCard({
   const { events, done } = taskEventStream;
   const liveStatus = done?.status || task.status;
   const status = getStatusMeta(liveStatus);
-  const Icon = status.icon;
   const latestMessage = useMemo(() => {
     for (let index = events.length - 1; index >= 0; index -= 1) {
       const message = events[index]?.data?.message;
@@ -889,31 +829,20 @@ function ActiveTaskCard({
   }, [done, events]);
 
   return (
-    <div
-      className={cn("overflow-hidden rounded-md border p-4", status.cardClass)}
-    >
-      <div className="space-y-3">
+    <article className="min-w-0 py-4 transition-colors pointer-fine:hover:bg-accent-action/[0.04]">
+      <div className="space-y-3 px-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
-              <Icon
-                size={16}
-                className={cn(
-                  status.iconClass,
-                  liveStatus === "running" && "animate-spin",
-                )}
-              />
-            </div>
+          <div className="min-w-0 flex-1">
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-white">
+              <div className="truncate text-sm font-semibold text-text-primary">
                 {getTaskLabel(task)}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/40">
-                <InfoBadge className={status.pill}>{status.label}</InfoBadge>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                <InfoBadge tone={status.tone}>{status.label}</InfoBadge>
                 {task.cancellation_requested_at &&
                 !task.cancellation_acknowledged_at &&
                 !["completed", "failed", "cancelled"].includes(task.status) ? (
-                  <InfoBadge>Cancellation requested</InfoBadge>
+                  <InfoBadge tone="warning">Cancellation requested</InfoBadge>
                 ) : null}
                 {task.pool ? <InfoBadge>{task.pool}</InfoBadge> : null}
                 <span>
@@ -930,24 +859,15 @@ function ActiveTaskCard({
 
           <div className="flex items-center gap-2">
             {liveStatus === "running" || Boolean(done) ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                onClick={onExpand}
-              >
-                <Zap size={13} />
+              <Button variant="outline" onClick={onExpand}>
                 {expanded ? "Hide live" : done ? "Task log" : "Live events"}
               </Button>
             ) : null}
             <Button
-              size="sm"
               variant="outline"
-              className="gap-2 "
               onClick={onCancel}
               disabled={Boolean(done)}
             >
-              <Ban size={13} />
               Cancel
             </Button>
           </div>
@@ -958,20 +878,16 @@ function ActiveTaskCard({
           active={!["completed", "failed", "cancelled"].includes(liveStatus)}
         />
         {latestMessage ? (
-          <div
-            className={cn("text-xs", done ? status.iconClass : "text-white/45")}
-          >
-            {latestMessage}
-          </div>
+          <div className="text-xs text-text-muted">{latestMessage}</div>
         ) : null}
       </div>
 
       {expanded && (liveStatus === "running" || Boolean(done)) ? (
-        <div className="mt-4 border-t border-white/8 pt-3">
+        <div className="mt-4 border-t border-border-quiet pt-3">
           <LiveTaskEvents taskId={task.id} stream={taskEventStream} />
         </div>
       ) : null}
-    </div>
+    </article>
   );
 }
 
@@ -989,152 +905,166 @@ function HistoryTaskRow({
   highlightStatus?: string | null;
 }) {
   const status = getStatusMeta(task.status);
-  const Icon = status.icon;
   const summary = describeResult(task);
   const showHumanLog = task.type === "repair" || task.type === "fix_artist";
   const highlightMeta = highlightStatus ? getStatusMeta(highlightStatus) : null;
   const family = taskFamily(task.type);
-  const familyMeta = FAMILY_META[family] ||
-    FAMILY_META.other || {
-      label: "Other",
-      chip: "border-white/10 bg-white/[0.04] text-white/55",
-    };
+  const familyMeta = FAMILY_META[family] ?? { label: "Other" };
   const needsAttention = taskNeedsAttention(task);
 
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border transition-[background-color,border-color,box-shadow] duration-700",
-        status.cardClass,
-        highlightMeta?.cardClass,
-        highlightStatus && "ring-1",
-        highlightStatus === "completed" && "ring-accent-action/35",
-        highlightStatus === "failed" && "ring-state-warning/35",
-        highlightStatus === "cancelled" && "ring-white/20",
+        "min-w-0 transition-colors duration-700",
+        highlightMeta?.tone === "success" && "bg-accent-action/[0.04]",
+        highlightMeta?.tone === "danger" && "bg-state-warning/[0.04]",
+        highlightMeta?.tone === "neutral" && "bg-text-primary/[0.03]",
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors "
-      >
-        <Icon size={14} className={status.iconClass} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium text-white">
-              {getTaskLabel(task)}
-            </span>
-            <InfoBadge className={status.pill}>{status.label}</InfoBadge>
-            <InfoBadge className={familyMeta.chip}>
-              {familyMeta.label}
-            </InfoBadge>
-            {needsAttention ? (
-              <InfoBadge className="border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text">
-                Needs attention
-              </InfoBadge>
-            ) : null}
-            {highlightMeta ? (
-              <InfoBadge className={highlightMeta.pill}>
-                Just finished
-              </InfoBadge>
-            ) : null}
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="group flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left transition-colors pointer-fine:hover:bg-accent-action/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-sm font-medium text-text-primary transition-colors group-hover:text-accent-action-hi">
+                {getTaskLabel(task)}
+              </span>
+              <InfoBadge tone={status.tone}>{status.label}</InfoBadge>
+              <InfoBadge>{familyMeta.label}</InfoBadge>
+              {needsAttention ? (
+                <InfoBadge tone="warning">Needs attention</InfoBadge>
+              ) : null}
+              {highlightMeta ? (
+                <InfoBadge tone={highlightMeta.tone}>Just finished</InfoBadge>
+              ) : null}
+            </div>
+            <div className="mt-1 truncate text-xs text-text-muted">
+              {summary || "No summary available"}
+            </div>
           </div>
-          <div className="mt-1 truncate text-xs text-white/40">
-            {summary || "No summary available"}
+          <div className="hidden text-xs text-text-subtle sm:block">
+            {formatDuration(
+              task.started_at || task.created_at,
+              task.updated_at,
+            )}
           </div>
-        </div>
-        <div className="hidden text-xs text-white/35 sm:block">
-          {formatDuration(task.started_at || task.created_at, task.updated_at)}
-        </div>
-        <div className="hidden text-xs text-white/35 xl:block">
-          {timeAgo(task.updated_at)}
-        </div>
+          <div className="hidden text-xs text-text-subtle xl:block">
+            {timeAgo(task.updated_at)}
+          </div>
+          {expanded ? (
+            <ChevronUp
+              size={14}
+              className="shrink-0 text-text-subtle"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronDown
+              size={14}
+              className="shrink-0 text-text-subtle"
+              aria-hidden="true"
+            />
+          )}
+        </button>
         {task.status === "failed" ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/45 hover:text-white"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRetry();
-            }}
-            title="Retry task"
+          <PageHeaderAction
+            label={`Retry ${getTaskLabel(task)}`}
+            tooltip="Retry task"
+            onClick={onRetry}
           >
-            <RotateCcw size={12} />
-          </Button>
+            <RotateCcw aria-hidden="true" />
+          </PageHeaderAction>
         ) : null}
-        {expanded ? (
-          <ChevronUp size={14} className="text-white/35" />
-        ) : (
-          <ChevronDown size={14} className="text-white/35" />
-        )}
-      </button>
+      </div>
 
       {expanded ? (
-        <div className="space-y-3 border-t border-white/8 bg-black/15 px-4 py-4">
-          <div className="grid gap-2 text-xs text-white/45 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-4 border-t border-border-quiet px-4 py-4">
+          <dl className="grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
             <div>
-              <span className="text-white/28">ID:</span>{" "}
-              <span className="font-mono text-white/70">{task.id}</span>
+              <dt>
+                <MonoLabel as="span" size="eyebrow">
+                  ID
+                </MonoLabel>
+              </dt>
+              <dd className="mb-0 mt-1 break-all font-mono text-text-secondary">
+                {task.id}
+              </dd>
             </div>
             <div>
-              <span className="text-white/28">Type:</span>{" "}
-              <span className="font-mono text-white/70">{task.type}</span>
+              <dt>
+                <MonoLabel as="span" size="eyebrow">
+                  Type
+                </MonoLabel>
+              </dt>
+              <dd className="mb-0 mt-1 break-words font-mono text-text-secondary">
+                {task.type}
+              </dd>
             </div>
             <div>
-              <span className="text-white/28">Created:</span>{" "}
-              <span className="text-white/70">
-                {new Date(task.created_at).toLocaleString()}
-              </span>
+              <dt>
+                <MonoLabel as="span" size="eyebrow">
+                  Created
+                </MonoLabel>
+              </dt>
+              <dd className="mb-0 mt-1 text-text-secondary">
+                <time dateTime={task.created_at}>
+                  {new Date(task.created_at).toLocaleString()}
+                </time>
+              </dd>
             </div>
             <div>
-              <span className="text-white/28">Duration:</span>{" "}
-              <span className="text-white/70">
+              <dt>
+                <MonoLabel as="span" size="eyebrow">
+                  Duration
+                </MonoLabel>
+              </dt>
+              <dd className="mb-0 mt-1 text-text-secondary">
                 {formatDuration(
                   task.started_at || task.created_at,
                   task.updated_at,
                 )}
-              </span>
+              </dd>
             </div>
-          </div>
+          </dl>
 
           {task.params && Object.keys(task.params).length > 0 ? (
-            <div>
-              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
+            <div className="space-y-2">
+              <MonoLabel as="div" size="eyebrow">
                 Params
-              </div>
-              <pre className="overflow-x-auto rounded-sm border border-white/6 bg-black/20 p-3 text-xs text-white/60">
+              </MonoLabel>
+              <pre className="overflow-x-auto rounded-md border border-border-quiet bg-panel-surface p-3 text-xs text-text-secondary">
                 {JSON.stringify(task.params, null, 2)}
               </pre>
             </div>
           ) : null}
 
           {task.error ? (
-            <div>
-              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-state-warning-text font-mono">
+            <div className="space-y-2">
+              <MonoLabel as="div" size="eyebrow">
                 Error
-              </div>
-              <pre className="overflow-x-auto rounded-sm border border-state-warning/12 bg-state-warning/[0.05] p-3 text-xs text-state-warning-text">
+              </MonoLabel>
+              <pre className="overflow-x-auto rounded-md border border-state-warning/20 bg-state-warning/[0.05] p-3 text-xs text-state-warning-text">
                 {task.error}
               </pre>
             </div>
           ) : null}
 
           {showHumanLog ? (
-            <div>
-              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
+            <div className="space-y-2">
+              <MonoLabel as="div" size="eyebrow">
                 Task log
-              </div>
-              <div className="rounded-sm border border-white/6 bg-black/20 px-3">
-                <TaskEventLog taskId={task.id} />
-              </div>
+              </MonoLabel>
+              <TaskEventLog taskId={task.id} />
             </div>
           ) : task.result ? (
-            <div>
-              <div className="mb-1 text-xs font-normal uppercase tracking-[0.12em] text-white/35 font-mono">
+            <div className="space-y-2">
+              <MonoLabel as="div" size="eyebrow">
                 Result
-              </div>
-              <pre className="max-h-[320px] overflow-auto rounded-sm border border-white/6 bg-black/20 p-3 text-xs text-white/60">
+              </MonoLabel>
+              <pre className="max-h-[320px] overflow-auto rounded-md border border-border-quiet bg-panel-surface p-3 text-xs text-text-secondary">
                 {JSON.stringify(task.result, null, 2)}
               </pre>
             </div>
@@ -1566,11 +1496,7 @@ export function Tasks() {
   }, [activeTasks, filterFamily, filterType, search]);
 
   if (loading && !tasksSnapshot) {
-    return (
-      <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingState label="Loading tasks" className="py-16" />;
   }
 
   if (error && !tasksSnapshot) {
@@ -1588,12 +1514,14 @@ export function Tasks() {
         title="Tasks"
         description="Background orchestration for enrichment, analysis, sync, repair and acquisition jobs across the whole stack."
         actions={
-          <PageHeaderAction
-            label="Refresh"
-            onClick={() => void fetchSnapshot(true)}
-          >
-            <RefreshCw aria-hidden="true" />
-          </PageHeaderAction>
+          <PageHeaderActions label="Task page actions">
+            <PageHeaderAction
+              label="Refresh"
+              onClick={() => void fetchSnapshot(true)}
+            >
+              <RefreshCw aria-hidden="true" />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       >
         <OpsSnapshotStatus
@@ -1664,15 +1592,17 @@ export function Tasks() {
         action={
           taskTab === "history" ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Task cleanup actions"
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
+              <TooltipHint content="Task cleanup actions">
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    aria-label="Task cleanup actions"
+                  >
+                    <MoreHorizontal aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipHint>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   onSelect={() => void cleanStatus("completed")}
@@ -1726,7 +1656,7 @@ export function Tasks() {
               <Search
                 size={14}
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 aria-label="Search tasks"
@@ -1775,7 +1705,7 @@ export function Tasks() {
 
           <TabsContent value="active" className="mt-0">
             {visibleActive.length > 0 ? (
-              <div className="space-y-3">
+              <div className="divide-y divide-border-quiet">
                 {visibleActive.map((task) => (
                   <ActiveTaskCard
                     key={task.id}
@@ -1791,15 +1721,16 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-                No active tasks match the current filters.
-              </div>
+              <EmptyState
+                message="No active tasks match the current filters."
+                className="py-10"
+              />
             )}
           </TabsContent>
 
           <TabsContent value="attention" className="mt-0">
             {filteredAttention.length > 0 ? (
-              <div className="space-y-2">
+              <div className="divide-y divide-border-quiet">
                 {filteredAttention.map((task) => (
                   <HistoryTaskRow
                     key={`attention-${task.id}`}
@@ -1816,15 +1747,16 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-                No tasks need attention right now.
-              </div>
+              <EmptyState
+                message="No tasks need attention right now."
+                className="py-10"
+              />
             )}
           </TabsContent>
 
           <TabsContent value="history" className="mt-0">
             {filteredHistory.length > 0 ? (
-              <div className="space-y-2">
+              <div className="divide-y divide-border-quiet">
                 {filteredHistory.map((task) => (
                   <HistoryTaskRow
                     key={task.id}
@@ -1841,9 +1773,10 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
-                No historical tasks match the current filters.
-              </div>
+              <EmptyState
+                message="No historical tasks match the current filters."
+                className="py-10"
+              />
             )}
           </TabsContent>
         </Tabs>

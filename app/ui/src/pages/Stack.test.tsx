@@ -92,19 +92,52 @@ describe("Stack typographic controls", () => {
     });
     expect(restart).toHaveTextContent("Restart");
     expect(restart.querySelector("svg")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Stop service worker" }),
-    ).toHaveTextContent("Stop");
+    const logs = screen.getByRole("button", { name: "Show logs for worker" });
+    expect(logs).toHaveTextContent("Logs");
+    expect(logs.querySelector("svg")).toBeNull();
+    const stop = screen.getByRole("button", { name: "Stop service worker" });
+    expect(stop).toHaveTextContent("Stop");
+    expect(stop.querySelector("svg")).toBeNull();
+    const start = screen.getByRole("button", { name: "Start service scanner" });
+    expect(start).toHaveTextContent("Start");
+    expect(start.querySelector("svg")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Start service scanner" }),
     ).toHaveTextContent("Start");
     const external = screen.getByRole("link", { name: "Open service tidarr" });
     expect(external).toHaveAttribute("href", "https://search.lespedants.org");
     expect(external).toHaveAttribute("target", "_blank");
-    expect(external.querySelector("svg")).toHaveAttribute(
-      "aria-hidden",
-      "true",
+    expect(external.querySelector("svg")).toBeNull();
+  });
+  it("uses shared MonoLabels and semantic InfoBadge tones for service metadata", async () => {
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("heading", { name: "Stack" });
+
+    const runningService = screen.getByRole("article", {
+      name: "Service worker",
+    });
+    const runningBadge = within(runningService)
+      .getByText("running", { exact: true })
+      .closest('[data-slot="info-badge"]');
+    expect(runningBadge).toHaveAttribute("data-tone", "success");
+    expect(within(runningService).getByText("Status")).toHaveClass(
+      "crate-mono-label",
     );
+    expect(within(runningService).getByText("Ports")).toHaveClass(
+      "crate-mono-label",
+    );
+    expect(within(runningService).getByText("Public route")).toHaveClass(
+      "crate-mono-label",
+    );
+
+    const stoppedService = screen.getByRole("article", {
+      name: "Service scanner",
+    });
+    expect(
+      within(stoppedService)
+        .getByText("exited", { exact: true })
+        .closest('[data-slot="info-badge"]'),
+    ).toHaveAttribute("data-tone", "neutral");
   });
   it("keeps disclosure keyboard semantics, logs loading and closing", async () => {
     let resolveLogs: (value: unknown) => void = () => {};

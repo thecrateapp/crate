@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Card,
@@ -99,10 +99,10 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
             <CardContent className="space-y-3">
               <p>
                 Score: {risk.data?.latest_snapshot?.score ?? 0}{" "}
-                <Badge variant="secondary">
+                <InfoBadge>
                   {risk.data?.latest_snapshot?.algorithm_version ??
                     "not computed"}
-                </Badge>
+                </InfoBadge>
               </p>
               {risk.data?.observations.map((item) => (
                 <p key={item.id} className="text-xs">

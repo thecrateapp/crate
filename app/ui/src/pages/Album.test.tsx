@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router";
@@ -24,6 +24,10 @@ vi.mock("@/hooks/use-api", () => ({
 
 vi.mock("@/hooks/use-task-events", () => ({
   useTaskEvents: () => ({ events: [], done: false }),
+}));
+
+vi.mock("@/components/album/RelatedAlbums", () => ({
+  RelatedAlbums: () => null,
 }));
 
 vi.mock("sonner", () => ({
@@ -68,6 +72,57 @@ beforeEach(() => {
         year: 2026,
       },
     ],
+  });
+});
+
+describe("Album page action labels", () => {
+  it("keeps text actions free of redundant icons and confirms deletion destructively", async () => {
+    mockUseApi.mockReturnValue({
+      data: {
+        artist: "Artist",
+        name: "Album",
+        path: "",
+        track_count: 0,
+        total_size_mb: 0,
+        total_length_sec: 0,
+        has_cover: false,
+        cover_file: null,
+        tracks: [],
+        album_tags: {},
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug/:albumSlug" element={<Album />} />
+      </Routes>,
+      { route: "/artists/artist/album" },
+    );
+
+    for (const label of [
+      "Edit Tags",
+      "Move Album",
+      "Merge Duplicate",
+      "Split Album",
+      "Analyze",
+      "Delete",
+    ]) {
+      expect(
+        screen.getByRole("button", { name: label }).querySelector("svg"),
+      ).toBeNull();
+    }
+
+    const deleteAction = screen.getByRole("button", { name: "Delete" });
+    expect(deleteAction).toHaveAttribute("data-variant", "outline");
+    await userEvent.setup().click(deleteAction);
+    const confirmation = await screen.findByRole("alertdialog");
+    expect(confirmation).toHaveTextContent("This action cannot be undone.");
+    expect(
+      within(confirmation).getByRole("button", { name: "Delete Album" }),
+    ).toHaveAttribute("data-variant", "destructive");
   });
 });
 
@@ -131,7 +186,8 @@ describe("MoveAlbumToArtistDialog", () => {
 
     await userEvent.type(screen.getByRole("textbox"), "target");
 
-    await screen.findByText("Target Artist");
+    const result = await screen.findByText("Target Artist");
+    expect(result.closest("button")).toHaveClass("hover:bg-accent-action/8");
     await userEvent.click(screen.getByText("Target Artist"));
 
     await waitFor(() => {

@@ -7,8 +7,29 @@ def get_runtime_taxonomy_rows() -> tuple[list[dict], list[dict], list[dict]]:
         node_rows = (
             session.execute(
                 text(
-                    "SELECT slug, name, description, is_top_level, eq_gains "
-                    "FROM genre_taxonomy_nodes"
+                    """
+                    SELECT
+                        n.id,
+                        n.slug,
+                        n.name,
+                        n.description,
+                        n.is_top_level,
+                        n.eq_gains,
+                        COALESCE((
+                            SELECT jsonb_agg(
+                                jsonb_build_object(
+                                    'dimension', facet.dimension,
+                                    'slug', facet.slug,
+                                    'name', facet.name
+                                ) ORDER BY facet.dimension, facet.name
+                            )
+                            FROM genre_taxonomy_node_facets assignment
+                            JOIN genre_taxonomy_facet_values facet
+                              ON facet.id = assignment.facet_id
+                            WHERE assignment.genre_id = n.id
+                        ), '[]'::jsonb) AS facets
+                    FROM genre_taxonomy_nodes n
+                    """
                 )
             )
             .mappings()

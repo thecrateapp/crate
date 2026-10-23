@@ -174,7 +174,17 @@ beforeEach(() => {
       return {
         albums: [],
         artists: [{ id: "artist-caspian", name: "Caspian", picture: null }],
-        tracks: [],
+        tracks: [
+          {
+            id: "track-dewy",
+            title: "Dewy",
+            artist: "Caspian",
+            album: "On Circles",
+            duration: 245,
+            url: "https://tidal.example/track/dewy",
+            quality: ["LOSSLESS"],
+          },
+        ],
       };
     if (path.startsWith("/api/tidal/search"))
       return { albums: [], artists: [], tracks: [] };
@@ -206,9 +216,25 @@ it("keeps Tidal artist browsing and release actions accessible without hover", a
     "Caspian",
   );
   await user.click(screen.getByRole("button", { name: "Search" }));
-  await user.click(
-    await screen.findByRole("button", { name: /browse albums/i }),
+  const artistsHeading = await screen.findByRole("heading", {
+    name: "Artists",
+  });
+  const tracksHeading = screen.getByRole("heading", { name: "Tracks" });
+  expect(artistsHeading.querySelector("svg")).toBeNull();
+  expect(tracksHeading.querySelector("svg")).toBeNull();
+  const artistResult = screen.getByRole("button", { name: /browse albums/i });
+  expect(artistResult).toHaveClass("bg-raised-surface");
+  expect(within(artistResult).getByText("C", { exact: true })).toBeVisible();
+  const wishlistTrack = screen.getByRole("button", {
+    name: "Add Dewy to wishlist",
+  });
+  expect(wishlistTrack).not.toHaveAttribute("title");
+  await user.hover(wishlistTrack);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Add to wishlist",
   );
+
+  await user.click(artistResult);
 
   expect(
     await screen.findByRole("heading", { name: "Caspian on Tidal" }),
@@ -218,6 +244,7 @@ it("keeps Tidal artist browsing and release actions accessible without hover", a
     name: "On Circles Tidal album",
   });
   expect(localAlbum).toHaveTextContent("Upgrade available");
+  expect(within(localAlbum).getByText("O", { exact: true })).toBeVisible();
   expect(screen.getByRole("button", { name: "Get upgrade" })).toBeVisible();
   expect(
     within(localAlbum).getByRole("button", { name: "View tracks" }),
@@ -414,6 +441,13 @@ it("keeps queue, wishlist, and history actions attached to their existing record
   expect(
     within(wishlistPanel).getByRole("article", { name: "On Circles" }),
   ).toBeVisible();
+  const removeWishlistItem = within(wishlistPanel).getByRole("button", {
+    name: "Remove On Circles from acquisition",
+  });
+  expect(removeWishlistItem).not.toHaveAttribute("title");
+  expect(removeWishlistItem).toHaveClass("text-text-muted");
+  await user.click(removeWishlistItem);
+  expect(mockApi).toHaveBeenCalledWith("/api/tidal/queue/42", "DELETE");
   await user.click(
     within(wishlistPanel).getByRole("button", {
       name: "Download On Circles now",

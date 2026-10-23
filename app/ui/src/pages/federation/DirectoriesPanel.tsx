@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 interface DirectoryCandidate {
   id: number;
@@ -82,11 +83,10 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       toast.success("Directory subscription added");
     });
 
-  if (loading)
-    return <p className="text-sm text-white/45">Loading directories…</p>;
+  if (loading) return <LoadingState label="Loading directories" />;
   if (error)
     return (
-      <p className="text-sm text-state-warning-text">
+      <p role="alert" className="text-sm text-state-warning-text">
         Could not load directories.
       </p>
     );
@@ -135,7 +135,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       ) : null}
 
       {!data?.length ? (
-        <p className="text-sm text-white/45">No directory subscriptions.</p>
+        <p className="text-sm text-text-muted">No directory subscriptions.</p>
       ) : (
         data.map((subscription) => (
           <Card key={subscription.subscription_uid}>
@@ -144,12 +144,22 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{subscription.url}</span>
-                    <Badge variant="secondary">{subscription.state}</Badge>
+                    <InfoBadge
+                      tone={
+                        subscription.state === "active"
+                          ? "success"
+                          : subscription.state === "error"
+                            ? "danger"
+                            : "neutral"
+                      }
+                    >
+                      {subscription.state}
+                    </InfoBadge>
                   </div>
-                  <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-white/45 sm:grid-cols-2">
+                  <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-text-muted sm:grid-cols-2">
                     <div>
                       <dt className="inline">Trusted key: </dt>
-                      <dd className="inline text-white/70">
+                      <dd className="inline text-text-secondary">
                         {subscription.trusted_keys_json
                           .map((key) => key.key_id)
                           .join(", ")}
@@ -157,7 +167,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                     </div>
                     <div>
                       <dt className="inline">Last verified: </dt>
-                      <dd className="inline text-white/70">
+                      <dd className="inline text-text-secondary">
                         <AbsoluteTime value={subscription.last_success_at} />
                       </dd>
                     </div>
@@ -238,14 +248,14 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
 
               <div className="space-y-2">
                 {subscription.candidates.length === 0 ? (
-                  <p className="text-xs text-white/45">
+                  <p className="text-xs text-text-muted">
                     No candidates discovered.
                   </p>
                 ) : (
                   subscription.candidates.map((candidate) => (
                     <div
                       key={candidate.id}
-                      className="rounded-xl border border-white/10 p-3"
+                      className="rounded-md border border-border-quiet p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -253,15 +263,37 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                             <span className="text-sm font-medium">
                               {candidate.display_name || candidate.node_uid}
                             </span>
-                            <Badge variant="secondary">{candidate.state}</Badge>
+                            <InfoBadge
+                              tone={
+                                candidate.state === "pending"
+                                  ? "warning"
+                                  : candidate.state === "ignored"
+                                    ? "neutral"
+                                    : candidate.state === "stale"
+                                      ? "danger"
+                                      : "info"
+                              }
+                            >
+                              {candidate.state}
+                            </InfoBadge>
                             {candidate.peer_trust_state ? (
-                              <Badge>{candidate.peer_trust_state}</Badge>
+                              <InfoBadge
+                                tone={
+                                  candidate.peer_trust_state === "approved"
+                                    ? "success"
+                                    : candidate.peer_trust_state === "pending"
+                                      ? "warning"
+                                      : "neutral"
+                                }
+                              >
+                                {candidate.peer_trust_state}
+                              </InfoBadge>
                             ) : null}
                           </div>
-                          <div className="mt-1 font-mono text-xs text-white/35">
+                          <div className="mt-1 font-mono text-xs text-text-subtle">
                             {candidate.node_uid}
                           </div>
-                          <div className="text-xs text-white/45">
+                          <div className="text-xs text-text-muted">
                             digest {candidate.descriptor_digest}
                           </div>
                         </div>

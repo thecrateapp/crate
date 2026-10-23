@@ -73,7 +73,15 @@ describe("Users compact list and preserved real detail/actions", () => {
     );
     expect(screen.getByRole("heading", { name: "Users" })).toHaveClass(
       "font-display",
+      "font-extrabold",
     );
+    const actionGroup = screen.getByRole("group", { name: "Page actions" });
+    for (const name of ["Invite user", "Add user"]) {
+      const action = within(actionGroup).getByRole("button", { name });
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).toHaveAttribute("data-variant", "ghost");
+      expect(action).not.toHaveAttribute("title");
+    }
   });
   it("opens actual detail from the row and preserves unrelated URL parameters on close", async () => {
     const user = userEvent.setup();
@@ -86,6 +94,12 @@ describe("Users compact list and preserved real detail/actions", () => {
     expect(within(dialog).getAllByText("Sample player").length).toBeGreaterThan(
       0,
     );
+    const roleLabel = Array.from(
+      dialog.querySelectorAll<HTMLElement>(".crate-mono-label"),
+    ).find((label) => label.textContent?.trim() === "Roles");
+    expect(roleLabel).toBeDefined();
+    expect(dialog.querySelector('[class*="border-white/"]')).toBeNull();
+    expect(dialog.querySelector('[class*="bg-black/"]')).toBeNull();
     expect(screen.getByTestId("url")).toHaveTextContent(
       "?node=sample&inspect=1",
     );

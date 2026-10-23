@@ -18,9 +18,11 @@ import {
   OpsPageHero,
   OpsPanel,
   OpsRefreshNotice,
+  OpsSurface,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 import { SmartMixCoverage } from "@/components/SmartMixCoverage";
 import { Button } from "@crate/ui/shadcn/button";
@@ -123,14 +125,14 @@ function PipelineCoverage({
   const blocked = failed > 0;
 
   return (
-    <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
+    <OpsSurface className="@container p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="space-y-1">
             <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
               {title}
             </h3>
-            <div className="text-xs text-white/40">
+            <div className="text-xs text-text-muted">
               {total > 0
                 ? `${done.toLocaleString()} of ${total.toLocaleString()} tracks processed`
                 : emptyLabel}
@@ -141,19 +143,19 @@ function PipelineCoverage({
           <InfoBadge>{percent}% coverage</InfoBadge>
           {active > 0 ? <InfoBadge active>{active} active</InfoBadge> : null}
           {failed > 0 ? (
-            <InfoBadge tone="warning">{failed} failed</InfoBadge>
+            <InfoBadge tone="danger">{failed} failed</InfoBadge>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-3">
-        <div className="h-px overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="h-px overflow-hidden rounded-full bg-border-quiet">
           <div
             className={cn(
               "h-full rounded-full transition-[width,background-color] duration-500",
               blocked
                 ? "bg-gradient-to-r from-state-warning/60 to-state-warning/70"
-                : accentClassName.replace("text-", "bg-").replace("/80", ""),
+                : accentClassName,
             )}
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
@@ -170,7 +172,7 @@ function PipelineCoverage({
           />
         </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -184,7 +186,7 @@ function MiniMetric({
   tone?: "default" | "muted" | "danger";
 }) {
   return (
-    <div className="crate-form-field rounded-sm border border-white/6 bg-black/20 px-3 py-2">
+    <div className="crate-form-field border-t border-border-quiet pt-2">
       <MonoLabel as="div">{label}</MonoLabel>
       <div
         className={cn(
@@ -192,8 +194,8 @@ function MiniMetric({
           tone === "danger"
             ? "text-state-warning-text"
             : tone === "muted"
-              ? "text-white/55"
-              : "text-white/85",
+              ? "text-text-muted"
+              : "text-text-primary",
         )}
       >
         {value}
@@ -215,9 +217,10 @@ function RecentTrackCard({
     | NonNullable<AnalysisStatusSnapshot["last_fingerprinted"]>;
 }) {
   return (
-    <article
+    <OpsSurface
+      as="article"
       aria-label={title}
-      className="@container rounded-md border border-white/8 bg-black/20 p-4"
+      className="@container p-4"
     >
       <div className="mb-4 flex items-start gap-3">
         <div className="space-y-1">
@@ -234,7 +237,7 @@ function RecentTrackCard({
             <div className="font-display text-xl font-bold tracking-tight text-text-primary">
               {track.title || "Untitled track"}
             </div>
-            <div className="text-sm text-white/45">
+            <div className="text-sm text-text-muted">
               {track.artist || "Unknown artist"}
               {track.album ? ` · ${track.album}` : ""}
             </div>
@@ -269,7 +272,7 @@ function RecentTrackCard({
               ) : null}
             </div>
           ) : kind === "bliss" ? (
-            <div className="text-sm text-white/45">
+            <div className="text-sm text-text-muted">
               Similarity vectors refreshed and ready for related-track features.
             </div>
           ) : kind === "fingerprint" ? (
@@ -283,11 +286,9 @@ function RecentTrackCard({
           ) : null}
         </div>
       ) : (
-        <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-6 text-sm text-white/35">
-          No recent output recorded yet.
-        </div>
+        <EmptyState message="No recent output recorded yet." className="py-6" />
       )}
-    </article>
+    </OpsSurface>
   );
 }
 
@@ -356,12 +357,12 @@ export function Analysis() {
         role="status"
         aria-label="Loading analysis status"
         aria-busy="true"
-        className="flex justify-center py-16 text-white/45"
+        className="flex justify-center py-16 text-text-muted"
       >
         <Loader2
           aria-hidden="true"
           data-admin-ux="analysis-loading"
-          className="h-5 w-5 animate-spin text-primary"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
         />
       </div>
     );
@@ -523,7 +524,7 @@ export function Analysis() {
           <InfoBadge>{metrics.activeJobs} active</InfoBadge>
         ) : null}
         {metrics.failedJobs > 0 ? (
-          <InfoBadge tone="warning">{metrics.failedJobs} failed</InfoBadge>
+          <InfoBadge tone="danger">{metrics.failedJobs} failed</InfoBadge>
         ) : null}
       </OpsPageHero>
 
@@ -578,7 +579,7 @@ export function Analysis() {
             active={status.analysis_active}
             failed={status.analysis_failed}
             total={status.total}
-            accentClassName="text-primary"
+            accentClassName="bg-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
           <PipelineCoverage
@@ -588,17 +589,17 @@ export function Analysis() {
             active={status.bliss_active}
             failed={status.bliss_failed}
             total={status.total}
-            accentClassName="text-accent-action-hi"
+            accentClassName="bg-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
-          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
+          <OpsSurface className="@container p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Audio fingerprints
                   </h3>
-                  <div className="text-xs text-white/40">
+                  <div className="text-xs text-text-muted">
                     {status.total > 0
                       ? `${status.fingerprint_done.toLocaleString()} of ${status.total.toLocaleString()} tracks fingerprinted`
                       : "Waiting for tracks"}
@@ -622,7 +623,7 @@ export function Analysis() {
             </div>
 
             <div className="space-y-3">
-              <div className="h-px overflow-hidden rounded-full bg-white/[0.06]">
+              <div className="h-px overflow-hidden rounded-full bg-border-quiet">
                 <div
                   className="h-full rounded-full bg-accent-action/80 transition-[width,background-color] duration-500"
                   style={{
@@ -651,7 +652,7 @@ export function Analysis() {
                 />
               </div>
             </div>
-          </div>
+          </OpsSurface>
         </div>
       </OpsPanel>
 
@@ -770,14 +771,14 @@ export function Analysis() {
         }
       >
         <div className="grid gap-4 xl:grid-cols-3">
-          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
+          <OpsSurface className="@container p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Lyrics
                   </h3>
-                  <div className="text-xs text-white/40">
+                  <div className="text-xs text-text-muted">
                     {status.lyrics_cached.toLocaleString()} cached lookups
                     across {status.total.toLocaleString()} tracks
                   </div>
@@ -800,16 +801,16 @@ export function Analysis() {
                 tone={status.lyrics_missing > 0 ? "muted" : "default"}
               />
             </div>
-          </div>
+          </OpsSurface>
 
-          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
+          <OpsSurface className="@container p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Portable metadata
                   </h3>
-                  <div className="text-xs text-white/40">
+                  <div className="text-xs text-text-muted">
                     {status.portable_sidecar_albums.toLocaleString()} sidecars
                     across {status.total_albums.toLocaleString()} albums
                   </div>
@@ -836,16 +837,16 @@ export function Analysis() {
                 tone={status.portable_tag_errors > 0 ? "danger" : "default"}
               />
             </div>
-          </div>
+          </OpsSurface>
 
-          <div className="@container rounded-md border border-white/8 bg-black/20 p-4">
+          <OpsSurface className="@container p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="space-y-1">
                   <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Rich exports
                   </h3>
-                  <div className="text-xs text-white/40">
+                  <div className="text-xs text-text-muted">
                     {status.rich_export_albums.toLocaleString()} albums exported
                     as portable packages
                   </div>
@@ -869,7 +870,7 @@ export function Analysis() {
                 value={`${metrics.portableTagPercent}%`}
               />
             </div>
-          </div>
+          </OpsSurface>
         </div>
       </OpsPanel>
 

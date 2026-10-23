@@ -40,4 +40,24 @@ describe("shared overlay recipes", () => {
       /(?:backdrop-)?filter:\s*[^;}]*blur\(/,
     );
   });
+
+  it("uses the accent foreground for menu options on hover and focus", () => {
+    const hoverRule = recipes.match(
+      /\.crate-overlay-menu-item:not\(:disabled\):not\(\[data-disabled\]\):hover,[\s\S]*?\{[^{}]*\}/,
+    )?.[0];
+
+    expect(recipes).toMatch(
+      /\.crate-overlay-menu-item:not\(:disabled\):not\(\[data-disabled\]\):hover,[\s\S]*?background:\s*var\(--hover-bg\);\s*color:\s*var\(--accent-action-hi\);/,
+    );
+    expect(hoverRule).not.toMatch(/border(?:-color)?\s*:/);
+    expect(recipes).toMatch(
+      /\.crate-overlay-menu-item:has\(\.crate-mono-label\)[\s\S]*?\.crate-mono-label\s*\{\s*color:\s*var\(--accent-action-hi\);/,
+    );
+    const monoMenuRules =
+      recipes.match(
+        /\.crate-overlay-menu-item:has\(\.crate-mono-label\)[\s\S]*?\{[^{}]*\}/g,
+      ) ?? [];
+    expect(monoMenuRules).toHaveLength(2);
+    expect(monoMenuRules.join("\n")).not.toMatch(/background:\s*transparent/);
+  });
 });

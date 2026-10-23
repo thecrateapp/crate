@@ -3,6 +3,7 @@ import { BackLink } from "@crate/ui/domain/navigation/BackLink";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import {
@@ -481,7 +482,7 @@ function RuleExpression({ rule, index }: { rule: SmartRule; index: number }) {
 
 function MetricTile({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="crate-form-field rounded-md border border-white/10 bg-black/15 p-3">
+    <div className="crate-form-field rounded-md border border-border-quiet bg-canvas-surface p-3">
       <MonoLabel as="div">{label}</MonoLabel>
       <div className="font-mono font-normal text-base">{value}</div>
     </div>
@@ -503,7 +504,7 @@ function DistributionBlock({
       <div className="flex flex-wrap gap-1.5">
         {items.map(([name, count]) => (
           <InfoBadge key={name}>
-            {name} <span className="text-white/35">{count}</span>
+            {name} <span className="text-text-subtle">{count}</span>
           </InfoBadge>
         ))}
       </div>
@@ -1024,7 +1025,7 @@ export function PlaylistEditor() {
             name={playlist.name}
             coverDataUrl={playlist.cover_data_url}
             tracks={playlist.artwork_tracks}
-            className="size-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03] object-cover md:size-56"
+            className="size-28 shrink-0 rounded-md border border-border-quiet bg-canvas-surface object-cover md:size-56"
             crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
           />
         }
@@ -1156,7 +1157,7 @@ export function PlaylistEditor() {
 
       <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
-          <Card className="border-white/10 bg-card">
+          <Card>
             <CardHeader className="space-y-1">
               <CardTitle className="text-base font-display">
                 Editorial
@@ -1227,14 +1228,13 @@ export function PlaylistEditor() {
                     onClick={handleGenerateDescription}
                     loading={describing}
                     disabled={describing || !name.trim() || !llmAvailable}
-                    title={!llmAvailable ? llmUnavailableReason : undefined}
                   >
                     Generate description with AI
                   </AIButton>
                 </div>
               </Field>
 
-              <div className="flex flex-wrap gap-2 border-t border-white/10 pt-4">
+              <div className="flex flex-wrap gap-2 border-t border-border-quiet pt-4">
                 <TogglePill
                   label="Active"
                   active={isActive}
@@ -1256,7 +1256,7 @@ export function PlaylistEditor() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-card">
+          <Card>
             <CardHeader className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base font-display">
                 Cover
@@ -1272,7 +1272,7 @@ export function PlaylistEditor() {
                   name={playlist.name}
                   coverDataUrl={playlist.cover_data_url}
                   tracks={playlist.artwork_tracks}
-                  className="h-28 w-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03]"
+                  className="h-28 w-28 shrink-0 rounded-md border border-border-quiet bg-canvas-surface"
                   crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
                 />
 
@@ -1319,18 +1319,15 @@ export function PlaylistEditor() {
                         : "Upload cover"}
                     </Button>
                     {playlist.cover_data_url ? (
-                      <Button
-                        variant="outline"
-                        size="icon-lg"
+                      <ActionIconButton
                         onClick={handleRemoveCover}
-                        aria-label="Remove cover"
                         title="Remove cover"
                       >
                         <Trash2
                           data-admin-ux="editor-remove-cover"
                           aria-hidden="true"
                         />
-                      </Button>
+                      </ActionIconButton>
                     ) : null}
                   </div>
                 </div>
@@ -1339,7 +1336,7 @@ export function PlaylistEditor() {
           </Card>
 
           {isSmart ? (
-            <Card className="border-white/10 bg-card">
+            <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="flex items-center gap-2 text-base font-display">
                   Smart rules
@@ -1404,18 +1401,15 @@ export function PlaylistEditor() {
                     return (
                       <div
                         key={index}
-                        className="@container rounded-md border border-white/10 bg-black/10 p-3"
+                        className="@container rounded-md border border-border-quiet bg-canvas-surface p-3"
                       >
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                           <div className="flex min-w-0 flex-wrap items-center gap-3">
                             <MonoLabel as="span">Rule {index + 1}</MonoLabel>
                             <RuleExpression rule={rule} index={index} />
                           </div>
-                          <Button
+                          <ActionIconButton
                             type="button"
-                            size="icon-lg"
-                            variant="ghost"
-                            aria-label={`Remove rule ${index + 1}`}
                             onClick={() => removeRule(index)}
                             title={`Remove rule ${index + 1}`}
                           >
@@ -1423,7 +1417,7 @@ export function PlaylistEditor() {
                               data-admin-ux="editor-remove-rule"
                               aria-hidden="true"
                             />
-                          </Button>
+                          </ActionIconButton>
                         </div>
 
                         <div className="grid gap-3 @xl:grid-cols-[180px_160px_minmax(0,1fr)]">
@@ -1556,7 +1550,7 @@ export function PlaylistEditor() {
                   })}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-quiet pt-4">
                   <p className="text-sm text-muted-foreground">
                     Use preview to sanity-check the shape of the result before
                     saving or generating again.
@@ -1705,7 +1699,7 @@ export function PlaylistEditor() {
             </Card>
           ) : null}
 
-          <Card className="border-white/10 bg-card">
+          <Card>
             <CardHeader className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
@@ -1737,7 +1731,7 @@ export function PlaylistEditor() {
                         data-admin-ux="editor-search"
                         aria-hidden="true"
                         size={14}
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
                       />
                       <Input
                         aria-label="Search tracks"
@@ -1750,7 +1744,7 @@ export function PlaylistEditor() {
                             ? "Search tracks matching this playlist..."
                             : "Search library tracks..."
                         }
-                        className="border-white/10 bg-black/25 pl-9"
+                        className="border-border-quiet bg-canvas-surface pl-9"
                       />
                     </div>
                   </Field>
@@ -1792,7 +1786,7 @@ export function PlaylistEditor() {
                       return (
                         <div
                           key={`${trackId}-${track.title}`}
-                          className="flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-3 py-2"
+                          className="flex items-center gap-3 rounded-md border border-border-quiet bg-canvas-surface px-3 py-2"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">
@@ -1832,7 +1826,7 @@ export function PlaylistEditor() {
                     })}
                   </div>
                 ) : deferredTrackSearchQuery.trim().length >= 2 ? (
-                  <div className="mt-3 rounded-md border border-dashed border-white/10 bg-black/15 px-3 py-4 text-center text-xs text-muted-foreground">
+                  <div className="mt-3 rounded-md border border-dashed border-border-quiet bg-canvas-surface px-3 py-4 text-center text-xs text-muted-foreground">
                     No candidate tracks found in this scope.
                   </div>
                 ) : null}
@@ -1883,7 +1877,7 @@ export function PlaylistEditor() {
                       {refineProposal.issues.slice(0, 8).map((issue) => (
                         <div
                           key={`${issue.type}-${issue.positions.join("-")}`}
-                          className="rounded-md border border-white/10 bg-black/20 px-3 py-2"
+                          className="rounded-md border border-border-quiet bg-canvas-surface px-3 py-2"
                         >
                           <div className="flex flex-wrap items-center gap-2">
                             <SeverityMeter
@@ -1938,11 +1932,8 @@ export function PlaylistEditor() {
                                 {formatTrackDuration(track.duration)}
                               </span>
                             ) : null}
-                            <Button
+                            <ActionIconButton
                               type="button"
-                              size="icon-lg"
-                              variant="ghost"
-                              aria-label={`Remove ${track.title}`}
                               onClick={() =>
                                 void handleRemoveTrack(track, index + 1)
                               }
@@ -1952,7 +1943,7 @@ export function PlaylistEditor() {
                                 data-admin-ux="editor-remove-track"
                                 aria-hidden="true"
                               />
-                            </Button>
+                            </ActionIconButton>
                           </div>
                         }
                       >
@@ -1961,7 +1952,7 @@ export function PlaylistEditor() {
                             data-admin-ux="editor-drag"
                             aria-hidden="true"
                             size={14}
-                            className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
+                            className="shrink-0 cursor-grab text-text-subtle group-hover:text-text-secondary"
                           />
                           <span className="w-6 shrink-0 text-right font-mono text-label tabular-nums text-text-subtle">
                             {String(index + 1).padStart(2, "0")}
@@ -1988,7 +1979,7 @@ export function PlaylistEditor() {
                   })}
                 </HairlineList>
               ) : (
-                <div className="rounded-md border border-dashed border-white/10 bg-black/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-8 text-center text-sm text-muted-foreground">
                   {isSmart
                     ? "No generated tracks yet. Run a generation once the rule set is ready."
                     : "No tracks in this playlist yet."}
@@ -1999,7 +1990,7 @@ export function PlaylistEditor() {
         </div>
 
         <div className="space-y-4">
-          <Card className="border-white/10 bg-card">
+          <Card>
             <CardHeader className="space-y-1">
               <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground font-mono">
                 Status
@@ -2024,7 +2015,7 @@ export function PlaylistEditor() {
           </Card>
 
           {history && history.length > 0 ? (
-            <Card className="border-white/10 bg-card">
+            <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground font-mono">
                   Generation history
@@ -2034,7 +2025,7 @@ export function PlaylistEditor() {
                 {history.map((entry) => (
                   <div
                     key={entry.id}
-                    className="rounded-md border border-white/10 bg-black/10 px-3 py-2"
+                    className="rounded-md border border-border-quiet bg-canvas-surface px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">

@@ -147,6 +147,7 @@ describe("Discover completeness refresh", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole("img", { name: "Caspian" })).toBeInTheDocument();
     const surface = screen
       .getByText("50% discography coverage")
       .closest(".bg-raised-surface");

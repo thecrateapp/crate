@@ -1,4 +1,5 @@
 import { Button } from "@crate/ui/shadcn/button";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { StructuredValue } from "@/components/admin/StructuredValue";
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
@@ -84,9 +85,9 @@ function SourceLines({ view }: { view: PlanChangeView }) {
       {view.evidence ? (
         <div>
           <p className="font-medium">From the source</p>
-          <p className="line-clamp-3 whitespace-pre-wrap" title={view.evidence}>
-            {view.evidence}
-          </p>
+          <TooltipHint content={view.evidence}>
+            <p className="line-clamp-3 whitespace-pre-wrap">{view.evidence}</p>
+          </TooltipHint>
         </div>
       ) : null}
       {view.source ? (
@@ -178,7 +179,6 @@ function IssueRow({
               type="button"
               variant="outline"
               size="sm"
-              title={artist.artist_uid}
               aria-label={named(`Use ${artist.name}`)}
               disabled={disabled}
               onClick={() => onUseArtist(issue.item_id, artist)}
@@ -228,7 +228,9 @@ export function ShowPlanSummary({
       className="space-y-4 rounded-md border border-border p-4"
     >
       <div className="space-y-0.5">
-        <h3 className="text-sm font-medium font-display">Review before saving</h3>
+        <h3 className="text-sm font-medium font-display">
+          Review before saving
+        </h3>
         <p className="text-xs text-muted-foreground">
           {`${countLabel(plan.changes.length, "show")} to save`}
         </p>
@@ -256,7 +258,9 @@ export function ShowPlanSummary({
                     : "New"}
               </StatusBadge>
               <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-medium font-display">{view.title}</h4>
+                <h4 className="text-sm font-medium font-display">
+                  {view.title}
+                </h4>
                 <p className="text-xs text-muted-foreground">{view.subtitle}</p>
               </div>
             </div>

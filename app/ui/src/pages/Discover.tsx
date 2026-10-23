@@ -26,6 +26,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
@@ -94,7 +95,7 @@ interface InsightsData {
 
 function completionTone(pct: number) {
   if (pct >= 100) return "bg-accent-action";
-  if (pct > 75) return "bg-primary";
+  if (pct > 75) return "bg-accent-action";
   if (pct > 50) return "bg-state-warning";
   return "bg-state-warning";
 }
@@ -113,37 +114,32 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
   return (
     <OpsSurface className="p-4">
       <div className="flex items-start gap-3">
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/8 bg-white/[0.04]">
-          <img
-            src={artistPhotoApiUrl({
-              artistId: artist.artist_id,
-              artistEntityUid: artist.artist_entity_uid,
-              artistSlug: artist.artist_slug,
-              artistName: artist.artist,
-            })}
-            alt={artist.artist}
-            className="h-full w-full object-cover"
-            onError={(event) => {
-              (event.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        </div>
+        <MediaCover
+          src={artistPhotoApiUrl({
+            artistId: artist.artist_id,
+            artistEntityUid: artist.artist_entity_uid,
+            artistSlug: artist.artist_slug,
+            artistName: artist.artist,
+          })}
+          alt={artist.artist}
+          className="size-14 shrink-0 border border-border-quiet bg-canvas-surface"
+        />
 
         <div className="min-w-0 flex-1 space-y-2">
           <div className="space-y-1">
             {href ? (
               <Link
                 to={href}
-                className="block truncate text-base font-semibold tracking-tight text-white transition-colors hover:text-primary"
+                className="block truncate text-base font-semibold tracking-tight text-text-primary transition-colors hover:text-accent-action-hi"
               >
                 {artist.artist}
               </Link>
             ) : (
-              <div className="truncate text-base font-semibold tracking-tight text-white">
+              <div className="truncate text-base font-semibold tracking-tight text-text-primary">
                 {artist.artist}
               </div>
             )}
-            <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-text-subtle">
               <InfoBadge>
                 {artist.local_count}/{artist.mb_count} releases
               </InfoBadge>
@@ -159,7 +155,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
           <div className="space-y-1">
             <div
               data-admin-ux="discovery-coverage-progress"
-              className="h-px overflow-hidden rounded-full bg-white/[0.06]"
+              className="h-px overflow-hidden rounded-full bg-border-quiet"
             >
               <div
                 className={cn(
@@ -169,7 +165,7 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
                 style={{ width: `${Math.min(artist.pct, 100)}%` }}
               />
             </div>
-            <div className="text-xs text-white/40">
+            <div className="text-xs text-text-subtle">
               {Math.round(artist.pct)}% discography coverage
             </div>
           </div>
@@ -234,38 +230,34 @@ function ReleaseRadarRow({ release }: { release: Release }) {
       : undefined;
 
   return (
-    <div className="flex items-center gap-3 rounded-sm border border-white/6 bg-black/15 px-3 py-3">
-      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md border border-white/8 bg-white/[0.04]">
-        {release.cover_url ? (
-          <img
-            src={release.cover_url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : null}
-      </div>
+    <div className="flex items-center gap-3 rounded-md border border-border-quiet bg-raised-surface px-3 py-3">
+      <MediaCover
+        src={release.cover_url}
+        alt=""
+        className="size-12 shrink-0 border border-border-quiet bg-canvas-surface"
+      />
       <div className="min-w-0 flex-1">
         {albumHref ? (
           <Link
             to={albumHref}
-            className="block truncate text-sm font-medium text-white transition-colors hover:text-primary"
+            className="block truncate text-sm font-medium text-text-primary transition-colors hover:text-accent-action-hi"
           >
             {release.album_title}
           </Link>
         ) : (
-          <div className="truncate text-sm font-medium text-white">
+          <div className="truncate text-sm font-medium text-text-primary">
             {release.album_title}
           </div>
         )}
         {artistHref ? (
           <Link
             to={artistHref}
-            className="block truncate text-xs text-white/45 transition-colors hover:text-white/80"
+            className="block truncate text-xs text-text-muted transition-colors hover:text-accent-action-hi"
           >
             {release.artist_name}
           </Link>
         ) : (
-          <div className="truncate text-xs text-white/45">
+          <div className="truncate text-xs text-text-muted">
             {release.artist_name}
           </div>
         )}
@@ -287,14 +279,18 @@ function PopularityRow({
   secondary?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-sm border border-white/6 bg-black/15 px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border-quiet bg-raised-surface px-3 py-2.5">
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-white">{label}</div>
+        <div className="truncate text-sm font-medium text-text-primary">
+          {label}
+        </div>
         {secondary ? (
-          <div className="truncate text-xs text-white/40">{secondary}</div>
+          <div className="truncate text-xs text-text-subtle">{secondary}</div>
         ) : null}
       </div>
-      <div className="shrink-0 text-xs font-medium text-white/60">{value}</div>
+      <div className="shrink-0 text-xs font-medium text-text-secondary">
+        {value}
+      </div>
     </div>
   );
 }
@@ -336,7 +332,7 @@ function DiscoveryFeedNotice({
       >
         <Loader2
           aria-hidden="true"
-          className="h-4 w-4 animate-spin text-primary"
+          className="h-4 w-4 animate-spin text-accent-action-hi"
         />
         Loading {label.toLowerCase()}…
       </div>
@@ -561,7 +557,7 @@ function DiscoverView({
               data-admin-ux="discovery-search"
               aria-hidden="true"
               size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
             />
             <Input
               id="discovery-search"
@@ -593,7 +589,7 @@ function DiscoverView({
           </div>
         ) : feeds.completeness.hasData ||
           (!feeds.completeness.loading && !feeds.completeness.error) ? (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-12 text-center text-sm text-white/35">
+          <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-12 text-center text-sm text-text-subtle">
             No acquisition opportunities match the current filter.
           </div>
         ) : null}
@@ -629,7 +625,7 @@ function DiscoverView({
             </div>
           ) : feeds.releases.hasData ||
             (!feeds.releases.loading && !feeds.releases.error) ? (
-            <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
+            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
               No detected releases available right now.
             </div>
           ) : null}
@@ -659,7 +655,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
+            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
               Genre expansion data is not available yet.
             </div>
           ) : null}
@@ -688,7 +684,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
+            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
               No momentum data available yet.
             </div>
           ) : null}
@@ -715,7 +711,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-10 text-center text-sm text-white/35">
+            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
               No album momentum data available yet.
             </div>
           ) : null}
@@ -908,11 +904,11 @@ export function Discover() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-16 text-white/45">
+      <div className="flex justify-center py-16 text-text-muted">
         <Loader2
           data-admin-ux="discovery-loading"
           aria-hidden="true"
-          className="h-5 w-5 animate-spin text-primary"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
         />
       </div>
     );

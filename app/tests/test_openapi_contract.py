@@ -95,6 +95,9 @@ def test_openapi_marks_genre_routes_as_authenticated_and_typed(test_app):
     eq_operation = data["paths"]["/api/genres/{slug}/eq-preset"]["patch"]
     invalid_operation = data["paths"]["/api/genres/taxonomy/invalid"]["get"]
     cleanup_operation = data["paths"]["/api/genres/taxonomy/cleanup-invalid"]["post"]
+    raw_tag_classification = data["paths"][
+        "/api/genres/taxonomy/raw-tags/{slug}/classification"
+    ]["put"]
 
     assert detail_operation["tags"] == ["genres"]
     assert detail_operation["summary"] == "Get detailed genre information"
@@ -122,6 +125,16 @@ def test_openapi_marks_genre_routes_as_authenticated_and_typed(test_app):
     assert cleanup_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/TaskEnqueueResponse")
+    assert raw_tag_classification["summary"] == (
+        "Classify an unmapped library genre tag and assign facet values"
+    )
+    assert raw_tag_classification["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert raw_tag_classification["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"].endswith("/GenreTaxonomyRawTagClassificationUpdateResponse")
 
 
 def test_openapi_types_jam_routes_and_marks_them_authenticated(test_app):

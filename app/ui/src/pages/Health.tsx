@@ -1,9 +1,11 @@
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  InfoBadge,
+  type InfoBadgeTone,
+} from "@crate/ui/primitives/InfoBadge";
 import {
   PageHeaderAction,
   PageHeaderActions,
-  PageHeaderLayout,
 } from "@/components/layout/PageHeader";
 import {
   ScanSearch as HeaderScanSearch,
@@ -13,6 +15,8 @@ import {
 } from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import {
+  OpsPageHero,
+  OpsPanel,
   OpsRefreshNotice,
   OpsSnapshotStatus,
   type OpsStreamStatus,
@@ -203,13 +207,14 @@ function executionLane(entry: RepairCatalogEntry | undefined) {
   return "Review required";
 }
 
-function executionLaneTone(entry: RepairCatalogEntry | undefined) {
-  if (!entry) return "border-white/10 bg-white/[0.04] text-white/55";
+function executionLaneTone(
+  entry: RepairCatalogEntry | undefined,
+): InfoBadgeTone {
+  if (!entry) return "neutral";
   if (entry.support === "manual" || !entry.auto_fixable)
-    return "border-white/10 bg-white/[0.04] text-white/55";
-  if (entry.supports_global_scope)
-    return "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi";
-  return "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text";
+    return "neutral";
+  if (entry.supports_global_scope) return "accent";
+  return "warning";
 }
 
 export function latestRepairSummary(task: TaskInsightLike | null) {
@@ -664,9 +669,11 @@ export function Health() {
     );
 
   return (
-    <div className="mx-auto w-full max-w-[70.5rem] min-w-0">
-      <PageHeaderLayout
-        as="header"
+    <div data-slot="library-health-page" className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Library Health"
+        description="Find problems in your library and how to resolve them."
+        compactActions
         actions={
           <PageHeaderActions>
             {isAdmin ? (
@@ -695,37 +702,14 @@ export function Health() {
           </PageHeaderActions>
         }
       >
-        <div>
-          <h1 className="font-display text-[clamp(2.25rem,4.3vw,3.375rem)] font-bold leading-[1.05] tracking-display text-text-primary">
-            Library Health
-          </h1>
-          <p className="mt-3 text-sm text-text-muted">
-            Find problems in your library and how to resolve them.
-          </p>
-        </div>
-      </PageHeaderLayout>
-      <div className="mt-6 border-b border-border-quiet pb-8 text-text-muted">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <OpsSnapshotStatus
-            snapshot={hasSnapshot ? { stale } : null}
-            streamStatus={streamStatus}
-          />
-        </div>
-        <p className="font-mono text-label">
-          Latest check:{" "}
-          {lastScan ? (
-            <time dateTime={lastScan}>{timeAgo(lastScan)}</time>
-          ) : (
-            "unavailable"
-          )}
-        </p>
-        {stale ? (
-          <p role="status" className="mt-2 text-sm">
-            Recorded results may be out of date.
-          </p>
-        ) : null}
-      </div>
-
+        <OpsSnapshotStatus
+          snapshot={hasSnapshot ? { stale } : null}
+          streamStatus={streamStatus}
+        />
+        <InfoBadge tone={lastScan ? "neutral" : "warning"}>
+          {lastScan ? `Last check ${timeAgo(lastScan)}` : "No check recorded"}
+        </InfoBadge>
+      </OpsPageHero>
       {refreshError ? (
         <OpsRefreshNotice
           message={refreshError}
@@ -735,51 +719,50 @@ export function Health() {
         />
       ) : null}
 
-      <section aria-label="Library issues" className="mt-9 min-w-0">
-        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-[1.6875rem] font-[650] tracking-tight text-text-primary">
-            {loading ? "Library issues" : `${totalOpen} recorded issues`}
-          </h2>
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-6 gap-y-2">
-            {!loading && grouped.length > 0 ? (
-              <p className="text-xs text-text-muted">
-                Loaded issues, most severe first
-              </p>
-            ) : null}
-            {Object.keys(counts).length > 0 ? (
-              <details className="min-w-0">
-                <summary className="min-h-11 cursor-pointer py-3 text-xs text-text-muted">
+      <OpsPanel
+        title={loading ? "Library issues" : `${totalOpen} recorded issues`}
+        description="Expand a check to inspect its cases and available repair actions."
+        action={
+          Object.keys(counts).length > 0 ? (
+            <details className="min-w-0">
+              <summary className="flex min-h-11 cursor-pointer items-center py-2">
+                <MonoLabel as="span" tone="accent">
                   Filter issues
-                </summary>
-                <div
-                  className="flex flex-wrap gap-2 pt-2"
-                  role="group"
-                  aria-label="Filter by check"
+                </MonoLabel>
+              </summary>
+              <div
+                className="flex flex-wrap gap-2 pt-2"
+                role="group"
+                aria-label="Filter by check"
+              >
+                <FilterChip
+                  active={filter === null}
+                  onClick={() => setFilter(null)}
                 >
-                  <FilterChip
-                    active={filter === null}
-                    onClick={() => setFilter(null)}
-                  >
-                    All{" "}
-                    <span className="ml-1 text-text-muted">{totalOpen}</span>
-                  </FilterChip>
-                  {Object.entries(counts)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([check, count]) => (
-                      <FilterChip
-                        key={check}
-                        active={filter === check}
-                        onClick={() => setFilter(check)}
-                      >
-                        {CHECK_LABELS[check] || check.replace(/_/g, " ")}{" "}
-                        <span className="ml-1 text-text-muted">{count}</span>
-                      </FilterChip>
-                    ))}
-                </div>
-              </details>
-            ) : null}
-          </div>
-        </div>
+                  All <span className="ml-1 text-text-muted">{totalOpen}</span>
+                </FilterChip>
+                {Object.entries(counts)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([check, count]) => (
+                    <FilterChip
+                      key={check}
+                      active={filter === check}
+                      onClick={() => setFilter(check)}
+                    >
+                      {CHECK_LABELS[check] || check.replace(/_/g, " ")}{" "}
+                      <span className="ml-1 text-text-muted">{count}</span>
+                    </FilterChip>
+                  ))}
+              </div>
+            </details>
+          ) : null
+        }
+      >
+        {!loading && grouped.length > 0 ? (
+          <p className="mb-5 text-sm text-text-muted">
+            Loaded issues, most severe first
+          </p>
+        ) : null}
         {filter ? (
           <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-text-muted">
             <p>Showing {CHECK_LABELS[filter] || filter.replace(/_/g, " ")}.</p>
@@ -864,11 +847,11 @@ export function Health() {
                     >
                       {label}
                     </h3>{" "}
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-label text-text-muted">
-                      <span>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <InfoBadge variant="counter">
                         {recordedCount}{" "}
                         {recordedCount === 1 ? "issue" : "issues"}
-                      </span>{" "}
+                      </InfoBadge>{" "}
                       <SeverityMeter level={severity} label={severity} />{" "}
                       {catalogEntry ? (
                         <span className="sr-only">
@@ -877,9 +860,12 @@ export function Health() {
                         </span>
                       ) : null}{" "}
                       {runs[check]?.last_run_at ? (
-                        <span>
-                          Checked {timeAgo(runs[check]!.last_run_at!)}
-                        </span>
+                        <>
+                          {" "}
+                          <InfoBadge>
+                            Checked {timeAgo(runs[check]!.last_run_at!)}
+                          </InfoBadge>
+                        </>
                       ) : null}
                     </div>
                     {description ? (
@@ -987,9 +973,9 @@ export function Health() {
                               >
                                 {scopeLabel(catalogEntry.scope)}
                               </InfoBadge>
-                              <span className="font-mono text-label text-text-muted">
+                              <InfoBadge>
                                 {executionLane(catalogEntry)}
-                              </span>
+                              </InfoBadge>
                             </div>
                           ) : null}
                           {catalogEntry?.requires_confirmation ? (
@@ -1044,7 +1030,6 @@ export function Health() {
                               variant="ghost"
                               className="min-h-11 text-caption text-text-muted"
                               onClick={() => handleDismissType(check)}
-                              title="Dismiss all issues of this type"
                               aria-label={`Dismiss all ${label} issues`}
                             >
                               Dismiss all
@@ -1063,17 +1048,19 @@ export function Health() {
               </article>
             );
           })}
-      </section>
+      </OpsPanel>
       <details className="mt-6 border-t border-border-quiet pt-3">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm text-text-secondary">
-          Latest activity
+        <summary className="flex min-h-11 cursor-pointer items-center gap-3 py-3">
+          <MonoLabel as="span" tone="accent">
+            Latest activity
+          </MonoLabel>
           {latestRepairTask ? (
-            <span className="ml-3 font-mono text-label text-text-muted">
+            <MonoLabel as="span">
               {repairOutcomeLabel(latestRepairTask)} ·{" "}
               {timeAgo(
                 latestRepairTask.updated_at || latestRepairTask.created_at,
               )}
-            </span>
+            </MonoLabel>
           ) : null}
         </summary>
         <div className="space-y-3 py-3 text-sm text-text-secondary">
@@ -1093,8 +1080,10 @@ export function Health() {
       </details>
       {catalogItems.length > 0 ? (
         <details className="mt-4 border-t border-border-quiet pt-3">
-          <summary className="min-h-11 cursor-pointer py-3 text-sm text-text-secondary">
-            Available checks ({catalogItems.length})
+          <summary className="flex min-h-11 cursor-pointer items-center py-3">
+            <MonoLabel as="span" tone="accent">
+              Available checks ({catalogItems.length})
+            </MonoLabel>
           </summary>
           <ul className="divide-y divide-border-quiet">
             {catalogItems.map((entry) => (
@@ -1104,29 +1093,27 @@ export function Health() {
                     {CHECK_LABELS[entry.check_type] ||
                       entry.check_type.replace(/_/g, " ")}
                   </h3>
-                  <p className="font-mono text-label text-text-muted">
+                  <InfoBadge>
                     {counts[entry.check_type]
                       ? `${counts[entry.check_type]} open issues recorded`
                       : runs[entry.check_type]?.last_run_at
                         ? "No open issues recorded"
                         : "No check result available"}
-                  </p>
+                  </InfoBadge>
                 </div>
                 <p className="text-sm text-text-muted">
                   {CHECK_DESCRIPTIONS[entry.check_type] ||
                     "No description available."}
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  <InfoBadge className={executionLaneTone(entry)}>
+                  <InfoBadge tone={executionLaneTone(entry)}>
                     {executionLane(entry)}
                   </InfoBadge>
                   <SeverityMeter
                     level={entry.risk}
                     label={riskLabel(entry.risk)}
                   />
-                  <span className="font-mono text-label text-text-muted">
-                    {scopeLabel(entry.scope)}
-                  </span>
+                  <InfoBadge>{scopeLabel(entry.scope)}</InfoBadge>
                 </div>
               </li>
             ))}
@@ -1220,8 +1207,7 @@ function IssueRow({
               e.stopPropagation();
               onResolve();
             }}
-            className="min-h-11 text-caption text-text-muted hover:bg-accent-action/10 hover:text-accent-action-hi"
-            title="Mark as resolved"
+            className="min-h-11 text-caption text-text-muted"
             aria-label="Mark as resolved"
           >
             Resolve
@@ -1232,8 +1218,7 @@ function IssueRow({
               e.stopPropagation();
               onDismiss();
             }}
-            className="min-h-11 text-caption text-text-muted hover:bg-white/10 hover:text-white"
-            title="Dismiss: it stays hidden unless its details change"
+            className="min-h-11 text-caption text-text-muted"
             aria-label="Dismiss: it stays hidden unless its details change"
           >
             Dismiss
@@ -1312,7 +1297,7 @@ function ArtistGroupHeader({
         <span className="min-w-0 truncate">
           {group.artistName ?? `Artist #${group.artistId}`}
         </span>
-        <span className="ml-2 shrink-0 text-white/40">
+        <span className="ml-2 shrink-0 text-text-subtle">
           {group.items.length}
         </span>
       </Link>

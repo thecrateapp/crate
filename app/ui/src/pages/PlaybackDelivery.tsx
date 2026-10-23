@@ -1,7 +1,14 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import {
+  InfoBadge,
+  type InfoBadgeTone,
+} from "@crate/ui/primitives/InfoBadge";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { Button } from "@crate/ui/shadcn/button";
+import { RefreshCw } from "@crate/ui/icons";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
 import { useEffect } from "react";
 
 import {
@@ -68,14 +75,11 @@ export interface PlaybackDeliverySnapshot {
   recent_variants: PlaybackDeliveryVariant[];
 }
 
-function variantStatusClass(status: string) {
-  if (status === "ready" || status === "running")
-    return "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi";
-  if (status === "failed")
-    return "border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text";
-  if (status === "pending")
-    return "border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text";
-  return "border-white/10 bg-white/[0.04] text-white/60";
+function variantStatusTone(status: string): InfoBadgeTone {
+  if (status === "ready" || status === "running") return "success";
+  if (status === "failed") return "danger";
+  if (status === "pending") return "warning";
+  return "neutral";
 }
 
 function relativeTime(value: string | null) {
@@ -155,10 +159,13 @@ export function PlaybackDeliveryContent({
       <OpsPageHero
         title="Playback Delivery"
         description="Cached audio variants, playback capacity and recent preparation results for Listen."
+        compactActions
         actions={
-          <Button variant="outline" size="sm" onClick={onRefresh}>
-            Refresh
-          </Button>
+          <PageHeaderActions label="Playback delivery actions">
+            <PageHeaderAction label="Refresh" onClick={onRefresh}>
+              <RefreshCw aria-hidden="true" />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       />
 
@@ -229,7 +236,7 @@ export function PlaybackDeliveryContent({
               <InfoBadge tone="warning">{stats.pending_stale} stale</InfoBadge>
             ) : null}
             {stats && stats.failed > 0 ? (
-              <InfoBadge tone="warning">{stats.failed} failed</InfoBadge>
+              <InfoBadge tone="danger">{stats.failed} failed</InfoBadge>
             ) : null}
           </div>
         </div>
@@ -264,7 +271,7 @@ export function PlaybackDeliveryContent({
                       {variant.delivery_format} {variant.delivery_bitrate}k
                     </div>
                   </div>
-                  <InfoBadge className={variantStatusClass(variant.status)}>
+              <InfoBadge tone={variantStatusTone(variant.status)}>
                     {variant.status}
                   </InfoBadge>
                   <div className="font-mono text-label tabular-nums text-text-muted">

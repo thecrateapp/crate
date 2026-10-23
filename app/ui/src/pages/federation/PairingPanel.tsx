@@ -67,7 +67,7 @@ export function PairingPanel({
           </Button>
         </div>
         {probe ? (
-          <pre className="max-h-40 overflow-auto text-xs text-white/55">
+          <pre className="max-h-40 overflow-auto rounded-md border border-border-quiet bg-card p-3 font-mono text-xs text-text-secondary">
             {JSON.stringify(probe, null, 2)}
           </pre>
         ) : null}

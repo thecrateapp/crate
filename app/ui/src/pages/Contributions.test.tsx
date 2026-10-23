@@ -23,6 +23,7 @@ describe("Contributions text and real contracts", () => {
     await screen.findByText("Luz de octubre");
     expect(screen.getByRole("heading", { name: "Contributions" })).toHaveClass(
       "font-display",
+      "font-extrabold",
     );
     const refresh = screen.getByRole("button", { name: "Refresh" });
     expect(refresh).toHaveAttribute("data-size", "icon-lg");
@@ -41,7 +42,9 @@ describe("Contributions text and real contracts", () => {
   it("retains contributor precedence, source words, status and real metadata", async () => {
     renderWithAdminProviders(<Contributions />);
     await screen.findByText("Luz de octubre");
-    expect(screen.getByText("4", { exact: true })).toBeInTheDocument();
+    const count = screen.getByText("4 contributions", { exact: true });
+    expect(count).toBeInTheDocument();
+    expect(count.closest('[data-slot="info-badge"]')).toBeInTheDocument();
     const contributionList = screen.getByRole("list", {
       name: "Community library contributions",
     });

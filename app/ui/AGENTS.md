@@ -6,6 +6,13 @@ V3 shares one identity, tokens, primitives, recipes and interaction rules with t
 Only domain components/workflows differ; do not add app-specific foundation variants. Bootstrap
 uses `@crate/ui/lib/crate-identity` and `@crate/ui/lib/interface-preferences`.
 
+## Visual reviews
+
+Before implementing or reviewing an Admin page's visual changes, follow the reusable
+[Admin UI visual review guide and checklist](./ADMIN_UI_REVIEW_CHECKLIST.md). Listen is the
+primary visual reference; reuse `@crate/ui` components when available, and add new shared
+components there only when both Admin and Listen use them.
+
 ## Directory map
 
 ```

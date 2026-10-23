@@ -1,5 +1,5 @@
 import { useApi } from "@/hooks/use-api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 
 import { PanelState } from "./PanelState";
 
@@ -17,17 +17,27 @@ export function AuditPanel() {
     <PanelState loading={audit.loading} error={audit.error}>
       <div className="space-y-1">
         {(audit.data ?? []).length === 0 ? (
-          <p className="text-sm text-white/45">No audit events.</p>
+          <p className="text-sm text-text-muted">No audit events.</p>
         ) : (
           audit.data?.map((event) => (
             <div
               key={event.id}
-              className="flex items-center gap-3 rounded-md border border-white/5 px-3 py-2 text-xs"
+              className="flex items-center gap-3 rounded-md border border-border-quiet-subtle px-3 py-2 text-xs"
             >
-              <Badge variant="secondary">{event.status}</Badge>
+              <InfoBadge
+                tone={
+                  event.status === "success"
+                    ? "success"
+                    : event.status === "failed"
+                      ? "danger"
+                      : "neutral"
+                }
+              >
+                {event.status}
+              </InfoBadge>
               <span>{event.event_type}</span>
               <time
-                className="ml-auto text-white/45"
+                className="ml-auto text-text-muted"
                 dateTime={event.created_at}
               >
                 {new Date(event.created_at).toLocaleString()}

@@ -904,6 +904,7 @@ def _get_runtime_taxonomy_graph() -> dict:
                 r"\s+", " ", (row.get("description") or "").strip().lower()
             ),
             "top_level": bool(row.get("is_top_level")),
+            "facets": row.get("facets") or [],
         }
         _register_alias(graph, slug, slug.replace("-", " "))
         _register_alias(graph, slug, row.get("name") or slug.replace("-", " "))
@@ -945,6 +946,7 @@ def get_genre_catalog() -> dict[str, dict]:
             "description": meta["description"],
             "aliases": sorted(graph["alias_terms_by_slug"].get(slug, set())),
             "top_level": meta["top_level"],
+            "facets": meta.get("facets", []),
             "parents": sorted(graph["parents_by_slug"].get(slug, set())),
             "related": sorted(graph["related_by_slug"].get(slug, set())),
             "influenced_by": sorted(graph["influenced_by_by_slug"].get(slug, set())),

@@ -1,9 +1,5 @@
-import {
-  PageHeaderAction,
-  PageHeaderActions,
-  PageHeaderLayout,
-} from "@/components/layout/PageHeader";
-import { AdminPageHeader } from "@/components/admin/ops-surfaces";
+import { PageHeaderAction } from "@/components/layout/PageHeader";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -13,7 +9,7 @@ import { Card } from "@crate/ui/shadcn/card";
 import { Avatar } from "@crate/ui/primitives/Avatar";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { StatusDot, type StatusDotTone } from "@crate/ui/primitives/StatusDot";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 
@@ -112,55 +108,39 @@ export function Contributions() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader>
-        <PageHeaderLayout
-          actions={
-            <PageHeaderActions>
-              <PageHeaderAction
-                label="Refresh"
-                type="button"
-                disabled={loading}
-                aria-busy={loading}
-                onClick={() => void load()}
-              >
-                {loading ? (
-                  <Loader2
-                    data-admin-ux="contributions-refresh-loading"
-                    aria-hidden="true"
-                    size={16}
-                    className="animate-spin"
-                  />
-                ) : null}
-                {!loading ? (
-                  <HeaderRefreshCw
-                    data-admin-ux="header-refresh"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </PageHeaderAction>
-            </PageHeaderActions>
-          }
-        >
-          <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">
-              Contributions
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Review what users brought into the shared library and who owns
-              each import.
-            </p>
-          </div>
-          {count != null ? (
-            <StatNumber
-              as="div"
-              value={count}
-              label="Contributions"
-              size="lg"
-              className="shrink-0"
-            />
-          ) : null}
-        </PageHeaderLayout>
-      </AdminPageHeader>
+      <OpsPageHero
+        title="Contributions"
+        description="Review what users brought into the shared library and who owns each import."
+        compactActions
+        actions={
+          <PageHeaderAction
+            label="Refresh"
+            type="button"
+            disabled={loading}
+            aria-busy={loading}
+            onClick={() => void load()}
+          >
+            {loading ? (
+              <Loader2
+                data-admin-ux="contributions-refresh-loading"
+                aria-hidden="true"
+                size={16}
+                className="animate-spin"
+              />
+            ) : null}
+            {!loading ? (
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh"
+                aria-hidden="true"
+              />
+            ) : null}
+          </PageHeaderAction>
+        }
+      >
+        {count != null ? (
+          <InfoBadge active>{count.toLocaleString()} contributions</InfoBadge>
+        ) : null}
+      </OpsPageHero>
 
       <Card
         aria-busy={loading}

@@ -3582,19 +3582,13 @@ button.genre-pill:hover,
 .crate-overlay-menu-item[data-highlighted],
 .crate-overlay-menu-item:focus-visible,
 .crate-overlay-menu-item[data-state="open"] {
-  background: color-mix(in srgb, var(--accent-action) 4%, transparent);
+  background: var(--hover-bg);
+  color: var(--accent-action-hi);
 }
 
 .crate-overlay-menu-item[data-state="checked"],
 .crate-overlay-menu-item[data-active="true"] {
   color: var(--accent-action-hi);
-}
-
-/* MonoLabel actions signal hover/focus through foreground, without a fill. */
-.crate-overlay-menu-item:has(.crate-mono-label):not(:disabled):not(
-    [data-disabled]
-  ):is(:hover, :focus-visible, [data-highlighted], [data-state="open"]) {
-  background: transparent;
 }
 
 .crate-overlay-menu-item:has(.crate-mono-label):not(:disabled):not(
@@ -3605,6 +3599,18 @@ button.genre-pill:hover,
     [data-highlighted],
     [data-state="open"]
   ) {
+  color: var(--accent-action-hi);
+}
+
+.crate-overlay-menu-item:has(.crate-mono-label):not(:disabled):not(
+    [data-disabled]
+  ):not([aria-disabled="true"]):is(
+    :hover,
+    :focus-visible,
+    [data-highlighted],
+    [data-state="open"]
+  )
+  .crate-mono-label {
   color: var(--accent-action-hi);
 }
 

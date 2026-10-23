@@ -80,7 +80,7 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     <>
       <OpsPageHero title="Analysis" description="Body copy" />
       <OpsPanel title="Coverage">Content</OpsPanel>
-      <OpsStatTile label="Tracks" value="1,200" />
+      <OpsStatTile label="Tracks" value="1,200" caption="Tracks cached" />
     </>,
   );
   expect(screen.getByRole("heading", { name: "Analysis" })).toHaveClass(
@@ -99,6 +99,8 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     "font-display",
     "font-mono",
   );
+  expect(screen.getByText("Body copy")).toHaveClass("text-text-muted");
+  expect(screen.getByText("Tracks cached")).toHaveClass("text-text-muted");
 });
 
 it("supports accent section headings for operational surfaces", () => {

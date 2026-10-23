@@ -11,11 +11,12 @@ import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Textarea } from "@crate/ui/shadcn/textarea";
 import {
   Tabs,
   TabsContent,
@@ -141,20 +142,23 @@ function statusLabel(status: string) {
   return STATUS_LABELS[status] ?? status;
 }
 
-function statusBadgeClass(status: string) {
+function statusTone(status: string): InfoBadgeTone {
   if (status === "needs_review" || status === "pending") {
-    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
+    return "warning";
   }
-  if (status === "published" || status === "drafting_ai") {
-    return "border-accent-action/25 bg-accent-action/10 text-accent-action-hi";
+  if (status === "published") {
+    return "success";
+  }
+  if (status === "drafting_ai") {
+    return "accent";
   }
   if (status === "rejected") {
-    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
+    return "danger";
   }
   if (status === "manual_required") {
-    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
+    return "warning";
   }
-  return "border-white/10 bg-white/5 text-white/65";
+  return "neutral";
 }
 
 function bundleKey(locale: string, sourceVersion: string) {
@@ -648,7 +652,7 @@ function OverviewSection({
               {requestCount} request{requestCount === 1 ? "" : "s"}
             </p>
           </div>
-          <Badge variant="secondary">{localeHealth.length} locales</Badge>
+          <InfoBadge>{localeHealth.length} locales</InfoBadge>
         </div>
       </div>
 
@@ -764,7 +768,7 @@ function BundlesSection({
 }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-5 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h2 className="font-display text-sm font-semibold text-white">
@@ -826,7 +830,7 @@ function BundlesSection({
           </div>
         </div>
       ) : (
-        <div className="divide-y divide-white/6">
+        <div className="divide-y divide-border-quiet-subtle">
           {bundles.map((bundle) => {
             const request = requestsByBundle.get(
               bundleKey(bundle.locale, bundle.sourceVersion),
@@ -852,14 +856,11 @@ function BundlesSection({
                       >
                         {bundle.locale}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className={statusBadgeClass(bundle.status)}
-                      >
+                      <InfoBadge tone={statusTone(bundle.status)}>
                         {statusLabel(bundle.status)}
-                      </Badge>
+                      </InfoBadge>
                     </div>
-                    <p className="mt-1 truncate text-sm text-white/62">
+                    <p className="mt-1 truncate text-sm text-text-muted">
                       {bundle.bundleVersion}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -871,7 +872,7 @@ function BundlesSection({
                     <div className="font-mono text-sm font-normal text-white tabular-nums">
                       {bundle.messageCount} strings
                     </div>
-                    <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/35">
+                    <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-text-subtle">
                       {request?.client ?? "admin"}
                     </div>
                   </div>
@@ -920,7 +921,7 @@ function EditorSection({
 }) {
   return (
     <Card className="min-h-[520px] gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="font-display text-sm font-semibold text-white">
@@ -1005,14 +1006,14 @@ function EditorSection({
 
           <QualityIssues report={qualityReport} />
 
-          <div className="overflow-hidden rounded-md border border-white/8">
-            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 font-mono md:grid border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-normal uppercase tracking-[0.12em] text-white/35">
+          <div className="overflow-hidden rounded-md border border-border-quiet">
+            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 border-b border-border-quiet bg-raised-surface px-4 py-2 font-mono text-[11px] font-normal uppercase tracking-[0.12em] text-text-subtle md:grid">
               <span>Key</span>
               <span>English source</span>
               <span>Translation</span>
               <span>Status</span>
             </div>
-            <div className="max-h-[520px] divide-y divide-white/6 overflow-y-auto">
+            <div className="max-h-[520px] divide-y divide-border-quiet-subtle overflow-y-auto">
               {messageRows.map(([key, value]) => (
                 <div
                   key={key}
@@ -1021,25 +1022,24 @@ function EditorSection({
                   <code className="break-all font-mono text-xs text-accent-action-hi/80">
                     {key}
                   </code>
-                  <span className="break-words text-white/38">
+                  <span className="break-words text-text-subtle">
                     Source unavailable
                   </span>
-                  <div className="crate-form-field min-w-0">
-                    <label
-                      htmlFor={`translation-${key}`}
-                      className="font-mono text-meta text-text-muted"
-                    >
-                      Translation
-                    </label>
-                    <textarea
+                  <div className="min-w-0 space-y-2">
+                    <FormField
                       id={`translation-${key}`}
-                      aria-label={`Translation for ${key}`}
-                      value={value}
-                      onChange={(event) =>
-                        onDraftChange(key, event.target.value)
-                      }
-                      className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-accent-action/45"
-                    />
+                      label="Translation"
+                      className="min-w-0"
+                    >
+                      <Textarea
+                        aria-label={`Translation for ${key}`}
+                        value={value}
+                        onChange={(event) =>
+                          onDraftChange(key, event.target.value)
+                        }
+                        className="min-h-16 resize-y"
+                      />
+                    </FormField>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"
@@ -1091,8 +1091,8 @@ function EditorSection({
           </div>
 
           {exportedJson ? (
-            <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
-              <div className="border-b border-white/8 px-4 py-3">
+            <div className="overflow-hidden rounded-md border border-border-quiet bg-card">
+              <div className="border-b border-border-quiet px-4 py-3">
                 <h3 className="font-display text-sm font-semibold text-white">
                   Exported JSON
                 </h3>
@@ -1127,8 +1127,8 @@ function QualityIssues({
 }) {
   const issues = report?.issues ?? [];
   return (
-    <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.03]">
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+    <div className="overflow-hidden rounded-md border border-border-quiet bg-raised-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-border-quiet px-4 py-3">
         <div>
           <h3 className="font-display text-sm font-semibold text-white">
             Quality issues
@@ -1139,21 +1139,14 @@ function QualityIssues({
               : "Quality report unavailable"}
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={
-            issues.length > 0
-              ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-              : "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-          }
-        >
+        <InfoBadge tone={issues.length > 0 ? "warning" : "success"}>
           {issues.length > 0 ? "Needs work" : "Clean"}
-        </Badge>
+        </InfoBadge>
       </div>
       {issues.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-white/62">No quality issues</div>
+        <div className="px-4 py-3 text-sm text-text-muted">No quality issues</div>
       ) : (
-        <div className="divide-y divide-white/6">
+        <div className="divide-y divide-border-quiet-subtle">
           {issues.map((issue) => (
             <div
               key={`${issue.locale}:${issue.key ?? issue.code}:${
@@ -1177,7 +1170,7 @@ function QualityIssues({
                   </code>
                 ) : null}
               </div>
-              <p className="text-white/78">{issue.message}</p>
+              <p className="text-text-primary">{issue.message}</p>
             </div>
           ))}
         </div>
@@ -1196,12 +1189,7 @@ function MessageStatusBadge({
   const issue = qualityReport?.issues.find((item) => item.key === keyName);
   if (!issue) {
     return (
-      <Badge
-        variant="outline"
-        className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-      >
-        ok
-      </Badge>
+      <InfoBadge tone="success">ok</InfoBadge>
     );
   }
   const status =
@@ -1211,23 +1199,16 @@ function MessageStatusBadge({
         ? "missing"
         : "error";
   return (
-    <Badge
-      variant="outline"
-      className={
-        status === "stale" || status === "missing"
-          ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-          : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-      }
-    >
+    <InfoBadge tone={status === "error" ? "danger" : "warning"}>
       {status}
-    </Badge>
+    </InfoBadge>
   );
 }
 
 function ImportExportSection() {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-5 py-4">
         <h2 className="font-display text-sm font-semibold text-white">
           Import / Export
         </h2>
@@ -1236,13 +1217,13 @@ function ImportExportSection() {
         </p>
       </div>
       <div className="grid gap-3 p-5 md:grid-cols-2">
-        <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
+        <div className="rounded-md border border-border-quiet bg-raised-surface p-4">
           <p className="font-semibold text-white">Import JSON</p>
           <p className="mt-2 text-sm text-muted-foreground">
             JSON import is not available. Review existing drafts in Bundles.
           </p>
         </div>
-        <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
+        <div className="rounded-md border border-border-quiet bg-raised-surface p-4">
           <p className="font-semibold text-white">Export bundle</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Select a bundle in Bundles, then use Export JSON in Editor.
@@ -1333,7 +1314,7 @@ function LoadingBlock() {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="crate-form-field min-w-0 rounded-md border border-white/8 bg-white/[0.03] px-3 py-2">
+    <div className="crate-form-field min-w-0 rounded-md border border-border-quiet bg-raised-surface px-3 py-2">
       <div className="font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
         {label}
       </div>

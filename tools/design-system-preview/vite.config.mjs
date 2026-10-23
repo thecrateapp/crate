@@ -72,7 +72,7 @@ export default defineConfig({
           );
         if (
           importer?.includes("/app/ui/src/components/genres/") &&
-          source === "@/lib/api"
+          ["@/lib/api", "@/hooks/use-api"].includes(source)
         )
           return fileURLToPath(
             new URL("admin-catalog-fixtures.ts", import.meta.url),
@@ -418,6 +418,9 @@ export default defineConfig({
         ),
         reviewAdminCatalog: fileURLToPath(
           new URL("review-admin-catalog.html", import.meta.url),
+        ),
+        reviewAdminGenreWheel: fileURLToPath(
+          new URL("review-admin-genre-wheel.html", import.meta.url),
         ),
         reviewAdminEntityRecovery: fileURLToPath(
           new URL("review-admin-entity-recovery.html", import.meta.url),

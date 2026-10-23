@@ -44,6 +44,9 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
     "app/ui/src/pages/PlaylistEditor.tsx",
     "app/ui/src/components/playlists/PlaylistArtwork.tsx",
     "app/ui/src/components/shows/ShowCard.tsx",
+    "app/ui/src/components/shows/AddShowButton.tsx",
+    "app/ui/src/components/shows/MergeShowsButton.tsx",
+    "app/ui/src/pages/Imports.tsx",
   ]);
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
@@ -112,6 +115,46 @@ const approvedControls = new Map([
   [
     "app/ui/src/pages/Upcoming.tsx:@/components/layout/PageHeader",
     { component: "PageHeaderAction", limit: 5 },
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/shows/AddShowButton",
+    { component: "AddShowButton", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/shows/MergeShowsButton",
+    { component: "MergeShowsButton", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/shows/MergeShowsSheet",
+    { component: "MergeShowsSheet", limit: 1 },
+  ],
+  [
+    "app/ui/src/components/shows/AddShowButton.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/components/shows/AddShowButton.tsx:./AddShowSheet",
+    { component: "AddShowSheet", limit: 1 },
+  ],
+  [
+    "app/ui/src/components/shows/MergeShowsButton.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
+  [
+    "app/ui/src/components/shows/MergeShowsButton.tsx:./MergeShowsSheet",
+    { component: "MergeShowsSheet", limit: 1 },
+  ],
+  [
+    "app/ui/src/pages/Imports.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 2 },
+  ],
+  [
+    "app/ui/src/pages/Imports.tsx:@crate/ui/shadcn/button",
+    { component: "Button", limit: 3 },
+  ],
+  [
+    "app/ui/src/pages/Imports.tsx:@crate/ui/composites/ConfirmDialog",
+    { component: "ConfirmDialog", limit: 1 },
   ],
   [
     "app/ui/src/pages/Playlists.tsx:@/components/layout/PageHeader",
@@ -257,6 +300,10 @@ const approvedUx = new Map([
   ["Users:header-add-user", ["lucide-react", "UserPlus"]],
   ["Upcoming:header-sync-shows", ["lucide-react", "CalendarSync"]],
   ["Upcoming:header-clear-caches", ["lucide-react", "Eraser"]],
+  ["AddShowButton:show-add", ["@crate/ui/icons", "CalendarPlus"]],
+  ["MergeShowsButton:show-merge", ["@crate/ui/icons", "Link"]],
+  ["Imports:header-refresh-queue", ["@crate/ui/icons", "RefreshCw"]],
+  ["Imports:imports-import-all", ["@crate/ui/icons", "ArrowDownToLine"]],
   ["Playlists:header-new-static", ["lucide-react", "FilePlus2"]],
   ["Playlists:header-new-smart", ["lucide-react", "ListPlus"]],
   // Diego's explicit 1AQ header-action amendment; no global primary-action exemption.

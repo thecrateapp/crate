@@ -1,4 +1,3 @@
-import {} from "lucide-react";
 import { Navigate, NavLink, Outlet, useParams } from "react-router";
 
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
@@ -12,10 +11,10 @@ const AGENTS_CONNECTIONS = ["agents.integrations.manage"] as const;
 
 function sectionLinkClass({ isActive }: { isActive: boolean }): string {
   return cn(
-    "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+    "inline-flex min-h-11 items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
     isActive
-      ? "border-accent-action/25 bg-accent-action/10 text-primary"
-      : "border-white/10 bg-white/[0.02] text-white/60 hover:bg-white/5 hover:text-white",
+      ? "border-border-quiet bg-card text-text-primary"
+      : "border-transparent bg-transparent text-text-muted hover:bg-text-primary/5 hover:text-accent-action-hi",
   );
 }
 

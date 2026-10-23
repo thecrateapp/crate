@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 
 from crate.ai.consumers import item_call, revalidate_call
@@ -13,6 +14,7 @@ from crate.db.queries.genres_library_catalog import list_unmapped_genres_for_inf
 from crate.db.queries.genres_library_detail import get_genre_detail
 from crate.db.queries.sound_intelligence import get_sound_intelligence_health
 from crate.db.repositories.genres_taxonomy_edges import VALID_RELATION_TYPES
+from crate.genre_facets import normalize_genre_facets
 from crate.genre_taxonomy import get_genre_catalog
 
 log = logging.getLogger(__name__)
@@ -189,8 +191,45 @@ def build_genre_taxonomy_node_proposal(
     )
 
     revalidate_call(ai_call)
+    recommended_action = getattr(response, "recommended_action", "needs_review")
+    valid_actions = {
+        "create_node",
+        "alias_existing",
+        "delete_marginal",
+        "classify_facet",
+        "needs_review",
+    }
+    if recommended_action not in valid_actions:
+        recommended_action = "needs_review"
+    if source_kind != "raw_genre" and recommended_action == "classify_facet":
+        recommended_action = "needs_review"
+
+    facet_suggestions: list[dict] = []
+    if recommended_action == "classify_facet":
+        raw_facets = [
+            (
+                facet.model_dump()
+                if hasattr(facet, "model_dump")
+                else {
+                    "dimension": getattr(facet, "dimension", None),
+                    "name": getattr(facet, "name", None),
+                }
+                if not isinstance(facet, dict)
+                else facet
+            )
+            for facet in (getattr(response, "facets", None) or [])
+        ]
+        try:
+            facet_suggestions = normalize_genre_facets(raw_facets)
+        except (AttributeError, TypeError, ValueError):
+            log.info("Invalid facet suggestion returned for raw genre %s", canonical_slug)
+        if not facet_suggestions:
+            recommended_action = "needs_review"
+
     relation_proposals = []
     for suggestion in response.relations:
+        if recommended_action == "classify_facet":
+            break
         relation_type = suggestion.relation_type
         if relation_type not in VALID_RELATION_TYPES:
             continue
@@ -211,19 +250,34 @@ def build_genre_taxonomy_node_proposal(
         )
 
     description = re.sub(r"\s+", " ", (response.description or "").strip())
+    eq_gains: list[float] = []
+    raw_eq_gains = getattr(response, "eq_gains", None)
+    if isinstance(raw_eq_gains, (list, tuple)) and len(raw_eq_gains) == 10:
+        try:
+            numeric_eq_gains = [float(value) for value in raw_eq_gains]
+            if all(math.isfinite(value) for value in numeric_eq_gains):
+                eq_gains = [
+                    round(max(-12.0, min(12.0, value)), 1)
+                    for value in numeric_eq_gains
+                ]
+        except (TypeError, ValueError):
+            eq_gains = []
+    eq_reasoning = re.sub(
+        r"\s+", " ", str(getattr(response, "eq_reasoning", "") or "").strip()
+    )[:420]
     aliases = [
         alias.strip()
         for alias in response.aliases
         if alias.strip() and len(alias.strip()) <= 80
     ]
-    recommended_action = getattr(response, "recommended_action", "needs_review")
-    if recommended_action not in {
-        "create_node",
-        "alias_existing",
-        "delete_marginal",
-        "needs_review",
-    }:
-        recommended_action = "needs_review"
+    if recommended_action == "classify_facet":
+        description = ""
+        aliases = []
+        relation_proposals = []
+        eq_gains = []
+        eq_reasoning = ""
+    else:
+        facet_suggestions = []
     recommended_target_slug = _normalize_slug(
         str(getattr(response, "recommended_target_slug", "") or "")
     )
@@ -237,9 +291,12 @@ def build_genre_taxonomy_node_proposal(
         "source_kind": source_kind,
         "recommended_action": recommended_action,
         "recommended_target_slug": recommended_target_slug,
+        "facets": facet_suggestions,
         "description": description,
         "aliases": list(dict.fromkeys(aliases))[:12],
         "relations": relation_proposals,
+        "eq_gains": eq_gains,
+        "eq_reasoning": eq_reasoning,
         "reasoning": response.reasoning,
         "current_relations": current_relations,
         "evidence": {

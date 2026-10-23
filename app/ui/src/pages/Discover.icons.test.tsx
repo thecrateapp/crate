@@ -85,7 +85,7 @@ describe("Discovery text presentation with real hooks", () => {
     const image = screen.getByRole("img", { name: "Costa Norte" });
     expect(image).toHaveAttribute("src", "/api/artists/23/photo");
     fireEvent.error(image);
-    expect(image).toHaveStyle({ display: "none" });
+    expect(image).not.toBeInTheDocument();
     expect(
       document.querySelector('img[src="/sample-discovery-cover.svg"]'),
     ).toHaveAttribute("alt", "");
@@ -95,7 +95,7 @@ describe("Discovery text presentation with real hooks", () => {
       "Check releases",
       "Open artist",
       "Acquire missing",
-      "Open full radar",
+      "Open Release Radar",
     ])
       for (const button of screen.getAllByRole("button", { name }))
         if (button.closest('[data-slot="admin-page-header"]'))
@@ -128,7 +128,7 @@ describe("Discovery text presentation with real hooks", () => {
     expect(mockApi).toHaveBeenCalledTimes(3);
   });
 
-  it("keeps canonical album/artist links and keyboard navigation to acquisition and full radar", async () => {
+  it("keeps canonical album/artist links and keyboard navigation to acquisition and release radar", async () => {
     await ready();
     expect(
       screen.getByRole("link", { name: "Luz de octubre" }),
@@ -147,7 +147,7 @@ describe("Discovery text presentation with real hooks", () => {
       "/download?q=Costa%20Norte",
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "Open full radar" }),
+      screen.getByRole("button", { name: "Open Release Radar" }),
     );
     expect(screen.getByLabelText("Current route")).toHaveTextContent(
       "/new-releases",

@@ -130,7 +130,9 @@ describe("AiModels", () => {
     }));
     renderWithAdminProviders(<AiModels />);
 
-    expect(screen.getByText("Loading AI settings…")).toBeVisible();
+    expect(
+      screen.getByRole("status", { name: "Loading AI settings" }),
+    ).toBeVisible();
   });
 
   it("shows a readable error state with a retry control", () => {

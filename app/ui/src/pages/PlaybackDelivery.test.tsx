@@ -77,7 +77,14 @@ describe("PlaybackDelivery", () => {
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Playback Delivery" }),
-    ).toBeInTheDocument();
+    ).toHaveClass("font-display", "font-extrabold");
+    const actions = screen.getByRole("group", {
+      name: "Playback delivery actions",
+    });
+    const refresh = within(actions).getByRole("button", { name: "Refresh" });
+    expect(refresh).toHaveAttribute("data-size", "icon-lg");
+    expect(refresh).toHaveAttribute("data-variant", "ghost");
+    expect(refresh).not.toHaveAttribute("title");
     expect(screen.getByText("51.25%")).toBeVisible();
     expect(screen.getByText("41 / 80 tracks")).toBeVisible();
     expect(
@@ -110,6 +117,23 @@ describe("PlaybackDelivery", () => {
       screen.queryByRole("meter", { name: "Transcode slots" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("n/a")).toBeVisible();
+  });
+
+  it("uses the semantic danger tone for failed playback variants", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...delivery,
+        recent_variants: [{ ...delivery.recent_variants[0], status: "failed" }],
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<PlaybackDelivery />, { route: "/playback" });
+
+    expect(
+      screen.getByText("failed").closest('[data-slot="info-badge"]'),
+    ).toHaveAttribute("data-tone", "danger");
   });
 
   it("supports cold-error recovery and refresh without discarding the last sample", async () => {

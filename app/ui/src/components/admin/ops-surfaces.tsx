@@ -42,7 +42,7 @@ export function OpsPageHero({
         <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
           {title}
         </h1>
-        <p className="mt-3 text-sm text-white/55">{description}</p>
+        <p className="mt-3 text-sm text-text-muted">{description}</p>
       </div>
       {children ? (
         <div className="flex flex-wrap items-center gap-2">{children}</div>
@@ -112,7 +112,7 @@ export function OpsStatTile({
         </div>
       </div>
       {caption ? (
-        <div className="mt-1 text-xs text-white/40">{caption}</div>
+        <div className="mt-1 text-xs text-text-muted">{caption}</div>
       ) : null}
     </div>
   );

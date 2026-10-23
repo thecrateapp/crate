@@ -33,7 +33,14 @@ describe("Trash text controls and retained UX", () => {
     await ready();
     expect(screen.getByRole("heading", { name: "Library Trash" })).toHaveClass(
       "font-display",
+      "font-extrabold",
     );
+    for (const name of ["Refresh", "Empty trash"]) {
+      const action = screen.getByRole("button", { name });
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).toHaveAttribute("data-variant", "ghost");
+      expect(action).not.toHaveAttribute("title");
+    }
     expect(document.querySelectorAll("svg")).toHaveLength(2);
     expect(
       document.querySelectorAll('svg[data-admin-ux^="header-"]'),

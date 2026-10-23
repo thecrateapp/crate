@@ -4,6 +4,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@/lib/utils";
 import { missingFields, type RequiredShowField } from "./show-draft";
 import {
@@ -312,12 +313,11 @@ export function ShowCandidateFields({
         {candidate.evidence ? (
           <div>
             <p className="font-medium">From the source</p>
-            <p
-              className="line-clamp-3 whitespace-pre-wrap"
-              title={candidate.evidence}
-            >
-              {candidate.evidence}
-            </p>
+            <TooltipHint content={candidate.evidence}>
+              <p className="line-clamp-3 whitespace-pre-wrap">
+                {candidate.evidence}
+              </p>
+            </TooltipHint>
           </div>
         ) : null}
         {source ? (

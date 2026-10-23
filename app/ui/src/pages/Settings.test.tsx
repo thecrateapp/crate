@@ -149,6 +149,19 @@ describe("Settings", () => {
     }));
   });
 
+  it("uses the shared loading state while settings are being fetched", () => {
+    useApiMock.mockImplementation(() => ({
+      data: null,
+      loading: true,
+      refetch: refetchMock,
+    }));
+    render(<Settings />);
+
+    expect(
+      screen.getByRole("status", { name: "Loading settings" }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the selected section in the URL and removes the default section", async () => {
     const user = userEvent.setup();
     apiMock.mockResolvedValue(settingsData);
@@ -158,20 +171,20 @@ describe("Settings", () => {
         <LocationProbe />
       </>,
     );
+    expect(screen.getByRole("heading", { name: "Settings" })).toHaveClass(
+      "font-display",
+      "font-extrabold",
+    );
 
     await user.click(screen.getByRole("tab", { name: "Downloads" }));
     expect(screen.getByTestId("location-search")).toHaveTextContent(
       "?section=downloads",
     );
-    expect(
-      screen.getByRole("group", { name: "Tidal Access" }),
-    ).toBeVisible();
+    expect(screen.getByRole("group", { name: "Tidal Access" })).toBeVisible();
 
     await user.click(screen.getByRole("tab", { name: "General" }));
     expect(screen.getByTestId("location-search")).toHaveTextContent("");
-    expect(
-      screen.getByRole("group", { name: "Worker Engine" }),
-    ).toBeVisible();
+    expect(screen.getByRole("group", { name: "Worker Engine" })).toBeVisible();
   });
 
   it("opens the Settings section requested by the URL", () => {
@@ -261,7 +274,12 @@ describe("Settings", () => {
     render(<Settings />);
 
     await user.click(screen.getByRole("tab", { name: /enrichment/i }));
-    await user.click(screen.getByRole("switch", { name: /ai refinement/i }));
+    const refinementSwitch = screen.getByRole("switch", {
+      name: /ai refinement/i,
+    });
+    expect(refinementSwitch).toHaveAttribute("data-slot", "switch");
+    expect(refinementSwitch).toHaveClass("crate-form-switch");
+    await user.click(refinementSwitch);
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/settings/paths", "PUT", {

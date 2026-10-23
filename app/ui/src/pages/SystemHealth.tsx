@@ -1,4 +1,5 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   PageHeaderAction,
@@ -288,19 +289,19 @@ function ChartTooltip({
   items: { label: string; value: string }[];
 }) {
   return (
-    <OpsSurface className="min-w-[180px] rounded-sm bg-panel-surface px-3 py-3 text-xs text-white">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-accent-action-hi/65 font-mono">
+    <OpsSurface className="min-w-[180px] rounded-sm bg-panel-surface px-3 py-3 text-xs text-text-primary">
+      <MonoLabel as="div" tone="accent">
         Metric slice
-      </div>
-      <div className="mt-2 font-medium text-white">{title}</div>
+      </MonoLabel>
+      <div className="mt-2 font-medium text-text-primary">{title}</div>
       <div className="mt-3 space-y-1.5">
         {items.map((item) => (
           <div
             key={`${item.label}-${item.value}`}
-            className="flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0"
+            className="flex items-center justify-between gap-4 border-b border-border-quiet pb-1 last:border-b-0 last:pb-0"
           >
-            <span className="text-white/45">{item.label}</span>
-            <span className="font-medium text-white">{item.value}</span>
+            <span className="text-text-muted">{item.label}</span>
+            <span className="font-medium text-text-primary">{item.value}</span>
           </div>
         ))}
       </div>
@@ -336,7 +337,7 @@ function HealthSignal({
           {score ?? "—"}
         </div>
       </div>
-      <div className="mt-3 text-xs text-white/45">{summary}</div>
+      <div className="mt-3 text-xs text-text-muted">{summary}</div>
     </OpsSurface>
   );
 }
@@ -366,7 +367,7 @@ function ResourceCard({
 function ProgressBar({
   value,
   max,
-  color = "bg-primary",
+  color = "bg-accent-action-hi",
   label,
 }: {
   value: number;
@@ -379,13 +380,13 @@ function ProgressBar({
     <div className={label ? "crate-form-field" : undefined}>
       {label ? (
         <div className="flex min-w-0 justify-between gap-2 font-mono text-label font-normal">
-          <span className="min-w-0 truncate text-white/40">{label}</span>
-          <span className="shrink-0 text-white/60 tabular-nums">
+          <span className="min-w-0 truncate text-text-muted">{label}</span>
+          <span className="shrink-0 text-text-secondary tabular-nums">
             {pct.toFixed(0)}%
           </span>
         </div>
       ) : null}
-      <div className="h-px overflow-hidden rounded-full bg-white/8">
+      <div className="h-px overflow-hidden rounded-full bg-border-quiet">
         <div
           className={`h-full rounded-full transition-[width,background-color] ${color}`}
           style={{ width: `${pct}%` }}
@@ -445,9 +446,10 @@ function MetricChart({
         <div className="mb-2 font-display text-xl font-bold text-text-primary">
           {title}
         </div>
-        <div className="flex h-48 items-center justify-center text-sm text-white/30">
-          No data yet
-        </div>
+        <EmptyState
+          message="No data yet"
+          className="h-48 items-center text-center"
+        />
       </OpsSurface>
     );
   }
@@ -465,10 +467,10 @@ function MetricChart({
           yScale={{ type: "linear", min: 0, max: "auto" }}
           curve="monotoneX"
           colors={[
-            "#06b6d4",
-            "rgba(6,182,212,0.3)",
-            "#f59e0b",
-            "rgba(245,158,11,0.3)",
+            "var(--color-accent-action-hi)",
+            "color-mix(in srgb, var(--color-accent-action-hi) 30%, transparent)",
+            "var(--color-state-warning)",
+            "color-mix(in srgb, var(--color-state-warning) 30%, transparent)",
           ]}
           lineWidth={2}
           pointSize={0}
@@ -477,9 +479,14 @@ function MetricChart({
           enableGridX={false}
           gridYValues={4}
           theme={{
-            text: { fill: "rgba(255,255,255,0.4)", fontSize: 10 },
-            grid: { line: { stroke: "rgba(255,255,255,0.06)" } },
-            crosshair: { line: { stroke: "#06b6d4", strokeWidth: 1 } },
+            text: { fill: "var(--color-text-subtle)", fontSize: 10 },
+            grid: { line: { stroke: "var(--color-border-quiet)" } },
+            crosshair: {
+              line: {
+                stroke: "var(--color-accent-action-hi)",
+                strokeWidth: 1,
+              },
+            },
             tooltip: {
               container: {
                 background: "transparent",
@@ -577,7 +584,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
 
         <OpsSurface className="overflow-hidden">
           {visibleRoutes.length > 0 ? (
-            <div className="divide-y divide-white/6">
+            <div className="divide-y divide-border-quiet">
               {visibleRoutes.map((route) => {
                 const isSlow = route.p95 >= 1000;
                 const isVerySlow = route.p95 >= 3000 || route.error_rate > 0.01;
@@ -597,7 +604,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                         <InfoBadge className="shrink-0">
                           {route.method}
                         </InfoBadge>
-                        <span className="min-w-0 truncate font-mono text-sm text-white/85">
+                        <span className="min-w-0 truncate font-mono text-sm text-text-primary">
                           {route.path}
                         </span>
                       </div>
@@ -610,58 +617,46 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                       </div>
                     </div>
                     <div className="crate-form-field">
-                      <span
-                        data-slot="form-field-label"
-                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
-                      >
+                      <MonoLabel as="span" data-slot="form-field-label">
                         Count
-                      </span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">
+                      </MonoLabel>
+                      <span className="text-sm font-medium tabular-nums text-text-primary">
                         {route.count.toLocaleString()}
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span
-                        data-slot="form-field-label"
-                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
-                      >
+                      <MonoLabel as="span" data-slot="form-field-label">
                         Avg
-                      </span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">
+                      </MonoLabel>
+                      <span className="text-sm font-medium tabular-nums text-text-primary">
                         {formatMs(route.avg)}
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span
-                        data-slot="form-field-label"
-                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
-                      >
+                      <MonoLabel as="span" data-slot="form-field-label">
                         p95 / p99
-                      </span>
+                      </MonoLabel>
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           isVerySlow
                             ? "text-state-warning-text"
                             : isSlow
                               ? "text-state-warning-text"
-                              : "text-white/80"
+                              : "text-text-primary"
                         }`}
                       >
                         {formatMs(route.p95)} · {formatMs(route.p99)}
                       </span>
                     </div>
                     <div className="crate-form-field">
-                      <span
-                        data-slot="form-field-label"
-                        className="font-mono text-label font-normal uppercase tracking-caps text-text-subtle"
-                      >
+                      <MonoLabel as="span" data-slot="form-field-label">
                         5xx
-                      </span>
+                      </MonoLabel>
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           route.error_rate > 0
                             ? "text-state-warning-text"
-                            : "text-white/65"
+                            : "text-text-secondary"
                         }`}
                       >
                         {formatRouteErrorRate(route.error_rate)}
@@ -672,9 +667,10 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               })}
             </div>
           ) : (
-            <div className="flex min-h-[132px] items-center justify-center text-sm text-white/30">
-              No route latency samples yet
-            </div>
+            <EmptyState
+              message="No route latency samples yet"
+              className="min-h-[132px] items-center text-center"
+            />
           )}
         </OpsSurface>
       </div>
@@ -782,11 +778,11 @@ export function SystemHealth() {
         role="status"
         aria-label="Loading system health metrics"
         aria-busy="true"
-        className="flex justify-center py-16 text-white/45"
+        className="flex justify-center py-16 text-text-muted"
       >
         <Loader2
           aria-hidden="true"
-          className="h-5 w-5 animate-spin text-primary"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
         />
       </div>
     );
@@ -1015,7 +1011,7 @@ export function SystemHealth() {
                       ? "bg-state-warning"
                       : system.disk.music.percent > 75
                         ? "bg-state-warning"
-                        : "bg-primary"
+                        : "bg-accent-action-hi"
                   }
                   label={`${system.disk.music.free_gb} GB free`}
                 />
@@ -1035,7 +1031,7 @@ export function SystemHealth() {
                       ? "bg-state-warning"
                       : system.disk.data.percent > 75
                         ? "bg-state-warning"
-                        : "bg-primary"
+                        : "bg-accent-action-hi"
                   }
                   label={`${system.disk.data.free_gb} GB free`}
                 />
@@ -1056,18 +1052,18 @@ export function SystemHealth() {
                   color={
                     system.db_pool.checked_out >= system.db_pool.size
                       ? "bg-state-warning"
-                      : "bg-primary"
+                      : "bg-accent-action-hi"
                   }
                   label={`${system.db_pool.checked_in} idle, ${system.db_pool.checked_out} active`}
                 />
                 {system.db_pools?.sqlalchemy?.size ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     SQLAlchemy: {system.db_pools.sqlalchemy.checked_out}/
                     {system.db_pools.sqlalchemy.size} checked out
                   </div>
                 ) : null}
                 {system.db_pools?.legacy?.size ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Legacy: {system.db_pools.legacy.checked_out}/
                     {system.db_pools.legacy.size} checked out
                   </div>
@@ -1096,7 +1092,7 @@ export function SystemHealth() {
                   }`}
                 />
                 {system.analysis.bliss && system.analysis.bliss.pending > 0 ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Bliss: {system.analysis.bliss.done} done,{" "}
                     {system.analysis.bliss.pending} pending
                   </div>
@@ -1116,7 +1112,7 @@ export function SystemHealth() {
                   max={100}
                   color={
                     system.resource_pressure.allowed
-                      ? "bg-primary"
+                      ? "bg-accent-action-hi"
                       : "bg-state-warning"
                   }
                   label={
@@ -1125,7 +1121,7 @@ export function SystemHealth() {
                       : "No batch pressure detected"
                   }
                 />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-text-muted">
                   <span>
                     IO wait:{" "}
                     {system.resource_pressure.snapshot?.iowait_percent ?? "—"}%
@@ -1146,7 +1142,7 @@ export function SystemHealth() {
                   </span>
                 </div>
                 {system.resource_pressure.window?.enabled ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Window {system.resource_pressure.window.start}-
                     {system.resource_pressure.window.end}
                     {" · "}
@@ -1175,13 +1171,13 @@ export function SystemHealth() {
                   color={
                     system.media_worker.pending > 0
                       ? "bg-state-warning"
-                      : "bg-primary"
+                      : "bg-accent-action-hi"
                   }
                   label={`${
                     system.media_worker.pending ?? 0
                   } pending bridge events`}
                 />
-                <div className="text-[10px] text-white/30">
+                <div className="font-mono text-label text-text-subtle">
                   {system.media_worker.recent_events?.[0]?.event
                     ? `Latest: ${String(
                         system.media_worker.recent_events[0].event,
@@ -1189,7 +1185,7 @@ export function SystemHealth() {
                     : system.media_worker.consumer_group}
                 </div>
                 {summary?.media_worker_completed ? (
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-text-muted">
                     <span>Done: {summary.media_worker_completed.count}</span>
                     <span>
                       Failed: {summary.media_worker_failed?.count ?? 0}
@@ -1320,10 +1316,10 @@ export function SystemHealth() {
                   className="grid grid-cols-2 items-center gap-3 px-4 py-3 sm:flex"
                 >
                   <div className="col-span-2 min-w-0 flex-1">
-                    <div className="break-words text-sm font-medium text-white">
+                    <div className="break-words text-sm font-medium text-text-primary">
                       {task.label || taskLabel(task.type)}
                     </div>
-                    <div className="mt-0.5 break-words text-xs text-white/40">
+                    <div className="mt-0.5 break-words text-xs text-text-muted">
                       {progress?.phase ? (
                         <span>{String(progress.phase)}</span>
                       ) : null}
@@ -1334,13 +1330,13 @@ export function SystemHealth() {
                   </div>
                   {pct > 0 ? (
                     <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
-                      <div className="h-px flex-1 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-px flex-1 overflow-hidden rounded-full bg-border-quiet">
                         <div
-                          className="h-full rounded-full bg-primary transition-[width,background-color]"
+                          className="h-full rounded-full bg-accent-action-hi transition-[width,background-color]"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="w-8 text-right text-[10px] tabular-nums text-white/40">
+                      <span className="w-8 text-right font-mono text-label tabular-nums text-text-muted">
                         {pct.toFixed(0)}%
                       </span>
                     </div>
@@ -1349,7 +1345,7 @@ export function SystemHealth() {
                     Elapsed
                     <span className="tabular-nums">{elapsedStr}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-white/20">
+                  <span className="font-mono text-label text-text-subtle">
                     {task.id.slice(0, 8)}
                   </span>
                 </OpsSurface>

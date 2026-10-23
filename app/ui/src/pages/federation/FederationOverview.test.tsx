@@ -35,6 +35,30 @@ it("renders node identity and the empty streaming state without peers", () => {
   expect(screen.getByText("No active peer usage.")).toBeInTheDocument();
 });
 
+it("uses the shared federation loading state and announces unavailable data", () => {
+  vi.mocked(useApi).mockImplementation((path: string | null) => ({
+    data: null,
+    loading: path?.endsWith("status") ?? false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+  const { rerender } = renderWithAdminProviders(<FederationOverview />);
+  expect(
+    screen.getByRole("status", { name: "Loading federation data" }),
+  ).toBeInTheDocument();
+
+  vi.mocked(useApi).mockImplementation((path: string | null) => ({
+    data: null,
+    loading: false,
+    error: path?.endsWith("status") ? "offline" : null,
+    refetch: vi.fn(),
+  }));
+  rerender(<FederationOverview />);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Federation data is unavailable.",
+  );
+});
+
 it("keeps each peer's stream usage aligned with its identity", () => {
   vi.mocked(useApi).mockImplementation((path: string | null) => ({
     data: path?.endsWith("status")

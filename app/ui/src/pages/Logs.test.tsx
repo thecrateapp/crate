@@ -41,17 +41,14 @@ describe("Logs typographic controls", () => {
     ).not.toBeNull();
   });
   it("retires redundant action and summary glyphs while keeping native live controls", async () => {
-    renderWithAdminProviders(<Logs />);
+    const { container } = renderWithAdminProviders(<Logs />);
     await screen.findByRole("heading", { name: "Logs" });
     expect(
       screen.getByRole("button", { name: "Refresh" }).querySelector("svg"),
     ).toHaveAttribute("data-admin-ux", "header-refresh");
     expect(screen.getByText("3 lines").querySelector("svg")).toBeNull();
     expect(screen.getByText(/workers online/).querySelector("svg")).toBeNull();
-    expect(screen.getByText("1 errors")).toHaveAttribute(
-      "data-tone",
-      "warning",
-    );
+    expect(screen.getByText("1 errors")).toHaveAttribute("data-tone", "danger");
     expect(screen.getByText("1 warnings")).toHaveAttribute(
       "data-tone",
       "warning",
@@ -66,6 +63,31 @@ describe("Logs typographic controls", () => {
       "href",
       "/tasks?task=scan-sample-123",
     );
+    const worker = screen.getAllByRole("button", { name: /log lines seen/ })[0]!;
+    expect(worker).toHaveClass("border-border-quiet", "bg-raised-surface");
+    const stream = screen.getByRole("heading", { name: "Incident stream" })
+      .parentElement?.parentElement;
+    expect(stream?.querySelector('[class*="bg-[#06080c]"]')).toBeNull();
+    expect(container.querySelector('[class*="text-white/"]')).toBeNull();
+  });
+  it("uses the shared empty state when no worker or log entries are available", async () => {
+    vi.mocked(api).mockResolvedValue({
+      ...snapshot,
+      workers: [],
+      logs: [],
+    });
+    renderWithAdminProviders(<Logs />);
+    await screen.findByRole("heading", { name: "Logs" });
+    expect(
+      screen
+        .getByText("No worker heartbeat data available yet.")
+        .closest('[data-testid="empty-state"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByText("No log lines match the current filters.")
+        .closest('[data-testid="empty-state"]'),
+    ).toBeInTheDocument();
   });
   it("keeps filters, refresh and live subscription lifetime", async () => {
     const user = userEvent.setup();

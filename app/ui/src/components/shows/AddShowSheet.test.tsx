@@ -690,7 +690,7 @@ describe("AddShowSheet", { timeout: 15_000 }, () => {
     ).toHaveAttribute("href", "/upcoming?show_id=42");
     expect(
       screen.getByRole("button", { name: "Use Listed Band (Show 1)" }),
-    ).toHaveAttribute("title", artistUid);
+    ).not.toHaveAttribute("title");
     expect(document.body.textContent).not.toContain(artistUid);
     await user.click(
       screen.getByRole("button", {

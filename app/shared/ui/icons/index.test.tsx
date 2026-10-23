@@ -6,6 +6,7 @@ import {
   Cassette2 as SolarCassette2Outline,
   Heart as SolarHeartOutline,
   Microphone as SolarMicrophoneOutline,
+  MinusSquare as SolarMinusSquareOutline,
   Pulse as SolarPulseOutline,
   Radar2 as SolarRadar2Outline,
 } from "@solar-icons/react-perf/Outline";
@@ -25,6 +26,7 @@ import {
   Heart,
   HeartBold,
   Loader2,
+  Minus,
   Pause,
   Play,
   Radio,
@@ -76,6 +78,12 @@ describe("@crate/ui/icons", () => {
   it("uses Solar Outline as the default visual style", () => {
     expect(renderSvgInner(<Heart size={24} />)).toBe(
       renderSvgInner(<SolarHeartOutline size={24} />),
+    );
+  });
+
+  it("maps the decrement action to the Solar Minus Square outline", () => {
+    expect(renderSvgInner(<Minus size={18} />)).toBe(
+      renderSvgInner(<SolarMinusSquareOutline size={18} />),
     );
   });
 

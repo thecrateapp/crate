@@ -333,6 +333,9 @@ describe("AgentPlanDetail", () => {
     const selection = await screen.findByRole("table", {
       name: "Complete editorial selection",
     });
+    expect(screen.getByText(/Requested by Unknown connection/)).toHaveClass(
+      "text-text-secondary",
+    );
     const rows = within(selection).getAllByRole("row");
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveTextContent("1");
