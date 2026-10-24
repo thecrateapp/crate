@@ -1,10 +1,19 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import {
   PageHeaderAction,
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
-import { RefreshCw as HeaderRefreshCw, Loader2, Search } from "lucide-react";
+import {
+  ExternalLink,
+  ListOrdered,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Square,
+} from "@crate/ui/icons";
 import {
   useCallback,
   useEffect,
@@ -20,20 +29,16 @@ import {
   OpsPanel,
   OpsRefreshNotice,
   OpsSnapshotStatus,
-  OpsStatTile,
-  OpsSurface,
   type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
-import { Button } from "@crate/ui/shadcn/button";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 interface Container {
   id: string;
@@ -76,29 +81,14 @@ const SERVICE_URLS: Record<string, string> = {
   traefik: "https://traefik.lespedants.org",
 };
 
-const STATE_STYLES: Record<
+const STATE_TONES: Record<
   string,
-  {
-    dot: string;
-    tone: "neutral" | "success" | "warning" | "danger";
-  }
+  "neutral" | "success" | "warning" | "danger"
 > = {
-  running: {
-    dot: "bg-accent-action",
-    tone: "success",
-  },
-  restarting: {
-    dot: "bg-state-warning",
-    tone: "warning",
-  },
-  exited: {
-    dot: "bg-text-subtle",
-    tone: "neutral",
-  },
-  dead: {
-    dot: "bg-state-warning",
-    tone: "danger",
-  },
+  running: "success",
+  restarting: "warning",
+  exited: "neutral",
+  dead: "danger",
 };
 
 function getServiceUrl(name: string) {
@@ -123,62 +113,6 @@ function createStackEventSource() {
   return new EventSource("/api/admin/stack-stream", {
     withCredentials: true,
   });
-}
-
-function formatLogTimestamp(line: string) {
-  const tsMatch = line.match(
-    /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^ ]*)\s*/,
-  );
-  if (tsMatch?.[1]) {
-    const date = new Date(tsMatch[1]);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    }
-    return tsMatch[1];
-  }
-
-  const goTsMatch = line.match(/time="([^"]+)"/);
-  if (goTsMatch?.[1]) {
-    const date = new Date(goTsMatch[1]);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    }
-    return goTsMatch[1];
-  }
-
-  return "";
-}
-
-function stateMeta(state: string) {
-  return (
-    STATE_STYLES[state] ?? {
-      dot: "bg-text-subtle",
-      tone: "neutral" as const,
-    }
-  );
-}
-
-function StackLogLine({ line }: { line: string }) {
-  const timestamp = formatLogTimestamp(line);
-
-  return (
-    <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-label text-text-secondary">
-      {timestamp ? (
-        <span className="w-[78px] shrink-0 text-text-subtle tabular-nums">
-          {timestamp}
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1 break-all">{line}</span>
-    </div>
-  );
 }
 
 function ServiceCard({
@@ -208,119 +142,102 @@ function ServiceCard({
   const isRunning = container.state === "running";
   const serviceUrl = getServiceUrl(container.name);
   const hostname = serviceHostname(container.name);
-  const state = stateMeta(container.state);
+  const metadata = [
+    { label: "Status", value: container.status },
+    {
+      label: "Ports",
+      value: container.ports.length
+        ? container.ports.join(", ")
+        : "No exposed ports",
+    },
+    { label: "Public route", value: hostname ?? "Internal only" },
+  ];
 
   return (
-    <OpsSurface
-      as="article"
+    <article
       aria-label={`Service ${container.name}`}
-      className="overflow-hidden"
+      className="min-w-0 space-y-4 border-b border-border-quiet py-5"
     >
-      <div className="space-y-4 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display text-base font-semibold tracking-tight text-text-primary">
-                {container.name}
-              </span>
-              <InfoBadge tone={state.tone}>
-                <span className={cn("h-2 w-2 rounded-full", state.dot)} />
-                {container.state}
-              </InfoBadge>
-              {hostname ? <InfoBadge>{hostname}</InfoBadge> : null}
-            </div>
-            <div className="text-sm text-text-muted">
-              {displayImage(container.image)}
-            </div>
-          </div>
-
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11"
-              onClick={onToggleLogs}
-              aria-label={`${expanded ? "Hide" : "Show"} logs for ${container.name}`}
-              aria-expanded={expanded}
-              aria-controls={logsId}
-            >
-              Logs
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11"
-              onClick={onToggleState}
-              disabled={busy}
-              aria-busy={busy || undefined}
-              aria-label={`${isRunning ? "Stop" : "Start"} service ${container.name}`}
-            >
-              {busy ? (
-                <Loader2
-                  data-admin-ux="service-state-loading"
-                  aria-hidden="true"
-                  size={15}
-                  className="animate-spin"
-                />
-              ) : null}
-              {isRunning ? "Stop" : "Start"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11"
-              onClick={onRestart}
-              disabled={busy || !isRunning}
-              aria-label={`Restart service ${container.name}`}
-            >
-              Restart
-            </Button>
-            {serviceUrl ? (
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="min-h-11"
-                aria-label={`Open service ${container.name}`}
-              >
-                <a href={serviceUrl} target="_blank" rel="noreferrer">
-                  Open service
-                </a>
-              </Button>
-            ) : null}
+            <h3 className="m-0 min-w-0 wrap-anywhere font-display text-base font-semibold tracking-tight text-text-primary">
+              {container.name}
+            </h3>
+            <InfoBadge tone={STATE_TONES[container.state] ?? "neutral"}>
+              {container.state}
+            </InfoBadge>
+          </div>
+          <div className="min-w-0 wrap-anywhere font-mono text-label font-normal text-text-muted">
+            {displayImage(container.image)}
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
-            <MonoLabel as="div">Status</MonoLabel>
-            <div className="text-sm font-medium text-text-primary">
-              {container.status}
-            </div>
-          </div>
-          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
-            <MonoLabel as="div">Ports</MonoLabel>
-            <div className="text-sm font-medium text-text-primary">
-              {container.ports.length > 0
-                ? container.ports.join(", ")
-                : "No exposed ports"}
-            </div>
-          </div>
-          <div className="crate-form-field rounded-md border border-border-quiet bg-app-surface p-3">
-            <MonoLabel as="div">Public route</MonoLabel>
-            <div className="text-sm font-medium text-text-primary">
-              {hostname ?? "Internal only"}
-            </div>
-          </div>
-        </div>
+        <PageHeaderActions label={`Actions for ${container.name}`}>
+          <PageHeaderAction
+            label={`${expanded ? "Hide" : "Show"} logs for ${container.name}`}
+            tooltip={expanded ? "Hide logs" : "Logs"}
+            onClick={onToggleLogs}
+            aria-expanded={expanded}
+            aria-controls={logsId}
+            aria-pressed={expanded}
+          >
+            <ListOrdered data-admin-ux="service-logs" aria-hidden="true" />
+          </PageHeaderAction>
+          <PageHeaderAction
+            label={`${isRunning ? "Stop" : "Start"} service ${container.name}`}
+            tooltip={isRunning ? "Stop" : "Start"}
+            onClick={onToggleState}
+            loading={busy}
+          >
+            {isRunning ? (
+              <Square data-admin-ux="service-stop" aria-hidden="true" />
+            ) : (
+              <Play data-admin-ux="service-start" aria-hidden="true" />
+            )}
+          </PageHeaderAction>
+          <PageHeaderAction
+            label={`Restart service ${container.name}`}
+            tooltip="Restart"
+            onClick={onRestart}
+            disabled={busy || !isRunning}
+          >
+            <RotateCcw data-admin-ux="service-restart" aria-hidden="true" />
+          </PageHeaderAction>
+          {serviceUrl ? (
+            <PageHeaderAction
+              asChild
+              label={`Open service ${container.name}`}
+              tooltip="Open service"
+            >
+              <a href={serviceUrl} target="_blank" rel="noreferrer">
+                <ExternalLink
+                  data-admin-ux="service-external"
+                  aria-hidden="true"
+                />
+              </a>
+            </PageHeaderAction>
+          ) : null}
+        </PageHeaderActions>
       </div>
+
+      <dl className="m-0 grid min-w-0 gap-4 sm:grid-cols-3">
+        {metadata.map(({ label, value }) => (
+          <div key={label} className="flex min-w-0 flex-col gap-1.5">
+            <MonoLabel as="dt">{label}</MonoLabel>
+            <dd className="m-0 wrap-anywhere font-mono text-sm font-normal text-text-primary">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
 
       {expanded ? (
         <div
           id={logsId}
           role="region"
           aria-label={`Logs for ${container.name}`}
-          className="border-t border-border-quiet bg-app-surface px-4 py-4"
+          className="min-w-0 border-t border-border-quiet pt-4"
         >
           <div className="mb-3 flex items-center justify-between gap-3">
             <MonoLabel as="div" tone="accent">
@@ -333,20 +250,15 @@ function ServiceCard({
           ) : logsError ? (
             <ErrorState message={logsError} onRetry={onRefreshLogs} />
           ) : logs?.logs ? (
-            <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-panel-surface py-2">
-              {logs.logs
-                .split("\n")
-                .filter(Boolean)
-                .map((line) => (
-                  <StackLogLine key={`${container.name}-${line}`} line={line} />
-                ))}
-            </div>
+            <pre className="m-0 max-h-80 overflow-y-auto whitespace-pre-wrap break-all font-mono text-label font-normal leading-6 text-text-secondary">
+              {logs.logs}
+            </pre>
           ) : (
             <EmptyState message="No logs available for this service." />
           )}
         </div>
       ) : null}
-    </OpsSurface>
+    </article>
   );
 }
 
@@ -542,26 +454,20 @@ export function Stack() {
     <div className="space-y-6">
       <OpsPageHero
         title="Stack"
-        description="Managed Docker services, their runtime state, and the quickest path to logs or restart when the platform starts wobbling."
+        description="Inspect service status, read recent logs and manage Docker services."
         compactActions
         actions={
           <PageHeaderActions>
             <PageHeaderAction
               label="Refresh"
               onClick={() => void fetchSnapshot(true)}
+              loading={loading}
             >
-              <HeaderRefreshCw
-                data-admin-ux="header-refresh"
-                aria-hidden="true"
-              />
+              <RefreshCw data-admin-ux="header-refresh" aria-hidden="true" />
             </PageHeaderAction>
           </PageHeaderActions>
         }
       >
-        <InfoBadge active>
-          {data?.running ?? 0}/{data?.total ?? 0} running
-        </InfoBadge>
-        <InfoBadge>{publicRoutes} public routes</InfoBadge>
         <InfoBadge>
           {data?.available ? "Docker available" : "Docker unavailable"}
         </InfoBadge>
@@ -594,44 +500,47 @@ export function Stack() {
                 into the API container to restore stack operations.
               </>
             }
-            className="items-center py-8 text-center"
           />
         </OpsPanel>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <OpsStatTile
+          <section
+            aria-label="Stack summary"
+            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-7 py-3 lg:grid-cols-3"
+          >
+            <StatNumber
+              as="div"
+              size="sm"
               label="Running services"
               value={(data?.running ?? 0).toLocaleString()}
-              caption={`${data?.total ?? 0} managed containers`}
-              tone={(data?.running ?? 0) > 0 ? "success" : "default"}
+              unit={`/ ${(data?.total ?? 0).toLocaleString()}`}
             />
-            <OpsStatTile
+            <StatNumber
+              as="div"
+              size="sm"
               label="Stopped services"
               value={(
                 (data?.total ?? 0) - (data?.running ?? 0)
               ).toLocaleString()}
-              caption="Exited or unavailable containers"
-              tone="default"
             />
-            <OpsStatTile
+            <StatNumber
+              as="div"
+              size="sm"
               label="Public routes"
               value={publicRoutes.toLocaleString()}
-              caption="Services with an external URL shortcut"
             />
-            <OpsStatTile
-              label="Visible services"
-              value={filteredContainers.length.toLocaleString()}
-              caption="Current filtered result set"
-            />
-          </div>
+          </section>
 
           <OpsPanel
-            title="Service filters"
-            description="Trim the board by runtime state or by service name, image and port text."
+            title="Services"
+            action={
+              <InfoBadge variant="counter">
+                {filteredContainers.length} / {data?.total ?? 0}
+              </InfoBadge>
+            }
           >
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="relative flex-1 min-w-[240px]">
+            <div className="mb-4 flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="relative min-w-0 flex-1">
                 <Search
                   data-admin-ux="stack-search"
                   aria-hidden="true"
@@ -643,7 +552,7 @@ export function Stack() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search services, images or ports..."
-                  className="min-h-11 pl-9"
+                  className="pl-9"
                 />
               </div>
               <SegmentedControl
@@ -658,14 +567,8 @@ export function Stack() {
                 ]}
               />
             </div>
-          </OpsPanel>
-
-          <OpsPanel
-            title="Services"
-            description="Service cards keep control actions close to state, while logs expand inline only when you need more detail."
-          >
             {filteredContainers.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-2">
+              <div className="grid min-w-0 gap-x-8 xl:grid-cols-2">
                 {filteredContainers.map((container) => (
                   <ServiceCard
                     key={container.id}

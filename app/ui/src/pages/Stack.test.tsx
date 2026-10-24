@@ -165,40 +165,77 @@ describe("Stack typographic controls", () => {
     );
     expect(screen.getByText("Docker available")).toBeVisible();
   });
-  it("names service actions, removes redundant summary/refresh/restart glyphs and preserves UX", async () => {
+  it("uses shared icon-only service actions without raised nested cards", async () => {
     renderWithAdminProviders(<Stack />);
     await screen.findByRole("heading", { name: "Stack" });
     expect(
       screen.getByRole("button", { name: "Refresh" }).querySelector("svg"),
     ).toHaveAttribute("data-admin-ux", "header-refresh");
-    expect(screen.getByRole("article", { name: "Service worker" })).toHaveClass(
-      "border-border-quiet",
-      "bg-raised-surface",
-      "shadow-none",
-    );
-    expect(screen.getByText("2/3 running").querySelector("svg")).toBeNull();
-    expect(screen.getByText("1 public routes").querySelector("svg")).toBeNull();
+    expect(
+      screen.getByRole("article", { name: "Service worker" }),
+    ).not.toHaveClass("bg-raised-surface");
     const restart = screen.getByRole("button", {
       name: "Restart service worker",
     });
-    expect(restart).toHaveTextContent("Restart");
-    expect(restart.querySelector("svg")).toBeNull();
     const logs = screen.getByRole("button", { name: "Show logs for worker" });
-    expect(logs).toHaveTextContent("Logs");
-    expect(logs.querySelector("svg")).toBeNull();
     const stop = screen.getByRole("button", { name: "Stop service worker" });
-    expect(stop).toHaveTextContent("Stop");
-    expect(stop.querySelector("svg")).toBeNull();
     const start = screen.getByRole("button", { name: "Start service scanner" });
-    expect(start).toHaveTextContent("Start");
-    expect(start.querySelector("svg")).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Start service scanner" }),
-    ).toHaveTextContent("Start");
     const external = screen.getByRole("link", { name: "Open service tidarr" });
     expect(external).toHaveAttribute("href", "https://search.lespedants.org");
     expect(external).toHaveAttribute("target", "_blank");
-    expect(external.querySelector("svg")).toBeNull();
+    for (const action of [restart, logs, stop, start, external]) {
+      expect(action).toHaveAttribute("data-variant", "ghost");
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).toHaveTextContent(/^$/);
+      expect(action.querySelectorAll("svg")).toHaveLength(1);
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
+      expect(action).not.toHaveAttribute("title");
+    }
+  });
+  it("keeps disabled restart discoverable with the shared tooltip", async () => {
+    renderWithAdminProviders(<Stack />);
+    const restart = await screen.findByRole("button", {
+      name: "Restart service scanner",
+    });
+    expect(restart).toBeDisabled();
+    const wrapper = screen.getByRole("group", {
+      name: "Restart service scanner",
+    });
+    expect(wrapper).toHaveAttribute("aria-disabled", "true");
+    expect(wrapper).toHaveAttribute("tabindex", "0");
+    wrapper.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Restart");
+    expect(api).not.toHaveBeenCalledWith(expect.anything(), "POST");
+  });
+  it("keeps the catalogue summary stable while the service count follows filters", async () => {
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    const summary = await screen.findByRole("region", {
+      name: "Stack summary",
+    });
+    const running = within(summary).getByText("Running services").parentElement;
+    expect(running).toHaveTextContent("2/ 3Running services");
+    expect(
+      within(summary).getByText("Stopped services").parentElement,
+    ).toHaveTextContent("1Stopped services");
+    const services = screen.getByRole("region", { name: "Services" });
+    expect(within(services).getByText("3 / 3")).toHaveAttribute(
+      "data-variant",
+      "counter",
+    );
+    await user.click(screen.getByRole("radio", { name: "Stopped" }));
+    expect(within(services).getByText("1 / 3")).toHaveAttribute(
+      "data-variant",
+      "counter",
+    );
+    expect(running).toHaveTextContent("2/ 3Running services");
+    expect(
+      screen.queryByRole("heading", { name: "Service filters" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("2/3 running")).not.toBeInTheDocument();
   });
   it("uses shared MonoLabels and semantic InfoBadge tones for service metadata", async () => {
     renderWithAdminProviders(<Stack />);
@@ -211,6 +248,7 @@ describe("Stack typographic controls", () => {
       .getByText("running", { exact: true })
       .closest('[data-slot="info-badge"]');
     expect(runningBadge).toHaveAttribute("data-tone", "success");
+    expect(runningBadge?.querySelector('[aria-hidden="true"]')).toBeNull();
     expect(within(runningService).getByText("Status")).toHaveClass(
       "crate-mono-label",
     );
@@ -219,6 +257,18 @@ describe("Stack typographic controls", () => {
     );
     expect(within(runningService).getByText("Public route")).toHaveClass(
       "crate-mono-label",
+    );
+    for (const label of ["Status", "Ports", "Public route"]) {
+      expect(within(runningService).getByText(label).tagName).toBe("DT");
+    }
+    for (const value of ["Up 2 hours", "No exposed ports", "Internal only"]) {
+      const reading = within(runningService).getByText(value);
+      expect(reading.tagName).toBe("DD");
+      expect(reading).toHaveClass("font-mono", "font-normal");
+    }
+    expect(within(runningService).getByText("crate-worker:sample")).toHaveClass(
+      "font-mono",
+      "wrap-anywhere",
     );
 
     const stoppedService = screen.getByRole("article", {
@@ -229,6 +279,24 @@ describe("Stack typographic controls", () => {
         .getByText("exited", { exact: true })
         .closest('[data-slot="info-badge"]'),
     ).toHaveAttribute("data-tone", "neutral");
+  });
+  it("keeps timestamped logs once, preserving duplicate lines in a bounded reading", async () => {
+    const line = "2026-10-24T12:34:56Z Worker heartbeat ready";
+    vi.mocked(api).mockImplementation(async (path) =>
+      path.includes("/logs?")
+        ? { name: "worker", logs: `${line}\n${line}` }
+        : snapshot,
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    await user.click(
+      await screen.findByRole("button", { name: "Show logs for worker" }),
+    );
+    const region = screen.getByRole("region", { name: "Logs for worker" });
+    const logReading = await within(region).findByText(`${line} ${line}`);
+    expect(logReading.tagName).toBe("PRE");
+    expect(logReading.textContent).toBe(`${line}\n${line}`);
+    expect(within(region).queryByText("12:34:56")).not.toBeInTheDocument();
   });
   it("keeps disclosure keyboard semantics, logs loading and closing", async () => {
     let resolveLogs: (value: unknown) => void = () => {};
@@ -348,14 +416,15 @@ describe("Stack typographic controls", () => {
     );
     expect(screen.getByText("tidarr", { exact: true })).toBeVisible();
     expect(created).toHaveBeenCalledOnce();
-    act(() =>
-      stream.onmessage?.({
-        data: JSON.stringify({
-          ...snapshot,
-          stack: { ...snapshot.stack, containers: [] },
-        }),
-        origin: window.location.origin,
-      } as MessageEvent),
+    act(
+      () =>
+        stream.onmessage?.({
+          data: JSON.stringify({
+            ...snapshot,
+            stack: { ...snapshot.stack, containers: [] },
+          }),
+          origin: window.location.origin,
+        } as MessageEvent),
     );
     expect(
       screen.getByText("No services match the current filters."),

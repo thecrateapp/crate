@@ -1,12 +1,16 @@
 import { expect, test } from "./fixtures";
-for (const width of [1440, 768, 390]) {
+import stackSnapshot from "./fixtures/stack-snapshot.json";
+for (const width of [1440, 768, 390, 320]) {
   test.describe(`operational controls ${width}`, () => {
     test.use({ viewport: { width, height: 1100 } });
-    test("keeps Logs and Stack usable with text actions and bounded UX glyphs", async ({
+    test("keeps Logs and Stack usable with shared icon actions and long service metadata", async ({
       page,
       openAdminPage,
       adminApi,
     }) => {
+      adminApi.respondTo("/api/admin/agent-plans/summary", {
+        awaiting_approval: 0,
+      });
       await openAdminPage("/logs");
       const main = page.getByRole("main");
       await expect(
@@ -42,6 +46,32 @@ for (const width of [1440, 768, 390]) {
         name: "worker",
         logs: "Sample service log",
       });
+      const longImage = `registry.local/crate/worker:${"long-release-identifier".repeat(
+        8,
+      )}`;
+      const longName =
+        "maintenance-worker-with-a-deliberately-long-compose-service-name";
+      adminApi.respondTo("/api/admin/stack-snapshot", {
+        ...stackSnapshot,
+        stack: {
+          ...stackSnapshot.stack,
+          total: 4,
+          running: 3,
+          containers: [
+            ...stackSnapshot.stack.containers,
+            {
+              id: "long-metadata-worker",
+              name: longName,
+              image: longImage,
+              state: "running",
+              status: "Up 2 hours (healthy)",
+              ports: [
+                "[2001:db8:85a3:0000:0000:8a2e:0370:7334]:8585->8585/tcp",
+              ],
+            },
+          ],
+        },
+      });
       await openAdminPage("/stack");
       const filters = main.getByRole("radiogroup", { name: "Service state" });
       const all = filters.getByRole("radio", { name: "All", exact: true });
@@ -75,7 +105,39 @@ for (const width of [1440, 768, 390]) {
         name: "Restart service worker",
         exact: true,
       });
-      await expect(restart.locator("svg")).toHaveCount(0);
+      for (const action of [
+        restart,
+        card.getByRole("button", { name: "Hide logs for worker", exact: true }),
+        card.getByRole("button", { name: "Stop service worker", exact: true }),
+      ]) {
+        await expect(action).toHaveAttribute("data-variant", "ghost");
+        await expect(action).toHaveAttribute("data-size", "icon-lg");
+        await expect(action.locator("svg")).toHaveCount(1);
+        await expect(action).toHaveText("");
+      }
+      await restart.hover();
+      await expect(restart).toHaveAttribute("aria-describedby", /\S+/);
+      const restartTooltip = await restart.getAttribute("aria-describedby");
+      await expect(
+        page.locator(`[role="tooltip"][id="${restartTooltip}"]`),
+      ).toHaveText("Restart");
+      await page.mouse.move(0, 0);
+      const disabledRestart = main.getByRole("button", {
+        name: "Restart service scanner",
+        exact: true,
+      });
+      await expect(disabledRestart).toBeDisabled();
+      const disabledWrapper = main.getByRole("group", {
+        name: "Restart service scanner",
+        exact: true,
+      });
+      await disabledWrapper.focus();
+      await expect(disabledWrapper).toHaveAttribute("aria-describedby", /\S+/);
+      const disabledTooltip =
+        await disabledWrapper.getAttribute("aria-describedby");
+      await expect(
+        page.locator(`[role="tooltip"][id="${disabledTooltip}"]`),
+      ).toHaveText("Restart");
       await restart.click();
       const dialog = page.getByRole("alertdialog");
       await expect(
@@ -121,6 +183,17 @@ for (const width of [1440, 768, 390]) {
         const box = await button.boundingBox();
         expect(Math.min(box!.width, box!.height)).toBeGreaterThanOrEqual(44);
       }
+      const longService = main.getByRole("article", {
+        name: `Service ${longName}`,
+        exact: true,
+      });
+      await expect(
+        longService.getByText(longImage, { exact: true }),
+      ).toBeVisible();
+      const cardBox = await longService.boundingBox();
+      expect(cardBox!.x).toBeGreaterThanOrEqual(0);
+      expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(width);
+      await expect(main.locator("[title]")).toHaveCount(0);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
