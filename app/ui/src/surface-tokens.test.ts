@@ -82,18 +82,18 @@ describe("admin surface color tokens", () => {
     );
   });
 
-  it("falls back to the glass value of each token", () => {
+  it("falls back to the fixed solid value of each token", () => {
     for (const [name, value] of registered) {
-      expect(value).toBe(`var(--crate-token-surface-${name}-glass)`);
+      expect(value).toBe(`var(--crate-token-surface-${name}-solid)`);
     }
   });
 
-  it("keeps a runtime value for each registered token on both surfaces", () => {
+  it("keeps each registered runtime token fixed to the shared solid identity", () => {
     for (const name of registered.keys()) {
       expect(surfacesCss).toContain(
         `--color-${name}: var(--crate-token-surface-${name}-solid)`,
       );
-      expect(surfacesCss).toContain(
+      expect(surfacesCss).not.toContain(
         `--color-${name}: var(--crate-token-surface-${name}-glass)`,
       );
     }
@@ -120,7 +120,7 @@ describe("admin surface color tokens", () => {
       expect(rule, utility).toContain(`var(--color-${token},`);
     }
     // `reference` neither inlines the value nor emits a :root declaration
-    // that could compete with surfaces.css: [data-surface] alone decides.
+    // that could compete with the fixed solid runtime values in surfaces.css.
     expect(css).not.toMatch(/--color-[\w-]+\s*:/);
     expect(css).not.toMatch(/:\s*var\(--crate-token-surface/);
   });

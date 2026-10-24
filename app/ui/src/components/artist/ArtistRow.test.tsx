@@ -22,6 +22,6 @@ it("retains the same minimum-size frame and navigation when an artist photo fall
   fireEvent.error(image);
   expect(screen.queryByRole("img", { name: "Costa Norte" })).toBeNull();
   expect(frame).toContainElement(screen.getByText("C", { exact: true }));
-  fireEvent.keyDown(screen.getByRole("link"), { key: "Enter" });
+  fireEvent.click(screen.getByRole("button", { name: "Open Costa Norte" }));
   expect(open).toHaveBeenCalledTimes(1);
 });

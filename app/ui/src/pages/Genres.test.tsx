@@ -292,6 +292,20 @@ describe("Genres page", () => {
     expect(search.parentElement).not.toHaveClass("max-w-xl");
   });
 
+  it("uses the common mono numeric role for taxonomy health counts", () => {
+    renderGenreList();
+    for (const label of [
+      "Needs mapping",
+      "Orphan nodes",
+      "No genre EQ",
+      "Missing copy",
+    ]) {
+      const count = screen.getByText(label).parentElement?.querySelector("dd");
+      expect(count).toHaveClass("font-mono", "font-normal", "tabular-nums");
+      expect(count).not.toHaveClass("font-display", "font-semibold");
+    }
+  });
+
   it("keeps Sound Intelligence above the taxonomy content in both views", () => {
     renderGenreList();
 
@@ -346,7 +360,9 @@ describe("Genres page", () => {
     ).toHaveTextContent("31.5 weighted plays");
     expect(screen.getByText("Inherited genre EQ")).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Review Grime genre" }));
+    await user.click(
+      screen.getByRole("button", { name: "Review Grime genre" }),
+    );
     expect(screen.getByLabelText("Current location")).toHaveTextContent(
       "/genres?genre=grime",
     );

@@ -134,13 +134,13 @@ describe("HeroCompositionCanvas", () => {
     const { container } = render(<Harness />);
 
     expect(await screen.findByTestId("konva-stage")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Crop" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Crop" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
     await user.click(screen.getByRole("button", { name: "Zoom in" }));
     await user.click(screen.getByRole("button", { name: "Flip" }));
     await user.click(screen.getByRole("button", { name: "Rotate clockwise" }));
@@ -187,7 +187,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     const subject = screen.getByTestId("konva-image-fill-subject");
     const initialWidth = subject.getAttribute("data-width");
@@ -204,7 +204,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
     const callsBeforeZoom = transformerForceUpdate.mock.calls.length;
 
     await user.click(screen.getByRole("button", { name: "Zoom in" }));
@@ -219,7 +219,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     expect(screen.queryByTestId("konva-image-fill-background")).toBeNull();
     expect(screen.getByTestId("konva-image-fill-subject")).toHaveAttribute(
@@ -398,7 +398,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     expect(screen.getByTestId("desktop-hero-artwork-mask")).toHaveStyle({
       maskImage: "none",

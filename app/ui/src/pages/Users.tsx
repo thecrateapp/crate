@@ -45,6 +45,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
@@ -761,16 +762,10 @@ export function Users() {
 
   async function handleDelete() {
     if (!deleteTarget || !canDeleteUsers) return;
-    try {
-      await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
-      toast.success("User deleted");
-      setDeleteTarget(null);
-      await fetchUsers();
-    } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to delete user",
-      );
-    }
+    await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
+    toast.success("User deleted");
+    setDeleteTarget(null);
+    await fetchUsers();
   }
 
   const counts = useMemo(
@@ -1203,6 +1198,7 @@ export function Users() {
       ) : null}
 
       <UserDetailDialog
+        key={detailTarget?.id ?? "closed"}
         user={detailTarget}
         onOpenChange={(open) => {
           if (!open) {
@@ -1228,9 +1224,12 @@ export function Users() {
         }? Open sessions will be revoked and owned contributions may be queued for cleanup.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={() => {
-          void handleDelete();
-        }}
+        onConfirm={handleDelete}
+        onError={(err) =>
+          toast.error(
+            err instanceof ApiError ? err.message : "Failed to delete user",
+          )
+        }
         eyebrow="Confirm action"
         consequence={`${
           deleteTarget?.name || deleteTarget?.email || "User"
@@ -1260,6 +1259,7 @@ function UserDetailDialog({
   const { user: currentUser, refetch } = useAuth();
   const open = !!user;
   const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const detailRequestRef = useRef(0);
   const [loadingRequest, setLoadingRequest] = useState<number | null>(null);
   const loading = loadingRequest !== null;
@@ -1277,6 +1277,7 @@ function UserDetailDialog({
     async (userId: number, signal?: AbortSignal) => {
       const requestId = ++detailRequestRef.current;
       setLoadingRequest(requestId);
+      setDetailError(null);
       try {
         const data = await api<UserDetail>(
           `/api/auth/users/${userId}`,
@@ -1284,11 +1285,12 @@ function UserDetailDialog({
           undefined,
           { signal },
         );
-        if (signal?.aborted) return;
+        if (signal?.aborted || requestId !== detailRequestRef.current) return;
         setDetail(data);
       } catch (err) {
         if (
           signal?.aborted ||
+          requestId !== detailRequestRef.current ||
           (err instanceof DOMException && err.name === "AbortError")
         ) {
           return;
@@ -1296,6 +1298,7 @@ function UserDetailDialog({
         toast.error(
           err instanceof ApiError ? err.message : "Failed to load user detail",
         );
+        setDetailError("User detail could not be loaded. Try again.");
         setDetail(null);
       } finally {
         setLoadingRequest((activeRequest) =>
@@ -1495,6 +1498,14 @@ function UserDetailDialog({
                 className="h-5 w-5 animate-spin"
               />
             </div>
+          ) : detailError ? (
+            <ErrorState
+              title="User detail unavailable"
+              message={detailError}
+              onRetry={() => {
+                if (user) void fetchDetail(user.id);
+              }}
+            />
           ) : detail ? (
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">

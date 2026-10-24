@@ -1,3 +1,5 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -5,12 +7,7 @@ import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { Card, CardContent, CardHeader } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
@@ -96,28 +93,38 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-display">Signed directories</CardTitle>
+            <MonoLabel as="h3" tone="accent">
+              Signed directories
+            </MonoLabel>
           </CardHeader>
           <CardContent className="grid gap-2 md:grid-cols-2">
-            <Input
-              aria-label="Directory URL"
-              placeholder="https://directory.example/nodes.json"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-            />
-            <Input
-              aria-label="Trusted key ID"
-              placeholder="Trusted key ID"
-              value={keyId}
-              onChange={(event) => setKeyId(event.target.value)}
-            />
-            <Input
-              aria-label="Trusted Ed25519 public key"
-              placeholder="Trusted Ed25519 public key (base64)"
-              value={publicKey}
-              onChange={(event) => setPublicKey(event.target.value)}
+            <FormField label="Directory URL">
+              <Input
+                aria-label="Directory URL"
+                placeholder="https://directory.example/nodes.json"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+              />
+            </FormField>
+            <FormField label="Trusted key ID">
+              <Input
+                aria-label="Trusted key ID"
+                placeholder="Trusted key ID"
+                value={keyId}
+                onChange={(event) => setKeyId(event.target.value)}
+              />
+            </FormField>
+            <FormField
+              label="Trusted Ed25519 public key"
               className="md:col-span-2"
-            />
+            >
+              <Input
+                aria-label="Trusted Ed25519 public key"
+                placeholder="Trusted Ed25519 public key (base64)"
+                value={publicKey}
+                onChange={(event) => setPublicKey(event.target.value)}
+              />
+            </FormField>
             <Button
               className="md:w-fit"
               disabled={

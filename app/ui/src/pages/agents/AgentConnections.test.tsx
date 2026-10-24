@@ -588,8 +588,10 @@ describe("AgentConnections", () => {
     expect(document.body).not.toHaveTextContent("library.health.read");
 
     const sheet = await openConnection(user);
-    expect(within(sheet).getByText("Inspect library health")).toHaveAttribute(
-      "title",
+    const permission = within(sheet).getByText("Inspect library health");
+    expect(permission).not.toHaveAttribute("title");
+    permission.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "library.health.read",
     );
     expect(sheet).not.toHaveTextContent("library.health.read");

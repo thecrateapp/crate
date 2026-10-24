@@ -15,6 +15,7 @@ export type { CrossfadeTransition } from "./player-types";
 import type { PlayerQueueSnapshot } from "@/contexts/player-session";
 import type { ConnectedPlaybackInstance } from "@/hooks/use-crate-connect-ws";
 import type { RemotePlaybackState } from "@/lib/remote-playback-state";
+import type { EngineMixState } from "@/lib/playback-engine";
 
 export interface PlayerStateValue {
   isPlaying: boolean;
@@ -22,6 +23,8 @@ export interface PlayerStateValue {
   volume: number;
   analyserVersion: number;
   crossfadeTransition: CrossfadeTransition | null;
+  mixState?: EngineMixState | null;
+  nativeMixAvailable?: boolean;
 }
 
 export interface JamTransportControls {
@@ -98,12 +101,7 @@ export interface PlayerConnectValue {
   requestTransfer: (targetInstanceId: string) => boolean;
   sendRemoteCommand: (
     type:
-      | "pause"
-      | "resume"
-      | "seek"
-      | "next_track"
-      | "previous_track"
-      | "volume",
+      "pause" | "resume" | "seek" | "next_track" | "previous_track" | "volume",
     payload?: Record<string, unknown>,
   ) => boolean;
   serverClockOffsetMs: number;

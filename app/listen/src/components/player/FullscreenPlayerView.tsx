@@ -1,3 +1,4 @@
+import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { PlayerPanels } from "./PlayerPanels";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
@@ -13,6 +14,7 @@ import {
 import type { FullscreenPlayerViewProps } from "@/components/player/fullscreen-player-view-types";
 export function FullscreenPlayerView({
   t,
+  open = true,
   state,
   player,
   refs,
@@ -28,9 +30,27 @@ export function FullscreenPlayerView({
   setShowEqualizer,
   markArtistPhotoFailed,
 }: FullscreenPlayerViewProps) {
+  useModalFocus({
+    active: open,
+    panelRef: refs.fsRootRef,
+    onEscape: actions.onEscape,
+    isolate: true,
+    restoreFocusTarget: () =>
+      document.querySelector<HTMLElement>(
+        '[data-player-surface-launcher="fullscreen"]',
+      ),
+  });
   return (
     <div
       ref={refs.fsRootRef}
+      role="dialog"
+      aria-label={t("player.queue.nowPlaying")}
+      aria-modal="true"
+      aria-hidden={!open}
+      inert={!open}
+      tabIndex={-1}
+      data-app-modal-panel="true"
+      data-modal-depth={-1}
       className={`fullscreen-player-surface fixed inset-0 z-fullscreen-player flex flex-col ease-out ${
         state.animating ? "opacity-100" : "opacity-0 translate-y-full"
       }`}

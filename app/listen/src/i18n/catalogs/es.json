@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Vaciar",
   "native.logs.hide": "Ocultar",
   "native.logs.empty": "Aún no hay eventos de reproducción.",
-  "native.logs.trigger": "Registro · {count}"
+  "native.logs.trigger": "Registro · {count}",
+  "library.liked.loadFailed": "No se pudieron cargar las canciones que te gustan.",
+  "library.liked.stateUnavailable": "Estado de favorito no disponible",
+  "settings.offline.removeConfirmTitle": "¿Eliminar las copias descargadas?",
+  "settings.offline.removeConfirmDescription": "Se eliminarán de este dispositivo {itemCount, plural, one {# elemento descargado} other {# elementos descargados}} con {trackCount, plural, one {# canción} other {# canciones}} ({size}). Tu biblioteca permanece en el servidor y puedes descargarla de nuevo.",
+  "settings.offline.removeConfirmAction": "Eliminar copias descargadas",
+  "home.playlists.arrivals.thisWeek": "Esta semana",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {La semana pasada} other {Hace # semanas}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Esta semana + # semana anterior} other {Esta semana + # semanas anteriores}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {# semana de lanzamientos anterior} other {# semanas de lanzamientos anteriores}}",
+  "crate.page.loadFailed": "No se pudo cargar esta Crate. Inténtalo de nuevo.",
+  "crate.page.refreshFailed": "No se pudo actualizar esta Crate. Se muestran los datos guardados.",
+  "crate.page.playbackLoadFailed": "No se pudieron cargar las canciones para reproducirlas. Inténtalo de nuevo.",
+  "artist.topTracks.unavailable": "Canciones destacadas no disponibles",
+  "player.mix.label": "Transición",
+  "player.mix.gapless": "Gapless",
+  "player.mix.paused": "En pausa",
+  "player.mix.buffering": "Cargando audio"
 }

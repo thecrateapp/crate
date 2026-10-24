@@ -2,7 +2,6 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
-import { ArtistAlbumRoute } from "@/pages/ArtistAlbumRoute";
 import { api } from "@/lib/api";
 import { Toaster } from "sonner";
 import { toasterConfig } from "@crate/ui/lib/toaster-config";
@@ -24,6 +23,11 @@ const Browse = lazy(() =>
 );
 const Artist = lazy(() =>
   import("@/pages/Artist").then((m) => ({ default: m.Artist })),
+);
+const ArtistAlbumRoute = lazy(() =>
+  import("@/pages/ArtistAlbumRoute").then((m) => ({
+    default: m.ArtistAlbumRoute,
+  })),
 );
 const Album = lazy(() =>
   import("@/pages/Album").then((m) => ({ default: m.Album })),

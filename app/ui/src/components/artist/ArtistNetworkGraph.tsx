@@ -1,5 +1,11 @@
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { ArrowRight, Plus } from "@crate/ui/icons";
 import ForceGraph2D from "react-force-graph-2d";
 
 import { api } from "@/lib/api";
@@ -83,6 +89,30 @@ export function ArtistNetworkGraph({
     new Set(),
   );
   const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  const [expandingNode, setExpandingNode] = useState<string | null>(null);
+  const [failedExpansion, setFailedExpansion] = useState<NetworkNode | null>(
+    null,
+  );
+  const motionAllowed = useMotionAllowed();
+  const [palette] = useState(() => {
+    const style = getComputedStyle(document.documentElement);
+    const color = (name: string) =>
+      style.getPropertyValue(name).trim() || style.color || "transparent";
+    return {
+      accent: color("--accent-action"),
+      accentHi: color("--accent-action-hi"),
+      primary: color("--text-primary"),
+      muted: color("--text-muted"),
+      subtle: color("--text-subtle"),
+      surface: color("--surface-object"),
+      border: color("--color-border"),
+      warning: color("--state-warning-text"),
+      font: style.getPropertyValue("--font-mono").trim() || "monospace",
+    };
+  });
 
   useEffect(() => {
     api<{ artists: string[] }>("/api/shows/artists-with-shows")
@@ -93,23 +123,38 @@ export function ArtistNetworkGraph({
       )
       .catch(() => {});
 
+    let cancelled = false;
     setLoading(true);
+    setError(null);
+    setSelectedNode(null);
     expandedNodesRef.current = new Set([centerArtist]);
     api<NetworkData>(
       artistNetworkApiPath(centerArtist, centerArtistId, centerArtistEntityUid),
     )
-      .then((data) => setNetworkData(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [centerArtist, centerArtistEntityUid, centerArtistId]);
+      .then((data) => {
+        if (!cancelled) setNetworkData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Artist network could not be loaded.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [centerArtist, centerArtistEntityUid, centerArtistId, attempt]);
 
   function expandNode(node: NetworkNode) {
-    if (expandedNodesRef.current.has(node.id)) return;
-    expandedNodesRef.current.add(node.id);
+    if (expandedNodesRef.current.has(node.id) || expandingNode) return;
+    setExpandingNode(node.id);
+    setError(null);
+    setFailedExpansion(null);
     api<NetworkData>(
       artistNetworkApiPath(node.id, node.artist_id, undefined, 1),
     )
       .then((data) => {
+        expandedNodesRef.current.add(node.id);
         setNetworkData((previous) => {
           // Case-insensitive dedup — artist names vary in casing across sources
           const existingIds = new Set(
@@ -152,8 +197,21 @@ export function ArtistNetworkGraph({
           };
         });
       })
-      .catch(() => {});
+      .catch(() => {
+        setError(`Could not expand ${node.id}. Try again.`);
+        setFailedExpansion(node);
+      })
+      .finally(() => setExpandingNode(null));
   }
+
+  const nodeHref = (node: NetworkNode) =>
+    node.in_library && node.artist_id != null
+      ? artistPagePath({
+          artistId: node.artist_id,
+          artistSlug: node.artist_slug,
+          artistName: node.id,
+        })
+      : `/download?q=${encodeURIComponent(node.id)}`;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -216,6 +274,16 @@ export function ArtistNetworkGraph({
     );
   }
 
+  if (error && networkData.nodes.length <= 1)
+    return (
+      <div ref={containerRef}>
+        <ErrorState
+          message={error}
+          onRetry={() => setAttempt((value) => value + 1)}
+        />
+      </div>
+    );
+
   if (networkData.nodes.length <= 1) {
     return (
       <div
@@ -234,155 +302,192 @@ export function ArtistNetworkGraph({
   );
 
   return (
-    <div
-      ref={containerRef}
-      style={{ height }}
-      className="w-full overflow-hidden"
-    >
-      <ForceGraph2D
-        ref={fgRef}
-        width={width}
-        height={height}
-        graphData={networkData}
-        backgroundColor="transparent"
-        nodeRelSize={6}
-        nodeVal={(node: any) => {
-          const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
-            | NetworkNode
-            | undefined;
-          const score = currentNode?.score ?? 0;
-          if (node.id?.toLowerCase() === centerArtist.toLowerCase())
-            return Math.max(4, score * 20);
-          return Math.max(1.5, score * 10);
-        }}
-        nodeCanvasObject={(
-          node: any,
-          ctx: CanvasRenderingContext2D,
-          globalScale: number,
-        ) => {
-          const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
-            | NetworkNode
-            | undefined;
-          const score = currentNode?.score ?? 0;
-          const inLibrary = currentNode?.in_library ?? false;
-          const hasShows = artistsWithShows.has(node.id.toLowerCase());
-          const isCenter =
-            node.id?.toLowerCase() === centerArtist.toLowerCase();
+    <div className="min-w-0 space-y-4">
+      {error ? (
+        <ErrorState
+          message={error}
+          onRetry={() =>
+            failedExpansion
+              ? expandNode(failedExpansion)
+              : setAttempt((value) => value + 1)
+          }
+        />
+      ) : null}
+      {selectedNode ? (
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <MonoLabel>{selectedNode.id}</MonoLabel>
+          <ActionGroup label={`Actions for ${selectedNode.id}`}>
+            <ActionButton
+              asChild
+              label={`Open selected artist ${selectedNode.id}`}
+            >
+              <Link to={nodeHref(selectedNode)}>
+                <ArrowRight
+                  data-admin-ux="artist-network-open"
+                  aria-hidden="true"
+                />
+              </Link>
+            </ActionButton>
+            <ActionButton
+              label={`Expand selected artist ${selectedNode.id}`}
+              disabled={
+                Boolean(expandingNode) ||
+                expandedNodesRef.current.has(selectedNode.id)
+              }
+              loading={expandingNode === selectedNode.id}
+              onClick={() => expandNode(selectedNode)}
+            >
+              <Plus
+                data-admin-ux="artist-network-expand-selected"
+                aria-hidden="true"
+              />
+            </ActionButton>
+          </ActionGroup>
+        </div>
+      ) : null}
+      <div
+        ref={containerRef}
+        style={{ height }}
+        className="w-full overflow-hidden"
+      >
+        <ForceGraph2D
+          ref={fgRef}
+          width={width}
+          height={height}
+          graphData={networkData}
+          backgroundColor="transparent"
+          nodeRelSize={6}
+          nodeVal={(node: any) => {
+            const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
+              NetworkNode | undefined;
+            const score = currentNode?.score ?? 0;
+            if (node.id?.toLowerCase() === centerArtist.toLowerCase())
+              return Math.max(4, score * 20);
+            return Math.max(1.5, score * 10);
+          }}
+          nodeCanvasObject={(
+            node: any,
+            ctx: CanvasRenderingContext2D,
+            globalScale: number,
+          ) => {
+            const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
+              NetworkNode | undefined;
+            const score = currentNode?.score ?? 0;
+            const inLibrary = currentNode?.in_library ?? false;
+            const hasShows = artistsWithShows.has(node.id.toLowerCase());
+            const isCenter =
+              node.id?.toLowerCase() === centerArtist.toLowerCase();
 
-          const baseSize = isCenter ? 14 : inLibrary ? 7 : 5;
-          const scoreBonus = score * 8;
-          const size = Math.max(baseSize, baseSize + scoreBonus);
+            const baseSize = isCenter ? 14 : inLibrary ? 7 : 5;
+            const scoreBonus = score * 8;
+            const size = Math.max(baseSize, baseSize + scoreBonus);
 
-          const x = node.x ?? 0;
-          const y = node.y ?? 0;
+            const x = node.x ?? 0;
+            const y = node.y ?? 0;
 
-          // Glow for center and in-library
-          if (isCenter || inLibrary) {
+            // Glow for center and in-library
+            if (isCenter || inLibrary) {
+              ctx.beginPath();
+              ctx.arc(x, y, size + 6, 0, 2 * Math.PI);
+              ctx.fillStyle = palette.accent;
+              ctx.globalAlpha = isCenter ? 0.12 : 0.06;
+              ctx.fill();
+              ctx.globalAlpha = 1;
+            }
+
+            // Shows ring
+            if (hasShows) {
+              ctx.beginPath();
+              ctx.arc(x, y, size + 4, 0, 2 * Math.PI);
+              ctx.strokeStyle = palette.warning;
+              ctx.lineWidth = 1.5;
+              ctx.setLineDash([3, 3]);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+
+            // Main circle
             ctx.beginPath();
-            ctx.arc(x, y, size + 6, 0, 2 * Math.PI);
+            ctx.arc(x, y, size, 0, 2 * Math.PI);
+            if (isCenter) {
+              ctx.fillStyle = palette.accent;
+            } else if (inLibrary) {
+              ctx.fillStyle = palette.accent;
+            } else {
+              ctx.fillStyle = palette.surface;
+            }
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = isCenter
+              ? palette.accentHi
+              : inLibrary
+                ? palette.accent
+                : palette.border;
+            ctx.lineWidth = isCenter ? 2.5 : inLibrary ? 1.5 : 0.5;
+            ctx.stroke();
+
+            // Label
+            const fontSize = Math.max(10, 12 / globalScale);
+            ctx.font = `400 ${fontSize}px ${palette.font}`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
             ctx.fillStyle = isCenter
-              ? "rgba(6,182,212,0.12)"
-              : "rgba(6,182,212,0.06)";
-            ctx.fill();
-          }
+              ? palette.primary
+              : inLibrary
+                ? palette.muted
+                : palette.subtle;
+            ctx.fillText(node.id, x, y + size + 4);
 
-          // Shows ring
-          if (hasShows) {
-            ctx.beginPath();
-            ctx.arc(x, y, size + 4, 0, 2 * Math.PI);
-            ctx.strokeStyle = "rgba(249,115,22,0.6)";
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([3, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-
-          // Main circle
-          ctx.beginPath();
-          ctx.arc(x, y, size, 0, 2 * Math.PI);
-          if (isCenter) {
-            ctx.fillStyle = "#06b6d4";
-          } else if (inLibrary) {
-            ctx.fillStyle = "#0e7490";
-          } else {
-            ctx.fillStyle = "#2a2a3a";
-          }
-          ctx.fill();
-
-          // Border
-          ctx.strokeStyle = isCenter
-            ? "#22d3ee"
-            : inLibrary
-              ? "#06b6d4"
-              : "rgba(255,255,255,0.08)";
-          ctx.lineWidth = isCenter ? 2.5 : inLibrary ? 1.5 : 0.5;
-          ctx.stroke();
-
-          // Label
-          const fontSize = Math.max(10, 12 / globalScale);
-          ctx.font = `${
-            isCenter || inLibrary ? "600 " : "400 "
-          }${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillStyle = isCenter
-            ? "rgba(255,255,255,0.95)"
-            : inLibrary
-              ? "rgba(241,245,249,0.85)"
-              : "rgba(241,245,249,0.4)";
-          ctx.fillText(node.id, x, y + size + 4);
-
-          // In-library satellite dot
-          if (inLibrary && !isCenter) {
-            ctx.beginPath();
-            ctx.arc(x + size * 0.7, y - size * 0.7, 3, 0, 2 * Math.PI);
-            ctx.fillStyle = "#22d3ee";
-            ctx.fill();
-            ctx.strokeStyle = "#0a0a14";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-        }}
-        linkColor={(link: any) => {
-          const sId = (
-            typeof link.source === "string"
-              ? link.source
-              : (link.source?.id ?? "")
-          ).toLowerCase();
-          const tId = (
-            typeof link.target === "string"
-              ? link.target
-              : (link.target?.id ?? "")
-          ).toLowerCase();
-          const sNode = nodeSet.get(sId);
-          const tNode = nodeSet.get(tId);
-          if (sNode?.in_library && tNode?.in_library)
-            return "rgba(6,182,212,0.25)";
-          return "rgba(100,116,139,0.15)";
-        }}
-        linkWidth={(link: any) => {
-          const v = typeof link.value === "number" ? link.value : 0.5;
-          return Math.max(0.5, v * 2);
-        }}
-        nodeLabel={(node: any) => {
-          const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
-            | NetworkNode
-            | undefined;
-          const inLibrary = currentNode?.in_library ?? false;
-          const score = currentNode?.score ?? 0;
-          const photoUrl =
-            currentNode?.artist_id != null
-              ? artistPhotoApiUrl({
-                  artistId: currentNode.artist_id,
-                  artistSlug: currentNode.artist_slug,
-                  artistName: node.id,
-                })
-              : "";
-          return `<div style="background:var(--color-card);border:1px solid var(--color-border);border-radius:10px;padding:0;font-size:12px;min-width:200px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+            // In-library satellite dot
+            if (inLibrary && !isCenter) {
+              ctx.beginPath();
+              ctx.arc(x + size * 0.7, y - size * 0.7, 3, 0, 2 * Math.PI);
+              ctx.fillStyle = palette.accentHi;
+              ctx.fill();
+              ctx.strokeStyle = palette.surface;
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+          }}
+          linkColor={(link: any) => {
+            const sId = (
+              typeof link.source === "string"
+                ? link.source
+                : (link.source?.id ?? "")
+            ).toLowerCase();
+            const tId = (
+              typeof link.target === "string"
+                ? link.target
+                : (link.target?.id ?? "")
+            ).toLowerCase();
+            const sNode = nodeSet.get(sId);
+            const tNode = nodeSet.get(tId);
+            if (sNode?.in_library && tNode?.in_library) return palette.accent;
+            return palette.border;
+          }}
+          linkWidth={(link: any) => {
+            const v = typeof link.value === "number" ? link.value : 0.5;
+            return Math.max(0.5, v * 2);
+          }}
+          nodeLabel={(node: any) => {
+            const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
+              NetworkNode | undefined;
+            const inLibrary = currentNode?.in_library ?? false;
+            const score = currentNode?.score ?? 0;
+            const photoUrl =
+              currentNode?.artist_id != null
+                ? artistPhotoApiUrl({
+                    artistId: currentNode.artist_id,
+                    artistSlug: currentNode.artist_slug,
+                    artistName: node.id,
+                  })
+                : "";
+            return `<div style="background:var(--color-card);border:1px solid var(--color-border);border-radius:4px;padding:0;font-size:12px;min-width:200px;overflow:hidden">
             <div style="display:flex;align-items:center;gap:8px;padding:10px 12px">
               ${
                 photoUrl
-                  ? `<img src="${photoUrl}" class="crate-media-thumbnail" style="width:48px;height:48px;border-radius:6px;object-fit:cover;background:#1c1c28" onerror="this.style.display='none'" />`
+                  ? `<img src="${photoUrl}" class="crate-media-thumbnail" style="width:48px;height:48px;border-radius:6px;object-fit:cover;background:var(--surface-object)" onerror="this.style.display='none'" />`
                   : ""
               }
               <div style="min-width:0;flex:1">
@@ -395,10 +500,10 @@ export function ArtistNetworkGraph({
               score > 0
                 ? `<div style="padding:0 12px 8px">
               <div style="display:flex;align-items:center;gap:6px">
-                <div style="flex:1;height:5px;background:#1c1c28;border-radius:3px;overflow:hidden">
+                <div style="flex:1;height:5px;background:var(--surface-object);border-radius:3px;overflow:hidden">
                   <div style="height:100%;width:${Math.round(
                     score * 100,
-                  )}%;border-radius:3px;background:linear-gradient(90deg,#06b6d433,#06b6d4)"></div>
+                  )}%;border-radius:3px;background:var(--accent-action)"></div>
                 </div>
                 <span style="font-size:9px;color:var(--color-muted-foreground)">${Math.round(
                   score * 100,
@@ -409,47 +514,79 @@ export function ArtistNetworkGraph({
             }
             <div style="padding:6px 12px;border-top:1px solid var(--color-border);font-size:10px;display:flex;justify-content:space-between;align-items:center">
               <span style="color:${
-                inLibrary ? "#06b6d4" : "var(--color-muted-foreground)"
+                inLibrary ? palette.accent : "var(--color-muted-foreground)"
               }">${inLibrary ? "In library" : "Not in library"}</span>
               ${
                 artistsWithShows.has(node.id.toLowerCase())
-                  ? `<span style="color:#f97316">Shows</span>`
+                  ? `<span style="color:var(--state-warning-text)">Shows</span>`
                   : ""
               }
-              <span style="color:var(--color-primary)">Click to navigate</span>
+              <span style="color:var(--color-primary)">Select for actions</span>
             </div>
           </div>`;
-        }}
-        onNodeClick={(node: any) => {
-          expandNode(node as NetworkNode);
-        }}
-        onNodeRightClick={(node: any) => {
-          const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
-            | NetworkNode
-            | undefined;
-          if (currentNode?.in_library && currentNode.artist_id != null) {
-            navigate(
-              artistPagePath({
-                artistId: currentNode.artist_id,
-                artistSlug: currentNode.artist_slug,
-                artistName: node.id,
-              }),
-            );
-          } else {
-            navigate(`/download?q=${encodeURIComponent(node.id)}`);
-          }
-        }}
-        cooldownTicks={200}
-        d3AlphaDecay={0.01}
-        d3VelocityDecay={0.2}
-        warmupTicks={50}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
-        enableNodeDrag={true}
-        onEngineStop={() => {
-          fgRef.current?.zoomToFit(400, 60);
-        }}
-      />
+          }}
+          onNodeClick={(node: any) => {
+            setSelectedNode(node as NetworkNode);
+          }}
+          onNodeRightClick={(node: any) => {
+            const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
+              NetworkNode | undefined;
+            if (currentNode?.in_library && currentNode.artist_id != null) {
+              navigate(
+                artistPagePath({
+                  artistId: currentNode.artist_id,
+                  artistSlug: currentNode.artist_slug,
+                  artistName: node.id,
+                }),
+              );
+            } else {
+              navigate(`/download?q=${encodeURIComponent(node.id)}`);
+            }
+          }}
+          cooldownTicks={motionAllowed ? 200 : 0}
+          d3AlphaDecay={0.01}
+          d3VelocityDecay={0.2}
+          warmupTicks={motionAllowed ? 50 : 200}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
+          enableNodeDrag={true}
+          onEngineStop={() => {
+            fgRef.current?.zoomToFit(motionAllowed ? 400 : 0, 60);
+          }}
+        />
+      </div>
+      <HairlineList label="Network artists" ruled={false}>
+        {networkData.nodes.map((node) => (
+          <HairlineRow
+            key={node.id}
+            active={selectedNode?.id === node.id}
+            trailing={
+              <ActionButton
+                label={`Expand ${node.id}`}
+                disabled={
+                  Boolean(expandingNode) ||
+                  expandedNodesRef.current.has(node.id)
+                }
+                loading={expandingNode === node.id}
+                onClick={() => expandNode(node)}
+              >
+                <Plus
+                  data-admin-ux="artist-network-expand"
+                  aria-hidden="true"
+                />
+              </ActionButton>
+            }
+          >
+            <Link
+              to={nodeHref(node)}
+              aria-label={`Open ${node.id}`}
+              className="font-display text-sm hover:text-accent-action-hi focus-visible:outline-2 focus-visible:outline-focus-ring"
+            >
+              {node.id}
+            </Link>
+          </HairlineRow>
+        ))}
+      </HairlineList>
     </div>
   );
 }

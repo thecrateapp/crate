@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { type TrackListVirtualListProps } from "@crate/ui/domain/tracks";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -30,7 +30,13 @@ function LikedTracksVirtualList({
 
 export function LibraryLikedTab() {
   const { t } = useTranslation();
-  const { likedTracks: tracks, loading } = useLikedTracks();
+  const {
+    likedTracks: tracks,
+    loading,
+    hasLoaded,
+    error,
+    refetch,
+  } = useLikedTracks();
   const { playAll } = usePlayerActions();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<LikedSort>("recent");
@@ -70,20 +76,32 @@ export function LibraryLikedTab() {
     [filtered],
   );
 
-  if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (loading && hasLoaded !== true)
+    return <LoadingState label={t("common.loadingShort")} />;
+  const readError = error ? (
+    <ErrorState
+      message={t("library.liked.loadFailed")}
+      retryLabel={t("common.retry")}
+      onRetry={refetch}
+    />
+  ) : null;
+  if (readError && !hasLoaded) return readError;
   if (!tracks || tracks.length === 0) {
     return (
-      <EmptyState
-        variant="dashed"
-        title={t("library.liked.emptyTitle")}
-        description={t("library.liked.empty")}
-      />
+      <>
+        {readError}
+        <EmptyState
+          variant="dashed"
+          title={t("library.liked.emptyTitle")}
+          description={t("library.liked.empty")}
+        />
+      </>
     );
   }
 
   function handlePlayAll() {
-    const list = filtered.length ? filtered : tracks;
-    const playerTracks: Track[] = list.map((track) =>
+    if (filtered.length === 0) return;
+    const playerTracks: Track[] = filtered.map((track) =>
       toPlayableTrack(
         {
           ...track,
@@ -114,45 +132,48 @@ export function LibraryLikedTab() {
   }
 
   return (
-    <LibraryLikedView
-      search={search}
-      onSearch={setSearch}
-      sort={sort}
-      onSort={setSort}
-      totalCount={tracks.length}
-      onPlay={handlePlayAll}
-      items={trackRows}
-      virtualList={LikedTracksVirtualList}
-      itemKey={(row, index) =>
-        row.id ??
-        row.path ??
-        row.artist + "-" + row.album + "-" + row.title + "-" + index
-      }
-      renderRow={(row, index) => (
-        <TrackRow
-          track={row}
-          index={index + 1}
-          showArtist
-          showAlbum
-          albumCover={
-            row.artist && row.album
-              ? albumCoverApiUrl(
-                  {
-                    albumId: row.album_id,
-                    albumEntityUid: row.album_entity_uid,
-                    artistEntityUid: row.artist_entity_uid,
-                    albumSlug: row.album_slug,
-                    artistName: row.artist,
-                    albumName: row.album,
-                  },
-                  { size: 128 },
-                )
-              : undefined
-          }
-          showCoverThumb
-          queueTracks={trackRows}
-        />
-      )}
-    />
+    <>
+      {readError}
+      <LibraryLikedView
+        search={search}
+        onSearch={setSearch}
+        sort={sort}
+        onSort={setSort}
+        totalCount={tracks.length}
+        onPlay={handlePlayAll}
+        items={trackRows}
+        virtualList={LikedTracksVirtualList}
+        itemKey={(row, index) =>
+          row.id ??
+          row.path ??
+          row.artist + "-" + row.album + "-" + row.title + "-" + index
+        }
+        renderRow={(row, index) => (
+          <TrackRow
+            track={row}
+            index={index + 1}
+            showArtist
+            showAlbum
+            albumCover={
+              row.artist && row.album
+                ? albumCoverApiUrl(
+                    {
+                      albumId: row.album_id,
+                      albumEntityUid: row.album_entity_uid,
+                      artistEntityUid: row.artist_entity_uid,
+                      albumSlug: row.album_slug,
+                      artistName: row.artist,
+                      albumName: row.album,
+                    },
+                    { size: 128 },
+                  )
+                : undefined
+            }
+            showCoverThumb
+            queueTracks={trackRows}
+          />
+        )}
+      />
+    </>
   );
 }

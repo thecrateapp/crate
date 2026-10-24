@@ -10,6 +10,7 @@ import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import {
@@ -34,6 +35,7 @@ import {
   useEffect,
   useEffectEvent,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -53,6 +55,7 @@ import {
 } from "@crate/ui/shadcn/popover";
 import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { useAuth } from "@/contexts/AuthContext";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 import { cn, timeAgo } from "@/lib/utils";
@@ -215,6 +218,10 @@ export function Upcoming() {
     unknown: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const readGeneration = useRef(0);
+  const syncWait = useRef<AbortController | null>(null);
   const [genreFilter, setGenreFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -238,11 +245,15 @@ export function Upcoming() {
   const [mergeIds, setMergeIds] = useState<readonly number[] | null>(null);
 
   async function fetchItems() {
+    const request = ++readGeneration.current;
+    setLoadError(false);
+    setLoading(!hasLoaded);
     try {
       const data = await api<{
         events: CachedShowEvent[];
         setlist_coverage?: SetlistCoverage;
       }>("/api/shows/cached?limit=5000");
+      if (request !== readGeneration.current) return;
       setItems(
         (data.events || []).map((show) => ({
           type: "show",
@@ -296,15 +307,20 @@ export function Upcoming() {
           unknown: 0,
         },
       );
+      setHasLoaded(true);
     } catch {
-      /* */
+      if (request === readGeneration.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === readGeneration.current) setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchItems();
+    void fetchItems();
+    return () => {
+      readGeneration.current += 1;
+      syncWait.current?.abort();
+    };
   }, []);
 
   const availableGenres = useMemo(() => {
@@ -399,17 +415,28 @@ export function Upcoming() {
   );
 
   async function syncShows() {
+    const controller = new AbortController();
+    syncWait.current = controller;
     setSyncing(true);
     try {
-      await api("/api/tasks/sync-shows", "POST");
-      toast.success("Show sync started");
-      setTimeout(() => {
-        setSyncing(false);
-        fetchItems();
-      }, 10000);
-    } catch {
-      setSyncing(false);
-      toast.error("Failed to sync shows");
+      const { task_id } = await api<{ task_id: string }>(
+        "/api/tasks/sync-shows",
+        "POST",
+      );
+      if (!task_id) throw new Error("Show sync returned no task identifier");
+      toast.success("Show sync queued");
+      const task = await waitForTask(task_id, 300000, controller.signal);
+      if (task.status !== "completed")
+        throw new Error(task.error || `Show sync ${task.status}`);
+      toast.success("Show sync completed");
+      await fetchItems();
+    } catch (error) {
+      if (!controller.signal.aborted)
+        toast.error(
+          error instanceof Error ? error.message : "Failed to sync shows",
+        );
+    } finally {
+      if (!controller.signal.aborted) setSyncing(false);
     }
   }
 
@@ -504,12 +531,16 @@ export function Upcoming() {
               >
                 {refreshingSetlists ? (
                   <Loader2
+                    data-admin-ux="upcoming-refresh-setlists-loading"
                     aria-hidden="true"
                     size={14}
                     className="animate-spin"
                   />
                 ) : (
-                  <HeaderCalendarSync aria-hidden="true" />
+                  <HeaderCalendarSync
+                    data-admin-ux="upcoming-refresh-setlists"
+                    aria-hidden="true"
+                  />
                 )}
               </PageHeaderAction>
             ) : null}
@@ -536,33 +567,55 @@ export function Upcoming() {
           </PageHeaderActions>
         }
       >
-        <InfoBadge active>{showCount} shows</InfoBadge>
-        <InfoBadge>{setlistCoverage.artist_count} billed artists</InfoBadge>
-        <InfoBadge
-          tone="success"
-          title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
-        >
-          {setlistCoverage.fresh} recent
-        </InfoBadge>
-        {setlistCoverage.stale > 0 ? (
-          <InfoBadge tone="warning">{setlistCoverage.stale} outdated</InfoBadge>
-        ) : null}
-        {setlistCoverage.missing > 0 ? (
-          <InfoBadge tone="neutral">
-            {setlistCoverage.missing} missing
+        {hasLoaded ? (
+          <>
+            <InfoBadge active>{showCount} shows</InfoBadge>
+            <InfoBadge>{setlistCoverage.artist_count} billed artists</InfoBadge>
+            <InfoBadge
+              tone="success"
+              title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
+            >
+              {setlistCoverage.fresh} recent
+            </InfoBadge>
+            {setlistCoverage.stale > 0 ? (
+              <InfoBadge tone="warning">
+                {setlistCoverage.stale} outdated
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.missing > 0 ? (
+              <InfoBadge tone="neutral">
+                {setlistCoverage.missing} missing
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.unknown > 0 ? (
+              <InfoBadge tone="info">
+                {setlistCoverage.unknown} without date
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.queued != null ? (
+              <InfoBadge tone="info">
+                {setlistCoverage.queued} refreshes queued
+              </InfoBadge>
+            ) : null}
+          </>
+        ) : (
+          <InfoBadge>
+            {loading ? "Loading shows" : "Show data unavailable"}
           </InfoBadge>
-        ) : null}
-        {setlistCoverage.unknown > 0 ? (
-          <InfoBadge tone="info">
-            {setlistCoverage.unknown} without date
-          </InfoBadge>
-        ) : null}
-        {setlistCoverage.queued != null ? (
-          <InfoBadge tone="info">
-            {setlistCoverage.queued} refreshes queued
-          </InfoBadge>
-        ) : null}
+        )}
       </OpsPageHero>
+
+      {loadError ? (
+        <ErrorState
+          title="Shows unavailable"
+          message={
+            hasLoaded
+              ? "The latest shows could not be loaded. The last successful calendar remains visible."
+              : "The show calendar could not be loaded. Try again."
+          }
+          onRetry={() => void fetchItems()}
+        />
+      ) : null}
 
       <OpsSurface className="p-3">
         <div className="flex flex-wrap items-start gap-4">
@@ -656,7 +709,7 @@ export function Upcoming() {
               title="Dismiss"
               aria-label="Dismiss"
             >
-              <X size={14} />
+              <X data-admin-ux="upcoming-dismiss-notice" size={14} />
             </ActionIconButton>
           ) : null}
         </div>
@@ -676,7 +729,7 @@ export function Upcoming() {
         </div>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && !loadError && items.length === 0 && (
         <OpsSurface role="status" className="px-6 py-24 text-center">
           <h2 className="font-display text-lg font-semibold text-text-primary">
             No upcoming shows
@@ -939,7 +992,10 @@ function ShowManagementRow({
               <div className="absolute top-2 right-2 z-10">
                 <ActionGroup label="Show actions">
                   <ActionButton label="Close show details" onClick={onToggle}>
-                    <X size={CRATE_ICON_SIZE.md} />
+                    <X
+                      data-admin-ux="upcoming-close-details"
+                      size={CRATE_ICON_SIZE.md}
+                    />
                   </ActionButton>
                 </ActionGroup>
               </div>
@@ -1054,7 +1110,10 @@ function ShowManagementRow({
                     href={artistHref}
                     data-admin-ux="show-management-open-artist"
                   >
-                    <UserRound size={CRATE_ICON_SIZE.md} />
+                    <UserRound
+                      data-admin-ux="upcoming-detail-open-artist"
+                      size={CRATE_ICON_SIZE.md}
+                    />
                   </ActionLink>
                 ) : null}
                 {item.url ? (
@@ -1065,7 +1124,10 @@ function ShowManagementRow({
                     rel="noreferrer"
                     data-admin-ux="show-management-open-listing"
                   >
-                    <ExternalLink size={CRATE_ICON_SIZE.md} />
+                    <ExternalLink
+                      data-admin-ux="upcoming-detail-open-listing"
+                      size={CRATE_ICON_SIZE.md}
+                    />
                   </ActionLink>
                 ) : null}
               </ActionGroup>
@@ -1080,6 +1142,7 @@ function ShowManagementRow({
           expanded={false}
           artwork={
             <MediaCover
+              data-admin-ux="upcoming-show-cover"
               src={artworkUrl}
               alt=""
               fallbackIcon={Calendar}
@@ -1129,7 +1192,10 @@ function ShowManagementRow({
                   onClick={(event) => event.stopPropagation()}
                   data-admin-ux="show-management-open-artist"
                 >
-                  <UserRound size={CRATE_ICON_SIZE.md} />
+                  <UserRound
+                    data-admin-ux="upcoming-row-open-artist"
+                    size={CRATE_ICON_SIZE.md}
+                  />
                 </ActionLink>
               ) : null}
               {item.url ? (
@@ -1141,7 +1207,10 @@ function ShowManagementRow({
                   onClick={(event) => event.stopPropagation()}
                   data-admin-ux="show-management-open-listing"
                 >
-                  <ExternalLink size={CRATE_ICON_SIZE.md} />
+                  <ExternalLink
+                    data-admin-ux="upcoming-row-open-listing"
+                    size={CRATE_ICON_SIZE.md}
+                  />
                 </ActionLink>
               ) : null}
             </ActionGroup>

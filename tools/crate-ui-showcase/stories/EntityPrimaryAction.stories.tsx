@@ -21,6 +21,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Base: Story = {};
+export const SelectionToggle: Story = {
+  args: {
+    href: undefined,
+    onOpen: () => {},
+    pressed: true,
+    children: "Selected album",
+  },
+};
 
 export const InternalLink: Story = {
   args: { href: "/albums/october", children: "Open album" },

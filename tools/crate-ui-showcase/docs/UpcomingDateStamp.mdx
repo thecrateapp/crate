@@ -1,0 +1,30 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/UpcomingDateStamp.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">UpcomingDateStamp</DocHeading>
+<EntryDetails
+  id="domain-shows-upcomingdatestamp"
+  review="Existing shared contract · catalogue reconciliation"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Receives an ISO local-calendar `YYYY-MM-DD` date and a locale from its caller. It creates
+  the date at local noon, so a calendar day is not interpreted as a UTC midnight.
+- A valid date renders a semantic `time` with the exact `dateTime` and a localized full-date
+  accessible name. Month/weekday use actual MonoLabel; the day retains its existing display role.
+- Missing, malformed and impossible dates render nothing, rather than a fake day or a Date error.
+  A caller supplies any desired unknown-date copy outside the stamp.
+- The stamp reserves56px; UpcomingEventRow owns its separate date lane. No dates are fetched
+  or inferred by this component. The example demonstrates a leap day and Spanish formatting.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.CalendarStates} />
+<Controls />
+
+Admin Upcoming/NewReleases and Listen upcoming rows use this shared module. The full Listen
+composition remains in Listen/Upcoming and shows; this focused contract does not certify native
+or assistive-technology behavior on every consumer.

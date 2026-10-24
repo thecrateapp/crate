@@ -40,6 +40,7 @@ export type ExtendedPlayerViewRefs = {
 };
 
 export type ExtendedPlayerViewActions = {
+  onEscape?: (event: KeyboardEvent) => void;
   closeWithFeedback: () => void;
   goToArtist: () => void;
   onSurfaceModeChange: (mode: PlayerSurfaceMode) => void;

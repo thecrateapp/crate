@@ -22,6 +22,12 @@ import { DocHeading } from "../components/DocHeading";
   including longer localized captions. In the horizontal layout the rail retains at least64px.
 - A known zero is distinct from missing data. Missing or invalid ranges expose a named group
   instead of a false meter or percentage. Supply localized label/value text from the app.
+- The rail is a fixed one-pixel shared recipe. Finite positive ranges expose `role=meter`;
+  both ARIA value and fill clamp to0..max. Null/non-finite readings display n/a as a named group.
+  A known value with an invalid/zero maximum retains its formatted reading without meter semantics.
+- `valueRef` targets the fill span (not the reading): imperative owners may set `--v`, while
+  the next value prop refreshes it. Optional `limit` marks a bounded ratio of max; `over` adds
+  textual warning context as well as color. Preserve callback/object ref cleanup.
 - Keep native range semantics, bounded fill, optional warning/limit and callback/object refs.
   No caller typography, width or geometry repairs.
 
@@ -29,6 +35,7 @@ import { DocHeading } from "../components/DocHeading";
 <Canvas of={Stories.Storage} />
 <Canvas of={Stories.MissingAndZero} />
 <Canvas of={Stories.NarrowLocalized} />
+<Canvas of={Stories.RangeStates} />
 <Controls />
 
 The presentation and browser checks cover375px,704px (existing Basque translations) and1200px. Full native/device QA remains separate.

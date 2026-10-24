@@ -213,11 +213,13 @@ export function TrackRowDetails({
 
 export function TrackRowLikeControl({
   hasTrackRef,
+  likesKnown = true,
   liked,
   toggleTrackLike,
   track,
 }: {
   hasTrackRef: boolean;
+  likesKnown?: boolean;
   liked: boolean;
   toggleTrackLike: ReturnType<typeof useLikedTracks>["toggleTrackLike"];
   track: TrackRowData;
@@ -232,12 +234,20 @@ export function TrackRowLikeControl({
           ? "opacity-100"
           : "pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
       }`}
-      title={t(liked ? "actions.track.unlike" : "actions.track.like")}
+      title={t(
+        !likesKnown
+          ? "library.liked.stateUnavailable"
+          : liked
+            ? "actions.track.unlike"
+            : "actions.track.like",
+      )}
+      disabled={!likesKnown}
       following={liked}
       heartTestId="track-like-heart"
       particlesTestId="track-like-particles"
       onClick={async (event) => {
         event.stopPropagation();
+        if (!likesKnown) return;
         try {
           await toggleTrackLike(
             track.library_track_id ??

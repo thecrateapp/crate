@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Effacer",
   "native.logs.hide": "Masquer",
   "native.logs.empty": "Aucun événement de lecture pour le moment.",
-  "native.logs.trigger": "Journal · {count}"
+  "native.logs.trigger": "Journal · {count}",
+  "library.liked.loadFailed": "Impossible de charger les titres aimés.",
+  "library.liked.stateUnavailable": "Statut favori indisponible",
+  "settings.offline.removeConfirmTitle": "Supprimer les copies téléchargées ?",
+  "settings.offline.removeConfirmDescription": "Supprimer de cet appareil {itemCount, plural, one {# élément téléchargé} other {# éléments téléchargés}} contenant {trackCount, plural, one {# titre} other {# titres}} ({size}). Votre bibliothèque reste sur le serveur et peut être téléchargée à nouveau.",
+  "settings.offline.removeConfirmAction": "Supprimer les copies téléchargées",
+  "home.playlists.arrivals.thisWeek": "Cette semaine",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {La semaine dernière} other {Il y a # semaines}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Cette semaine + # semaine précédente} other {Cette semaine + # semaines précédentes}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {# semaine de sorties passée} other {# semaines de sorties passées}}",
+  "crate.page.loadFailed": "Impossible de charger cette Crate. Réessayez.",
+  "crate.page.refreshFailed": "Impossible d’actualiser cette Crate. Les informations enregistrées sont affichées.",
+  "crate.page.playbackLoadFailed": "Impossible de charger les titres pour la lecture. Réessayez.",
+  "artist.topTracks.unavailable": "Titres populaires indisponibles",
+  "player.mix.label": "Transition",
+  "player.mix.gapless": "Sans interruption",
+  "player.mix.paused": "En pause",
+  "player.mix.buffering": "Chargement audio"
 }

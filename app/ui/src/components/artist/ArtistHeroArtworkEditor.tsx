@@ -10,7 +10,12 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
-import { Eye, Heart, ImagePlus, Loader2, Play, Trash2 } from "lucide-react";
+import { Heart, Loader2, Play } from "@crate/ui/icons";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { Slider } from "@crate/ui/primitives/Slider";
+import { Switch } from "@crate/ui/primitives/Switch";
 import { toast } from "sonner";
 
 import {
@@ -423,6 +428,7 @@ export function ArtistHeroArtworkEditor({
           ? error.message
           : "Hero composition deletion failed",
       );
+      throw error;
     } finally {
       setProcessing(false);
     }
@@ -521,12 +527,12 @@ export function ArtistHeroArtworkEditor({
 
   return (
     <>
-      <section className="rounded-md border border-border bg-card/55 p-4 md:p-6">
+      <section className="space-y-4 border-t border-border-quiet pt-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-normal uppercase tracking-[0.18em] text-primary font-mono">
+            <MonoLabel as="p" tone="accent">
               Featured artist hero
-            </p>
+            </MonoLabel>
             <h2 className="mt-1 text-xl font-semibold text-foreground font-display">
               Desktop and mobile compositions
             </h2>
@@ -588,42 +594,26 @@ export function ArtistHeroArtworkEditor({
                 </div>
               ) : null}
               {canEdit ? (
-                <div className="flex items-center gap-3 rounded-md border border-border bg-background/35 px-3 py-2">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">
-                      Featured artist
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {profile.is_featured
-                        ? "Shown in the home hero"
-                        : "Enable after approving a composition"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
+                <FormField
+                  label="Featured artist"
+                  hint={
+                    profile.is_featured
+                      ? "Shown in the home hero"
+                      : "Enable after approving a composition"
+                  }
+                  layout="inline"
+                >
+                  <Switch
                     aria-label="Featured artist"
-                    aria-checked={profile.is_featured ?? false}
+                    checked={profile.is_featured ?? false}
                     disabled={
                       featuredBusy ||
                       (!profile.is_featured &&
                         (profile.featured_devices?.length ?? 0) === 0)
                     }
-                    onClick={() => void setFeatured(!profile.is_featured)}
-                    className={`relative h-6 w-11 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      profile.is_featured
-                        ? "border-primary bg-primary"
-                        : "border-border bg-muted"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${
-                        profile.is_featured ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                    onCheckedChange={(checked) => void setFeatured(checked)}
+                  />
+                </FormField>
               ) : null}
             </div>
           ) : (
@@ -631,31 +621,17 @@ export function ArtistHeroArtworkEditor({
           )}
         </div>
 
-        <div
-          className="mt-5 flex gap-2"
-          role="tablist"
-          aria-label="Hero composition"
-        >
-          {(["desktop", "mobile"] as const).map((composition) => (
-            <button
-              key={composition}
-              type="button"
-              role="tab"
-              aria-selected={active === composition}
-              onClick={() => setActive(composition)}
-              className={`rounded-md border px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                active === composition
-                  ? "border-primary/60 bg-primary/12 text-primary"
-                  : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {composition}
-              <span className="ml-2 text-xs opacity-60">
-                {composition === "desktop" ? "1480 × 600" : "1080 × 1350"}
-              </span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          className="mt-5"
+          label="Hero composition"
+          as="tabs"
+          value={active}
+          onValueChange={setActive}
+          items={(["desktop", "mobile"] as const).map((composition) => ({
+            value: composition,
+            label: `${composition} · ${composition === "desktop" ? "1480 × 600" : "1080 × 1350"}`,
+          }))}
+        />
 
         <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <HeroCompositionCanvas
@@ -681,39 +657,25 @@ export function ArtistHeroArtworkEditor({
           </HeroCompositionCanvas>
 
           <div className="space-y-5">
-            <div className="rounded-md border border-border bg-background/35 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    Image treatment
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Shared by desktop and mobile artwork.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
+            <div className="border-t border-border-quiet pt-4">
+              <MonoLabel as="h3" tone="accent">
+                Image treatment
+              </MonoLabel>
+              <FormField
+                label="Grayscale"
+                hint="Shared by desktop and mobile artwork."
+                layout="inline"
+                className="mt-3"
+              >
+                <Switch
                   aria-label="Grayscale"
-                  aria-checked={treatment.grayscale}
+                  checked={treatment.grayscale}
                   disabled={!canEdit}
-                  onClick={() =>
-                    updateTreatment({ grayscale: !treatment.grayscale })
+                  onCheckedChange={(checked) =>
+                    updateTreatment({ grayscale: checked })
                   }
-                  className={`relative h-6 w-11 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    treatment.grayscale
-                      ? "border-primary bg-primary"
-                      : "border-border bg-muted"
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${
-                      treatment.grayscale ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
+                />
+              </FormField>
 
               <div className="mt-4 space-y-4">
                 <TreatmentSlider
@@ -751,7 +713,6 @@ export function ArtistHeroArtworkEditor({
                   className="w-full"
                   onClick={() => inputRef.current?.click()}
                 >
-                  <ImagePlus className="mr-2 h-4 w-4" />
                   {sourceFiles[active]
                     ? sourceFiles[active]?.name
                     : `Upload ${active} source`}
@@ -765,7 +726,10 @@ export function ArtistHeroArtworkEditor({
                     onClick={() => void deriveFromBackground()}
                   >
                     {processing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2
+                        data-admin-ux="hero-save-desktop-loading"
+                        className="mr-2 h-4 w-4 animate-spin"
+                      />
                     ) : null}
                     {profile
                       ? "Refresh from background"
@@ -779,7 +743,6 @@ export function ArtistHeroArtworkEditor({
                   disabled={!activeSource}
                   onClick={() => void openPreview()}
                 >
-                  <Eye className="h-4 w-4" />
                   Preview result
                 </Button>
 
@@ -789,7 +752,10 @@ export function ArtistHeroArtworkEditor({
                   onClick={() => void generate()}
                 >
                   {uploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2
+                      data-admin-ux="hero-save-mobile-loading"
+                      className="mr-2 h-4 w-4 animate-spin"
+                    />
                   ) : null}
                   Generate hero artwork
                 </Button>
@@ -801,7 +767,6 @@ export function ArtistHeroArtworkEditor({
                     disabled={processing || uploading}
                     onClick={() => setDeleteComposition(active)}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
                     Delete {active} composition
                   </Button>
                 ) : null}
@@ -818,7 +783,6 @@ export function ArtistHeroArtworkEditor({
                   disabled={!activeSource}
                   onClick={() => void openPreview()}
                 >
-                  <Eye className="h-4 w-4" />
                   Preview result
                 </Button>
               </>
@@ -835,9 +799,9 @@ export function ArtistHeroArtworkEditor({
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <p className="text-[11px] font-normal uppercase tracking-[0.18em] text-primary font-mono">
+            <MonoLabel as="p" tone="accent">
               {artistName}
-            </p>
+            </MonoLabel>
             <h2 className="mt-1 text-lg font-semibold text-foreground font-display">
               Preview hero artwork
             </h2>
@@ -846,39 +810,27 @@ export function ArtistHeroArtworkEditor({
         </ModalHeader>
 
         <ModalBody className="max-h-[calc(92vh-9rem)] space-y-4 p-5 md:p-6">
-          <div
-            className="flex gap-2"
-            role="tablist"
-            aria-label="Preview composition"
-          >
-            {(["desktop", "mobile"] as const).map((composition) => (
-              <button
-                key={composition}
-                type="button"
-                role="tab"
-                aria-label={`Preview ${composition} composition`}
-                aria-selected={active === composition}
-                onClick={() => setActive(composition)}
-                className={`rounded-md border px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                  active === composition
-                    ? "border-primary/60 bg-primary/12 text-primary"
-                    : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {composition}
-                <span className="ml-2 text-xs opacity-60">
-                  {composition === "desktop" ? "1480 × 600" : "1080 × 1350"}
-                </span>
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            label="Preview composition"
+            as="tabs"
+            value={active}
+            onValueChange={setActive}
+            items={(["desktop", "mobile"] as const).map((composition) => ({
+              value: composition,
+              label: `${composition} · ${composition === "desktop" ? "1480 × 600" : "1080 × 1350"}`,
+              ariaLabel: `Preview ${composition} composition`,
+            }))}
+          />
 
           {previewLoading ? (
             <div
-              className="flex min-h-48 items-center justify-center rounded-md border border-border bg-background/40 text-sm text-muted-foreground"
+              className="flex min-h-48 items-center justify-center rounded-md border border-border bg-surface-object text-sm text-muted-foreground"
               role="status"
             >
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2
+                data-admin-ux="hero-preview-loading"
+                className="mr-2 h-4 w-4 animate-spin"
+              />
               Rendering canonical preview…
             </div>
           ) : (
@@ -920,13 +872,11 @@ export function ArtistHeroArtworkEditor({
         description="This permanently removes the saved composition and its rendered artwork. You can create it again from a new source or the artist background."
         confirmLabel="Delete composition"
         variant="destructive"
-        onConfirm={() => {
-          void (() => {
-            const composition = deleteComposition;
-            setDeleteComposition(null);
-            if (composition) void deletePersistedComposition(composition);
-          })();
+        onConfirm={async () => {
+          if (deleteComposition)
+            await deletePersistedComposition(deleteComposition);
         }}
+        onError={() => {}}
         eyebrow="Confirm action"
         consequence={`${
           deleteComposition ?? ""
@@ -950,28 +900,18 @@ function TreatmentSlider({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="crate-form-field">
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor={id} className="text-xs font-medium text-foreground">
-          {label}
-        </label>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {Math.round(value * 100)}%
-        </span>
-      </div>
-      <input
+    <FormField id={id} label={label} hint={`${Math.round(value * 100)}%`}>
+      <Slider
         id={id}
         aria-label={label}
-        type="range"
         min="0.5"
         max="1.5"
         step="0.05"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="h-1.5 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
       />
-    </div>
+    </FormField>
   );
 }
 
@@ -1042,7 +982,7 @@ function HeroPresentationOverlay({
           mobile ? "w-11 px-0" : "px-5"
         }`}
       >
-        <Play size={17} fill="currentColor" />
+        <Play data-admin-ux="hero-preview-play" size={17} fill="currentColor" />
         {mobile ? null : "Play artist"}
       </span>
       <span
@@ -1053,7 +993,7 @@ function HeroPresentationOverlay({
             : "border-0 bg-transparent backdrop-blur-0"
         }`}
       >
-        <Heart size={18} />
+        <Heart data-admin-ux="hero-preview-follow" size={18} />
       </span>
     </div>
   );

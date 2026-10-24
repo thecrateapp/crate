@@ -456,7 +456,13 @@ it("labels local OCR as free and never says the model is not configured", async 
   expect(screen.queryByText(/not configured/i)).toBeNull();
   const badges = screen.getAllByText("AI · gemini-3.8-flash");
   expect(badges).toHaveLength(2);
-  for (const badge of badges) expect(badge).toHaveAttribute("title", MODEL);
+  for (const badge of badges) {
+    expect(badge).not.toHaveAttribute("title");
+    expect(badge.closest('[data-slot="tooltip-trigger"]')).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+  }
   await user.click(radio("AI image reading"));
   expect(
     screen.getByText(/Sends the image to gemini-3.8-flash once/),
@@ -821,6 +827,21 @@ it("uses design-system controls only", async () => {
     await screen.findByRole("button", { name: "Recent imports" }),
   );
   const fileInput = screen.getByLabelText("Images");
+  for (const label of ["Pasted text", "Event link"]) {
+    expect(
+      screen.getByLabelText(label).closest('[data-slot="form-field"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(label).closest('[data-slot="form-field-label"]'),
+    ).toHaveClass("text-text-subtle");
+  }
+  expect(screen.getByLabelText("Event link")).toHaveAccessibleDescription(
+    "Crate fetches public pages only. If the page needs a login, paste a screenshot or its text instead.",
+  );
+  expect(
+    screen.getByRole("button", { name: "Remove image 1" }),
+  ).toHaveAttribute("data-size", "icon-lg");
+  expect(container.querySelector("[title]")).toBeNull();
   expect(fileInput).toHaveClass("sr-only");
   expect(fileInput).toHaveAttribute("tabindex", "-1");
   expect(container.querySelectorAll('input[type="file"]')).toHaveLength(1);
@@ -1133,4 +1154,20 @@ it("says what an image method sends besides the image", async () => {
       "Sends the text read from the image, your pasted text and the linked page's text to gemini-3.8-flash once. The image stays on your server. This counts toward your AI usage.",
     ),
   ).toBeVisible();
+});
+
+it("exposes a method's configured model through the shared keyboard tooltip", async () => {
+  sourceApi();
+  render(<Harness />);
+  await waitFor(() => expect(requests("/availability")).toHaveLength(1));
+  await userEvent.upload(screen.getByLabelText("Images"), png());
+  const card = methodCard("AI image reading");
+  const cost = card.querySelector(
+    '[data-slot="tooltip-trigger"][tabindex="0"]',
+  );
+  if (!(cost instanceof HTMLElement))
+    throw new Error("Configured model tooltip trigger is missing");
+  expect(cost).not.toHaveAttribute("title");
+  cost.focus();
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(MODEL);
 });

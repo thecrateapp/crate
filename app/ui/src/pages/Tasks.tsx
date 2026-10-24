@@ -1,3 +1,4 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -926,7 +927,7 @@ function HistoryTaskRow({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="group flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left transition-colors pointer-fine:hover:bg-accent-action/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus"
+          className="crate-focus-inset group flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left transition-colors"
         >
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -1219,22 +1220,16 @@ export function Tasks() {
   }, [searchParams, tasks]);
 
   async function handleCancel(id: string) {
-    try {
-      const result = await api<{ status: string }>(
-        `/api/tasks/${id}/cancel`,
-        "POST",
-      );
-      toast.success(
-        result.status === "cancelled"
-          ? "Task cancelled"
-          : "Cancellation requested",
-      );
-      await fetchSnapshot(true);
-    } catch {
-      toast.error("Failed to cancel task");
-    } finally {
-      setCancelId(null);
-    }
+    const result = await api<{ status: string }>(
+      `/api/tasks/${id}/cancel`,
+      "POST",
+    );
+    toast.success(
+      result.status === "cancelled"
+        ? "Task cancelled"
+        : "Cancellation requested",
+    );
+    await fetchSnapshot(true);
   }
 
   async function handleRetry(task: Task) {
@@ -1637,22 +1632,8 @@ export function Tasks() {
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
-          <div
-            className={cn(
-              "grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2",
-              taskTab === "history"
-                ? "xl:grid-cols-[minmax(0,1.2fr)_minmax(160px,0.8fr)_minmax(200px,1fr)_minmax(160px,0.8fr)]"
-                : "lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(200px,1fr)]",
-            )}
-          >
-            <div
-              className={cn(
-                "relative min-w-0",
-                taskTab === "history"
-                  ? "md:col-span-2 xl:col-span-1"
-                  : "md:col-span-2 lg:col-span-1",
-              )}
-            >
+          <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(200px,1fr)]">
+            <div className="relative min-w-0 md:col-span-2 lg:col-span-1">
               <Search
                 size={14}
                 aria-hidden="true"
@@ -1688,18 +1669,26 @@ export function Tasks() {
               triggerClassName="w-full min-w-0 max-w-none"
             />
             {taskTab === "history" ? (
-              <AdminSelect
-                ariaLabel="Filter task outcomes"
-                value={filterStatus === "all" ? "" : filterStatus}
-                onChange={(value) => setFilterStatus(value || "all")}
-                options={[
+              <div
+                role="group"
+                aria-label="Filter task outcomes"
+                className="flex min-w-0 flex-wrap gap-2 md:col-span-2 lg:col-span-3"
+              >
+                {[
+                  { value: "all", label: "All outcomes" },
                   { value: "completed", label: "Completed" },
                   { value: "failed", label: "Failed" },
                   { value: "cancelled", label: "Cancelled" },
-                ]}
-                placeholder="All outcomes"
-                triggerClassName="w-full min-w-0 max-w-none"
-              />
+                ].map((option) => (
+                  <FilterChip
+                    key={option.value}
+                    active={filterStatus === option.value}
+                    onClick={() => setFilterStatus(option.value)}
+                  >
+                    {option.label}
+                  </FilterChip>
+                ))}
+              </div>
             ) : null}
           </div>
 
@@ -1791,9 +1780,10 @@ export function Tasks() {
         description="Cancel this background task? Running jobs may stop mid-operation depending on the worker handler."
         confirmLabel="Cancel task"
         variant="destructive"
-        onConfirm={() => {
-          void (() => cancelId && handleCancel(cancelId))();
+        onConfirm={async () => {
+          if (cancelId) await handleCancel(cancelId);
         }}
+        onError={() => toast.error("Failed to cancel task")}
         eyebrow="Confirm action"
         consequence={`Task ${
           cancelId ?? ""

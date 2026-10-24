@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,32 +35,47 @@ import { openShareSheet } from "@/lib/social-share";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
 import { buildPlaylistPageActions } from "@/pages/playlist-action-menus";
 
-export function newArrivalsWindowLabel(
+type ReleaseWindow =
+  | { kind: "week"; index: number }
+  | { kind: "currentAndPrevious" | "pastWeeks"; count: number };
+
+export function newArrivalsWindow(
   data: HomeGeneratedPlaylistDetail | null,
-): string | null {
+): ReleaseWindow | null {
   if (!data || data.id !== "my-new-arrivals") return null;
-  const bucketIndexes = Array.from(
-    new Set(
+  const indices = [
+    ...new Set(
       data.tracks
         .map((track) => track.release_week_index)
-        .filter((value): value is number => typeof value === "number"),
+        .filter(
+          (index): index is number =>
+            typeof index === "number" && Number.isInteger(index) && index >= 0,
+        ),
     ),
-  ).sort((a, b) => a - b);
-  if (!bucketIndexes.length) return null;
+  ].sort((a, b) => a - b);
+  if (!indices.length) return null;
+  if (indices.length === 1) return { kind: "week", index: indices[0]! };
+  if (indices[0] === 0)
+    return { kind: "currentAndPrevious", count: indices[indices.length - 1]! };
+  return { kind: "pastWeeks", count: indices.length };
+}
 
-  const firstLabel =
-    data.tracks.find((track) => track.release_week_index === bucketIndexes[0])
-      ?.release_week_label || null;
-  if (bucketIndexes.length === 1) {
-    return firstLabel;
-  }
-  if (bucketIndexes[0] === 0) {
-    const previousWeeks = Math.max(...bucketIndexes);
-    return `This week + ${previousWeeks} previous week${
-      previousWeeks === 1 ? "" : "s"
-    }`;
-  }
-  return `Past ${bucketIndexes.length} release weeks`;
+export function newArrivalsWindowLabel(
+  data: HomeGeneratedPlaylistDetail | null,
+  t: TFunction,
+): string | null {
+  const window = newArrivalsWindow(data);
+  if (!window) return null;
+  if (window.kind === "week")
+    return window.index === 0
+      ? t("home.playlists.arrivals.thisWeek")
+      : t("home.playlists.arrivals.weeksAgo", { count: window.index });
+  return t(
+    window.kind === "currentAndPrevious"
+      ? "home.playlists.arrivals.currentAndPrevious"
+      : "home.playlists.arrivals.pastWeeks",
+    { count: window.count },
+  );
 }
 
 export function HomePlaylist() {
@@ -80,30 +96,29 @@ export function HomePlaylist() {
       { safetyNetMs: 120_000 },
     );
   const releaseWindowLabel = useMemo(
-    () => newArrivalsWindowLabel(data),
-    [data],
+    () => newArrivalsWindowLabel(data, t),
+    [data, t],
   );
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
-    return data.tracks.map(
-      (track): Track =>
-        toPlayableTrack(track, {
-          cover:
-            track.artist && track.album
-              ? albumCoverApiUrl(
-                  {
-                    albumId: track.album_id || undefined,
-                    albumEntityUid: track.album_entity_uid || undefined,
-                    artistEntityUid: track.artist_entity_uid || undefined,
-                    albumSlug: track.album_slug || undefined,
-                    artistName: track.artist,
-                    albumName: track.album,
-                  },
-                  { size: 512 },
-                ) || undefined
-              : undefined,
-        }),
+    return data.tracks.map((track): Track =>
+      toPlayableTrack(track, {
+        cover:
+          track.artist && track.album
+            ? albumCoverApiUrl(
+                {
+                  albumId: track.album_id || undefined,
+                  albumEntityUid: track.album_entity_uid || undefined,
+                  artistEntityUid: track.artist_entity_uid || undefined,
+                  albumSlug: track.album_slug || undefined,
+                  artistName: track.artist,
+                  albumName: track.album,
+                },
+                { size: 512 },
+              ) || undefined
+            : undefined,
+      }),
     );
   }, [data]);
 

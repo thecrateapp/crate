@@ -69,6 +69,7 @@ export function usePlayerPlaybackRuntime({
     commitIsBuffering,
     setAnalyserVersion,
     setCrossfadeTransition,
+    setMixState,
     setRecentlyPlayed,
     setPlaybackDeliveryPolicy,
     setInfinitePlaybackEnabled,
@@ -270,6 +271,7 @@ export function usePlayerPlaybackRuntime({
     repeatRef,
     rotateTrackerSession,
     setCrossfadeTransition,
+    setMixState,
     shuffleRef,
   });
 

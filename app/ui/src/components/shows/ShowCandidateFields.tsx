@@ -77,9 +77,14 @@ const REQUIRED = new Set<string>([
   "city",
 ] satisfies RequiredShowField[]);
 
-const STATUS_OPTIONS = Object.entries(SHOW_STATUS_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+const STATUS_OPTIONS = [
+  "scheduled",
+  "onsale",
+  "offsale",
+  "cancelled",
+  "postponed",
+  "rescheduled",
+].map((value) => ({ value, label: SHOW_STATUS_LABELS[value] ?? value }));
 
 function parseLineup(value: string): string[] {
   return value

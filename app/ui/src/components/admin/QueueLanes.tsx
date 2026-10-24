@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
@@ -208,34 +209,37 @@ function TaskChip({
     </>
   );
 
-  return onSelect ? (
-    <button
-      type="button"
-      className={cn(
-        className,
-        "cursor-pointer hover:text-accent-action-hi focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent-action-hi",
+  return (
+    <TooltipHint content={title}>
+      {onSelect ? (
+        <button
+          type="button"
+          className={cn(
+            className,
+            "cursor-pointer hover:text-accent-action-hi focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent-action-hi",
+          )}
+          style={style}
+          data-queue-state={state}
+          data-queue-task-id={task.id}
+          aria-label={`Open ${taskLabel(task.type)} task details · ${state}`}
+          onClick={() => onSelect(task.id)}
+        >
+          {content}
+        </button>
+      ) : (
+        <span
+          className={className}
+          style={style}
+          data-queue-state={state}
+          data-queue-task-id={task.id}
+          role="img"
+          tabIndex={0}
+          aria-label={`${taskLabel(task.type)} · ${state}`}
+        >
+          {content}
+        </span>
       )}
-      style={style}
-      data-queue-state={state}
-      data-queue-task-id={task.id}
-      aria-label={`Open ${taskLabel(task.type)} task details · ${state}`}
-      title={title}
-      onClick={() => onSelect(task.id)}
-    >
-      {content}
-    </button>
-  ) : (
-    <span
-      className={className}
-      style={style}
-      data-queue-state={state}
-      data-queue-task-id={task.id}
-      role="img"
-      aria-label={`${taskLabel(task.type)} · ${state}`}
-      title={title}
-    >
-      {content}
-    </span>
+    </TooltipHint>
   );
 }
 

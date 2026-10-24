@@ -11,20 +11,17 @@ const ALBUM_SKELETON_KEYS = Array.from(
 
 export function ArtistLoadingState() {
   return (
-    <div className="-mx-8 -mt-8">
-      <div className="h-[360px] bg-card animate-pulse" />
-      <div className="px-8 pt-6">
-        <div className="flex gap-2 mb-6">
+    <div className="min-w-0 space-y-4">
+      <div className="min-h-hero-md bg-surface-object" />
+      <div className="min-w-0">
+        <div className="mb-6 flex flex-wrap gap-2">
           {ACTION_SKELETON_KEYS.map((key) => (
-            <Skeleton key={key} className="h-9 w-28" />
+            <Skeleton key={key} className="size-11" />
           ))}
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
           {ALBUM_SKELETON_KEYS.map((key) => (
-            <div
-              key={key}
-              className="bg-card border border-border rounded-md p-3"
-            >
+            <div key={key} className="min-w-0">
               <Skeleton className="w-full aspect-square rounded-md mb-2" />
               <Skeleton className="h-4 w-3/4 mb-1" />
               <Skeleton className="h-3 w-1/2" />

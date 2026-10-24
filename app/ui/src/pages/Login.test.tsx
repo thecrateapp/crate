@@ -45,6 +45,17 @@ describe("Login", () => {
     });
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveAttribute(
+      "data-slot",
+      "input",
+    );
+    expect(
+      screen.getByLabelText("Email").closest('[data-slot="form-field"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "autoComplete",
+      "current-password",
+    );
     expect(
       screen.getByRole("button", { name: /sign in/i }),
     ).toBeInTheDocument();

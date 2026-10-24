@@ -4,6 +4,7 @@ import {
   useEffect,
   useReducer,
   useRef,
+  useState,
   type ChangeEvent,
   type FormEvent,
 } from "react";
@@ -31,6 +32,7 @@ import {
 interface PlaylistCreateModalProps {
   open: boolean;
   mode?: "create" | "edit";
+  editorIdentity?: string | number;
   initialName?: string;
   initialDescription?: string;
   initialCoverDataUrl?: string | null;
@@ -53,6 +55,7 @@ interface PlaylistCreateModalProps {
 export function PlaylistCreateModal({
   open,
   mode = "create",
+  editorIdentity,
   initialName = "",
   initialDescription = "",
   initialCoverDataUrl = null,
@@ -86,9 +89,19 @@ export function PlaylistCreateModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const initializedSession = useRef<{ identity: string | number } | null>(null);
+  const [searchError, setSearchError] = useState(false);
+  const [searchAttempt, setSearchAttempt] = useState(0);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSession.current = null;
+      return;
+    }
+    const identity = editorIdentity ?? mode;
+    if (initializedSession.current?.identity === identity) return;
+    initializedSession.current = { identity };
+    setSearchError(false);
     dispatch({
       type: "reset",
       initialName,
@@ -105,6 +118,8 @@ export function PlaylistCreateModal({
     initialName,
     initialTracks,
     initialVisibility,
+    editorIdentity,
+    mode,
     open,
   ]);
 
@@ -126,6 +141,7 @@ export function PlaylistCreateModal({
   useEffect(() => {
     if (!open) return undefined;
     const query = search.trim();
+    setSearchError(false);
     if (query.length < 2) {
       dispatch({ type: "set-results", value: [] });
       dispatch({ type: "set-searching", value: false });
@@ -133,8 +149,8 @@ export function PlaylistCreateModal({
     }
 
     let cancelled = false;
+    dispatch({ type: "set-searching", value: true });
     const timer = window.setTimeout(async () => {
-      dispatch({ type: "set-searching", value: true });
       try {
         const response = await api<{ tracks: SearchTrackResult[] }>(
           `/api/catalog/search?q=${encodeURIComponent(query)}&limit=20`,
@@ -144,7 +160,7 @@ export function PlaylistCreateModal({
         }
       } catch {
         if (!cancelled) {
-          dispatch({ type: "set-results", value: [] });
+          setSearchError(true);
         }
       } finally {
         if (!cancelled) {
@@ -157,7 +173,7 @@ export function PlaylistCreateModal({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, search]);
+  }, [open, search, searchAttempt]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -185,11 +201,14 @@ export function PlaylistCreateModal({
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    const session = initializedSession.current;
     try {
       const dataUrl = await fileToDataUrl(file);
-      dispatch({ type: "set-cover", value: dataUrl });
+      if (session === initializedSession.current)
+        dispatch({ type: "set-cover", value: dataUrl });
     } catch {
-      dispatch({ type: "set-cover", value: null });
+      if (session === initializedSession.current)
+        dispatch({ type: "set-cover", value: null });
     } finally {
       event.target.value = "";
     }
@@ -258,6 +277,8 @@ export function PlaylistCreateModal({
           search={search}
           searching={searching}
           results={results}
+          error={searchError ? t("search.errors.tryAgain") : undefined}
+          onRetry={() => setSearchAttempt((attempt) => attempt + 1)}
           t={t}
           onSearchChange={(value) => dispatch({ type: "set-search", value })}
           onAddTrack={(track) => addTrack(toComposerTrack(track))}

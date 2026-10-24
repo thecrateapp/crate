@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -127,11 +127,12 @@ describe("New Releases text presentation with real data hook and handlers", () =
     const timelineRow = document.querySelector(
       '[data-slot="release-radar-row"][aria-label="Luz de octubre by Costa Norte"]',
     );
-    expect(timelineRow?.querySelector('[data-slot="upcoming-event-row"]')).toBeInTheDocument();
-    expect(timelineRow?.querySelector('[data-slot="action-group"]')).toHaveAttribute(
-      "aria-label",
-      "Actions for Luz de octubre",
-    );
+    expect(
+      timelineRow?.querySelector('[data-slot="upcoming-event-row"]'),
+    ).toBeInTheDocument();
+    expect(
+      timelineRow?.querySelector('[data-slot="action-group"]'),
+    ).toHaveAttribute("aria-label", "Actions for Luz de octubre");
     expect(
       screen.queryByRole("link", { name: "Puerto sin fecha" }),
     ).not.toBeInTheDocument();
@@ -140,6 +141,8 @@ describe("New Releases text presentation with real data hook and handlers", () =
         expect(button).toHaveAttribute("data-size", "icon-lg");
       else if (button.closest('[data-slot="action-group"]'))
         expect(button).toHaveAttribute("data-size", "icon-lg");
+      else if (button.getAttribute("data-slot") === "chip")
+        expect(button).toHaveClass("[@media(pointer:coarse)]:min-h-11");
       else expect(button).toHaveClass("min-h-11");
     expect(mockApi).toHaveBeenCalledTimes(1);
     expect(SampleStream.instances).toHaveLength(1);
@@ -171,8 +174,12 @@ describe("New Releases text presentation with real data hook and handlers", () =
       "/artists/viento-sur/horizonte",
     );
     await userEvent.click(screen.getByRole("button", { name: "All" }));
-    await userEvent.click(screen.getByRole("combobox", { name: "Any date" }));
-    await userEvent.click(await screen.findByRole("option", { name: "Upcoming" }));
+    await userEvent.click(
+      within(screen.getByRole("group", { name: "Release date" })).getByRole(
+        "button",
+        { name: "Upcoming" },
+      ),
+    );
     expect(screen.getByText("Mañana", {})).toBeInTheDocument();
     expect(screen.queryByText("Horizonte", {})).not.toBeInTheDocument();
     expect(mockApi).toHaveBeenCalledTimes(1);
@@ -336,7 +343,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
         mockApi.mock.calls.filter(([, method]) => method !== "POST"),
       ).toHaveLength(1);
       expect(toast.success).not.toHaveBeenCalledWith("Release check complete");
-      expect(toast.error).toHaveBeenCalledTimes(outcome === "reject" ? 1 : 0);
+      expect(toast.error).toHaveBeenCalledTimes(1);
     },
   );
   it("preserves a failed check POST without starting a task", async () => {
@@ -430,8 +437,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
     await userEvent.click(screen.getByRole("button", { name: "Grid" }));
     expect(getReleaseArticles()).toHaveLength(3);
     expect(
-      getReleaseArticles().every((article) =>
-        article.classList.contains("bg-raised-surface") &&
+      getReleaseArticles().every(
+        (article) =>
+          article.classList.contains("bg-raised-surface") &&
           article.classList.contains("shadow-none"),
       ),
     ).toBe(true);

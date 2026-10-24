@@ -4,6 +4,7 @@ import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { useNativeBufferingRecovery } from "@/contexts/use-native-buffering-recovery";
 import { useNativePlaybackReconciliation } from "@/contexts/use-native-playback-reconciliation";
+import type { EngineMixState } from "@/lib/playback-engine";
 export {
   isStaleNativeEvent,
   type NativeEventWatermark,
@@ -51,6 +52,7 @@ type NativePlaybackRuntimeOptions = {
     playSource: PlaySource | null,
   ) => void;
   setCrossfadeTransition: (transition: CrossfadeTransition | null) => void;
+  setMixState?: (state: EngineMixState | null) => void;
 };
 
 export function useNativePlaybackRuntime({
@@ -78,6 +80,7 @@ export function useNativePlaybackRuntime({
   repeatRef,
   rotateTrackerSession,
   setCrossfadeTransition,
+  setMixState,
   shuffleRef,
 }: NativePlaybackRuntimeOptions) {
   const {
@@ -107,6 +110,7 @@ export function useNativePlaybackRuntime({
     applyNativeState,
     applyNativeTrackChange,
     isNativeEventStale,
+    applyNativeMixState,
   } = useNativePlaybackReconciliation({
     clearNativeBufferingRecovery,
     clearNativeBufferingWatchdog,
@@ -125,6 +129,7 @@ export function useNativePlaybackRuntime({
     repeatRef,
     rotateTrackerSession,
     scheduleNativeBufferingWatchdog,
+    setMixState,
   });
 
   useNativePlaybackEventBridge({
@@ -147,5 +152,7 @@ export function useNativePlaybackRuntime({
     retryNativePlaybackAfterAuthError,
     scheduleNativeBufferingWatchdog,
     setCrossfadeTransition,
+    applyNativeMixState,
+    setMixState,
   });
 }

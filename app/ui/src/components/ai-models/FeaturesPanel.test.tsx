@@ -380,9 +380,17 @@ describe("FeaturesPanel", () => {
 
     const vision = row("Extract shows from image");
     expect(within(vision).getByText(/Last run/)).toBeVisible();
-    const time = vision.querySelector("time[title]");
+    const time = vision.querySelector("time");
     expect(time).not.toBeNull();
-    expect(time?.getAttribute("title")).toBeTruthy();
+    expect(time).not.toHaveAttribute("title");
+    expect(time).toHaveAttribute(
+      "dateTime",
+      activityFixture.items.find(
+        (item) => item.action_id === "shows.extract.vision",
+      )!.created_at,
+    );
+    expect(time).toHaveAttribute("tabIndex", "0");
+    expect(time).toHaveTextContent(/ago/);
     expect(within(vision).getByText(/Succeeded/)).toBeVisible();
     expect(
       within(row("Propose genre EQ")).getByText("No recent runs"),

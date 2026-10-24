@@ -238,7 +238,7 @@ export function Contributions() {
                           {albumPath ? (
                             <Link
                               to={albumPath}
-                              className="inline-flex min-h-11 min-w-[44px] max-w-full items-center text-sm font-semibold text-foreground transition-colors hover:text-accent-action-hi focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action-hi"
+                              className="inline-flex min-h-11 min-w-[44px] max-w-full items-center text-sm font-semibold text-foreground transition-colors hover:text-accent-action-hi"
                             >
                               <span className="truncate">
                                 {item.album_name}

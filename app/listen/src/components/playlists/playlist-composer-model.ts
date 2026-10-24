@@ -24,6 +24,7 @@ export interface SearchTrackResult extends CatalogTrack {
 }
 
 export function getTrackKey(track: PlaylistComposerTrack): string {
+  if (track.playlistEntryId != null) return `entry:${track.playlistEntryId}`;
   if (track.globalTrackUid) return `global:${track.globalTrackUid}`;
   if (track.entityUid) return `entity:${track.entityUid}`;
   if (track.libraryTrackId != null) return `id:${track.libraryTrackId}`;

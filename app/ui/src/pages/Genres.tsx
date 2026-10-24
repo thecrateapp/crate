@@ -801,7 +801,10 @@ function GenreList() {
           meta={`${formatNumber(soundHealth.eq.total_genres)} taxonomy nodes`}
         >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-            <section aria-label="Listening-led genre EQ priorities" className="min-w-0">
+            <section
+              aria-label="Listening-led genre EQ priorities"
+              className="min-w-0"
+            >
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <MonoLabel as="h3" tone="accent" size="eyebrow">
                   Most listened without genre EQ
@@ -833,7 +836,8 @@ function GenreList() {
                           {priority.name}
                         </MonoLabel>
                         <span className="shrink-0 text-xs tabular-nums text-text-muted transition-colors group-hover:text-accent-action-hi">
-                          {priority.weighted_play_count.toFixed(1)} weighted plays
+                          {priority.weighted_play_count.toFixed(1)} weighted
+                          plays
                           <span className="ml-2 text-text-subtle">
                             {priority.listening_share_90d_pct}%
                           </span>
@@ -854,7 +858,10 @@ function GenreList() {
                 </p>
               )}
             </section>
-            <section aria-label="Effective EQ source coverage" className="min-w-0">
+            <section
+              aria-label="Effective EQ source coverage"
+              className="min-w-0"
+            >
               <MonoLabel as="h3" tone="accent" size="eyebrow" className="mb-3">
                 Genre EQ coverage
               </MonoLabel>
@@ -897,7 +904,7 @@ function GenreList() {
                   Needs mapping
                 </MonoLabel>
                 <dd
-                  className={`m-0 mt-2 font-display text-2xl font-semibold tabular-nums ${soundHealth.taxonomy.unmapped_raw_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
+                  className={`m-0 mt-2 font-mono text-2xl font-normal tabular-nums ${soundHealth.taxonomy.unmapped_raw_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
                 >
                   {formatNumber(soundHealth.taxonomy.unmapped_raw_count)}
                 </dd>
@@ -910,7 +917,7 @@ function GenreList() {
                   Orphan nodes
                 </MonoLabel>
                 <dd
-                  className={`m-0 mt-2 font-display text-2xl font-semibold tabular-nums ${soundHealth.taxonomy.orphan_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
+                  className={`m-0 mt-2 font-mono text-2xl font-normal tabular-nums ${soundHealth.taxonomy.orphan_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
                 >
                   {formatNumber(soundHealth.taxonomy.orphan_count)}
                 </dd>
@@ -923,9 +930,11 @@ function GenreList() {
                   No genre EQ
                 </MonoLabel>
                 <dd
-                  className={`m-0 mt-2 font-display text-2xl font-semibold tabular-nums ${soundHealth.taxonomy.missing_effective_eq_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
+                  className={`m-0 mt-2 font-mono text-2xl font-normal tabular-nums ${soundHealth.taxonomy.missing_effective_eq_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
                 >
-                  {formatNumber(soundHealth.taxonomy.missing_effective_eq_count)}
+                  {formatNumber(
+                    soundHealth.taxonomy.missing_effective_eq_count,
+                  )}
                 </dd>
                 <p className="m-0 mt-1 text-xs text-text-muted">
                   Nodes without a direct or inherited preset
@@ -936,7 +945,7 @@ function GenreList() {
                   Missing copy
                 </MonoLabel>
                 <dd
-                  className={`m-0 mt-2 font-display text-2xl font-semibold tabular-nums ${soundHealth.taxonomy.missing_description_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
+                  className={`m-0 mt-2 font-mono text-2xl font-normal tabular-nums ${soundHealth.taxonomy.missing_description_count > 0 ? "text-state-warning-text" : "text-text-primary"}`}
                 >
                   {formatNumber(soundHealth.taxonomy.missing_description_count)}
                 </dd>
@@ -1169,7 +1178,9 @@ function GenreList() {
                               genre={g}
                               busyAction={unmappedActionBusy[g.slug] ?? null}
                               canDelete={canCurateGenres}
-                              canEnrich={taxonomyProposalLLM?.available === true}
+                              canEnrich={
+                                taxonomyProposalLLM?.available === true
+                              }
                               onAction={handleUnmappedAction}
                               onDelete={setDeleteTarget}
                             />
@@ -1240,9 +1251,11 @@ function GenreList() {
                   Recommended action
                 </MonoLabel>
                 <p className="mb-0 mt-1 font-medium text-text-primary">
-                  {TAXONOMY_ACTION_LABELS[
-                    unmappedProposal.proposal.recommended_action
-                  ]}
+                  {
+                    TAXONOMY_ACTION_LABELS[
+                      unmappedProposal.proposal.recommended_action
+                    ]
+                  }
                 </p>
               </div>
               {unmappedProposal.proposal.recommended_target_slug ? (

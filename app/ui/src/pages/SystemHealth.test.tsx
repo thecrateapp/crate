@@ -5,9 +5,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import dashboardFixture from "../../../../tests/admin-e2e/fixtures/metrics-dashboard.json";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
-const { useApiMock, refetchMock } = vi.hoisted(() => ({
+const { useApiMock, refetchMock, charts, motionMock } = vi.hoisted(() => ({
   useApiMock: vi.fn(),
   refetchMock: vi.fn(),
+  charts: [] as Record<string, unknown>[],
+  motionMock: vi.fn(() => true),
+}));
+vi.mock("@crate/ui/lib/motion-gate", () => ({ useMotionAllowed: motionMock }));
+vi.mock("@nivo/line", () => ({
+  ResponsiveLine: (props: Record<string, unknown>) => {
+    charts.push(props);
+    return null;
+  },
 }));
 
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
@@ -23,6 +32,53 @@ const resourcesDescription =
   "Storage pressure, database pool use and analysis backlog surfaced as operational cards.";
 
 describe("SystemHealth Resources instrument", () => {
+  it.each([false, true])(
+    "honours motion permission %s at the statistical chart boundary",
+    (allowed) => {
+      motionMock.mockReturnValue(allowed);
+      charts.length = 0;
+      useApiMock.mockReturnValue({
+        data: dashboardFixture,
+        loading: false,
+        error: null,
+        refetch: refetchMock,
+      });
+      renderWithAdminProviders(<SystemHealth />);
+      expect(charts.length).toBeGreaterThan(0);
+      for (const chart of charts) expect(chart.animate).toBe(allowed);
+    },
+  );
+  it("labels the actual API maximum honestly and lets metrics fit the available container", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...dashboard,
+        summary: {
+          ...dashboard.summary,
+          api_latency: {
+            ...dashboard.summary.api_latency,
+            max: 17619,
+            avg: 230,
+          },
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+    expect(screen.queryByText("API p95")).toBeNull();
+    const max = screen
+      .getByText("API max")
+      .closest<HTMLElement>(".crate-form-field");
+    expect(within(max!).getByText("17619ms")).toHaveClass("whitespace-nowrap");
+    expect(max?.closest('[data-slot="system-health-summary"]')).toHaveClass(
+      "grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))]",
+    );
+    expect(screen.getAllByRole("meter").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("progressbar", { name: "Audio analysis coverage" }),
+    ).toHaveAttribute("aria-valuenow");
+  });
   beforeEach(() => {
     useApiMock.mockReset();
     refetchMock.mockReset();
@@ -161,7 +217,9 @@ describe("SystemHealth Resources instrument", () => {
         '[class*="border-white/"], [class*="bg-black/"], [class*="text-white/"], [class*="bg-primary"]',
       ),
     ).toBeNull();
-    expect(container.querySelector('[data-testid="empty-state"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="empty-state"]'),
+    ).toBeInTheDocument();
   });
 
   it("retains the metrics window and refresh controls", async () => {

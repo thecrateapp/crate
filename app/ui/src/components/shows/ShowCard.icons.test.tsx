@@ -5,25 +5,28 @@ import { ShowCard, type ShowEvent } from "./ShowCard";
 import fixture from "../../../../../tests/admin-e2e/fixtures/upcoming-1ao.json";
 const show = { ...fixture.items[4]!, type: "show" as const };
 describe("Admin ShowCard reviewed glyph contract", () => {
-  it("keeps real artist/ticket destinations with text actions and no redundant location/action icons", () => {
+  it("keeps real artist/ticket destinations with shared icon actions and no decorative glyphs", () => {
     const { container } = render(
       <MemoryRouter>
         <ShowCard show={show} />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Open Artist" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Open artist" })).toHaveAttribute(
       "href",
       "/artists/costa-norte",
     );
-    expect(screen.getByRole("link", { name: "Get Tickets" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Get tickets" })).toHaveAttribute(
       "href",
       show.url,
     );
-    expect(screen.getByRole("link", { name: "Get Tickets" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Get tickets" })).toHaveAttribute(
       "target",
       "_blank",
     );
-    expect(container.querySelectorAll("svg")).toHaveLength(0);
+    expect(container.querySelectorAll("svg")).toHaveLength(2);
+    expect(
+      screen.getByRole("group", { name: "Show preview actions" }),
+    ).toBeVisible();
     expect(screen.getByText("Sala Puerto")).toBeInTheDocument();
   });
   it("retains controlled card keyboard expansion, external UX and close glyph", () => {
@@ -46,11 +49,10 @@ describe("Admin ShowCard reviewed glyph contract", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Close show details" }));
     expect(toggle).toHaveBeenCalledTimes(2);
-    expect(container.querySelectorAll("svg")).toHaveLength(1);
-    expect(container.querySelector("svg")).toHaveAttribute(
-      "data-admin-ux",
-      "show-close",
-    );
+    expect(container.querySelectorAll("svg")).toHaveLength(3);
+    expect(
+      container.querySelector('svg[data-admin-ux="show-close"]'),
+    ).toHaveAttribute("data-admin-ux", "show-close");
   });
   it("preserves legacy ShowEvent compact and missing-data rendering", () => {
     const legacy = {
@@ -74,10 +76,10 @@ describe("Admin ShowCard reviewed glyph contract", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.queryByRole("link", { name: "Get Tickets" }),
+      screen.queryByRole("link", { name: "Get tickets" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "Open Artist" }),
+      screen.queryByRole("link", { name: "Open artist" }),
     ).not.toBeInTheDocument();
   });
   it("uses an opaque raised surface for both static and interactive show cards", () => {

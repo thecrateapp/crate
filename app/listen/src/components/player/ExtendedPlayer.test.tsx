@@ -1,5 +1,6 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -126,10 +127,6 @@ vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
 
-vi.mock("@crate/ui/lib/use-escape-key", () => ({
-  useEscapeKey: vi.fn(),
-}));
-
 describe("ExtendedPlayer", () => {
   beforeEach(() => {
     localStorage.removeItem("listen-eq-enabled");
@@ -206,16 +203,13 @@ describe("ExtendedPlayer", () => {
     });
 
     const onClose = vi.fn();
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={onClose} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={onClose} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
     await userEvent
       .setup()
@@ -234,16 +228,13 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={vi.fn()} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
     expect(
       screen.getByRole("button", { name: "Equalizer" }),
@@ -269,16 +260,13 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={vi.fn()} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
     const closeButton = screen.getByLabelText("Close player");
     const equalizerButton = screen.getByRole("button", {
@@ -374,4 +362,49 @@ describe("ExtendedPlayer", () => {
 
     expect(container.innerHTML).not.toContain("shadow-player-artwork-layered");
   });
+});
+
+it("isolates the prepared and closed surface and returns focus to its launcher", async () => {
+  const user = userEvent.setup();
+  const track = createMockTrack({
+    id: "focus-track",
+    title: "Paused focus track",
+  });
+  function PlayerHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button onClick={() => setOpen(true)}>Expand player</button>
+        <ExtendedPlayer open={open} onClose={() => setOpen(false)} />
+        <button>After player</button>
+      </>
+    );
+  }
+  renderWithListenProviders(<PlayerHarness />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+      currentIndex: 0,
+    }),
+  });
+  const closedSurface = screen
+    .getByTestId("player-track-identity")
+    .closest(".z-app-extended-player");
+  expect(closedSurface).toHaveAttribute("inert");
+  expect(closedSurface).toHaveAttribute("aria-hidden", "true");
+  expect(
+    screen.queryByRole("button", { name: "Close player" }),
+  ).not.toBeInTheDocument();
+  const launcher = screen.getByRole("button", { name: "Expand player" });
+  await user.click(launcher);
+  const close = screen.getByRole("button", { name: "Close player" });
+  await waitFor(() => expect(close).toHaveFocus());
+  await user.click(close);
+  expect(launcher).toHaveFocus();
+  expect(closedSurface).toHaveAttribute("inert");
+  // jsdom does not enforce native inert during user-event tabbing.
+  // The AX boundary and focus restoration are asserted here; real Tab is checked in browser.
+  expect(
+    screen.queryByRole("button", { name: "Close player" }),
+  ).not.toBeInTheDocument();
 });

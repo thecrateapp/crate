@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Svuota",
   "native.logs.hide": "Nascondi",
   "native.logs.empty": "Nessun evento di riproduzione per ora.",
-  "native.logs.trigger": "Registro · {count}"
+  "native.logs.trigger": "Registro · {count}",
+  "library.liked.loadFailed": "Impossibile caricare i brani preferiti.",
+  "library.liked.stateUnavailable": "Stato dei preferiti non disponibile",
+  "settings.offline.removeConfirmTitle": "Rimuovere le copie scaricate?",
+  "settings.offline.removeConfirmDescription": "Rimuovi da questo dispositivo {itemCount, plural, one {# elemento scaricato} other {# elementi scaricati}} con {trackCount, plural, one {# brano} other {# brani}} ({size}). La tua libreria rimane sul server e può essere scaricata di nuovo.",
+  "settings.offline.removeConfirmAction": "Rimuovi copie scaricate",
+  "home.playlists.arrivals.thisWeek": "Questa settimana",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {La settimana scorsa} other {# settimane fa}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Questa settimana + # settimana precedente} other {Questa settimana + # settimane precedenti}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {# settimana di uscite precedente} other {# settimane di uscite precedenti}}",
+  "crate.page.loadFailed": "Impossibile caricare questa Crate. Riprova.",
+  "crate.page.refreshFailed": "Impossibile aggiornare questa Crate. Vengono mostrati i dettagli salvati.",
+  "crate.page.playbackLoadFailed": "Impossibile caricare i brani per la riproduzione. Riprova.",
+  "artist.topTracks.unavailable": "Brani più ascoltati non disponibili",
+  "player.mix.label": "Transizione",
+  "player.mix.gapless": "Senza pause",
+  "player.mix.paused": "In pausa",
+  "player.mix.buffering": "Caricamento audio"
 }

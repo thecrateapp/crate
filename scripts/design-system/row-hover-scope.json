@@ -16,8 +16,8 @@
   },
   {
     "path": "app/ui/src/pages/Playlists.tsx",
-    "prefix": "flex cursor-pointer flex-col gap-4 p-4 @2xl:flex-row @2xl:items-start",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow"
   },
   {
     "path": "app/ui/src/pages/I18nReview.tsx",
@@ -26,32 +26,32 @@
   },
   {
     "path": "app/ui/src/pages/Stack.tsx",
-    "prefix": "flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60",
+    "prefix": "flex gap-3 rounded-sm px-2 py-1 font-mono text-label text-text-secondary",
     "kind": "row"
   },
   {
     "path": "app/ui/src/components/shows/ShowCard.tsx",
-    "prefix": "relative w-full overflow-hidden rounded-md border",
+    "prefix": "relative w-full overflow-hidden transition-[height,border-color]",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Album.tsx",
-    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Album.tsx",
-    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Download.tsx",
-    "prefix": "flex items-center gap-3 px-3 py-2 rounded-md",
+    "prefix": "group flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Download.tsx",
-    "prefix": "flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md",
+    "prefix": "flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-sm text-text-secondary",
     "kind": "row"
   },
   {
@@ -66,48 +66,52 @@
   },
   {
     "path": "app/ui/src/pages/PlaylistEditor.tsx",
-    "prefix": "flex items-center gap-3 rounded-md px-2 py-2",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow",
+    "ownerLabel": "Preview track sample"
   },
   {
     "path": "app/ui/src/pages/PlaylistEditor.tsx",
-    "prefix": "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow",
+    "ownerLabel": "Candidate tracks"
   },
   {
     "path": "app/ui/src/pages/NewReleases.tsx",
-    "prefix": "group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors",
+    "prefix": "group overflow-hidden p-0",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Logs.tsx",
-    "prefix": "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors",
+    "prefix": "grid gap-3 border-b border-border-quiet px-4 py-3 font-mono text-label transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Artist.tsx",
-    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors",
     "kind": "row"
   },
   {
     "path": "app/ui/src/pages/Genres.tsx",
-    "prefix": "flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors",
+    "prefix": "flex min-w-0 items-center justify-between gap-3 border-b border-border-quiet py-2 text-left",
     "kind": "row"
   },
   {
     "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
-    "prefix": "w-full flex items-center gap-3 px-4 py-2.5",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow"
   },
   {
     "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
-    "prefix": "w-full flex items-center gap-4 px-4 py-2 text-left transition-colors group",
-    "kind": "row"
+    "kind": "row",
+    "component": "EntityRow",
+    "ownerLabel": "Library top tracks"
   },
   {
     "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
-    "prefix": "w-full flex items-center gap-4 px-4 py-2 text-left opacity-60 transition-colors",
-    "kind": "row"
+    "kind": "row",
+    "component": "EntityRow",
+    "ownerLabel": "Additional Spotify top tracks"
   },
   {
     "path": "app/ui/src/components/shows/ShowCard.tsx",
@@ -116,33 +120,33 @@
   },
   {
     "path": "app/ui/src/components/shows/ShowCard.tsx",
-    "prefix": "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out",
+    "prefix": "hover:border-accent-action-hi/40",
     "kind": "row"
   },
   {
     "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
-    "prefix": "flex items-center gap-4 p-3 rounded-md border border-accent-action/10",
-    "kind": "row"
+    "kind": "row",
+    "component": "EntityRow"
   },
   {
     "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
-    "prefix": "w-full flex items-center gap-4 px-4 py-2.5 rounded-md",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow"
   },
   {
     "path": "app/ui/src/components/artist/ArtistRow.tsx",
-    "prefix": "flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors",
-    "kind": "row"
+    "kind": "row",
+    "component": "EntityRow"
   },
   {
     "path": "app/ui/src/components/album/AlbumRow.tsx",
-    "prefix": "group flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors",
-    "kind": "row"
+    "kind": "row",
+    "component": "EntityRow"
   },
   {
     "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
-    "prefix": "group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors",
-    "kind": "row"
+    "kind": "row",
+    "component": "HairlineRow"
   },
   {
     "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
@@ -161,7 +165,7 @@
   },
   {
     "path": "app/ui/src/pages/Tasks.tsx",
-    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "prefix": "crate-focus-inset group flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left transition-colors",
     "kind": "row"
   },
   {

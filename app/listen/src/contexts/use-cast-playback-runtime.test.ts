@@ -32,7 +32,7 @@ describe("useCastPlaybackRuntime", () => {
     const commitIsPlaying = vi.fn();
     const setVolumeState = vi.fn();
 
-    const { unmount } = renderHook(() =>
+    const { result, unmount } = renderHook(() =>
       useCastPlaybackRuntime({
         commitCurrentTime,
         commitCurrentIndex,
@@ -55,6 +55,7 @@ describe("useCastPlaybackRuntime", () => {
       });
     });
 
+    expect(result.current).toBe(true);
     expect(commitCurrentTime).toHaveBeenCalledWith(42.5);
     expect(commitCurrentIndex).toHaveBeenCalledWith(3);
     expect(commitDuration).toHaveBeenCalledWith(185);
@@ -74,7 +75,7 @@ describe("useCastPlaybackRuntime", () => {
     });
     const commitCurrentTime = vi.fn();
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useCastPlaybackRuntime({
         commitCurrentTime,
         commitCurrentIndex: vi.fn(),
@@ -95,6 +96,7 @@ describe("useCastPlaybackRuntime", () => {
       });
     });
 
+    expect(result.current).toBe(false);
     expect(commitCurrentTime).not.toHaveBeenCalled();
   });
 });

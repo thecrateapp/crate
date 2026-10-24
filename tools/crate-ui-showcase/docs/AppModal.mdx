@@ -22,3 +22,9 @@ The biography sample composes the actual ArtistBioProfile with the same AppModal
 <Controls of={Stories.Base} />
 
 <Canvas of={Stories.FullWidthBiography} />
+
+## Shared focus lifecycle · 24 October review
+
+`useModalFocus` is the same lifecycle used by AppModal and Listen's specialized player surfaces. It enters the active panel, wraps Tab only in the top layer, respects a portalled child's Escape/Tab ownership and restores the opening trigger. A specialized fullscreen surface can additionally isolate its background branches without replacing its layout or transition. A resolver supports a launcher that is recreated after closing; a non-modal workspace may keep the player dock accessible while open. Closed animated player surfaces remain mounted but are inert and hidden from assistive technology during their exit.
+
+The Base story's nested dialog and portalled Select/Tooltip exercise the unchanged facade. The shared focus tests cover the specialized scope with a nested AppModal and focus return. Listen's player tests cover prepared/closed exclusion, fullscreen naming and isolation, boundary Tab wrapping, the recreated launcher and nested Escape priority. Real browser/native keyboard and touch animation checks remain consumer responsibilities; no playback is needed for those focus checks.

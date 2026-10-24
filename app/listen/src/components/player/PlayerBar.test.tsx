@@ -14,6 +14,10 @@ import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
 import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
+const likesReadState = vi.hoisted(() => ({ hasLoaded: true }));
+afterEach(() => {
+  likesReadState.hasLoaded = true;
+});
 const trackReads = vi.hoisted(() => vi.fn());
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
@@ -28,6 +32,7 @@ vi.mock("@crate/ui/lib/use-breakpoint", () => ({
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
+    hasLoaded: likesReadState.hasLoaded,
     isLiked: isLikedMock,
     likeTrack: likeTrackMock,
     unlikeTrack: unlikeTrackMock,
@@ -737,4 +742,22 @@ it("uses the shared reviewable solid player frame", () => {
     .querySelector('[data-slot="player-chrome"]');
   expect(chrome).toHaveClass("bg-surface-chrome");
   expect(chrome?.className).not.toMatch(/blur|glass|shadow/);
+});
+
+it("does not offer a blind like before the initial collection read succeeds", () => {
+  likesReadState.hasLoaded = false;
+  likeTrackMock.mockClear();
+  unlikeTrackMock.mockClear();
+  useIsDesktopMock.mockReturnValue(true);
+  const track = createMockTrack({ title: "Unknown like state" });
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: track, queue: [track] },
+  });
+  const heart = screen.getByRole("button", {
+    name: "Liked status unavailable",
+  });
+  expect(heart).toBeDisabled();
+  fireEvent.click(heart);
+  expect(likeTrackMock).not.toHaveBeenCalled();
+  expect(unlikeTrackMock).not.toHaveBeenCalled();
 });

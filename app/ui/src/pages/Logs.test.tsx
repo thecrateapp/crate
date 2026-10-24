@@ -30,6 +30,30 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("Logs typographic controls", () => {
+  it("lets an operator inspect complete metadata including a long search match", async () => {
+    const metadata = {
+      album: "Costa Norte",
+      details: "Long diagnostic payload ".repeat(40),
+      terminal: "needle-at-the-end",
+    };
+    vi.mocked(api).mockResolvedValue({
+      ...snapshot,
+      logs: [{ ...snapshot.logs[0], metadata }],
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Logs />);
+    await user.type(
+      await screen.findByRole("textbox", { name: "Search worker logs" }),
+      "needle-at-the-end",
+    );
+    await user.click(screen.getByText("Inspect metadata"));
+    const details = screen.getByText("Inspect metadata").closest("details");
+    expect(details).toHaveAttribute("open");
+    expect(details?.querySelector("pre")).toHaveTextContent(
+      "needle-at-the-end",
+    );
+    expect(details?.querySelector("pre")).toHaveClass("overflow-auto");
+  });
   it("names initial loading while retaining the busy glyph", () => {
     vi.mocked(api).mockReturnValue(new Promise(() => {}));
     renderWithAdminProviders(<Logs />);
@@ -63,7 +87,9 @@ describe("Logs typographic controls", () => {
       "href",
       "/tasks?task=scan-sample-123",
     );
-    const worker = screen.getAllByRole("button", { name: /log lines seen/ })[0]!;
+    const worker = screen.getAllByRole("button", {
+      name: /log lines seen/,
+    })[0]!;
     expect(worker).toHaveClass("border-border-quiet", "bg-raised-surface");
     const stream = screen.getByRole("heading", { name: "Incident stream" })
       .parentElement?.parentElement;

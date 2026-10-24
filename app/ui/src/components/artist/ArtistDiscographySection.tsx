@@ -1,10 +1,13 @@
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { AdminSelect } from "@/components/ui";
 import { AlbumCard } from "@/components/album/AlbumCard";
 import { MissingAlbumCard } from "@/components/album/MissingAlbumCard";
 import { TidalAlbumCard } from "@/components/album/TidalAlbumCard";
 import type { ArtistAlbumSummary } from "@/components/artist/artistPageTypes";
 import { Button } from "@crate/ui/shadcn/button";
-import { Disc3, Eye, EyeOff, Loader2 } from "lucide-react";
 
 interface MissingAlbum {
   title: string;
@@ -60,46 +63,44 @@ export function ArtistDiscographySection({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-4">
-          <h2 className="text-lg font-semibold font-display">{albums.length} Albums</h2>
+          <div className="flex items-center gap-2">
+            <MonoLabel as="h2" tone="accent">
+              Albums
+            </MonoLabel>
+            <InfoBadge variant="counter">{albums.length}</InfoBadge>
+          </div>
           {missingAlbums.length > 0 && (
-            <button
-              onClick={onToggleShowMissing}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showMissing ? <Eye size={14} /> : <EyeOff size={14} />}
+            <FilterChip active={showMissing} onClick={onToggleShowMissing}>
               {showMissing ? "Hide" : "Show"} missing ({missingAlbums.length})
-            </button>
+            </FilterChip>
           )}
           {canDownloadTidal && tidalMissing.length > 0 && (
             <Button
               size="sm"
               variant="outline"
-              className="border-primary/30 text-primary hover:bg-primary/10"
-              disabled={downloadingDiscog}
+              loading={downloadingDiscog}
               onClick={() => {
                 void onDownloadDiscography();
               }}
             >
-              {downloadingDiscog ? (
-                <Loader2 size={14} className="animate-spin mr-1" />
-              ) : (
-                <Disc3 size={14} className="mr-1" />
-              )}
               Complete Discography ({tidalMissing.length} from Tidal)
             </Button>
           )}
         </div>
-        <SegmentedControl
-          as="radio"
-          label="Sort albums"
-          value={sort}
-          onValueChange={onSortChange}
-          items={[
-            { value: "name", label: "Name" },
-            { value: "year", label: "Newest" },
-            { value: "tracks", label: "Most Tracks" },
-          ]}
-        />
+        <FormField label="Sort albums" className="w-44">
+          <AdminSelect
+            ariaLabel="Sort albums"
+            placeholder="Sort albums"
+            value={sort}
+            onChange={onSortChange}
+            allowClear={false}
+            options={[
+              { value: "name", label: "Name" },
+              { value: "year", label: "Newest" },
+              { value: "tracks", label: "Most Tracks" },
+            ]}
+          />
+        </FormField>
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">

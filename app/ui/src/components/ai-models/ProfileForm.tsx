@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 import { Input } from "@crate/ui/shadcn/input";
+import { FormField } from "@crate/ui/primitives/FormField";
 
 import { AdminSelect } from "@/components/ui";
 import {
@@ -271,15 +272,14 @@ export function ProfileForm({
 
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
           {profile ? null : (
-            <label className="block space-y-1 text-sm text-white/70">
-              Name
+            <FormField label="Name" className="min-w-0">
               <Input
                 required
                 maxLength={200}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
-            </label>
+            </FormField>
           )}
 
           <ModelPicker
@@ -290,24 +290,25 @@ export function ProfileForm({
             disabled={busy}
           />
 
-          <AdminSelect
-            ariaLabel="Image detail"
-            placeholder="Image detail"
-            allowClear={false}
-            value={model ? limits.image_detail : ""}
-            options={(model?.image_details ?? []).map((detail) => ({
-              value: detail,
-              label: imageDetailLabel(detail),
-            }))}
-            disabled={busy || !model}
-            onChange={(detail) =>
-              setLimits((current) => ({ ...current, image_detail: detail }))
-            }
-          />
+          <FormField label="Image detail">
+            <AdminSelect
+              ariaLabel="Image detail"
+              placeholder="Image detail"
+              allowClear={false}
+              value={model ? limits.image_detail : ""}
+              options={(model?.image_details ?? []).map((detail) => ({
+                value: detail,
+                label: imageDetailLabel(detail),
+              }))}
+              disabled={busy || !model}
+              onChange={(detail) =>
+                setLimits((current) => ({ ...current, image_detail: detail }))
+              }
+            />
+          </FormField>
 
-          <div className="flex flex-wrap gap-3">
-            <label className="space-y-1 text-sm text-white/70">
-              Time limit (seconds)
+          <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+            <FormField label="Time limit (seconds)" className="min-w-0">
               <Input
                 type="number"
                 required
@@ -318,9 +319,8 @@ export function ProfileForm({
                   setLimit("timeout_seconds", event.target.valueAsNumber)
                 }
               />
-            </label>
-            <label className="space-y-1 text-sm text-white/70">
-              Output tokens
+            </FormField>
+            <FormField label="Output tokens" className="min-w-0">
               <Input
                 type="number"
                 required
@@ -331,9 +331,8 @@ export function ProfileForm({
                   setLimit("max_output_tokens", event.target.valueAsNumber)
                 }
               />
-            </label>
-            <label className="space-y-1 text-sm text-white/70">
-              Input tokens
+            </FormField>
+            <FormField label="Input tokens" className="min-w-0">
               <Input
                 type="number"
                 required
@@ -344,7 +343,7 @@ export function ProfileForm({
                   setLimit("max_input_tokens", event.target.valueAsNumber)
                 }
               />
-            </label>
+            </FormField>
           </div>
 
           {conflicted ? (
@@ -373,7 +372,7 @@ export function ProfileForm({
               disabled={busy}
               onCheckedChange={(checked) => setReviewed(checked === true)}
             />
-            <label htmlFor={checkboxId} className="text-sm text-white/80">
+            <label htmlFor={checkboxId} className="text-sm text-text-secondary">
               I reviewed this model&apos;s options and limits
             </label>
           </div>

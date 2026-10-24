@@ -16,6 +16,7 @@ import type { QualityBadge } from "@/components/player/bar/player-bar-utils";
 type PlayerBarViewState = {
   isDesktop: boolean;
   liked: boolean;
+  likeStateAvailable?: boolean;
   isShapedRadioTrack: boolean;
   effectiveIsPlaying: boolean;
   effectiveIsBuffering: boolean;
@@ -162,6 +163,7 @@ export function PlayerBarView({
     jamQueueLocked,
     jamTransportDisabled,
     liked,
+    likeStateAvailable,
     showEqualizer,
     showLyrics,
     showPlayerBarAnalyzer,
@@ -196,6 +198,7 @@ export function PlayerBarView({
             sourceLabel={sourceLabel}
             isDesktop={isDesktop}
             liked={liked}
+            likeStateAvailable={likeStateAvailable}
             isShapedRadioTrack={isShapedRadioTrack}
             shapedRadioSessionId={shapedRadioSessionId}
             onNavigate={onNavigate}

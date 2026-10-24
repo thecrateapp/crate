@@ -2,7 +2,10 @@ import {
   PageHeaderAction,
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
-import { OpsPageHero } from "@/components/admin/ops-surfaces";
+import { OpsPageHero, OpsRefreshNotice } from "@/components/admin/ops-surfaces";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import {
   RefreshCw as HeaderRefreshCw,
   Trash2 as HeaderTrash2,
@@ -100,6 +103,8 @@ function technicalLine(item: QuarantinedTrack) {
 export function Trash() {
   const [items, setItems] = useState<QuarantinedTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<QuarantinedTrack | null>(
     null,
@@ -114,12 +119,15 @@ export function Trash() {
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     try {
       const payload = await api<QuarantineResponse>(
         "/api/manage/tracks/quarantine",
       );
       setItems(payload.items ?? []);
+      setHasLoaded(true);
     } catch (error) {
+      setLoadError("Could not load quarantined tracks.");
       toast.error(
         error instanceof Error && error.message
           ? error.message
@@ -139,6 +147,7 @@ export function Trash() {
     endpoint: string,
     body: Record<string, unknown>,
     successMessage: string,
+    propagateError = false,
   ) {
     setBusyPath(item.quarantine_path);
     try {
@@ -152,7 +161,7 @@ export function Trash() {
         toast.success(successMessage);
         await load();
       } else {
-        toast.error(task.error || "Track operation failed");
+        throw new Error(task.error || `Track operation ${task.status}`);
       }
     } catch (error) {
       toast.error(
@@ -160,9 +169,9 @@ export function Trash() {
           ? error.message
           : "Track operation failed",
       );
+      if (propagateError) throw error;
     } finally {
       setBusyPath(null);
-      setDeleteTarget(null);
     }
   }
 
@@ -187,6 +196,7 @@ export function Trash() {
         reason: "Manual hard delete from .crate-trash",
       },
       "Quarantined track deleted permanently",
+      true,
     );
   }
 
@@ -215,7 +225,7 @@ export function Trash() {
         toast.success(`Trash emptied${suffix}`);
         await load();
       } else {
-        toast.error(task.error || "Empty trash failed");
+        throw new Error(task.error || `Empty trash ${task.status}`);
       }
     } catch (error) {
       toast.error(
@@ -223,9 +233,9 @@ export function Trash() {
           ? error.message
           : "Empty trash failed",
       );
+      throw error;
     } finally {
       setBulkDeleting(false);
-      setBulkDeleteOpen(false);
     }
   }
 
@@ -290,28 +300,24 @@ export function Trash() {
         }
       />
 
-      <Card className="border-border-quiet bg-card">
-        {loading ? (
-          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-            <Loader2
-              data-admin-ux="trash-list-loading"
-              aria-hidden="true"
-              size={16}
-              className="animate-spin"
-            />
-            Loading quarantined tracks...
-          </div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm font-medium text-foreground">
-              .crate-trash is empty
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Quarantined tracks will appear here after manual removals or
-              repair actions.
-            </p>
-          </div>
-        ) : (
+      {loadError && hasLoaded ? (
+        <OpsRefreshNotice
+          message={`${loadError} Showing the last successful list.`}
+          onRetry={() => void load()}
+          retrying={loading}
+        />
+      ) : null}
+      {loading && !hasLoaded ? (
+        <LoadingState label="Loading quarantined tracks" />
+      ) : loadError && !hasLoaded ? (
+        <ErrorState message={loadError} onRetry={() => void load()} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          title=".crate-trash is empty"
+          description="Quarantined tracks will appear here after manual removals or repair actions."
+        />
+      ) : (
+        <Card className="border-border-quiet bg-card">
           <div className="divide-y divide-border-quiet">
             {items.map((item) => {
               const busy = busyPath === item.quarantine_path;
@@ -371,8 +377,8 @@ export function Trash() {
               );
             })}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -383,9 +389,10 @@ export function Trash() {
         }" from .crate-trash? This cannot be undone.`}
         confirmLabel="Delete Permanently"
         variant="destructive"
-        onConfirm={() => {
-          void (() => deleteTarget && void hardDelete(deleteTarget))();
+        onConfirm={async () => {
+          if (deleteTarget) await hardDelete(deleteTarget);
         }}
+        onError={() => undefined}
         eyebrow="Confirm action"
         consequence={`${
           deleteTarget ? displayTitle(deleteTarget) : "Track"
@@ -405,9 +412,8 @@ export function Trash() {
         )}) from .crate-trash? This cannot be undone.`}
         confirmLabel="Empty Trash"
         variant="destructive"
-        onConfirm={() => {
-          void (() => void hardDeleteAll())();
-        }}
+        onConfirm={hardDeleteAll}
+        onError={() => undefined}
         eyebrow="Confirm action"
         consequence={`${items.length} tracks · ${formatBytes(
           totalSizeBytes,

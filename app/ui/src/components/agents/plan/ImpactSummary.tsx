@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useId } from "react";
 
 import { StatusBadge } from "@/components/admin/StatusBadge";
@@ -11,12 +12,9 @@ export function ImpactSummary({ impact }: { impact: Record<string, unknown> }) {
 
   return (
     <section aria-labelledby={headingId} className="space-y-2">
-      <h3
-        id={headingId}
-        className="text-xs font-normal uppercase tracking-[0.12em] text-white/40 font-mono"
-      >
+      <MonoLabel as="h3" tone="accent" id={headingId}>
         Impact
-      </h3>
+      </MonoLabel>
       {chips.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {chips.map((chip, index) => (
@@ -27,7 +25,7 @@ export function ImpactSummary({ impact }: { impact: Record<string, unknown> }) {
         </ul>
       ) : null}
       {details ? (
-        <div className="text-sm text-white/80">
+        <div className="text-sm text-text-secondary">
           <StructuredValue value={details} />
         </div>
       ) : null}

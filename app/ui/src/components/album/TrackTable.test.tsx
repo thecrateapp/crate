@@ -34,19 +34,23 @@ vi.mock("@/components/ui/music-context-menu", () => ({
     onMoveTrack?: () => void;
     onQuarantineTrack?: () => void;
   }) => (
-    <div>
+    <>
       {children}
-      {onMoveTrack ? (
-        <button type="button" onClick={onMoveTrack}>
-          Move to Album
-        </button>
-      ) : null}
-      {onQuarantineTrack ? (
-        <button type="button" onClick={onQuarantineTrack}>
-          Quarantine Track
-        </button>
-      ) : null}
-    </div>
+      <tr>
+        <td colSpan={20}>
+          {onMoveTrack ? (
+            <button type="button" onClick={onMoveTrack}>
+              Move to Album
+            </button>
+          ) : null}
+          {onQuarantineTrack ? (
+            <button type="button" onClick={onQuarantineTrack}>
+              Quarantine Track
+            </button>
+          ) : null}
+        </td>
+      </tr>
+    </>
   ),
 }));
 
@@ -197,4 +201,79 @@ it("marks synced lyrics as available rather than waiting", () => {
     />,
   );
   expect(screen.getByText("SYNCED")).toHaveClass("text-accent-action-hi");
+});
+
+it("opens a wide scrollable track profile and preserves Escape, close and trigger focus", async () => {
+  const user = userEvent.setup();
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{
+        concubine: {
+          tempo: 124,
+          key: "A",
+          scale: "minor",
+          energy: 0.8,
+          mood: null,
+          danceability: null,
+          valence: null,
+          acousticness: null,
+          instrumentalness: null,
+          loudness: null,
+          dynamic_range: null,
+          spectral_complexity: null,
+        },
+      }}
+    />,
+  );
+  const trigger = screen.getByRole("button", { name: "Show audio profile" });
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", {
+    name: "Concubine · Audio profile",
+  });
+  const panel = dialog.querySelector("[data-app-modal-panel]");
+  expect(panel).toHaveClass("sm:max-w-6xl", "flex", "flex-col");
+  expect(panel).not.toHaveAttribute("data-overlay-size");
+  expect(
+    dialog.querySelector('[data-slot="audio-profile-scroll"]'),
+  ).toHaveClass("overflow-y-auto", "min-h-0");
+  expect(
+    screen.getByRole("region", { name: "Sound profile" }),
+  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Close audio profile" }),
+    ).toHaveFocus(),
+  );
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  await user.click(screen.getByRole("button", { name: "Close audio profile" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+});
+
+it("blocks repeated quarantine confirmation until the task finishes", async () => {
+  mockApi.mockResolvedValueOnce({ task_id: "pending-quarantine" });
+  let finish!: (result: Awaited<ReturnType<typeof waitForTask>>) => void;
+  mockWaitForTask.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    }) as ReturnType<typeof waitForTask>,
+  );
+  render(<TrackTable tracks={[track]} artist="Converge" />);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Quarantine Track" }),
+  );
+  const confirms = screen.getAllByRole("button", { name: "Quarantine Track" });
+  const confirm = confirms[confirms.length - 1]!;
+  await userEvent.click(confirm);
+  expect(confirm).toBeDisabled();
+  expect(screen.getByRole("alertdialog")).toBeVisible();
+  finish({ status: "completed" } as Awaited<ReturnType<typeof waitForTask>>);
+  await waitFor(() =>
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+  );
 });

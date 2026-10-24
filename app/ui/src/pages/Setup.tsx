@@ -4,16 +4,8 @@ import { Input } from "@crate/ui/shadcn/input";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  User,
-  Key,
-  Music,
-  ArrowRight,
-  Check,
-  Loader2,
-  ExternalLink,
-  Sparkles,
-} from "lucide-react";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 const STEPS = ["Account", "API Keys", "Library Scan", "Done"];
 
@@ -75,7 +67,7 @@ export function Setup() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-lg py-8">
         <CrateLogo title="Crate" className="mx-auto mb-6 w-16" />
 
         {/* Progress */}
@@ -91,7 +83,7 @@ export function Setup() {
                       : "bg-muted text-muted-foreground"
                 }`}
               >
-                {i < step ? <Check size={14} /> : i + 1}
+                {i + 1}
               </div>
               {i < STEPS.length - 1 && (
                 <div
@@ -104,47 +96,53 @@ export function Setup() {
           ))}
         </div>
 
-        <div className="bg-card border border-border rounded-md p-8 shadow-xl">
+        <div className="bg-card border border-border rounded-md p-5 sm:p-8">
           {/* Step 0: Admin Account */}
           {step === 0 && (
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <User size={18} className="text-primary" />
-                <h2 className="text-lg font-bold font-display">Create Admin Account</h2>
-              </div>
+              <h1 className="mb-1 text-lg font-bold font-display">
+                Create Admin Account
+              </h1>
               <p className="text-sm text-muted-foreground mb-6">
                 This will be your login to manage Crate.
               </p>
               <div className="space-y-3">
-                <Input
-                  placeholder="Name (optional)"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <Input
-                  placeholder="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <FormField label="Name (optional)">
+                  <Input
+                    name="name"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Email">
+                  <Input
+                    name="email"
+                    autoComplete="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </FormField>
+                <FormField label="Password">
+                  <Input
+                    name="password"
+                    autoComplete="new-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </FormField>
               </div>
               <Button
                 className="w-full mt-6"
                 onClick={createAdmin}
                 disabled={creating || !email || !password}
+                loading={creating}
               >
-                {creating ? (
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                ) : null}
-                Create Account <ArrowRight size={14} className="ml-2" />
+                Create Account
               </Button>
             </div>
           )}
@@ -152,10 +150,7 @@ export function Setup() {
           {/* Step 1: API Keys */}
           {step === 1 && (
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Key size={18} className="text-primary" />
-                <h2 className="text-lg font-bold font-display">API Keys</h2>
-              </div>
+              <h1 className="mb-1 text-lg font-bold font-display">API Keys</h1>
               <p className="text-sm text-muted-foreground mb-6">
                 Optional — enable enrichment features. You can add these later
                 in Settings.
@@ -199,39 +194,37 @@ export function Setup() {
                     url: "https://api.setlist.fm/docs/1.0/index.html",
                   },
                 ].map(({ key, label, desc, url }) => (
-                  <div key={key} className="crate-form-field">
-                    <div className="flex items-center gap-2">
-                      <label
-                        htmlFor={`setup-${key}`}
-                        className="text-xs font-medium"
-                      >
-                        {label}
-                      </label>
-                      {desc && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {desc}
-                        </span>
-                      )}
-                      {url && (
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-primary hover:underline ml-auto"
-                        >
-                          Get key <ExternalLink size={9} className="inline" />
-                        </a>
-                      )}
-                    </div>
+                  <FormField
+                    key={key}
+                    id={`setup-${key}`}
+                    label={label}
+                    hint={
+                      <>
+                        {desc}
+                        {url ? (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-accent-action-hi hover:underline"
+                            >
+                              Get key
+                            </a>
+                          </>
+                        ) : null}
+                      </>
+                    }
+                  >
                     <Input
-                      id={`setup-${key}`}
-                      placeholder={`Enter ${label}...`}
-                      value={(keys as any)[key]}
+                      value={keys[key as keyof typeof keys]}
                       onChange={(e) =>
                         setKeys((prev) => ({ ...prev, [key]: e.target.value }))
                       }
                     />
-                  </div>
+                  </FormField>
                 ))}
               </div>
               <div className="flex gap-2 mt-6">
@@ -242,11 +235,9 @@ export function Setup() {
                   className="flex-1"
                   onClick={saveKeys}
                   disabled={savingKeys}
+                  loading={savingKeys}
                 >
-                  {savingKeys ? (
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                  ) : null}
-                  Save Keys <ArrowRight size={14} className="ml-2" />
+                  Save Keys
                 </Button>
               </div>
             </div>
@@ -255,8 +246,9 @@ export function Setup() {
           {/* Step 2: Library Scan */}
           {step === 2 && (
             <div className="text-center">
-              <Music size={40} className="text-primary mx-auto mb-4" />
-              <h2 className="text-lg font-bold mb-2 font-display">Scan Your Library</h2>
+              <h1 className="text-lg font-bold mb-2 font-display">
+                Scan Your Library
+              </h1>
               <p className="text-sm text-muted-foreground mb-6">
                 Crate will scan your music collection, read tags, and build your
                 library database. This runs in the background — you can start
@@ -271,12 +263,11 @@ export function Setup() {
                 >
                   Skip — I'll scan later
                 </Button>
-                <Button onClick={startScan} disabled={scanning}>
-                  {scanning ? (
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                  ) : (
-                    <Sparkles size={14} className="mr-2" />
-                  )}
+                <Button
+                  onClick={startScan}
+                  disabled={scanning}
+                  loading={scanning}
+                >
                   Start Scan
                 </Button>
               </div>
@@ -286,10 +277,9 @@ export function Setup() {
           {/* Step 3: Done */}
           {step === 3 && (
             <div className="text-center">
-              <div className="w-16 h-16 rounded-md bg-accent-action/10 flex items-center justify-center mx-auto mb-4">
-                <Check size={32} className="text-accent-action-hi" />
-              </div>
-              <h2 className="text-lg font-bold mb-2 font-display">You're all set!</h2>
+              <h1 className="text-lg font-bold mb-2 font-display">
+                You're all set!
+              </h1>
               <p className="text-sm text-muted-foreground mb-6">
                 Crate is scanning your library in the background. This may take
                 a while depending on your collection size.
@@ -300,15 +290,15 @@ export function Setup() {
                 }}
                 className="w-full"
               >
-                Go to Dashboard <ArrowRight size={14} className="ml-2" />
+                Go to Dashboard
               </Button>
             </div>
           )}
         </div>
 
-        <div className="text-center mt-4 text-xs text-muted-foreground">
+        <MonoLabel as="p" className="mt-4 text-center" aria-live="polite">
           Step {step + 1} of {STEPS.length}
-        </div>
+        </MonoLabel>
       </div>
     </div>
   );

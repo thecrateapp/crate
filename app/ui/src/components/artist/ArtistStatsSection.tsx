@@ -1,3 +1,4 @@
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { ArtistNetworkGraph } from "@/components/artist/ArtistNetworkGraph";
 import { ArtistStats } from "@/components/artist/ArtistStats";
 
@@ -15,14 +16,17 @@ export function ArtistStatsSection({
   return (
     <div className="space-y-6">
       <ArtistStats artistId={artistId} artistEntityUid={artistEntityUid} />
-      <div className="bg-card border border-border rounded-md p-4">
-        <h4 className="text-sm font-semibold mb-3 font-display">Artist Network</h4>
+      <InstrumentPanel
+        as="section"
+        headingLevel={3}
+        label={{ children: "Artist Network", tone: "accent" }}
+      >
         <ArtistNetworkGraph
           centerArtist={artistName}
           centerArtistId={artistId}
           centerArtistEntityUid={artistEntityUid}
         />
-      </div>
+      </InstrumentPanel>
     </div>
   );
 }

@@ -29,6 +29,7 @@ export function PlayerBar() {
         state={{
           isDesktop: playerBar.isDesktop,
           liked: playerBar.liked,
+          likeStateAvailable: playerBar.likeStateAvailable,
           isShapedRadioTrack: playerBar.isShapedRadioTrack,
           effectiveIsPlaying: playerBar.effectiveIsPlaying,
           effectiveIsBuffering: playerBar.effectiveIsBuffering,

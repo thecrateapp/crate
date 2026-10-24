@@ -21,6 +21,7 @@ _OPTIONS = {
     "max_per_artist",
     "max_per_album",
     "expand_related_genres",
+    "require_full_mix_profile",
 }
 _TEXT_OPS = {"eq", "neq", "contains", "not_contains", "in"}
 _NUMBER_OPS = {"eq", "neq", "gte", "lte", "between", "in"}
@@ -37,7 +38,12 @@ def validate_smart_rules(rules: dict) -> dict:
         value = rules.get(key)
         if value is not None and (type(value) is not int or not 1 <= value <= maximum):
             raise ValueError(f"Invalid {key}")
-    for key in ("deduplicate_artist", "deduplicate_variants", "expand_related_genres"):
+    for key in (
+        "deduplicate_artist",
+        "deduplicate_variants",
+        "expand_related_genres",
+        "require_full_mix_profile",
+    ):
         if key in rules and type(rules[key]) is not bool:
             raise ValueError(f"Invalid {key}")
     selection = rules.get("rules", [])

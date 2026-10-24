@@ -4,11 +4,7 @@ import {
   PageHeaderAction,
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
-import {
-  RefreshCw as HeaderRefreshCw,
-  Loader2,
-  Search,
-} from "lucide-react";
+import { RefreshCw as HeaderRefreshCw, Loader2, Search } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -34,6 +30,7 @@ import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -189,6 +186,8 @@ function ServiceCard({
   expanded,
   logs,
   logsLoading,
+  logsError,
+  onRefreshLogs,
   busy,
   onToggleLogs,
   onRestart,
@@ -198,6 +197,8 @@ function ServiceCard({
   expanded: boolean;
   logs: ContainerLogs | null;
   logsLoading: boolean;
+  logsError: string | null;
+  onRefreshLogs: () => void;
   busy: boolean;
   onToggleLogs: () => void;
   onRestart: () => void;
@@ -328,20 +329,9 @@ function ServiceCard({
             <InfoBadge>{container.name}</InfoBadge>
           </div>
           {logsLoading ? (
-            <div
-              role="status"
-              aria-label={`Loading logs for ${container.name}`}
-              aria-busy="true"
-              className="flex items-center gap-2 py-6 text-sm text-text-muted"
-            >
-              <Loader2
-                data-admin-ux="service-logs-loading"
-                aria-hidden="true"
-                size={14}
-                className="animate-spin text-accent-action-hi"
-              />
-              Loading service logs…
-            </div>
+            <LoadingState label={`Loading logs for ${container.name}`} />
+          ) : logsError ? (
+            <ErrorState message={logsError} onRetry={onRefreshLogs} />
           ) : logs?.logs ? (
             <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-panel-surface py-2">
               {logs.logs
@@ -352,9 +342,7 @@ function ServiceCard({
                 ))}
             </div>
           ) : (
-            <div className="rounded-md border border-dashed border-border-quiet bg-panel-surface px-4 py-6 text-sm text-text-muted">
-              No logs available for this service.
-            </div>
+            <EmptyState message="No logs available for this service." />
           )}
         </div>
       ) : null}
@@ -375,6 +363,14 @@ export function Stack() {
   const [expandedLogs, setExpandedLogs] = useState<string | null>(null);
   const [logs, setLogs] = useState<ContainerLogs | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const logsRequestRef = useRef(0);
+  useEffect(
+    () => () => {
+      logsRequestRef.current += 1;
+    },
+    [],
+  );
   const reconnectTimerRef = useRef<number | null>(null);
   const data = snapshot?.stack ?? null;
 
@@ -437,7 +433,6 @@ export function Stack() {
   }, []);
 
   async function handleRestart(name: string) {
-    setRestartTarget(null);
     setRestarting((current) => new Set(current).add(name));
     try {
       await api(`/api/stack/container/${name}/restart`, "POST");
@@ -445,8 +440,6 @@ export function Stack() {
       window.setTimeout(() => {
         void fetchSnapshot(true, true);
       }, 2500);
-    } catch {
-      toast.error(`Failed to restart ${name}`);
     } finally {
       setRestarting((current) => {
         const next = new Set(current);
@@ -478,22 +471,31 @@ export function Stack() {
 
   async function toggleLogs(name: string) {
     if (expandedLogs === name) {
+      logsRequestRef.current += 1;
       setExpandedLogs(null);
       setLogs(null);
       return;
     }
 
     setExpandedLogs(name);
+    await loadLogs(name);
+  }
+
+  async function loadLogs(name: string) {
+    const request = ++logsRequestRef.current;
+    setLogs(null);
     setLogsLoading(true);
+    setLogsError(null);
     try {
       const response = await api<ContainerLogs>(
         `/api/stack/container/${name}/logs?tail=30`,
       );
-      setLogs(response);
+      if (request === logsRequestRef.current) setLogs(response);
     } catch {
-      setLogs({ name, logs: "" });
+      if (request === logsRequestRef.current)
+        setLogsError(`Could not load logs for ${name}.`);
     } finally {
-      setLogsLoading(false);
+      if (request === logsRequestRef.current) setLogsLoading(false);
     }
   }
 
@@ -527,20 +529,7 @@ export function Stack() {
   );
 
   if (loading && !data) {
-    return (
-      <div
-        role="status"
-        aria-label="Loading stack services"
-        aria-busy="true"
-        className="flex justify-center py-16 text-text-muted"
-      >
-        <Loader2
-          data-admin-ux="stack-loading"
-          aria-hidden="true"
-          className="h-5 w-5 animate-spin text-accent-action-hi"
-        />
-      </div>
-    );
+    return <LoadingState variant="page" label="Loading stack services" />;
   }
 
   if (error && !data) {
@@ -684,6 +673,10 @@ export function Stack() {
                     expanded={expandedLogs === container.name}
                     logs={expandedLogs === container.name ? logs : null}
                     logsLoading={expandedLogs === container.name && logsLoading}
+                    logsError={
+                      expandedLogs === container.name ? logsError : null
+                    }
+                    onRefreshLogs={() => void loadLogs(container.name)}
                     busy={restarting.has(container.name)}
                     onToggleLogs={() => toggleLogs(container.name)}
                     onRestart={() => setRestartTarget(container.name)}
@@ -712,9 +705,10 @@ export function Stack() {
         description={`Restart ${restartTarget}? This interrupts the container and may briefly affect admin or listener traffic.`}
         confirmLabel="Restart"
         variant="destructive"
-        onConfirm={() => {
-          void (() => restartTarget && handleRestart(restartTarget))();
+        onConfirm={async () => {
+          if (restartTarget) await handleRestart(restartTarget);
         }}
+        onError={() => toast.error(`Failed to restart ${restartTarget}`)}
         eyebrow="Confirm action"
         consequence={`${
           restartTarget ?? "Service"

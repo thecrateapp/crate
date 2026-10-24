@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { api } from "@/lib/api";
 import { albumActionApiPath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import { toast } from "sonner";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Save } from "@crate/ui/icons";
 
 interface Track {
   filename: string;
@@ -113,22 +117,15 @@ export function TagEditor({
   }
 
   function field(label: string, key: keyof typeof values) {
-    const inputId = `album-tag-${key}`;
     return (
-      <div className="flex gap-3 items-center mb-3">
-        <label
-          htmlFor={inputId}
-          className="w-[100px] text-sm text-muted-foreground text-right flex-shrink-0"
-        >
-          {label}
-        </label>
+      <FormField label={label} id={`album-tag-${key}`}>
         <Input
-          id={inputId}
           value={values[key]}
-          onChange={(e) => setValues({ ...values, [key]: e.target.value })}
-          className="bg-input border-border"
+          onChange={(event) =>
+            setValues({ ...values, [key]: event.target.value })
+          }
         />
-      </div>
+      </FormField>
     );
   }
 
@@ -138,118 +135,129 @@ export function TagEditor({
   );
 
   return (
-    <div className="bg-card border border-border rounded-md p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold font-display">Album Tags</h3>
-        <Button size="sm" onClick={save} disabled={saving}>
-          {saving ? "Saving..." : "Save Tags"}
-        </Button>
+    <InstrumentPanel
+      as="section"
+      headingLevel={2}
+      label={{ children: "Album tags", tone: "accent" }}
+      actions={
+        <ActionButton label="Save Tags" loading={saving} onClick={save}>
+          <Save data-admin-ux="album-save-tags" aria-hidden="true" />
+        </ActionButton>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("Artist", "artist")}
+        {field("Album artist", "albumartist")}
+        {field("Album", "album")}
+        {field("Year", "date")}
       </div>
-      {field("Artist", "artist")}
-      {field("Album Artist", "albumartist")}
-      {field("Album", "album")}
-      {field("Year", "date")}
-
-      {/* Genre with badges */}
-      <div className="flex gap-3 items-start mb-3">
-        <span className="w-[100px] text-sm text-muted-foreground text-right flex-shrink-0 pt-2">
-          Genres
-        </span>
-        <div className="flex-1">
-          <div className="flex gap-1.5 flex-wrap mb-2">
-            {currentGenres.map((g) => (
-              <Badge key={g} variant="default" className="gap-1">
-                {g}
-                <button
-                  type="button"
-                  aria-label={`Remove genre ${g}`}
-                  onClick={() => removeGenre(g)}
-                  className="hover:text-text-secondary"
-                >
-                  <X size={12} />
-                </button>
-              </Badge>
-            ))}
-          </div>
+      <div className="mt-5 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {currentGenres.map((genre) => (
+            <GenrePill
+              key={genre}
+              item={{ name: genre }}
+              onRemove={() => removeGenre(genre)}
+              removeLabel={`Remove genre ${genre}`}
+            />
+          ))}
+        </div>
+        <FormField
+          label="Genres"
+          hint="Comma-separated genre names"
+          id="album-tag-genres"
+        >
           <Input
             value={values.genre}
-            onChange={(e) => setValues({ ...values, genre: e.target.value })}
-            className="bg-input border-border mb-2"
+            onChange={(event) =>
+              setValues({ ...values, genre: event.target.value })
+            }
             placeholder="Comma-separated genres"
           />
-          {suggestedGenres.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
-              {suggestedGenres.slice(0, 20).map((g) => (
-                <Badge
-                  key={g}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-primary/20"
-                  onClick={() => addGenre(g)}
-                >
-                  + {g}
-                </Badge>
+        </FormField>
+        {suggestedGenres.length ? (
+          <div className="space-y-2">
+            <MonoLabel as="div">Suggested genres</MonoLabel>
+            <div className="flex flex-wrap gap-2">
+              {suggestedGenres.slice(0, 20).map((genre) => (
+                <GenrePill
+                  key={genre}
+                  item={{ name: genre }}
+                  onClick={() => addGenre(genre)}
+                />
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        ) : null}
       </div>
-
-      {/* Track-level editing */}
-      {tracks && tracks.length > 0 && (
-        <div className="mt-4 border-t border-border pt-4">
-          <button
-            className="flex items-center gap-2 text-sm font-medium hover:text-foreground mb-3"
+      {tracks?.length ? (
+        <div className="mt-5 space-y-3 border-t border-border-quiet pt-4">
+          <Button
+            variant="ghost"
+            aria-expanded={showTracks}
+            aria-controls="album-track-tags"
             onClick={() => setShowTracks(!showTracks)}
           >
-            {showTracks ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            Track Tags ({tracks.length})
-          </button>
-          {showTracks && (
-            <div className="space-y-1.5">
-              <div className="flex gap-2 items-center text-[10px] text-muted-foreground uppercase tracking-wider px-1 mb-1 font-mono">
-                <span className="w-16">#</span>
-                <span className="flex-1">Title</span>
-                <span className="w-[120px] text-right hidden sm:block">
-                  File
-                </span>
-              </div>
-              {tracks.map((t) => {
-                const edits = trackEdits[t.filename] || {};
-                const modified =
-                  edits.title !== undefined || edits.tracknumber !== undefined;
+            {showTracks ? "Hide track tags" : "Edit track tags"} (
+            {tracks.length})
+          </Button>
+          {showTracks ? (
+            <div id="album-track-tags" className="space-y-3">
+              {tracks.map((track) => {
+                const edits = trackEdits[track.filename] || {};
                 return (
                   <div
-                    key={t.filename}
-                    className={`flex gap-2 items-center rounded-md px-1 py-0.5 ${
-                      modified ? "bg-primary/5 ring-1 ring-primary/20" : ""
-                    }`}
+                    key={track.filename}
+                    className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3"
                   >
-                    <Input
-                      className="w-16 bg-input border-border text-xs text-center"
-                      value={edits.tracknumber ?? t.tracknumber ?? ""}
-                      onChange={(e) =>
-                        updateTrack(t.filename, "tracknumber", e.target.value)
+                    <FormField
+                      label={
+                        <>
+                          Track number{" "}
+                          <span className="sr-only">for {track.filename}</span>
+                        </>
                       }
-                      placeholder="#"
-                    />
-                    <Input
-                      className="flex-1 bg-input border-border text-sm"
-                      value={edits.title ?? t.title ?? ""}
-                      onChange={(e) =>
-                        updateTrack(t.filename, "title", e.target.value)
+                    >
+                      <Input
+                        aria-label={`Track number for ${track.filename}`}
+                        value={edits.tracknumber ?? track.tracknumber ?? ""}
+                        onChange={(event) =>
+                          updateTrack(
+                            track.filename,
+                            "tracknumber",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </FormField>
+                    <FormField
+                      label={
+                        <>
+                          Title{" "}
+                          <span className="sr-only">for {track.filename}</span>
+                        </>
                       }
-                      placeholder="Track title"
-                    />
-                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px] hidden sm:block">
-                      {t.filename.split("/").pop()}
-                    </span>
+                      hint={track.filename.split("/").pop()}
+                    >
+                      <Input
+                        aria-label={`Title for ${track.filename}`}
+                        value={edits.title ?? track.title ?? ""}
+                        onChange={(event) =>
+                          updateTrack(
+                            track.filename,
+                            "title",
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </FormField>
                   </div>
                 );
               })}
             </div>
-          )}
+          ) : null}
         </div>
-      )}
-    </div>
+      ) : null}
+    </InstrumentPanel>
   );
 }

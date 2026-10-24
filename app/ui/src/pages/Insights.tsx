@@ -1,3 +1,4 @@
+import { useChartColors } from "@/hooks/use-chart-colors";
 import { useMemo, type ReactNode } from "react";
 
 import { ResponsiveBar } from "@nivo/bar";
@@ -14,6 +15,7 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { useApi } from "@/hooks/use-api";
 import { cn, formatNumber } from "@/lib/utils";
 
@@ -218,6 +220,19 @@ function InsightChartCard({
 }
 
 export function Insights() {
+  const motionAllowed = useMotionAllowed();
+  const colors = useChartColors();
+  const chartTheme = {
+    ...NIVO_THEME,
+    text: { fill: colors.secondary, fontFamily: "var(--font-mono-stack)" },
+    axis: {
+      ticks: { text: { fill: colors.subtle, fontSize: 11 } },
+      legend: { text: { fill: colors.secondary, fontSize: 12 } },
+    },
+    grid: { line: { stroke: colors.border, strokeWidth: 1 } },
+    labels: { text: { fill: colors.primary, fontSize: 11 } },
+    legends: { text: { fill: colors.secondary, fontSize: 11 } },
+  };
   const { data, loading, error, refetch } =
     useApi<InsightsData>("/api/insights");
 
@@ -230,7 +245,7 @@ export function Insights() {
 
   const genreData = useMemo(() => {
     return (data?.top_genres ?? []).slice(0, 12).map((genre) => ({
-      genre: truncateLabel(genre.genre, 16),
+      genre: genre.genre,
       artists: genre.artists,
       albums: genre.albums,
       fullGenre: genre.genre,
@@ -243,15 +258,15 @@ export function Insights() {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 12)
       .map(([country, count]) => ({
-        country: truncateLabel(country, 14),
+        country: country,
         artists: count,
         fullCountry: country,
       }));
   }, [data?.countries]);
 
   const popularityData = useMemo(() => {
-    return (data?.popularity ?? []).slice(0, 12).map((item) => ({
-      artist: truncateLabel(item.artist, 20),
+    return (data?.popularity ?? []).slice(0, 12).map((item, index) => ({
+      artist: JSON.stringify([item.artist, index]),
       fullArtist: item.artist,
       popularity:
         item.popularity_score != null
@@ -263,8 +278,8 @@ export function Insights() {
   }, [data?.popularity]);
 
   const topAlbumData = useMemo(() => {
-    return (data?.top_albums ?? []).slice(0, 12).map((album) => ({
-      album: truncateLabel(album.album, 22),
+    return (data?.top_albums ?? []).slice(0, 12).map((album, index) => ({
+      album: JSON.stringify([album.artist, album.album, album.year, index]),
       fullAlbum: album.album,
       fullArtist: album.artist,
       popularity:
@@ -459,12 +474,16 @@ export function Insights() {
                   margin={{ top: 8, right: 24, bottom: 36, left: 136 }}
                   padding={0.24}
                   groupMode="grouped"
-                  colors={["#06b6d4", "#67e8f9"]}
+                  colors={[colors.accent, colors.secondary]}
                   borderRadius={4}
                   labelSkipWidth={16}
                   labelSkipHeight={16}
                   axisBottom={{ tickSize: 0, tickPadding: 8 }}
-                  axisLeft={{ tickSize: 0, tickPadding: 8 }}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (value) => truncateLabel(String(value), 16),
+                  }}
                   legends={[
                     {
                       dataFrom: "keys",
@@ -476,8 +495,9 @@ export function Insights() {
                       symbolSize: 10,
                     },
                   ]}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ id, value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Genre footprint"
@@ -524,13 +544,18 @@ export function Insights() {
                   layout="horizontal"
                   margin={{ top: 8, right: 24, bottom: 16, left: 122 }}
                   padding={0.26}
-                  colors={["#06b6d4"]}
+                  colors={[colors.accent]}
                   borderRadius={4}
                   enableLabel={false}
                   axisBottom={{ tickSize: 0, tickPadding: 8 }}
-                  axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (value) => truncateLabel(String(value), 14),
+                  }}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Artist origins"
@@ -565,13 +590,14 @@ export function Insights() {
                   indexBy="decade"
                   margin={{ top: 8, right: 16, bottom: 34, left: 48 }}
                   padding={0.28}
-                  colors={["#22d3ee"]}
+                  colors={[colors.accent]}
                   borderRadius={4}
                   enableLabel={false}
                   axisBottom={{ tickRotation: 0, tickSize: 0, tickPadding: 8 }}
                   axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Catalog density"
@@ -611,14 +637,25 @@ export function Insights() {
                   layout="horizontal"
                   margin={{ top: 8, right: 22, bottom: 16, left: 156 }}
                   padding={0.24}
-                  colors={["#06b6d4"]}
+                  colors={[colors.accent]}
                   borderRadius={4}
                   enableLabel={false}
                   valueScale={{ type: "linear", min: 0, max: 100 }}
                   axisBottom={{ tickSize: 0, tickPadding: 8 }}
-                  axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (value) =>
+                      truncateLabel(
+                        popularityData.find(
+                          (row) => row.artist === String(value),
+                        )?.fullArtist ?? String(value),
+                        20,
+                      ),
+                  }}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Artist standout"
@@ -666,14 +703,24 @@ export function Insights() {
                   layout="horizontal"
                   margin={{ top: 8, right: 22, bottom: 16, left: 164 }}
                   padding={0.24}
-                  colors={["#67e8f9"]}
+                  colors={[colors.secondary]}
                   borderRadius={4}
                   enableLabel={false}
                   valueScale={{ type: "linear", min: 0, max: 100 }}
                   axisBottom={{ tickSize: 0, tickPadding: 8 }}
-                  axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  axisLeft={{
+                    tickSize: 0,
+                    tickPadding: 8,
+                    format: (value) =>
+                      truncateLabel(
+                        topAlbumData.find((row) => row.album === String(value))
+                          ?.fullAlbum ?? String(value),
+                        22,
+                      ),
+                  }}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Album standout"
@@ -738,10 +785,11 @@ export function Insights() {
                     tickPadding: 8,
                   }}
                   nodeSize={8}
-                  colors={["#06b6d4"]}
+                  colors={[colors.accent]}
                   useMesh={true}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ node }) => {
                     const point = node.data as {
                       artist: string;
@@ -803,15 +851,16 @@ export function Insights() {
                   layout="horizontal"
                   margin={{ top: 8, right: 24, bottom: 16, left: 132 }}
                   padding={0.26}
-                  colors={["#06b6d4"]}
+                  colors={[colors.accent]}
                   borderRadius={4}
                   enableLabel={true}
-                  labelTextColor="#f8fafc"
+                  labelTextColor={colors.primary}
                   valueScale={{ type: "linear", min: 0, max: 100 }}
                   axisBottom={{ tickSize: 0, tickPadding: 8 }}
                   axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Analysis coverage"
@@ -854,13 +903,14 @@ export function Insights() {
                   indexBy="bpm"
                   margin={{ top: 8, right: 16, bottom: 38, left: 48 }}
                   padding={0.22}
-                  colors={["#22d3ee"]}
+                  colors={[colors.accent]}
                   borderRadius={4}
                   enableLabel={false}
                   axisBottom={{ tickRotation: 0, tickSize: 0, tickPadding: 8 }}
                   axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Tempo bucket"
@@ -904,10 +954,11 @@ export function Insights() {
                     tickPadding: 8,
                   }}
                   nodeSize={6}
-                  colors={["#06b6d4"]}
+                  colors={[colors.accent]}
                   useMesh={true}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ node }) => {
                     const point = node.data as {
                       title?: string;
@@ -969,10 +1020,11 @@ export function Insights() {
                     tickPadding: 8,
                   }}
                   nodeSize={6}
-                  colors={["#67e8f9"]}
+                  colors={[colors.secondary]}
                   useMesh={true}
-                  theme={NIVO_THEME}
+                  theme={chartTheme}
                   motionConfig="gentle"
+                  animate={motionAllowed}
                   tooltip={({ node }) => {
                     const point = node.data as {
                       title?: string;

@@ -19,6 +19,10 @@ and contract evidence do not certify every route or native/AT qualification.
 <Canvas of={Stories.Base} />
 <Controls of={Stories.Base} />
 
+Selection mode uses a native callback button: `pressed` announces its state while `selected` owns the frame treatment. Normal destinations remain native links and never expose a toggle state.
+
+<Canvas of={Stories.SelectionToggle} />
+
 <Canvas of={Stories.Active} />
 
 <Canvas of={Stories.Selected} />
@@ -26,3 +30,5 @@ and contract evidence do not certify every route or native/AT qualification.
 <Canvas of={Stories.Disabled} />
 
 <Canvas of={Stories.FullText} />
+
+Use an explicit `openLabel` for selection actions; `pressed={false}` keeps an unselected toggle announced, and href destinations do not receive aria-pressed.

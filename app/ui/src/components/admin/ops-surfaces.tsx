@@ -1,4 +1,9 @@
-import type { ComponentProps, ReactNode } from "react";
+import {
+  useEffect,
+  useReducer,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { PageHeaderLayout } from "../layout/PageHeader";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -140,7 +145,7 @@ export function OpsSurface({
 
 export function OpsPanel({
   title,
-  titleTone,
+  titleTone = "accent",
   description,
   action,
   children,
@@ -173,12 +178,41 @@ export function OpsSnapshotStatus({
   snapshot,
   streamStatus,
 }: {
-  snapshot: { stale?: boolean; built_at?: string | null } | null | undefined;
+  snapshot:
+    | { stale?: boolean; built_at?: string | null; stale_after?: string | null }
+    | null
+    | undefined;
   streamStatus: OpsStreamStatus;
 }) {
-  const freshnessLabel = snapshot?.stale
+  const [, expire] = useReducer((version: number) => version + 1, 0);
+  const built = Date.parse(snapshot?.built_at ?? "");
+  const deadline = Date.parse(snapshot?.stale_after ?? "");
+  useEffect(() => {
+    if (!Number.isFinite(deadline) || deadline <= Date.now()) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) expire();
+      else timer = setTimeout(schedule, Math.min(remaining + 1, 2147483647));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [deadline]);
+  const stale =
+    snapshot?.stale === true ||
+    (Number.isFinite(deadline) && deadline <= Date.now());
+  const current =
+    snapshot?.stale === false &&
+    Number.isFinite(built) &&
+    Number.isFinite(deadline) &&
+    built <= Date.now() &&
+    deadline > built &&
+    !stale;
+  const freshnessLabel = stale
     ? "Snapshot stale"
-    : "Snapshot current";
+    : current
+      ? "Snapshot current"
+      : "Snapshot freshness unknown";
   const freshnessTitle = snapshot?.built_at
     ? `Snapshot built ${new Date(snapshot.built_at).toLocaleString()}`
     : undefined;
@@ -192,10 +226,7 @@ export function OpsSnapshotStatus({
   return (
     <>
       {snapshot ? (
-        <InfoBadge
-          tone={snapshot.stale ? "warning" : "neutral"}
-          title={freshnessTitle}
-        >
+        <InfoBadge tone={stale ? "warning" : "neutral"} title={freshnessTitle}>
           {freshnessLabel}
         </InfoBadge>
       ) : null}

@@ -137,7 +137,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       false,
     );
   });
-  it("refreshes only status and preserves the selected view", async () => {
+  it("refreshes every catalog surface and preserves the selected view", async () => {
     await ready();
     await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
@@ -146,6 +146,8 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       runsUrl,
       duplicatesUrl,
       statusUrl,
+      runsUrl,
+      duplicatesUrl,
     ]);
     expect(screen.getByText("Reconciliation runs")).toBeInTheDocument();
   });
@@ -189,7 +191,9 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
           }),
       );
       await act(async () => finishPost({ task_id: "sample-catalog-task" }));
-      expect([...pending.keys()].sort()).toEqual([statusUrl, runsUrl].sort());
+      expect([...pending.keys()].sort()).toEqual(
+        [statusUrl, runsUrl, duplicatesUrl].sort(),
+      );
       await act(async () =>
         pending.get(statusUrl)!(structuredClone(fixture[statusUrl])),
       );
@@ -197,6 +201,9 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       expect(selected).not.toHaveAttribute("aria-busy", "true");
       await act(async () =>
         pending.get(runsUrl)!(structuredClone(fixture[runsUrl])),
+      );
+      await act(async () =>
+        pending.get(duplicatesUrl)!(structuredClone(fixture[duplicatesUrl])),
       );
       await waitFor(() => expect(selected).toBeEnabled());
       expect(toast.success).toHaveBeenCalledWith(
@@ -206,7 +213,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       );
       expect(
         mockApi.mock.calls.filter(([path]) => path === duplicatesUrl),
-      ).toHaveLength(1);
+      ).toHaveLength(2);
     },
   );
   it("unlocks on POST rejection without refreshing or replacing the current readings", async () => {
@@ -237,7 +244,12 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     mockApi.mockReturnValue(new Promise(() => {}));
     const v = mount();
     expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
-    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Loading catalog status" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("No reconciliation runs yet."),
+    ).not.toBeInTheDocument();
     v.unmount();
     mockApi.mockRejectedValue(new Error("Read unavailable"));
     mount();
@@ -245,8 +257,8 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled(),
     );
     expect(
-      screen.getByText("Catalog serving status is unavailable."),
+      screen.getByText("Catalog status could not be loaded."),
     ).toBeInTheDocument();
-    expect(screen.getAllByText("0")).toHaveLength(4);
+    expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
   });
 });

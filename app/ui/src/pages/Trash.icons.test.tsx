@@ -59,10 +59,10 @@ describe("Trash text controls and retained UX", () => {
     expect(
       refresh.querySelector('[data-admin-ux="trash-refresh-loading"]'),
     ).not.toBeNull();
-    expect(screen.getByText("Loading quarantined tracks...")).toBeVisible();
     expect(
-      document.querySelector('[data-admin-ux="trash-list-loading"]'),
-    ).not.toBeNull();
+      screen.getByRole("status", { name: "Loading quarantined tracks" }),
+    ).toHaveAttribute("data-testid", "loading-state");
+    expect(screen.queryByText(".crate-trash is empty")).toBeNull();
   });
   it("refreshes the existing read endpoint without a mutation", async () => {
     await ready();

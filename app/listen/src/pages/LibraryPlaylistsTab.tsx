@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Pencil, Plus, Trash2 } from "@crate/ui/icons";
 
@@ -19,9 +19,9 @@ import { api } from "@/lib/api";
 import { formatTotalDuration } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
 import {
-  hasTrackReference,
-  toTrackReferencePayload,
-} from "@/lib/track-reference";
+  createPlaylistTrackEditSession,
+  persistPlaylistTracks,
+} from "@/pages/persist-playlist-tracks";
 
 import {
   playlistOwnerLabel,
@@ -51,6 +51,7 @@ export function LibraryPlaylistsTab() {
     null,
   );
   const [saving, setSaving] = useState(false);
+  const trackEditSession = useRef(createPlaylistTrackEditSession());
   const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(
     null,
   );
@@ -120,6 +121,7 @@ export function LibraryPlaylistsTab() {
   async function openPlaylistEditor(playlistId: number) {
     try {
       const detail = await api<PlaylistDetail>(`/api/playlists/${playlistId}`);
+      trackEditSession.current = createPlaylistTrackEditSession();
       setEditingPlaylist(detail);
     } catch {
       notify.error(t("playlist.toasts.loadFailed"));
@@ -135,6 +137,7 @@ export function LibraryPlaylistsTab() {
     tracks: PlaylistComposerTrack[];
   }) {
     if (!editingPlaylist) return;
+    const session = trackEditSession.current;
     setSaving(true);
     try {
       await api(`/api/playlists/${editingPlaylist.id}`, "PUT", {
@@ -145,45 +148,12 @@ export function LibraryPlaylistsTab() {
         is_collaborative: payload.isCollaborative,
       });
 
-      const originalByEntryId = new Map(
-        editableTracks(editingPlaylist)
-          .filter((track) => track.playlistEntryId != null)
-          .map((track) => [track.playlistEntryId as number, track]),
+      await persistPlaylistTracks(
+        editingPlaylist.id,
+        editableTracks(editingPlaylist),
+        payload.tracks,
+        session,
       );
-
-      const nextEntryIds = new Set(
-        payload.tracks
-          .map((track) => track.playlistEntryId)
-          .filter((value): value is number => value != null),
-      );
-
-      const removedTracks = [...originalByEntryId.values()]
-        .filter((track) => !nextEntryIds.has(track.playlistEntryId as number))
-        .sort((a, b) => (b.playlistPosition || 0) - (a.playlistPosition || 0));
-
-      for (const track of removedTracks) {
-        if (track.playlistPosition != null) {
-          await api(
-            `/api/playlists/${editingPlaylist.id}/tracks/${track.playlistPosition}`,
-            "DELETE",
-          );
-        }
-      }
-
-      const newTracks = payload.tracks.filter(
-        (track) => track.playlistEntryId == null && hasTrackReference(track),
-      );
-      if (newTracks.length > 0) {
-        await api(`/api/playlists/${editingPlaylist.id}/tracks`, "POST", {
-          tracks: newTracks.map((track) =>
-            toTrackReferencePayload({
-              ...track,
-              album: track.album || "",
-              duration: track.duration || 0,
-            }),
-          ),
-        });
-      }
 
       notify.success(t("playlist.toasts.updated"));
       setEditingPlaylist(null);
@@ -315,6 +285,7 @@ export function LibraryPlaylistsTab() {
       <PlaylistCreateModal
         open={!!editingPlaylist}
         mode="edit"
+        editorIdentity={editingPlaylist?.id}
         initialName={editingPlaylist?.name}
         initialDescription={editingPlaylist?.description}
         initialCoverDataUrl={editingPlaylist?.cover_data_url}

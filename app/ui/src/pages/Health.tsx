@@ -1,8 +1,5 @@
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
-import {
-  InfoBadge,
-  type InfoBadgeTone,
-} from "@crate/ui/primitives/InfoBadge";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -42,6 +39,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import {
+  useHealthRepairBatches,
+  type RepairBatchStatus,
+} from "@/hooks/use-health-repair-batches";
+import {
   pickLatestRepairTask,
   taskNeedsAttention,
   type TaskInsightLike,
@@ -73,6 +74,7 @@ interface HealthSnapshotData {
     subject_key: string;
     version: number;
     built_at?: string | null;
+    stale_after?: string | null;
     stale: boolean;
     generation_ms: number;
   };
@@ -211,8 +213,7 @@ function executionLaneTone(
   entry: RepairCatalogEntry | undefined,
 ): InfoBadgeTone {
   if (!entry) return "neutral";
-  if (entry.support === "manual" || !entry.auto_fixable)
-    return "neutral";
+  if (entry.support === "manual" || !entry.auto_fixable) return "neutral";
   if (entry.supports_global_scope) return "accent";
   return "warning";
 }
@@ -300,8 +301,17 @@ function repairOutcomeLabel(task: RepairHistoryTask | null) {
   return task.status;
 }
 
+const REPAIR_BATCH_LABELS: Record<RepairBatchStatus, string> = {
+  waiting: "Awaiting result",
+  following: "Following task",
+  retrying: "Tracking unavailable; retrying",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
 export function Health() {
-  const { isAdmin } = useAuth();
+  const { hasCapability } = useAuth();
   const [issues, setIssues] = useState<HealthIssue[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [runs, setRuns] = useState<Record<string, HealthCheckRun>>({});
@@ -311,7 +321,9 @@ export function Health() {
   const [latestRepairTask, setLatestRepairTask] =
     useState<RepairHistoryTask | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stale, setStale] = useState(false);
+  const [snapshotMetadata, setSnapshotMetadata] = useState<
+    HealthSnapshotData["snapshot"] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -328,10 +340,38 @@ export function Health() {
     count: number;
   } | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [repairBatchIds, setRepairBatchIds] = useState<string[]>([]);
+  const operationBusyRef = useRef(false);
+  const operationBusy = scanning || fixing !== null || activeTaskId !== null;
   const reconnectTimerRef = useRef<number | null>(null);
   const taskReconnectTimerRef = useRef<number | null>(null);
   const { done: activeTaskDone, reset: resetTaskEvents } =
     useTaskEvents(activeTaskId);
+  const {
+    statuses: repairBatchStatuses,
+    finishedCount: repairBatchesFinished,
+  } = useHealthRepairBatches(repairBatchIds, (outcomes) => {
+    const completed = outcomes.filter(
+      (status) => status === "completed",
+    ).length;
+    const failed = outcomes.filter((status) => status === "failed").length;
+    const cancelled = outcomes.filter(
+      (status) => status === "cancelled",
+    ).length;
+    if (failed || cancelled) {
+      toast.error(
+        `Repair batches finished: ${completed} completed, ${failed} failed, ${cancelled} cancelled`,
+      );
+    } else {
+      toast.success(
+        `Repair complete: ${completed} of ${repairBatchIds.length} batches completed`,
+      );
+    }
+    void fetchIssues(true);
+    void fetchLatestRepairTask(true);
+    operationBusyRef.current = false;
+    setFixing(null);
+  });
 
   async function fetchRepairCatalog() {
     try {
@@ -381,7 +421,7 @@ export function Health() {
         setIssues(data.issues);
         setCounts(data.counts);
         setRuns(data.runs ?? {});
-        setStale(data.snapshot?.stale === true);
+        setSnapshotMetadata(data.snapshot);
         hasSnapshotRef.current = true;
         setHasSnapshot(true);
         setError(null);
@@ -437,7 +477,7 @@ export function Health() {
           setIssues(payload.issues);
           setCounts(payload.counts);
           setRuns(payload.runs ?? {});
-          setStale(payload.snapshot?.stale === true);
+          setSnapshotMetadata(payload.snapshot);
           hasSnapshotRef.current = true;
           setHasSnapshot(true);
           setError(null);
@@ -521,17 +561,24 @@ export function Health() {
       }
       void fetchIssuesEvent(true);
       void fetchLatestRepairTask(true);
-    } else if (activeTaskDone.status === "failed") {
+    } else if (
+      activeTaskDone.status === "failed" ||
+      activeTaskDone.status === "cancelled"
+    ) {
       toast.error(scanning ? "Scan failed" : "Repair failed");
       void fetchLatestRepairTask(true);
     }
     setScanning(false);
+    operationBusyRef.current = false;
     setFixing(null);
     setActiveTaskId(null);
     resetTaskEvents();
   }, [activeTaskDone, activeTaskId, resetTaskEvents, scanning]);
 
   async function runScan() {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
     setScanning(true);
     try {
       const { task_id } = await api<{ task_id: string }>(
@@ -541,12 +588,17 @@ export function Health() {
       toast.success("Health scan started...");
       setActiveTaskId(task_id);
     } catch {
+      operationBusyRef.current = false;
       setScanning(false);
       toast.error("Failed to start scan");
     }
   }
 
   async function runDuplicateCleanup() {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
+    setFixing("duplicate_tracks");
     try {
       const result = await api<{ task_id: string; status?: string }>(
         "/api/manage/repair-duplicate-tracks",
@@ -558,7 +610,13 @@ export function Health() {
           : "Duplicate cleanup queued",
       );
       if (result.task_id) setActiveTaskId(result.task_id);
+      else {
+        operationBusyRef.current = false;
+        setFixing(null);
+      }
     } catch {
+      operationBusyRef.current = false;
+      setFixing(null);
       toast.error("Failed to start the duplicate cleanup");
     }
   }
@@ -588,7 +646,10 @@ export function Health() {
     }
   }
 
-  async function handleFixType(checkType: string) {
+  async function handleFixType(checkType: string, propagateError = false) {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
     setFixing(checkType);
     try {
       const res = await api<{
@@ -598,7 +659,13 @@ export function Health() {
         allowed: boolean;
         reason?: string | null;
       }>(`/api/manage/health-issues/fix-type/${checkType}`, "POST");
-      if (!res.task_id) {
+      const taskIds = [
+        ...new Set([
+          ...(res.task_ids ?? []),
+          ...(res.task_id ? [res.task_id] : []),
+        ]),
+      ];
+      if (!taskIds.length) {
         if (res.reason === "global_scope_not_supported") {
           toast.error("This repair must be reviewed artist-by-artist");
         } else if (res.reason === "not_auto_fixable") {
@@ -607,18 +674,22 @@ export function Health() {
           toast.error("No auto-fixable issues");
         }
         setFixing(null);
+        operationBusyRef.current = false;
         return;
       }
-      const batches = res.task_ids?.length ?? 1;
+      const batches = taskIds.length;
       toast.success(
         batches > 1
           ? `Fixing ${res.fixable} issues in ${batches} batches...`
           : `Fixing ${res.fixable} issues...`,
       );
-      setActiveTaskId(res.task_id);
-    } catch {
+      if (batches > 1) setRepairBatchIds(taskIds);
+      else setActiveTaskId(taskIds[0]!);
+    } catch (error) {
       setFixing(null);
+      operationBusyRef.current = false;
       toast.error("Failed to start repair");
+      if (propagateError) throw error;
     }
   }
 
@@ -676,11 +747,11 @@ export function Health() {
         compactActions
         actions={
           <PageHeaderActions>
-            {isAdmin ? (
+            {hasCapability("library.repair.run") ? (
               <PageHeaderAction
                 label={scanning ? "Scanning..." : "Run scan"}
                 onClick={runScan}
-                disabled={scanning}
+                disabled={operationBusy}
                 aria-busy={scanning}
               >
                 {scanning ? (
@@ -703,7 +774,7 @@ export function Health() {
         }
       >
         <OpsSnapshotStatus
-          snapshot={hasSnapshot ? { stale } : null}
+          snapshot={snapshotMetadata}
           streamStatus={streamStatus}
         />
         <InfoBadge tone={lastScan ? "neutral" : "warning"}>
@@ -717,6 +788,40 @@ export function Health() {
           retrying={refreshing}
           className="mt-5"
         />
+      ) : null}
+
+      {repairBatchIds.length > 1 ? (
+        <OpsPanel title="Repair batches">
+          <p role="status" className="text-sm text-text-muted">
+            {repairBatchesFinished} of {repairBatchIds.length} batches finished
+          </p>
+          <ul className="mt-3 space-y-2">
+            {repairBatchIds.map((id, index) => {
+              const status = repairBatchStatuses[id] ?? "waiting";
+              return (
+                <li key={id} className="flex flex-wrap items-center gap-3">
+                  <Link
+                    className="inline-flex min-h-11 items-center text-sm text-accent-action hover:underline"
+                    to={`/tasks?task=${encodeURIComponent(id)}`}
+                  >
+                    Repair batch {index + 1}
+                  </Link>
+                  <InfoBadge
+                    tone={
+                      status === "failed" || status === "cancelled"
+                        ? "danger"
+                        : status === "retrying"
+                          ? "warning"
+                          : "neutral"
+                    }
+                  >
+                    {REPAIR_BATCH_LABELS[status]}
+                  </InfoBadge>
+                </li>
+              );
+            })}
+          </ul>
+        </OpsPanel>
       ) : null}
 
       <OpsPanel
@@ -999,7 +1104,7 @@ export function Health() {
                                       })
                                     : handleFixType(check)
                                 }
-                                disabled={isFixing}
+                                disabled={operationBusy}
                                 aria-busy={isFixing}
                               >
                                 {isFixing ? (
@@ -1022,6 +1127,7 @@ export function Health() {
                                 }
                                 className="min-h-11"
                                 onClick={() => void runDuplicateCleanup()}
+                                disabled={operationBusy}
                               >
                                 Run cleanup now
                               </Button>
@@ -1132,12 +1238,11 @@ export function Health() {
             : "Recorded total unavailable for this check."
         } Files move on disk and each affected artist is re-synced afterwards.`}
         confirmLabel="Queue repairs"
-        onConfirm={() => {
-          void (() => {
-            const check = pendingBulkFix?.check;
-            setPendingBulkFix(null);
-            if (check) void handleFixType(check);
-          })();
+        onConfirm={async () => {
+          if (pendingBulkFix) await handleFixType(pendingBulkFix.check, true);
+        }}
+        onError={() => {
+          /* The operation reports its recoverable error. */
         }}
         eyebrow="Confirm action"
         consequence="Check-wide eligible repairs · moves files on disk · re-syncs each affected artist"

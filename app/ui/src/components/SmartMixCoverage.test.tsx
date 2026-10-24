@@ -86,13 +86,31 @@ describe("SmartMixCoverage", () => {
 
     render(<SmartMixCoverage />);
 
+    const summary = screen
+      .getByText("Smart Mix profiles")
+      .closest(".space-y-1");
+    expect(summary).toBeInTheDocument();
+    expect(summary?.querySelector("svg")).toBeNull();
     expect(screen.getByText("40% coverage")).toBeInTheDocument();
+    expect(
+      screen.getByRole("progressbar", { name: "Smart Mix profile coverage" }),
+    ).toHaveAttribute("aria-valuenow", "40");
     expect(screen.getByText("smart-mix-v1")).toBeInTheDocument();
     expect(screen.getByText("35")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("60")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("button", { name: "Pause backfill" })
+        .querySelector("svg"),
+    ).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Cancel backfill" })
+        .querySelector("svg"),
+    ).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Pause backfill" }));
 

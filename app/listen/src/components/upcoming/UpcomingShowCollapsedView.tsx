@@ -50,6 +50,7 @@ export function UpcomingShowCollapsedView({
       }
       date={<UpcomingDateStamp date={item.date} locale={i18n.language} />}
       onToggle={onToggle}
+      expanded={false}
       actions={
         <div className="flex flex-col">
           <ActionGroup label={t("radar.show.attend")}>

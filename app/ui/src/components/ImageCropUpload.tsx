@@ -3,7 +3,15 @@ import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";
 import { Button } from "@crate/ui/shadcn/button";
 import { toast } from "sonner";
-import { Camera, Loader2, X } from "lucide-react";
+import { Camera } from "@crate/ui/icons";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import {
+  AppModal,
+  ModalBody,
+  ModalFooter,
+} from "@crate/ui/primitives/AppModal";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Slider } from "@crate/ui/primitives/Slider";
 
 import { waitForTask } from "@/lib/tasks";
 
@@ -103,49 +111,43 @@ export function ImageCropUpload({
         }}
       />
 
-      {/* Trigger button (overlay) */}
-      <button
+      <span
         className={
           className ??
-          "absolute bottom-1 right-1 p-1.5 rounded-md bg-black/60 text-white/70 hover:text-white hover:bg-black/80 opacity-0 group-hover/cover:opacity-100 transition-opacity"
+          "absolute bottom-1 right-1 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/cover:opacity-100 pointer-fine:group-focus-within/cover:opacity-100"
         }
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          inputRef.current?.click();
-        }}
-        title="Upload image"
       >
-        <Camera size={14} />
-        {label ? <span>{label}</span> : null}
-      </button>
-
-      {/* Crop modal */}
-      {imageSrc && (
-        <div
-          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80"
-          onClick={cancel}
+        <ActionButton
+          label={label ?? "Upload image"}
+          loading={uploading}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            inputRef.current?.click();
+          }}
         >
-          <div
-            className="bg-card rounded-md border border-border-quiet shadow-2xl w-[90vw] max-w-[600px] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <span className="text-sm font-medium">Crop Image</span>
-              <button
-                type="button"
-                aria-label="Close crop dialog"
-                onClick={cancel}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X size={16} />
-              </button>
-            </div>
+          <Camera data-admin-ux="crop-upload" aria-hidden="true" />
+        </ActionButton>
+      </span>
 
-            <div
-              className="relative w-full"
-              style={{ height: aspect >= 1 ? 400 : 500 }}
-            >
+      <AppModal
+        open={Boolean(imageSrc)}
+        onClose={cancel}
+        title="Crop image"
+        description="Adjust the crop and zoom before uploading."
+        closeDisabled={uploading}
+        closeOnOverlay={!uploading}
+        closeOnEscape={!uploading}
+        size="lg"
+      >
+        <ModalBody className="space-y-4">
+          <div
+            className="relative w-full"
+            style={{
+              height: aspect >= 1 ? "min(50vh, 400px)" : "min(55vh, 500px)",
+            }}
+          >
+            {imageSrc ? (
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -155,40 +157,31 @@ export function ImageCropUpload({
                 onZoomChange={setZoom}
                 onCropComplete={onCropComplete}
               />
-            </div>
-
-            <div className="px-4 py-2 flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">Zoom</span>
-              <input
-                type="range"
-                aria-label="Image zoom"
-                min={1}
-                max={3}
-                step={0.05}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
-              <Button variant="outline" size="sm" onClick={cancel}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleUpload} disabled={uploading}>
-                {uploading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin mr-1" />{" "}
-                    Uploading...
-                  </>
-                ) : (
-                  "Upload"
-                )}
-              </Button>
-            </div>
+            ) : null}
           </div>
-        </div>
-      )}
+          <FormField label="Zoom">
+            <Slider
+              min={1}
+              max={3}
+              step={0.05}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+            />
+          </FormField>
+        </ModalBody>
+        <ModalFooter className="flex justify-end gap-2">
+          <Button variant="outline" onClick={cancel} disabled={uploading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleUpload()}
+            loading={uploading}
+            disabled={uploading}
+          >
+            {uploading ? "Uploading…" : "Upload"}
+          </Button>
+        </ModalFooter>
+      </AppModal>
     </>
   );
 }

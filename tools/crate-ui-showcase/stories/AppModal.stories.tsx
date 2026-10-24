@@ -18,6 +18,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Base: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Keyboard contract: focus enters the modal; Tab wraps within the active panel; Escape dismisses only the top dialog. Open the nested dialog to check return to its trigger, and close the parent to return to Open playlist settings. Select and Tooltip portals retain their own dismissal.",
+      },
+    },
+  },
   render: () => (
     <TooltipProvider>
       <ModalExample />

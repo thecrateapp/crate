@@ -740,7 +740,7 @@ export function Imports() {
                         aria-pressed={isSelected}
                         disabled={!canInspect}
                         onClick={() => setSelectedKey(key)}
-                        className="flex min-w-0 items-start gap-3 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-accent-action-hi disabled:cursor-default"
+                        className="flex min-w-0 items-start gap-3 rounded-sm text-left disabled:cursor-default"
                       >
                         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border-quiet bg-app-surface">
                           {cover ? (

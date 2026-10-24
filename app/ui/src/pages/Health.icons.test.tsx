@@ -6,9 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fixture from "../../../../tests/admin-e2e/fixtures/health-1ad.json";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { api } from "@/lib/api";
+import { waitForTask, type TaskCompletion } from "@/lib/tasks";
 import { useTaskEvents } from "@/hooks/use-task-events";
+import { toast } from "sonner";
 import { Health } from "./Health";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
 vi.mock("@/hooks/use-task-events", () => ({ useTaskEvents: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const reset = vi.fn();
@@ -43,8 +46,48 @@ async function ready() {
 function card(toggle: HTMLElement) {
   return within(toggle.closest("article")! as HTMLElement);
 }
+function deferredTask() {
+  let resolve!: (task: TaskCompletion) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<TaskCompletion>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+async function queueBatchedRepair() {
+  const originalApi = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, method, ...rest) => {
+    if (path === "/api/manage/health-issues/fix-type/artist_layout_fix") {
+      return Promise.resolve({
+        task_id: "repair-batch-1",
+        task_ids: ["repair-batch-1", "repair-batch-2"],
+        fixable: 24,
+        allowed: true,
+      }) as never;
+    }
+    return originalApi(path, method, ...rest);
+  });
+  const user = userEvent.setup();
+  const view = mount();
+  await user.click(
+    await screen.findByRole("button", {
+      name: "Review issues: Artist Layout Fix",
+    }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Queue repair for Artist Layout Fix" }),
+  );
+  await user.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", {
+      name: "Queue repairs",
+    }),
+  );
+  return view;
+}
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(waitForTask).mockReset();
   sampleHealth = {
     ...structuredClone(fixture.health),
     counts: { ...fixture.health.counts },
@@ -93,11 +136,159 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("Library Health text controls and preserved UX", () => {
+  it.each(["failed", "cancelled"])(
+    "keeps every repair batch locked until terminal and reports a %s batch",
+    async (status) => {
+      const first = deferredTask();
+      const second = deferredTask();
+      vi.mocked(waitForTask).mockImplementation((id) =>
+        id === "repair-batch-1" ? first.promise : second.promise,
+      );
+      await queueBatchedRepair();
+      await waitFor(() => expect(waitForTask).toHaveBeenCalledTimes(1));
+      expect(waitForTask).toHaveBeenCalledWith(
+        "repair-batch-1",
+        expect.any(Number),
+        expect.any(AbortSignal),
+      );
+      await act(async () => first.resolve({ status: "completed" }));
+      await waitFor(() => expect(waitForTask).toHaveBeenCalledTimes(2));
+      expect(screen.getByRole("button", { name: "Run scan" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", {
+          name: "Queue repair for Artist Layout Fix",
+        }),
+      ).toBeDisabled();
+      expect(screen.getByText("1 of 2 batches finished")).toBeVisible();
+      expect(toast.success).not.toHaveBeenCalledWith(
+        expect.stringContaining("Repair complete"),
+      );
+      expect(api).not.toHaveBeenCalledWith(
+        "/api/admin/health-snapshot?fresh=1",
+        "GET",
+        undefined,
+        expect.anything(),
+      );
+
+      await act(async () => second.resolve({ status }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Run scan" })).toBeEnabled(),
+      );
+      expect(toast.error).toHaveBeenCalledWith(
+        status === "failed"
+          ? "Repair batches finished: 1 completed, 1 failed, 0 cancelled"
+          : "Repair batches finished: 1 completed, 0 failed, 1 cancelled",
+      );
+      expect(toast.success).not.toHaveBeenCalledWith(
+        expect.stringContaining("Repair complete"),
+      );
+      expect(
+        screen.getByRole("link", { name: "Repair batch 2" }),
+      ).toHaveAttribute("href", "/tasks?task=repair-batch-2");
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/health-snapshot?fresh=1",
+        "GET",
+        undefined,
+        expect.anything(),
+      );
+    },
+  );
+  it("reports repair success only after every batch completes and aborts observers on unmount", async () => {
+    const first = deferredTask();
+    const second = deferredTask();
+    vi.mocked(waitForTask)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const view = await queueBatchedRepair();
+    await waitFor(() => expect(waitForTask).toHaveBeenCalledTimes(1));
+    await act(async () => first.resolve({ status: "completed" }));
+    expect(toast.success).not.toHaveBeenCalledWith(
+      expect.stringContaining("Repair complete"),
+    );
+    await act(async () => second.resolve({ status: "completed" }));
+    expect(toast.success).toHaveBeenCalledWith(
+      "Repair complete: 2 of 2 batches completed",
+    );
+    expect(screen.getByText("2 of 2 batches finished")).toBeVisible();
+    const signal = vi.mocked(waitForTask).mock.calls[0]![2]!;
+    view.unmount();
+    expect(signal.aborted).toBe(true);
+  });
+  it("keeps a timed-out batch locked and resumes tracking before the remaining batches", async () => {
+    const first = deferredTask();
+    const resumed = deferredTask();
+    vi.mocked(waitForTask)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(resumed.promise)
+      .mockResolvedValueOnce({ status: "completed" });
+    const view = await queueBatchedRepair();
+    await waitFor(() => expect(waitForTask).toHaveBeenCalledTimes(1));
+    vi.useFakeTimers();
+    await act(async () =>
+      first.reject(new Error("Timed out waiting for task completion")),
+    );
+    expect(screen.getByText("Tracking unavailable; retrying")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Run scan" })).toBeDisabled();
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(waitForTask).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(waitForTask).mock.calls[1]![0]).toBe("repair-batch-1");
+    await act(async () => resumed.resolve({ status: "completed" }));
+    expect(vi.mocked(waitForTask).mock.calls[2]![0]).toBe("repair-batch-2");
+    expect(screen.getByRole("button", { name: "Run scan" })).toBeEnabled();
+    view.unmount();
+    vi.useRealTimers();
+  });
+  it("does not follow another batch or announce completion after leaving Health", async () => {
+    const first = deferredTask();
+    vi.mocked(waitForTask).mockReturnValue(first.promise);
+    const view = await queueBatchedRepair();
+    await waitFor(() => expect(waitForTask).toHaveBeenCalledTimes(1));
+    const signal = vi.mocked(waitForTask).mock.calls[0]![2]!;
+    view.unmount();
+    expect(signal.aborted).toBe(true);
+    await act(async () => first.resolve({ status: "completed" }));
+    expect(waitForTask).toHaveBeenCalledTimes(1);
+    expect(toast.success).not.toHaveBeenCalledWith(
+      expect.stringContaining("Repair complete"),
+    );
+    expect(api).not.toHaveBeenCalledWith(
+      "/api/admin/health-snapshot?fresh=1",
+      "GET",
+      undefined,
+      expect.anything(),
+    );
+  });
+  it("does not let a repair replace the scan being observed", async () => {
+    const user = userEvent.setup();
+    mount();
+    const toggle = await ready();
+    await user.click(screen.getByRole("button", { name: "Run scan" }));
+    await user.click(toggle);
+    expect(
+      screen.getByRole("button", { name: "Queue repair for Unindexed Files" }),
+    ).toBeDisabled();
+    expect(
+      vi.mocked(useTaskEvents).mock.calls[
+        vi.mocked(useTaskEvents).mock.calls.length - 1
+      ]?.[0],
+    ).toBe("sample-health-task");
+  });
+  it("offers scans to a custom repair operator without admin.access", async () => {
+    renderWithAdminProviders(<Health />, {
+      auth: {
+        isAdmin: false,
+        hasCapability: (capability) => capability === "library.repair.run",
+      },
+    });
+    await ready();
+    expect(screen.getByRole("button", { name: "Run scan" })).toBeEnabled();
+  });
   it("uses one accessible disclosure with sibling actions and no retired glyphs", async () => {
     const user = userEvent.setup(),
       { container } = mount(),
@@ -361,8 +552,10 @@ describe("Library Health text controls and preserved UX", () => {
     ).toBeVisible();
     view.unmount();
   });
-  it("keeps the existing scan role gate and neutral risk instruments", async () => {
-    mount(false);
+  it("gates scan by its endpoint capability and keeps neutral risk instruments", async () => {
+    renderWithAdminProviders(<Health />, {
+      auth: { isAdmin: false, hasCapability: () => false },
+    });
     await ready();
     expect(
       screen.queryByRole("button", { name: "Run scan" }),

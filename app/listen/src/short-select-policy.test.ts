@@ -18,8 +18,18 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Existing1AZ SleepTimer presentation extracted from controller; typed timer preset choices, no added control.",
   "app/listen/src/pages/LibraryCollectionSortDropdown.tsx:Select:selected.value":
     "One shared collection Sort form adapter takes the typed artist/album/liked choice arrays; Sort uses Select by Diego's1AQ amendment, reconciled1AY.",
-  'app/ui/src/components/layout/Sidebar.tsx:AdminSelect:previewRole ?? ""':
-    "Available permission presets are supplied by the server and filtered for the current user.",
+  "app/ui/src/components/ai-models/ActivityPanel.tsx:AdminSelect:actionId":
+    "Feature options are the action definitions supplied by the AI snapshot API.",
+  'app/ui/src/components/ai-models/FeatureModelSheet.tsx:AdminSelect:selectedProfile ? selectedProfile.profile.id : ""':
+    "Saved profile identities and labels come from the runtime AI profile catalog.",
+  'app/ui/src/components/ai-models/ModelPicker.tsx:AdminSelect:connection ? connection.id : ""':
+    "Configured provider connections are runtime user-managed records, not fixed choices.",
+  'app/ui/src/components/ai-models/ModelPicker.tsx:AdminSelect:model ? model.model_id : ""':
+    "Eligible models come from the chosen provider connection's model catalog.",
+  'app/ui/src/components/ai-models/ModelPicker.tsx:AdminSelect:model ? current : ""':
+    "Reasoning form presets depend on the selected model capabilities and include stored custom budgets.",
+  'app/ui/src/components/ai-models/ProfileForm.tsx:AdminSelect:model ? limits.image_detail : ""':
+    "Image detail is a categorical profile field supplied by the selected model's capability metadata.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:genre":
     "The catalog supplies available genres; their cardinality is not a UI constant.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:country":
@@ -79,6 +89,39 @@ const FORM_SELECTS: Record<string, FormSelect> = {
       reason:
         "Existing private/public categorical form field (present before1AY); explicit form Select rule from1AQ/1AR, not a filter.",
     },
+  "app/ui/src/components/artist/ArtistDiscographySection.tsx:AdminSelect:sort":
+    {
+      choices: 3,
+      sites: 1,
+      reason:
+        "Categorical Sort uses Select under Diego's1AQ amendment; this is the album ordering field, not a content filter.",
+    },
+  "app/ui/src/components/artist/ArtistMetadataEditor.tsx:AdminSelect:values.artist_type":
+    {
+      choices: 6,
+      sites: 1,
+      reason:
+        "Categorical artist Type edit field follows1AQ/1AR; five declared values plus the existing clear option.",
+    },
+  'app/ui/src/components/shows/ShowCandidateFields.tsx:AdminSelect:candidate.status ?? "scheduled"':
+    {
+      choices: 6,
+      sites: 1,
+      reason:
+        "Categorical show Status writes the draft's persisted value; the six reviewed event states use Select under1AQ/1AR.",
+    },
+  "app/ui/src/pages/Tasks.tsx:AdminSelect:filterFamily": {
+    choices: 7,
+    sites: 1,
+    reason:
+      "Explicit Task Desk exception in app/ui/ADMIN_UI_REVIEW_CHECKLIST.md: search, family and type stay in one aligned row using selectors for family/type.",
+  },
+  "app/ui/src/pages/federation/PoliciesPanel.tsx:AdminSelect:preset": {
+    choices: 5,
+    sites: 1,
+    reason:
+      "Grant preset is a categorical policy edit persisted to a peer, not a list filter;1AQ/1AR retains Select.",
+  },
   "app/ui/src/pages/Playlists.tsx:AdminSelect:category": {
     choices: 6,
     sites: 2,
@@ -388,6 +431,27 @@ function inspectControls(source: string, file = "fixture.tsx"): Control[] {
         }
       }
     }
+    if (
+      component === "AdminSelect" &&
+      expressionAttribute(node, "value")?.getText(tree) === "value"
+    ) {
+      const options = expressionAttribute(node, "options");
+      const forwarded =
+        options &&
+        ((ts.isIdentifier(options) && options.text === "options") ||
+          (ts.isCallExpression(options) &&
+            ts.isPropertyAccessExpression(options.expression) &&
+            options.expression.name.text === "map" &&
+            options.expression.expression.getText(tree) === "options"));
+      if (forwarded) {
+        let ancestor: ts.Node = node;
+        while (!ts.isSourceFile(ancestor)) {
+          if (ts.isFunctionDeclaration(ancestor) && wrappers.has(ancestor))
+            return;
+          ancestor = ancestor.parent;
+        }
+      }
+    }
     const value = expressionAttribute(node, "value");
     const valueText =
       value?.getText(tree).replace(/\s+/g, " ") ??
@@ -533,6 +597,30 @@ describe("shared short select policy", () => {
     ).toEqual([
       "fixture.tsx:FilterSelect:status: 2 choices must use shared filter chips",
       "fixture.tsx:select:unrelated: 1 choices must use shared filter chips",
+    ]);
+  });
+
+  it("checks each FilterSelect caller when its wrapper forwards mapped options to AdminSelect", () => {
+    const controls = inspectControls(`
+      function FilterSelect({value, options}) {
+        return <><AdminSelect value={value} options={options.map(option => ({value: option, label: option}))} allowClear={false} />
+        <AdminSelect value={unrelated} options={["one", "two"]} allowClear={false} /></>;
+      }
+      <><FilterSelect value={locale} options={locales} />
+      <FilterSelect value={status} options={["all", "open"]} /></>;
+    `);
+    expect(controls.map(({ value, count }) => [value, count])).toEqual([
+      ["unrelated", 2],
+      ["locale", undefined],
+      ["status", 2],
+    ]);
+    expect(
+      violations(controls, {
+        "fixture.tsx:FilterSelect:locale": "Runtime locale catalog.",
+      }),
+    ).toEqual([
+      "fixture.tsx:AdminSelect:unrelated: 2 choices must use shared filter chips",
+      "fixture.tsx:FilterSelect:status: 2 choices must use shared filter chips",
     ]);
   });
 

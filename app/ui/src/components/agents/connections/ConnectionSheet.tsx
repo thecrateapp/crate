@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -112,12 +114,9 @@ function SheetSection({
   return (
     <section aria-labelledby={headingId} className="space-y-3 py-5 first:pt-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3
-          id={headingId}
-          className="text-sm font-semibold text-foreground font-display"
-        >
+        <MonoLabel as="h3" tone="accent" id={headingId}>
           {title}
-        </h3>
+        </MonoLabel>
         {action}
       </div>
       {children}
@@ -160,16 +159,16 @@ function GrantedPermissions({
     <div className="space-y-3">
       {groups.map((group) => (
         <div key={group.id} className="space-y-1.5">
-          <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
-            {group.label}
-          </p>
+          <MonoLabel tone="accent">{group.label}</MonoLabel>
           <ul className="space-y-1">
             {group.scopes.map((scope) => (
               <li
                 key={scope.scope}
                 className="flex flex-wrap items-center gap-2 text-sm"
               >
-                <span title={scope.scope}>{scope.label}</span>
+                <TooltipHint content={scope.scope}>
+                  <span tabIndex={0}>{scope.label}</span>
+                </TooltipHint>
                 {scope.access === "change" ? (
                   <StatusBadge tone="warning">Can change</StatusBadge>
                 ) : null}
@@ -180,9 +179,7 @@ function GrantedPermissions({
       ))}
       {other.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
-            Other
-          </p>
+          <MonoLabel tone="accent">Other</MonoLabel>
           <ul className="space-y-1">
             {other.map((grant) => {
               const scope = byScope.get(grant);
@@ -191,9 +188,11 @@ function GrantedPermissions({
                   key={grant}
                   className="flex flex-wrap items-center gap-2 text-sm"
                 >
-                  <span title={grant}>
-                    {scope?.label ?? "Unknown permission"}
-                  </span>
+                  <TooltipHint content={grant}>
+                    <span tabIndex={0}>
+                      {scope?.label ?? "Unknown permission"}
+                    </span>
+                  </TooltipHint>
                   {!scope || scope.access === "change" ? (
                     <StatusBadge tone="warning">Can change</StatusBadge>
                   ) : null}
@@ -281,7 +280,7 @@ function ActivityRow({
     typeof evidence.before === "boolean" && typeof evidence.after === "boolean";
 
   return (
-    <li className="space-y-1 rounded-md border border-white/10 p-3 text-sm">
+    <li className="space-y-1 rounded-md border border-border-quiet p-3 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="font-medium text-foreground">
           {activityText({
@@ -619,7 +618,7 @@ export function ConnectionSheet({
             </p>
           ) : null}
 
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-border-quiet">
             <SheetSection
               title="Permissions"
               action={
@@ -705,7 +704,7 @@ export function ConnectionSheet({
                     {activeCredentials.map((credential) => (
                       <li
                         key={credential.credential_id}
-                        className="flex flex-col gap-2 rounded-md border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-md border border-border-quiet p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <p className="text-sm">
                           {Date.parse(credential.expires_at) <= now
@@ -772,7 +771,7 @@ export function ConnectionSheet({
                     {authorizations.map((authorization) => (
                       <li
                         key={authorization.authorization_id}
-                        className="flex flex-col gap-2 rounded-md border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-md border border-border-quiet p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <p className="min-w-0 text-sm [overflow-wrap:anywhere]">
                           {`User #${authorization.user_id} · ${authorization.client_id}`}

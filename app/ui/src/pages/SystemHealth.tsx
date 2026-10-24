@@ -9,6 +9,7 @@ import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ResponsiveLine } from "@nivo/line";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 
 import {
   OpsPageHero,
@@ -18,6 +19,8 @@ import {
   OpsSurface,
 } from "@/components/admin/ops-surfaces";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { Meter } from "@crate/ui/primitives/Meter";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
@@ -364,34 +367,34 @@ function ResourceCard({
   );
 }
 
-function ProgressBar({
+function ResourceMeter({
   value,
   max,
-  color = "bg-accent-action-hi",
-  label,
+  color,
+  label = "Usage",
+  valueText,
 }: {
-  value: number;
+  value: number | null;
   max: number;
   color?: string;
   label?: string;
+  valueText?: string;
 }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const pct = value != null && max > 0 ? (value / max) * 100 : null;
   return (
-    <div className={label ? "crate-form-field" : undefined}>
-      {label ? (
-        <div className="flex min-w-0 justify-between gap-2 font-mono text-label font-normal">
-          <span className="min-w-0 truncate text-text-muted">{label}</span>
-          <span className="shrink-0 text-text-secondary tabular-nums">
-            {pct.toFixed(0)}%
-          </span>
-        </div>
+    <div className="space-y-2">
+      <Meter
+        value={value}
+        max={max}
+        label={label}
+        valueText={
+          valueText ?? (pct == null ? "Unavailable" : `${pct.toFixed(0)}%`)
+        }
+        over={value != null && max > 0 && value > max}
+      />
+      {value != null && value <= max && color === "bg-state-warning" ? (
+        <InfoBadge tone="warning">Elevated</InfoBadge>
       ) : null}
-      <div className="h-px overflow-hidden rounded-full bg-border-quiet">
-        <div
-          className={`h-full rounded-full transition-[width,background-color] ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
     </div>
   );
 }
@@ -407,6 +410,7 @@ function MetricChart({
   yLabel: string;
   series?: { id: string; field: keyof TimeseriesPoint }[];
 }) {
+  const motionAllowed = useMotionAllowed();
   const { chartData, tickValues } = useMemo(() => {
     if (!data?.length) return { chartData: [], tickValues: [] as string[] };
     const labels = data.map((point) =>
@@ -461,6 +465,7 @@ function MetricChart({
       </div>
       <div className="h-48">
         <ResponsiveLine
+          animate={motionAllowed}
           data={chartData}
           margin={{ top: 8, right: 16, bottom: 32, left: 48 }}
           xScale={{ type: "point" }}
@@ -609,10 +614,12 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                         </span>
                       </div>
                       <div className="mt-2 max-w-xl">
-                        <ProgressBar
+                        <ResourceMeter
                           value={route.p95}
                           max={maxP95}
                           color={barColor}
+                          label={`${route.method} ${route.path} p95`}
+                          valueText={`${route.p95.toFixed(0)} ms; highest sampled route p95 ${maxP95.toFixed(0)} ms`}
                         />
                       </div>
                     </div>
@@ -781,6 +788,7 @@ export function SystemHealth() {
         className="flex justify-center py-16 text-text-muted"
       >
         <Loader2
+          data-admin-ux="system-health-loading"
           aria-hidden="true"
           className="h-5 w-5 animate-spin text-accent-action-hi"
         />
@@ -877,11 +885,18 @@ export function SystemHealth() {
         ) : null}
       </OpsPageHero>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_repeat(6,minmax(0,1fr))]">
+      <div
+        data-slot="system-health-summary"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-4"
+      >
         <HealthSignal score={score} summary={scoreSummary} />
         <OpsStatTile
-          label="API p95"
-          value={summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
+          label="API max"
+          value={
+            <span className="whitespace-nowrap">
+              {summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
+            </span>
+          }
           caption={
             summary
               ? `avg ${summary.api_latency.avg.toFixed(0)}ms`
@@ -985,7 +1000,7 @@ export function SystemHealth() {
 
       {system ? (
         <InstrumentPanel
-          label={{ children: "Resources" }}
+          label={{ children: "Resources", tone: "accent" }}
           headingLevel={2}
           summary={
             system.disk?.music
@@ -1003,7 +1018,7 @@ export function SystemHealth() {
                 label="Music Volume"
                 value={`${system.disk.music.used_gb} / ${system.disk.music.total_gb} GB`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.disk.music.used_gb}
                   max={system.disk.music.total_gb}
                   color={
@@ -1023,7 +1038,7 @@ export function SystemHealth() {
                 label="Data Volume"
                 value={`${system.disk.data.used_gb} / ${system.disk.data.total_gb} GB`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.disk.data.used_gb}
                   max={system.disk.data.total_gb}
                   color={
@@ -1046,7 +1061,7 @@ export function SystemHealth() {
                   (system.db_pool.overflow > 0 ? system.db_pool.overflow : 0)
                 }`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.db_pool.checked_out}
                   max={system.db_pool.size}
                   color={
@@ -1079,18 +1094,25 @@ export function SystemHealth() {
                   system.analysis.analysis.pending
                 }`}
               >
-                <ProgressBar
-                  value={system.analysis.analysis.done}
-                  max={
+                <ProgressHairline
+                  label="Audio analysis coverage"
+                  value={
                     system.analysis.analysis.done +
-                    system.analysis.analysis.pending
+                      system.analysis.analysis.pending >
+                    0
+                      ? system.analysis.analysis.done /
+                        (system.analysis.analysis.done +
+                          system.analysis.analysis.pending)
+                      : undefined
                   }
-                  label={`${system.analysis.analysis.pending} pending${
-                    system.analysis.analysis.failed > 0
-                      ? `, ${system.analysis.analysis.failed} failed`
-                      : ""
-                  }`}
+                  valueText={`${system.analysis.analysis.done} done, ${system.analysis.analysis.pending} pending, ${system.analysis.analysis.failed} failed`}
                 />
+                <MonoLabel as="p">
+                  {system.analysis.analysis.pending} pending
+                  {system.analysis.analysis.failed > 0
+                    ? `, ${system.analysis.analysis.failed} failed`
+                    : ""}
+                </MonoLabel>
                 {system.analysis.bliss && system.analysis.bliss.pending > 0 ? (
                   <div className="font-mono text-label text-text-subtle">
                     Bliss: {system.analysis.bliss.done} done,{" "}
@@ -1105,9 +1127,11 @@ export function SystemHealth() {
                 label="Resource Governor"
                 value={system.resource_pressure.allowed ? "Open" : "Deferring"}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={
-                    (system.resource_pressure.snapshot?.load_ratio ?? 0) * 100
+                    system.resource_pressure.snapshot?.load_ratio != null
+                      ? system.resource_pressure.snapshot.load_ratio * 100
+                      : null
                   }
                   max={100}
                   color={
@@ -1165,7 +1189,7 @@ export function SystemHealth() {
                     : "Redis offline"
                 }
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.media_worker.active_slots?.length ?? 0}
                   max={Math.max(1, system.media_worker.max_active ?? 1)}
                   color={
@@ -1330,10 +1354,10 @@ export function SystemHealth() {
                   </div>
                   {pct > 0 ? (
                     <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
-                      <div className="h-px flex-1 overflow-hidden rounded-full bg-border-quiet">
-                        <div
-                          className="h-full rounded-full bg-accent-action-hi transition-[width,background-color]"
-                          style={{ width: `${pct}%` }}
+                      <div className="min-w-0 flex-1">
+                        <ProgressHairline
+                          label={`${task.label || taskLabel(task.type)} progress`}
+                          value={pct / 100}
                         />
                       </div>
                       <span className="w-8 text-right font-mono text-label tabular-nums text-text-muted">

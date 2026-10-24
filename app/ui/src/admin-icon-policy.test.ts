@@ -17,37 +17,96 @@ import {
 } from "../../../scripts/design-system/admin-icon-inventory.mjs";
 
 const repo = resolve(process.cwd(), "../..");
+// Artist/Album migration, 2026-10-23: concrete domain files are audited directly.
+// Includes their existing artwork framing/crop tools; Nivo and Canvas instruments
+// remain external visuals, while real action/search/disclosure/busy glyphs are bounded.
+const libraryScope = [
+  "app/ui/src/pages/Artist.tsx",
+  "app/ui/src/pages/Album.tsx",
+  "app/ui/src/components/ImageCropUpload.tsx",
+  "app/ui/src/components/scanner/MatchCard.tsx",
+  "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+  "app/ui/src/components/artist/ArtistArtworkSection.tsx",
+  "app/ui/src/components/artist/ArtistAvatar.tsx",
+  "app/ui/src/components/artist/ArtistBioResearchAction.tsx",
+  "app/ui/src/components/artist/ArtistBioResearchDialog.tsx",
+  "app/ui/src/components/artist/ArtistCard.tsx",
+  "app/ui/src/components/artist/ArtistDiscographySection.tsx",
+  "app/ui/src/components/artist/ArtistGenreSelector.tsx",
+  "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+  "app/ui/src/components/artist/ArtistHeroSection.tsx",
+  "app/ui/src/components/artist/ArtistLoadingState.tsx",
+  "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+  "app/ui/src/components/artist/ArtistNetworkGraph.tsx",
+  "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+  "app/ui/src/components/artist/ArtistPageBits.tsx",
+  "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+  "app/ui/src/components/artist/ArtistRow.tsx",
+  "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+  "app/ui/src/components/artist/ArtistShowsSection.tsx",
+  "app/ui/src/components/artist/ArtistSimilarSection.tsx",
+  "app/ui/src/components/artist/ArtistStats.tsx",
+  "app/ui/src/components/artist/ArtistStatsSection.tsx",
+  "app/ui/src/components/artist/ArtistTabsNav.tsx",
+  "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+  "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+  "app/ui/src/components/album/AlbumCard.tsx",
+  "app/ui/src/components/album/AlbumGrid.tsx",
+  "app/ui/src/components/album/AlbumHeader.tsx",
+  "app/ui/src/components/album/AlbumRow.tsx",
+  "app/ui/src/components/album/AudioProfileCard.tsx",
+  "app/ui/src/components/album/MissingAlbumCard.tsx",
+  "app/ui/src/components/album/RelatedAlbums.tsx",
+  "app/ui/src/components/album/TagEditor.tsx",
+  "app/ui/src/components/album/TidalAlbumCard.tsx",
+  "app/ui/src/components/album/TrackTable.tsx",
+];
+const supportingScope = [
+  "app/ui/src/components/layout/HeaderUserMenu.tsx",
+  "app/ui/src/components/admin/ListPagination.tsx",
+  "app/ui/src/components/SmartMixCoverage.tsx",
+  "app/ui/src/components/SmartMixActivity.tsx",
+  "app/ui/src/components/SmartMixTracks.tsx",
+  "app/ui/src/components/admin/QueueLanes.tsx",
+  "app/ui/src/components/admin/RelativeTime.tsx",
+  "app/ui/src/pages/agents/Agents.tsx",
+];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
-  .concat([
-    "app/ui/src/components/ui/AIButton.tsx",
-    "app/ui/src/components/ui/AdminSelect.tsx",
-    "app/ui/src/components/admin/ops-surfaces.tsx",
-    "app/ui/src/components/layout/PageHeader.tsx",
-    "app/ui/src/pages/Logs.tsx",
-    "app/ui/src/pages/Stack.tsx",
-    "app/ui/src/pages/Analysis.tsx",
-    "app/ui/src/pages/Dashboard.tsx",
-    "app/ui/src/pages/SystemHealth.tsx",
-    "app/ui/src/pages/Health.tsx",
-    "app/ui/src/pages/Trash.tsx",
-    "app/ui/src/pages/Contributions.tsx",
-    "app/ui/src/pages/Bandcamp.tsx",
-    "app/ui/src/pages/Discover.tsx",
-    "app/ui/src/pages/NewReleases.tsx",
-    "app/ui/src/pages/GlobalCatalog.tsx",
-    "app/ui/src/pages/Roles.tsx",
-    "app/ui/src/pages/Users.tsx",
-    "app/ui/src/pages/I18nReview.tsx",
-    "app/ui/src/pages/Upcoming.tsx",
-    "app/ui/src/pages/Playlists.tsx",
-    "app/ui/src/pages/PlaylistEditor.tsx",
-    "app/ui/src/components/playlists/PlaylistArtwork.tsx",
-    "app/ui/src/components/shows/ShowCard.tsx",
-    "app/ui/src/components/shows/AddShowButton.tsx",
-    "app/ui/src/components/shows/MergeShowsButton.tsx",
-    "app/ui/src/pages/Imports.tsx",
-  ]);
+  .concat(
+    [
+      "app/ui/src/components/ui/AIButton.tsx",
+      "app/ui/src/components/ui/AdminSelect.tsx",
+      "app/ui/src/components/admin/ops-surfaces.tsx",
+      "app/ui/src/components/layout/PageHeader.tsx",
+      "app/ui/src/pages/Logs.tsx",
+      "app/ui/src/pages/Stack.tsx",
+      "app/ui/src/pages/Analysis.tsx",
+      "app/ui/src/pages/Dashboard.tsx",
+      "app/ui/src/pages/SystemHealth.tsx",
+      "app/ui/src/pages/Health.tsx",
+      "app/ui/src/pages/Trash.tsx",
+      "app/ui/src/pages/Contributions.tsx",
+      "app/ui/src/pages/Bandcamp.tsx",
+      "app/ui/src/pages/Discover.tsx",
+      "app/ui/src/pages/NewReleases.tsx",
+      "app/ui/src/pages/GlobalCatalog.tsx",
+      "app/ui/src/pages/Roles.tsx",
+      "app/ui/src/pages/Users.tsx",
+      "app/ui/src/pages/I18nReview.tsx",
+      "app/ui/src/pages/Upcoming.tsx",
+      "app/ui/src/pages/Playlists.tsx",
+      "app/ui/src/pages/PlaylistEditor.tsx",
+      "app/ui/src/components/playlists/PlaylistArtwork.tsx",
+      "app/ui/src/components/playlists/PlaylistEditorTrackList.tsx",
+      "app/ui/src/components/shows/ShowCard.tsx",
+      "app/ui/src/components/shows/AddShowButton.tsx",
+      "app/ui/src/components/shows/MergeShowsButton.tsx",
+      "app/ui/src/pages/Imports.tsx",
+    ],
+    libraryScope,
+    supportingScope,
+  );
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
@@ -207,7 +266,7 @@ const approvedControls = new Map([
   ],
   [
     "app/ui/src/pages/NewReleases.tsx:@/components/ui/AdminSelect",
-    { component: "AdminSelect", limit: 1 },
+    { component: "AdminSelect", limit: 2 },
   ],
   [
     "app/ui/src/pages/Discover.tsx:@crate/ui/primitives/ErrorState",
@@ -251,7 +310,7 @@ const approvedControls = new Map([
   ],
   [
     "app/ui/src/pages/Stack.tsx:@crate/ui/primitives/ErrorState",
-    { component: "ErrorState", limit: 1 },
+    { component: "ErrorState", limit: 2 },
   ],
   [
     "app/ui/src/pages/Stack.tsx:@crate/ui/composites/ConfirmDialog",
@@ -262,8 +321,718 @@ const approvedControls = new Map([
     { component: "AdminSelect", limit: 1 },
   ],
 ]);
+// Each shared catalogue export and domain composition is registered separately.
+// A module exporting ActionButton and ActionLink is not a blanket glyph exemption:
+// direct children and icon props remain independently audited, opaque spreads fail,
+// and each exact path/source/export may appear only this many times in source.
+const approvedLibraryControls = new Map<string, number>([
+  // 24 October review: recovery states and functional graph/calendar actions.
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistNetworkGraph.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistNetworkGraph.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    3,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistSimilarSection.tsx:@/components/artist/ArtistNetworkGraph:ArtistNetworkGraph",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistStatsSection.tsx:@/components/artist/ArtistNetworkGraph:ArtistNetworkGraph",
+    1,
+  ],
+  [
+    "app/ui/src/components/shows/ShowCard.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/shows/ShowCard.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
+    2,
+  ],
+  [
+    "app/ui/src/components/shows/ShowCard.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/pages/GlobalCatalog.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  [
+    "app/ui/src/pages/I18nReview.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    4,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  ["app/ui/src/pages/Users.tsx:@crate/ui/primitives/ErrorState:ErrorState", 1],
+  // Final review: exact shared controls and locally composed surfaces, all bounded.
+  // PlaylistEditor: retry/disclosure/busy controls, with child glyphs audited below.
+  ["app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/domain/states:ErrorState", 3],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/domain/navigation/BackLink:BackLink",
+    2,
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    3,
+  ],
+  ["app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/shadcn/button:Button", 7],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/PlaylistEditor.tsx:@/components/playlists/PlaylistEditorTrackList:PlaylistEditorTrackList",
+    1,
+  ],
+  [
+    "app/ui/src/components/playlists/PlaylistEditorTrackList.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    3,
+  ],
+  ["app/ui/src/components/ui/AIButton.tsx:@crate/ui/shadcn/button:Button", 1],
+  [
+    "app/ui/src/components/layout/Shell.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  ["app/ui/src/components/layout/Shell.tsx:./HeaderUserMenu:HeaderUserMenu", 2],
+  [
+    "app/ui/src/components/layout/Shell.tsx:@crate/ui/primitives/AppModal:AppModal",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Analysis.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Analysis.tsx:@/components/SmartMixCoverage:SmartMixCoverage",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Bandcamp.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  [
+    "app/ui/src/pages/Discover.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Health.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/I18nReview.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Logs.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/NewReleases.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    3,
+  ],
+  [
+    "app/ui/src/pages/NewReleases.tsx:@/components/admin/ListPagination:ListPagination",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@/components/admin/ListPagination:ListPagination",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Stack.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  ["app/ui/src/pages/Trash.tsx:@crate/ui/primitives/ErrorState:ErrorState", 1],
+  [
+    "app/ui/src/pages/Trash.tsx:@/components/admin/ops-surfaces:OpsRefreshNotice",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@/components/admin/ListPagination:ListPagination",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    3,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
+    4,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/SmartMixCoverage.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/SmartMixCoverage.tsx:@/components/SmartMixActivity:SmartMixActivity",
+    1,
+  ],
+  [
+    "app/ui/src/components/SmartMixCoverage.tsx:@/components/SmartMixTracks:SmartMixTracks",
+    1,
+  ],
+  [
+    "app/ui/src/components/SmartMixTracks.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+
+  [
+    "app/ui/src/components/ImageCropUpload.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/ImageCropUpload.tsx:@crate/ui/primitives/AppModal:AppModal",
+    1,
+  ],
+  [
+    "app/ui/src/components/ImageCropUpload.tsx:@crate/ui/shadcn/button:Button",
+    2,
+  ],
+  [
+    "app/ui/src/components/album/AlbumCard.tsx:@crate/ui/domain/entity/EntityCard:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/AlbumCard.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  ["app/ui/src/components/album/AlbumGrid.tsx:./AlbumCard:AlbumCard", 1],
+  [
+    "app/ui/src/components/album/AlbumHeader.tsx:@/components/ImageCropUpload:ImageCropUpload",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/AlbumHeader.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    4,
+  ],
+  [
+    "app/ui/src/components/album/AlbumHeader.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/AlbumHeader.tsx:@/components/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/AlbumRow.tsx:@crate/ui/domain/entity/EntityRow:EntityRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/MissingAlbumCard.tsx:@crate/ui/domain/entity/EntityCard:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/RelatedAlbums.tsx:@crate/ui/domain/entity/EntityCard:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TagEditor.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TagEditor.tsx:@crate/ui/domain/genres/GenrePill:GenrePill",
+    2,
+  ],
+  [
+    "app/ui/src/components/album/TidalAlbumCard.tsx:@crate/ui/domain/entity/EntityCard:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TidalAlbumCard.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    2,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/shadcn/dialog:DialogContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/AppModal:AppModal",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/shadcn/dialog:DialogFooter",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@/components/track/SimilarTracksPanel:SimilarTracksPanel",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkGallery.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    4,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkGallery.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkSection.tsx:@crate/ui/shadcn/button:Button",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkSection.tsx:./ArtistArtworkGallery:ArtistArtworkGallery",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkSection.tsx:./ArtistHeroArtworkEditor:ArtistHeroArtworkEditor",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistArtworkSection.tsx:@/components/ImageCropUpload:ImageCropUpload",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistBioResearchAction.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistBioResearchDialog.tsx:@crate/ui/domain/ArtistBioProfile:ArtistBioProfile",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistBioResearchDialog.tsx:@crate/ui/shadcn/dialog:DialogContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistBioResearchDialog.tsx:@crate/ui/shadcn/dialog:DialogFooter",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistCard.tsx:@crate/ui/domain/entity:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistDiscographySection.tsx:@crate/ui/shadcn/button:Button",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistDiscographySection.tsx:@/components/ui:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistDiscographySection.tsx:@/components/album/AlbumCard:AlbumCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistDiscographySection.tsx:@/components/album/TidalAlbumCard:TidalAlbumCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistDiscographySection.tsx:@/components/album/MissingAlbumCard:MissingAlbumCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistGenreSelector.tsx:@crate/ui/domain/genres/GenrePill:GenrePill",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistGenreSelector.tsx:@crate/ui/primitives/Checkbox:Checkbox",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx:./HeroCompositionCanvas:HeroCompositionCanvas",
+    2,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx:@crate/ui/primitives/AppModal:AppModal",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx:@crate/ui/primitives/AppModal:ModalCloseButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx:@crate/ui/domain/genres/GenrePill:GenrePill",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroSection.tsx:@/components/ImageCropUpload:ImageCropUpload",
+    3,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroSection.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    10,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistHeroSection.tsx:@/components/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:@crate/ui/shadcn/dialog:DialogContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:./ArtistBioResearchAction:ArtistBioResearchAction",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:./ArtistGenreSelector:ArtistGenreSelector",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:@/components/ui/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:@crate/ui/shadcn/dialog:DialogFooter",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:@crate/ui/shadcn/button:Button",
+    2,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistMetadataEditor.tsx:./ArtistBioResearchDialog:ArtistBioResearchDialog",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistOverviewSection.tsx:./ArtistBioResearchAction:ArtistBioResearchAction",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistOverviewSection.tsx:./ArtistTopTracksSection:ArtistTopTracksSection",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistPageBits.tsx:@crate/ui/domain/entity:EntityCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRepairDialog.tsx:@crate/ui/shadcn/dialog:DialogContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRepairDialog.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRepairDialog.tsx:@crate/ui/primitives/Checkbox:Checkbox",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRepairDialog.tsx:@crate/ui/shadcn/dialog:DialogFooter",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRow.tsx:@crate/ui/domain/entity:EntityRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistRow.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistSetlistSection.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistShowsSection.tsx:@crate/ui/domain/entity:EntityRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistSimilarSection.tsx:@/components/artist/ArtistPageBits:SimilarArtistCard",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistStats.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistStatsSection.tsx:@/components/artist/ArtistStats:ArtistStats",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistTopTracksSection.tsx:@crate/ui/domain/entity:EntityRow",
+    2,
+  ],
+  [
+    "app/ui/src/components/artist/HeroCompositionCanvas.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/scanner/MatchCard.tsx:@crate/ui/domain/entity/EntityRow:EntityRow",
+    1,
+  ],
+  ["app/ui/src/pages/Album.tsx:@crate/ui/shadcn/dialog:DialogContent", 3],
+  ["app/ui/src/pages/Album.tsx:@crate/ui/shadcn/dialog:DialogFooter", 3],
+  ["app/ui/src/pages/Album.tsx:@crate/ui/primitives/ErrorState:ErrorState", 4],
+  ["app/ui/src/pages/Album.tsx:@/components/album/AlbumHeader:AlbumHeader", 1],
+  [
+    "app/ui/src/pages/Album.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    7,
+  ],
+  ["app/ui/src/pages/Album.tsx:@/components/album/TagEditor:TagEditor", 1],
+  ["app/ui/src/pages/Album.tsx:@/components/scanner/MatchCard:MatchCard", 1],
+  ["app/ui/src/pages/Album.tsx:@/components/album/TrackTable:TrackTable", 1],
+  [
+    "app/ui/src/pages/Album.tsx:@/components/album/RelatedAlbums:RelatedAlbums",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Album.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    2,
+  ],
+  ["app/ui/src/pages/Artist.tsx:@crate/ui/shadcn/dialog:DialogContent", 1],
+  ["app/ui/src/pages/Artist.tsx:@crate/ui/shadcn/dialog:DialogFooter", 1],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistOverviewSection:ArtistOverviewSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistTopTracksSection:ArtistTopTracksSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistDiscographySection:ArtistDiscographySection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistSetlistSection:ArtistSetlistSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistShowsSection:ArtistShowsSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistSimilarSection:ArtistSimilarSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistStatsSection:ArtistStatsSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistArtworkSection:ArtistArtworkSection",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistRepairDialog:ArtistRepairDialog",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistMetadataEditor:ArtistMetadataEditor",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistBioResearchDialog:ArtistBioResearchDialog",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@/components/artist/ArtistHeroSection:ArtistHeroSection",
+    1,
+  ],
+  ["app/ui/src/pages/Artist.tsx:@crate/ui/primitives/ErrorState:ErrorState", 4],
+]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["ListPagination:pagination-previous", ["lucide-react", "ChevronLeft"]],
+  ["ListPagination:pagination-next", ["lucide-react", "ChevronRight"]],
+
+  ["Shell:mobile-search", ["@crate/ui/icons", "Search"]],
+  ["Playlists:playlists-mobile-actions", ["lucide-react", "MoreHorizontal"]],
+  ["NewReleases:releases-timeline-download", ["@crate/ui/icons", "Download"]],
+
+  ["SmartMixActivity:mix-activity-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-start-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-resume-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-pause-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-cancel-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixTracks:mix-track-search", ["@crate/ui/icons", "Search"]],
+  ["SmartMixTracks:mix-reanalyze-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixTracks:mix-load-more-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SystemHealth:system-health-loading", ["lucide-react", "Loader2"]],
+  ["Discover:discover-block-loading", ["lucide-react", "Loader2"]],
+  ["Upcoming:upcoming-refresh-setlists-loading", ["lucide-react", "Loader2"]],
+  ["Upcoming:upcoming-refresh-setlists", ["lucide-react", "CalendarSync"]],
+  ["Upcoming:upcoming-dismiss-notice", ["lucide-react", "X"]],
+  ["Upcoming:upcoming-close-details", ["lucide-react", "X"]],
+  ["Upcoming:upcoming-detail-open-artist", ["@crate/ui/icons", "UserRound"]],
+  ["Upcoming:upcoming-row-open-artist", ["@crate/ui/icons", "UserRound"]],
+  [
+    "Upcoming:upcoming-detail-open-listing",
+    ["@crate/ui/icons", "ExternalLink"],
+  ],
+  ["Upcoming:upcoming-row-open-listing", ["@crate/ui/icons", "ExternalLink"]],
+
+  // Functional Artist/Album actions and the search/disclosure/loading sites they use.
+  // HeroArtworkEditor's two Play/Heart sites render the non-interactive Listen hero
+  // preview inside its composition instrument; they are not Admin content decoration.
+  // HeroCompositionCanvas's static IconToolButton wrapper is misclassified as dynamic
+  // by the inventory name heuristic. Only its six individually named calls are accepted;
+  // the wrapper's actual ActionButton and each child glyph are still audited below.
+  ["Artist:artist-merge-search", ["@crate/ui/icons", "Search"]],
+  ["Artist:artist-merge-search-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Album:album-move-search", ["@crate/ui/icons", "Search"]],
+  ["Album:album-move-search-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Album:album-merge-search", ["@crate/ui/icons", "Search"]],
+  ["Album:album-merge-search-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Album:album-split-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Album:album-edit-tags", ["@crate/ui/icons", "Tag"]],
+  ["Album:album-move", ["@crate/ui/icons", "ArrowRight"]],
+  ["Album:album-merge", ["@crate/ui/icons", "Link"]],
+  ["Album:album-split", ["@crate/ui/icons", "Copy"]],
+  ["Album:album-sync-musicbrainz", ["@crate/ui/icons", "RefreshCw"]],
+  ["Album:album-analyze", ["@crate/ui/icons", "BarChart3"]],
+  ["Album:album-delete", ["@crate/ui/icons", "Trash2"]],
+  ["HeroCompositionCanvas:composition-zoom-out", ["local", "IconToolButton"]],
+  [
+    "HeroCompositionCanvas:composition-zoom-out-glyph",
+    ["lucide-react", "ZoomOut"],
+  ],
+  ["HeroCompositionCanvas:composition-zoom-in", ["local", "IconToolButton"]],
+  [
+    "HeroCompositionCanvas:composition-zoom-in-glyph",
+    ["lucide-react", "ZoomIn"],
+  ],
+  ["HeroCompositionCanvas:composition-flip", ["local", "IconToolButton"]],
+  [
+    "HeroCompositionCanvas:composition-flip-glyph",
+    ["lucide-react", "FlipHorizontal2"],
+  ],
+  [
+    "HeroCompositionCanvas:composition-rotate-left",
+    ["local", "IconToolButton"],
+  ],
+  [
+    "HeroCompositionCanvas:composition-rotate-left-glyph",
+    ["lucide-react", "RotateCcw"],
+  ],
+  [
+    "HeroCompositionCanvas:composition-rotate-right",
+    ["local", "IconToolButton"],
+  ],
+  [
+    "HeroCompositionCanvas:composition-rotate-right-glyph",
+    ["lucide-react", "RotateCw"],
+  ],
+  ["HeroCompositionCanvas:composition-reset", ["local", "IconToolButton"]],
+  [
+    "HeroCompositionCanvas:composition-reset-glyph",
+    ["lucide-react", "RefreshCcw"],
+  ],
+  [
+    "ArtistSetlistSection:artist-refresh-setlist",
+    ["@crate/ui/icons", "RefreshCw"],
+  ],
+  ["ArtistRepairDialog:repair-refresh", ["@crate/ui/icons", "RefreshCw"]],
+  ["ArtistRepairDialog:repair-plan-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistRepairDialog:repair-issues-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistRepairDialog:repair-scope-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistRepairDialog:repair-preview-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistRepairDialog:repair-queue-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistHeroSection:artist-enrich", ["@crate/ui/icons", "RefreshCw"]],
+  ["ArtistHeroSection:artist-analyze", ["@crate/ui/icons", "AudioLines"]],
+  ["ArtistHeroSection:artist-edit", ["@crate/ui/icons", "Pencil"]],
+  ["ArtistHeroSection:artist-core-playlist", ["@crate/ui/icons", "ListMusic"]],
+  ["ArtistHeroSection:artist-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
+  ["ArtistHeroSection:artist-write-metadata", ["@crate/ui/icons", "Tag"]],
+  ["ArtistHeroSection:artist-export-metadata", ["@crate/ui/icons", "Archive"]],
+  ["ArtistHeroSection:artist-repair", ["@crate/ui/icons", "SlidersHorizontal"]],
+  ["ArtistHeroSection:artist-merge", ["@crate/ui/icons", "Link"]],
+  ["ArtistHeroSection:artist-delete", ["@crate/ui/icons", "Trash2"]],
+  [
+    "ArtistHeroArtworkEditor:hero-save-desktop-loading",
+    ["@crate/ui/icons", "Loader2"],
+  ],
+  [
+    "ArtistHeroArtworkEditor:hero-save-mobile-loading",
+    ["@crate/ui/icons", "Loader2"],
+  ],
+  [
+    "ArtistHeroArtworkEditor:hero-preview-loading",
+    ["@crate/ui/icons", "Loader2"],
+  ],
+  ["ArtistHeroArtworkEditor:hero-preview-play", ["@crate/ui/icons", "Play"]],
+  ["ArtistHeroArtworkEditor:hero-preview-follow", ["@crate/ui/icons", "Heart"]],
+  [
+    "ArtistGenreSelector:artist-genres-disclosure",
+    ["@crate/ui/icons", "ChevronDown"],
+  ],
+  ["ArtistGenreSelector:artist-genres-search", ["@crate/ui/icons", "Search"]],
+  [
+    "ArtistBioResearchDialog:bio-research-loading",
+    ["@crate/ui/icons", "Loader2"],
+  ],
+  ["ArtistBioResearchDialog:bio-apply-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistBioResearchAction:artist-research-bio", ["@crate/ui/icons", "Bot"]],
+  ["ArtistArtworkGallery:artwork-upload", ["@crate/ui/icons", "ImagePlus"]],
+  ["ArtistArtworkGallery:artwork-search", ["@crate/ui/icons", "Search"]],
+  ["ArtistArtworkGallery:artwork-loading", ["@crate/ui/icons", "Loader2"]],
+  ["ArtistArtworkGallery:artwork-delete", ["@crate/ui/icons", "Trash2"]],
+  [
+    "ArtistArtworkGallery:artwork-upload-loading",
+    ["@crate/ui/icons", "Loader2"],
+  ],
+  ["ArtistArtworkGallery:artwork-ai-generate", ["@crate/ui/icons", "Bot"]],
+  ["ArtistArtworkGallery:artwork-ai-loading", ["@crate/ui/icons", "Loader2"]],
+  ["TrackTable:track-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
+  ["TrackTable:track-move-search", ["@crate/ui/icons", "Search"]],
+  ["TrackTable:track-move-search-loading", ["@crate/ui/icons", "Loader2"]],
+  ["TrackTable:track-audio-profile", ["@crate/ui/icons", "BarChart3"]],
+  ["TrackTable:track-download", ["@crate/ui/icons", "Download"]],
+  ["TidalAlbumCard:album-acquire-tidal", ["@crate/ui/icons", "Download"]],
+  ["TagEditor:album-save-tags", ["@crate/ui/icons", "Save"]],
+  ["AlbumHeader:album-enrich", ["@crate/ui/icons", "Bot"]],
+  ["AlbumHeader:album-download", ["@crate/ui/icons", "Download"]],
+  ["AlbumHeader:album-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
+  ["AlbumHeader:album-write-metadata", ["@crate/ui/icons", "Save"]],
+  ["AlbumHeader:album-export-metadata", ["@crate/ui/icons", "Share2"]],
+  ["AlbumCard:album-cover-loading", ["@crate/ui/icons", "Loader2"]],
+  ["AlbumCard:album-cover-search", ["@crate/ui/icons", "ImagePlus"]],
+  ["ImageCropUpload:crop-upload", ["@crate/ui/icons", "Camera"]],
   ["Playlists:playlists-open-editor", ["lucide-react", "Pencil"]],
   ["Playlists:playlists-deactivate", ["lucide-react", "PowerOff"]],
   ["Playlists:playlists-activate", ["lucide-react", "Power"]],
@@ -290,9 +1059,9 @@ const approvedUx = new Map([
   ["Logs:header-refresh", ["lucide-react", "RefreshCw"]],
   ["Stack:header-refresh", ["lucide-react", "RefreshCw"]],
   ["Health:header-run-scan", ["lucide-react", "ScanSearch"]],
-  ["Bandcamp:header-sync-collection", ["lucide-react", "FolderSync"]],
-  ["Bandcamp:header-refresh-radar", ["lucide-react", "Radar"]],
-  ["Bandcamp:header-backfill-urls", ["lucide-react", "Link"]],
+  ["Bandcamp:header-sync-collection", ["@crate/ui/icons", "RefreshCw"]],
+  ["Bandcamp:header-refresh-radar", ["@crate/ui/icons", "Radar"]],
+  ["Bandcamp:header-backfill-urls", ["@crate/ui/icons", "Link"]],
   ["NewReleases:header-timeline", ["lucide-react", "List"]],
   ["NewReleases:header-grid", ["lucide-react", "LayoutGrid"]],
   ["NewReleases:header-check-now", ["lucide-react", "Radar"]],
@@ -306,31 +1075,30 @@ const approvedUx = new Map([
   ["Imports:imports-import-all", ["@crate/ui/icons", "ArrowDownToLine"]],
   ["Playlists:header-new-static", ["lucide-react", "FilePlus2"]],
   ["Playlists:header-new-smart", ["lucide-react", "ListPlus"]],
-  // Diego's explicit 1AQ header-action amendment; no global primary-action exemption.
-  ["PlaylistEditor:editor-duplicate-action", ["lucide-react", "Copy"]],
-  ["PlaylistEditor:editor-preview-action", ["lucide-react", "Eye"]],
-  ["PlaylistEditor:editor-generate-action", ["lucide-react", "ListRestart"]],
-  ["PlaylistEditor:editor-save-action", ["lucide-react", "Save"]],
-  ["PlaylistEditor:editor-remove-rule", ["lucide-react", "Trash2"]],
-  ["PlaylistEditor:editor-remove-track", ["lucide-react", "Trash2"]],
-  ["PlaylistEditor:editor-remove-cover", ["lucide-react", "Trash2"]],
-  ["Playlists:playlists-remove-rule", ["lucide-react", "Trash2"]],
-  ["PlaylistEditor:editor-loading", ["lucide-react", "Loader2"]],
+  // Reviewed editor actions use Solar; row controls are audited in their own file.
+  ["PlaylistEditor:editor-duplicate-action", ["@crate/ui/icons", "Copy"]],
+  ["PlaylistEditor:editor-preview-action", ["@crate/ui/icons", "Eye"]],
+  ["PlaylistEditor:editor-generate-action", ["@crate/ui/icons", "RefreshCw"]],
+  ["PlaylistEditor:editor-save-action", ["@crate/ui/icons", "Save"]],
+  ["PlaylistEditor:editor-remove-rule", ["@crate/ui/icons", "Trash2"]],
+  ["PlaylistEditor:editor-edit-cover", ["@crate/ui/icons", "Camera"]],
+  ["PlaylistEditor:editor-remove-cover", ["@crate/ui/icons", "Trash2"]],
+  ["PlaylistEditor:editor-preview", ["@crate/ui/icons", "Loader2"]],
+  ["PlaylistEditor:editor-generate", ["@crate/ui/icons", "Loader2"]],
+  ["PlaylistEditor:editor-save", ["@crate/ui/icons", "Loader2"]],
   [
-    "PlaylistEditor:editor-back",
-    ["@crate/ui/domain/navigation/BackLink", "BackLink"],
+    "PlaylistEditorTrackList:playlist-track-move-up",
+    ["@crate/ui/icons", "ArrowUp"],
   ],
-  ["PlaylistEditor:editor-preview", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-generate", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-save", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-cover-upload", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-save-rules", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-apply-preview", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-search", ["lucide-react", "Search"]],
-  ["PlaylistEditor:editor-search-loading", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-add-track", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-apply-refinement", ["lucide-react", "Loader2"]],
-  ["PlaylistEditor:editor-drag", ["lucide-react", "GripVertical"]],
+  [
+    "PlaylistEditorTrackList:playlist-track-move-down",
+    ["@crate/ui/icons", "ArrowDown"],
+  ],
+  [
+    "PlaylistEditorTrackList:playlist-track-remove",
+    ["@crate/ui/icons", "Trash2"],
+  ],
+  ["Playlists:playlists-remove-rule", ["lucide-react", "Trash2"]],
 
   ["Playlists:playlists-search", ["lucide-react", "Search"]],
   ["Playlists:playlists-loading", ["lucide-react", "Loader2"]],
@@ -338,8 +1106,8 @@ const approvedUx = new Map([
   ["Playlists:playlists-static-saving", ["lucide-react", "Loader2"]],
   ["Playlists:playlists-smart-close", ["lucide-react", "X"]],
   ["Playlists:playlists-smart-saving", ["lucide-react", "Loader2"]],
-  ["Upcoming:upcoming-view-list", ["lucide-react", "List"]],
-  ["Upcoming:upcoming-view-calendar", ["lucide-react", "CalendarDays"]],
+  ["Upcoming:upcoming-view-list", ["@crate/ui/icons", "ListOrdered"]],
+  ["Upcoming:upcoming-view-calendar", ["@crate/ui/icons", "Calendar"]],
   ["Upcoming:upcoming-sync", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-search", ["lucide-react", "Search"]],
   ["Upcoming:upcoming-loading", ["lucide-react", "Loader2"]],
@@ -350,8 +1118,21 @@ const approvedUx = new Map([
   ["Upcoming:upcoming-previous", ["lucide-react", "ChevronLeft"]],
   ["Upcoming:upcoming-next", ["lucide-react", "ChevronRight"]],
   ["Upcoming:upcoming-popover-loading", ["lucide-react", "Loader2"]],
-  ["ShowCard:show-tickets-external", ["lucide-react", "ExternalLink"]],
-  ["ShowCard:show-close", ["lucide-react", "X"]],
+  ["ShowCard:show-tickets-external", ["@crate/ui/icons", "ExternalLink"]],
+  ["ShowCard:show-close", ["@crate/ui/icons", "X"]],
+  ["ShowCard:show-preview-open-artist", ["@crate/ui/icons", "UserRound"]],
+  ["ShowCard:show-preview-tickets", ["@crate/ui/icons", "ExternalLink"]],
+  ["Browse:browse-batch-enrich", ["@crate/ui/icons", "RefreshCw"]],
+  ["Browse:browse-batch-analyze", ["@crate/ui/icons", "AudioLines"]],
+  ["Browse:browse-batch-delete", ["@crate/ui/icons", "Trash2"]],
+  ["Browse:browse-batch-select-all", ["@crate/ui/icons", "Check"]],
+  ["Browse:browse-batch-cancel", ["@crate/ui/icons", "X"]],
+  ["ArtistNetworkGraph:artist-network-open", ["@crate/ui/icons", "ArrowRight"]],
+  [
+    "ArtistNetworkGraph:artist-network-expand-selected",
+    ["@crate/ui/icons", "Plus"],
+  ],
+  ["ArtistNetworkGraph:artist-network-expand", ["@crate/ui/icons", "Plus"]],
 
   ["I18nReview:translations-refresh", ["lucide-react", "Loader2"]],
   ["I18nReview:translations-draft", ["lucide-react", "Loader2"]],
@@ -385,9 +1166,9 @@ const approvedUx = new Map([
   ["Discover:discovery-loading", ["lucide-react", "Loader2"]],
   ["Discover:discovery-recompute-loading", ["lucide-react", "Loader2"]],
   ["Discover:discovery-check-loading", ["lucide-react", "Loader2"]],
-  ["Bandcamp:bandcamp-sync-loading", ["lucide-react", "Loader2"]],
-  ["Bandcamp:bandcamp-backfill-loading", ["lucide-react", "Loader2"]],
-  ["Bandcamp:bandcamp-confirm-loading", ["lucide-react", "Loader2"]],
+  ["Bandcamp:bandcamp-sync-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Bandcamp:bandcamp-backfill-loading", ["@crate/ui/icons", "Loader2"]],
+  ["Bandcamp:bandcamp-confirm-loading", ["@crate/ui/icons", "Loader2"]],
   ["Bandcamp:bandcamp-match-external", ["lucide-react", "ExternalLink"]],
   ["Bandcamp:bandcamp-confirmed-external", ["lucide-react", "ArrowUpRight"]],
   ["Bandcamp:bandcamp-item-external", ["lucide-react", "ExternalLink"]],
@@ -438,12 +1219,18 @@ const approvedUx = new Map([
   ["SearchBar:search-field", ["lucide-react", "Search"]],
   ["SearchBar:search-loading", ["lucide-react", "Loader2"]],
   ["SearchBar:search-clear", ["lucide-react", "X"]],
-  ["AIButton:ai-loading", ["@crate/ui/icons", "Loader2"]],
   ["AIButton:ai-bot", ["@crate/ui/icons", "Bot"]],
   [
     "CommandPalette:palette-close",
     ["@crate/ui/shadcn/overlay-close-button", "OverlayCloseButton"],
   ],
+]);
+// Technical no-artwork fallbacks, distinct from decorative content glyphs.
+// Each approval names one MediaCover callsite and its exact catalogue symbol/size.
+const approvedFallbacks = new Map([
+  ["NewReleases:releases-timeline-cover", "Disc3"],
+  ["NewReleases:releases-card-cover", "Disc3"],
+  ["Upcoming:upcoming-show-cover", "Calendar"],
 ]);
 function violations(sources: Map<string, string>, entries: IconEntry[]) {
   const found: string[] = [];
@@ -452,7 +1239,21 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
   const trees = new Map<string, ts.SourceFile>();
   for (const entry of entries.filter((entry) => sources.has(entry.path))) {
     if (entry.kind === "external-visual") continue;
+    const reviewedLocalComposition =
+      entry.kind === "dynamic-glyph" &&
+      entry.path === "app/ui/src/components/artist/HeroCompositionCanvas.tsx" &&
+      entry.name === "IconToolButton" &&
+      !entry.source;
+    const possibleFallbackReference =
+      entry.kind === "glyph-reference" &&
+      entry.source === "@crate/ui/icons" &&
+      ((entry.path === "app/ui/src/pages/NewReleases.tsx" &&
+        (entry.origin ?? entry.name) === "Disc3") ||
+        (entry.path === "app/ui/src/pages/Upcoming.tsx" &&
+          (entry.origin ?? entry.name) === "Calendar"));
     if (
+      !reviewedLocalComposition &&
+      !possibleFallbackReference &&
       ![
         "glyph-jsx",
         "owned-icon-consumer",
@@ -488,6 +1289,18 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     let attributes: ts.JsxAttributes | undefined;
     let reviewedInstrument = false;
     function visit(node: ts.Node) {
+      if (possibleFallbackReference && ts.isIdentifier(node)) {
+        const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+        const expression = node.parent;
+        if (
+          pos.line + 1 === entry.line &&
+          pos.character + 1 === entry.column &&
+          ts.isJsxExpression(expression) &&
+          ts.isJsxAttribute(expression.parent) &&
+          ts.isJsxAttributes(expression.parent.parent)
+        )
+          attributes = expression.parent.parent;
+      }
       // Existing Leaflet marker assets are instrument data, not action glyph slots.
       if (
         entry.kind === "icon-property" &&
@@ -547,6 +1360,55 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         (attr) => ts.isJsxAttribute(attr) && attr.name.getText(tree) === name,
       ) as ts.JsxAttribute | undefined;
     const unknownSpread = attrs.some(ts.isJsxSpreadAttribute);
+    const fallbackMarker = prop("data-admin-ux")?.initializer;
+    if (fallbackMarker && ts.isStringLiteral(fallbackMarker)) {
+      const marker = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${fallbackMarker.text}`;
+      const glyph = approvedFallbacks.get(marker);
+      const parent = attributes.parent;
+      const imports = new Map<string, { source: string; imported: string }>();
+      for (const statement of tree.statements) {
+        if (
+          ts.isImportDeclaration(statement) &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.importClause?.namedBindings &&
+          ts.isNamedImports(statement.importClause.namedBindings)
+        )
+          for (const binding of statement.importClause.namedBindings.elements)
+            imports.set(binding.name.text, {
+              source: statement.moduleSpecifier.text,
+              imported: binding.propertyName?.text ?? binding.name.text,
+            });
+      }
+      const component =
+        ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent)
+          ? imports.get(parent.tagName.getText(tree))
+          : undefined;
+      const fallback = prop("fallbackIcon")?.initializer?.getText(tree);
+      const glyphBinding = glyph ? imports.get(glyph) : undefined;
+      const sizeBinding = imports.get("CRATE_ICON_SIZE");
+      const site = `${marker}:${entry.kind}:${entry.name}`;
+      if (
+        !unknownSpread &&
+        glyph &&
+        component?.source === "@crate/ui/domain/media/MediaCover" &&
+        component.imported === "MediaCover" &&
+        fallback === `{${glyph}}` &&
+        glyphBinding?.source === "@crate/ui/icons" &&
+        glyphBinding.imported === glyph &&
+        sizeBinding?.source === "@crate/ui/icons" &&
+        sizeBinding.imported === "CRATE_ICON_SIZE" &&
+        prop("iconSize")?.initializer?.getText(tree) ===
+          "{CRATE_ICON_SIZE.xl}" &&
+        ((entry.kind === "icon-prop" &&
+          ["fallbackIcon", "iconSize"].includes(entry.name)) ||
+          (entry.kind === "glyph-reference" &&
+            (entry.origin ?? entry.name) === glyph)) &&
+        !usedUx.has(site)
+      ) {
+        usedUx.add(site);
+        continue;
+      }
+    }
     // Inventory's /icon/i also matches aiConfigured. This reviewed local boolean prop
     // is not a glyph channel; accept only its original binding at this concrete site.
     if (
@@ -619,6 +1481,134 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       controlUses.set(key, (controlUses.get(key) ?? 0) + 1);
       continue;
     }
+    // FormField injects only IDs/ARIA control attributes into this existing Type select.
+    // Keep its one exact render-prop binding reviewable; a same-named spread outside
+    // that shared FormField callback, another binding, or an extra spread still fails.
+    const knownFormControlSpread = (() => {
+      if (
+        entry.path !==
+          "app/ui/src/components/artist/ArtistMetadataEditor.tsx" ||
+        entry.source !== "@/components/ui/AdminSelect" ||
+        (entry.origin ?? entry.name) !== "AdminSelect"
+      )
+        return false;
+      const spreads = attrs.filter(ts.isJsxSpreadAttribute);
+      if (
+        spreads.length !== 1 ||
+        spreads[0]!.expression.getText(tree) !== "control"
+      )
+        return false;
+      let parent: ts.Node | undefined = attributes.parent;
+      while (parent && !ts.isArrowFunction(parent)) parent = parent.parent;
+      if (
+        !parent ||
+        !ts.isArrowFunction(parent) ||
+        parent.parameters.length !== 1 ||
+        parent.parameters[0]!.name.getText(tree) !== "control" ||
+        !ts.isParenthesizedExpression(parent.body) ||
+        !ts.isJsxSelfClosingElement(parent.body.expression) ||
+        parent.body.expression.attributes !== attributes ||
+        !ts.isJsxExpression(parent.parent) ||
+        !ts.isJsxElement(parent.parent.parent) ||
+        parent.parent.parent.openingElement.tagName.getText(tree) !==
+          "FormField"
+      )
+        return false;
+      return tree.statements.some(
+        (statement) =>
+          ts.isImportDeclaration(statement) &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.moduleSpecifier.text === "@crate/ui/primitives/FormField" &&
+          statement.importClause?.namedBindings &&
+          ts.isNamedImports(statement.importClause.namedBindings) &&
+          statement.importClause.namedBindings.elements.some(
+            (binding) =>
+              binding.name.text === "FormField" &&
+              (binding.propertyName?.text ?? binding.name.text) === "FormField",
+          ),
+      );
+    })();
+    // AIButton delegates its busy glyph to the shared Button. Only accept the
+    // component's own rest binding when its explicit loading prop follows it;
+    // caller props must never override that reviewed glyph channel. The Bot
+    // child is still checked separately, and the shared consumer count is one.
+    const knownAIButtonLoadingSpread = (() => {
+      if (
+        entry.path !== "app/ui/src/components/ui/AIButton.tsx" ||
+        entry.source !== "@crate/ui/shadcn/button" ||
+        (entry.origin ?? entry.name) !== "Button"
+      )
+        return false;
+      const spreads = attrs.filter(ts.isJsxSpreadAttribute);
+      const loading = prop("loading");
+      if (
+        spreads.length !== 1 ||
+        spreads[0]!.expression.getText(tree) !== "props" ||
+        loading?.initializer?.getText(tree) !== "{loading}" ||
+        attrs.indexOf(loading) < attrs.indexOf(spreads[0]!)
+      )
+        return false;
+      let parent: ts.Node | undefined = attributes.parent;
+      while (parent && !ts.isFunctionDeclaration(parent))
+        parent = parent.parent;
+      if (
+        !parent ||
+        !ts.isFunctionDeclaration(parent) ||
+        parent.name?.text !== "AIButton" ||
+        parent.parameters.length !== 1 ||
+        !ts.isObjectBindingPattern(parent.parameters[0]!.name)
+      )
+        return false;
+      const bindings = parent.parameters[0]!.name.elements;
+      if (
+        !bindings.some(
+          (binding) =>
+            binding.dotDotDotToken && binding.name.getText(tree) === "props",
+        ) ||
+        !bindings.some(
+          (binding) =>
+            !binding.dotDotDotToken &&
+            binding.name.getText(tree) === "loading" &&
+            (binding.propertyName?.getText(tree) ?? "loading") === "loading",
+        )
+      )
+        return false;
+      const element = attributes.parent;
+      if (
+        !ts.isJsxOpeningElement(element) &&
+        !ts.isJsxSelfClosingElement(element)
+      )
+        return false;
+      const localName = element.tagName.getText(tree);
+      return tree.statements.some(
+        (statement) =>
+          ts.isImportDeclaration(statement) &&
+          ts.isStringLiteral(statement.moduleSpecifier) &&
+          statement.moduleSpecifier.text === "@crate/ui/shadcn/button" &&
+          statement.importClause?.namedBindings &&
+          ts.isNamedImports(statement.importClause.namedBindings) &&
+          statement.importClause.namedBindings.elements.some(
+            (binding) =>
+              binding.name.text === localName &&
+              (binding.propertyName?.text ?? binding.name.text) === "Button",
+          ),
+      );
+    })();
+    const libraryControlKey = `${key}:${entry.origin ?? entry.name}`;
+    const libraryControlLimit = approvedLibraryControls.get(libraryControlKey);
+    if (
+      (!unknownSpread ||
+        knownFormControlSpread ||
+        knownAIButtonLoadingSpread) &&
+      entry.kind.startsWith("owned-") &&
+      libraryControlLimit !== undefined
+    ) {
+      controlUses.set(
+        libraryControlKey,
+        (controlUses.get(libraryControlKey) ?? 0) + 1,
+      );
+      continue;
+    }
     const marker = prop("data-admin-ux")?.initializer;
     if (marker && ts.isStringLiteral(marker)) {
       const key = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${
@@ -628,7 +1618,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       if (
         !unknownSpread &&
         approved &&
-        approved[0] === entry.source &&
+        approved[0] === (entry.source ?? "local") &&
         approved[1] === (entry.origin ?? entry.name) &&
         !usedUx.has(key)
       ) {
@@ -674,12 +1664,56 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     found.push(entry.id);
   }
   for (const [key, count] of controlUses)
-    if (count > approvedControls.get(key)!.limit)
+    if (
+      count >
+      (approvedLibraryControls.get(key) ?? approvedControls.get(key)!.limit)
+    )
       found.push(`${key}: reviewed control grew`);
   return found;
 }
 
 describe("Admin icon retirement policy — migrated Admin surfaces", () => {
+  it("does not misclassify the exact shared action wrapper, while still auditing its children", () => {
+    const source =
+      'import {ActionIconButton} from "@crate/ui/primitives/ActionIconButton"; import {Trash2} from "@crate/ui/icons"; const view=<ActionIconButton title="Delete"><Trash2/></ActionIconButton>;';
+    const entries = analyzeSource("fixture.tsx", source).entries;
+    expect(entries.some((entry) => entry.kind === "dynamic-glyph")).toBe(false);
+    expect(
+      entries.some(
+        (entry) => entry.kind === "glyph-jsx" && entry.origin === "Trash2",
+      ),
+    ).toBe(true);
+    expect(
+      analyzeSource(
+        "fixture.tsx",
+        source.replace(
+          "@crate/ui/primitives/ActionIconButton",
+          "./LocalActionIconButton",
+        ),
+      ).entries.some((entry) => entry.kind === "dynamic-glyph"),
+    ).toBe(true);
+  });
+  it("bounds technical MediaCover fallbacks to the exact component, symbol and callsite", () => {
+    const path = "app/ui/src/pages/NewReleases.tsx";
+    const source =
+      'import {MediaCover} from "@crate/ui/domain/media/MediaCover"; import {Disc3, CRATE_ICON_SIZE} from "@crate/ui/icons"; const view=<MediaCover data-admin-ux="releases-card-cover" fallbackIcon={Disc3} iconSize={CRATE_ICON_SIZE.xl}/>;';
+    const check = (value: string) =>
+      violations(new Map([[path, value]]), analyzeSource(path, value).entries);
+    expect(check(source)).toEqual([]);
+    expect(check(source.replace(/Disc3/g, "Search")).length).toBeGreaterThan(0);
+    expect(
+      check(source.replace("@crate/ui/domain/media/MediaCover", "./LocalCover"))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      check(
+        source.replace(
+          "/>;",
+          '/>; const duplicate=<MediaCover data-admin-ux="releases-card-cover" fallbackIcon={Disc3} iconSize={CRATE_ICON_SIZE.xl}/>;',
+        ),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
   it("rejects direct, passed, mapped, dynamic and wrapped glyphs in the migrated files", () => {
     const inventory = buildInventory(repo);
     const sources = new Map(
@@ -687,6 +1721,274 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
     );
     expect(violations(sources, inventory.entries)).toEqual([]);
   }, 15_000);
+  it("keeps the newly reviewed Artist and Album subtree free of unregistered glyph sites", () => {
+    const sources = new Map(
+      libraryScope.map((path) => [
+        path,
+        readFileSync(join(repo, path), "utf8"),
+      ]),
+    );
+    expect(violations(sources, buildInventory(repo).entries)).toEqual([]);
+  }, 15_000);
+  it("keeps editor glyph approvals aligned with the current Solar action sites", () => {
+    for (const component of ["PlaylistEditor", "PlaylistEditorTrackList"]) {
+      const path =
+        component === "PlaylistEditor"
+          ? "app/ui/src/pages/PlaylistEditor.tsx"
+          : "app/ui/src/components/playlists/PlaylistEditorTrackList.tsx";
+      const glyphs = analyzeSource(
+        path,
+        readFileSync(join(repo, path), "utf8"),
+      ).entries.filter((entry) => entry.kind === "glyph-jsx");
+      expect(glyphs.every((entry) => entry.source === "@crate/ui/icons")).toBe(
+        true,
+      );
+      const liveMarkers = glyphs.map(
+        (entry) =>
+          `${component}:${entry.snippet.match(/data-admin-ux="([^"]+)"/)?.[1] ?? "unregistered"}`,
+      );
+      expect(new Set(liveMarkers).size).toBe(glyphs.length);
+      expect(liveMarkers.sort()).toEqual(
+        [...approvedUx.keys()]
+          .filter((key) => key.startsWith(`${component}:`))
+          .sort(),
+      );
+    }
+  });
+  it("does not extend an editor row action approval to another glyph or duplicate marker", () => {
+    const path = "app/ui/src/components/playlists/PlaylistEditorTrackList.tsx";
+    const source =
+      'import {ArrowUp} from "@crate/ui/icons"; const view=<ArrowUp data-admin-ux="playlist-track-move-up"/>;';
+    const check = (value: string) =>
+      violations(new Map([[path, value]]), analyzeSource(path, value).entries);
+    expect(check(source)).toEqual([]);
+    expect(check(source.replace(/ArrowUp/g, "Copy"))).toHaveLength(1);
+    expect(
+      check(
+        source.replace(
+          "/>;",
+          '/>; const duplicate=<ArrowUp data-admin-ux="playlist-track-move-up"/>;',
+        ),
+      ),
+    ).toHaveLength(1);
+  });
+  it("bounds AIButton's shared busy glyph without accepting opaque loading overrides", () => {
+    const path = "app/ui/src/components/ui/AIButton.tsx";
+    const source =
+      'import {Button} from "@crate/ui/shadcn/button"; export function AIButton({loading,...props}) {return <Button {...props} loading={loading}/>;}';
+    const check = (value: string) => {
+      const tree = ts.createSourceFile(
+        path,
+        value,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const entries: IconEntry[] = [];
+      function visit(node: ts.Node) {
+        if (
+          (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+          node.tagName.getText(tree) === "Button"
+        ) {
+          const position = tree.getLineAndCharacterOfPosition(
+            node.getStart(tree),
+          );
+          entries.push({
+            id: `Button:${position.line}:${position.character}`,
+            path,
+            line: position.line + 1,
+            column: position.character + 1,
+            kind: "owned-icon-consumer",
+            name: "Button",
+            source: "@crate/ui/shadcn/button",
+            control: "Button",
+            label: "",
+            snippet: node.getText(tree),
+          });
+        }
+        ts.forEachChild(node, visit);
+      }
+      visit(tree);
+      return violations(new Map([[path, value]]), entries);
+    };
+    expect(check(source)).toEqual([]);
+    for (const changed of [
+      source.replace(
+        "{...props} loading={loading}",
+        "loading={loading} {...props}",
+      ),
+      source.replace("{...props}", "{...other}"),
+      source.replace("{...props}", "{...props} {...other}"),
+      source.replace("loading={loading}", "loading={other}"),
+      source.replace("@crate/ui/shadcn/button", "./LocalButton"),
+    ])
+      expect(check(changed)).toHaveLength(1);
+    expect(
+      check(
+        source.replace(
+          "/>;",
+          "/>;} export function Duplicate(){return <Button loading={true}/>;",
+        ),
+      ),
+    ).toHaveLength(1);
+    const retired =
+      'import {Loader2} from "@crate/ui/icons"; const view=<Loader2 data-admin-ux="ai-loading"/>;';
+    expect(
+      violations(
+        new Map([[path, retired]]),
+        analyzeSource(path, retired).entries,
+      ),
+    ).toHaveLength(1);
+  });
+  it("gives each Artist hero action a distinct glyph without including artwork overlays", () => {
+    const path = "app/ui/src/components/artist/ArtistHeroSection.tsx";
+    const actionSites = new Set(
+      [...approvedUx.keys()]
+        .filter((key) => key.startsWith("ArtistHeroSection:"))
+        .map((key) => key.slice("ArtistHeroSection:".length)),
+    );
+    const actionGlyphs = analyzeSource(
+      path,
+      readFileSync(join(repo, path), "utf8"),
+    ).entries.filter(
+      (entry) =>
+        entry.kind === "glyph-jsx" &&
+        entry.control === "ActionButton" &&
+        actionSites.has(
+          entry.snippet.match(/data-admin-ux="([^"]+)"/)?.[1] ?? "",
+        ),
+    );
+    expect(actionGlyphs).toHaveLength(actionSites.size);
+    const symbols = actionGlyphs.map((entry) => entry.origin ?? entry.name);
+    expect(symbols.filter((symbol) => symbol === "ListMusic")).toHaveLength(1);
+    expect(symbols.filter((symbol) => symbol === "AlignLeft")).toHaveLength(1);
+    expect(new Set(symbols).size).toBe(actionGlyphs.length);
+  });
+  it("rejects reusing the Core Tracks glyph for the Artist Lyrics action", () => {
+    const path = "app/ui/src/components/artist/ArtistHeroSection.tsx";
+    const source =
+      'import {ListMusic} from "@crate/ui/icons"; const view=<><ListMusic data-admin-ux="artist-core-playlist"/><ListMusic data-admin-ux="artist-sync-lyrics"/></>;';
+    expect(
+      violations(
+        new Map([[path, source]]),
+        analyzeSource(path, source).entries,
+      ),
+    ).toHaveLength(1);
+  });
+  it("does not let a reviewed FormField callback become an opaque Select prop channel", () => {
+    const path = "app/ui/src/components/artist/ArtistMetadataEditor.tsx";
+    for (const source of [
+      "const view=<AdminSelect {...control}/>;",
+      "const view=<FormField>{control => <AdminSelect {...control}/>}</FormField>;",
+      'import {FormField} from "@crate/ui/primitives/FormField"; const view=<FormField>{control => (<AdminSelect {...other}/>)}</FormField>;',
+      'import {FormField} from "@crate/ui/primitives/FormField"; const view=<FormField>{control => (<AdminSelect {...control} {...other}/>)}</FormField>;',
+    ]) {
+      const tree = ts.createSourceFile(
+        path,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const positions: number[] = [];
+      function visit(node: ts.Node) {
+        if (
+          ts.isJsxSelfClosingElement(node) &&
+          node.tagName.getText(tree) === "AdminSelect"
+        )
+          positions.push(node.getStart(tree));
+        ts.forEachChild(node, visit);
+      }
+      visit(tree);
+      const entries = positions.map((position) => {
+        const pos = tree.getLineAndCharacterOfPosition(position);
+        return {
+          id: "select",
+          path,
+          line: pos.line + 1,
+          column: pos.character + 1,
+          kind: "owned-icon-consumer",
+          name: "AdminSelect",
+          source: "@/components/ui/AdminSelect",
+          control: "AdminSelect",
+          label: "",
+          snippet: "",
+        } as IconEntry;
+      });
+      expect(violations(new Map([[path, source]]), entries)).toHaveLength(1);
+    }
+  });
+  it("bounds each library catalogue export without exempting the whole module", () => {
+    const path = "app/ui/src/components/album/AlbumCard.tsx";
+    const source = "<><ActionButton/><ActionButton/><OtherControl/></>";
+    const tree = ts.createSourceFile(
+      path,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const entries: IconEntry[] = [];
+    function visit(node: ts.Node) {
+      if (ts.isJsxSelfClosingElement(node)) {
+        const pos = tree.getLineAndCharacterOfPosition(node.getStart(tree));
+        entries.push({
+          id: node.tagName.getText(tree),
+          path,
+          line: pos.line + 1,
+          column: pos.character + 1,
+          kind: "owned-icon-consumer",
+          name: node.tagName.getText(tree),
+          source: "@crate/ui/primitives/ActionGroup",
+          control: node.tagName.getText(tree),
+          label: "",
+          snippet: "",
+        });
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(tree);
+    expect(violations(new Map([[path, source]]), entries)).toEqual([
+      "OtherControl",
+      `${path}:@crate/ui/primitives/ActionGroup:ActionButton: reviewed control grew`,
+    ]);
+  });
+  it("still audits an inline vector added inside the approved composition wrapper", () => {
+    const path = "app/ui/src/components/artist/HeroCompositionCanvas.tsx";
+    const source =
+      'function IconToolButton(){return <svg><path/></svg>;} const view=<IconToolButton data-admin-ux="composition-zoom-out" label="Zoom out"/>;';
+    expect(
+      violations(new Map([[path, source]]), analyzeSource(path, source).entries)
+        .length,
+    ).toBeGreaterThan(0);
+  });
+  it("does not extend an Album glyph approval to another symbol or duplicate site", () => {
+    const path = "app/ui/src/components/album/AlbumHeader.tsx";
+    for (const source of [
+      'import {Search} from "@crate/ui/icons"; const view=<Search data-admin-ux="album-enrich"/>;',
+      'import {Bot} from "@crate/ui/icons"; const view=<><Bot data-admin-ux="album-enrich"/><Bot data-admin-ux="album-enrich"/></>;',
+    ])
+      expect(
+        violations(
+          new Map([[path, source]]),
+          analyzeSource(path, source).entries,
+        ),
+      ).toHaveLength(1);
+  });
+  it("rejects unnamed or duplicated local composition controls instead of hiding dynamic entries", () => {
+    const path = "app/ui/src/components/artist/HeroCompositionCanvas.tsx";
+    for (const source of [
+      'const view=<IconToolButton label="New action"/>;',
+      'const view=<><IconToolButton data-admin-ux="composition-zoom-out" label="Zoom out"/><IconToolButton data-admin-ux="composition-zoom-out" label="Zoom out"/></>;',
+      'const view=<OtherIconToolButton data-admin-ux="composition-zoom-out"/>;',
+    ])
+      expect(
+        violations(
+          new Map([[path, source]]),
+          analyzeSource(path, source).entries,
+        ).length,
+      ).toBeGreaterThan(0);
+  });
   it("treats the exact shared size token as data while still auditing Solar glyphs", () => {
     const result = analyzeSource(
       "fixture.tsx",

@@ -7,12 +7,23 @@ import {
   useEffectEvent,
   useRef,
 } from "react";
-import { useSearchParams, useNavigate } from "react-router";
+import { useSearchParams } from "react-router";
 import {
   AdminSelect,
   type AdminSelectOption,
 } from "@/components/ui/AdminSelect";
 import { Button } from "@crate/ui/shadcn/button";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import {
+  LayoutGrid,
+  ListOrdered as List,
+  X,
+  RefreshCw,
+  AudioLines,
+  Trash2,
+  Check,
+  Loader2,
+} from "@crate/ui/icons";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
@@ -26,20 +37,9 @@ import {
 import {
   artistActionApiPath,
   artistManagementApiPath,
-  artistPagePath,
 } from "@/lib/library-routes";
 import { toast } from "sonner";
-import {
-  LayoutGrid,
-  List,
-  Loader2,
-  Check,
-  SquareCheck,
-  X,
-  RefreshCw,
-  BrainCircuit,
-  Trash2,
-} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArtistCard } from "@/components/artist/ArtistCard";
 import { ArtistRow } from "@/components/artist/ArtistRow";
 
@@ -102,7 +102,18 @@ const ISSUE_OPTIONS = [
 
 export function Browse() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const { hasCapability } = useAuth();
+  const canEnrich = hasCapability("library.metadata.write");
+  const canAnalyze = hasCapability("library.analysis.manage");
+  const canDelete =
+    hasCapability("library.artist.remove") &&
+    hasCapability("library.files.delete");
+  const canSelect = canEnrich || canAnalyze || canDelete;
+  const requestGeneration = useRef(0);
+  const [batchPending, setBatchPending] = useState<
+    "enrich" | "reanalyze" | "delete" | null
+  >(null);
+  const batchPendingRef = useRef(false);
 
   const genre = searchParams.get("genre") ?? "";
   const country = searchParams.get("country") ?? "";
@@ -148,57 +159,61 @@ export function Browse() {
     setSelectMode(false);
   }
 
-  async function batchEnrich() {
+  async function batchAction(action: "enrich" | "reanalyze") {
+    if (
+      batchPendingRef.current ||
+      !(action === "enrich" ? canEnrich : canAnalyze)
+    )
+      return;
+    batchPendingRef.current = true;
+    setBatchPending(action);
     const artistsById = new Map(
       artists.flatMap((artist) =>
         artist.id == null ? [] : [[artist.id, artist] as const],
       ),
     );
-    await Promise.all(
-      Array.from(selected, async (artistId) => {
-        const artist = artistsById.get(artistId);
-        const endpoint = artistActionApiPath(
-          { artistId, artistEntityUid: artist?.entity_uid },
-          "enrich",
+    try {
+      const outcomes = await Promise.all(
+        Array.from(selected, async (artistId) => {
+          const artist = artistsById.get(artistId);
+          const reference = { artistId, artistEntityUid: artist?.entity_uid };
+          const endpoint =
+            action === "enrich"
+              ? artistActionApiPath(reference, "enrich")
+              : artistManagementApiPath(reference, "reanalyze");
+          try {
+            if (!endpoint) throw new Error("Artist reference missing");
+            await api(endpoint, "POST");
+            return { artistId, queued: true };
+          } catch {
+            return { artistId, queued: false };
+          }
+        }),
+      );
+      const failed = outcomes.filter((outcome) => !outcome.queued);
+      const queued = outcomes.length - failed.length;
+      const label = action === "enrich" ? "Enrichment" : "Analysis";
+      if (queued)
+        toast.success(
+          `${label} started for ${queued} artist${queued === 1 ? "" : "s"}`,
         );
-        if (!endpoint) return;
-        try {
-          await api(endpoint, "POST");
-        } catch {
-          /* continue */
-        }
-      }),
-    );
-    toast.success(`Enrichment started for ${selected.size} artists`);
-    clearSelection();
-  }
-
-  async function batchAnalyze() {
-    const artistsById = new Map(
-      artists.flatMap((artist) =>
-        artist.id == null ? [] : [[artist.id, artist] as const],
-      ),
-    );
-    await Promise.all(
-      Array.from(selected, async (artistId) => {
-        const artist = artistsById.get(artistId);
-        const endpoint = artistManagementApiPath(
-          { artistId, artistEntityUid: artist?.entity_uid },
-          "reanalyze",
+      if (failed.length) {
+        toast.error(
+          `${label} failed for ${failed.length} artist${failed.length === 1 ? "" : "s"}`,
+          { description: "Failed artists remain selected. Try again." },
         );
-        if (!endpoint) return;
-        try {
-          await api(endpoint, "POST");
-        } catch {
-          /* continue */
-        }
-      }),
-    );
-    toast.success(`Analysis started for ${selected.size} artists`);
-    clearSelection();
+        setSelected(new Set(failed.map((outcome) => outcome.artistId)));
+      } else clearSelection();
+    } finally {
+      batchPendingRef.current = false;
+      setBatchPending(null);
+    }
   }
 
   async function batchDelete() {
+    if (batchPendingRef.current || !canDelete) return;
+    batchPendingRef.current = true;
+    setBatchPending("delete");
     let queued = 0;
     let failed = 0;
 
@@ -242,8 +257,21 @@ export function Browse() {
       toast.error("Failed to queue artist deletion");
     }
 
+    batchPendingRef.current = false;
+    setBatchPending(null);
+    if (failed) {
+      setSelected(
+        new Set(
+          Array.from(selected).filter(
+            (_, index) => outcomes[index] !== "queued",
+          ),
+        ),
+      );
+      throw new Error(
+        "Some artists could not be queued. Failed artists remain selected.",
+      );
+    }
     clearSelection();
-    setShowBatchDelete(false);
   }
 
   const setParam = useCallback(
@@ -269,20 +297,28 @@ export function Browse() {
     if (format) params.set("format", format);
     const query = params.toString();
 
+    let cancelled = false;
     api<BrowseFilters>(`/api/browse/filters${query ? `?${query}` : ""}`)
       .then((data) => {
+        if (cancelled) return;
         setFilters(data);
         if (genre && !data.genres.some((option) => option.name === genre)) {
           setParam("genre", "");
         }
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [country, decade, format, genre, setParam]);
 
   const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchPage = useCallback(
     (page: number, reset = false) => {
+      const generation = reset
+        ? ++requestGeneration.current
+        : requestGeneration.current;
       setPageError(null);
       if (reset) setLoading(true);
       else setLoadingMore(true);
@@ -300,11 +336,13 @@ export function Browse() {
 
       api<PaginatedResponse>(`/api/artists?${params.toString()}`)
         .then((data) => {
+          if (generation !== requestGeneration.current) return;
           setArtists((prev) => (reset ? data.items : [...prev, ...data.items]));
           setTotal(data.total);
           hasMoreRef.current = data.items.length >= PER_PAGE;
         })
         .catch(() => {
+          if (generation !== requestGeneration.current) return;
           setPageError(page);
           if (reset) {
             setArtists([]);
@@ -313,6 +351,7 @@ export function Browse() {
           hasMoreRef.current = false;
         })
         .finally(() => {
+          if (generation !== requestGeneration.current) return;
           setLoading(false);
           setLoadingMore(false);
         });
@@ -416,7 +455,7 @@ export function Browse() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={selected.size ? "space-y-6 pb-36 sm:pb-24" : "space-y-6"}>
       <OpsPageHero
         title="Browse Artists"
         description="Explore the artists in your library and narrow the catalog with the filters below."
@@ -431,43 +470,35 @@ export function Browse() {
         description="Filter by sound, origin, format or library status. Your selection stays in the URL."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant={selectMode ? "default" : "outline"}
-              onClick={() => {
-                setSelectMode(!selectMode);
-                if (selectMode) clearSelection();
-              }}
-            >
-              {selectMode ? (
-                <Check size={13} className="mr-1" />
-              ) : (
-                <SquareCheck size={13} className="mr-1" />
-              )}
-              {selectMode ? "Done" : "Select"}
-            </Button>
-            <div className="flex overflow-hidden rounded-md border border-border">
+            {canSelect ? (
               <Button
-                variant={view === "grid" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-9 w-9 rounded-none"
-                aria-label="Grid view"
+                size="sm"
+                disabled={batchPending !== null}
+                variant={selectMode ? "default" : "outline"}
+                onClick={() => {
+                  setSelectMode(!selectMode);
+                  if (selectMode) clearSelection();
+                }}
+              >
+                {selectMode ? "Done" : "Select"}
+              </Button>
+            ) : null}
+            <ActionGroup label="Artist view">
+              <ActionButton
+                label="Grid view"
                 aria-pressed={view === "grid"}
                 onClick={() => setView("grid")}
               >
-                <LayoutGrid size={16} />
-              </Button>
-              <Button
-                variant={view === "list" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-9 w-9 rounded-none"
-                aria-label="List view"
+                <LayoutGrid data-admin-ux="browse-grid" aria-hidden="true" />
+              </ActionButton>
+              <ActionButton
+                label="List view"
                 aria-pressed={view === "list"}
                 onClick={() => setView("list")}
               >
-                <List size={16} />
-              </Button>
-            </div>
+                <List data-admin-ux="browse-list" aria-hidden="true" />
+              </ActionButton>
+            </ActionGroup>
           </div>
         }
       >
@@ -612,6 +643,7 @@ export function Browse() {
             {artists.map((a) => (
               <ArtistCard
                 key={a.name}
+                artworkShape="square"
                 artistId={a.id}
                 artistSlug={a.slug}
                 name={a.name}
@@ -624,17 +656,7 @@ export function Browse() {
                 featuredDevices={a.featured_devices}
                 selectMode={selectMode}
                 isSelected={a.id != null ? selected.has(a.id) : false}
-                onClick={() =>
-                  selectMode
-                    ? toggleSelect(a.id)
-                    : navigate(
-                        artistPagePath({
-                          artistId: a.id,
-                          artistSlug: a.slug,
-                          artistName: a.name,
-                        }),
-                      )
-                }
+                onClick={selectMode ? () => toggleSelect(a.id) : undefined}
               />
             ))}
           </div>
@@ -643,6 +665,7 @@ export function Browse() {
             {artists.map((a) => (
               <ArtistRow
                 key={a.name}
+                artworkShape="square"
                 name={a.name}
                 artistId={a.id}
                 artistSlug={a.slug}
@@ -656,17 +679,7 @@ export function Browse() {
                 featuredDevices={a.featured_devices}
                 selectMode={selectMode}
                 isSelected={a.id != null ? selected.has(a.id) : false}
-                onClick={() =>
-                  selectMode
-                    ? toggleSelect(a.id)
-                    : navigate(
-                        artistPagePath({
-                          artistId: a.id,
-                          artistSlug: a.slug,
-                          artistName: a.name,
-                        }),
-                      )
-                }
+                onClick={selectMode ? () => toggleSelect(a.id) : undefined}
               />
             ))}
           </div>
@@ -683,30 +696,71 @@ export function Browse() {
         )}
       </div>
 
-      {selected.size > 0 && (
-        <div className="fixed bottom-14 left-0 right-0 md:left-[220px] z-40 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom">
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <div className="flex gap-2 flex-1">
-            <Button size="sm" variant="outline" onClick={batchEnrich}>
-              <RefreshCw size={13} className="mr-1" /> Enrich
-            </Button>
-            <Button size="sm" variant="outline" onClick={batchAnalyze}>
-              <BrainCircuit size={13} className="mr-1" /> Analyze
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowBatchDelete(true)}
+      {canSelect && selected.size > 0 && (
+        <div
+          data-slot="browse-batch-actions"
+          className="fixed inset-x-0 bottom-0 z-40 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-canvas px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:left-[var(--sidebar-w)]"
+        >
+          <MonoLabel as="span" aria-live="polite">
+            {selected.size} selected
+          </MonoLabel>
+          <ActionGroup label="Selected artist actions">
+            {canEnrich ? (
+              <ActionButton
+                label="Enrich selected artists"
+                disabled={batchPending !== null}
+                loading={batchPending === "enrich"}
+                onClick={() => void batchAction("enrich")}
+              >
+                <RefreshCw
+                  data-admin-ux="browse-batch-enrich"
+                  aria-hidden="true"
+                />
+              </ActionButton>
+            ) : null}
+            {canAnalyze ? (
+              <ActionButton
+                label="Analyze selected artists"
+                disabled={batchPending !== null}
+                loading={batchPending === "reanalyze"}
+                onClick={() => void batchAction("reanalyze")}
+              >
+                <AudioLines
+                  data-admin-ux="browse-batch-analyze"
+                  aria-hidden="true"
+                />
+              </ActionButton>
+            ) : null}
+            {canDelete ? (
+              <ActionButton
+                label="Delete selected artists"
+                disabled={batchPending !== null}
+                onClick={() => setShowBatchDelete(true)}
+              >
+                <Trash2
+                  data-admin-ux="browse-batch-delete"
+                  aria-hidden="true"
+                />
+              </ActionButton>
+            ) : null}
+            <ActionButton
+              label="Select all loaded artists"
+              disabled={batchPending !== null}
+              onClick={selectAll}
             >
-              <Trash2 size={13} className="mr-1" /> Delete
-            </Button>
-          </div>
-          <Button size="sm" variant="ghost" onClick={selectAll}>
-            Select All
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            <X size={13} /> Cancel
-          </Button>
+              <Check
+                data-admin-ux="browse-batch-select-all"
+                aria-hidden="true"
+              />
+            </ActionButton>
+            <ActionButton
+              label="Cancel selection"
+              disabled={batchPending !== null}
+              onClick={clearSelection}
+            >
+              <X data-admin-ux="browse-batch-cancel" aria-hidden="true" />
+            </ActionButton>
+          </ActionGroup>
         </div>
       )}
 
@@ -717,9 +771,8 @@ export function Browse() {
         description={`This will permanently delete ${selected.size} artist(s) and all their files. This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={() => {
-          void batchDelete();
-        }}
+        onConfirm={batchDelete}
+        onError={() => {}}
         eyebrow="Confirm action"
         consequence={`${selected.size} artists · permanently deletes all their files`}
       />

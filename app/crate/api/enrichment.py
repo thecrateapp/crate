@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Mapping
 from typing import Any
@@ -162,6 +163,31 @@ def get_artist_page_enrichment(name: str) -> dict:
     return {}
 
 
+def _artist_analysis_payload(rows: list[dict]) -> dict[str, dict]:
+    """Preserve legacy title lookup without dropping same-title tracks."""
+    result: dict[str, dict] = {}
+    for row in rows:
+        entry = dict(row)
+        title = (entry.get("title") or "").lower()
+        track_id = entry.get("track_id")
+        key = title or (f"track:{track_id}" if track_id is not None else "")
+        if not key:
+            continue
+        if key in result:
+            key = (
+                f"track:{track_id}" if track_id is not None else f"{key}#{len(result)}"
+            )
+        mood = entry.pop("mood_json", None)
+        if isinstance(mood, str):
+            try:
+                mood = json.loads(mood)
+            except (ValueError, TypeError):
+                mood = None
+        entry["mood"] = mood
+        result[key] = entry
+    return result
+
+
 @router.get(
     "/api/artists/{artist_id}/analysis-data",
     response_model=ArtistAnalysisDataResponse,
@@ -175,23 +201,7 @@ def get_artist_analysis_data(request: Request, artist_id: int):
     if not artist_name:
         raise HTTPException(status_code=404, detail="Not found")
     rows = get_artist_analysis_tracks(artist_name)
-    result = {}
-    for row in rows:
-        title = (row.get("title") or "").lower()
-        if not title:
-            continue
-        entry = dict(row)
-        mood = entry.pop("mood_json", None)
-        if isinstance(mood, str):
-            import json as _json
-
-            try:
-                mood = _json.loads(mood)
-            except Exception:
-                mood = None
-        entry["mood"] = mood
-        result[title] = entry
-    return result
+    return _artist_analysis_payload(rows)
 
 
 @router.get(
@@ -206,23 +216,7 @@ def get_artist_analysis_data_by_entity_uid(request: Request, artist_entity_uid: 
         raise HTTPException(status_code=404, detail="Not found")
     _require_auth(request)
     rows = get_artist_analysis_tracks(artist_name)
-    result = {}
-    for row in rows:
-        title = (row.get("title") or "").lower()
-        if not title:
-            continue
-        entry = dict(row)
-        mood = entry.pop("mood_json", None)
-        if isinstance(mood, str):
-            import json as _json
-
-            try:
-                mood = _json.loads(mood)
-            except Exception:
-                mood = None
-        entry["mood"] = mood
-        result[title] = entry
-    return result
+    return _artist_analysis_payload(rows)
 
 
 @router.get(

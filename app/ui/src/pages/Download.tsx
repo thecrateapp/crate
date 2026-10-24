@@ -6,8 +6,20 @@ import {
   CRATE_ICON_SIZE,
   Download as DownloadActionIcon,
   Heart as HeartIcon,
+  Search,
+  Loader2,
+  Trash2,
+  ArrowUp,
+  ArrowLeft,
+  ListOrdered as List,
 } from "@crate/ui/icons";
-import { OpsPageHero, OpsSurface } from "@/components/admin/ops-surfaces";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import {
+  OpsPageHero,
+  OpsSurface,
+  OpsRefreshNotice,
+} from "@/components/admin/ops-surfaces";
 import {
   useState,
   useCallback,
@@ -36,20 +48,7 @@ import {
 import { api, apiSseUrl } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { toast } from "sonner";
-import {
-  Search,
-  Download,
-  Disc3,
-  Music,
-  Loader2,
-  CheckCircle2,
-  Trash2,
-  ArrowUp,
-  RotateCcw,
-  Upload,
-  ArrowLeft,
-  List,
-} from "lucide-react";
+import { EntityAvatar } from "@crate/ui/domain/entity";
 // encPath available if needed for navigation
 
 interface TidalAlbum {
@@ -352,6 +351,12 @@ export function DownloadPage() {
   const [query, setQuery] = useState(initialQ || session.query);
   const [results, setResults] = useState<SearchResult | null>(session.results);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [soulseekError, setSoulseekError] = useState<string | null>(null);
+  const searchGeneration = useRef(0);
+  const searchController = useRef<AbortController | null>(null);
+  const [queueBusy, setQueueBusy] = useState<Set<number>>(new Set());
+  const queueBusyRef = useRef(new Set<number>());
   const [quality, setQuality] = useState("max");
   const [activeDownloads, setActiveDownloads] = useState<Set<string>>(
     new Set(),
@@ -372,10 +377,18 @@ export function DownloadPage() {
     name: string;
     picture: string | null;
   } | null>(null);
-  const { data: acquisitionSurface, refetch: refetchAcquisitionSurface } =
-    useApi<AcquisitionSurface>("/api/acquisition/snapshot");
-  const { data: artistSuggestions, refetch: refetchArtistSuggestions } =
-    useApi<ArtistSuggestionsPayload>("/api/acquisition/artist-suggestions");
+  const {
+    data: acquisitionSurface,
+    loading: acquisitionLoading,
+    error: acquisitionError,
+    refetch: refetchAcquisitionSurface,
+  } = useApi<AcquisitionSurface>("/api/acquisition/snapshot");
+  const {
+    data: artistSuggestions,
+    loading: suggestionsLoading,
+    error: suggestionsError,
+    refetch: refetchArtistSuggestions,
+  } = useApi<ArtistSuggestionsPayload>("/api/acquisition/artist-suggestions");
   const [liveAcquisitionSurface, setLiveAcquisitionSurface] =
     useState<AcquisitionSurface | null>(null);
 
@@ -384,7 +397,7 @@ export function DownloadPage() {
   const tidalQueue = currentAcquisitionSurface?.tidal_queue ?? [];
   const slskQueue = currentAcquisitionSurface?.soulseek_queue ?? [];
   const tidalAuthenticated =
-    currentAcquisitionSurface?.tidal_authenticated ?? false;
+    currentAcquisitionSurface?.tidal_authenticated ?? null;
 
   // Merged queue
   const queue = tidalQueue;
@@ -422,68 +435,90 @@ export function DownloadPage() {
     async (q?: string) => {
       const term = (q ?? query).trim();
       if (term.length < 2) return;
+      const generation = ++searchGeneration.current;
+      searchController.current?.abort();
+      const controller = new AbortController();
+      searchController.current = controller;
+      const current = () =>
+        generation === searchGeneration.current && !controller.signal.aborted;
+      slskStreamRef.current?.close();
+      slskStreamRef.current = null;
+      setResults(null);
+      setSoulseekResults(null);
+      setSearchError(null);
+      setSoulseekError(null);
       setSearching(true);
+      setSearchingSlsk(term.length >= 3);
+      setSlskSearchId(null);
+      if (term.length >= 3) {
+        void api<{ search_id: string }>(
+          "/api/acquisition/search/soulseek",
+          "POST",
+          { query: term },
+          { signal: controller.signal },
+        )
+          .then((data) => {
+            if (!current()) return;
+            if (!data.search_id)
+              throw new Error("Missing Soulseek search identity");
+            setSlskSearchId(data.search_id);
+            const stream = new EventSource(
+              apiSseUrl(
+                `/api/acquisition/search/soulseek/${data.search_id}/stream`,
+              ),
+            );
+            slskStreamRef.current = stream;
+            stream.onmessage = (event) => {
+              if (!current()) return;
+              try {
+                const payload = JSON.parse(event.data) as {
+                  results: SoulseekResult[];
+                  isComplete: boolean;
+                };
+                setSoulseekResults(payload.results);
+                if (payload.isComplete) {
+                  setSearchingSlsk(false);
+                  stream.close();
+                  if (slskStreamRef.current === stream)
+                    slskStreamRef.current = null;
+                }
+              } catch {
+                /* Wait for the next valid frame. */
+              }
+            };
+            stream.onerror = () => {
+              stream.close();
+              if (!current()) return;
+              setSearchingSlsk(false);
+              setSoulseekError(
+                "Could not refresh Soulseek results. Retry the search.",
+              );
+              if (slskStreamRef.current === stream)
+                slskStreamRef.current = null;
+            };
+          })
+          .catch(() => {
+            if (current()) {
+              setSoulseekError("Could not search Soulseek. Retry the search.");
+              setSearchingSlsk(false);
+            }
+          });
+      }
       try {
         const data = await api<SearchResult>(
           `/api/tidal/search?q=${encodeURIComponent(term)}&limit=20`,
+          "GET",
+          undefined,
+          { signal: controller.signal },
         );
-        setResults(data);
+        if (current()) setResults(data);
       } catch {
-        toast.error("Search failed — check Tidal authentication");
+        if (current())
+          setSearchError(
+            "Could not search Tidal. Check authentication and retry.",
+          );
       } finally {
-        setSearching(false);
-      }
-      // Also search Soulseek (non-blocking: start search, then poll)
-      if (term.length >= 3) {
-        slskStreamRef.current?.close();
-        slskStreamRef.current = null;
-        setSoulseekResults(null);
-        setSearchingSlsk(true);
-        setSlskSearchId(null);
-
-        api<{ search_id: string }>("/api/acquisition/search/soulseek", "POST", {
-          query: term,
-        })
-          .then((d) => {
-            if (d.search_id) {
-              setSlskSearchId(d.search_id);
-              const stream = new EventSource(
-                apiSseUrl(
-                  `/api/acquisition/search/soulseek/${d.search_id}/stream`,
-                ),
-              );
-              slskStreamRef.current = stream;
-              stream.onmessage = (event) => {
-                try {
-                  const payload = JSON.parse(event.data) as {
-                    results: SoulseekResult[];
-                    isComplete: boolean;
-                  };
-                  setSoulseekResults(payload.results);
-                  if (payload.isComplete) {
-                    setSearchingSlsk(false);
-                    stream.close();
-                    if (slskStreamRef.current === stream) {
-                      slskStreamRef.current = null;
-                    }
-                  }
-                } catch {
-                  // Ignore malformed search frames and keep the stream alive.
-                }
-              };
-              stream.onerror = () => {
-                setSearchingSlsk(false);
-                stream.close();
-                if (slskStreamRef.current === stream) {
-                  slskStreamRef.current = null;
-                }
-              };
-            }
-          })
-          .catch(() => {
-            setSoulseekResults([]);
-            setSearchingSlsk(false);
-          });
+        if (current()) setSearching(false);
       }
     },
     [query],
@@ -538,6 +573,8 @@ export function DownloadPage() {
   useEffect(() => {
     if (initialQ) doSearchEvent(initialQ);
     return () => {
+      searchGeneration.current += 1;
+      searchController.current?.abort();
       slskStreamRef.current?.close();
       slskStreamRef.current = null;
     };
@@ -587,16 +624,63 @@ export function DownloadPage() {
   }
 
   async function removeQueueItem(id: number) {
-    await api(`/api/tidal/queue/${id}`, "DELETE").catch(() => {});
-    refetchQueue();
+    if (queueBusyRef.current.has(id)) return;
+    queueBusyRef.current.add(id);
+    setQueueBusy(new Set(queueBusyRef.current));
+    try {
+      await api(`/api/tidal/queue/${id}`, "DELETE");
+      refetchQueue();
+    } catch {
+      toast.error("Could not remove the acquisition item. Retry the action.");
+    } finally {
+      queueBusyRef.current.delete(id);
+      setQueueBusy(new Set(queueBusyRef.current));
+    }
   }
 
-  async function promoteWishlist(id: number) {
-    await api(`/api/tidal/queue/${id}`, "PUT", { status: "queued" }).catch(
-      () => {},
+  async function promoteWishlist(id: number, quiet = false) {
+    if (queueBusyRef.current.has(id)) return false;
+    queueBusyRef.current.add(id);
+    setQueueBusy(new Set(queueBusyRef.current));
+    try {
+      await api(`/api/tidal/queue/${id}`, "PUT", { status: "queued" });
+      setLiveAcquisitionSurface((current) => {
+        const surface = current ?? acquisitionSurface;
+        return surface
+          ? {
+              ...surface,
+              tidal_queue: surface.tidal_queue.map((item) =>
+                item.id === id ? { ...item, status: "queued" } : item,
+              ),
+            }
+          : current;
+      });
+      if (!quiet) toast.success("Moved to download queue");
+      refetchQueue();
+      return true;
+    } catch {
+      if (!quiet)
+        toast.error(
+          "Could not queue the wishlist item. It remains in Wishlist.",
+        );
+      return false;
+    } finally {
+      queueBusyRef.current.delete(id);
+      setQueueBusy(new Set(queueBusyRef.current));
+    }
+  }
+
+  async function promoteAllWishlist() {
+    const results = await Promise.all(
+      wishlist.map((item) => promoteWishlist(item.id, true)),
     );
-    toast.success("Moved to download queue");
-    refetchQueue();
+    const queued = results.filter(Boolean).length;
+    const failed = results.length - queued;
+    if (failed)
+      toast.error(
+        `${queued} queued · ${failed} failed. Failed items remain in Wishlist.`,
+      );
+    else toast.success(`${queued} wishlist items moved to download queue`);
   }
 
   async function submitUpload() {
@@ -631,6 +715,20 @@ export function DownloadPage() {
   const history =
     queue?.filter((q) => ["completed", "failed"].includes(q.status)) ?? [];
 
+  const queueReadState = acquisitionError ? (
+    <ErrorState
+      message="Could not load acquisition queue."
+      onRetry={refetchQueue}
+    />
+  ) : (
+    <LoadingState
+      label={
+        acquisitionLoading
+          ? "Loading acquisition queue"
+          : "Waiting for acquisition queue"
+      }
+    />
+  );
   return (
     <div className="space-y-6">
       <OpsPageHero
@@ -644,16 +742,34 @@ export function DownloadPage() {
               : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
           }
         >
-          Tidal {tidalAuthenticated ? "connected" : "disconnected"}
+          {tidalAuthenticated == null
+            ? "Tidal status unavailable"
+            : `Tidal ${tidalAuthenticated ? "connected" : "disconnected"}`}
         </InfoBadge>
-        <InfoBadge>
-          {activeQueue.length + slskDownloads.length} active downloads
-        </InfoBadge>
+        {currentAcquisitionSurface ? (
+          <InfoBadge>
+            {activeQueue.length + slskDownloads.length} active downloads
+          </InfoBadge>
+        ) : null}
         {wishlist.length > 0 ? (
           <InfoBadge>{wishlist.length} wishlisted</InfoBadge>
         ) : null}
       </OpsPageHero>
 
+      {acquisitionError && currentAcquisitionSurface ? (
+        <OpsRefreshNotice
+          message="Could not refresh acquisition. Showing the last successful queue."
+          onRetry={refetchQueue}
+        />
+      ) : null}
+      {suggestionsError ? (
+        <OpsRefreshNotice
+          message="Could not load listener suggestions."
+          onRetry={refetchArtistSuggestions}
+        />
+      ) : suggestionsLoading && !artistSuggestions ? (
+        <LoadingState label="Loading listener suggestions" />
+      ) : null}
       <OpsSurface
         as="div"
         role="region"
@@ -903,7 +1019,14 @@ export function DownloadPage() {
             </TabsList>
 
             <TabsContent value="tidal" className="mt-0">
-              {results ? (
+              {searchError ? (
+                <ErrorState
+                  message={searchError}
+                  onRetry={() => void doSearch()}
+                />
+              ) : searching ? (
+                <LoadingState label="Searching Tidal" />
+              ) : results ? (
                 <div className="space-y-8">
                   {/* Artists */}
                   {(results.artists ?? []).length > 0 && (
@@ -1009,7 +1132,7 @@ export function DownloadPage() {
                         {results.tracks!.map((track) => (
                           <div
                             key={track.id}
-                            className="group flex items-center gap-3 rounded-md px-3 py-2 transition-colors pointer-fine:hover:bg-accent-action/[0.04]"
+                            className="group flex items-center gap-3 rounded-md px-3 py-2 transition-colors"
                           >
                             <div className="flex-1 min-w-0">
                               <div className="truncate text-sm text-text-primary">
@@ -1025,7 +1148,7 @@ export function DownloadPage() {
                             <ActionIconButton
                               title="Add to wishlist"
                               aria-label={`Add ${track.title} to wishlist`}
-                              className="text-text-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                              className="text-text-muted pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
                               onClick={() =>
                                 addToWishlist({
                                   url: track.url,
@@ -1092,7 +1215,12 @@ export function DownloadPage() {
 
             <TabsContent value="soulseek" className="mt-0">
               <div>
-                {soulseekResults && soulseekResults.length > 0 ? (
+                {soulseekError ? (
+                  <ErrorState
+                    message={soulseekError}
+                    onRetry={() => void doSearch()}
+                  />
+                ) : soulseekResults && soulseekResults.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                     {soulseekResults.map((r) => (
                       <SlskResultCard
@@ -1180,15 +1308,6 @@ export function DownloadPage() {
                     : "border-border-quiet bg-canvas-surface hover:border-accent-action/50"
                 }`}
               >
-                <Upload
-                  size={22}
-                  aria-hidden="true"
-                  className={
-                    uploadDragActive
-                      ? "text-accent-action-hi"
-                      : "text-text-subtle"
-                  }
-                />
                 <label
                   htmlFor="acquisition-upload-files"
                   className="cursor-pointer text-sm font-semibold text-text-primary underline decoration-border-quiet underline-offset-4 hover:text-accent-action-hi"
@@ -1233,19 +1352,6 @@ export function DownloadPage() {
                         key={`${file.name}-${file.size}-${file.lastModified}`}
                         className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-sm text-text-secondary"
                       >
-                        {file.name.toLowerCase().endsWith(".zip") ? (
-                          <Disc3
-                            size={16}
-                            aria-hidden="true"
-                            className="shrink-0 text-accent-action-hi"
-                          />
-                        ) : (
-                          <Music
-                            size={16}
-                            aria-hidden="true"
-                            className="shrink-0 text-accent-action-hi"
-                          />
-                        )}
                         <span className="min-w-0 flex-1 truncate">
                           {file.name}
                         </span>
@@ -1280,9 +1386,7 @@ export function DownloadPage() {
               >
                 {uploading ? (
                   <Loader2 size={14} className="mr-2 animate-spin" />
-                ) : (
-                  <Upload size={14} className="mr-2" />
-                )}
+                ) : null}
                 Add to library
               </Button>
               {uploadTaskId ? (
@@ -1360,7 +1464,9 @@ export function DownloadPage() {
                 </div>
               )}
             </header>
-            {activeQueue.length === 0 && slskDownloads.length === 0 ? (
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : activeQueue.length === 0 && slskDownloads.length === 0 ? (
               <OpsSurface
                 role="status"
                 className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
@@ -1380,6 +1486,7 @@ export function DownloadPage() {
                     key={item.id}
                     item={item}
                     onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
                   />
                 ))}
                 {slskDownloads.map((d) => (
@@ -1389,9 +1496,12 @@ export function DownloadPage() {
                     key={`slsk-${d.username}-${d.artist}-${d.album}-${d.filename}`}
                     className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-4"
                   >
-                    <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border-quiet bg-canvas-surface text-text-subtle">
-                      <Music size={16} aria-hidden="true" />
-                    </div>
+                    <EntityAvatar
+                      name={d.album}
+                      alt=""
+                      shape="rounded"
+                      size="md"
+                    />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-text-primary">
                         {d.filename || d.album}
@@ -1443,13 +1553,7 @@ export function DownloadPage() {
                       >
                         {d.status}
                       </InfoBadge>
-                      {d.progress >= 100 ? (
-                        <CheckCircle2
-                          size={18}
-                          aria-label={`${d.album} download complete`}
-                          className="text-accent-action-hi flex-shrink-0"
-                        />
-                      ) : null}
+
                       {(d.status.includes("Errored") ||
                         d.status.includes("Rejected") ||
                         d.status.includes("Aborted")) && (
@@ -1497,8 +1601,8 @@ export function DownloadPage() {
                             }
                           }}
                         >
-                          <RotateCcw size={14} className="mr-1" /> Find
-                          alternate
+                          {" "}
+                          Find alternate
                         </Button>
                       )}
                     </div>
@@ -1525,14 +1629,17 @@ export function DownloadPage() {
               {wishlist.length > 0 ? (
                 <Button
                   className="min-h-11"
-                  onClick={() => wishlist.forEach((w) => promoteWishlist(w.id))}
+                  onClick={() => void promoteAllWishlist()}
+                  disabled={queueBusy.size > 0}
+                  aria-busy={queueBusy.size > 0}
                 >
-                  <Download size={14} className="mr-2" />
                   Download all ({wishlist.length})
                 </Button>
               ) : null}
             </header>
-            {wishlist.length === 0 ? (
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : wishlist.length === 0 ? (
               <OpsSurface
                 role="status"
                 className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
@@ -1552,6 +1659,7 @@ export function DownloadPage() {
                     key={item.id}
                     item={item}
                     onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
                     onPromote={promoteWishlist}
                   />
                 ))}
@@ -1571,7 +1679,9 @@ export function DownloadPage() {
                 Check completed downloads and anything that needs another try.
               </p>
             </header>
-            {history.length === 0 ? (
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : history.length === 0 ? (
               <OpsSurface
                 role="status"
                 className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
@@ -1590,6 +1700,7 @@ export function DownloadPage() {
                     key={item.id}
                     item={item}
                     onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
                   />
                 ))}
               </div>
@@ -1605,8 +1716,10 @@ function QueueRow({
   item,
   onRemove,
   onPromote,
+  busy = false,
 }: {
   item: QueueItem;
+  busy?: boolean;
   onRemove: (id: number) => void;
   onPromote?: (id: number) => void;
 }) {
@@ -1623,17 +1736,13 @@ function QueueRow({
       aria-label={item.title}
       className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-4"
     >
-      <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-border-quiet bg-canvas-surface">
-        {item.cover_url ? (
-          <img
-            src={item.cover_url}
-            alt=""
-            className="crate-media-thumbnail h-full w-full object-cover"
-          />
-        ) : (
-          <Disc3 size={18} aria-hidden="true" className="text-text-subtle" />
-        )}
-      </div>
+      <EntityAvatar
+        src={item.cover_url}
+        name={item.title}
+        alt=""
+        shape="rounded"
+        size="md"
+      />
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-text-primary">
           {item.title}
@@ -1650,16 +1759,19 @@ function QueueRow({
           {onPromote && item.status === "wishlist" ? (
             <ActionIconButton
               title={`Download ${item.title} now`}
+              disabled={busy}
+              aria-busy={busy || undefined}
               onClick={() => onPromote(item.id)}
             >
-              <ArrowUp size={15} />
+              <ArrowUp size={15} aria-hidden="true" />
             </ActionIconButton>
           ) : null}
           <ActionIconButton
             title={`Remove ${item.title} from acquisition`}
+            disabled={busy}
             onClick={() => onRemove(item.id)}
           >
-            <Trash2 size={15} />
+            <Trash2 size={15} aria-hidden="true" />
           </ActionIconButton>
         </div>
       </div>
@@ -1709,7 +1821,7 @@ function TidalArtistBrowser({
   }) => void;
   activeDownloads: Set<string>;
 }) {
-  const { data, loading } = useApi<{
+  const { data, loading, error, refetch } = useApi<{
     albums: TidalArtistAlbum[];
     artist_name: string;
   }>(`/api/tidal/artists/${artistId}/albums`);
@@ -1720,6 +1832,12 @@ function TidalArtistBrowser({
 
   return (
     <section aria-label={`${artistName} Tidal albums`} className="grid gap-4">
+      {error && data ? (
+        <OpsRefreshNotice
+          message="Could not refresh artist albums. Showing the last successful list."
+          onRetry={refetch}
+        />
+      ) : null}
       <OpsSurface
         as="div"
         className="flex flex-wrap items-center gap-3 p-3 sm:p-4"
@@ -1744,7 +1862,7 @@ function TidalArtistBrowser({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <InfoBadge>{albums.length} albums</InfoBadge>
+          {data ? <InfoBadge>{albums.length} albums</InfoBadge> : null}
           {localCount > 0 ? (
             <InfoBadge tone="accent">{localCount} in library</InfoBadge>
           ) : null}
@@ -1769,7 +1887,12 @@ function TidalArtistBrowser({
         ) : null}
       </OpsSurface>
 
-      {loading ? (
+      {error && !data ? (
+        <ErrorState
+          message="Could not load Tidal artist albums."
+          onRetry={refetch}
+        />
+      ) : loading && !data ? (
         <OpsSurface
           role="status"
           className="grid min-h-48 place-items-center px-4 py-8 text-center"
@@ -1856,6 +1979,7 @@ function TidalAlbumCard({
   const [open, setOpen] = useState(false);
   const [tracks, setTracks] = useState<TidalTrackItem[] | null>(null);
   const [loadingTracks, setLoadingTracks] = useState(false);
+  const [tracksError, setTracksError] = useState<string | null>(null);
   const isLocal = status === "local";
   const tidalTier = qualityTier(album.quality);
   const localTier = localQuality ? localQualityTier(localQuality) : 0;
@@ -1866,13 +1990,14 @@ function TidalAlbumCard({
     setOpen(true);
     if (!tracks) {
       setLoadingTracks(true);
+      setTracksError(null);
       try {
         const data = await api<{ tracks: TidalTrackItem[] }>(
           `/api/tidal/albums/${album.id}/tracks`,
         );
         setTracks(data.tracks);
       } catch {
-        setTracks([]);
+        setTracksError("Could not load album tracks.");
       } finally {
         setLoadingTracks(false);
       }
@@ -2001,6 +2126,11 @@ function TidalAlbumCard({
                   className="animate-spin text-muted-foreground"
                 />
               </div>
+            ) : tracksError ? (
+              <ErrorState
+                message={tracksError}
+                onRetry={() => void openTracklist()}
+              />
             ) : !tracks?.length ? (
               <div className="text-sm text-muted-foreground py-4 text-center">
                 No tracks found
@@ -2094,9 +2224,9 @@ function SlskResultCard({
             <ActionIconButton
               onClick={() => setOpen(true)}
               title="View files"
-              className="absolute bottom-1 right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              className="absolute bottom-1 right-1 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
             >
-              <List size={14} />
+              <List size={14} aria-hidden="true" />
             </ActionIconButton>
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
@@ -2209,8 +2339,8 @@ function SlskResultCard({
               }}
               className="w-full"
             >
-              <Download size={13} className="mr-1.5" /> Download all{" "}
-              {r.files.length} files from {r.username}
+              {" "}
+              Download all {r.files.length} files from {r.username}
             </Button>
           </div>
         </DialogContent>

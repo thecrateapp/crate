@@ -8,6 +8,31 @@ import {
 } from "./subscribe-native-player-events";
 
 describe("subscribeNativePlayerEvents", () => {
+  it("keeps playback listeners attached when an old plugin cannot subscribe to mix telemetry", async () => {
+    const removed = vi.fn();
+    const engine = {
+      on: vi.fn((event: string) =>
+        event === "mixStateChanged"
+          ? Promise.reject(new Error("unsupported"))
+          : Promise.resolve(removed),
+      ),
+    } as unknown as Pick<PlaybackEngine, "on">;
+    const handlers = Object.fromEntries(
+      [...NATIVE_PLAYER_EVENT_NAMES, "mixStateChanged"].map((event) => [
+        event,
+        vi.fn(),
+      ]),
+    ) as unknown as NativePlayerEventHandlers;
+    const subscription = subscribeNativePlayerEvents(engine, handlers);
+    await expect(subscription.ready).resolves.toBeUndefined();
+    expect(engine.on).toHaveBeenCalledWith(
+      "mixStateChanged",
+      handlers["mixStateChanged" as keyof NativePlayerEventHandlers],
+    );
+    expect(removed).not.toHaveBeenCalled();
+    subscription.dispose();
+    expect(removed).toHaveBeenCalled();
+  });
   it("removes listeners that resolve after the subscription is disposed", async () => {
     const removers = NATIVE_PLAYER_EVENT_NAMES.map(() => vi.fn());
     let resolveFirstListener: (() => void) | undefined;

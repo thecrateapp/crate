@@ -28,14 +28,14 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   useCallback,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
+  cloneElement,
+  type ReactElement,
 } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -45,6 +45,14 @@ import {
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { PlaylistTrackRequirements } from "@/components/playlists/PlaylistTrackRequirements";
+import {
+  validateFeaturedRank,
+  validatePlaylistCreation,
+  type CreationErrors,
+} from "@/components/playlists/playlist-creation-validation";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
@@ -52,6 +60,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { api } from "@/lib/api";
+import { useApi } from "@/hooks/use-api";
 import { timeAgo } from "@/lib/utils";
 
 interface SystemPlaylist {
@@ -71,13 +80,6 @@ interface SystemPlaylist {
   total_duration: number;
   generation_status?: string;
   last_generated_at?: string | null;
-}
-
-function ruleHasValue(rule: DraftSmartRule): boolean {
-  if (rule.op === "between") {
-    return rule.rangeMin.trim() !== "" || rule.rangeMax.trim() !== "";
-  }
-  return rule.value.trim() !== "";
 }
 
 interface FilterOptions {
@@ -203,18 +205,35 @@ function formatPlaylistDuration(totalSeconds: number): string {
 
 function Field({
   label,
+  id,
   className = "",
+  error,
   children,
 }: {
   label: string;
+  id?: string;
   className?: string;
-  children: ReactNode;
+  error?: string;
+  children: ReactElement<{
+    "aria-label"?: string;
+    "aria-labelledby"?: string;
+    "aria-invalid"?: boolean;
+    "aria-describedby"?: string;
+    id?: string;
+  }>;
 }) {
   return (
-    <div className={cn("crate-form-field", className)}>
-      <MonoLabel as="span">{label}</MonoLabel>
-      {children}
-    </div>
+    <FormField id={id} label={label} className={className} error={error}>
+      {(control) =>
+        cloneElement(children, {
+          ...control,
+          "aria-labelledby":
+            children.type === AdminSelect
+              ? undefined
+              : control["aria-labelledby"],
+        })
+      }
+    </FormField>
   );
 }
 
@@ -238,20 +257,23 @@ export function Playlists() {
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SystemPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<FilterMode>("all");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [composerMode, setComposerMode] = useState<ComposerMode>(null);
   const [deleteTarget, setDeleteTarget] = useState<SystemPlaylist | null>(null);
+  const [deleteError, setDeleteError] = useState(false);
 
   const fetchPlaylists = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await api<SystemPlaylist[]>("/api/admin/system-playlists");
       setPlaylists(Array.isArray(data) ? data : []);
     } catch {
-      setPlaylists([]);
+      setLoadError(true);
       toast.error("Failed to load system playlists");
     } finally {
       setLoading(false);
@@ -333,14 +355,11 @@ export function Playlists() {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    try {
-      await api(`/api/admin/system-playlists/${deleteTarget.id}`, "DELETE");
-      toast.success(`Deleted "${deleteTarget.name}"`);
-      setDeleteTarget(null);
-      void fetchPlaylists();
-    } catch {
-      toast.error("Failed to delete system playlist");
-    }
+    setDeleteError(false);
+    await api(`/api/admin/system-playlists/${deleteTarget.id}`, "DELETE");
+    toast.success(`Deleted "${deleteTarget.name}"`);
+    setDeleteTarget(null);
+    void fetchPlaylists();
   }
 
   async function toggleActive(playlist: SystemPlaylist) {
@@ -492,6 +511,14 @@ export function Playlists() {
         />
       ) : null}
 
+      {!loading && loadError && playlists.length > 0 ? (
+        <ErrorState
+          message="System playlists could not be refreshed. Showing the last successful results."
+          onRetry={() => void fetchPlaylists()}
+          retryLabel="Retry playlists"
+        />
+      ) : null}
+
       {loading ? (
         <div
           role="status"
@@ -506,6 +533,12 @@ export function Playlists() {
           />{" "}
           Loading playlists…
         </div>
+      ) : loadError && playlists.length === 0 ? (
+        <ErrorState
+          message="System playlists could not be loaded."
+          onRetry={() => void fetchPlaylists()}
+          retryLabel="Retry playlists"
+        />
       ) : filteredPlaylists.length === 0 ? (
         <Card className="p-10 text-center">
           <h2 className="text-lg font-medium font-display">
@@ -517,192 +550,196 @@ export function Playlists() {
           </p>
         </Card>
       ) : (
-        <HairlineList
-          as="ul"
-          label="System playlists"
-          className="mt-3 space-y-4"
-        >
-          {visiblePlaylists.map((playlist) => (
-            <HairlineRow
-              key={playlist.id}
-              truncate={false}
-              className="items-stretch gap-2 py-0 md:gap-4"
-              trailing={
-                <div className="flex h-full shrink-0 items-center">
-                  <div className="hidden md:flex">
-                    <PageHeaderActions label={`Actions for ${playlist.name}`}>
-                      <PageHeaderAction
-                        label={`Edit ${playlist.name}`}
-                        tooltip="Edit"
-                        onClick={() => navigate(`/playlists/${playlist.id}`)}
-                      >
-                        <Pencil
-                          data-admin-ux="playlists-open-editor"
-                          aria-hidden="true"
-                        />
-                      </PageHeaderAction>
-                      <PageHeaderAction
-                        label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
-                        tooltip={playlist.is_active ? "Deactivate" : "Activate"}
-                        onClick={() => void toggleActive(playlist)}
-                      >
-                        {playlist.is_active ? (
-                          <PowerOff
-                            data-admin-ux="playlists-deactivate"
+        <>
+          <HairlineList
+            as="ul"
+            label="System playlists"
+            className="mt-3 space-y-4"
+          >
+            {visiblePlaylists.map((playlist) => (
+              <HairlineRow
+                key={playlist.id}
+                truncate={false}
+                className="items-stretch gap-2 py-0 md:gap-4"
+                trailing={
+                  <div className="flex h-full shrink-0 items-center">
+                    <div className="hidden md:flex">
+                      <PageHeaderActions label={`Actions for ${playlist.name}`}>
+                        <PageHeaderAction
+                          label={`Edit ${playlist.name}`}
+                          tooltip="Edit"
+                          onClick={() => navigate(`/playlists/${playlist.id}`)}
+                        >
+                          <Pencil
+                            data-admin-ux="playlists-open-editor"
                             aria-hidden="true"
                           />
-                        ) : (
-                          <Power
-                            data-admin-ux="playlists-activate"
-                            aria-hidden="true"
-                          />
-                        )}
-                      </PageHeaderAction>
-                      <PageHeaderAction
-                        label={`Delete ${playlist.name}`}
-                        tooltip="Delete"
-                        onClick={() => setDeleteTarget(playlist)}
-                      >
-                        <Trash2
-                          data-admin-ux="playlists-delete"
-                          aria-hidden="true"
-                        />
-                      </PageHeaderAction>
-                    </PageHeaderActions>
-                  </div>
-                  <div className="md:hidden">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Actions for ${playlist.name}`}
-                          className="size-11"
-                        >
-                          <MoreHorizontal aria-hidden="true" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => navigate(`/playlists/${playlist.id}`)}
-                        >
-                          <Pencil aria-hidden="true" /> Edit playlist
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => void toggleActive(playlist)}
+                        </PageHeaderAction>
+                        <PageHeaderAction
+                          label={`${playlist.is_active ? "Deactivate" : "Activate"} ${playlist.name}`}
+                          tooltip={
+                            playlist.is_active ? "Deactivate" : "Activate"
+                          }
+                          onClick={() => void toggleActive(playlist)}
                         >
                           {playlist.is_active ? (
-                            <PowerOff aria-hidden="true" />
+                            <PowerOff
+                              data-admin-ux="playlists-deactivate"
+                              aria-hidden="true"
+                            />
                           ) : (
-                            <Power aria-hidden="true" />
+                            <Power
+                              data-admin-ux="playlists-activate"
+                              aria-hidden="true"
+                            />
                           )}
-                          {playlist.is_active ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onSelect={() => setDeleteTarget(playlist)}
+                        </PageHeaderAction>
+                        <PageHeaderAction
+                          label={`Delete ${playlist.name}`}
+                          tooltip="Delete"
+                          onClick={() => setDeleteTarget(playlist)}
                         >
-                          <Trash2 aria-hidden="true" /> Delete playlist
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              }
-            >
-              <Link
-                to={`/playlists/${playlist.id}`}
-                aria-label={`Open ${playlist.name}`}
-                className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 py-0 md:min-h-44 md:gap-4"
-              >
-                <div
-                  data-slot="playlist-row-content"
-                  className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 md:min-h-44 md:gap-4"
-                >
-                  <PlaylistArtwork
-                    name={playlist.name}
-                    coverDataUrl={playlist.cover_data_url}
-                    tracks={playlist.artwork_tracks}
-                    className="size-28 shrink-0 self-stretch rounded-sm border border-border-quiet bg-canvas-surface object-cover md:size-44"
-                  />
-
-                  <div
-                    data-slot="playlist-row-information"
-                    className="flex min-h-28 min-w-0 flex-1 flex-col justify-between gap-2 py-0 md:min-h-44 md:py-2"
-                  >
-                    <div className="grid min-w-0 gap-2">
-                      <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
-                        <InfoBadge
-                          active={playlist.generation_mode === "smart"}
-                        >
-                          {playlist.generation_mode}
-                        </InfoBadge>
-                        <InfoBadge active={playlist.is_curated}>
-                          {playlist.is_curated ? "curated" : "internal"}
-                        </InfoBadge>
-                        <InfoBadge active={playlist.is_active}>
-                          {playlist.is_active ? "active" : "inactive"}
-                        </InfoBadge>
-                        {playlist.generation_mode === "smart" ? (
-                          <InfoBadge active={playlist.auto_refresh_enabled}>
-                            auto-refresh
-                          </InfoBadge>
-                        ) : null}
-                        {playlist.generation_status === "running" ||
-                        playlist.generation_status === "queued" ||
-                        playlist.generation_status === "failed" ? (
-                          <InfoBadge
-                            tone={
-                              playlist.generation_status === "failed"
-                                ? "danger"
-                                : playlist.generation_status === "queued"
-                                  ? "warning"
-                                  : "info"
+                          <Trash2
+                            data-admin-ux="playlists-delete"
+                            aria-hidden="true"
+                          />
+                        </PageHeaderAction>
+                      </PageHeaderActions>
+                    </div>
+                    <div className="md:hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Actions for ${playlist.name}`}
+                            className="size-11"
+                          >
+                            <MoreHorizontal
+                              data-admin-ux="playlists-mobile-actions"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              navigate(`/playlists/${playlist.id}`)
                             }
                           >
-                            {playlist.generation_status === "running"
-                              ? "generating"
-                              : playlist.generation_status}
+                            Edit playlist
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => void toggleActive(playlist)}
+                          >
+                            {playlist.is_active ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={() => setDeleteTarget(playlist)}
+                          >
+                            Delete playlist
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                }
+              >
+                <Link
+                  to={`/playlists/${playlist.id}`}
+                  aria-label={`Open ${playlist.name}`}
+                  className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 py-0 md:min-h-44 md:gap-4"
+                >
+                  <div
+                    data-slot="playlist-row-content"
+                    className="flex min-h-28 min-w-0 flex-1 items-stretch gap-2 md:min-h-44 md:gap-4"
+                  >
+                    <PlaylistArtwork
+                      name={playlist.name}
+                      coverDataUrl={playlist.cover_data_url}
+                      tracks={playlist.artwork_tracks}
+                      className="size-28 shrink-0 self-stretch rounded-sm border border-border-quiet bg-canvas-surface object-cover md:size-44"
+                    />
+
+                    <div
+                      data-slot="playlist-row-information"
+                      className="flex min-h-28 min-w-0 flex-1 flex-col justify-between gap-2 py-0 md:min-h-44 md:py-2"
+                    >
+                      <div className="grid min-w-0 gap-2">
+                        <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+                          <InfoBadge
+                            active={playlist.generation_mode === "smart"}
+                          >
+                            {playlist.generation_mode}
+                          </InfoBadge>
+                          <InfoBadge active={playlist.is_curated}>
+                            {playlist.is_curated ? "curated" : "internal"}
+                          </InfoBadge>
+                          <InfoBadge active={playlist.is_active}>
+                            {playlist.is_active ? "active" : "inactive"}
+                          </InfoBadge>
+                          {playlist.generation_mode === "smart" ? (
+                            <InfoBadge active={playlist.auto_refresh_enabled}>
+                              auto-refresh
+                            </InfoBadge>
+                          ) : null}
+                          {playlist.generation_status === "running" ||
+                          playlist.generation_status === "queued" ||
+                          playlist.generation_status === "failed" ? (
+                            <InfoBadge
+                              tone={
+                                playlist.generation_status === "failed"
+                                  ? "danger"
+                                  : playlist.generation_status === "queued"
+                                    ? "warning"
+                                    : "info"
+                              }
+                            >
+                              {playlist.generation_status === "running"
+                                ? "generating"
+                                : playlist.generation_status}
+                            </InfoBadge>
+                          ) : null}
+                        </div>
+                        <div className="grid min-w-0 gap-1">
+                          <h2 className="m-0 truncate font-display text-base font-semibold text-text-primary md:text-lg">
+                            {playlist.name}
+                          </h2>
+                          <p className="m-0 line-clamp-1 text-sm leading-5 text-text-muted md:line-clamp-2">
+                            {playlist.description ||
+                              "No editorial description yet."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+                        <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+                        <InfoBadge>
+                          {formatPlaylistDuration(playlist.total_duration)}
+                        </InfoBadge>
+                        <InfoBadge>
+                          {playlist.follower_count ?? 0} follower
+                          {playlist.follower_count === 1 ? "" : "s"}
+                        </InfoBadge>
+                        {playlist.category ? (
+                          <InfoBadge>{playlist.category}</InfoBadge>
+                        ) : null}
+                        {playlist.featured_rank != null ? (
+                          <InfoBadge>Rank {playlist.featured_rank}</InfoBadge>
+                        ) : null}
+                        {playlist.last_generated_at ? (
+                          <InfoBadge>
+                            Generated {timeAgo(playlist.last_generated_at)}
                           </InfoBadge>
                         ) : null}
                       </div>
-                      <div className="grid min-w-0 gap-1">
-                        <h2 className="m-0 truncate font-display text-base font-semibold text-text-primary md:text-lg">
-                          {playlist.name}
-                        </h2>
-                        <p className="m-0 line-clamp-1 text-sm leading-5 text-text-muted md:line-clamp-2">
-                          {playlist.description ||
-                            "No editorial description yet."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
-                      <InfoBadge>{playlist.track_count} tracks</InfoBadge>
-                      <InfoBadge>
-                        {formatPlaylistDuration(playlist.total_duration)}
-                      </InfoBadge>
-                      <InfoBadge>
-                        {playlist.follower_count ?? 0} follower
-                        {playlist.follower_count === 1 ? "" : "s"}
-                      </InfoBadge>
-                      {playlist.category ? (
-                        <InfoBadge>{playlist.category}</InfoBadge>
-                      ) : null}
-                      {playlist.featured_rank != null ? (
-                        <InfoBadge>Rank {playlist.featured_rank}</InfoBadge>
-                      ) : null}
-                      {playlist.last_generated_at ? (
-                        <InfoBadge>
-                          Generated {timeAgo(playlist.last_generated_at)}
-                        </InfoBadge>
-                      ) : null}
                     </div>
                   </div>
-                </div>
-              </Link>
-            </HairlineRow>
-          ))}
-        </HairlineList>
+                </Link>
+              </HairlineRow>
+            ))}
+          </HairlineList>
+        </>
       )}
 
       {!loading && filteredPlaylists.length > 0 ? (
@@ -717,14 +754,26 @@ export function Playlists() {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(false);
+          }
+        }}
         title="Delete system playlist"
         description={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
-        onConfirm={() => {
-          void handleDelete();
+        onConfirm={handleDelete}
+        onError={() => {
+          setDeleteError(true);
+          toast.error("Failed to delete system playlist");
         }}
+        body={
+          deleteError ? (
+            <ErrorState message="Playlist could not be deleted. Try again." />
+          ) : undefined
+        }
         eyebrow="Confirm action"
         consequence={`${deleteTarget?.name ?? "Playlist"} · ${
           deleteTarget?.track_count ?? 0
@@ -748,9 +797,13 @@ function CreateStaticPlaylistPanel({
   const [isCurated, setIsCurated] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [rankError, setRankError] = useState<string>();
 
   async function submit() {
     if (!name.trim()) return;
+    const rank = validateFeaturedRank(featuredRank);
+    setRankError(rank.error);
+    if (rank.error) return;
     setSaving(true);
     try {
       const playlist = await api<SystemPlaylist>(
@@ -760,7 +813,7 @@ function CreateStaticPlaylistPanel({
           name: name.trim(),
           description: description.trim(),
           category,
-          featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
+          featured_rank: rank.value,
           generation_mode: "static",
           is_curated: isCurated,
           is_active: isActive,
@@ -840,7 +893,7 @@ function CreateStaticPlaylistPanel({
               triggerClassName="w-full max-w-none"
             />
           </Field>
-          <Field label="Featured rank">
+          <Field label="Featured rank" error={rankError}>
             <Input
               type="number"
               aria-label="Featured rank"
@@ -905,6 +958,7 @@ function CreateSmartPlaylistPanel({
   const [isCurated, setIsCurated] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [requireFullMixProfile, setRequireFullMixProfile] = useState(false);
   const [rules, setRules] = useState<DraftSmartRule[]>([
     { field: "genre", op: "contains", value: "", rangeMin: "", rangeMax: "" },
   ]);
@@ -912,15 +966,16 @@ function CreateSmartPlaylistPanel({
   const [match, setMatch] = useState<"all" | "any">("all");
   const [sort, setSort] = useState("random");
   const [saving, setSaving] = useState(false);
-  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
-    null,
+  const {
+    data: filterOptions,
+    loading: optionsLoading,
+    error: optionsError,
+    refetch: refetchOptions,
+  } = useApi<FilterOptions>("/api/playlists/filter-options");
+  const [errors, setErrors] = useState<CreationErrors>({ byRule: {} });
+  const needsOptions = rules.some((rule) =>
+    Boolean(DROPDOWN_FIELDS[rule.field]),
   );
-
-  useEffect(() => {
-    api<FilterOptions>("/api/playlists/filter-options")
-      .then(setFilterOptions)
-      .catch(() => {});
-  }, []);
 
   function updateRule(index: number, patch: Partial<DraftSmartRule>) {
     setRules((current) =>
@@ -956,42 +1011,9 @@ function CreateSmartPlaylistPanel({
 
   async function submit() {
     if (!name.trim()) return;
-    const payloadRules = rules.reduce<
-      Array<{
-        field: string;
-        op: string;
-        value: string | number | [number, number];
-      }>
-    >((payloadRules, rule) => {
-      if (!ruleHasValue(rule)) return payloadRules;
-      if (rule.op === "between") {
-        const min = rule.rangeMin.trim() ? Number(rule.rangeMin) : 0;
-        const max = rule.rangeMax.trim() ? Number(rule.rangeMax) : 9999;
-        payloadRules.push({
-          field: rule.field,
-          op: "between",
-          value: [min, max],
-        });
-      } else if (getFieldType(rule.field) === "number") {
-        payloadRules.push({
-          field: rule.field,
-          op: rule.op,
-          value: Number(rule.value),
-        });
-      } else {
-        payloadRules.push({
-          field: rule.field,
-          op: rule.op,
-          value: rule.value.trim(),
-        });
-      }
-      return payloadRules;
-    }, []);
-
-    if (payloadRules.length === 0) {
-      toast.error("Add at least one smart rule");
-      return;
-    }
+    const validation = validatePlaylistCreation({ rules, limit, featuredRank });
+    setErrors(validation.errors);
+    if (!validation.valid || (needsOptions && !filterOptions)) return;
 
     setSaving(true);
     try {
@@ -1002,16 +1024,19 @@ function CreateSmartPlaylistPanel({
           name: name.trim(),
           description: description.trim(),
           category,
-          featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
+          featured_rank: validation.featuredRank,
           generation_mode: "smart",
           is_curated: isCurated,
           is_active: isActive,
           auto_refresh_enabled: autoRefreshEnabled,
           smart_rules: {
             match,
-            rules: payloadRules,
-            limit: Number(limit) || 50,
+            rules: validation.rules,
+            limit: validation.limit,
             sort,
+            ...(requireFullMixProfile
+              ? { require_full_mix_profile: true }
+              : {}),
           },
         },
       );
@@ -1094,7 +1119,7 @@ function CreateSmartPlaylistPanel({
               triggerClassName="w-full max-w-none"
             />
           </Field>
-          <Field label="Featured rank">
+          <Field label="Featured rank" error={errors.featuredRank}>
             <Input
               type="number"
               aria-label="Featured rank"
@@ -1139,7 +1164,7 @@ function CreateSmartPlaylistPanel({
                   triggerClassName="w-full max-w-none"
                 />
               </Field>
-              <Field label="Limit" className="w-[120px]">
+              <Field label="Limit" className="w-[120px]" error={errors.limit}>
                 <Input
                   type="number"
                   min={1}
@@ -1162,6 +1187,32 @@ function CreateSmartPlaylistPanel({
             </div>
           </div>
 
+          <PlaylistTrackRequirements
+            className="mb-4"
+            value={requireFullMixProfile}
+            onChange={setRequireFullMixProfile}
+            disabled={saving}
+          />
+
+          {!filterOptions && optionsLoading ? (
+            <LoadingState label="Loading rule options" />
+          ) : null}
+          {optionsError ? (
+            <ErrorState
+              message={
+                filterOptions
+                  ? "Rule options could not be refreshed. Showing the last loaded options."
+                  : "Rule options could not be loaded."
+              }
+              onRetry={() => void refetchOptions()}
+              retryLabel="Retry rule options"
+            />
+          ) : null}
+          {errors.rules ? (
+            <p role="alert" className="mb-3 text-sm text-state-warning-text">
+              {errors.rules}
+            </p>
+          ) : null}
           <div className="space-y-3">
             {rules.map((rule, index) => {
               const ops = getOpsForField(rule.field);
@@ -1226,12 +1277,24 @@ function CreateSmartPlaylistPanel({
                       />
                     </Field>
 
-                    <Field label="Value">
+                    <Field
+                      id={`playlist-rule-${index}`}
+                      label="Value"
+                      error={errors.byRule[index]}
+                    >
                       {rule.op === "between" ? (
                         <div className="grid gap-3 sm:grid-cols-2">
                           <Input
                             type="number"
                             aria-label="Minimum"
+                            aria-invalid={
+                              Boolean(errors.byRule[index]) || undefined
+                            }
+                            aria-describedby={
+                              errors.byRule[index]
+                                ? `playlist-rule-${index}-error`
+                                : undefined
+                            }
                             value={rule.rangeMin}
                             onChange={(event) =>
                               updateRule(index, {
@@ -1243,6 +1306,14 @@ function CreateSmartPlaylistPanel({
                           <Input
                             type="number"
                             aria-label="Maximum"
+                            aria-invalid={
+                              Boolean(errors.byRule[index]) || undefined
+                            }
+                            aria-describedby={
+                              errors.byRule[index]
+                                ? `playlist-rule-${index}-error`
+                                : undefined
+                            }
                             value={rule.rangeMax}
                             onChange={(event) =>
                               updateRule(index, {
@@ -1258,6 +1329,7 @@ function CreateSmartPlaylistPanel({
                           onChange={(value) => updateRule(index, { value })}
                           options={dropdownOptions}
                           placeholder={dropdownConfig.placeholder}
+                          disabled={!filterOptions || saving}
                           searchable
                           searchPlaceholder={dropdownConfig.searchPlaceholder}
                           allowClear={false}
@@ -1290,6 +1362,7 @@ function CreateSmartPlaylistPanel({
               size="sm"
               className="min-h-11"
               onClick={addRule}
+              disabled={rules.length >= 12 || saving}
             >
               Add rule
             </Button>
@@ -1308,7 +1381,9 @@ function CreateSmartPlaylistPanel({
             <Button
               className="min-h-11"
               onClick={submit}
-              disabled={saving || !name.trim()}
+              disabled={
+                saving || !name.trim() || (needsOptions && !filterOptions)
+              }
             >
               {saving ? (
                 <Loader2

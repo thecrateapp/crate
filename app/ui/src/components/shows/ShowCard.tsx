@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ExternalLink, X } from "lucide-react";
+import { ExternalLink, X, UserRound, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
+import {
+  ActionButton,
+  ActionGroup,
+  ActionLink,
+} from "@crate/ui/primitives/ActionGroup";
 
 import {
   artistBackgroundApiUrl,
@@ -367,37 +375,6 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
   );
 }
 
-function ActionButton({
-  href,
-  label,
-  tone = "neutral",
-}: {
-  href?: string;
-  label: string;
-  tone?: "neutral" | "primary";
-}) {
-  if (!href) return null;
-
-  return (
-    <a
-      href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-      className={cn(
-        "flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border py-2.5 text-[11px] font-semibold transition-colors",
-        tone === "primary"
-          ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/18"
-          : "border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary",
-      )}
-    >
-      {label}
-      {href.startsWith("http") ? (
-        <span className="h-[5px] w-[5px] rounded-full bg-accent-action" />
-      ) : null}
-    </a>
-  );
-}
-
 function ExpandedShowCardBody({
   show,
   closeable,
@@ -412,9 +389,7 @@ function ExpandedShowCardBody({
   const { dateLabel, timeLabel } = formatDateParts(
     show.date,
     show.time,
-  ) as ReturnType<typeof formatDateParts> & {
-    timeLabel?: string;
-  };
+  ) as ReturnType<typeof formatDateParts> & { timeLabel?: string };
   const support = show.lineupArtists.slice(1);
   const locationLabel = [show.city, show.region, show.country]
     .filter(Boolean)
@@ -423,125 +398,87 @@ function ExpandedShowCardBody({
     .filter(Boolean)
     .join(" · ");
   const artistHref = getArtistLink(show.primaryArtist);
+  const name = show.primaryArtist?.name ?? show.title;
 
   return (
-    <div className="relative flex h-full flex-col">
-      <div className="absolute inset-0 overflow-hidden">
-        {show.backgroundUrl ? (
-          <img
-            src={show.backgroundUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover brightness-[0.4] saturate-[0.7]"
-            onError={(event) => {
-              (event.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent" />
-      </div>
-
-      <div className="relative h-[136px] flex-shrink-0">
+    <article
+      className="flex min-w-0 flex-col gap-4 p-4"
+      aria-label={`${name} show preview`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <MonoLabel as="div" tone="accent" meta={[dateLabel, timeLabel]} />
         {closeable ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-md border border-border-quiet bg-surface-canvas text-text-muted transition-colors hover:border-accent-action-hi hover:text-accent-action-hi"
-            aria-label="Close show details"
-          >
-            <X data-admin-ux="show-close" aria-hidden="true" size={14} />
-          </button>
+          <ActionGroup label="Close show preview">
+            <ActionButton label="Close show details" onClick={onClose}>
+              <X
+                data-admin-ux="show-close"
+                aria-hidden="true"
+                size={CRATE_ICON_SIZE.md}
+              />
+            </ActionButton>
+          </ActionGroup>
         ) : null}
-
-        <div className="absolute right-3 top-2.5 z-10 text-right">
-          <div className="font-mono text-[10px] font-normal tracking-wide text-primary/70">
-            {dateLabel}
-          </div>
-          {timeLabel ? (
-            <div className="font-mono font-normal text-[10px] text-white/40">
-              {timeLabel}
-            </div>
+      </div>
+      <div className="flex min-w-0 items-center gap-3">
+        <MediaCover
+          src={show.coverUrl || show.artistPhotoUrl || show.backgroundUrl}
+          alt={name}
+          className="size-16 shrink-0"
+        />
+        <div className="min-w-0">
+          <h3 className="break-words font-display text-2xl font-bold leading-tight text-text-primary">
+            {artistHref ? (
+              <Link to={artistHref} className="hover:text-accent-action-hi">
+                {name}
+              </Link>
+            ) : (
+              name
+            )}
+          </h3>
+          {support.length > 0 ? (
+            <p className="m-0 mt-1 text-sm text-text-muted">
+              With{" "}
+              {support
+                .slice(0, 4)
+                .map((artist) => artist.name)
+                .join(" · ")}
+              {support.length > 4 ? ` +${support.length - 4}` : ""}
+            </p>
           ) : null}
         </div>
-
-        <div className="absolute bottom-3 left-3 right-3 z-10">
-          <div className="flex items-center gap-2">
-            {show.artistPhotoUrl ? (
-              <img
-                src={show.artistPhotoUrl}
-                alt=""
-                className="crate-media-thumbnail h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"
-                onError={(event) => {
-                  (event.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            ) : null}
-            <div className="min-w-0">
-              {artistHref ? (
-                <Link
-                  to={artistHref}
-                  data-slot="entity-title"
-                  className="block truncate font-display text-sm font-bold text-white transition-colors hover:text-primary"
-                >
-                  {show.primaryArtist?.name ?? show.title}
-                </Link>
-              ) : (
-                <div
-                  data-slot="entity-title"
-                  className="truncate font-display text-sm font-bold text-white"
-                >
-                  {show.primaryArtist?.name ?? show.title}
-                </div>
-              )}
-              {support.length > 0 ? (
-                <div className="truncate text-[10px] text-white/40">
-                  w/{" "}
-                  {support
-                    .slice(0, 4)
-                    .map((artist) => artist.name)
-                    .join(" · ")}
-                  {support.length > 4 ? ` +${support.length - 4}` : ""}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
       </div>
-
-      <div className="relative flex-1 px-3 pb-3 pt-2.5">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-          <div className="min-w-0">
-            <span className="font-medium text-white/70">{show.venue}</span>
-            {addressLabel ? (
-              <span className="text-white/40"> · {addressLabel}</span>
-            ) : null}
-            {locationLabel ? (
-              <div className="text-white/40">{locationLabel}</div>
-            ) : null}
-          </div>
-        </div>
-
-        {show.genres.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {show.genres.slice(0, 3).map((genre) => (
-              <span
-                key={genre}
-                className="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/40"
-              >
-                {genre}
-              </span>
-            ))}
-          </div>
+      <MonoLabel as="div" meta={[show.venue, addressLabel, locationLabel]} />
+      <GenrePillRow
+        items={show.genres.map((genre) => ({ name: genre }))}
+        max={3}
+      />
+      <ActionGroup label="Show preview actions">
+        {artistHref ? (
+          <ActionLink href={artistHref} label="Open artist">
+            <UserRound
+              data-admin-ux="show-preview-open-artist"
+              aria-hidden="true"
+              size={CRATE_ICON_SIZE.md}
+            />
+          </ActionLink>
         ) : null}
-
-        <div className="mt-3 flex gap-2">
-          <ActionButton href={artistHref} label="Open Artist" />
-          <ActionButton href={show.url} label="Get Tickets" tone="primary" />
-        </div>
-        {actions ? (
-          <div className="mt-2 flex flex-wrap gap-2">{actions}</div>
+        {show.url ? (
+          <ActionLink
+            href={show.url}
+            label="Get tickets"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ExternalLink
+              data-admin-ux="show-preview-tickets"
+              aria-hidden="true"
+              size={CRATE_ICON_SIZE.md}
+            />
+          </ActionLink>
         ) : null}
-      </div>
-    </div>
+      </ActionGroup>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+    </article>
   );
 }
 

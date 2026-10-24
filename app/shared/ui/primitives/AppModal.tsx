@@ -17,6 +17,7 @@ import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
 import { acquireBodyScrollLock } from "@crate/ui/lib/body-scroll-lock";
 import { cn } from "@crate/ui/lib/cn";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
 export type AppModalSize = "sm" | "md" | "lg" | "xl";
@@ -59,35 +60,7 @@ interface ModalSectionProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
-
 const ModalDepth = createContext(0);
-
-function topModal(doc: Document) {
-  const panels = Array.from(
-    doc.querySelectorAll<HTMLElement>("[data-app-modal-panel]"),
-  ).sort((a, b) => Number(a.dataset.modalDepth) - Number(b.dataset.modalDepth));
-  return panels[panels.length - 1];
-}
-
-function focusableElements(panel: HTMLElement) {
-  return Array.from(
-    panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-  ).filter(
-    (element) =>
-      !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
-      element.getAttribute("type") !== "hidden" &&
-      getComputedStyle(element).display !== "none" &&
-      getComputedStyle(element).visibility !== "hidden",
-  );
-}
 
 export function AppModal({
   open,
@@ -125,7 +98,15 @@ export function AppModal({
   const resolvedMaxWidthClassName =
     maxWidthClassName ??
     (size ? MODAL_SIZE_CLASS_NAMES[size] : DEFAULT_MAX_WIDTH_CLASS_NAME);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  useModalFocus({
+    active: open,
+    panelRef,
+    onEscape: (event) => {
+      if (!closeOnEscape) return;
+      event.preventDefault();
+      onClose();
+    },
+  });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -134,83 +115,8 @@ export function AppModal({
       ? acquireBodyScrollLock(document)
       : undefined;
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      const panel = panelRef.current;
-      if (
-        !panel ||
-        topModal(document) !== panel ||
-        event.defaultPrevented ||
-        event.isComposing
-      )
-        return;
-      if (event.key === "Escape" && closeOnEscape) {
-        event.preventDefault();
-        onClose();
-      }
-      if (event.key !== "Tab") return;
-      const focusable = focusableElements(panel);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) return;
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || active === panel)) {
-        event.preventDefault();
-        last.focus();
-        return;
-      }
-      if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      releaseScrollLock?.();
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [closeOnEscape, lockBodyScroll, onClose, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const frame = window.requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (!panel || topModal(document) !== panel) return;
-      const activeElement = document.activeElement;
-      if (
-        activeElement instanceof HTMLElement &&
-        panel.contains(activeElement)
-      ) {
-        return;
-      }
-      const firstFocusable = focusableElements(panel)[0];
-      (firstFocusable ?? panel).focus();
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      const previous = previouslyFocusedElementRef.current;
-      const remaining = topModal(document);
-      if (
-        previous &&
-        document.contains(previous) &&
-        (!remaining ||
-          remaining === panelRef.current ||
-          remaining.contains(previous))
-      ) {
-        previous.focus();
-      }
-      previouslyFocusedElementRef.current = null;
-    };
-  }, [open]);
+    return () => releaseScrollLock?.();
+  }, [lockBodyScroll, open]);
 
   const [isEntering, setIsEntering] = useState(open);
   const [isDragClosing, setIsDragClosing] = useState(false);

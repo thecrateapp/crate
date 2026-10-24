@@ -13,8 +13,13 @@ it("uses matching input and action columns for probe and pairing", () => {
 
   const probeInput = screen.getByLabelText("Probe URL");
   const pairingInput = screen.getByLabelText("Pairing URL");
-  const probeRow = probeInput.parentElement;
-  const pairingRow = pairingInput.parentElement;
+  expect(screen.getByRole("heading", { name: "Pairing" })).toHaveClass(
+    "crate-mono-label",
+  );
+  expect(probeInput.closest("[data-slot=form-field]")).not.toBeNull();
+  expect(pairingInput.closest("[data-slot=form-field]")).not.toBeNull();
+  const probeRow = probeInput.closest("[data-slot=pairing-input-row]");
+  const pairingRow = pairingInput.closest("[data-slot=pairing-input-row]");
 
   expect(probeRow).toHaveClass("grid-cols-[minmax(0,1fr)_5rem]");
   expect(pairingRow).toHaveClass("grid-cols-[minmax(0,1fr)_5rem]");

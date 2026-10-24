@@ -9,6 +9,10 @@ import {
   useEffect,
   useCallback,
   useRef,
+  Children,
+  cloneElement,
+  isValidElement,
+  type ComponentProps,
   type ReactNode,
 } from "react";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
@@ -18,6 +22,8 @@ import { Input } from "@crate/ui/shadcn/input";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import {
   Tabs,
   TabsContent,
@@ -43,20 +49,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 import { toast } from "sonner";
-import {
-  Loader2,
-  Save,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
-  Play,
-  Wifi,
-  X,
-  Plus,
-  ExternalLink,
-  Activity,
-} from "lucide-react";
+import { Loader2, X } from "@crate/ui/icons";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 
 const CACHE_ACTIONS = [
   { type: "all", label: "Clear All", variant: "outline" as const },
@@ -149,27 +144,41 @@ interface AuditResponse {
   offset: number;
 }
 
-async function saveSoulseekSettings(
-  data: Record<string, unknown>,
-): Promise<void> {
-  try {
-    await api("/api/settings/soulseek", "PUT", data);
-    toast.success("Soulseek settings saved");
-  } catch {
-    toast.error("Failed to save");
+function useSettingsWrite(path: string, successMessage = "Setting saved") {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+
+  async function save(data: Record<string, unknown>, rollback: () => void) {
+    if (inFlight.current) return false;
+    inFlight.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await api(path, "PUT", data);
+      toast.success(successMessage);
+      return true;
+    } catch {
+      rollback();
+      setError(
+        "Changes could not be saved. The previous setting is kept; try again.",
+      );
+      toast.error("Failed to save");
+      return false;
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
   }
+  return { saving, error, save };
 }
 
-async function saveSettingsSection(
-  section: string,
-  data: Record<string, unknown>,
-): Promise<void> {
-  try {
-    await api(`/api/settings/${section}`, "PUT", data);
-    toast.success("Setting saved");
-  } catch {
-    toast.error("Failed to save");
-  }
+function SettingsWriteError({ message }: { message: string | null }) {
+  return message ? (
+    <p role="alert" className="text-sm text-state-warning-text">
+      {message}
+    </p>
+  ) : null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -266,17 +275,37 @@ function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-x-3 gap-y-2 border-b border-border-quiet-subtle py-3 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-      <div className="space-y-1">
-        <MonoLabel as="span">{label}</MonoLabel>
-        {hint && (
-          <p className="text-[11px] leading-relaxed text-text-subtle">{hint}</p>
-        )}
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {children}
-      </div>
-    </div>
+    <FormField
+      kind="group"
+      label={label}
+      hint={hint}
+      className="gap-x-3 border-b border-border-quiet-subtle py-3 last:border-b-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center [&>[data-slot=form-field-hint]]:md:col-start-2"
+    >
+      {(field) => (
+        <div
+          {...field}
+          role="group"
+          className="flex min-w-0 flex-wrap items-center gap-2"
+        >
+          {Children.map(children, (child) => {
+            if (
+              !isValidElement<ComponentProps<"input">>(child) ||
+              (child.type !== Input && child.type !== Slider)
+            )
+              return child;
+            return cloneElement(child, {
+              "aria-labelledby": child.props["aria-label"]
+                ? child.props["aria-labelledby"]
+                : field["aria-labelledby"],
+              "aria-describedby":
+                [child.props["aria-describedby"], field["aria-describedby"]]
+                  .filter(Boolean)
+                  .join(" ") || undefined,
+            });
+          })}
+        </div>
+      )}
+    </FormField>
   );
 }
 
@@ -470,7 +499,9 @@ export function Settings() {
           <p className="text-sm text-text-muted">{currentNav.description}</p>
 
           {section === "general" && <GeneralSection settings={settings} />}
-          {section === "downloads" && <DownloadsSection refetch={refetch} />}
+          {section === "downloads" && (
+            <DownloadsSection soulseek={settings.soulseek} />
+          )}
           {section === "schedules" && (
             <SchedulesSection
               schedules={settings.schedules}
@@ -551,7 +582,6 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
             <div className="flex items-center gap-3">
               {worker && worker.running_tasks.length > 0 ? (
                 <Badge className="border-primary/30 bg-primary/15 text-primary">
-                  <Activity size={10} className="mr-1" />
                   {worker.running_tasks.length} running
                 </Badge>
               ) : (
@@ -637,21 +667,27 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
 
 // ── Downloads ──────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function DownloadsSection({ refetch: _refetch }: { refetch: () => void }) {
+function DownloadsSection({
+  soulseek,
+}: {
+  soulseek: SettingsData["soulseek"];
+}) {
   return (
     <>
       <TidalCard />
-      <SoulseekCard />
+      <SoulseekCard settings={soulseek} />
       <DownloadWindowCard />
     </>
   );
 }
 
 function TidalCard() {
-  const { data: acqStatus, refetch } = useApi<AcquisitionStatus>(
-    "/api/acquisition/status",
-  );
+  const {
+    data: acqStatus,
+    loading,
+    error,
+    refetch,
+  } = useApi<AcquisitionStatus>("/api/acquisition/status");
   const [refreshing, setRefreshing] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
   const [deviceUrl, setDeviceUrl] = useState<string | null>(null);
@@ -751,90 +787,121 @@ function TidalCard() {
         title="Tidal Access"
         description="Manage the current device auth session and token refresh flow."
       >
-        <FieldRow label="Status">
-          <StatusDot
-            tone={authenticated ? "on" : "warn"}
-            title={authenticated ? "Connected" : "Not connected"}
-          />
-          <span className="text-sm">
-            {authenticated ? "Authenticated" : "Not authenticated"}
-          </span>
-        </FieldRow>
-        <div className="flex flex-wrap gap-2 md:pl-[212px]">
-          {authenticated ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                {refreshing ? (
-                  <Loader2 size={12} className="animate-spin mr-1.5" />
-                ) : (
-                  <RefreshCw size={12} className="mr-1.5" />
-                )}
-                Refresh Token
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                Logout
-              </Button>
-            </>
+        {!acqStatus ? (
+          loading ? (
+            <LoadingState label="Loading Tidal status" />
           ) : (
-            <Button size="sm" onClick={handleLogin} disabled={loggingIn}>
-              {loggingIn ? (
-                <Loader2 size={12} className="animate-spin mr-1.5" />
+            <ErrorState
+              message="Tidal status could not be loaded."
+              onRetry={refetch}
+              retryLabel="Retry Tidal status"
+            />
+          )
+        ) : (
+          <>
+            {error ? (
+              <ErrorState
+                message="Tidal status could not be refreshed. Showing the last confirmed status."
+                onRetry={refetch}
+                retryLabel="Retry Tidal status"
+              />
+            ) : null}
+            <FieldRow label="Status">
+              <StatusDot
+                tone={authenticated ? "on" : "warn"}
+                title={authenticated ? "Connected" : "Not connected"}
+              />
+              <span className="text-sm">
+                {authenticated ? "Authenticated" : "Not authenticated"}
+              </span>
+            </FieldRow>
+            <div className="flex flex-wrap gap-2 md:pl-[212px]">
+              {authenticated ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                  >
+                    {refreshing ? (
+                      <Loader2 size={12} className="animate-spin mr-1.5" />
+                    ) : null}
+                    Refresh Token
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleLogout}>
+                    Logout
+                  </Button>
+                </>
               ) : (
-                <ExternalLink size={12} className="mr-1.5" />
+                <Button size="sm" onClick={handleLogin} disabled={loggingIn}>
+                  {loggingIn ? (
+                    <Loader2 size={12} className="animate-spin mr-1.5" />
+                  ) : null}
+                  {loggingIn ? "Waiting for auth..." : "Login to Tidal"}
+                </Button>
               )}
-              {loggingIn ? "Waiting for auth..." : "Login to Tidal"}
-            </Button>
-          )}
-        </div>
-        {loggingIn && deviceUrl && (
-          <div className="md:pl-[212px]">
-            <p className="text-xs text-muted-foreground">
-              A login page should have opened.{" "}
-              <a
-                href={deviceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Click here if it didn't open
-              </a>
-            </p>
-          </div>
+            </div>
+            {loggingIn && deviceUrl && (
+              <div className="md:pl-[212px]">
+                <p className="text-xs text-muted-foreground">
+                  A login page should have opened.{" "}
+                  <a
+                    href={deviceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Click here if it didn't open
+                  </a>
+                </p>
+              </div>
+            )}
+          </>
         )}
       </PanelCard>
     </Section>
   );
 }
 
-function SoulseekCard() {
-  const { data: acqStatus } = useApi<AcquisitionStatus>(
-    "/api/acquisition/status",
-  );
+function SoulseekCard({ settings }: { settings: SettingsData["soulseek"] }) {
+  const {
+    data: acqStatus,
+    loading,
+    error,
+    refetch,
+  } = useApi<AcquisitionStatus>("/api/acquisition/status");
   const slsk = acqStatus?.soulseek;
   const connected = slsk?.connected ?? false;
 
-  const [quality, setQuality] = useState("flac");
-  const [minBitrate, setMinBitrate] = useState("320");
-  const [loaded, setLoaded] = useState(false);
+  const [quality, setQuality] = useState(settings?.quality || "flac");
+  const [minBitrate, setMinBitrate] = useState(
+    String(settings?.min_bitrate ?? 320),
+  );
+  const confirmed = useRef({ quality, minBitrate });
+  const write = useSettingsWrite(
+    "/api/settings/soulseek",
+    "Soulseek settings saved",
+  );
 
-  useEffect(() => {
-    if (!loaded) {
-      api<Record<string, string>>("/api/settings")
-        .then((s: any) => {
-          if (s?.soulseek) {
-            setQuality(s.soulseek.quality || "flac");
-            setMinBitrate(String(s.soulseek.min_bitrate || 320));
-          }
-          setLoaded(true);
-        })
-        .catch(() => setLoaded(true));
-    }
-  }, [loaded]);
+  async function saveQuality(next: string) {
+    const previous = confirmed.current.quality;
+    setQuality(next);
+    if (await write.save({ quality: next }, () => setQuality(previous)))
+      confirmed.current.quality = next;
+  }
+
+  async function saveBitrate() {
+    const previous = confirmed.current.minBitrate;
+    const next = String(Number.parseInt(minBitrate, 10) || 320);
+    setMinBitrate(next);
+    if (
+      await write.save({ min_bitrate: Number(next) }, () =>
+        setMinBitrate(previous),
+      )
+    )
+      confirmed.current.minBitrate = next;
+  }
 
   return (
     <Section
@@ -846,32 +913,54 @@ function SoulseekCard() {
         description="Acquisition quality defaults and current daemon connection state."
       >
         <FieldRow label="Status">
-          <StatusDot
-            tone={connected ? "on" : "warn"}
-            title={connected ? "Connected" : "Not connected"}
-          />
-          <span className="text-sm">
-            {connected ? `Connected (${slsk?.state})` : "Disconnected"}
-          </span>
-          {!connected && (
-            <span className="text-[10px] text-text-subtle">
-              slskd container not running
-            </span>
+          {!acqStatus ? (
+            loading ? (
+              <LoadingState label="Loading Soulseek status" />
+            ) : (
+              <ErrorState
+                message="Soulseek status could not be loaded."
+                onRetry={refetch}
+                retryLabel="Retry Soulseek status"
+              />
+            )
+          ) : (
+            <>
+              <StatusDot
+                tone={connected ? "on" : "warn"}
+                title={connected ? "Connected" : "Not connected"}
+              />
+              <span className="text-sm">
+                {connected ? `Connected (${slsk?.state})` : "Disconnected"}
+              </span>
+              {!connected && (
+                <span className="text-[10px] text-text-subtle">
+                  slskd container not running
+                </span>
+              )}
+            </>
           )}
         </FieldRow>
+        {error && acqStatus ? (
+          <ErrorState
+            message="Soulseek status could not be refreshed. Showing the last confirmed status."
+            onRetry={refetch}
+            retryLabel="Retry Soulseek status"
+          />
+        ) : null}
         <FieldRow label="Quality">
           <SegmentedControl
             as="radio"
             label="Quality"
             value={quality}
-            onValueChange={(value) => {
-              setQuality(value);
-              void saveSoulseekSettings({ quality: value });
-            }}
+            onValueChange={(value) => void saveQuality(value)}
             items={[
-              { value: "flac", label: "FLAC only" },
-              { value: "flac_320", label: "FLAC + MP3 320k" },
-              { value: "any", label: "Any quality" },
+              { value: "flac", label: "FLAC only", disabled: write.saving },
+              {
+                value: "flac_320",
+                label: "FLAC + MP3 320k",
+                disabled: write.saving,
+              },
+              { value: "any", label: "Any quality", disabled: write.saving },
             ]}
           />
         </FieldRow>
@@ -880,52 +969,25 @@ function SoulseekCard() {
             type="number"
             className="h-10 w-24"
             value={minBitrate}
+            disabled={write.saving}
             onChange={(e) => setMinBitrate(e.target.value)}
-            onBlur={() =>
-              void saveSoulseekSettings({
-                min_bitrate: parseInt(minBitrate) || 320,
-              })
-            }
+            onBlur={() => void saveBitrate()}
           />
           <span className="text-xs text-muted-foreground">kbps</span>
         </FieldRow>
+        <SettingsWriteError message={write.error} />
       </PanelCard>
     </Section>
   );
 }
 
 function DownloadWindowCard() {
-  const { data: policy, refetch } = useApi<DownloadPolicy>(
-    "/api/admin/download-policy",
-  );
-  const [windowEnabled, setWindowEnabled] = useState(false);
-  const [windowStart, setWindowStart] = useState("02:00");
-  const [windowEnd, setWindowEnd] = useState("07:00");
-  const [maxUsers, setMaxUsers] = useState("0");
-  const [maxStreams, setMaxStreams] = useState("0");
-  const loadedRef = useRef(false);
-
-  useEffect(() => {
-    if (policy && !loadedRef.current) {
-      setWindowEnabled(policy.time_window.enabled);
-      setWindowStart(policy.time_window.start);
-      setWindowEnd(policy.time_window.end);
-      setMaxUsers(String(policy.user_limit.max));
-      setMaxStreams(String(policy.stream_limit.max));
-      loadedRef.current = true;
-    }
-  }, [policy]);
-
-  async function save(patch: Record<string, unknown>) {
-    try {
-      await api("/api/admin/download-policy", "PUT", patch);
-      toast.success("Download policy updated");
-      refetch();
-    } catch {
-      toast.error("Failed to update");
-    }
-  }
-
+  const {
+    data: policy,
+    loading,
+    error,
+    refetch,
+  } = useApi<DownloadPolicy>("/api/admin/download-policy");
   return (
     <Section
       title="Download Policy"
@@ -935,91 +997,175 @@ function DownloadWindowCard() {
         title="Quiet Hours & Limits"
         description="Keep downloads out of busy listening windows and cap concurrent activity."
       >
-        {policy && (
-          <FieldRow label="Current status">
-            <Badge
-              className={`${
-                policy.downloads_allowed_now
-                  ? "bg-accent-action/10 text-accent-action-hi border-accent-action/20"
-                  : "bg-state-warning/10 text-state-warning-text border-state-warning/20"
-              }`}
-            >
-              {policy.downloads_allowed_now
-                ? "Downloads active"
-                : "Downloads paused"}
-            </Badge>
-            {policy.active_users > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {policy.active_users} user{policy.active_users > 1 ? "s" : ""}{" "}
-                active
-              </span>
-            )}
-          </FieldRow>
+        {!policy ? (
+          loading ? (
+            <LoadingState label="Loading download policy" />
+          ) : (
+            <ErrorState
+              message="Download policy could not be loaded."
+              onRetry={refetch}
+              retryLabel="Retry download policy"
+            />
+          )
+        ) : (
+          <>
+            {error ? (
+              <ErrorState
+                message="Download policy could not be refreshed. Showing the last confirmed settings."
+                onRetry={refetch}
+                retryLabel="Retry download policy"
+              />
+            ) : null}
+            <DownloadPolicyForm policy={policy} refetch={refetch} />
+          </>
         )}
-        <FieldRow
-          label="Time window"
-          hint="Only allow downloads during these hours"
-        >
-          <Toggle
-            checked={windowEnabled}
-            ariaLabel="Time window"
-            onChange={(v) => {
-              setWindowEnabled(v);
-              save({ window_enabled: v });
-            }}
-          />
-          {windowEnabled && (
-            <>
-              <Input
-                type="time"
-                className="h-10 w-28"
-                value={windowStart}
-                onChange={(e) => setWindowStart(e.target.value)}
-                onBlur={() => save({ window_start: windowStart })}
-              />
-              <span className="text-xs text-muted-foreground">to</span>
-              <Input
-                type="time"
-                className="h-10 w-28"
-                value={windowEnd}
-                onChange={(e) => setWindowEnd(e.target.value)}
-                onBlur={() => save({ window_end: windowEnd })}
-              />
-            </>
-          )}
-        </FieldRow>
-        <FieldRow
-          label="Max active users"
-          hint="Pause if more than N users listening"
-        >
-          <Input
-            type="number"
-            min={0}
-            className="h-10 w-24"
-            value={maxUsers}
-            onChange={(e) => setMaxUsers(e.target.value)}
-            onBlur={() => save({ max_active_users: parseInt(maxUsers) || 0 })}
-          />
-          <span className="text-[10px] text-text-subtle">0 = no limit</span>
-        </FieldRow>
-        <FieldRow
-          label="Max active streams"
-          hint="Pause if more than N concurrent streams"
-        >
-          <Input
-            type="number"
-            min={0}
-            className="h-10 w-24"
-            value={maxStreams}
-            onChange={(e) => setMaxStreams(e.target.value)}
-            onBlur={() =>
-              save({ max_active_streams: parseInt(maxStreams) || 0 })
-            }
-          />
-          <span className="text-[10px] text-text-subtle">0 = no limit</span>
-        </FieldRow>
       </PanelCard>
     </Section>
+  );
+}
+
+function DownloadPolicyForm({
+  policy,
+  refetch,
+}: {
+  policy: DownloadPolicy;
+  refetch: () => void;
+}) {
+  const [windowEnabled, setWindowEnabled] = useState(
+    policy.time_window.enabled,
+  );
+  const [windowStart, setWindowStart] = useState(policy.time_window.start);
+  const [windowEnd, setWindowEnd] = useState(policy.time_window.end);
+  const [maxUsers, setMaxUsers] = useState(String(policy.user_limit.max));
+  const [maxStreams, setMaxStreams] = useState(String(policy.stream_limit.max));
+  const confirmed = useRef({
+    window_enabled: policy.time_window.enabled,
+    window_start: policy.time_window.start,
+    window_end: policy.time_window.end,
+    max_active_users: policy.user_limit.max,
+    max_active_streams: policy.stream_limit.max,
+  });
+  const write = useSettingsWrite(
+    "/api/admin/download-policy",
+    "Download policy updated",
+  );
+
+  async function commit<K extends keyof typeof confirmed.current>(
+    key: K,
+    value: (typeof confirmed.current)[K],
+    restore: (value: (typeof confirmed.current)[K]) => void,
+  ) {
+    const previous = confirmed.current[key];
+    if (await write.save({ [key]: value }, () => restore(previous))) {
+      confirmed.current[key] = value;
+      refetch();
+    }
+  }
+
+  return (
+    <div aria-busy={write.saving}>
+      <FieldRow label="Current status">
+        <Badge
+          className={
+            policy.downloads_allowed_now
+              ? "bg-accent-action/10 text-accent-action-hi border-accent-action/20"
+              : "bg-state-warning/10 text-state-warning-text border-state-warning/20"
+          }
+        >
+          {policy.downloads_allowed_now
+            ? "Downloads active"
+            : "Downloads paused"}
+        </Badge>
+        {policy.active_users > 0 ? (
+          <span className="text-xs text-muted-foreground">
+            {policy.active_users} user{policy.active_users > 1 ? "s" : ""}{" "}
+            active
+          </span>
+        ) : null}
+      </FieldRow>
+      <FieldRow
+        label="Time window"
+        hint="Only allow downloads during these hours"
+      >
+        <Toggle
+          checked={windowEnabled}
+          ariaLabel="Time window"
+          disabled={write.saving}
+          onChange={(next) => {
+            setWindowEnabled(next);
+            void commit("window_enabled", next, setWindowEnabled);
+          }}
+        />
+        {windowEnabled ? (
+          <>
+            <Input
+              type="time"
+              aria-label="Time window start"
+              className="w-28"
+              disabled={write.saving}
+              value={windowStart}
+              onChange={(event) => setWindowStart(event.target.value)}
+              onBlur={() =>
+                void commit("window_start", windowStart, setWindowStart)
+              }
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="time"
+              aria-label="Time window end"
+              className="w-28"
+              disabled={write.saving}
+              value={windowEnd}
+              onChange={(event) => setWindowEnd(event.target.value)}
+              onBlur={() => void commit("window_end", windowEnd, setWindowEnd)}
+            />
+          </>
+        ) : null}
+      </FieldRow>
+      <FieldRow
+        label="Max active users"
+        hint="Pause if more than N users listening"
+      >
+        <Input
+          type="number"
+          min={0}
+          className="w-24"
+          disabled={write.saving}
+          value={maxUsers}
+          onChange={(event) => setMaxUsers(event.target.value)}
+          onBlur={() =>
+            void commit(
+              "max_active_users",
+              Number.parseInt(maxUsers, 10) || 0,
+              (previous) => setMaxUsers(String(previous)),
+            )
+          }
+        />
+        <span className="text-xs text-text-subtle">0 = no limit</span>
+      </FieldRow>
+      <FieldRow
+        label="Max active streams"
+        hint="Pause if more than N concurrent streams"
+      >
+        <Input
+          type="number"
+          min={0}
+          className="w-24"
+          disabled={write.saving}
+          value={maxStreams}
+          onChange={(event) => setMaxStreams(event.target.value)}
+          onBlur={() =>
+            void commit(
+              "max_active_streams",
+              Number.parseInt(maxStreams, 10) || 0,
+              (previous) => setMaxStreams(String(previous)),
+            )
+          }
+        />
+        <span className="text-xs text-text-subtle">0 = no limit</span>
+      </FieldRow>
+      <SettingsWriteError message={write.error} />
+    </div>
   );
 }
 
@@ -1093,9 +1239,7 @@ function SchedulesSection({
           <Button size="sm" onClick={save} disabled={saving}>
             {saving ? (
               <Loader2 size={12} className="mr-1.5 animate-spin" />
-            ) : (
-              <Save size={12} className="mr-1.5" />
-            )}
+            ) : null}
             Save Schedules
           </Button>
         }
@@ -1127,9 +1271,7 @@ function SchedulesSection({
               >
                 {runningType === key ? (
                   <Loader2 size={12} className="mr-1.5 animate-spin" />
-                ) : (
-                  <Play size={12} className="mr-1.5" />
-                )}
+                ) : null}
                 Run now
               </Button>
             </FieldRow>
@@ -1268,6 +1410,35 @@ function EnrichmentSection({
   const [savingPaths, setSavingPaths] = useState(false);
   const [audioExts, setAudioExts] = useState<string[]>(exts);
   const [newExt, setNewExt] = useState("");
+  const processingWrite = useSettingsWrite("/api/settings/processing");
+  const extensionsWrite = useSettingsWrite("/api/settings/library");
+  const confirmedProcessing = useRef({ ...proc });
+  const confirmedExtensions = useRef(exts);
+
+  async function saveProcessing<K extends keyof SettingsData["processing"]>(
+    key: K,
+    value: SettingsData["processing"][K],
+  ) {
+    const previous = confirmedProcessing.current[key];
+    const restore = () => {
+      if (key === "mb_auto_apply_threshold") setThreshold(previous);
+      else if (key === "enrichment_min_age_hours") setMinAge(previous);
+      else setMaxPop(previous);
+    };
+    if (await processingWrite.save({ [key]: value }, restore))
+      confirmedProcessing.current[key] = value;
+  }
+
+  async function saveExtensions(updated: string[]) {
+    const previous = confirmedExtensions.current;
+    setAudioExts(updated);
+    if (
+      await extensionsWrite.save({ audio_extensions: updated }, () =>
+        setAudioExts(previous),
+      )
+    )
+      confirmedExtensions.current = updated;
+  }
 
   useEffect(() => {
     setLlmRefinementEnabled(paths.llm_refinement_enabled);
@@ -1306,8 +1477,7 @@ function EnrichmentSection({
 
   function removeExt(ext: string) {
     const updated = audioExts.filter((e) => e !== ext);
-    setAudioExts(updated);
-    void saveSettingsSection("library", { audio_extensions: updated });
+    void saveExtensions(updated);
   }
 
   function addExt() {
@@ -1316,9 +1486,8 @@ function EnrichmentSection({
     const normalized = ext.startsWith(".") ? ext : `.${ext}`;
     if (audioExts.includes(normalized)) return;
     const updated = [...audioExts, normalized];
-    setAudioExts(updated);
     setNewExt("");
-    void saveSettingsSection("library", { audio_extensions: updated });
+    void saveExtensions(updated);
   }
 
   return (
@@ -1334,9 +1503,7 @@ function EnrichmentSection({
             <Button size="sm" onClick={saveEnrichment} disabled={saving}>
               {saving ? (
                 <Loader2 size={12} className="mr-1.5 animate-spin" />
-              ) : (
-                <Save size={12} className="mr-1.5" />
-              )}
+              ) : null}
               Save Sources
             </Button>
           }
@@ -1348,11 +1515,6 @@ function EnrichmentSection({
                 onChange={(v) => setDraft((prev) => ({ ...prev, [key]: v }))}
                 ariaLabel={ENRICHMENT_LABELS[key] ?? key}
               />
-              {draft[key] ? (
-                <CheckCircle2 size={13} className="text-accent-action-hi/70" />
-              ) : (
-                <XCircle size={13} className="text-text-subtle" />
-              )}
             </FieldRow>
           ))}
         </PanelCard>
@@ -1394,16 +1556,13 @@ function EnrichmentSection({
               min={50}
               max={100}
               value={threshold}
+              disabled={processingWrite.saving}
               onChange={(e) => setThreshold(Number(e.target.value))}
               onMouseUp={() =>
-                void saveSettingsSection("processing", {
-                  mb_auto_apply_threshold: threshold,
-                })
+                void saveProcessing("mb_auto_apply_threshold", threshold)
               }
               onTouchEnd={() =>
-                void saveSettingsSection("processing", {
-                  mb_auto_apply_threshold: threshold,
-                })
+                void saveProcessing("mb_auto_apply_threshold", threshold)
               }
               onKeyUp={(event) => {
                 if (
@@ -1418,9 +1577,10 @@ function EnrichmentSection({
                     "PageDown",
                   ].includes(event.key)
                 ) {
-                  void saveSettingsSection("processing", {
-                    mb_auto_apply_threshold: Number(event.currentTarget.value),
-                  });
+                  void saveProcessing(
+                    "mb_auto_apply_threshold",
+                    Number(event.currentTarget.value),
+                  );
                 }
               }}
               className="w-32"
@@ -1436,11 +1596,10 @@ function EnrichmentSection({
               max={168}
               className="h-10 w-24"
               value={minAge}
+              disabled={processingWrite.saving}
               onChange={(e) => setMinAge(Number(e.target.value))}
               onBlur={() =>
-                void saveSettingsSection("processing", {
-                  enrichment_min_age_hours: minAge,
-                })
+                void saveProcessing("enrichment_min_age_hours", minAge)
               }
             />
             <span className="text-xs text-muted-foreground">hours</span>
@@ -1455,15 +1614,13 @@ function EnrichmentSection({
               max={500}
               className="h-10 w-24"
               value={maxPop}
+              disabled={processingWrite.saving}
               onChange={(e) => setMaxPop(Number(e.target.value))}
-              onBlur={() =>
-                void saveSettingsSection("processing", {
-                  max_track_popularity: maxPop,
-                })
-              }
+              onBlur={() => void saveProcessing("max_track_popularity", maxPop)}
             />
             <span className="text-xs text-muted-foreground">tracks</span>
           </FieldRow>
+          <SettingsWriteError message={processingWrite.error} />
         </PanelCard>
       </Section>
 
@@ -1477,17 +1634,17 @@ function EnrichmentSection({
         >
           <div className="flex flex-wrap gap-1.5">
             {audioExts.map((ext) => (
-              <Badge key={ext} variant="secondary" className="gap-1">
-                {ext}
-                <button
-                  type="button"
-                  aria-label={`Remove ${ext}`}
+              <div key={ext} className="inline-flex items-center gap-1">
+                <Badge variant="secondary">{ext}</Badge>
+                <ActionButton
+                  label={`Remove ${ext}`}
+                  tooltip="Remove extension"
                   onClick={() => removeExt(ext)}
-                  className="ml-0.5 hover:text-state-warning-text transition-colors"
+                  disabled={extensionsWrite.saving}
                 >
-                  <X size={10} />
-                </button>
-              </Badge>
+                  <X aria-hidden="true" />
+                </ActionButton>
+              </div>
             ))}
           </div>
           <div className="flex items-center gap-2">
@@ -1495,15 +1652,24 @@ function EnrichmentSection({
               className="h-10 w-28"
               placeholder=".wav"
               value={newExt}
+              aria-label="Audio extension"
+              disabled={extensionsWrite.saving}
               onChange={(e) => setNewExt(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") addExt();
               }}
             />
-            <Button variant="outline" size="sm" onClick={addExt}>
-              <Plus size={12} className="mr-1" /> Add
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addExt}
+              disabled={extensionsWrite.saving}
+            >
+              {" "}
+              Add
             </Button>
           </div>
+          <SettingsWriteError message={extensionsWrite.error} />
         </PanelCard>
       </Section>
     </>
@@ -1600,9 +1766,7 @@ function NotificationsSection({
           <Button onClick={save} disabled={saving} size="sm">
             {saving ? (
               <Loader2 size={12} className="animate-spin mr-1.5" />
-            ) : (
-              <Save size={12} className="mr-1.5" />
-            )}
+            ) : null}
             Save
           </Button>
           <Button
@@ -1613,9 +1777,7 @@ function NotificationsSection({
           >
             {testing ? (
               <Loader2 size={12} className="animate-spin mr-1.5" />
-            ) : (
-              <Wifi size={12} className="mr-1.5" />
-            )}
+            ) : null}
             Send Test
           </Button>
         </div>
@@ -1710,9 +1872,7 @@ function StorageSection({
               >
                 {clearing === type ? (
                   <Loader2 size={12} className="animate-spin mr-1.5" />
-                ) : (
-                  <Trash2 size={12} className="mr-1.5" />
-                )}
+                ) : null}
                 {label}
               </Button>
             ))}
@@ -1730,12 +1890,16 @@ function AuditSection() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const requestRef = useRef(0);
   const [actionFilter, setActionFilter] = useState<string>("all");
   const limit = 50;
 
   const load = useCallback(
     async (reset: boolean, currentOffset = 0) => {
+      const requestId = ++requestRef.current;
       setLoading(true);
+      setLoadError(false);
       try {
         const newOffset = reset ? 0 : currentOffset;
         const filterParam =
@@ -1743,6 +1907,7 @@ function AuditSection() {
         const res = await api<AuditResponse>(
           `/api/manage/audit-log?limit=${limit}&offset=${newOffset}${filterParam}`,
         );
+        if (requestId !== requestRef.current) return;
         if (reset) {
           setEntries(res.entries);
           setOffset(res.entries.length);
@@ -1752,16 +1917,21 @@ function AuditSection() {
         }
         setTotal(res.total);
       } catch {
+        if (requestId !== requestRef.current) return;
+        setLoadError(true);
         toast.error("Failed to load audit log");
       } finally {
-        setLoading(false);
+        if (requestId === requestRef.current) setLoading(false);
       }
     },
     [actionFilter],
   );
 
   useEffect(() => {
-    load(true);
+    void load(true);
+    return () => {
+      requestRef.current += 1;
+    };
   }, [actionFilter, load]);
 
   const actions = [...new Set(entries.map((e) => e.action))].sort();
@@ -1793,15 +1963,26 @@ function AuditSection() {
         </div>
 
         {loading && entries.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 size={18} className="animate-spin" />
-          </div>
+          <LoadingState label="Loading audit log" />
+        ) : loadError && entries.length === 0 ? (
+          <ErrorState
+            message="Audit log could not be loaded."
+            onRetry={() => void load(true)}
+            retryLabel="Retry audit log"
+          />
         ) : entries.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             No entries
           </div>
         ) : (
           <>
+            {loadError ? (
+              <ErrorState
+                message="Audit log could not be refreshed. Showing the last successful results."
+                onRetry={() => void load(true)}
+                retryLabel="Retry audit log"
+              />
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1825,11 +2006,14 @@ function AuditSection() {
                     key={entry.id}
                     className="border-border-quiet-subtle"
                   >
-                    <TableCell
-                      className="text-xs text-muted-foreground whitespace-nowrap py-1.5"
-                      title={new Date(entry.timestamp).toLocaleString()}
-                    >
-                      {formatTimestamp(entry.timestamp)}
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap py-1.5">
+                      <TooltipHint
+                        content={new Date(entry.timestamp).toLocaleString()}
+                      >
+                        <time dateTime={entry.timestamp} tabIndex={0}>
+                          {formatTimestamp(entry.timestamp)}
+                        </time>
+                      </TooltipHint>
                     </TableCell>
                     <TableCell className="py-1.5">
                       <Badge variant="outline">{entry.action}</Badge>

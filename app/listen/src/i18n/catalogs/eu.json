@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Hustu",
   "native.logs.hide": "Ezkutatu",
   "native.logs.empty": "Oraindik ez dago erreprodukzio-gertaerarik.",
-  "native.logs.trigger": "Erregistroa · {count}"
+  "native.logs.trigger": "Erregistroa · {count}",
+  "library.liked.loadFailed": "Ezin izan dira gustuko abestiak kargatu.",
+  "library.liked.stateUnavailable": "Gustuko egoera ez dago erabilgarri",
+  "settings.offline.removeConfirmTitle": "Deskargatutako kopiak kendu?",
+  "settings.offline.removeConfirmDescription": "Kendu gailu honetatik {itemCount, plural, one {deskargatutako elementu #} other {deskargatutako # elementu}}, {trackCount, plural, one {abesti #} other {# abesti}} dituztenak ({size}). Liburutegia zerbitzarian geratuko da eta berriro deskarga dezakezu.",
+  "settings.offline.removeConfirmAction": "Kendu deskargatutako kopiak",
+  "home.playlists.arrivals.thisWeek": "Aste honetan",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {Aurreko astean} other {Duela # aste}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Aste hau + aurreko aste #} other {Aste hau + aurreko # asteak}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {Argitalpenen aurreko aste #} other {Argitalpenen aurreko # asteak}}",
+  "crate.page.loadFailed": "Ezin izan da Crate hau kargatu. Saiatu berriro.",
+  "crate.page.refreshFailed": "Ezin izan da Crate hau eguneratu. Gordetako xehetasunak erakusten dira.",
+  "crate.page.playbackLoadFailed": "Ezin izan dira erreproduzitzeko abestiak kargatu. Saiatu berriro.",
+  "artist.topTracks.unavailable": "Abesti nabarmenenak ez daude erabilgarri",
+  "player.mix.label": "Trantsizioa",
+  "player.mix.gapless": "Etenik gabe",
+  "player.mix.paused": "Pausatuta",
+  "player.mix.buffering": "Audioa kargatzen"
 }

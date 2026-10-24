@@ -8,7 +8,7 @@ import {
   DatabaseBackup as HeaderDatabaseBackup,
   Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import {
@@ -20,6 +20,8 @@ import {
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Badge } from "@crate/ui/shadcn/badge";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import {
   Tabs,
   TabsContent,
@@ -91,7 +93,7 @@ function formatDate(value?: string | null) {
 }
 
 function formatNumber(value: number | undefined) {
-  return numberFormatter.format(value || 0);
+  return value == null ? "—" : numberFormatter.format(value);
 }
 
 function servingModeLabel(mode?: GlobalCatalogStatus["serving_mode"]) {
@@ -130,14 +132,31 @@ export function GlobalCatalog() {
   const {
     data: status,
     loading,
+    error: statusError,
     refetch: refetchStatus,
   } = useApi<GlobalCatalogStatus>("/api/admin/global-catalog/status");
-  const { data: runs, refetch: refetchRuns } = useApi<{
+  const {
+    data: runs,
+    loading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = useApi<{
     items: GlobalCatalogRun[];
   }>("/api/admin/global-catalog/runs?limit=25");
-  const { data: duplicates } = useApi<{ items: DuplicateCandidate[] }>(
+  const {
+    data: duplicates,
+    loading: duplicatesLoading,
+    error: duplicatesError,
+    refetch: refetchDuplicates,
+  } = useApi<{ items: DuplicateCandidate[] }>(
     "/api/admin/global-catalog/duplicates?limit=50",
   );
+
+  function refreshAll() {
+    refetchStatus();
+    refetchRuns();
+    refetchDuplicates();
+  }
 
   async function queueReconcile(mode: "incremental" | "full") {
     setReconciling(mode);
@@ -148,7 +167,7 @@ export function GlobalCatalog() {
           ? "Full reconciliation queued"
           : "Incremental reconciliation queued",
       );
-      await Promise.all([refetchStatus(), refetchRuns()]);
+      refreshAll();
     } catch {
       toast.error("Failed to queue reconciliation");
     } finally {
@@ -170,7 +189,7 @@ export function GlobalCatalog() {
           <PageHeaderActions>
             <PageHeaderAction
               label="Refresh"
-              onClick={() => void refetchStatus()}
+              onClick={refreshAll}
               disabled={loading}
             >
               <HeaderRefreshCw
@@ -239,144 +258,216 @@ export function GlobalCatalog() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-0">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Artists" value={formatNumber(counts?.artists)} />
-            <MetricCard label="Albums" value={formatNumber(counts?.albums)} />
-            <MetricCard label="Tracks" value={formatNumber(counts?.tracks)} />
-            <MetricCard
-              label="Entity sources"
-              value={formatNumber(counts?.sources)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <OpsPanel title="Read model">
-              <div className="space-y-4 text-sm">
-                <StatusDot
-                  tone={
-                    status?.serving_mode === "global-degraded"
-                      ? "warn"
-                      : status?.serving_mode === "global-ready"
-                        ? "on"
-                        : "off"
-                  }
-                  label={servingModeLabel(status?.serving_mode)}
+          <CatalogReadState
+            data={status}
+            loading={loading}
+            error={statusError}
+            label="catalog status"
+            message="Catalog status could not be loaded."
+            onRetry={refetchStatus}
+          >
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <MetricCard
+                  label="Artists"
+                  value={formatNumber(counts?.artists)}
                 />
-                <p className="m-0 text-text-muted">
-                  {servingModeDescription(status?.serving_mode)}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <OpsSurface className="p-3">
-                    <MonoLabel as="div">Reconciliation state</MonoLabel>
-                    <p className="mb-0 mt-1 text-text-primary">
-                      {status?.state.status || "unknown"}
-                    </p>
-                  </OpsSurface>
-                  <OpsSurface className="p-3">
-                    <MonoLabel as="div">Stale peers</MonoLabel>
-                    <p className="mb-0 mt-1 tabular-nums text-text-primary">
-                      {status ? formatNumber(status.stale_peer_count) : "—"}
-                    </p>
-                  </OpsSurface>
-                  <OpsSurface className="p-3 sm:col-span-2">
-                    <MonoLabel as="div">Unresolved match candidates</MonoLabel>
-                    <p className="mb-0 mt-1 tabular-nums text-text-primary">
-                      {status
-                        ? formatNumber(status.ambiguous_candidate_count)
-                        : "—"}
-                    </p>
-                  </OpsSurface>
-                </div>
-                <p className="m-0 text-xs text-text-muted">
-                  Similar sources below the automatic merge threshold; they
-                  remain separate until reviewed.
-                </p>
+                <MetricCard
+                  label="Albums"
+                  value={formatNumber(counts?.albums)}
+                />
+                <MetricCard
+                  label="Tracks"
+                  value={formatNumber(counts?.tracks)}
+                />
+                <MetricCard
+                  label="Entity sources"
+                  value={formatNumber(counts?.sources)}
+                />
               </div>
-            </OpsPanel>
 
-            <OpsPanel title="Last run" className="lg:col-span-2">
-              {status?.last_run ? (
-                <RunSummary run={status.last_run} />
-              ) : (
-                <p className="m-0 text-sm text-text-muted">
-                  No reconciliation runs yet.
-                </p>
-              )}
-            </OpsPanel>
-          </div>
-        </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <OpsPanel title="Read model">
+                  <div className="space-y-4 text-sm">
+                    <StatusDot
+                      tone={
+                        status?.serving_mode === "global-degraded"
+                          ? "warn"
+                          : status?.serving_mode === "global-ready"
+                            ? "on"
+                            : "off"
+                      }
+                      label={servingModeLabel(status?.serving_mode)}
+                    />
+                    <p className="m-0 text-text-muted">
+                      {servingModeDescription(status?.serving_mode)}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <OpsSurface className="p-3">
+                        <MonoLabel as="div">Reconciliation state</MonoLabel>
+                        <p className="mb-0 mt-1 text-text-primary">
+                          {status?.state.status || "unknown"}
+                        </p>
+                      </OpsSurface>
+                      <OpsSurface className="p-3">
+                        <MonoLabel as="div">Stale peers</MonoLabel>
+                        <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                          {status ? formatNumber(status.stale_peer_count) : "—"}
+                        </p>
+                      </OpsSurface>
+                      <OpsSurface className="p-3 sm:col-span-2">
+                        <MonoLabel as="div">
+                          Unresolved match candidates
+                        </MonoLabel>
+                        <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                          {status
+                            ? formatNumber(status.ambiguous_candidate_count)
+                            : "—"}
+                        </p>
+                      </OpsSurface>
+                    </div>
+                    <p className="m-0 text-xs text-text-muted">
+                      Similar sources below the automatic merge threshold; they
+                      remain separate until reviewed.
+                    </p>
+                  </div>
+                </OpsPanel>
+
+                <OpsPanel title="Last run" className="lg:col-span-2">
+                  {status?.last_run ? (
+                    <RunSummary run={status.last_run} />
+                  ) : (
+                    <p className="m-0 text-sm text-text-muted">
+                      No reconciliation runs yet.
+                    </p>
+                  )}
+                </OpsPanel>
+              </div>
+            </div>
+          </CatalogReadState>
         </TabsContent>
 
         <TabsContent value="runs" className="mt-0">
-        <OpsPanel title="Reconciliation runs">
-          <div className="space-y-3">
-            {runItems.length ? (
-              runItems.map((run) => <RunSummary key={run.run_id} run={run} />)
-            ) : (
-              <p className="m-0 text-sm text-text-muted">No runs found.</p>
-            )}
-          </div>
-        </OpsPanel>
+          <OpsPanel title="Reconciliation runs">
+            <CatalogReadState
+              data={runs}
+              loading={runsLoading}
+              error={runsError}
+              label="catalog runs"
+              message="Catalog runs could not be loaded."
+              onRetry={refetchRuns}
+            >
+              <div className="space-y-3">
+                {runItems.length ? (
+                  runItems.map((run) => (
+                    <RunSummary key={run.run_id} run={run} />
+                  ))
+                ) : (
+                  <p className="m-0 text-sm text-text-muted">No runs found.</p>
+                )}
+              </div>
+            </CatalogReadState>
+          </OpsPanel>
         </TabsContent>
 
         <TabsContent value="duplicates" className="mt-0">
-        <OpsPanel title="Duplicate candidates">
-          <div className="space-y-3">
-            {duplicateItems.length ? (
-              duplicateItems.map((candidate) => (
-                <OpsSurface
-                  as="article"
-                  key={`${candidate.entity_type}-${candidate.match_key}`}
-                  className="p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{candidate.entity_type}</Badge>
-                    <span className="min-w-0 break-all font-mono text-sm text-text-primary">
-                      {candidate.match_key}
-                    </span>
-                    <MonoLabel as="span">
-                      {candidate.source_count} sources
-                    </MonoLabel>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {candidate.sources.map((source) => (
-                      <OpsSurface
-                        as="div"
-                        key={`${source.source_kind}-${
-                          source.node_uid ??
-                          source.local_entity_uid ??
-                          source.remote_entity_uid ??
-                          source.global_entity_uid ??
-                          source.match_method ??
-                          "source"
-                        }`}
-                        className="min-w-0 p-3 text-xs text-text-muted"
-                      >
-                        <MonoLabel as="div" tone="accent">
-                          {source.source_kind}
+          <OpsPanel title="Duplicate candidates">
+            <CatalogReadState
+              data={duplicates}
+              loading={duplicatesLoading}
+              error={duplicatesError}
+              label="duplicate candidates"
+              message="Duplicate candidates could not be loaded."
+              onRetry={refetchDuplicates}
+            >
+              <div className="space-y-3">
+                {duplicateItems.length ? (
+                  duplicateItems.map((candidate) => (
+                    <OpsSurface
+                      as="article"
+                      key={`${candidate.entity_type}-${candidate.match_key}`}
+                      className="p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{candidate.entity_type}</Badge>
+                        <span className="min-w-0 break-all font-mono text-sm text-text-primary">
+                          {candidate.match_key}
+                        </span>
+                        <MonoLabel as="span">
+                          {candidate.source_count} sources
                         </MonoLabel>
-                        <div className="break-all font-mono">
-                          {source.node_uid || source.local_entity_uid}
-                        </div>
-                        <div className="break-all font-mono">
-                          {source.match_method}
-                        </div>
-                      </OpsSurface>
-                    ))}
-                  </div>
-                </OpsSurface>
-              ))
-            ) : (
-              <p className="m-0 text-sm text-text-muted">
-                No duplicate candidates above the confidence threshold.
-              </p>
-            )}
-          </div>
-        </OpsPanel>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                        {candidate.sources.map((source) => (
+                          <OpsSurface
+                            as="div"
+                            key={`${source.source_kind}-${
+                              source.node_uid ??
+                              source.local_entity_uid ??
+                              source.remote_entity_uid ??
+                              source.global_entity_uid ??
+                              source.match_method ??
+                              "source"
+                            }`}
+                            className="min-w-0 p-3 text-xs text-text-muted"
+                          >
+                            <MonoLabel as="div" tone="accent">
+                              {source.source_kind}
+                            </MonoLabel>
+                            <div className="break-all font-mono">
+                              {source.node_uid || source.local_entity_uid}
+                            </div>
+                            <div className="break-all font-mono">
+                              {source.match_method}
+                            </div>
+                          </OpsSurface>
+                        ))}
+                      </div>
+                    </OpsSurface>
+                  ))
+                ) : (
+                  <p className="m-0 text-sm text-text-muted">
+                    No duplicate candidates above the confidence threshold.
+                  </p>
+                )}
+              </div>
+            </CatalogReadState>
+          </OpsPanel>
         </TabsContent>
       </Tabs>
     </main>
+  );
+}
+
+function CatalogReadState({
+  data,
+  loading,
+  error,
+  label,
+  message,
+  onRetry,
+  children,
+}: {
+  data: unknown;
+  loading: boolean;
+  error: string | null | undefined;
+  label: string;
+  message: string;
+  onRetry: () => void;
+  children: ReactNode;
+}) {
+  if (!data && loading) return <LoadingState label={`Loading ${label}`} />;
+  if (!data) return <ErrorState message={message} onRetry={onRetry} />;
+  return (
+    <>
+      {error ? (
+        <ErrorState
+          message={`${message} Showing the last successful results.`}
+          onRetry={onRetry}
+        />
+      ) : null}
+      {children}
+    </>
   );
 }
 

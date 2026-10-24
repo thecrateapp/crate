@@ -59,8 +59,11 @@ describe("Admin search presentation and interactions", () => {
     const track = screen.getByRole("button", {
       name: /Luz Costa Norte — Octubre track/,
     });
-    for (const row of [artist, album, track])
+    expect(screen.getByText("In Library")).toHaveClass("crate-mono-label");
+    for (const row of [artist, album, track]) {
       expect(row.querySelector("svg")).toBeNull();
+      expect(row).toHaveClass("hover:text-accent-action-hi", "border-l-2");
+    }
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "ArrowUp" });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -78,6 +81,8 @@ describe("Admin search presentation and interactions", () => {
     fireEvent.focus(input);
     const recent = screen.getByRole("button", { name: "Costa" });
     expect(recent.querySelector("svg")).toBeNull();
+    expect(screen.getByText("Recent")).toHaveClass("crate-mono-label");
+    expect(recent).toHaveClass("hover:text-accent-action-hi");
     fireEvent.keyDown(input, { key: "ArrowDown" });
     fireEvent.keyDown(input, { key: "Enter" });
     await tick();
@@ -127,4 +132,24 @@ describe("Admin search presentation and interactions", () => {
         .querySelector("img"),
     ).toHaveAttribute("src", expect.stringContaining("/api/artists/7/photo"));
   });
+});
+
+it("notifies its modal owner only after choosing a result and keeps concurrent field IDs unique", async () => {
+  const selected = vi.fn();
+  render(
+    <MemoryRouter>
+      <SearchBar onNavigate={selected} />
+      <SearchBar />
+    </MemoryRouter>,
+  );
+  const fields = screen.getAllByRole("textbox", { name: "Search library" });
+  expect(fields[0]!.id).not.toBe(fields[1]!.id);
+  expect(selected).not.toHaveBeenCalled();
+  fireEvent.change(fields[0]!, { target: { value: "luz" } });
+  await tick();
+  expect(selected).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: /Costa Norte Artist artist/ }),
+  );
+  expect(selected).toHaveBeenCalledOnce();
 });

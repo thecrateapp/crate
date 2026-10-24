@@ -1,4 +1,7 @@
 import { SkipLink } from "@crate/ui/primitives/SkipLink";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { Search as SearchIcon } from "@crate/ui/icons";
 import {
   useState,
   useCallback,
@@ -42,8 +45,10 @@ import {
 export function Shell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const helpOpenerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarExpanded, setSidebarExpanded] = useState(
@@ -51,8 +56,22 @@ export function Shell() {
   );
 
   const focusSearch = useCallback(() => {
-    searchInputRef.current?.focus();
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setMobileSearchOpen(true);
+    } else {
+      searchInputRef.current?.focus();
+    }
   }, []);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const frame = requestAnimationFrame(() =>
+      mobileSearchInputRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [mobileSearchOpen]);
+
+  useEffect(() => setMobileSearchOpen(false), [location.pathname]);
 
   const blurSearch = useCallback(() => {
     if (document.activeElement instanceof HTMLElement) {
@@ -90,12 +109,8 @@ export function Shell() {
     };
   }, []);
 
-  const overlayHeader =
-    /^\/artists\/[^/]+\/[^/]+$/.test(location.pathname) ||
-    /^\/albums\/[^/]+\/[^/]+$/.test(location.pathname);
   const sidebarWidthClass = sidebarExpanded ? "md:ml-60" : "md:ml-36";
   const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-36";
-  const desktopHeaderOffsetClass = overlayHeader ? "md:pt-0" : "md:pt-24";
   const shellStyle = {
     "--sidebar-w": sidebarExpanded
       ? `${SIDEBAR_EXPANDED_WIDTH}px`
@@ -134,7 +149,13 @@ export function Shell() {
             </Button>
           </SheetTrigger>
           <div className="text-sm font-bold text-white">Crate Admin</div>
-          <div className="pointer-events-auto ml-auto">
+          <div className="pointer-events-auto ml-auto flex items-center gap-1">
+            <ActionButton
+              label="Search library"
+              onClick={() => setMobileSearchOpen(true)}
+            >
+              <SearchIcon data-admin-ux="mobile-search" aria-hidden="true" />
+            </ActionButton>
             <HeaderUserMenu />
           </div>
         </div>
@@ -209,13 +230,9 @@ export function Shell() {
         className={`overflow-x-hidden supports-[overflow:clip]:overflow-x-clip transition-[margin-left] duration-200 ${sidebarWidthClass}`}
       >
         <div
-          className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${
-            overlayHeader
-              ? "md:px-0"
-              : sidebarExpanded
-                ? "md:px-6 lg:px-8"
-                : "md:px-10 lg:px-12"
-          } ${desktopHeaderOffsetClass}`}
+          className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 md:pt-24 ${
+            sidebarExpanded ? "md:px-6 lg:px-8" : "md:px-10 lg:px-12"
+          }`}
         >
           <div key={location.pathname} className="animate-page-in">
             <Outlet />
@@ -224,6 +241,21 @@ export function Shell() {
       </main>
 
       <CommandPalette />
+
+      <AppModal
+        open={mobileSearchOpen}
+        onClose={() => setMobileSearchOpen(false)}
+        title="Search library"
+        description="Find artists, albums and tracks in your library."
+        closeLabel="Close library search"
+      >
+        <ModalBody>
+          <SearchBar
+            inputRef={mobileSearchInputRef}
+            onNavigate={() => setMobileSearchOpen(false)}
+          />
+        </ModalBody>
+      </AppModal>
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent
@@ -236,7 +268,9 @@ export function Shell() {
           }}
         >
           <DialogHeader>
-            <DialogTitle className="font-display">Keyboard Shortcuts</DialogTitle>
+            <DialogTitle className="font-display">
+              Keyboard Shortcuts
+            </DialogTitle>
             <DialogDescription>
               Navigate the admin console quickly with your keyboard.
             </DialogDescription>

@@ -9,6 +9,24 @@ import {
 } from "@/components/playlists/playlist-composer-model";
 
 describe("playlist composer model", () => {
+  it("moves and removes duplicate catalog tracks by their distinct playlist entry", () => {
+    const first = {
+      title: "Track",
+      artist: "Band",
+      globalTrackUid: "same",
+      playlistEntryId: 11,
+    };
+    const second = { ...first, playlistEntryId: 12 };
+    const moved = playlistComposerReducer(
+      { ...initialPlaylistComposerState, tracks: [first, second] },
+      { type: "move-track", activeId: "entry:12", overId: "entry:11" },
+    );
+    expect(moved.tracks).toEqual([second, first]);
+    expect(
+      playlistComposerReducer(moved, { type: "remove-track", key: "entry:11" })
+        .tracks,
+    ).toEqual([second]);
+  });
   it("uses the most stable available identity for tracks", () => {
     expect(
       getTrackKey({

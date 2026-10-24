@@ -27,6 +27,7 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
@@ -100,7 +101,13 @@ function completionTone(pct: number) {
   return "bg-state-warning";
 }
 
-function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
+function OpportunityCard({
+  artist,
+  canAcquire,
+}: {
+  artist: ArtistCompleteness;
+  canAcquire: boolean;
+}) {
   const navigate = useNavigate();
   const href =
     artist.artist_id != null || artist.artist_slug || artist.artist
@@ -196,15 +203,17 @@ function OpportunityCard({ artist }: { artist: ArtistCompleteness }) {
             Open artist
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          className="min-h-11 gap-2"
-          onClick={() =>
-            navigate(`/download?q=${encodeURIComponent(artist.artist)}`)
-          }
-        >
-          Acquire missing
-        </Button>
+        {canAcquire ? (
+          <Button
+            size="sm"
+            className="min-h-11 gap-2"
+            onClick={() =>
+              navigate(`/download?q=${encodeURIComponent(artist.artist)}`)
+            }
+          >
+            Acquire missing
+          </Button>
+        ) : null}
       </div>
     </OpsSurface>
   );
@@ -331,6 +340,7 @@ function DiscoveryFeedNotice({
         className="mb-4 flex min-h-11 items-center gap-3 rounded-md border border-border-quiet bg-panel-surface px-4 py-3 text-sm text-text-muted"
       >
         <Loader2
+          data-admin-ux="discover-block-loading"
           aria-hidden="true"
           className="h-4 w-4 animate-spin text-accent-action-hi"
         />
@@ -350,6 +360,9 @@ type DiscoveryFeed = {
 };
 
 interface DiscoverViewProps {
+  canCheckReleases: boolean;
+  canAcquire: boolean;
+  canViewRadar: boolean;
   navigate: (to: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
@@ -378,6 +391,9 @@ interface DiscoverViewProps {
 }
 
 function DiscoverView({
+  canCheckReleases,
+  canAcquire,
+  canViewRadar,
   navigate,
   search,
   onSearchChange,
@@ -435,53 +451,45 @@ function DiscoverView({
                   />
                 ) : null}
               </PageHeaderAction>
-              <PageHeaderAction
-                label="Check releases"
-                onClick={checkReleases}
-                aria-busy={checking}
-                disabled={checking}
-              >
-                {checking && (
-                  <Loader2
-                    data-admin-ux="discovery-check-loading"
-                    aria-hidden="true"
-                    size={14}
-                    className="animate-spin"
-                  />
-                )}
-                {!checking ? (
-                  <HeaderRadar
-                    data-admin-ux="header-check-releases"
-                    aria-hidden="true"
-                  />
-                ) : null}
-              </PageHeaderAction>
+              {canCheckReleases ? (
+                <PageHeaderAction
+                  label="Check releases"
+                  onClick={checkReleases}
+                  aria-busy={checking}
+                  disabled={checking}
+                >
+                  {checking && (
+                    <Loader2
+                      data-admin-ux="discovery-check-loading"
+                      aria-hidden="true"
+                      size={14}
+                      className="animate-spin"
+                    />
+                  )}
+                  {!checking ? (
+                    <HeaderRadar
+                      data-admin-ux="header-check-releases"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </PageHeaderAction>
+              ) : null}
             </>
           </PageHeaderActions>
         }
       >
-        <InfoBadge
-          active={feeds.completeness.hasData && summary.opportunityArtists > 0}
-        >
-          {feeds.completeness.hasData
-            ? `${summary.opportunityArtists} acquisition targets`
-            : "Catalogue gaps unavailable"}
-        </InfoBadge>
-        <InfoBadge>
-          {feeds.releases.hasData
-            ? `${summary.detectedReleases} detected releases`
-            : "Release radar unavailable"}
-        </InfoBadge>
-        <InfoBadge>
-          {feeds.completeness.hasData
-            ? `${summary.incompleteArtists} incomplete artists`
-            : "Catalogue coverage unavailable"}
-        </InfoBadge>
-        <InfoBadge>
-          {feeds.insights.hasData
-            ? `${trendingArtists.length + momentumAlbums.length} momentum signals`
-            : "Momentum data unavailable"}
-        </InfoBadge>
+        {Object.values(feeds).some((feed) => feed.loading) ? (
+          <InfoBadge>Refreshing discovery</InfoBadge>
+        ) : null}
+        {feeds.completeness.error ? (
+          <InfoBadge tone="warning">Catalogue gaps unavailable</InfoBadge>
+        ) : null}
+        {feeds.releases.error ? (
+          <InfoBadge tone="warning">Release radar unavailable</InfoBadge>
+        ) : null}
+        {feeds.insights.error ? (
+          <InfoBadge tone="warning">Momentum data unavailable</InfoBadge>
+        ) : null}
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -584,7 +592,11 @@ function DiscoverView({
         {opportunityArtists.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {opportunityArtists.slice(0, 8).map((artist) => (
-              <OpportunityCard key={artist.artist} artist={artist} />
+              <OpportunityCard
+                key={artist.artist}
+                artist={artist}
+                canAcquire={canAcquire}
+              />
             ))}
           </div>
         ) : feeds.completeness.hasData ||
@@ -600,14 +612,16 @@ function DiscoverView({
           title="Release Radar"
           description="Freshly detected albums from your orbit that may deserve immediate acquisition."
           action={
-            <Button
-              size="sm"
-              variant="outline"
-              className="min-h-11 gap-2"
-              onClick={() => navigate("/new-releases")}
-            >
-              Open Release Radar
-            </Button>
+            canViewRadar ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 gap-2"
+                onClick={() => navigate("/new-releases")}
+              >
+                Open Release Radar
+              </Button>
+            ) : undefined
           }
         >
           <DiscoveryFeedNotice
@@ -722,6 +736,7 @@ function DiscoverView({
 }
 
 export function Discover() {
+  const { hasCapability, hasAnyCapability } = useAuth();
   const navigate = useNavigate();
   const { pollTask } = useTaskPoll();
   const [search, setSearch] = useState("");
@@ -917,6 +932,15 @@ export function Discover() {
   return (
     <DiscoverView
       navigate={navigate}
+      canCheckReleases={hasCapability("curation.releases.write")}
+      canAcquire={hasAnyCapability([
+        "library.import.manage",
+        "library.tidal.manage",
+      ])}
+      canViewRadar={hasAnyCapability([
+        "curation.releases.write",
+        "library.tidal.manage",
+      ])}
       search={search}
       onSearchChange={setSearch}
       recomputing={recomputing}

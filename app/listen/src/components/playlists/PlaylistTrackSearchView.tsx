@@ -10,6 +10,8 @@ export function PlaylistTrackSearchView({
   search,
   searching,
   results,
+  error,
+  onRetry,
   t,
   onSearchChange,
   onAddTrack,
@@ -17,6 +19,8 @@ export function PlaylistTrackSearchView({
   search: string;
   searching: boolean;
   results: SearchTrackResult[];
+  error?: string;
+  onRetry?: () => void;
   t: ReturnType<typeof useTranslation>["t"];
   onSearchChange: (value: string) => void;
   onAddTrack: (track: SearchTrackResult) => void;
@@ -27,6 +31,8 @@ export function PlaylistTrackSearchView({
         search,
         searching,
         results,
+        error,
+        onRetry,
         t,
         onSearchChange,
         onAddTrack,
@@ -38,6 +44,8 @@ export function playlistTrackSearchProps({
   search,
   searching,
   results,
+  error,
+  onRetry,
   t,
   onSearchChange,
   onAddTrack,
@@ -48,6 +56,8 @@ export function playlistTrackSearchProps({
     label: t("playlistComposer.searchPlaceholder"),
     query: search,
     searching,
+    error,
+    onRetry,
     items: results.map(catalogTrackItem),
     kinds: ["track"],
     onQueryChange: onSearchChange,

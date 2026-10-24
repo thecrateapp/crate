@@ -1,8 +1,8 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
-import { useNavigate } from "react-router";
-import { Check, Users, Wrench } from "lucide-react";
-
+import { EntityRow } from "@crate/ui/domain/entity";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { formatCompact, formatSize } from "@/lib/utils";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
@@ -22,6 +22,8 @@ interface ArtistRowProps {
   selectMode?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
+  /** Browse preserves square artist covers; artist entity views default to portraits. */
+  artworkShape?: "circle" | "square";
 }
 
 export function ArtistRow({
@@ -39,108 +41,86 @@ export function ArtistRow({
   selectMode,
   isSelected,
   onClick,
+  artworkShape = "circle",
 }: ArtistRowProps) {
-  const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
-  const letter = name.charAt(0).toUpperCase();
-
-  function handleClick() {
-    if (onClick) {
-      onClick();
-    } else {
-      navigate(artistPagePath({ artistId, artistSlug, artistName: name }));
-    }
-  }
-
   return (
-    <div
-      role="link"
-      tabIndex={0}
-      onClick={handleClick}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleClick();
-        }
-      }}
-      className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors  ${
-        isSelected ? "bg-white/[0.06]" : ""
-      }`}
-    >
-      {selectMode ? (
-        <div className="flex-shrink-0">
-          <div
-            className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
-              isSelected
-                ? "border-primary bg-primary"
-                : "border-white/35 bg-transparent"
-            }`}
-          >
-            {isSelected ? (
-              <Check size={11} className="text-primary-foreground" />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="crate-media-thumbnail relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-white/5">
-        {!imgError ? (
-          <img
-            src={artistPhotoApiUrl({ artistId, artistSlug, artistName: name })}
-            alt={name}
-            loading="lazy"
-            className="h-full w-full object-cover"
-            onError={() => setImgError(true)}
+    <EntityRow
+      title={name}
+      selected={isSelected}
+      pressed={selectMode ? Boolean(isSelected) : undefined}
+      href={
+        !selectMode && !onClick
+          ? artistPagePath({ artistId, artistSlug, artistName: name })
+          : undefined
+      }
+      onOpen={onClick}
+      openLabel={
+        selectMode
+          ? `${isSelected ? "Deselect" : "Select"} ${name}`
+          : `Open ${name}`
+      }
+      menuButton="none"
+      shape={artworkShape}
+      leading={
+        <span
+          data-shape={artworkShape}
+          className={`crate-media-thumbnail relative flex size-12 shrink-0 items-center justify-center overflow-hidden bg-surface-object ${artworkShape === "square" ? "rounded-lg" : "rounded-full"}`}
+        >
+          {!imgError ? (
+            <img
+              src={artistPhotoApiUrl({
+                artistId,
+                artistSlug,
+                artistName: name,
+              })}
+              alt={name}
+              loading="lazy"
+              className="size-full object-cover"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <span className="font-display text-base text-text-muted">
+              {name.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </span>
+      }
+      subtitle={
+        genres?.length ? (
+          <GenrePillRow
+            items={genres.slice(0, 3).map((genre) => ({ name: genre }))}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/25 to-primary/5">
-            <span className="text-sm font-bold text-primary/70">{letter}</span>
-          </div>
-        )}
-        {hasIssues ? (
-          <div className="absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-state-warning/12 text-state-warning-text">
-            <Wrench size={10} />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <div className="truncate text-sm font-medium text-foreground">
-            {name}
-          </div>
+        ) : undefined
+      }
+      titleAccessory={
+        <>
           {isFeatured ? <InfoBadge active>Featured</InfoBadge> : null}
+          {hasIssues ? (
+            <InfoBadge tone="warning">Needs repair</InfoBadge>
+          ) : null}
           {isFeatured
             ? featuredDevices.map((device) => (
                 <InfoBadge key={device}>{device}</InfoBadge>
               ))
             : null}
-        </div>
-        {genres && genres.length > 0 ? (
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {genres.slice(0, 3).map((genre) => (
-              <InfoBadge key={genre}>{genre.toLowerCase()}</InfoBadge>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="hidden text-xs text-muted-foreground sm:block">
-        {albums} albums
-      </div>
-      <div className="hidden w-20 text-right text-xs text-muted-foreground sm:block">
-        {tracks} tracks
-      </div>
-      <div className="hidden w-16 text-right text-xs text-muted-foreground lg:block">
-        {formatSize(total_size_mb)}
-      </div>
-      {listeners != null && listeners > 0 ? (
-        <div className="hidden w-20 items-center justify-end gap-1 text-xs text-muted-foreground md:flex">
-          <Users size={12} />
-          {formatCompact(listeners)}
-        </div>
-      ) : null}
-    </div>
+        </>
+      }
+      trailing={
+        <>
+          <MonoLabel as="span" className="hidden sm:block">
+            {albums} albums · {tracks} tracks
+          </MonoLabel>
+          <MonoLabel as="span" className="hidden lg:block">
+            {formatSize(total_size_mb)}
+          </MonoLabel>
+          {listeners != null && listeners > 0 ? (
+            <MonoLabel as="span" className="hidden md:block">
+              {formatCompact(listeners)} listeners
+            </MonoLabel>
+          ) : null}
+        </>
+      }
+    />
   );
 }

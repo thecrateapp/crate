@@ -7,6 +7,7 @@ import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
 import { PlayerLyricsContent } from "./PlayerLyricsContent";
 import { PlayerStage } from "./PlayerStage";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
+import { PlayerMixIndicator } from "./PlayerMixIndicator";
 import type {
   FullscreenPlayerViewProps,
   ViewPlayer,
@@ -66,10 +67,11 @@ export function FullscreenPlayerPlayerTab({
         onArtistClick={actions.goToArtist}
         artistClickable={Boolean(
           player.resolvedArtist?.id != null ||
-            player.resolvedArtist?.globalArtistUid,
+          player.resolvedArtist?.globalArtistUid,
         )}
       />
       <div className="mx-auto mt-4 w-full max-w-[360px]">
+        <PlayerMixIndicator mix={player.mix ?? null} />
         <PlayerProgressLeaf
           onSeek={actions.seekWithFeedback}
           disabled={state.jamQueueLocked}

@@ -1,6 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useEffect, useState } from "react";
-import { Bot, ArrowLeft, Play, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import {
+  Bot,
+  ArrowLeft,
+  Play,
+  Tag,
+  GripVertical,
+  ArrowDownToLineBold,
+  CRATE_ICON_SIZE,
+} from "@crate/ui/icons";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 function TokenTable({ tokens }: { tokens: string[] }) {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -48,7 +57,8 @@ function ColorSamples() {
       <h2 className="showcase-heading">Crate colors</h2>
       <p>
         One identity. Samples read the actual variables instead of copying hex
-        values.
+        values. The fullscreen player uses one continuous canvas; its
+        transparent header shares the body surface.
       </p>
       <div className="showcase-line">
         {colors.map((token) => (
@@ -84,10 +94,16 @@ export const Typography: Story = {
     <div className="showcase-stack">
       <h2 className="showcase-heading">Typography by role</h2>
       <p className="font-display text-4xl">
-        Bricolage Grotesque · headings and numerals
+        Bricolage Grotesque · headings and display numerals
       </p>
       <p className="text-base">Roboto · body and controls</p>
       <MonoLabel>JetBrains Mono · labels and metadata</MonoLabel>
+      <p className="font-mono font-normal tabular-nums">
+        1,024 · technical count
+      </p>
+      <p className="font-mono text-meta font-normal">
+        FLAC · 44.1 kHz · 16 bit
+      </p>
       <p>
         The same packaged faces serve web and native. Each component contract
         defines weight, size and role.
@@ -100,6 +116,8 @@ export const Typography: Story = {
           "--text-label",
           "--text-info-badge",
           "--text-filter-chip",
+          "--type-meta-size",
+          "--text-meta",
         ]}
       />
     </div>
@@ -162,7 +180,20 @@ export const Icons: Story = {
         <ArrowLeft aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
         <Play aria-hidden="true" size={CRATE_ICON_SIZE.lg} />
       </div>
+      <ActionGroup label="Catalogue action glyphs">
+        <ActionButton label="Mark as facet">
+          <Tag aria-hidden="true" />
+        </ActionButton>
+        <ActionButton label="Reorder items">
+          <GripVertical aria-hidden="true" />
+        </ActionButton>
+        <ActionButton label="Download available files">
+          <ArrowDownToLineBold aria-hidden="true" />
+        </ActionButton>
+      </ActionGroup>
       <p>
+        Tag, GripVertical and ArrowDownToLineBold expose the actual Solar
+        aliases used for taxonomy, reorder and available-download actions.
         Import from @crate/ui/icons. Decorative glyphs are aria-hidden; controls
         retain accessible names. Use conventional action and UX glyphs, with
         recorded domain exceptions.
@@ -176,9 +207,12 @@ export const Motion: Story = {
       <h2 className="showcase-heading">Motion and effects</h2>
       <p>
         Respect prefers-reduced-motion, visibility and existing functional
-        preferences. State never relies on motion or color alone. Rows do not
-        brighten on hover; active state, selection and focus have separate
-        roles.
+        preferences. State never relies on motion or color alone. Enabled track
+        rows retain the approved fine-pointer accent wash; other row families
+        keep foreground-only feedback. Active state, selection and focus have
+        separate roles. Indeterminate ProgressHairline moves only while visible
+        and motion is allowed; Meter and determinate progress use a fixed
+        one-pixel rail.
       </p>
     </div>
   ),

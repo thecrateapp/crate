@@ -1,11 +1,17 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import type { OfflineItemRecord } from "@/lib/offline";
 import type { OfflineContextValue } from "@/contexts/offline-context";
-import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+import { OfflineContext } from "@/contexts/offline-context";
+import {
+  createMockOfflineValue,
+  renderWithListenProviders,
+} from "@/test/render-with-listen-providers";
+import { SettingsPanelActivity } from "./settings-panel-activity";
 
 const nativeFilesystem = vi.hoisted(() => ({ enabled: false }));
 vi.mock("@/lib/platform", async (importOriginal) => {
@@ -162,7 +168,7 @@ describe("OfflineSection meters", () => {
     expect(screen.queryByText(/NaN|Infinity/)).not.toBeInTheDocument();
   });
 
-  it("preserves sync and remove-copy actions", async () => {
+  it("syncs directly but requires contextual confirmation before removing all downloaded copies", async () => {
     const user = userEvent.setup();
     const syncAll = vi.fn(async () => {});
     const clearActiveProfile = vi.fn(async () => {});
@@ -175,8 +181,230 @@ describe("OfflineSection meters", () => {
     await user.click(
       screen.getByRole("button", { name: "Remove offline copies" }),
     );
+    expect(clearActiveProfile).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/3 downloaded items/);
+    expect(dialog).toHaveTextContent(/10 tracks/);
+    expect(dialog).toHaveTextContent(/256 MB/);
+    expect(dialog).toHaveTextContent(/library stays on the server/);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(clearActiveProfile).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole("button", { name: "Remove offline copies" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Remove downloaded copies",
+      }),
+    );
     expect(clearActiveProfile).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
+
+  it("keeps removal pending, shows a safe failure in the confirmation and retries without losing context", async () => {
+    const user = userEvent.setup();
+    let rejectClear!: (error: Error) => void;
+    const clearActiveProfile = vi
+      .fn()
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectClear = reject;
+        }),
+      )
+      .mockResolvedValue(undefined);
+    renderOffline({ clearActiveProfile });
+    await user.click(
+      screen.getByRole("button", { name: "Remove offline copies" }),
+    );
+    const dialog = screen.getByRole("alertdialog");
+    const confirm = within(dialog).getByRole("button", {
+      name: "Remove downloaded copies",
+    });
+    await user.click(confirm);
+    expect(confirm).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(dialog).toBeVisible();
+    await act(async () =>
+      rejectClear(new Error("Internal secret /tmp/local-profile")),
+    );
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "Failed to clear offline copies",
+    );
+    expect(dialog).not.toHaveTextContent("local-profile");
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(clearActiveProfile).toHaveBeenCalledTimes(2);
+  });
+
+  it("dismisses an unsubmitted removal confirmation when its Settings panel hides", async () => {
+    const user = userEvent.setup();
+    const clearActiveProfile = vi.fn(async () => {});
+    let setActive!: (active: boolean) => void;
+    function SettingsPanel() {
+      const [active, updateActive] = useState(true);
+      setActive = updateActive;
+      return (
+        <SettingsPanelActivity value={active}>
+          <OfflineSection />
+        </SettingsPanelActivity>
+      );
+    }
+    renderWithListenProviders(<SettingsPanel />, {
+      locale: "en",
+      offline: { summary: offlineSummary, clearActiveProfile },
+    });
+    await user.click(
+      screen.getByRole("button", { name: "Remove offline copies" }),
+    );
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+    act(() => setActive(false));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    act(() => setActive(true));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(clearActiveProfile).not.toHaveBeenCalled();
+  });
+
+  it("retains the original removal scope and permits retry when asset cleanup fails after the offline snapshot was emptied", async () => {
+    const user = userEvent.setup();
+    let rejectAssets!: (error: Error) => void;
+    let attempts = 0;
+    function OfflineProfile() {
+      const [summary, setSummary] = useState(offlineSummary);
+      return (
+        <OfflineContext
+          value={createMockOfflineValue({
+            summary,
+            clearActiveProfile: async () => {
+              attempts++;
+              setSummary({
+                ...offlineSummary,
+                itemCount: 0,
+                trackCount: 0,
+                totalBytes: 0,
+              });
+              if (attempts === 1)
+                await new Promise<void>((_, reject) => {
+                  rejectAssets = reject;
+                });
+            },
+          })}
+        >
+          <OfflineSection />
+        </OfflineContext>
+      );
+    }
+    renderWithListenProviders(<OfflineProfile />, { locale: "en" });
+    await user.click(
+      screen.getByRole("button", { name: "Remove offline copies" }),
+    );
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove downloaded copies" }),
+    );
+    expect(dialog).toHaveTextContent("3 downloaded items");
+    await act(async () => rejectAssets(new Error("asset cleanup failed")));
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole("alert")).toBeVisible();
+    expect(dialog).toHaveTextContent("3 downloaded items");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove downloaded copies" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(attempts).toBe(2);
+  });
+
+  it.each(["writable", "unsupported", "readOnly", "syncing"] as const)(
+    "recovers a partial removal failure after leaving Settings without restarting it automatically (%s)",
+    async (gate) => {
+      const user = userEvent.setup();
+      let rejectAssets!: (error: Error) => void;
+      let setActive!: (active: boolean) => void;
+      let setGate!: (gate: string) => void;
+      let attempts = 0;
+      function OfflineProfile() {
+        const [summary, setSummary] = useState(offlineSummary);
+        const [active, updateActive] = useState(true);
+        const [capability, updateGate] = useState("writable");
+        setActive = updateActive;
+        setGate = updateGate;
+        return (
+          <SettingsPanelActivity value={active}>
+            <OfflineContext
+              value={createMockOfflineValue({
+                summary,
+                supported: capability !== "unsupported",
+                readOnly: capability === "readOnly",
+                syncing: capability === "syncing",
+                clearActiveProfile: async () => {
+                  attempts++;
+                  setSummary({
+                    ...offlineSummary,
+                    itemCount: 0,
+                    trackCount: 0,
+                    totalBytes: 0,
+                  });
+                  if (attempts === 1)
+                    await new Promise<void>((_, reject) => {
+                      rejectAssets = reject;
+                    });
+                },
+              })}
+            >
+              <OfflineSection />
+            </OfflineContext>
+          </SettingsPanelActivity>
+        );
+      }
+      renderWithListenProviders(<OfflineProfile />, { locale: "en" });
+      await user.click(
+        screen.getByRole("button", { name: "Remove offline copies" }),
+      );
+      await user.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", {
+          name: "Remove downloaded copies",
+        }),
+      );
+      act(() => setActive(false));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      await act(async () =>
+        rejectAssets(new Error("Internal profile asset failure")),
+      );
+      act(() => {
+        setGate(gate);
+        setActive(true);
+      });
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(attempts).toBe(1);
+      const failure = screen.getByRole("alert");
+      expect(failure).toHaveTextContent("Failed to clear offline copies");
+      expect(failure).not.toHaveTextContent("Internal profile asset failure");
+      if (gate !== "writable") {
+        expect(
+          within(failure).queryByRole("button", { name: "Retry" }),
+        ).toBeNull();
+        act(() => setGate("writable"));
+      }
+      await user.click(within(failure).getByRole("button", { name: "Retry" }));
+      const retry = screen.getByRole("alertdialog");
+      expect(retry).toHaveTextContent("3 downloaded items");
+      expect(retry).toHaveTextContent("10 tracks");
+      expect(retry).toHaveTextContent("256 MB");
+      expect(attempts).toBe(1);
+      await user.click(
+        within(retry).getByRole("button", { name: "Remove downloaded copies" }),
+      );
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(attempts).toBe(2);
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: "Remove offline copies" }),
+      ).toBeDisabled();
+    },
+  );
 
   it.each(["unsupported", "syncing", "empty mirror"] as const)(
     "keeps destructive and sync controls disabled for %s",

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
+import { SHOW_STATUS_LABELS } from "./show-import-presentation";
 import { ShowCandidateFields } from "./ShowCandidateFields";
 import { ShowCandidateList } from "./ShowCandidateList";
 import type { ShowDraftState } from "./show-draft";
@@ -339,6 +340,9 @@ it("uses design-system controls only", async () => {
     "Europe/Madrid",
   );
   await user.click(screen.getByRole("combobox", { name: "Status for show 1" }));
+  expect(
+    screen.getAllByRole("option").map((option) => option.textContent),
+  ).toEqual(Object.values(SHOW_STATUS_LABELS));
   await user.click(screen.getByRole("option", { name: "On sale" }));
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ item_id: "a", status: "onsale" }),

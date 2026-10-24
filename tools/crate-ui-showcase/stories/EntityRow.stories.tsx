@@ -25,6 +25,9 @@ export const Base: Story = {};
 export const Active: Story = { args: { active: true } };
 export const Selected: Story = { args: { selected: true } };
 export const Disabled: Story = { args: { disabled: true } };
+export const SelectionToggle: Story = {
+  args: { href: undefined, onOpen: () => {}, selected: true, pressed: true },
+};
 export const FullText: Story = {
   args: {
     truncate: false,

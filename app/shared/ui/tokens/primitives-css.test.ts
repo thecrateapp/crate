@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { transform } from "lightningcss";
+import { Features, transform } from "lightningcss";
 import { compile } from "tailwindcss";
 import { describe, expect, it } from "vitest";
 
@@ -28,8 +28,15 @@ describe("primitive typography CSS", () => {
       }).code.toString();
       expect(minified).toContain(`font-size:${fallback}`);
       expect(minified).toMatch(/@supports\s+not\s*\(font-size:\s*1cqi\)/);
+      // Tailwind can coalesce the fallback and fluid value into a nested rule
+      // when a tier also defines tracking. Inspect the flattened CSS artifact.
+      const flattened = transform({
+        filename: "typography.css",
+        code: Buffer.from(css),
+        include: Features.Nesting,
+      }).code.toString();
       const declarations = [
-        ...css.matchAll(
+        ...flattened.matchAll(
           new RegExp(`\\.text-numeral-${size}\\s*\\{([^}]+)\\}`, "g"),
         ),
       ].flatMap(([, body]) =>

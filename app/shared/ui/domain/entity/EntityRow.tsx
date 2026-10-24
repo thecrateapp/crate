@@ -29,9 +29,7 @@ export interface EntityRowClassNames {
 }
 
 export interface EntityRowProps
-  extends EntityPrimaryActionProps,
-    EntityMenuProps,
-    EntityFrameAttributes {
+  extends EntityPrimaryActionProps, EntityMenuProps, EntityFrameAttributes {
   title: string;
   /** Rich identity content; plain title remains the menu/accessibility fallback. */
   titleContent?: ReactNode;
@@ -82,6 +80,7 @@ export const EntityRow = memo(function EntityRow({
   href,
   external,
   openLabel,
+  pressed,
   actionMenu,
   renderMenu,
   menuButton = "hover",
@@ -152,6 +151,7 @@ export const EntityRow = memo(function EntityRow({
         href={href}
         external={external}
         openLabel={openLabel}
+        pressed={pressed}
         disabled={disabled}
         current={active}
         className={cn(

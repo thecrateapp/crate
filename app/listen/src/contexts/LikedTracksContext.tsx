@@ -49,6 +49,8 @@ export interface LikedTrack {
 interface LikedTracksContextValue {
   likedTracks: LikedTrack[];
   loading: boolean;
+  hasLoaded: boolean;
+  error: string | null;
   isLiked: (
     trackId?: number | null,
     trackEntityUid?: string | null,
@@ -90,6 +92,9 @@ function getComparableKeys(value?: string | null): string[] {
 export function LikedTracksProvider({ children }: { children: ReactNode }) {
   const [likedTracks, setLikedTracks] = useState<LikedTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
   const likedTracksRequestRef = useRef<AbortController | null>(null);
   const likedTracksRef = useRef<LikedTrack[]>([]);
 
@@ -102,6 +107,7 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     likedTracksRequestRef.current = controller;
     setLoading(true);
+    setError(null);
     try {
       const tracks = await api<LikedTrack[]>(
         "/api/me/likes?limit=1000",
@@ -111,11 +117,15 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         },
       );
+      if (controller.signal.aborted) return;
       setLikedTracks(Array.isArray(tracks) ? tracks : []);
+      hasLoadedRef.current = true;
+      setHasLoaded(true);
     } catch (error) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
         return;
       }
+      setError(error instanceof Error ? error.message || "unknown" : "unknown");
     } finally {
       if (likedTracksRequestRef.current === controller) {
         likedTracksRequestRef.current = null;
@@ -277,6 +287,7 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       trackPath?: string | null,
       globalTrackUid?: string | null,
     ) => {
+      if (!hasLoadedRef.current) throw new Error("Likes have not been loaded");
       if (trackId == null && !trackEntityUid && !trackPath && !globalTrackUid)
         return false;
       if (isLiked(trackId, trackEntityUid, trackPath, globalTrackUid)) {
@@ -291,6 +302,8 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
     () => ({
       likedTracks,
       loading,
+      hasLoaded,
+      error,
       isLiked,
       likeTrack,
       unlikeTrack,
@@ -300,6 +313,8 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
     [
       likedTracks,
       loading,
+      hasLoaded,
+      error,
       isLiked,
       likeTrack,
       unlikeTrack,

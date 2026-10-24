@@ -1,3 +1,9 @@
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    hasCapability: (cap: string) => cap !== "no-permission",
+    hasAnyCapability: () => true,
+  }),
+}));
 import {
   act,
   cleanup,
@@ -5,6 +11,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
@@ -124,7 +131,10 @@ describe("Discovery text presentation with real hooks", () => {
       screen.getByText("No detected releases available right now."),
     ).toBeInTheDocument();
     expect(screen.getByText("ambient", { exact: true })).toBeInTheDocument();
-    expect(screen.getByText("2 detected releases")).toBeInTheDocument();
+    const releaseMetric = screen.getByText("Detected releases", {
+      exact: true,
+    }).parentElement!;
+    expect(within(releaseMetric).getByText("2", { exact: true })).toBeVisible();
     expect(mockApi).toHaveBeenCalledTimes(3);
   });
 
@@ -136,12 +146,14 @@ describe("Discovery text presentation with real hooks", () => {
     for (const link of screen.getAllByRole("link", { name: "Costa Norte" }))
       expect(link).toHaveAttribute("href", "/artists/costa-norte");
     const first = screen.getAllByRole("button", { name: "Open artist" })[0]!;
-    first.focus();
+    act(() => first.focus());
     await userEvent.keyboard("{Enter}");
     expect(screen.getByLabelText("Current route")).toHaveTextContent(
       "/artists/costa-norte",
     );
-    screen.getAllByRole("button", { name: "Acquire missing" })[0]!.focus();
+    act(() =>
+      screen.getAllByRole("button", { name: "Acquire missing" })[0]!.focus(),
+    );
     await userEvent.keyboard(" ");
     expect(screen.getByLabelText("Current route")).toHaveTextContent(
       "/download?q=Costa%20Norte",
@@ -156,7 +168,7 @@ describe("Discovery text presentation with real hooks", () => {
 
   it("refreshes exactly the three original surfaces from the keyboard", async () => {
     await ready();
-    screen.getByRole("button", { name: "Refresh" }).focus();
+    act(() => screen.getByRole("button", { name: "Refresh" }).focus());
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(mockApi).toHaveBeenCalledTimes(6));
     expect(
@@ -201,7 +213,7 @@ describe("Discovery text presentation with real hooks", () => {
       );
       await ready();
       const button = screen.getByRole("button", { name: "Recompute gaps" });
-      button.focus();
+      act(() => button.focus());
       await userEvent.keyboard("{Enter}");
       await waitFor(() =>
         expect(mockWait).toHaveBeenCalledWith(
@@ -344,7 +356,12 @@ describe("Discovery text presentation with real hooks", () => {
       expect(
         screen.queryByText(label, { exact: true }),
       ).not.toBeInTheDocument();
-    expect(screen.getByText("10 acquisition targets")).toBeInTheDocument();
+    const acquisitionMetric = screen.getByText("Acquisition targets", {
+      exact: true,
+    }).parentElement!;
+    expect(
+      within(acquisitionMetric).getByText("10", { exact: true }),
+    ).toBeVisible();
   });
 
   it("aborts the actual task wait when the page unmounts", async () => {

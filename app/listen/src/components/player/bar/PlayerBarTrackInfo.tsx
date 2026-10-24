@@ -20,6 +20,7 @@ export interface PlayerBarTrackInfoProps {
   sourceLabel: string | null;
   isDesktop: boolean;
   liked: boolean;
+  likeStateAvailable?: boolean;
   isShapedRadioTrack: boolean;
   shapedRadioSessionId: string | null | undefined;
   onNavigate: (path: string) => void;
@@ -38,6 +39,7 @@ export function PlayerBarTrackInfo({
   sourceLabel,
   isDesktop,
   liked,
+  likeStateAvailable,
   isShapedRadioTrack,
   shapedRadioSessionId,
   onNavigate,
@@ -104,6 +106,7 @@ export function PlayerBarTrackInfo({
   return (
     <div className="flex min-w-0 shrink-0 flex-1 items-center gap-3 md:w-[min(26vw,260px)] md:flex-none lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
       <div
+        data-player-surface-launcher={isDesktop ? undefined : "fullscreen"}
         role={isDesktop ? undefined : "button"}
         tabIndex={isDesktop ? undefined : 0}
         aria-label={isDesktop ? undefined : "Open fullscreen player"}
@@ -157,6 +160,7 @@ export function PlayerBarTrackInfo({
           displayTrack={displayTrack}
           isShapedRadioTrack={isShapedRadioTrack}
           liked={liked}
+          likeStateAvailable={likeStateAvailable}
           onNextTrack={onNextTrack}
           onToggleLike={onToggleLike}
           shapedRadioSessionId={shapedRadioSessionId}

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PlayerChromeRefinementsExample } from "../reviews/ArtistPlayerReview";
 import { PlayerSourceLabelExample } from "../reviews/ActionLabelsReview";
+import { PlayerMixExample } from "../reviews/PlayerMixReview";
 import {
   PlayerTransportStory,
   PlayerPanelsStory,
@@ -31,6 +32,17 @@ export const PanelsQueueLyricsAndResume: Story = {
 };
 
 export const DiscMotion: Story = { render: () => <DiscMotionExample /> };
+export const ActualTransition: Story = {
+  render: () => <PlayerMixExample />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Actual native execution only: blue Crossfade, yellow Beatmatch with applied bass swap, neutral Gapless. The existing 1px disc ring and MonoLabel/StatusDot share one semantic color map. Pause and missing telemetry clear the ring. This isolated fixture uses production player pieces with simulated native state, without audio or network.",
+      },
+    },
+  },
+};
 export const DisplayModes: Story = {
   render: () => <PlayerSurfaceModeExamples />,
 };

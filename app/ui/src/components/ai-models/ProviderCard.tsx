@@ -1,9 +1,9 @@
 import { useId, useState, type FormEvent } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Switch } from "@crate/ui/primitives/Switch";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
+import { FormField } from "@crate/ui/primitives/FormField";
 
 import { RelativeTime } from "@/components/admin/RelativeTime";
 import { StatusBadge } from "@/components/admin/StatusBadge";
@@ -79,8 +79,11 @@ function KeyForm({
 
   return (
     <div className="space-y-2">
-      <label className="block space-y-1 text-sm text-white/70">
-        API key
+      <FormField
+        label="API key"
+        hint="Keys are write-only. Crate never shows them again."
+        className="min-w-0"
+      >
         <Input
           type="password"
           aria-label="API key"
@@ -89,10 +92,7 @@ function KeyForm({
           value={key}
           onChange={(event) => setKey(event.target.value)}
         />
-      </label>
-      <p className="text-xs text-white/45">
-        Keys are write-only. Crate never shows them again.
-      </p>
+      </FormField>
       <div className="flex flex-wrap gap-2">
         <Button disabled={busy || !key} onClick={() => void submit(key)}>
           Save key
@@ -164,30 +164,27 @@ function LimitsForm({
   return (
     <form
       onSubmit={(event) => void saveSettings(event)}
-      className="flex flex-wrap gap-3"
+      className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-3"
     >
-      <label className="space-y-1 text-sm text-white/70">
-        Name
+      <FormField label="Name" className="min-w-0">
         <Input
           required
           maxLength={200}
           value={label}
           onChange={(event) => setLabel(event.target.value)}
         />
-      </label>
+      </FormField>
       {isOllama ? (
-        <label className="space-y-1 text-sm text-white/70">
-          Endpoint
+        <FormField label="Endpoint" className="min-w-0">
           <Input
             type="url"
             required
             value={endpoint}
             onChange={(event) => setEndpoint(event.target.value)}
           />
-        </label>
+        </FormField>
       ) : null}
-      <label className="space-y-1 text-sm text-white/70">
-        Daily calls
+      <FormField label="Daily calls" className="min-w-0">
         <Input
           type="number"
           min={1}
@@ -196,9 +193,8 @@ function LimitsForm({
           value={numberInputValue(dailyCalls)}
           onChange={(event) => setDailyCalls(event.target.valueAsNumber)}
         />
-      </label>
-      <label className="space-y-1 text-sm text-white/70">
-        Daily tokens
+      </FormField>
+      <FormField label="Daily tokens" className="min-w-0">
         <Input
           type="number"
           min={1}
@@ -207,9 +203,8 @@ function LimitsForm({
           value={numberInputValue(dailyTokens)}
           onChange={(event) => setDailyTokens(event.target.valueAsNumber)}
         />
-      </label>
-      <label className="space-y-1 text-sm text-white/70">
-        At a time
+      </FormField>
+      <FormField label="At a time" className="min-w-0">
         <Input
           type="number"
           min={1}
@@ -218,15 +213,14 @@ function LimitsForm({
           value={numberInputValue(maxConcurrent)}
           onChange={(event) => setMaxConcurrent(event.target.valueAsNumber)}
         />
-      </label>
-      <label className="flex items-center gap-2 self-end pb-1 text-sm text-white/70">
-        <Switch
-          aria-label="Connection enabled"
-          checked={enabled}
-          onCheckedChange={setEnabled}
-        />
-        Enabled
-      </label>
+      </FormField>
+      <FormField
+        label="Connection enabled"
+        layout="inline"
+        className="self-end"
+      >
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
+      </FormField>
       <Button type="submit" disabled={busy || !valid}>
         Save settings
       </Button>
@@ -272,8 +266,7 @@ function ManualModelForm({
       onSubmit={(event) => void addModel(event)}
       className="flex flex-wrap items-end gap-2"
     >
-      <label className="space-y-1 text-sm text-white/70">
-        Model ID
+      <FormField label="Model ID" className="min-w-0">
         <Input
           aria-label="Model ID"
           required
@@ -282,7 +275,7 @@ function ManualModelForm({
           value={modelId}
           onChange={(event) => setModelId(event.target.value)}
         />
-      </label>
+      </FormField>
       <Button type="submit" disabled={busy || !modelId}>
         Add model
       </Button>
@@ -302,20 +295,15 @@ function SettingsSection({
 
   return (
     <div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         aria-expanded={open}
         aria-controls={open ? contentId : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex items-center gap-1 text-sm text-white/70 hover:text-white"
       >
-        {open ? (
-          <ChevronDown aria-hidden="true" className="size-4" />
-        ) : (
-          <ChevronRight aria-hidden="true" className="size-4" />
-        )}
         Settings
-      </button>
+      </Button>
       {open ? (
         <div id={contentId} className="mt-3 space-y-4">
           <LimitsForm
@@ -324,7 +312,7 @@ function SettingsSection({
             refresh={refresh}
           />
           <ManualModelForm connection={connection} refresh={refresh} />
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-text-muted">
             Added models stay pending until Crate can confirm what they support.
           </p>
         </div>
@@ -380,19 +368,19 @@ export function ProviderCard({
   return (
     <article
       aria-label={name}
-      className="space-y-3 rounded-md border border-white/10 bg-white/[0.02] p-4"
+      className="space-y-3 rounded-md border border-border-quiet bg-surface-container p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-medium text-white font-display">{name}</h3>
-          <p className="text-sm text-white/50">
+          <h3 className="font-medium text-text-primary font-display">{name}</h3>
+          <p className="text-sm text-text-muted">
             {providerLabel(connection.provider)}
           </p>
         </div>
         <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
       </div>
 
-      <div className="space-y-1 text-sm text-white/70">
+      <div className="space-y-1 text-sm text-text-secondary">
         <p>{keyLine(connection)}</p>
         <p>Endpoint: {connection.endpoint ?? "provider default"}</p>
         <ModelsLine connection={connection} />
@@ -425,7 +413,7 @@ export function ProviderCard({
       ) : null}
 
       {connection.read_only ? (
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-text-muted">
           Limits: {formatCount(connection.max_concurrent)} at a time ·{" "}
           {formatCount(connection.daily_calls)} calls ·{" "}
           {formatCount(connection.daily_tokens)} tokens per day

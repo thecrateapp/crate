@@ -50,3 +50,15 @@ def test_admin_rejects_unsupported_new_smart_rules():
     with pytest.raises(HTTPException) as error:
         _validate_generation_mode("smart", {"rules": [], "sort": "surprise"})
     assert error.value.status_code == 422
+
+
+@pytest.mark.parametrize("required", [True, False])
+def test_editorial_rules_accept_full_mix_profile_boolean(required):
+    rules = {"rules": [], "require_full_mix_profile": required}
+    assert validate_smart_rules(rules) is rules
+
+
+@pytest.mark.parametrize("required", [None, "true", "false", 0, 1])
+def test_editorial_rules_reject_non_boolean_full_mix_profile(required):
+    with pytest.raises(ValueError, match="require_full_mix_profile"):
+        validate_smart_rules({"rules": [], "require_full_mix_profile": required})

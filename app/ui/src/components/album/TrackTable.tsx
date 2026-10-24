@@ -1,20 +1,21 @@
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { useLibrarySearch } from "@/hooks/use-library-search";
 import {
   formatTrackAnalysis,
   formatTrackQuality,
 } from "@crate/ui/lib/track-meta";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BarChart3,
-  Disc3,
   Download,
-  FileText,
+  AlignLeft,
   Loader2,
   Search,
-} from "lucide-react";
-import { ResponsiveRadar } from "@nivo/radar";
+} from "@crate/ui/icons";
 
 import { SimilarTracksPanel } from "@/components/track/SimilarTracksPanel";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@crate/ui/shadcn/badge";
@@ -116,24 +117,12 @@ interface AlbumSearchResult {
   has_cover?: boolean;
 }
 
-interface SearchResponse {
-  albums?: AlbumSearchResult[];
-}
-
-export interface AudioAnalysisTrack {
-  tempo: number | null;
-  key: string | null;
-  scale: string | null;
-  energy: number | null;
-  mood: Record<string, number> | null;
-  danceability: number | null;
-  valence: number | null;
-  acousticness: number | null;
-  instrumentalness: number | null;
-  loudness: number | null;
-  dynamic_range: number | null;
-  spectral_complexity: number | null;
-}
+export type { AudioAnalysisTrack } from "./audio-analysis";
+import { analysisForTrack, type AudioAnalysisTrack } from "./audio-analysis";
+import { AudioProfileCard } from "./AudioProfileCard";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 
 interface TrackTableProps {
   tracks: Track[];
@@ -197,14 +186,11 @@ function PopularityBar({
             </span>
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-        >
+        <TooltipContent side="top">
           <div className="space-y-1 text-xs">
             <div>Popularity {Math.round(pct * 100)}%</div>
             {confidence != null ? (
-              <div className="text-white/60">
+              <div className="text-text-secondary">
                 Confidence {Math.round(confidencePct * 100)}%
               </div>
             ) : null}
@@ -229,16 +215,11 @@ function formatBytes(bytes: number | null | undefined) {
   }`;
 }
 
-function variantTone(status: string) {
-  if (status === "ready")
-    return "border-accent-action/35 bg-accent-action/10 text-accent-action-hi";
-  if (status === "failed")
-    return "border-state-warning/35 bg-state-warning/10 text-state-warning-text";
-  if (status === "running")
-    return "border-accent-action/35 bg-accent-action/10 text-accent-action-hi";
-  if (status === "pending")
-    return "border-state-warning/35 bg-state-warning/10 text-state-warning-text";
-  return "border-white/15 bg-white/[0.04] text-white/50";
+function variantTone(status: string): InfoBadgeTone {
+  if (status === "ready" || status === "running") return "success";
+  if (status === "failed") return "danger";
+  if (status === "pending") return "warning";
+  return "neutral";
 }
 
 function variantLabel(variant: TrackStreamVariant) {
@@ -256,7 +237,7 @@ function TrackVariantBadges({
   variants: TrackStreamVariant[] | undefined;
 }) {
   if (!variants?.length) {
-    return <span className="text-xs text-white/25">None</span>;
+    return <span className="text-xs text-text-subtle">None</span>;
   }
 
   const visible = variants.slice(0, 2);
@@ -266,46 +247,36 @@ function TrackVariantBadges({
         <TooltipTrigger asChild>
           <div className="flex min-w-[112px] flex-wrap gap-1">
             {visible.map((variant) => (
-              <span
-                key={variant.id}
-                className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none ${variantTone(
-                  variant.status,
-                )}`}
-              >
+              <InfoBadge key={variant.id} tone={variantTone(variant.status)}>
                 {variantLabel(variant)}
-              </span>
+              </InfoBadge>
             ))}
             {variants.length > visible.length ? (
-              <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.04] px-1.5 py-0.5 text-[10px] leading-none text-white/45">
+              <InfoBadge variant="counter">
                 +{variants.length - visible.length}
-              </span>
+              </InfoBadge>
             ) : null}
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="w-[260px] border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-        >
+        <TooltipContent side="top" className="w-72">
           <div className="space-y-2 text-xs">
-            <div className="font-semibold text-white/75">Playback variants</div>
+            <div className="font-semibold text-text-primary">
+              Playback variants
+            </div>
             {variants.map((variant) => (
               <div
                 key={variant.id}
-                className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-2"
+                className="rounded-md border border-border-quiet bg-surface-object px-2 py-2"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-white/75">
+                  <span className="font-medium text-text-primary">
                     {variant.preset}
                   </span>
-                  <span
-                    className={`rounded-md border px-1.5 py-0.5 text-[10px] ${variantTone(
-                      variant.status,
-                    )}`}
-                  >
+                  <InfoBadge tone={variantTone(variant.status)}>
                     {variant.status}
-                  </span>
+                  </InfoBadge>
                 </div>
-                <div className="mt-1 text-white/45">
+                <div className="mt-1 text-text-muted">
                   {variantLabel(variant)}
                   {variant.delivery_sample_rate
                     ? ` / ${Math.round(variant.delivery_sample_rate / 1000)}kHz`
@@ -314,7 +285,7 @@ function TrackVariantBadges({
                   {formatBytes(variant.bytes)}
                 </div>
                 {variant.task_status ? (
-                  <div className="mt-1 text-white/30">
+                  <div className="mt-1 text-text-subtle">
                     Task {variant.task_status}
                   </div>
                 ) : null}
@@ -343,20 +314,6 @@ function normalizeLyricsStatus(lyrics: TrackLyricsStatus | undefined) {
   return "none";
 }
 
-function lyricsTone(status: string) {
-  if (status === "synced")
-    return "border-accent-action/40 bg-accent-action/10 text-accent-action-hi";
-  if (status === "txt")
-    return "border-accent-action/40 bg-accent-action/10 text-accent-action-hi";
-  return "border-white/10 bg-white/[0.03] text-white/35";
-}
-
-function lyricsLabel(status: string) {
-  if (status === "synced") return "SYNCED";
-  if (status === "txt") return "TXT";
-  return "NONE";
-}
-
 function LyricsBadge({
   lyrics,
   busy = false,
@@ -367,57 +324,26 @@ function LyricsBadge({
   onClick?: () => void;
 }) {
   const status = normalizeLyricsStatus(lyrics);
-  const label = lyricsLabel(status);
-  const actionLabel = busy ? "Syncing lyrics..." : "Sync lyrics for this track";
+  const label =
+    status === "synced" ? "SYNCED" : status === "txt" ? "TXT" : "NONE";
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (!busy) onClick?.();
-            }}
-            className={`inline-flex min-w-[68px] items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none transition-colors hover:bg-white/[0.08] disabled:cursor-wait disabled:opacity-70 ${lyricsTone(
-              status,
-            )}`}
-            aria-label={`${actionLabel}: ${label}`}
-          >
-            {busy ? (
-              <Loader2 size={11} className="animate-spin" />
-            ) : (
-              <FileText size={11} />
-            )}
-            {label}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+    <div className="flex items-center gap-2">
+      <InfoBadge tone={status === "none" ? "neutral" : "accent"}>
+        {label}
+      </InfoBadge>
+      {onClick ? (
+        <ActionButton
+          label={busy ? "Syncing lyrics..." : "Sync lyrics for this track"}
+          loading={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick();
+          }}
         >
-          <div className="space-y-1 text-xs">
-            <div>
-              {busy
-                ? "Syncing lyrics..."
-                : label === "NONE"
-                  ? "No lyrics cached"
-                  : label === "TXT"
-                    ? "Plain lyrics cached"
-                    : "Synced lyrics cached"}
-            </div>
-            <div className="text-white/50">{actionLabel}</div>
-            {lyrics?.updated_at ? (
-              <div className="text-white/50">
-                Updated {new Date(lyrics.updated_at).toLocaleString()}
-              </div>
-            ) : null}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <AlignLeft data-admin-ux="track-sync-lyrics" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -438,50 +364,14 @@ function MoveTrackDialog({
   onOpenChange: (open: boolean) => void;
   onMove: (targetAlbum: AlbumSearchResult) => void;
 }) {
-  const [query, setQuery] = useState(defaultQuery);
-  const [results, setResults] = useState<AlbumSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery(defaultQuery);
-    setResults([]);
-  }, [defaultQuery, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<SearchResponse>(
-        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      )
-        .then((payload) => {
-          if (!active) return;
-          setResults(payload.albums ?? []);
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          toast.error("Album search failed");
-        })
-        .finally(() => {
-          if (active) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [open, query]);
+  const {
+    query,
+    setQuery,
+    results,
+    searching,
+    error: searchError,
+    retry: retrySearch,
+  } = useLibrarySearch<AlbumSearchResult>(open, defaultQuery, "albums");
 
   const title = track?.tags.title || track?.filename || "this track";
 
@@ -489,7 +379,9 @@ function MoveTrackDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-display">Move Track to Album</DialogTitle>
+          <DialogTitle className="font-display">
+            Move Track to Album
+          </DialogTitle>
           <DialogDescription>
             Queue a worker task to move "{title}" into another album directory.
           </DialogDescription>
@@ -497,16 +389,14 @@ function MoveTrackDialog({
 
         <div className="space-y-3">
           <div className="crate-form-field">
-            <label
-              htmlFor="move-track-target"
-              className="text-xs font-normal uppercase tracking-[0.16em] text-muted-foreground font-mono"
-            >
+            <label htmlFor="move-track-target" data-slot="form-field-label">
               Target album
             </label>
             <div className="relative">
               <Search
+                data-admin-ux="track-move-search"
                 size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 id="move-track-target"
@@ -519,14 +409,20 @@ function MoveTrackDialog({
             </div>
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
-            {searching ? (
+          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border-quiet bg-canvas-surface">
+            {searchError ? (
+              <ErrorState message={searchError} onRetry={retrySearch} />
+            ) : searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="track-move-search-loading"
+                  size={15}
+                  className="animate-spin"
+                />
                 Searching albums...
               </div>
             ) : results.length ? (
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-border-quiet">
                 {results.map((album) => {
                   const isCurrentAlbum =
                     currentAlbumId != null && album.id === currentAlbumId;
@@ -540,9 +436,10 @@ function MoveTrackDialog({
                       onClick={() => onMove(album)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/45">
-                        <Disc3 size={16} />
-                      </div>
+                      <MediaCover
+                        alt={album.name}
+                        className="size-12 shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-text-primary">
                           {album.name}
@@ -586,137 +483,41 @@ function MoveTrackDialog({
   );
 }
 
-const FEATURE_BARS: { key: keyof AudioAnalysisTrack; label: string }[] = [
-  { key: "danceability", label: "Danceability" },
-  { key: "valence", label: "Valence" },
-  { key: "acousticness", label: "Acousticness" },
-  { key: "instrumentalness", label: "Instrumental" },
-  { key: "energy", label: "Energy" },
-  { key: "spectral_complexity", label: "Complexity" },
-];
-
-function TrackAudioInfo({ track }: { track: AudioAnalysisTrack }) {
-  const hasFeatures = FEATURE_BARS.some(
-    (feature) => track[feature.key] != null,
-  );
-  if (!hasFeatures && track.loudness == null && !track.mood) return null;
-
-  const radarData = FEATURE_BARS.map((feature) => ({
-    feature: feature.label,
-    value: (track[feature.key] as number | null) ?? 0,
-  }));
-  const hasRadar = radarData.some((item) => item.value > 0);
-  const topMoods = track.mood
-    ? Object.entries(track.mood)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-    : [];
-
+function TrackAudioInfo({
+  track,
+  title,
+}: {
+  track: AudioAnalysisTrack;
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:text-primary"
-            aria-label="Show audio profile"
-          >
-            <BarChart3 size={13} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="left"
-          className="w-[320px] border border-white/10 bg-popover-surface p-4 text-foreground shadow-[0_24px_64px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+    <>
+      <ActionButton label="Show audio profile" onClick={() => setOpen(true)}>
+        <BarChart3 data-admin-ux="track-audio-profile" aria-hidden="true" />
+      </ActionButton>
+      <AppModal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={<span className="wrap-anywhere">{title} · Audio profile</span>}
+        description="Measured audio features, Smart Mix readiness and similarity references for this track."
+        closeLabel="Close audio profile"
+        maxWidthClassName="sm:max-w-6xl"
+        panelClassName="flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col"
+        headerClassName="shrink-0"
+      >
+        <ModalBody
+          className="min-h-0 min-w-0 px-5 py-5"
+          data-slot="audio-profile-scroll"
         >
-          <div className="mb-2 text-[11px] font-semibold text-white/70">
-            Audio Profile
-          </div>
-          {hasRadar ? (
-            <div className="mx-auto mb-3 h-[200px] w-[200px]">
-              <ResponsiveRadar
-                data={radarData}
-                keys={["value"]}
-                indexBy="feature"
-                maxValue={1}
-                margin={{ top: 20, right: 40, bottom: 20, left: 40 }}
-                gridShape="circular"
-                gridLevels={3}
-                dotSize={4}
-                dotColor="#16161e"
-                dotBorderWidth={1}
-                colors={["#06b6d4"]}
-                fillOpacity={0.2}
-                borderWidth={1}
-                borderColor="#16161e"
-                gridLabelOffset={12}
-                theme={{
-                  text: { fill: "#9ca3af", fontSize: 9 },
-                  grid: { line: { stroke: "#ffffff15" } },
-                  tooltip: {
-                    container: {
-                      background: "#16161e",
-                      color: "#f1f5f9",
-                      borderRadius: "8px",
-                      fontSize: 11,
-                      border: "1px solid #ffffff15",
-                      padding: "6px 10px",
-                    },
-                  },
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            {FEATURE_BARS.map((feature) => {
-              const value = track[feature.key] as number | null;
-              if (value == null) return null;
-              return (
-                <div key={feature.key} className="flex items-center gap-2">
-                  <span className="w-[70px] shrink-0 text-[10px] text-white/50">
-                    {feature.label}
-                  </span>
-                  <div className="h-px flex-1 overflow-hidden rounded-full bg-primary/10">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{
-                        width: `${Math.round(value * 100)}%`,
-                        opacity: 0.4 + value * 0.6,
-                      }}
-                    />
-                  </div>
-                  <span className="w-[28px] text-right font-mono text-[10px] text-white/40">
-                    {Math.round(value * 100)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {track.loudness != null ? (
-            <div className="mt-2 flex items-center gap-2 border-t border-white/5 pt-1.5">
-              <span className="w-[70px] shrink-0 text-[10px] text-white/50">
-                Loudness
-              </span>
-              <span className="font-mono text-[10px] text-white/60">
-                {track.loudness.toFixed(1)} dB
-              </span>
-            </div>
-          ) : null}
-          {topMoods.length > 0 ? (
-            <div className="flex flex-wrap gap-1 pt-2">
-              {topMoods.map(([mood, score]) => (
-                <span
-                  key={mood}
-                  className="rounded-md border border-white/10 bg-white/8 px-1.5 py-0.5 text-[9px] text-white/60"
-                >
-                  {mood} {Math.round(score * 100)}%
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <AudioProfileCard
+            analysisData={{ track }}
+            totalTracks={1}
+            presentation="track-dialog"
+          />
+        </ModalBody>
+      </AppModal>
+    </>
   );
 }
 
@@ -776,7 +577,7 @@ export function TrackTable({
         toast.success("Track moved to quarantine");
         await onTrackQuarantined?.();
       } else {
-        toast.error(task.error || "Track quarantine failed");
+        throw new Error(task.error || "Track quarantine failed");
       }
     } catch (error) {
       toast.error(
@@ -784,9 +585,9 @@ export function TrackTable({
           ? error.message
           : "Failed to quarantine track",
       );
+      throw error;
     } finally {
       setQuarantiningTrackKey(null);
-      setPendingQuarantineTrack(null);
     }
   }
 
@@ -834,8 +635,7 @@ export function TrackTable({
   const hasAnalysis =
     analysisData &&
     tracks.some((track) => {
-      const title = (track.tags.title || track.filename).toLowerCase();
-      return analysisData[title] != null;
+      return analysisForTrack(analysisData, track) != null;
     });
 
   return (
@@ -874,12 +674,7 @@ export function TrackTable({
             {tracks.map((track, index) => {
               const trackId = getTrackId(track);
               const lyricsSyncKey = getTrackLyricsSyncKey(track);
-              const trackTitle = (
-                track.tags.title || track.filename
-              ).toLowerCase();
-              const analyzedTrack = analysisData
-                ? (analysisData[trackTitle] ?? undefined)
-                : undefined;
+              const analyzedTrack = analysisForTrack(analysisData, track);
 
               return (
                 <MusicContextMenu
@@ -982,9 +777,11 @@ export function TrackTable({
                       <TableCell className="crate-table-secondary crate-table-number">
                         <span className="crate-track-analysis">
                           {formatTrackAnalysis(
-                            analyzedTrack?.tempo,
-                            analyzedTrack?.key,
-                            analyzedTrack?.scale,
+                            analyzedTrack?.smart_mix?.bpm ??
+                              analyzedTrack?.tempo,
+                            analyzedTrack?.smart_mix?.key ?? analyzedTrack?.key,
+                            analyzedTrack?.smart_mix?.scale ??
+                              analyzedTrack?.scale,
                           ) ?? "—"}
                         </span>
                       </TableCell>
@@ -1010,28 +807,32 @@ export function TrackTable({
                     {hasAnalysis ? (
                       <TableCell>
                         {analyzedTrack ? (
-                          <TrackAudioInfo track={analyzedTrack} />
+                          <TrackAudioInfo
+                            track={analyzedTrack}
+                            title={track.tags.title || track.filename}
+                          />
                         ) : null}
                       </TableCell>
                     ) : null}
                     <TableCell>
                       {track.entity_uid || track.id || track.path ? (
-                        <a
+                        <ActionLink
+                          label="Download track"
                           href={
                             trackDownloadApiPath({
                               entityUid: track.entity_uid,
                               id: track.id,
                               path: track.path,
-                            }) || "#"
+                            }) || undefined
                           }
                           download
-                          className="crate-track-action inline-flex h-8 w-8 items-center justify-center text-text-muted transition-colors hover:bg-accent-action/4 hover:text-text-primary"
-                          aria-label="Download track"
-                          title="Download track"
                           onClick={(event) => event.stopPropagation()}
                         >
-                          <Download size={14} />
-                        </a>
+                          <Download
+                            data-admin-ux="track-download"
+                            aria-hidden="true"
+                          />
+                        </ActionLink>
                       ) : null}
                     </TableCell>
                   </TableRow>
@@ -1063,11 +864,11 @@ export function TrackTable({
         }" to .crate-trash and remove it from this album? This is reversible from the filesystem.`}
         confirmLabel="Quarantine Track"
         variant="destructive"
-        onConfirm={() => {
-          void (() =>
-            pendingQuarantineTrack &&
-            void quarantineTrack(pendingQuarantineTrack))();
+        onConfirm={async () => {
+          if (pendingQuarantineTrack)
+            await quarantineTrack(pendingQuarantineTrack);
         }}
+        onError={() => {}}
         eyebrow="Confirm action"
         consequence={`1 track · ${
           pendingQuarantineTrack?.size_mb ?? "—"

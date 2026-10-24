@@ -33,9 +33,7 @@ export interface EntityCardClassNames {
 }
 
 export interface EntityCardProps
-  extends EntityPrimaryActionProps,
-    EntityMenuProps,
-    EntityFrameAttributes {
+  extends EntityPrimaryActionProps, EntityMenuProps, EntityFrameAttributes {
   title: string;
   active?: boolean;
   truncate?: boolean;
@@ -203,6 +201,7 @@ export const EntityCard = memo(function EntityCard({
   href,
   external,
   openLabel,
+  pressed,
   actionMenu,
   renderMenu,
   menuButton = "hover",
@@ -270,6 +269,7 @@ export const EntityCard = memo(function EntityCard({
         href={href}
         external={external}
         openLabel={openLabel}
+        pressed={pressed}
         disabled={disabled}
         current={active}
         className={cn(

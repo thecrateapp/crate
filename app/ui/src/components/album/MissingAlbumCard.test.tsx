@@ -1,8 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { MissingAlbumCard } from "./MissingAlbumCard";
 
+beforeEach(() =>
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  ),
+);
 it.each(["Album", "EP", "Single", "Compilation"])(
   "keeps %s as neutral release metadata",
   (type) => {

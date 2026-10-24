@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useSearchParams } from "react-router";
 
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Input } from "@crate/ui/shadcn/input";
+import { Button } from "@crate/ui/shadcn/button";
 import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
@@ -71,8 +74,10 @@ export function Login() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-4">
           <CrateLogo title="Crate" className="mb-2 h-16 w-16" />
-          <h1 className="text-2xl font-bold text-white font-display">Crate</h1>
-          <p className="-mt-0.5 text-sm text-white/40">Own your music</p>
+          <h1 className="text-2xl font-bold text-text-primary font-display">
+            Crate
+          </h1>
+          <p className="-mt-0.5 text-sm text-text-muted">Own your music</p>
         </div>
 
         {authConfig.invite_only ? (
@@ -83,46 +88,44 @@ export function Login() {
         ) : null}
 
         {error ? (
-          <p className="text-center text-sm text-state-warning-text">{error}</p>
+          <p
+            role="alert"
+            className="text-center text-sm text-state-warning-text"
+          >
+            {error}
+          </p>
         ) : null}
 
-        <div className="crate-form-field">
-          <label htmlFor="email" className="block text-sm text-white/60">
-            Email
-          </label>
-          <input
+        <FormField label="Email">
+          <Input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            className="h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white focus:border-accent-action/50 focus:outline-none"
           />
-        </div>
+        </FormField>
 
-        <div className="crate-form-field">
-          <label htmlFor="password" className="block text-sm text-white/60">
-            Password
-          </label>
-          <input
+        <FormField label="Password">
+          <Input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white focus:border-accent-action/50 focus:outline-none"
           />
-        </div>
+        </FormField>
 
-        <button
+        <Button
           type="submit"
           disabled={submitting}
-          className="h-10 w-full rounded-md bg-accent-action text-sm font-medium text-black transition-colors hover:bg-accent-action-hover disabled:opacity-50"
+          loading={submitting}
+          className="w-full"
         >
           {submitting ? "Signing in..." : "Sign in"}
-        </button>
+        </Button>
 
         <OAuthButtons returnTo={redirectTo} />
       </form>

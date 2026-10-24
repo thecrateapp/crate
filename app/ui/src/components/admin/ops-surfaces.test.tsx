@@ -1,9 +1,10 @@
 import { ChevronDown } from "lucide-react";
 import { Button } from "@crate/ui/shadcn/button";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+afterEach(() => vi.useRealTimers());
 import {
   AdminPageHeader,
   OpsPageHero,
@@ -15,6 +16,29 @@ import {
 } from "./ops-surfaces";
 
 describe("operational snapshot status", () => {
+  it("expires an open snapshot at its producer deadline without new stream messages", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-24T10:00:00Z"));
+    render(
+      <OpsSnapshotStatus
+        snapshot={{
+          stale: false,
+          built_at: "2026-10-24T09:59:59Z",
+          stale_after: "2026-10-24T10:00:05Z",
+        }}
+        streamStatus="paused"
+      />,
+    );
+    expect(screen.getByText("Snapshot current")).toBeVisible();
+    act(() => vi.advanceTimersByTime(5001));
+    expect(screen.getByText("Snapshot stale")).toBeVisible();
+    vi.useRealTimers();
+  });
+  it("does not claim freshness without a temporal contract", () => {
+    render(<OpsSnapshotStatus snapshot={{}} streamStatus="live" />);
+    expect(screen.getByText("Snapshot freshness unknown")).toBeVisible();
+    expect(screen.queryByText("Snapshot current")).toBeNull();
+  });
   it("distinguishes freshness from a reconnecting stream", () => {
     render(
       <OpsSnapshotStatus
@@ -91,7 +115,7 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     "font-mono",
     "font-normal",
     "uppercase",
-    "text-text-subtle",
+    "text-accent-action-hi",
   );
   expect(screen.getByText("Tracks")).toHaveClass("font-mono", "font-normal");
   expect(screen.getByText("1,200")).toHaveClass("font-mono", "tabular-nums");

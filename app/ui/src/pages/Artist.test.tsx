@@ -1,11 +1,19 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router";
+import type { ReactNode } from "react";
 
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
-const { mockUseApi } = vi.hoisted(() => ({ mockUseApi: vi.fn() }));
+const { mockUseApi, mockArtistEnrichment, mockOverview, mockHero } = vi.hoisted(
+  () => ({
+    mockUseApi: vi.fn(),
+    mockArtistEnrichment: vi.fn(),
+    mockOverview: vi.fn(),
+    mockHero: vi.fn(),
+  }),
+);
 
 import {
   Artist,
@@ -29,12 +37,8 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 vi.mock("@/hooks/use-artist-data", () => ({
-  useTopTracks: () => ({ data: [] }),
-  useArtistEnrichment: () => ({
-    enrichment: null,
-    loading: false,
-    refetch: vi.fn(),
-  }),
+  useTopTracks: () => [],
+  useArtistEnrichment: mockArtistEnrichment,
 }));
 
 vi.mock("@/lib/tasks", () => ({
@@ -42,7 +46,10 @@ vi.mock("@/lib/tasks", () => ({
 }));
 
 vi.mock("@/components/artist/ArtistHeroSection", () => ({
-  ArtistHeroSection: () => null,
+  ArtistHeroSection: (props: Record<string, unknown>) => {
+    mockHero(props);
+    return null;
+  },
 }));
 
 vi.mock("@/components/artist/ArtistMetadataEditor", () => ({
@@ -57,16 +64,15 @@ vi.mock("@/components/artist/ArtistDiscographySection", () => ({
   ArtistDiscographySection: () => null,
 }));
 
-vi.mock("@/components/artist/ArtistAboutSection", () => ({
-  ArtistAboutSection: () => null,
-}));
-
 vi.mock("@/components/artist/ArtistLoadingState", () => ({
   ArtistLoadingState: () => null,
 }));
 
 vi.mock("@/components/artist/ArtistOverviewSection", () => ({
-  ArtistOverviewSection: () => null,
+  ArtistOverviewSection: (props: Record<string, unknown>) => {
+    mockOverview(props);
+    return <div data-testid="artist-overview" />;
+  },
 }));
 
 vi.mock("@/components/artist/ArtistSetlistSection", () => ({
@@ -90,7 +96,7 @@ vi.mock("@/components/artist/ArtistTopTracksSection", () => ({
 }));
 
 vi.mock("@/components/artist/ArtistTabsNav", () => ({
-  ArtistTabsNav: () => null,
+  ArtistTabsNav: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("@/components/artist/artistPageData", () => ({
@@ -113,6 +119,11 @@ const mockWaitForTask = vi.mocked(waitForTask);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockArtistEnrichment.mockReturnValue({
+    enrichment: null,
+    loading: false,
+    refetch: vi.fn(),
+  });
   mockUseApi.mockReturnValue({
     data: null,
     loading: false,
@@ -132,6 +143,61 @@ beforeEach(() => {
 });
 
 describe("Artist page load state", () => {
+  it("supplies the complete artist and library data to the consolidated Overview", async () => {
+    const enrichment = {
+      musicbrainz: {
+        area: "Toronto",
+        country: "CA",
+        members: [{ name: "Member" }],
+      },
+      lastfm: { listeners: 123, playcount: 456 },
+      spotify: { followers: 789, popularity: 30 },
+    };
+    mockArtistEnrichment.mockReturnValue({
+      enrichment,
+      loading: false,
+      refetch: vi.fn(),
+    });
+    mockUseApi.mockImplementation((url: string | null) => ({
+      data:
+        url === "/api/artist-slugs/artist"
+          ? {
+              id: 7,
+              slug: "artist",
+              name: "Artist",
+              bio: "Biography",
+              albums: [
+                { name: "One", tracks: 4, size_mb: 100 },
+                { name: "Two", tracks: 8, size_mb: 200 },
+              ],
+            }
+          : null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug" element={<Artist />} />
+      </Routes>,
+      { route: "/artists/artist#about" },
+    );
+    await waitFor(() =>
+      expect(mockOverview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bioText: "Biography",
+          musicbrainz: enrichment.musicbrainz,
+          lastfm: enrichment.lastfm,
+          spotify: enrichment.spotify,
+          albumCount: 2,
+          totalTracks: 12,
+          totalSizeMb: 300,
+        }),
+      ),
+    );
+    expect(screen.getByTestId("artist-overview")).toBeInTheDocument();
+  });
+
   it("loads an artist reached through the legacy numeric-ID URL", async () => {
     renderWithAdminProviders(
       <Routes>
@@ -205,7 +271,8 @@ describe("MergeArtistDialog", () => {
 
     const result = await screen.findByText("Target Artist");
     const resultButton = result.closest("button");
-    expect(resultButton).toHaveClass("hover:bg-accent-action/8");
+    expect(resultButton).toHaveClass("hover:text-accent-action-hi");
+    expect(resultButton).not.toHaveClass("hover:bg-accent-action/8");
     expect(resultButton).not.toHaveClass("text-white/88");
 
     await userEvent.click(screen.getByText("Target Artist"));
@@ -269,4 +336,33 @@ describe("refreshArtistProbableSetlist", () => {
     ).rejects.toThrow("Setlist.fm rate limit exceeded");
     expect(refetch).not.toHaveBeenCalled();
   });
+});
+
+it("enables analysis for a capable non-admin role", async () => {
+  mockUseApi.mockImplementation((url: string | null) => ({
+    data:
+      url === "/api/artist-slugs/camel"
+        ? { id: 7, name: "Camel", slug: "camel", albums: [] }
+        : null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+  await act(async () => {
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/artists/:artistSlug" element={<Artist />} />
+      </Routes>,
+      {
+        route: "/artists/camel",
+        auth: {
+          isAdmin: false,
+          hasCapability: (cap) => cap === "library.analysis.manage",
+        },
+      },
+    );
+  });
+  expect(mockHero).toHaveBeenLastCalledWith(
+    expect.objectContaining({ canAnalyze: true, canEditMetadata: false }),
+  );
 });

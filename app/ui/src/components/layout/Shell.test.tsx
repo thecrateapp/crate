@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
@@ -9,7 +9,11 @@ vi.mock("@/contexts/OpsSnapshotContext", () => ({
   useOpsSnapshot: () => ({ data: null }),
 }));
 vi.mock("./SearchBar", () => ({
-  SearchBar: () => <input aria-label="Search library" />,
+  SearchBar: ({
+    inputRef,
+  }: {
+    inputRef?: import("react").RefObject<HTMLInputElement | null>;
+  }) => <input ref={inputRef} aria-label="Search library" />,
 }));
 vi.mock("./CommandPalette", () => ({ CommandPalette: () => null }));
 
@@ -81,4 +85,46 @@ it("uses a solid app surface for both fixed shell headers", () => {
   expect(
     screen.getAllByRole("button", { name: "Admin account menu" }),
   ).toHaveLength(2);
+});
+
+it.each(
+  [
+    "/browse",
+    "/artists/test-artist",
+    "/artists/test-artist/test-album",
+    "/albums/42/test-album",
+  ].flatMap((route) => [true, false].map((expanded) => ({ route, expanded }))),
+)(
+  "keeps $route below the fixed header with sidebar expanded=$expanded",
+  ({ route, expanded }) => {
+    localStorage.setItem("crate-admin-sidebar-expanded", String(expanded));
+    renderWithAdminProviders(<Shell />, { route });
+    const main = screen.getByRole("main");
+    const content = main.firstElementChild;
+    expect(main).toHaveClass(expanded ? "md:ml-60" : "md:ml-36");
+    expect(content).toHaveClass("pt-20", "md:pt-24");
+    expect(content).toHaveClass(expanded ? "md:px-6" : "md:px-10");
+    expect(content).not.toHaveClass("md:pt-0", "md:px-0");
+  },
+);
+
+it("opens a mobile library search with keyboard focus and restores its trigger on close", async () => {
+  const user = userEvent.setup();
+  renderWithAdminProviders(<Shell />);
+  const trigger = screen.getByRole("button", { name: "Search library" });
+  expect(
+    trigger.closest('[data-admin-ux="mobile-shell-header"]'),
+  ).not.toBeNull();
+  await user.click(trigger);
+  const dialog = screen.getByRole("dialog", { name: "Search library" });
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("textbox", { name: "Search library" }),
+    ).toHaveFocus(),
+  );
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("dialog", { name: "Search library" }),
+  ).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
 });

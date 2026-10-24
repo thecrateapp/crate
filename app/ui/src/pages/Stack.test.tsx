@@ -36,12 +36,103 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Stack typographic controls", () => {
-  it("names initial loading while retaining the busy glyph", () => {
+  it("keeps restart confirmation pending until acceptance and recoverable on rejection", async () => {
+    let reject!: (reason: Error) => void;
+    vi.mocked(api).mockImplementation((_path, method) =>
+      method === "POST"
+        ? new Promise((_resolve, fail) => {
+            reject = fail;
+          })
+        : Promise.resolve(snapshot),
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    await user.click(
+      await screen.findByRole("button", { name: "Restart service worker" }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Restart",
+      }),
+    );
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    ).toBeDisabled();
+    await act(async () => reject(new Error("offline")));
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Restart",
+      }),
+    ).toBeEnabled();
+  });
+  it("discards a late log response after another service is selected", async () => {
+    let finishWorker!: (value: unknown) => void;
+    vi.mocked(api).mockImplementation((path) => {
+      if (path.includes("/worker/logs?"))
+        return new Promise((resolve) => {
+          finishWorker = resolve;
+        });
+      if (path.includes("/scanner/logs?"))
+        return Promise.resolve({
+          name: "scanner",
+          logs: "Scanner selected logs",
+        });
+      return Promise.resolve(snapshot);
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("heading", { name: "Stack" });
+    await user.click(
+      screen.getByRole("button", { name: "Show logs for worker" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Show logs for scanner" }),
+    );
+    await screen.findByText("Scanner selected logs");
+    await act(async () =>
+      finishWorker({ name: "worker", logs: "Obsolete worker logs" }),
+    );
+    expect(
+      within(
+        screen.getByRole("region", { name: "Logs for scanner" }),
+      ).getByText("Scanner selected logs"),
+    ).toBeVisible();
+    expect(screen.queryByText("Obsolete worker logs")).toBeNull();
+  });
+  it("distinguishes unavailable logs from an empty log response and retries the same service", async () => {
+    let attempts = 0;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (!path.includes("/logs?")) return snapshot;
+      if (attempts++ === 0) throw new Error("network unavailable");
+      return { name: "worker", logs: "" };
+    });
+    const user = userEvent.setup();
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("heading", { name: "Stack" });
+    await user.click(
+      screen.getByRole("button", { name: "Show logs for worker" }),
+    );
+    const region = screen.getByRole("region", { name: "Logs for worker" });
+    expect(await within(region).findByRole("alert")).toHaveTextContent(
+      "Could not load logs for worker.",
+    );
+    expect(
+      within(region).queryByText("No logs available for this service."),
+    ).toBeNull();
+    await user.click(within(region).getByRole("button", { name: "Retry" }));
+    expect(
+      await within(region).findByText("No logs available for this service."),
+    ).toBeVisible();
+    expect(attempts).toBe(2);
+  });
+  it("uses the shared page loading state before services arrive", async () => {
     vi.mocked(api).mockReturnValue(new Promise(() => {}));
     renderWithAdminProviders(<Stack />);
     expect(
-      screen.getByRole("status", { name: "Loading stack services" }),
-    ).toHaveAttribute("aria-busy", "true");
+      await screen.findByRole("status", { name: "Loading stack services" }),
+    ).toHaveAttribute("data-variant", "page");
   });
   it("does not turn a failed fetch into a false Docker-unavailable snapshot", async () => {
     vi.mocked(api).mockRejectedValue(new Error("network unavailable"));
@@ -159,9 +250,12 @@ describe("Stack typographic controls", () => {
     expect(hide).toHaveAttribute("aria-expanded", "true");
     const region = screen.getByRole("region", { name: "Logs for worker" });
     expect(region.id).toBe(hide.getAttribute("aria-controls"));
-    expect(within(region).getByRole("status")).toHaveAttribute(
-      "aria-busy",
-      "true",
+    expect(within(region).getByRole("status")).toHaveAccessibleName(
+      "Loading logs for worker",
+    );
+    expect(within(region).getByTestId("loading-state")).toHaveAttribute(
+      "data-variant",
+      "section",
     );
     await act(async () =>
       resolveLogs({ name: "worker", logs: "Sample service log" }),

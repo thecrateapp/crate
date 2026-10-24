@@ -21,6 +21,8 @@ export function usePlayerContextValues({
     () => ({
       analyserVersion: state.analyserVersion,
       crossfadeTransition: state.crossfadeTransition,
+      mixState: state.mixState ?? null,
+      nativeMixAvailable: state.nativeMixAvailable ?? false,
       isBuffering: state.isBuffering,
       isPlaying: state.isPlaying,
       volume: state.volume,
@@ -28,6 +30,8 @@ export function usePlayerContextValues({
     [
       state.analyserVersion,
       state.crossfadeTransition,
+      state.mixState,
+      state.nativeMixAvailable,
       state.isBuffering,
       state.isPlaying,
       state.volume,

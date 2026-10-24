@@ -209,7 +209,20 @@ function parse(path, source) {
         add("external-visual", name, node, {
           source: bindings.get(root).source,
         });
-      else if (ICON_NAME.test(name)) add("dynamic-glyph", name, node);
+      // This shared compatibility action renders its caller's children verbatim;
+      // its static name is not a dynamically selected glyph. Child glyphs and
+      // icon props remain independently inventoried. Do not exempt local wrappers.
+      else if (
+        ICON_NAME.test(name) &&
+        !(
+          bindings.get(root)?.source ===
+            "@crate/ui/primitives/ActionIconButton" &&
+          ["ActionIconButton", "ActionIconLink"].includes(
+            bindings.get(root)?.imported,
+          )
+        )
+      )
+        add("dynamic-glyph", name, node);
       if (["svg", "canvas"].includes(name)) add("native-visual", name, node);
       for (const attr of node.attributes.properties) {
         if (ts.isJsxAttribute(attr) && ICON_NAME.test(attr.name.getText(tree)))

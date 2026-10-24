@@ -70,30 +70,29 @@ describe("GenreTaxonomySummary", () => {
     const summary = screen.getByRole("region", {
       name: "Genre summary for punk",
     });
+    const sharedParent = within(summary).getByRole("group", {
+      name: "Shared parent (derived)",
+    });
+    const related = within(summary).getByRole("group", { name: "Related" });
+    const relatedPill = within(related).getByRole("button", { name: "emo" });
     expect(
-      within(summary).getByRole("button", {
-        name: "Select emo, shared parent (derived)",
-      }),
+      within(sharedParent).getByRole("button", { name: "emo" }),
+    ).toBeInTheDocument();
+    expect(relatedPill).toHaveClass("genre-pill", "pointer-coarse:min-h-11");
+    expect(relatedPill).not.toHaveAttribute("title");
+    expect(
+      within(
+        within(summary).getByRole("group", { name: "Fusion of" }),
+      ).getByRole("button", { name: "hardcore punk" }),
     ).toBeInTheDocument();
     expect(
-      within(summary).getByRole("button", { name: "Select emo, related" }),
+      within(
+        within(summary).getByRole("group", {
+          name: "Fusions containing this genre",
+        }),
+      ).getByRole("button", { name: "melodic hardcore" }),
     ).toBeInTheDocument();
-    expect(
-      within(summary).getByRole("button", {
-        name: "Select hardcore punk, fusion of",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(summary).getByRole("button", {
-        name: "Select melodic hardcore, fusions containing this genre",
-      }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(
-      within(summary).getByRole("button", {
-        name: "Select emo, related",
-      }),
-    );
+    fireEvent.click(relatedPill);
     expect(onSelectGenre).toHaveBeenCalledWith("emo");
   });
 });

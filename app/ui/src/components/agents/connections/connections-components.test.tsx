@@ -204,7 +204,7 @@ describe("PermissionPicker", () => {
     ).not.toBeChecked();
   });
 
-  it("shows grouped checkboxes with ids only in the title when Custom is chosen", async () => {
+  it("shows grouped checkboxes with scope ids in keyboard-accessible tooltips", async () => {
     const user = userEvent.setup();
     render(
       <PermissionPicker
@@ -221,7 +221,12 @@ describe("PermissionPicker", () => {
       within(showsGroup).getByText("Read upcoming shows"),
     ).toBeInTheDocument();
     expect(screen.queryByText("curation.shows.read")).not.toBeInTheDocument();
-    expect(screen.getByTitle("curation.shows.read")).toBeInTheDocument();
+    const scope = screen.getByRole("checkbox", { name: "Read upcoming shows" });
+    expect(scope).not.toHaveAttribute("title");
+    scope.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "curation.shows.read",
+    );
   });
 
   it("disables a preset that needs a permission the caller lacks", () => {
@@ -322,11 +327,13 @@ describe("PermissionPicker", () => {
     );
 
     const other = screen.getByRole("group", { name: "Other" });
-    expect(within(other).getByText("Unknown permission")).toHaveAttribute(
-      "title",
+    const unknown = within(other).getByText("Unknown permission");
+    expect(unknown).not.toHaveAttribute("title");
+    unknown.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "ops.future.read",
     );
-    expect(screen.queryByText("ops.future.read")).not.toBeInTheDocument();
+    expect(other).not.toHaveTextContent("ops.future.read");
     await user.click(
       within(other).getByRole("button", { name: "Remove unknown permission" }),
     );
@@ -497,6 +504,9 @@ describe("ConnectAgentDialog", () => {
       />,
     );
 
+    expect(
+      screen.getByLabelText("Name").closest("[data-slot=form-field]"),
+    ).not.toBeNull();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     await user.type(screen.getByLabelText("Name"), "   ");
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();

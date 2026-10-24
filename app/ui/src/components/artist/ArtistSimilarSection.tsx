@@ -1,3 +1,4 @@
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { ArtistNetworkGraph } from "@/components/artist/ArtistNetworkGraph";
 import { SimilarArtistCard } from "@/components/artist/ArtistPageBits";
 
@@ -25,14 +26,19 @@ export function ArtistSimilarSection({
 }: ArtistSimilarSectionProps) {
   return (
     <div>
-      <div className="bg-card border border-border rounded-md overflow-hidden mb-6">
-        <h4 className="text-sm font-semibold px-4 pt-4 pb-2 font-display">Artist Network</h4>
+      <InstrumentPanel
+        as="section"
+        headingLevel={3}
+        ruled={false}
+        label={{ children: "Artist Network", tone: "accent" }}
+        className="mb-6"
+      >
         <ArtistNetworkGraph
           centerArtist={artistName}
           centerArtistId={artistId}
           centerArtistEntityUid={artistEntityUid}
         />
-      </div>
+      </InstrumentPanel>
       {artists.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
           {artists.map((artist) => (

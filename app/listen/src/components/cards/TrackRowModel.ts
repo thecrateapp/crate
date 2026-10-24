@@ -158,9 +158,9 @@ function resolveTrackRowState(
 
   const hasLinkActions = Boolean(
     track.artist_id != null ||
-      track.global_artist_uid ||
-      track.album_id != null ||
-      track.global_album_uid,
+    track.global_artist_uid ||
+    track.album_id != null ||
+    track.global_album_uid,
   );
 
   return {
@@ -180,7 +180,7 @@ export function useTrackRowModel({
   albumCover,
   extraActions,
 }: Pick<TrackRowProps, "track" | "albumCover" | "extraActions">) {
-  const { isLiked } = useLikedTracks();
+  const { isLiked, hasLoaded } = useLikedTracks();
   const { getTrackState } = useOffline();
   const resolved = resolveTrackRowState(track, albumCover);
   const hasTrackRef = hasPlayableTrackReference(track);
@@ -212,6 +212,7 @@ export function useTrackRowModel({
     ...resolved,
     actionMenu,
     hasTrackRef,
+    likesKnown: hasLoaded !== false,
     liked,
     offlineLabel,
     offlineState,

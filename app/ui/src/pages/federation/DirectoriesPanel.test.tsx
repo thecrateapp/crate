@@ -46,6 +46,22 @@ describe("DirectoriesPanel", () => {
     vi.mocked(api).mockResolvedValue({});
   });
 
+  it("uses shared section captions and visible field labels", () => {
+    renderWithAdminProviders(<DirectoriesPanel canManage />);
+    expect(
+      screen.getByRole("heading", { name: "Signed directories" }),
+    ).toHaveClass("crate-mono-label");
+    for (const name of [
+      "Directory URL",
+      "Trusted key ID",
+      "Trusted Ed25519 public key",
+    ]) {
+      expect(
+        screen.getByRole("textbox", { name }).closest("[data-slot=form-field]"),
+      ).not.toBeNull();
+    }
+  });
+
   it("announces its shared loading and error states", () => {
     vi.mocked(useApi).mockReturnValue({
       data: null,

@@ -94,6 +94,54 @@ const actions = [
   ],
 ] as const;
 describe("Analysis typographic controls", () => {
+  it("keeps an unavailable worker report distinct from an empty library", () => {
+    snapshot({
+      data: {
+        analysis: { ...analysis, total: 0, unavailable: true, stale: true },
+      } as unknown as ReturnType<typeof useOpsSnapshot>["data"],
+    });
+    renderWithAdminProviders(<Analysis />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Analysis worker report is unavailable",
+    );
+    expect(screen.queryByText("0 tracks")).toBeNull();
+    expect(screen.queryByText("PCM fallback")).toBeNull();
+  });
+  it("identifies an outdated worker report while preserving its last measurements", () => {
+    snapshot({
+      data: { analysis: { ...analysis, stale: true } } as unknown as ReturnType<
+        typeof useOpsSnapshot
+      >["data"],
+    });
+    renderWithAdminProviders(<Analysis />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Analysis worker report is outdated",
+    );
+    expect(
+      screen.getByText(`${analysis.total.toLocaleString()} tracks`),
+    ).toBeVisible();
+  });
+  it("exposes pipeline coverage through the shared progress semantics", () => {
+    renderWithAdminProviders(<Analysis />);
+    expect(
+      screen.getByRole("progressbar", { name: "Audio features coverage" }),
+    ).toHaveAttribute(
+      "aria-valuenow",
+      String((analysis.analysis_done / analysis.total) * 100),
+    );
+    expect(
+      screen.getByRole("progressbar", { name: "Bliss vectors coverage" }),
+    ).toHaveAttribute(
+      "aria-valuenow",
+      String((analysis.bliss_done / analysis.total) * 100),
+    );
+    expect(
+      screen.getByRole("progressbar", { name: "Fingerprint coverage" }),
+    ).toHaveAttribute(
+      "aria-valuenow",
+      String((analysis.fingerprint_done / analysis.total) * 100),
+    );
+  });
   it("distinguishes display titles, numeric readouts and technical labels from body copy", () => {
     const { container } = renderWithAdminProviders(<Analysis />);
     for (const title of [
@@ -119,7 +167,9 @@ describe("Analysis typographic controls", () => {
     );
     expect(within(latest).getByText("Bruma")).toHaveClass("font-display");
     expect(latest).toHaveClass("border-border-quiet", "bg-raised-surface");
-    expect(container.querySelector('[class*="bg-black/"], [class*="border-white/"]')).toBeNull();
+    expect(
+      container.querySelector('[class*="bg-black/"], [class*="border-white/"]'),
+    ).toBeNull();
     expect(container.querySelector('[class*="text-white/"]')).toBeNull();
   });
   it("names initial loading and retains its functional glyph", () => {
@@ -165,10 +215,7 @@ describe("Analysis typographic controls", () => {
       "4 failed",
     ])
       expect(screen.getByText(text).querySelector("svg")).toBeNull();
-    expect(screen.getByText("4 failed")).toHaveAttribute(
-      "data-tone",
-      "danger",
-    );
+    expect(screen.getByText("4 failed")).toHaveAttribute("data-tone", "danger");
     expect(
       screen.getByRole("heading", { name: "Audio features" }),
     ).toBeVisible();

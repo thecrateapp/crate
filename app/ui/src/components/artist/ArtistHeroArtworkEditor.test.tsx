@@ -571,7 +571,7 @@ describe("ArtistHeroArtworkEditor", () => {
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(2);
   });
 
-  it("keeps switch thumbs anchored inside the track in both states", async () => {
+  it("uses shared switches and exposes their state through changes", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -591,23 +591,19 @@ describe("ArtistHeroArtworkEditor", () => {
     const featured = await screen.findByRole("switch", {
       name: "Featured artist",
     });
-    expect(featured.querySelector("span")).toHaveClass(
-      "left-0.5",
-      "translate-x-5",
-    );
+    expect(featured).toHaveAttribute("data-slot", "switch");
+    expect(featured).toHaveAttribute("aria-checked", "true");
+    expect(
+      featured.querySelector("[data-slot=switch-thumb]"),
+    ).toBeInTheDocument();
 
     const grayscale = screen.getByRole("switch", { name: "Grayscale" });
-    expect(grayscale.querySelector("span")).toHaveClass(
-      "left-0.5",
-      "translate-x-0",
-    );
+    expect(grayscale).toHaveAttribute("data-slot", "switch");
+    expect(grayscale).toHaveAttribute("aria-checked", "false");
 
     await user.click(grayscale);
 
-    expect(grayscale.querySelector("span")).toHaveClass(
-      "left-0.5",
-      "translate-x-5",
-    );
+    expect(grayscale).toHaveAttribute("aria-checked", "true");
   });
 
   it("shows the final artist presentation inside the editable canvas", async () => {
@@ -1114,4 +1110,37 @@ describe("ArtistHeroArtworkEditor", () => {
       );
     });
   });
+});
+
+it("keeps hero deletion locked until its worker confirms completion", async () => {
+  let finish!: (result: Awaited<ReturnType<typeof waitForTask>>) => void;
+  vi.mocked(waitForTask).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    }) as ReturnType<typeof waitForTask>,
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_: unknown, init?: RequestInit) =>
+      Response.json(
+        init?.method === "DELETE"
+          ? { task_id: "pending-hero-delete" }
+          : manualProfile(),
+      ),
+    ),
+  );
+  render(
+    <ArtistHeroArtworkEditor artistId={7} artistName="Converge" canEdit />,
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Delete desktop composition" }),
+  );
+  const confirm = screen.getByRole("button", { name: "Delete composition" });
+  await userEvent.click(confirm);
+  expect(confirm).toBeDisabled();
+  expect(screen.getByRole("alertdialog")).toBeVisible();
+  finish({ status: "completed" } as Awaited<ReturnType<typeof waitForTask>>);
+  await waitFor(() =>
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+  );
 });

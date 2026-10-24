@@ -1,7 +1,6 @@
-import {
-  InfoBadge,
-  type InfoBadgeTone,
-} from "@crate/ui/primitives/InfoBadge";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { RefreshCw } from "@crate/ui/icons";
@@ -121,16 +120,7 @@ export function PlaybackDeliveryContent({
   onRefresh: () => void;
 }) {
   if (loading && !delivery) {
-    return (
-      <div
-        role="status"
-        aria-label="Loading playback delivery"
-        aria-busy="true"
-        className="py-16 text-center text-sm text-text-muted"
-      >
-        Loading playback delivery...
-      </div>
-    );
+    return <LoadingState variant="page" label="Loading playback delivery" />;
   }
 
   if (error && !delivery) {
@@ -271,7 +261,7 @@ export function PlaybackDeliveryContent({
                       {variant.delivery_format} {variant.delivery_bitrate}k
                     </div>
                   </div>
-              <InfoBadge tone={variantStatusTone(variant.status)}>
+                  <InfoBadge tone={variantStatusTone(variant.status)}>
                     {variant.status}
                   </InfoBadge>
                   <div className="font-mono text-label tabular-nums text-text-muted">
@@ -285,9 +275,7 @@ export function PlaybackDeliveryContent({
               );
             })
           ) : (
-            <div className="px-4 py-6 text-sm text-text-muted">
-              No playback variants prepared yet.
-            </div>
+            <EmptyState message="No playback variants prepared yet." />
           )}
         </div>
       </OpsPanel>

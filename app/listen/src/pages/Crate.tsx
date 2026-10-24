@@ -126,19 +126,22 @@ function useCrateDetail() {
   const location = useLocation();
   const detail = useApi<CrateDetail>(
     requestedRef ? crateDetailUrl(requestedRef) : null,
+    "GET",
+    undefined,
+    { reportCachedErrors: true },
   );
-  const canonicalRef = detail.data ? crateRef(detail.data) : null;
+  const data = detail.status === 404 ? null : detail.data;
+  const canonicalRef = data ? crateRef(data) : null;
 
   useEffect(() => {
-    if (!detail.data || !canonicalRef || canonicalRef === requestedRef) return;
-    cacheSet(crateDetailUrl(canonicalRef), detail.data);
-    navigate(
-      `${cratePagePath(detail.data)}${location.search}${location.hash}`,
-      { replace: true },
-    );
+    if (!data || !canonicalRef || canonicalRef === requestedRef) return;
+    cacheSet(crateDetailUrl(canonicalRef), data);
+    navigate(`${cratePagePath(data)}${location.search}${location.hash}`, {
+      replace: true,
+    });
   }, [
     canonicalRef,
-    detail.data,
+    data,
     location.hash,
     location.search,
     navigate,
@@ -147,16 +150,12 @@ function useCrateDetail() {
 
   const albums = useMemo(
     () =>
-      detail.data
-        ? orderCrateAlbums(
-            detail.data.albums,
-            detail.data.is_ordered,
-            detail.data.sort_direction,
-          )
+      data
+        ? orderCrateAlbums(data.albums, data.is_ordered, data.sort_direction)
         : [],
-    [detail.data],
+    [data],
   );
-  return { ...detail, albums };
+  return { ...detail, data, albums };
 }
 
 function shareCrate(crate: CrateDetail, albums: NumberedCrateAlbum[]) {
@@ -167,7 +166,7 @@ function shareCrate(crate: CrateDetail, albums: NumberedCrateAlbum[]) {
 function AnonymousCrate() {
   const { t } = useTranslation();
   const location = useLocation();
-  const { data, loading, albums } = useCrateDetail();
+  const { data, loading, error, status, refetch, albums } = useCrateDetail();
   const crateId = data?.id ?? null;
   const coverUrl = useCallback<CrateCoverUrl>(
     (album, size) =>
@@ -181,6 +180,7 @@ function AnonymousCrate() {
     return <CrateLoader label={t("crate.page.loading")} />;
   }
   if (!data) {
+    if (error && status !== 404) return <CrateReadError onRetry={refetch} />;
     return (
       <CrateUnavailable
         showBackLink={false}
@@ -193,6 +193,7 @@ function AnonymousCrate() {
 
   return (
     <div data-testid="crate-shell" className="-mx-4 -mt-6 pb-12 sm:-mx-6">
+      {error ? <CrateReadError cached onRetry={refetch} /> : null}
       <CrateHero
         crate={data}
         albums={albums}
@@ -232,16 +233,24 @@ function AnonymousCrate() {
 function AuthenticatedCrate() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data, loading, refetch, albums } = useCrateDetail();
+  const { data, loading, error, status, refetch, albums } = useCrateDetail();
   const crateId = data?.id ?? null;
   const {
     supported: offlineSupported,
     getCrateState,
     toggleCrateOffline,
   } = useOffline();
-  const { data: playbackData, loading: playbackLoading } = useApi<
-    CratePlaybackTrack[]
-  >(crateId ? `/api/crates/${encodeURIComponent(crateId)}/playback` : null);
+  const {
+    data: playbackData,
+    loading: playbackLoading,
+    error: playbackError,
+    refetch: refetchPlayback,
+  } = useApi<CratePlaybackTrack[]>(
+    crateId ? `/api/crates/${encodeURIComponent(crateId)}/playback` : null,
+    "GET",
+    undefined,
+    { reportCachedErrors: true },
+  );
   const { playAll, setRepeatMode } = usePlayerActions();
   const [editing, setEditing] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -395,7 +404,10 @@ function AuthenticatedCrate() {
     return <CrateLoader label={t("crate.page.loading")} />;
   }
 
-  if (!data) return <CrateUnavailable showBackLink />;
+  if (!data) {
+    if (error && status !== 404) return <CrateReadError onRetry={refetch} />;
+    return <CrateUnavailable showBackLink />;
+  }
 
   const hasAlbums = albums.length > 0;
 
@@ -404,6 +416,7 @@ function AuthenticatedCrate() {
       data-testid="crate-shell"
       className="-mx-4 -mt-4 pb-12 sm:-mx-6 sm:-mt-6"
     >
+      {error ? <CrateReadError cached onRetry={refetch} /> : null}
       <CrateHero
         crate={data}
         albums={albums}
@@ -439,6 +452,15 @@ function AuthenticatedCrate() {
           />
         }
       />
+
+      {playbackError ? (
+        <ErrorState
+          message={t("crate.page.playbackLoadFailed")}
+          retryLabel={t("common.retry")}
+          onRetry={refetchPlayback}
+          className="mx-4 mt-6 sm:mx-6"
+        />
+      ) : null}
 
       {editing && canEditCrate ? (
         <Suspense fallback={null}>
@@ -477,6 +499,24 @@ function AuthenticatedCrate() {
         onRemoveAlbum={canEditCrate ? removeAlbum : undefined}
       />
     </div>
+  );
+}
+
+function CrateReadError({
+  cached = false,
+  onRetry,
+}: {
+  cached?: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ErrorState
+      message={t(cached ? "crate.page.refreshFailed" : "crate.page.loadFailed")}
+      retryLabel={t("common.retry")}
+      onRetry={onRetry}
+      className="px-4 py-4 sm:px-6"
+    />
   );
 }
 

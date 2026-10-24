@@ -6,9 +6,13 @@ const mocks = vi.hoisted(() => ({
   useApi: vi.fn(),
   detail: null as unknown,
   error: null as unknown,
+  status: null as number | null,
   playback: [] as unknown,
+  playbackError: null as unknown,
+  playbackStatus: null as number | null,
   api: vi.fn(),
   refetch: vi.fn(),
+  playbackRefetch: vi.fn(),
   startShapedRadio: vi.fn(),
   shuffleArray: vi.fn((tracks: unknown[]) => [...tracks].reverse()),
 }));
@@ -110,8 +114,12 @@ describe("Crate page", () => {
     vi.stubGlobal("ResizeObserver", undefined);
     mocks.detail = crate();
     mocks.error = null;
+    mocks.status = null;
+    mocks.playbackError = null;
+    mocks.playbackStatus = null;
     mocks.api.mockReset();
     mocks.refetch.mockReset();
+    mocks.playbackRefetch.mockReset();
     mocks.api.mockResolvedValue({ ok: true });
     mocks.startShapedRadio.mockReset();
     mocks.startShapedRadio.mockResolvedValue({ tracks: [] });
@@ -145,8 +153,11 @@ describe("Crate page", () => {
               ? []
               : mocks.detail,
       loading: false,
-      error: mocks.error,
-      refetch: mocks.refetch,
+      error: path?.endsWith("/playback") ? mocks.playbackError : mocks.error,
+      status: path?.endsWith("/playback") ? mocks.playbackStatus : mocks.status,
+      refetch: path?.endsWith("/playback")
+        ? mocks.playbackRefetch
+        : mocks.refetch,
     }));
   });
 
@@ -647,6 +658,9 @@ describe("Crate page", () => {
     expect(screen.queryByText("Back to Crates")).not.toBeInTheDocument();
     expect(mocks.useApi).not.toHaveBeenCalledWith(
       `/api/crates/${crateId}/playback`,
+      "GET",
+      undefined,
+      { reportCachedErrors: true },
     );
     expect(
       document.querySelector(
@@ -660,10 +674,18 @@ describe("Crate page", () => {
     renderCrate();
 
     await waitFor(() =>
-      expect(mocks.useApi).toHaveBeenCalledWith(`/api/crates/${publicRef}`),
+      expect(mocks.useApi).toHaveBeenCalledWith(
+        `/api/crates/${publicRef}`,
+        "GET",
+        undefined,
+        { reportCachedErrors: true },
+      ),
     );
     expect(mocks.useApi).toHaveBeenCalledWith(
       `/api/crates/${crateId}/playback`,
+      "GET",
+      undefined,
+      { reportCachedErrors: true },
     );
     await user.click(screen.getByRole("button", { name: "Follow" }));
     expect(mocks.api).toHaveBeenCalledWith(
@@ -674,9 +696,82 @@ describe("Crate page", () => {
 
   it("does not reveal metadata when a private crate is inaccessible", async () => {
     mocks.detail = null;
-    mocks.error = new Error("not found");
+    mocks.error = "Not found";
+    mocks.status = 404;
     renderCrate();
     expect(await screen.findByText("This Crate is unavailable.")).toBeVisible();
     expect(screen.queryByText("Year-end records")).not.toBeInTheDocument();
   });
+
+  it.each([true, false])(
+    "offers Retry for an uncached detail failure for authenticated=%s instead of claiming the Crate is unavailable",
+    async (authenticated) => {
+      const user = userEvent.setup();
+      mocks.detail = null;
+      mocks.error = "Internal API failure detail";
+      mocks.status = 503;
+      renderCrate(undefined, authenticated ? undefined : { user: null });
+      const error = screen.getByRole("alert");
+      expect(error).toHaveTextContent("Could not load this Crate");
+      expect(error).not.toHaveTextContent("Internal API failure detail");
+      expect(screen.queryByText("This Crate is unavailable.")).toBeNull();
+      await user.click(within(error).getByRole("button", { name: "Retry" }));
+      expect(mocks.refetch).toHaveBeenCalledOnce();
+      expect(mocks.playbackRefetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([true, false])(
+    "retains cached detail and exposes refresh Retry for authenticated=%s",
+    async (authenticated) => {
+      const user = userEvent.setup();
+      mocks.error = "offline";
+      mocks.status = 500;
+      renderCrate(undefined, authenticated ? undefined : { user: null });
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Year-end records" }),
+      ).toBeVisible();
+      expect(screen.getByRole("list")).toHaveTextContent("Blending");
+      const error = screen.getByRole("alert");
+      expect(error).toHaveTextContent("Showing saved details");
+      await user.click(within(error).getByRole("button", { name: "Retry" }));
+      expect(mocks.refetch).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([true, false])(
+    "honors an authoritative 404 over cached detail for authenticated=%s",
+    (authenticated) => {
+      mocks.error = "Not found";
+      mocks.status = 404;
+      renderCrate(undefined, authenticated ? undefined : { user: null });
+      expect(screen.getByText("This Crate is unavailable.")).toBeVisible();
+      expect(screen.queryByText("Year-end records")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    },
+  );
+
+  it.each([true, false])(
+    "provides a separate playback Retry and keeps cached tracks usable=%s",
+    async (cached) => {
+      const user = userEvent.setup();
+      if (!cached) mocks.playback = null;
+      mocks.playbackError = "Audio storage internal error";
+      mocks.playbackStatus = 503;
+      renderCrate();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Year-end records" }),
+      ).toBeVisible();
+      expect(screen.getByRole("list")).toHaveTextContent("Blending");
+      const error = screen.getByRole("alert");
+      expect(error).toHaveTextContent("Could not load tracks for playback");
+      expect(error).not.toHaveTextContent("Audio storage internal error");
+      const play = screen.getByRole("button", { name: "Play Crate" });
+      if (cached) expect(play).toBeEnabled();
+      else expect(play).toBeDisabled();
+      await user.click(within(error).getByRole("button", { name: "Retry" }));
+      expect(mocks.playbackRefetch).toHaveBeenCalledOnce();
+      expect(mocks.refetch).not.toHaveBeenCalled();
+    },
+  );
 });

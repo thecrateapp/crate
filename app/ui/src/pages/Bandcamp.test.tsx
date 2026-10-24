@@ -11,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Bandcamp } from "./Bandcamp";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { waitForTask } from "@/lib/tasks";
+vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
 import fixture from "../../../../tests/admin-e2e/fixtures/bandcamp-1ah.json";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -41,6 +43,7 @@ async function ready() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(waitForTask).mockReset().mockResolvedValue({ status: "completed" });
   payloads = structuredClone(fixture);
   mockApi.mockImplementation((path, method) =>
     Promise.resolve(
@@ -56,11 +59,36 @@ afterEach(() => {
 });
 
 describe("Bandcamp text presentation and real contracts", () => {
-  it("uses existing display/metric recipes with only reviewed external glyphs at rest", async () => {
-    await ready();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "font-display",
+  it("retains busy state and the last feeds until the worker reports its actual outcome", async () => {
+    let finish!: (value: { status: string; error?: string }) => void;
+    vi.mocked(waitForTask).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
     );
+    await ready();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sync collection" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Sync collection" }),
+    ).toBeDisabled();
+    expect(
+      mockApi.mock.calls.filter(([, method]) => method !== "POST"),
+    ).toHaveLength(8);
+    await act(async () =>
+      finish({ status: "failed", error: "Bandcamp worker failed" }),
+    );
+    expect(toast.error).toHaveBeenCalledWith("Bandcamp worker failed");
+    expect(
+      screen.getByRole("button", { name: "Sync collection" }),
+    ).toBeEnabled();
+  });
+  it("uses existing display/metric recipes and reserves glyphs for the three header actions", async () => {
+    await ready();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Bandcamp" }),
+    ).toHaveClass("font-display");
     expect(screen.getByText("2 pending", { exact: true })).toHaveTextContent(
       /^2 pending$/,
     );
@@ -74,7 +102,7 @@ describe("Bandcamp text presentation and real contracts", () => {
     expect(document.querySelectorAll("svg:not([data-admin-ux])")).toHaveLength(
       0,
     );
-    expect(document.querySelectorAll("svg[data-admin-ux]")).toHaveLength(7);
+    expect(document.querySelectorAll("svg[data-admin-ux]")).toHaveLength(3);
     for (const glyph of document.querySelectorAll("svg"))
       expect(glyph).toHaveAttribute("aria-hidden", "true");
     for (const name of actions)
@@ -194,7 +222,7 @@ describe("Bandcamp text presentation and real contracts", () => {
     expect(screen.getByRole("button", { name: "Backfill URLs" })).toBeEnabled();
   });
 
-  it("preserves checking state and empty fallbacks while reads are pending", () => {
+  it("keeps pending reads distinct from confirmed empty collections", () => {
     mockApi.mockReturnValue(new Promise(() => {}));
     render(<Bandcamp />);
     expect(screen.getByText("Checking connection...")).toBeInTheDocument();
@@ -202,9 +230,52 @@ describe("Bandcamp text presentation and real contracts", () => {
       screen.getByRole("button", { name: "Sync collection" }),
     ).toBeDisabled();
     expect(
-      screen.getByText("No Bandcamp match candidates pending."),
+      screen.queryByText("No Bandcamp match candidates pending."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No Bandcamp imports yet."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Loading Bandcamp matches" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Loading Bandcamp imports" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("—", { exact: true })).toHaveLength(4);
+  });
+
+  it("keeps a failed section independent, with a retry instead of an empty result", async () => {
+    mockApi.mockImplementation((path) =>
+      path === "/api/bandcamp/admin/matches?limit=100"
+        ? Promise.reject(new Error("offline"))
+        : Promise.resolve(structuredClone(payloads[path])),
+    );
+    await ready();
+    const failure = await screen.findByRole("alert", {
+      name: "Bandcamp matches could not be loaded.",
+    });
+    expect(
+      screen.queryByText("No Bandcamp match candidates pending."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("7 total")).toBeInTheDocument();
+    mockApi.mockImplementation((path) =>
+      Promise.resolve(structuredClone(payloads[path])),
+    );
+    await userEvent.click(
+      within(failure).getByRole("button", { name: "Retry" }),
+    );
+    expect(await screen.findByText("2 pending")).toBeInTheDocument();
+  });
+
+  it("shows genuine empty results only after successful reads", async () => {
+    payloads["/api/bandcamp/admin/matches?limit=100"] = { items: [], total: 0 };
+    payloads["/api/bandcamp/me/imports"] = { imports: [], total: 0 };
+    await ready();
+    expect(
+      await screen.findByText("No Bandcamp match candidates pending."),
     ).toBeInTheDocument();
     expect(screen.getByText("No Bandcamp imports yet.")).toBeInTheDocument();
+    expect(screen.getByText("0 pending")).toBeInTheDocument();
   });
 
   it("keeps real metadata, image URL and external opening arguments from the keyboard", async () => {

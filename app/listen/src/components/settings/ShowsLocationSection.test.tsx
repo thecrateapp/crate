@@ -27,6 +27,143 @@ describe("Shows settings reads", () => {
     mocks.success.mockReset();
     mocks.error.mockReset();
   });
+
+  it.each(["radius", "mode"] as const)(
+    "keeps the confirmed %s during a pending write, blocks concurrent changes and retains it on rejection",
+    async (field) => {
+      let rejectWrite!: (error: Error) => void;
+      const pendingWrite = new Promise((_, reject) => {
+        rejectWrite = reject;
+      });
+      mocks.api
+        .mockResolvedValueOnce(madrid)
+        .mockReturnValueOnce(pendingWrite)
+        .mockResolvedValue({});
+      const user = userEvent.setup();
+      renderWithListenProviders(<ShowsLocationSection />, { locale: "en" });
+      const mode = await screen.findByRole("combobox", {
+        name: "Location for shows",
+      });
+      const radius = screen.getByRole("combobox", { name: "Search radius" });
+      await user.click(field === "radius" ? radius : mode);
+      await user.click(
+        screen.getByRole("option", {
+          name: field === "radius" ? "100 km" : "Near me",
+        }),
+      );
+      expect(radius).toHaveTextContent("60 km");
+      expect(mode).toHaveTextContent("Fixed city");
+      expect(radius).toBeDisabled();
+      expect(mode).toBeDisabled();
+      expect(screen.getByRole("combobox", { name: "City" })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "Detect from IP" }),
+      ).toBeDisabled();
+      await user.click(radius);
+      expect(
+        mocks.api.mock.calls.filter((call) => call[1] === "PUT"),
+      ).toHaveLength(1);
+      await act(async () => rejectWrite(new Error("rejected")));
+      expect(radius).toHaveTextContent("60 km");
+      expect(mode).toHaveTextContent("Fixed city");
+      expect(radius).toBeEnabled();
+      expect(mode).toBeEnabled();
+      await user.click(field === "radius" ? radius : mode);
+      await user.click(
+        screen.getByRole("option", {
+          name: field === "radius" ? "100 km" : "Near me",
+        }),
+      );
+      await waitFor(() =>
+        expect(field === "radius" ? radius : mode).toHaveTextContent(
+          field === "radius" ? "100 km" : "Near me",
+        ),
+      );
+    },
+  );
+
+  it("keeps the confirmed city until a city write succeeds and can retry after rejection", async () => {
+    const manchester = {
+      city: "Manchester",
+      country: "United Kingdom",
+      country_code: "GB",
+      display_name: "Manchester, United Kingdom",
+      latitude: 53.4,
+      longitude: -2.2,
+    };
+    let rejectWrite!: (error: Error) => void;
+    const pendingWrite = new Promise((_, reject) => {
+      rejectWrite = reject;
+    });
+    let attempts = 0;
+    mocks.api.mockImplementation((path: string, method?: string) =>
+      method === "PUT"
+        ? ++attempts === 1
+          ? pendingWrite
+          : Promise.resolve({})
+        : path === "/api/me/location"
+          ? Promise.resolve(madrid)
+          : Promise.resolve([manchester]),
+    );
+    const user = userEvent.setup();
+    renderWithListenProviders(<ShowsLocationSection />, { locale: "en" });
+    const city = await screen.findByRole("combobox", { name: "City" });
+    const selectManchester = async () => {
+      await user.clear(city);
+      await user.type(city, "Man");
+      await user.click(
+        await screen.findByRole("option", {
+          name: "Manchester, United Kingdom",
+        }),
+      );
+    };
+    await selectManchester();
+    expect(city).toHaveValue("Madrid");
+    expect(city).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "Search radius" }),
+    ).toBeDisabled();
+    await act(async () => rejectWrite(new Error("rejected")));
+    expect(city).toHaveValue("Madrid");
+    expect(city).toBeEnabled();
+    await selectManchester();
+    await waitFor(() => expect(city).toHaveValue("Manchester"));
+  });
+
+  it("serializes IP detection with the other location changes and retains the confirmed city if its PUT fails", async () => {
+    const detected = {
+      city: "Paris",
+      country: "France",
+      country_code: "FR",
+      latitude: 48.8,
+      longitude: 2.3,
+    };
+    let rejectWrite!: (error: Error) => void;
+    const pendingWrite = new Promise((_, reject) => {
+      rejectWrite = reject;
+    });
+    mocks.api
+      .mockResolvedValueOnce(madrid)
+      .mockResolvedValueOnce(detected)
+      .mockReturnValueOnce(pendingWrite);
+    const user = userEvent.setup();
+    renderWithListenProviders(<ShowsLocationSection />, { locale: "en" });
+    const city = await screen.findByRole("combobox", { name: "City" });
+    await user.click(screen.getByRole("button", { name: "Detect from IP" }));
+    expect(city).toHaveValue("Madrid");
+    expect(city).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "Location for shows" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "Search radius" }),
+    ).toBeDisabled();
+    await act(async () => rejectWrite(new Error("rejected")));
+    expect(city).toHaveValue("Madrid");
+    expect(city).toBeEnabled();
+    expect(screen.getByText("Madrid, Spain")).toBeVisible();
+    expect(mocks.error).toHaveBeenCalledWith("Could not detect your location");
+  });
   it("keeps unknown defaults unavailable after a failed read, retries without writing and then persists a chosen radius", async () => {
     mocks.api
       .mockRejectedValueOnce(new Error("offline"))

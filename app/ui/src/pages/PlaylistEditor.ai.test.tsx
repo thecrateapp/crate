@@ -1,6 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { llmStatus } = vi.hoisted(() => ({
+  llmStatus: {
+    available: true,
+    model: "gemini-test",
+    provider: "gemini",
+  },
+}));
+
 vi.mock("react-router", () => ({
   useNavigate: () => vi.fn(),
   useParams: () => ({ playlistId: "42" }),
@@ -11,11 +19,7 @@ vi.mock("@/hooks/use-api", () => ({
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
-  useActionLLMStatus: () => ({
-    available: true,
-    model: "gemini-test",
-    provider: "gemini",
-  }),
+  useActionLLMStatus: () => llmStatus,
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -119,6 +123,7 @@ function mockRule(op: string, value: number | number[], field = "year") {
 describe("PlaylistEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    llmStatus.available = true;
     vi.stubGlobal("EventSource", MockEventSource);
     mockUseApi.mockImplementation((url: string | null) => {
       if (url?.includes("/editor-snapshot")) {
@@ -150,7 +155,7 @@ describe("PlaylistEditor", () => {
     render(<PlaylistEditor />);
 
     expect(
-      screen.getByPlaceholderText("Search tracks matching this playlist..."),
+      screen.getByRole("searchbox", { name: "Search tracks" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Suggest refinements/i }),
@@ -158,8 +163,12 @@ describe("PlaylistEditor", () => {
     expect(screen.getByText("Add rule")).toBeInTheDocument();
     expect(screen.getByText("generated")).toBeInTheDocument();
     expect(
-      screen.getByText(/Upload a clean image-only hero asset/i),
+      screen.getByRole("button", { name: "Upload cover" }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("Cover image")).toHaveAttribute(
+      "accept",
+      "image/*",
+    );
   });
 
   it("saves metadata without resubmitting unchanged legacy year rules", async () => {
@@ -210,7 +219,7 @@ describe("PlaylistEditor", () => {
   it("saves edited year filters as four-digit text", async () => {
     mockRule("gte", 2000);
     render(<PlaylistEditor />);
-    fireEvent.change(screen.getByPlaceholderText("Value"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Value" }), {
       target: { value: "2030" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -231,7 +240,7 @@ describe("PlaylistEditor", () => {
   it("keeps edited BPM filters numeric", async () => {
     mockRule("gte", 120, "bpm");
     render(<PlaylistEditor />);
-    fireEvent.change(screen.getByPlaceholderText("Value"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Value" }), {
       target: { value: "171.25" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -251,10 +260,10 @@ describe("PlaylistEditor", () => {
   it("preserves textual year bounds when editing either range endpoint", async () => {
     mockRule("between", [2000, 2020]);
     render(<PlaylistEditor />);
-    fireEvent.change(screen.getByPlaceholderText("Minimum"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Minimum" }), {
       target: { value: "1990" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Maximum"), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Maximum" }), {
       target: { value: "2030" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -269,6 +278,51 @@ describe("PlaylistEditor", () => {
         }),
       ),
     );
+  });
+
+  it("stages AI description copy without applying it and preserves normalized rule options", async () => {
+    mockRule("gte", 2000);
+    vi.mocked(api).mockResolvedValue({
+      description: "Generated editorial copy",
+    } as never);
+    render(<PlaylistEditor />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate description with AI" }),
+    );
+
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42/ai-description",
+        "POST",
+        {
+          apply: false,
+          smart_rules: {
+            match: "all",
+            limit: 50,
+            sort: "random",
+            rules: [{ field: "year", op: "gte", value: "2000" }],
+            max_per_artist: 3,
+            deduplicate_artist: true,
+          },
+        },
+      ),
+    );
+    expect(screen.getByRole("textbox", { name: "Description" })).toHaveValue(
+      "Generated editorial copy",
+    );
+    expect(vi.mocked(api).mock.calls).toHaveLength(1);
+  });
+
+  it("hides the AI description action when no model is configured", () => {
+    llmStatus.available = false;
+    render(<PlaylistEditor />);
+
+    expect(
+      screen.queryByRole("button", { name: "Generate description with AI" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Description" })).toBeEnabled();
+    expect(api).not.toHaveBeenCalled();
   });
 
   it("applies only server-stored refinement action IDs", async () => {

@@ -213,6 +213,7 @@ export const TrackRow = memo(function TrackRow({
           showLike ? (
             <TrackRowLikeControl
               hasTrackRef={model.hasTrackRef}
+              likesKnown={model.likesKnown}
               liked={model.liked}
               toggleTrackLike={toggleTrackLike}
               track={track}

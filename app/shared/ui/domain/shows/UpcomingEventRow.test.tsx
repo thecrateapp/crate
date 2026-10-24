@@ -33,7 +33,7 @@ describe("UpcomingEventRow layout slots", () => {
         '[data-slot="upcoming-event-actions-slot"]',
       );
 
-      expect(identity?.contains(dateSlot)).toBe(false);
+      expect(identity?.contains(dateSlot ?? null)).toBe(false);
       expect(dateSlot?.nextElementSibling).toBe(actionsSlot);
       expect(dateSlot).toHaveClass("w-14", "shrink-0");
       expect(actionsSlot).toHaveClass("w-28", "shrink-0");

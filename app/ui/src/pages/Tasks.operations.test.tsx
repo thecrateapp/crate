@@ -597,4 +597,52 @@ describe("Tasks operational controls", () => {
     );
     expect(toast.success).not.toHaveBeenCalled();
   });
+  it("filters history outcomes through short chips while keeping family and type selectors aligned", async () => {
+    const user = userEvent.setup();
+    mockSnapshot(
+      snapshot({
+        history: [
+          task({
+            id: "completed-filter",
+            label: "Completed filter row",
+            status: "completed",
+          }),
+          task({
+            id: "failed-filter",
+            label: "Failed filter row",
+            status: "failed",
+          }),
+          task({
+            id: "cancelled-filter",
+            label: "Cancelled filter row",
+            status: "cancelled",
+          }),
+        ],
+      }),
+    );
+    renderWithAdminProviders(<Tasks />);
+    await user.click(await screen.findByRole("tab", { name: "History" }));
+    expect(screen.getByRole("combobox", { name: "Task family" })).toBeVisible();
+    const outcomes = screen.getByRole("group", {
+      name: "Filter task outcomes",
+    });
+    const all = within(outcomes).getByRole("button", { name: "All outcomes" });
+    expect(all).toHaveAttribute("data-slot", "chip");
+    expect(all).toHaveAttribute("aria-pressed", "true");
+    for (const [label, visible, absent] of [
+      ["Completed", "Completed filter row", "Failed filter row"],
+      ["Failed", "Failed filter row", "Cancelled filter row"],
+      ["Cancelled", "Cancelled filter row", "Completed filter row"],
+    ]) {
+      const chip = within(outcomes).getByRole("button", { name: label });
+      await user.click(chip);
+      expect(chip).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByText(visible!)).toBeVisible();
+      expect(screen.queryByText(absent!)).not.toBeInTheDocument();
+    }
+    await user.click(all);
+    expect(screen.getByText("Completed filter row")).toBeVisible();
+    expect(screen.getByText("Failed filter row")).toBeVisible();
+    expect(screen.getByText("Cancelled filter row")).toBeVisible();
+  });
 });

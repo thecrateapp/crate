@@ -37,12 +37,18 @@ export function AiModels() {
     error,
     refetch,
   } = useApi<Snapshot>(canReadConfig ? `${AI_ROOT}/snapshot` : null);
-  const { data: usage } = useApi<Usage>(
-    canReadUsage ? `${AI_ROOT}/usage` : null,
-  );
-  const { data: activity } = useApi<ActivityLog>(
-    canReadUsage ? `${AI_ROOT}/activity?limit=50` : null,
-  );
+  const {
+    data: usage,
+    loading: usageLoading,
+    error: usageError,
+    refetch: refetchUsage,
+  } = useApi<Usage>(canReadUsage ? `${AI_ROOT}/usage` : null);
+  const {
+    data: activity,
+    loading: activityLoading,
+    error: activityError,
+    refetch: refetchActivity,
+  } = useApi<ActivityLog>(canReadUsage ? `${AI_ROOT}/activity?limit=50` : null);
 
   const today = usage ? usageToday(usage, new Date()) : null;
   const budget = snapshot ? dailyTokenBudget(snapshot) : null;
@@ -76,10 +82,36 @@ export function AiModels() {
         </p>
       ) : null}
 
-      {loading ? (
-        <LoadingState label="Loading AI settings" />
-      ) : null}
+      {loading ? <LoadingState label="Loading AI settings" /> : null}
       {error ? <ErrorState message={LOAD_ERROR} onRetry={refetch} /> : null}
+
+      {canReadUsage && usageLoading && !usage ? (
+        <LoadingState label="Loading AI usage" />
+      ) : null}
+      {canReadUsage && usageError ? (
+        <ErrorState
+          message={
+            usage
+              ? "AI usage could not be refreshed. Showing the last successful totals."
+              : "AI usage could not be loaded."
+          }
+          onRetry={refetchUsage}
+        />
+      ) : null}
+      {canReadUsage && activityLoading && !activity ? (
+        <LoadingState label="Loading recent feature runs" />
+      ) : null}
+      {canReadUsage && activityError ? (
+        <ErrorState
+          message={
+            activity
+              ? "Recent feature runs could not be refreshed. Showing the last successful results."
+              : "Recent feature runs could not be loaded."
+          }
+          onRetry={refetchActivity}
+          retryLabel="Retry recent runs"
+        />
+      ) : null}
 
       {usage && today ? (
         <div className="grid gap-3 sm:grid-cols-3">

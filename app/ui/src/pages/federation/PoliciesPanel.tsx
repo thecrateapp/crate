@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { AdminSelect } from "@/components/ui/AdminSelect";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { PanelState } from "./PanelState";
@@ -42,46 +44,50 @@ function PeerPolicy({
         <MonoLabel as="p" size="eyebrow" className="break-all">
           {nodeUid}
         </MonoLabel>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((value) => (
-            <Button
-              key={value}
-              size="sm"
-              variant={preset === value ? "default" : "secondary"}
-              disabled={!canManage}
-              onClick={() =>
-                void patch(`/api/admin/federation/nodes/${nodeUid}/preset`, {
-                  preset: value,
-                })
-              }
-            >
-              {value}
-            </Button>
-          ))}
-        </div>
+        <FormField label="Grant preset">
+          <AdminSelect
+            value={preset}
+            disabled={!canManage}
+            allowClear={false}
+            placeholder="Choose a preset"
+            options={PRESETS.map((value) => ({
+              value,
+              label: value.replace(/_/g, " "),
+            }))}
+            onChange={(value) =>
+              void patch(`/api/admin/federation/nodes/${nodeUid}/preset`, {
+                preset: value,
+              })
+            }
+          />
+        </FormField>
         <div className="grid gap-2 sm:grid-cols-4">
-          <Input
-            aria-label="Maximum streams"
-            type="number"
-            value={maxStreams}
-            onChange={(event) => setMaxStreams(event.target.value)}
-            placeholder="Max streams"
-          />
-          <Input
-            aria-label="Daily bytes"
-            type="number"
-            value={dailyBytes}
-            onChange={(event) => setDailyBytes(event.target.value)}
-            placeholder="Daily bytes"
-          />
-          <Input
-            aria-label="Maximum results"
-            type="number"
-            value={maxResults}
-            onChange={(event) => setMaxResults(event.target.value)}
-            placeholder="Max results"
-          />
+          <FormField label="Maximum streams">
+            <Input
+              type="number"
+              value={maxStreams}
+              onChange={(event) => setMaxStreams(event.target.value)}
+              placeholder="Max streams"
+            />
+          </FormField>
+          <FormField label="Daily bytes">
+            <Input
+              type="number"
+              value={dailyBytes}
+              onChange={(event) => setDailyBytes(event.target.value)}
+              placeholder="Daily bytes"
+            />
+          </FormField>
+          <FormField label="Maximum results">
+            <Input
+              type="number"
+              value={maxResults}
+              onChange={(event) => setMaxResults(event.target.value)}
+              placeholder="Max results"
+            />
+          </FormField>
           <Button
+            className="self-end"
             disabled={!canManage}
             onClick={() =>
               void patch(`/api/admin/federation/nodes/${nodeUid}/limits`, {

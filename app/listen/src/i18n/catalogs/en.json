@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Clear",
   "native.logs.hide": "Hide",
   "native.logs.empty": "No playback events yet.",
-  "native.logs.trigger": "Logs · {count}"
+  "native.logs.trigger": "Logs · {count}",
+  "library.liked.loadFailed": "Could not load liked tracks.",
+  "library.liked.stateUnavailable": "Liked status unavailable",
+  "settings.offline.removeConfirmTitle": "Remove downloaded copies?",
+  "settings.offline.removeConfirmDescription": "Remove {itemCount, plural, one {# downloaded item} other {# downloaded items}} containing {trackCount, plural, one {# track} other {# tracks}} ({size}) from this device. Your library stays on the server and can be downloaded again.",
+  "settings.offline.removeConfirmAction": "Remove downloaded copies",
+  "home.playlists.arrivals.thisWeek": "This week",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {Last week} other {# weeks ago}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {This week + # previous week} other {This week + # previous weeks}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {Past # release week} other {Past # release weeks}}",
+  "crate.page.loadFailed": "Could not load this Crate. Try again.",
+  "crate.page.refreshFailed": "Could not refresh this Crate. Showing saved details.",
+  "crate.page.playbackLoadFailed": "Could not load tracks for playback. Try again.",
+  "artist.topTracks.unavailable": "Top tracks unavailable",
+  "player.mix.label": "Transition",
+  "player.mix.gapless": "Gapless",
+  "player.mix.paused": "Paused",
+  "player.mix.buffering": "Buffering"
 }

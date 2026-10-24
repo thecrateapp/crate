@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { Badge } from "@crate/ui/shadcn/badge";
-import { Search, Music } from "lucide-react";
+import { EntityCard } from "@crate/ui/domain/entity/EntityCard";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 
 interface MissingAlbumCardProps {
   title: string;
@@ -8,54 +8,29 @@ interface MissingAlbumCardProps {
   type: string;
   artist?: string;
 }
-
-function hashColor(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++)
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  const h = Math.abs(hash) % 360;
-  return `hsl(${h}, 30%, 15%)`;
-}
-
 export function MissingAlbumCard({
   title,
   year,
   type,
   artist,
 }: MissingAlbumCardProps) {
-  const searchQuery = encodeURIComponent(`${artist || ""} ${title}`.trim());
-
+  const target = `/download?q=${encodeURIComponent(`${artist || ""} ${title}`.trim())}`;
   return (
-    <div className="border border-dashed border-border rounded-md p-3 text-center grayscale opacity-60 hover:opacity-80 transition-opacity">
-      <div
-        className="w-full aspect-square rounded-md overflow-hidden mb-2 relative flex items-center justify-center"
-        style={{
-          background: `linear-gradient(135deg, ${hashColor(title)}, ${hashColor(
-            title + title,
-          )})`,
-        }}
-      >
-        <span className="text-3xl font-bold text-white/20">
-          {title.charAt(0).toUpperCase()}
-        </span>
-        <Music size={16} className="text-white/10 absolute bottom-2 right-2" />
-      </div>
-      <div className="font-semibold text-sm text-left truncate">{title}</div>
-      <div className="text-xs text-muted-foreground text-left flex items-center gap-1 flex-wrap mt-0.5">
-        <span>{year || "?"}</span>
-        <Badge
-          variant="outline"
-          className="border-border-quiet text-text-secondary"
-        >
-          {type}
-        </Badge>
-      </div>
+    <div className="min-w-0">
+      <EntityCard
+        title={title}
+        subtitle={year || "Year unknown"}
+        href={target}
+        layout="grid"
+        menuButton="none"
+        cover={{ alt: title }}
+        meta={<InfoBadge>{type}</InfoBadge>}
+      />
       <Link
-        to={`/download?q=${searchQuery}`}
-        onClick={(e) => e.stopPropagation()}
-        className="mt-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        to={target}
+        className="inline-flex min-h-11 items-center px-3 text-sm text-text-muted hover:text-accent-action-hi"
       >
-        <Search size={12} /> Search
+        Search
       </Link>
     </div>
   );

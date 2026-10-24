@@ -1,4 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+const discoveryPermissions = vi.hoisted(() => ({ allowed: true }));
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({
+    hasCapability: () => discoveryPermissions.allowed,
+    hasAnyCapability: () => discoveryPermissions.allowed,
+  }),
+}));
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,6 +48,7 @@ import { Discover } from "./Discover";
 
 describe("Discover completeness refresh", () => {
   beforeEach(() => {
+    discoveryPermissions.allowed = true;
     apiMock.mockReset();
     pollTaskMock.mockReset();
     refetchCompletenessMock.mockReset();
@@ -97,7 +105,7 @@ describe("Discover completeness refresh", () => {
     );
 
     const onComplete = pollTaskMock.mock.calls[0]![1] as () => void;
-    onComplete();
+    act(() => onComplete());
 
     expect(refetchCompletenessMock).toHaveBeenCalledTimes(1);
   });
@@ -170,7 +178,7 @@ describe("Discover completeness refresh", () => {
     const onComplete = pollTaskMock.mock.calls[0]![1] as (
       result?: Record<string, unknown>,
     ) => void;
-    onComplete({ partial: true, failed_artists: 2 });
+    act(() => onComplete({ partial: true, failed_artists: 2 }));
 
     expect(refetchCompletenessMock).toHaveBeenCalledTimes(1);
     expect(toastWarningMock).toHaveBeenCalledWith(
@@ -230,4 +238,42 @@ describe("Discover completeness refresh", () => {
 
     expect(refetchCompletenessMock).toHaveBeenCalledTimes(1);
   });
+  it("shows discovery figures once instead of repeating them as header pills", () => {
+    render(
+      <MemoryRouter>
+        <Discover />
+      </MemoryRouter>,
+    );
+    for (const text of [
+      "0 acquisition targets",
+      "0 detected releases",
+      "0 incomplete artists",
+      "0 momentum signals",
+    ]) {
+      expect(screen.queryByText(text)).not.toBeInTheDocument();
+    }
+    expect(screen.getByText("Acquisition targets")).toBeInTheDocument();
+    expect(screen.getByText("Incomplete artists")).toBeInTheDocument();
+  });
+});
+
+it("hides release writes from library-only viewers", () => {
+  discoveryPermissions.allowed = false;
+  useApiMock.mockReturnValue({
+    data: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
+  render(
+    <MemoryRouter>
+      <Discover />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.queryByRole("button", { name: "Check releases" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Open Release Radar" }),
+  ).not.toBeInTheDocument();
 });

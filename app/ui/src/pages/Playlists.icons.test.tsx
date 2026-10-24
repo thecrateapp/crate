@@ -273,7 +273,10 @@ describe("System Playlists reviewed rendering and contracts", () => {
       "Ambient mix",
     );
     await user.click(screen.getByRole("button", { name: "Create & open" }));
-    expect(toast.error).toHaveBeenCalledWith("Add at least one smart rule");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Add at least one smart rule.",
+    );
+    expect(mock.mock.calls.some(([, method]) => method === "POST")).toBe(false);
     expect(
       screen.getByRole("button", { name: "Remove rule 1" }),
     ).toBeDisabled();

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Meter } from "@crate/ui/primitives/Meter";
+import { MeterStates } from "../fixtures/ProgressUpcomingSamples";
 const meta = {
   id: "components-meter",
   title: "Components/Data Display/Meter",
@@ -40,3 +41,5 @@ export const NarrowLocalized: Story = {
     </div>
   ),
 };
+
+export const RangeStates: Story = { render: () => <MeterStates /> };

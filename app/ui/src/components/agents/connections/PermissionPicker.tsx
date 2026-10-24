@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
@@ -29,13 +31,19 @@ function ScopeCheckbox({
   const isUngrantable = !scope.can_grant;
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <Checkbox
-        id={id}
-        title={scope.scope}
-        checked={checked}
-        disabled={disabled || isUngrantable}
-        onCheckedChange={(next) => onToggle(scope.scope, next === true)}
-      />
+      <TooltipHint content={scope.scope}>
+        <span
+          className="inline-flex"
+          tabIndex={disabled || isUngrantable ? 0 : undefined}
+        >
+          <Checkbox
+            id={id}
+            checked={checked}
+            disabled={disabled || isUngrantable}
+            onCheckedChange={(next) => onToggle(scope.scope, next === true)}
+          />
+        </span>
+      </TooltipHint>
       <label htmlFor={id}>{scope.label}</label>
       {isUngrantable ? (
         <span className="text-xs text-muted-foreground">
@@ -62,9 +70,7 @@ function ScopeColumn({
   if (scopes.length === 0) return null;
   return (
     <div className="space-y-1.5">
-      <p className="text-xs font-normal tracking-wide text-muted-foreground uppercase font-mono">
-        {title}
-      </p>
+      <MonoLabel tone="accent">{title}</MonoLabel>
       <div className="space-y-1.5">
         {scopes.map((scope) => (
           <ScopeCheckbox
@@ -321,7 +327,9 @@ export function PermissionPicker({
                     key={grant}
                     className="flex flex-wrap items-center gap-2 text-sm"
                   >
-                    <span title={grant}>Unknown permission</span>
+                    <TooltipHint content={grant}>
+                      <span tabIndex={0}>Unknown permission</span>
+                    </TooltipHint>
                     <Button
                       type="button"
                       size="xs"

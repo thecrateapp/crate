@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueueLanes, type QueueLaneBreakdown } from "./QueueLanes";
+import userEvent from "@testing-library/user-event";
 
 const emptyCounts = {
   fast: 0,
@@ -42,6 +43,28 @@ function mockReducedMotion(matches: boolean) {
 }
 
 describe("QueueLanes", () => {
+  it("uses a keyboard tooltip for lane task details without native titles", async () => {
+    const user = userEvent.setup();
+    const onTaskSelect = vi.fn();
+    const { container } = render(
+      <QueueLanes
+        breakdown={breakdown({ running: { maintenance: 1 } })}
+        runningTasks={[
+          { id: "one", type: "quality_check", pool: "maintenance" },
+        ]}
+        pendingTasks={[]}
+        onTaskSelect={onTaskSelect}
+      />,
+    );
+    const task = screen.getByRole("button", {
+      name: /Open Quality Check task details/,
+    });
+    expect(container.querySelector("[title]")).toBeNull();
+    task.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("maintenance");
+    await user.keyboard("{Enter}");
+    expect(onTaskSelect).toHaveBeenCalledWith("one");
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

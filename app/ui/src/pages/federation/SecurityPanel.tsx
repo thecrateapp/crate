@@ -1,16 +1,15 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { Card, CardContent, CardHeader } from "@crate/ui/shadcn/card";
 
 import { PanelState } from "./PanelState";
 import type { FederationStatus } from "./types";
@@ -55,7 +54,9 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-display">Key material</CardTitle>
+            <MonoLabel as="h3" tone="accent">
+              Key material
+            </MonoLabel>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
@@ -94,52 +95,68 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
         {selected ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-display">Risk explanation</CardTitle>
+              <MonoLabel as="h3" tone="accent">
+                Risk explanation
+              </MonoLabel>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p>
-                Score: {risk.data?.latest_snapshot?.score ?? 0}{" "}
-                <InfoBadge>
-                  {risk.data?.latest_snapshot?.algorithm_version ??
-                    "not computed"}
-                </InfoBadge>
-              </p>
-              {risk.data?.observations.map((item) => (
-                <p key={item.id} className="text-xs">
-                  {item.observation_type}: {item.count} ({item.severity})
+              {risk.loading ? (
+                <LoadingState label="Loading peer risk" />
+              ) : risk.error || !risk.data ? (
+                <ErrorState
+                  message="Peer risk could not be loaded."
+                  onRetry={() => void risk.refetch()}
+                />
+              ) : risk.data.latest_snapshot ? (
+                <p>
+                  Score: {risk.data.latest_snapshot.score}{" "}
+                  <InfoBadge>
+                    {risk.data.latest_snapshot.algorithm_version}
+                  </InfoBadge>
                 </p>
-              ))}
-              {risk.data?.temporary_actions.map((action) => (
-                <div
-                  key={action.id}
-                  className="flex items-center justify-between text-xs"
-                >
-                  <span>
-                    {action.action_type} {action.capability} until{" "}
-                    <time dateTime={action.expires_at}>
-                      {new Date(action.expires_at).toLocaleString()}
-                    </time>
-                  </span>
-                  {canManage ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        void mutate(
-                          `/api/admin/federation/risk/actions/${action.id}/reverse`,
-                          "Temporary action reversed",
-                        )
-                      }
-                    >
-                      Reverse
-                    </Button>
-                  ) : null}
-                </div>
-              ))}
+              ) : (
+                <EmptyState description="No risk score has been computed for this peer." />
+              )}
+              {!risk.loading &&
+                !risk.error &&
+                risk.data?.observations.map((item) => (
+                  <p key={item.id} className="text-xs">
+                    {item.observation_type}: {item.count} ({item.severity})
+                  </p>
+                ))}
+              {!risk.loading &&
+                !risk.error &&
+                risk.data?.temporary_actions.map((action) => (
+                  <div
+                    key={action.id}
+                    className="flex items-center justify-between text-xs"
+                  >
+                    <span>
+                      {action.action_type} {action.capability} until{" "}
+                      <time dateTime={action.expires_at}>
+                        {new Date(action.expires_at).toLocaleString()}
+                      </time>
+                    </span>
+                    {canManage ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          void mutate(
+                            `/api/admin/federation/risk/actions/${action.id}/reverse`,
+                            "Temporary action reversed",
+                          )
+                        }
+                      >
+                        Reverse
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
             </CardContent>
           </Card>
         ) : (
-          <p className="text-sm text-white/45">No peers to evaluate.</p>
+          <p className="text-sm text-text-muted">No peers to evaluate.</p>
         )}
       </div>
     </PanelState>

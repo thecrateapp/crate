@@ -76,7 +76,7 @@ beforeEach(() => {
 });
 
 describe("Album page action labels", () => {
-  it("keeps text actions free of redundant icons and confirms deletion destructively", async () => {
+  it("keeps compact album actions accessible and confirms deletion destructively", async () => {
     mockUseApi.mockReturnValue({
       data: {
         artist: "Artist",
@@ -110,13 +110,18 @@ describe("Album page action labels", () => {
       "Analyze",
       "Delete",
     ]) {
-      expect(
-        screen.getByRole("button", { name: label }).querySelector("svg"),
-      ).toBeNull();
+      const action = screen.getByRole("button", { name: label });
+      expect(action).toHaveAttribute("data-size", "icon-lg");
+      expect(action).not.toHaveAttribute("title");
+      expect(action.textContent).toBe("");
+      expect(action.querySelector("svg")).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
     }
 
     const deleteAction = screen.getByRole("button", { name: "Delete" });
-    expect(deleteAction).toHaveAttribute("data-variant", "outline");
+    expect(deleteAction).toHaveAttribute("data-variant", "ghost");
     await userEvent.setup().click(deleteAction);
     const confirmation = await screen.findByRole("alertdialog");
     expect(confirmation).toHaveTextContent("This action cannot be undone.");
@@ -187,7 +192,10 @@ describe("MoveAlbumToArtistDialog", () => {
     await userEvent.type(screen.getByRole("textbox"), "target");
 
     const result = await screen.findByText("Target Artist");
-    expect(result.closest("button")).toHaveClass("hover:bg-accent-action/8");
+    expect(result.closest("button")).toHaveClass("hover:text-accent-action-hi");
+    expect(result.closest("button")).not.toHaveClass(
+      "hover:bg-accent-action/8",
+    );
     await userEvent.click(screen.getByText("Target Artist"));
 
     await waitFor(() => {
@@ -280,4 +288,124 @@ describe("SplitAlbumDialog", () => {
 
     expect(onSplit).toHaveBeenCalledWith("New Album", [1]);
   });
+});
+
+it("uses specific capabilities for analysis and track lyrics", () => {
+  mockUseApi.mockReturnValue({
+    data: {
+      id: 1,
+      artist: "Artist",
+      name: "Album",
+      track_count: 1,
+      total_size_mb: 0,
+      total_length_sec: 0,
+      has_cover: false,
+      tracks: [
+        {
+          id: 4,
+          filename: "song.flac",
+          format: "flac",
+          length_sec: 60,
+          size_mb: 2,
+          bitrate: 320,
+          tags: { title: "Song" },
+        },
+      ],
+      album_tags: {},
+    },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
+  renderWithAdminProviders(
+    <Routes>
+      <Route path="/artists/:artistSlug/:albumSlug" element={<Album />} />
+    </Routes>,
+    {
+      route: "/artists/artist/album",
+      auth: {
+        isAdmin: false,
+        hasCapability: (cap) =>
+          cap === "library.analysis.manage" || cap === "library.view",
+      },
+    },
+  );
+  expect(screen.getByRole("button", { name: "Analyze" })).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Sync lyrics for this track" }),
+  ).not.toBeInTheDocument();
+});
+it.each(["move", "merge"])(
+  "shows a retryable %s search failure instead of an empty result",
+  async (kind) => {
+    mockApi.mockRejectedValueOnce(new Error("offline"));
+    render(
+      kind === "move" ? (
+        <MoveAlbumToArtistDialog
+          open
+          albumName="One"
+          currentArtistName="Artist"
+          busy={false}
+          onMove={vi.fn()}
+          onOpenChange={vi.fn()}
+        />
+      ) : (
+        <MergeAlbumDialog
+          open
+          currentAlbumName="Target"
+          currentArtistName="Artist"
+          busy={false}
+          onMerge={vi.fn()}
+          onOpenChange={vi.fn()}
+        />
+      ),
+    );
+    if (kind === "move")
+      await userEvent.type(screen.getByRole("textbox"), "Target");
+    await screen.findByRole("button", { name: "Retry" });
+    expect(
+      screen.queryByText(/No matching (artists|albums) found/),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await screen.findByText(kind === "move" ? "Target Artist" : "Target Album");
+  },
+);
+
+it("keeps deletion pending and leaves the confirmation open after failure", async () => {
+  let rejectDelete!: (reason: Error) => void;
+  mockUseApi.mockReturnValue({
+    data: {
+      id: 1,
+      artist: "Artist",
+      name: "Album",
+      track_count: 0,
+      total_size_mb: 0,
+      total_length_sec: 0,
+      has_cover: false,
+      tracks: [],
+      album_tags: {},
+    },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
+  mockApi.mockReturnValue(
+    new Promise((_, reject) => {
+      rejectDelete = reject;
+    }),
+  );
+  renderWithAdminProviders(
+    <Routes>
+      <Route path="/artists/:artistSlug/:albumSlug" element={<Album />} />
+    </Routes>,
+    { route: "/artists/artist/album" },
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await userEvent.click(screen.getByRole("button", { name: "Delete Album" }));
+  expect(screen.getByRole("button", { name: "Delete Album" })).toBeDisabled();
+  rejectDelete(new Error("offline"));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Delete Album" })).toBeEnabled(),
+  );
+  expect(screen.getByRole("alertdialog")).toBeVisible();
 });

@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -26,6 +27,7 @@ vi.mock("@/hooks/use-task-poll", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: apiMock,
+  ApiError: class extends Error {},
 }));
 
 vi.mock("@/hooks/use-llm", () => ({
@@ -133,6 +135,40 @@ describe("GenreTaxonomyTree", () => {
     });
   });
 
+  it("keeps expansion accessible and separate from genre selection", async () => {
+    const user = userEvent.setup();
+    const onSelectionChange = vi.fn();
+    renderTree({
+      taxonomyData: {
+        ...taxonomyTree,
+        nodes: taxonomyTree.nodes.map((node) =>
+          node.slug === "hardcore"
+            ? { ...node, children_slugs: ["punk"] }
+            : node,
+        ),
+        top_level_slugs: ["hardcore"],
+      },
+      onSelectionChange,
+      showDetailPanel: false,
+    });
+    const expand = screen.getByRole("button", { name: "Expand Hardcore" });
+    expect(expand).toHaveClass("size-11");
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    const children = document.getElementById(
+      expand.getAttribute("aria-controls")!,
+    );
+    expect(children).not.toBeVisible();
+    expand.focus();
+    await user.keyboard("{Enter}");
+    expect(onSelectionChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Collapse Hardcore" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(children).toBeVisible();
+    await user.click(screen.getByText("Punk"));
+    expect(onSelectionChange).toHaveBeenCalledWith("punk");
+  });
+
   it("renders genre tree names as white monospaced labels", () => {
     renderTree({ showDetailPanel: false });
 
@@ -144,16 +180,18 @@ describe("GenreTaxonomyTree", () => {
     );
   });
 
-  it("uses Listen menu hover treatment without an accent border", () => {
+  it("keeps unselected taxonomy rows without hover fill or an accent border", () => {
     renderTree({ showDetailPanel: false });
 
     const label = screen.getByText("Hardcore");
     const row = label.closest(".group");
 
-    expect(row).toHaveClass("hover:bg-[var(--hover-bg)]");
+    expect(row).not.toHaveClass("hover:bg-[var(--hover-bg)]");
     expect(row).toHaveClass("border-white/6");
     expect(row).not.toHaveClass("hover:border-accent-action");
     expect(label).toHaveClass("group-hover:text-accent-action-hi");
+    fireEvent.click(label);
+    expect(row).toHaveClass("border-accent-action/40", "bg-accent-action/10");
   });
 
   it("hides curator actions and EQ editor for read-only users", () => {
@@ -404,5 +442,170 @@ describe("GenreTaxonomyTree", () => {
       screen.getByText(/10-band EQ curve are staged for review/),
     ).toBeVisible();
     expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves dirty metadata and relationships while refreshing clean fields of the same genre", async () => {
+    const freshTree = {
+      ...taxonomyTree,
+      nodes: taxonomyTree.nodes.map((node) =>
+        node.slug === "hardcore"
+          ? {
+              ...node,
+              description: "Server refreshed description",
+              parent_slugs: ["punk"],
+              artist_count: 13,
+            }
+          : node,
+      ),
+    };
+    const view = renderTree({ taxonomyData: taxonomyTree, canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    const description = screen.getByRole("textbox", { name: "Description" });
+    fireEvent.change(description, {
+      target: { value: "Unsaved editorial description" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Top-level genre" }));
+    const related = screen
+      .getByRole("textbox", { name: "Search related" })
+      .closest("section") as HTMLElement;
+    fireEvent.click(
+      within(related).getByRole("button", { name: "Remove punk" }),
+    );
+    view.rerender(
+      <MemoryRouter>
+        <GenreTaxonomyTree taxonomyData={freshTree} canCurate />
+      </MemoryRouter>,
+    );
+    expect(description).toHaveValue("Unsaved editorial description");
+    expect(
+      screen.getByRole("checkbox", { name: "Top-level genre" }),
+    ).not.toBeChecked();
+    expect(
+      within(
+        screen
+          .getByRole("textbox", { name: "Search parents" })
+          .closest("section") as HTMLElement,
+      ).getByRole("button", { name: "Remove punk" }),
+    ).toBeVisible();
+    expect(
+      within(related).queryByRole("button", { name: "Remove punk" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save relationships" }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/genres/taxonomy/hardcore/relations",
+        "PUT",
+        { relation_type: "related", target_slugs: [] },
+      ),
+    );
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads fresh values for a clean genre and resets drafts when selecting a different genre", () => {
+    const view = renderTree({ taxonomyData: taxonomyTree, canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    view.rerender(
+      <MemoryRouter>
+        <GenreTaxonomyTree
+          taxonomyData={{
+            ...taxonomyTree,
+            nodes: taxonomyTree.nodes.map((node) =>
+              node.slug === "hardcore"
+                ? { ...node, description: "Fresh clean value" }
+                : node,
+            ),
+          }}
+          canCurate
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("textbox", { name: "Description" })).toHaveValue(
+      "Fresh clean value",
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Description" }), {
+      target: { value: "Hardcore dirty draft" },
+    });
+    fireEvent.click(screen.getByText("Punk", { selector: "span" }));
+    expect(screen.getByRole("textbox", { name: "Description" })).toHaveValue(
+      "",
+    );
+  });
+  it("retains delete confirmation on failure and lets the same genre be retried", async () => {
+    const user = userEvent.setup();
+    let reject!: (reason: Error) => void;
+    const pending = new Promise<unknown>((_resolve, fail) => {
+      reject = fail;
+    });
+    apiMock.mockReturnValueOnce(pending).mockResolvedValue({
+      ok: true,
+      removed_artist_assignments: 0,
+      removed_album_assignments: 0,
+    });
+    renderTree({ taxonomyData: taxonomyTree, canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    await user.click(screen.getByRole("button", { name: "Delete genre" }));
+    const dialog = await screen.findByRole("alertdialog");
+    const confirm = within(dialog).getByRole("button", {
+      name: "Delete Genre",
+    });
+    await user.click(confirm);
+    expect(confirm).toBeDisabled();
+    expect(dialog).toBeInTheDocument();
+    await act(async () => {
+      reject(new Error("temporary"));
+      await pending.catch(() => {});
+    });
+    expect(confirm).toBeEnabled();
+    expect(dialog).toBeInTheDocument();
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("does not clear a different genre selection when an earlier deletion completes", async () => {
+    const selection = vi.fn();
+    let resolve!: (result: unknown) => void;
+    const pending = new Promise((done) => {
+      resolve = done;
+    });
+    apiMock.mockReturnValue(pending);
+    const view = renderTree({
+      taxonomyData: taxonomyTree,
+      canCurate: true,
+      selectedSlug: "hardcore",
+      onSelectionChange: selection,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Delete genre" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Delete Genre",
+      }),
+    );
+    view.rerender(
+      <MemoryRouter>
+        <GenreTaxonomyTree
+          taxonomyData={taxonomyTree}
+          canCurate
+          selectedSlug="punk"
+          onSelectionChange={selection}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Description" }), {
+      target: { value: "Punk draft" },
+    });
+    await act(async () => {
+      resolve({
+        ok: true,
+        removed_artist_assignments: 0,
+        removed_album_assignments: 0,
+      });
+      await pending;
+    });
+    expect(selection).not.toHaveBeenCalledWith(null);
+    expect(screen.getByRole("textbox", { name: "Description" })).toHaveValue(
+      "Punk draft",
+    );
   });
 });

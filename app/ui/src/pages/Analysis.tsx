@@ -26,6 +26,7 @@ import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 import { SmartMixCoverage } from "@/components/SmartMixCoverage";
 import { Button } from "@crate/ui/shadcn/button";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import {
   useOpsSnapshot,
   type AnalysisStatusSnapshot,
@@ -109,7 +110,6 @@ function PipelineCoverage({
   active,
   failed,
   total,
-  accentClassName,
   emptyLabel,
 }: {
   title: string;
@@ -118,11 +118,9 @@ function PipelineCoverage({
   active: number;
   failed: number;
   total: number;
-  accentClassName: string;
   emptyLabel: string;
 }) {
   const percent = formatPercent(done, total);
-  const blocked = failed > 0;
 
   return (
     <OpsSurface className="@container p-4">
@@ -149,17 +147,11 @@ function PipelineCoverage({
       </div>
 
       <div className="space-y-3">
-        <div className="h-px overflow-hidden rounded-full bg-border-quiet">
-          <div
-            className={cn(
-              "h-full rounded-full transition-[width,background-color] duration-500",
-              blocked
-                ? "bg-gradient-to-r from-state-warning/60 to-state-warning/70"
-                : accentClassName,
-            )}
-            style={{ width: `${Math.min(percent, 100)}%` }}
-          />
-        </div>
+        <ProgressHairline
+          label={`${title} coverage`}
+          value={total > 0 ? done / total : undefined}
+          valueText={`${done} of ${total} tracks processed`}
+        />
 
         <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
           <MiniMetric label="Done" value={done.toLocaleString()} />
@@ -217,11 +209,7 @@ function RecentTrackCard({
     | NonNullable<AnalysisStatusSnapshot["last_fingerprinted"]>;
 }) {
   return (
-    <OpsSurface
-      as="article"
-      aria-label={title}
-      className="@container p-4"
-    >
+    <OpsSurface as="article" aria-label={title} className="@container p-4">
       <div className="mb-4 flex items-start gap-3">
         <div className="space-y-1">
           <MonoLabel as="h3">{title}</MonoLabel>
@@ -295,8 +283,12 @@ function RecentTrackCard({
 export function Analysis() {
   const { data: opsSnapshot, loading, error, refresh } = useOpsSnapshot();
   const rawStatus = opsSnapshot?.analysis ?? null;
+  const report = rawStatus as
+    | (AnalysisStatusSnapshot & { unavailable?: boolean; stale?: boolean })
+    | null;
   const status = useMemo(
-    () => (rawStatus ? normalizeStatus(rawStatus) : null),
+    () =>
+      rawStatus && !report?.unavailable ? normalizeStatus(rawStatus) : null,
     [rawStatus],
   );
   const [activeAction, setActiveAction] = useState<ActionKey>(null);
@@ -375,7 +367,11 @@ export function Analysis() {
   if (!status) {
     return (
       <ErrorState
-        message="No analysis status available"
+        message={
+          report?.unavailable
+            ? "Analysis worker report is unavailable. Waiting for a worker sample."
+            : "No analysis status available"
+        }
         onRetry={() => void refresh(true)}
       />
     );
@@ -528,9 +524,13 @@ export function Analysis() {
         ) : null}
       </OpsPageHero>
 
-      {error ? (
+      {error || report?.stale || opsSnapshot?.snapshot?.stale ? (
         <OpsRefreshNotice
-          message="Analysis status could not refresh. Showing the last successful snapshot."
+          message={
+            error
+              ? "Analysis status could not refresh. Showing the last successful snapshot."
+              : "Analysis worker report is outdated. Showing the last available measurements."
+          }
           onRetry={() => void refresh(true)}
         />
       ) : null}
@@ -579,7 +579,6 @@ export function Analysis() {
             active={status.analysis_active}
             failed={status.analysis_failed}
             total={status.total}
-            accentClassName="bg-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
           <PipelineCoverage
@@ -589,7 +588,6 @@ export function Analysis() {
             active={status.bliss_active}
             failed={status.bliss_failed}
             total={status.total}
-            accentClassName="bg-accent-action-hi"
             emptyLabel="Waiting for tracks"
           />
           <OpsSurface className="@container p-4">
@@ -623,14 +621,15 @@ export function Analysis() {
             </div>
 
             <div className="space-y-3">
-              <div className="h-px overflow-hidden rounded-full bg-border-quiet">
-                <div
-                  className="h-full rounded-full bg-accent-action/80 transition-[width,background-color] duration-500"
-                  style={{
-                    width: `${Math.min(metrics.fingerprintPercent, 100)}%`,
-                  }}
-                />
-              </div>
+              <ProgressHairline
+                label="Fingerprint coverage"
+                value={
+                  status.total > 0
+                    ? status.fingerprint_done / status.total
+                    : undefined
+                }
+                valueText={`${status.fingerprint_done} of ${status.total} tracks fingerprinted`}
+              />
 
               <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
                 <MiniMetric

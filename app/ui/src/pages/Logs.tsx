@@ -117,7 +117,7 @@ function WorkerTile({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-md border bg-raised-surface p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action-hi",
+        "rounded-md border bg-raised-surface p-3 text-left transition-colors",
         active
           ? "border-accent-action/25 bg-accent-action/10"
           : "border-border-quiet hover:bg-surface-control",
@@ -178,9 +178,14 @@ function LogRow({ entry }: { entry: LogEntry }) {
           <span>{timeAgo(entry.created_at)}</span>
         </div>
         {metadata ? (
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-label text-text-subtle">
-            {metadata}
-          </div>
+          <details className="min-w-0 text-label text-text-subtle">
+            <summary className="flex min-h-11 cursor-pointer items-center">
+              Inspect metadata
+            </summary>
+            <pre className="max-h-80 overflow-auto whitespace-pre rounded-md border border-border-quiet bg-panel-surface p-3 text-label text-text-secondary">
+              {JSON.stringify(entry.metadata, null, 2)}
+            </pre>
+          </details>
         ) : null}
       </div>
     </div>

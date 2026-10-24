@@ -1,25 +1,13 @@
 import { useApi } from "@/hooks/use-api";
-import { Loader2 } from "lucide-react";
+import { useChartColors } from "@/hooks/use-chart-colors";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { artistActionApiPath } from "@/lib/library-routes";
-// Badge available if needed for quality indicators
 import { ResponsivePie } from "@nivo/pie";
 import { ResponsiveBar } from "@nivo/bar";
-import { ResponsiveRadar } from "@nivo/radar";
-
-const NIVO_THEME = {
-  axis: { ticks: { text: { fill: "#6b7280", fontSize: 11 } } },
-  grid: { line: { stroke: "var(--color-border)" } },
-  tooltip: {
-    container: {
-      background: "var(--color-card)",
-      color: "var(--color-foreground)",
-      borderRadius: "8px",
-      fontSize: 12,
-      border: "1px solid var(--color-border)",
-    },
-  },
-  labels: { text: { fill: "#9ca3af", fontSize: 10 } },
-};
+import { ResponsiveRadar, svgDefaultProps } from "@nivo/radar";
 
 interface ArtistStatsData {
   formats: { id: string; value: number }[];
@@ -54,28 +42,49 @@ export function ArtistStats({
   artistId?: number;
   artistEntityUid?: string;
 }) {
-  const { data, loading } = useApi<ArtistStatsData>(
+  const colors = useChartColors();
+  const motionAllowed = useMotionAllowed();
+  const theme = {
+    text: {
+      fill: colors.secondary,
+      fontFamily: "var(--font-mono-stack)",
+      fontSize: 11,
+    },
+    axis: { ticks: { text: { fill: colors.subtle, fontSize: 11 } } },
+    grid: { line: { stroke: colors.border } },
+    tooltip: {
+      container: {
+        background: colors.surface,
+        color: colors.primary,
+        borderRadius: "6px",
+        fontSize: 12,
+        border: `1px solid ${colors.border}`,
+        boxShadow: "none",
+      },
+    },
+    labels: { text: { fill: colors.primary, fontSize: 11 } },
+    legends: { text: { fill: colors.secondary, fontSize: 11 } },
+  };
+  const palette = [colors.accent, colors.secondary, colors.subtle];
+  const { data, loading, error, refetch } = useApi<ArtistStatsData>(
     artistActionApiPath({ artistId, artistEntityUid }, "stats") || null,
   );
 
-  if (loading)
+  if (loading) return <LoadingState label="Loading stats" />;
+  if (error)
     return (
-      <div className="py-8 text-center text-muted-foreground">
-        <Loader2 size={18} className="animate-spin inline mr-2" />
-        Loading stats...
-      </div>
+      <ErrorState
+        message="Artist statistics could not be loaded."
+        onRetry={refetch}
+      />
     );
   if (!data)
-    return (
-      <div className="py-8 text-center text-muted-foreground">
-        No stats available
-      </div>
-    );
+    return <p className="py-8 text-sm text-text-muted">No stats available</p>;
 
   const radarData =
     data.audio_by_album.length > 0
       ? data.audio_by_album.map((a) => ({
-          album: a.album.length > 15 ? a.album.slice(0, 15) + "..." : a.album,
+          album: a.album,
           energy: a.avg_energy ?? 0,
           danceability: a.avg_danceability ?? 0,
           valence: a.avg_valence ?? 0,
@@ -83,12 +92,12 @@ export function ArtistStats({
         }))
       : [];
   const timelineData = data.albums_timeline.reduce<
-    Array<{ album: string; tracks: number; year: string }>
-  >((items, album) => {
+    Array<{ album: string; label: string; tracks: number; year: string }>
+  >((items, album, index) => {
     if (!album.year) return items;
     items.push({
-      album:
-        album.name.length > 18 ? album.name.slice(0, 18) + "..." : album.name,
+      album: JSON.stringify([album.name, album.year, index]),
+      label: album.name,
       tracks: album.track_count,
       year: album.year,
     });
@@ -98,8 +107,12 @@ export function ArtistStats({
   return (
     <div className="space-y-6">
       {data.albums_timeline.length > 0 && (
-        <div className="bg-card border border-border rounded-md p-4">
-          <h4 className="text-sm font-semibold mb-3 font-display">Discography Timeline</h4>
+        <InstrumentPanel
+          as="section"
+          headingLevel={3}
+          ruled={false}
+          label={{ children: "Discography Timeline", tone: "accent" }}
+        >
           <div className="h-[200px]">
             <ResponsiveBar
               data={timelineData}
@@ -107,119 +120,170 @@ export function ArtistStats({
               indexBy="album"
               margin={{ top: 10, right: 10, bottom: 50, left: 40 }}
               padding={0.3}
-              colors={["#06b6d4"]}
+              colors={[colors.accent]}
               borderRadius={3}
               enableLabel={true}
-              labelTextColor="#fff"
-              axisBottom={{ tickRotation: -35 }}
-              theme={NIVO_THEME}
-              animate={true}
+              labelTextColor={colors.primary}
+              axisBottom={{
+                tickRotation: -35,
+                format: (value) => {
+                  const name =
+                    timelineData.find((row) => row.album === String(value))
+                      ?.label ?? String(value);
+                  return name.length > 18 ? `${name.slice(0, 18)}…` : name;
+                },
+              }}
+              theme={theme}
+              animate={motionAllowed}
               motionConfig="gentle"
               tooltip={({ data: d }) => (
                 <div
                   style={{
-                    background: "var(--color-card)",
-                    color: "var(--color-foreground)",
+                    background: colors.surface,
+                    color: colors.primary,
                     padding: "6px 10px",
                     borderRadius: "6px",
                     fontSize: 11,
-                    border: "1px solid var(--color-border)",
+                    border: `1px solid ${colors.border}`,
                   }}
                 >
-                  <strong>{String(d.album)}</strong> ({String(d.year)})<br />
+                  <strong>{String(d.label)}</strong> ({String(d.year)})<br />
                   {String(d.tracks)} tracks
                 </div>
               )}
             />
           </div>
-        </div>
+        </InstrumentPanel>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {data.formats.length > 0 && (
-          <div className="bg-card border border-border rounded-md p-4">
-            <h4 className="text-sm font-semibold mb-3 font-display">Formats</h4>
-            <div className="h-[180px]">
-              <ResponsivePie
-                data={data.formats}
-                margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                innerRadius={0.6}
-                padAngle={2}
-                cornerRadius={4}
-                colors={["#06b6d4", "#06b6d4cc", "#06b6d499", "#06b6d466"]}
-                borderWidth={0}
-                enableArcLinkLabels={true}
-                arcLinkLabelsColor={{ from: "color" }}
-                arcLinkLabelsTextColor="#9ca3af"
-                arcLinkLabelsThickness={2}
-                arcLabelsTextColor="#fff"
-                theme={NIVO_THEME}
-              />
-            </div>
-          </div>
-        )}
-        {data.genres.length > 0 && (
-          <div className="bg-card border border-border rounded-md p-4">
-            <h4 className="text-sm font-semibold mb-3 font-display">Genre Profile</h4>
-            <div className="h-[180px]">
-              <ResponsiveBar
-                data={data.genres.map((g) => ({
-                  genre:
-                    g.name.length > 14 ? g.name.slice(0, 14) + "..." : g.name,
-                  weight: Math.round(g.weight * 100),
-                }))}
-                keys={["weight"]}
-                indexBy="genre"
-                layout="horizontal"
-                margin={{ top: 5, right: 20, bottom: 5, left: 100 }}
-                padding={0.3}
-                colors={["#06b6d4"]}
-                borderRadius={3}
-                enableLabel={true}
-                labelTextColor="#fff"
-                theme={NIVO_THEME}
-                animate={true}
-                motionConfig="gentle"
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      {data.formats.length > 0 || data.genres.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.formats.length > 0 && (
+            <InstrumentPanel
+              as="section"
+              headingLevel={3}
+              ruled={data.albums_timeline.length > 0}
+              label={{ children: "Formats", tone: "accent" }}
+            >
+              <div className="h-[180px]">
+                <ResponsivePie
+                  data={data.formats}
+                  margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  innerRadius={0.6}
+                  padAngle={2}
+                  cornerRadius={4}
+                  colors={palette}
+                  borderWidth={0}
+                  enableArcLinkLabels={true}
+                  arcLinkLabelsColor={{ from: "color" }}
+                  arcLinkLabelsTextColor={colors.secondary}
+                  arcLinkLabelsThickness={2}
+                  arcLabelsTextColor={colors.primary}
+                  theme={theme}
+                  animate={motionAllowed}
+                />
+              </div>
+            </InstrumentPanel>
+          )}
+          {data.genres.length > 0 && (
+            <InstrumentPanel
+              as="section"
+              headingLevel={3}
+              ruled={data.albums_timeline.length > 0}
+              label={{ children: "Genre Profile", tone: "accent" }}
+            >
+              <div className="h-[180px]">
+                <ResponsiveBar
+                  data={data.genres.map((g) => ({
+                    genre: g.name,
+                    weight: Math.round(g.weight * 100),
+                  }))}
+                  keys={["weight"]}
+                  indexBy="genre"
+                  axisLeft={{
+                    format: (value) =>
+                      String(value).length > 14
+                        ? `${String(value).slice(0, 14)}…`
+                        : String(value),
+                  }}
+                  layout="horizontal"
+                  margin={{ top: 5, right: 20, bottom: 5, left: 100 }}
+                  padding={0.3}
+                  colors={[colors.accent]}
+                  borderRadius={3}
+                  enableLabel={true}
+                  labelTextColor={colors.primary}
+                  theme={theme}
+                  animate={motionAllowed}
+                  motionConfig="gentle"
+                />
+              </div>
+            </InstrumentPanel>
+          )}
+        </div>
+      ) : null}
 
       {data.top_tracks_by_popularity.length > 0 && (
-        <div className="bg-card border border-border rounded-md p-4">
-          <h4 className="text-sm font-semibold mb-3 font-display">Most Popular Tracks</h4>
+        <InstrumentPanel
+          as="section"
+          headingLevel={3}
+          ruled={
+            data.albums_timeline.length > 0 ||
+            data.formats.length > 0 ||
+            data.genres.length > 0
+          }
+          label={{ children: "Most Popular Tracks", tone: "accent" }}
+        >
           <div className="h-[250px]">
             <ResponsiveBar
               data={data.top_tracks_by_popularity
                 .slice(0, 10)
                 .reverse()
-                .map((t) => ({
-                  track:
-                    t.title.length > 20
-                      ? t.title.slice(0, 20) + "..."
-                      : t.title,
+                .map((t, index) => ({
+                  track: JSON.stringify([t.title, t.album, index]),
+                  title: t.title,
+                  album: t.album,
                   listeners: t.lastfm_listeners || t.popularity,
                 }))}
               keys={["listeners"]}
               indexBy="track"
+              axisLeft={{
+                format: (value) => {
+                  const title = JSON.parse(String(value))[0] as string;
+                  return title.length > 20 ? `${title.slice(0, 20)}…` : title;
+                },
+              }}
+              tooltip={({ data: d, value }) => (
+                <div className="bg-card p-3 text-sm text-text-primary">
+                  {String(d.title)} · {String(d.album)}: {value}
+                </div>
+              )}
               layout="horizontal"
               margin={{ top: 5, right: 20, bottom: 5, left: 160 }}
               padding={0.3}
-              colors={["#06b6d4"]}
+              colors={[colors.accent]}
               borderRadius={3}
               enableLabel={true}
-              labelTextColor="#fff"
-              theme={NIVO_THEME}
-              animate={true}
+              labelTextColor={colors.primary}
+              theme={theme}
+              animate={motionAllowed}
               motionConfig="gentle"
             />
           </div>
-        </div>
+        </InstrumentPanel>
       )}
 
       {radarData.length > 0 && (
-        <div className="bg-card border border-border rounded-md p-4">
-          <h4 className="text-sm font-semibold mb-3 font-display">Audio Profile by Album</h4>
+        <InstrumentPanel
+          as="section"
+          headingLevel={3}
+          ruled={
+            data.albums_timeline.length > 0 ||
+            data.formats.length > 0 ||
+            data.genres.length > 0 ||
+            data.top_tracks_by_popularity.length > 0
+          }
+          label={{ children: "Audio Profile by Album", tone: "accent" }}
+        >
           <div className="h-[300px]">
             <ResponsiveRadar
               data={radarData}
@@ -229,16 +293,29 @@ export function ArtistStats({
               margin={{ top: 30, right: 60, bottom: 30, left: 60 }}
               curve="linearClosed"
               gridLabelOffset={16}
+              gridLabel={(props) => {
+                const Label = svgDefaultProps.gridLabel;
+                return (
+                  <Label
+                    {...props}
+                    id={
+                      props.id.length > 15
+                        ? `${props.id.slice(0, 15)}…`
+                        : props.id
+                    }
+                  />
+                );
+              }}
               dotSize={8}
               dotColor={{ theme: "background" }}
               dotBorderWidth={2}
-              colors={["#06b6d4", "#06b6d4cc", "#06b6d499", "#06b6d466"]}
+              colors={palette}
               fillOpacity={0.2}
               theme={{
-                ...NIVO_THEME,
-                labels: { text: { fill: "#9ca3af", fontSize: 11 } },
+                ...theme,
+                labels: { text: { fill: colors.secondary, fontSize: 11 } },
               }}
-              animate={true}
+              animate={motionAllowed}
               motionConfig="gentle"
               legends={[
                 {
@@ -252,7 +329,7 @@ export function ArtistStats({
               ]}
             />
           </div>
-        </div>
+        </InstrumentPanel>
       )}
       {(() => {
         const albumPop = data.albums_timeline
@@ -267,30 +344,44 @@ export function ArtistStats({
           .slice(0, 8);
         if (!albumPop.length) return null;
         return (
-          <div className="bg-card border border-border rounded-md p-4">
-            <h4 className="text-sm font-semibold mb-3 font-display">Top Albums</h4>
+          <InstrumentPanel
+            as="section"
+            headingLevel={3}
+            label={{ children: "Top Albums", tone: "accent" }}
+          >
             <div className="h-[200px]">
               <ResponsiveBar
-                data={albumPop.reverse().map((a) => ({
-                  album:
-                    a.name.length > 20 ? a.name.slice(0, 20) + "..." : a.name,
+                data={albumPop.reverse().map((a, index) => ({
+                  album: JSON.stringify([a.name, a.year, index]),
+                  label: a.name,
                   listeners: a.lastfm_listeners ?? a.popularity ?? 0,
                 }))}
                 keys={["listeners"]}
                 indexBy="album"
+                axisLeft={{
+                  format: (value) => {
+                    const title = JSON.parse(String(value))[0] as string;
+                    return title.length > 20 ? `${title.slice(0, 20)}…` : title;
+                  },
+                }}
+                tooltip={({ data: d, value }) => (
+                  <div className="bg-card p-3 text-sm text-text-primary">
+                    {String(d.label)}: {value}
+                  </div>
+                )}
                 layout="horizontal"
                 margin={{ top: 5, right: 20, bottom: 5, left: 160 }}
                 padding={0.3}
-                colors={["#06b6d4"]}
+                colors={[colors.accent]}
                 borderRadius={3}
                 enableLabel={true}
-                labelTextColor="#fff"
-                theme={NIVO_THEME}
-                animate={true}
+                labelTextColor={colors.primary}
+                theme={theme}
+                animate={motionAllowed}
                 motionConfig="gentle"
               />
             </div>
-          </div>
+          </InstrumentPanel>
         );
       })()}
     </div>

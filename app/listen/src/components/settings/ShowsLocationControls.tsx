@@ -20,11 +20,13 @@ export function LocationModePicker({
   mode,
   displayCity,
   displayCountry,
+  disabled,
   onChange,
 }: {
   mode: "fixed" | "near_me";
   displayCity?: string | null;
   displayCountry?: string | null;
+  disabled?: boolean;
   onChange: (mode: "fixed" | "near_me") => void;
 }) {
   const { t } = useTranslation();
@@ -32,6 +34,7 @@ export function LocationModePicker({
     <SelectRow
       label={t("settings.shows.location")}
       value={mode}
+      disabled={disabled}
       onChange={onChange}
       options={[
         {
@@ -62,6 +65,7 @@ export function FixedCityPicker({
   setShowDropdown,
   detectFromIp,
   selectCity,
+  disabled,
 }: {
   city: string;
   searchQuery: string;
@@ -74,6 +78,7 @@ export function FixedCityPicker({
   setShowDropdown: (value: boolean) => void;
   detectFromIp: () => void;
   selectCity: (result: CityResult) => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -109,6 +114,7 @@ export function FixedCityPicker({
                 active >= 0 ? `${listId}-${active}` : undefined
               }
               value={searchQuery || city}
+              disabled={disabled}
               placeholder={t("settings.shows.cityPlaceholder")}
               onChange={(event) => {
                 setActiveIndex(-1);
@@ -170,6 +176,7 @@ export function FixedCityPicker({
                     data-active={active === index || undefined}
                     data-highlighted={active === index ? "" : undefined}
                     tabIndex={-1}
+                    disabled={disabled}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
                       selectCity(result);
@@ -187,6 +194,7 @@ export function FixedCityPicker({
       <Button
         variant="secondary"
         loading={detecting}
+        disabled={disabled}
         onClick={() => detectFromIp()}
       >
         {!detecting ? (
@@ -200,15 +208,18 @@ export function FixedCityPicker({
 export function RadiusPicker({
   radius,
   onChange,
+  disabled,
 }: {
   radius: number;
   onChange: (radius: number) => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <SelectRow
       label={t("settings.shows.searchRadius")}
       value={String(radius)}
+      disabled={disabled}
       onChange={(value) => onChange(Number(value))}
       options={[...new Set([...RADIUS_OPTIONS, radius])]
         .sort((a, b) => a - b)

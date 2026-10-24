@@ -127,6 +127,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
         new NativePlaybackTelemetry(MAX_BUFFERED_EVENTS);
 
     private final NativeEventSequence nativeEventSequence = new NativeEventSequence();
+    private final NativeMixStateReporter mixStateReporter = new NativeMixStateReporter(
+        payload -> emit("mixStateChanged", payload)
+    );
 
     private ExoPlayer deckAPlayer;
     private ExoPlayer deckBPlayer;
@@ -1272,6 +1275,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         payload.put("queueSize", queueState.size());
         payload.put("crossfadeMs", crossfadeMs);
         payload.put("eqEnabled", eqEnabled);
+        NativeMixState mixState = captureMixState();
+        payload.put("mixState", mixState == null ? JSONObject.NULL : mixState.toJson());
         return payload;
     }
 
@@ -1287,6 +1292,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         @Nullable List<JSONObject> transitionPlanPayloads
     ) {
         if (player == null) return;
+        // Physical deck callbacks may publish immediately: retire the old execution first.
+        cancelNativeTransition("queue_replaced");
         resumeAuthorizationPending = false;
         resumeAuthorizationIntent = null;
         this.crossfadeMs = Math.max(0, crossfadeMs);
@@ -1444,6 +1451,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             revision,
             resolveTransitionPlans(queueState.snapshot(), result.plans)
         );
+        publishMixState();
         Log.i(
             NativeMixAudioProcessor.QOE_TAG,
             "continuation appended=" + result.tracks.size()
@@ -1555,6 +1563,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
             revision,
             resolveTransitionPlans(tracks, result.plans)
         );
+        publishMixState();
         Log.i(
             NativeMixAudioProcessor.QOE_TAG,
             "continuation planned=" + result.plans.size() + " merged=" + merged
@@ -1565,10 +1574,12 @@ public class CrateNativePlaybackService extends MediaSessionService {
         String revision,
         @Nullable List<JSONObject> transitionPlanPayloads
     ) {
-        return queueState.replaceTransitionPlans(
+        boolean accepted = queueState.replaceTransitionPlans(
             revision,
             resolveTransitionPlans(queueState.snapshot(), transitionPlanPayloads)
         );
+        publishMixState();
+        return accepted;
     }
 
     private void applyQueueAuthorization(List<NativeTrack> tracks) {
@@ -1995,6 +2006,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     private void syncNativeMixTicker() {
+        publishMixState();
         mainHandler.removeCallbacks(nativeMixTicker);
         nativeMixTickerStarted = false;
         if (
@@ -2137,6 +2149,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 + " engaged=" + mixController.isBeatmatching()
                 + " bass=" + boundedPlan.bassHandoff
         );
+        publishMixState();
         emit("transitionStarted", transitionPayload(boundedPlan, 0.0f));
     }
 
@@ -2262,6 +2275,31 @@ public class CrateNativePlaybackService extends MediaSessionService {
         transitionOutgoingIndex = -1;
         transitionStartedWallMs = 0L;
         lastTransitionProgressEventElapsedMs = 0L;
+        publishMixState();
+    }
+
+    @Nullable
+    private NativeMixState captureMixState() {
+        if (player == null || mixController == null || resumeAuthorizationPending) return null;
+        NativeMixState active = mixController.activeMixState(queueState.revision());
+        if (active != null) return active;
+        int index = player.getCurrentMediaItemIndex();
+        NativeTrack outgoing = queueState.get(index);
+        NativeTrack incoming = queueState.get(index + 1);
+        if (outgoing == null || incoming == null) return null;
+        NativeTransitionPlan plan = queueState.transitionPlanFor(outgoing.id, incoming.id);
+        String currentEdge = queueState.revision() + ":" + outgoing.id + ">" + incoming.id;
+        return NativeMixState.confirmedGapless(
+            queueState.revision(), mixController.executionId(), outgoing.id, incoming.id,
+            crossfadeMs, hasMixableAdjacentTrack(),
+            player.getRepeatMode() == Player.REPEAT_MODE_ONE,
+            plan != null && plan.mode == NativeTransitionPlan.Mode.GAPLESS,
+            fallenBackEdge.equals(currentEdge)
+        );
+    }
+
+    private void publishMixState() {
+        mixStateReporter.publish(queueState.revision(), captureMixState(), this::basePayload);
     }
 
     private void emitNativeTransitionProgress(float progress) {
@@ -2351,6 +2389,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     private void emitState(String eventName) {
         if (player == null) return;
+        publishMixState();
         JSObject payload = getSnapshot();
         emit(eventName, payload);
     }

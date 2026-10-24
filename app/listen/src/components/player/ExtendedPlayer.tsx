@@ -19,7 +19,6 @@ import {
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
 import {
   ExtendedPlayerView,
   type ExtendedPlayerTabId,
@@ -178,8 +177,6 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     [onClose, showEqualizer, showVizSettings],
   );
 
-  useEscapeKey(open, handleEscape);
-
   if (!isDesktop || !currentTrack) return null;
 
   function closeWithFeedback() {
@@ -241,6 +238,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         vizSettingsButtonRef,
       }}
       actions={{
+        onEscape: handleEscape,
         closeWithFeedback,
         goToArtist,
         onSurfaceModeChange: (mode) => {

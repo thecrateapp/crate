@@ -121,7 +121,7 @@ export function usePlayerBarController() {
   } | null>(null);
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] =
     useState<PlaybackDeliveryPreference>(getPlaybackDeliveryPolicyPreference);
-  const { isLiked, likeTrack, unlikeTrack } = useLikedTracks();
+  const { isLiked, likeTrack, unlikeTrack, hasLoaded } = useLikedTracks();
   usePlayerBarPlaybackPreferenceEffect({
     eventName: PLAYER_PLAYBACK_PREFS_EVENT,
     getPreference: getPlaybackDeliveryPolicyPreference,
@@ -236,6 +236,7 @@ export function usePlayerBarController() {
   return {
     isDesktop,
     liked,
+    likeStateAvailable: hasLoaded !== false,
     isShapedRadioTrack,
     effectiveIsPlaying,
     effectiveIsBuffering,
@@ -268,7 +269,9 @@ export function usePlayerBarController() {
     duration,
     onPrepareFullscreen: prepareFullscreenPlayer,
     onOpenFullscreen: openFullscreenPlayer,
-    onToggleLike: () => void toggleLike(),
+    onToggleLike: () => {
+      if (hasLoaded !== false) void toggleLike();
+    },
     onNextTrack: handleNextTrack,
     onOverlayChange: surface.setHasFloatingOverlayOpen,
     handleTouchStart,

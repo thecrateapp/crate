@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useId,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 import {
-  ChevronRight,
   Copy,
   Disc3,
   Globe,
@@ -21,7 +27,8 @@ import { ApiError, api } from "@/lib/api";
 import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
-import { Bot } from "@crate/ui/icons";
+import { Bot, ChevronRight } from "@crate/ui/icons";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -217,17 +224,33 @@ function NodeDetailPanel({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [coverBroken, setCoverBroken] = useState(false);
   const [coverVersion, setCoverVersion] = useState(0);
+  const baselineNode = useRef(node);
 
   useEffect(() => {
-    setDescriptionDraft(node.description ?? "");
-    setTopLevelDraft(node.top_level);
-    setRelationDrafts({
-      parent: node.parent_slugs ?? [],
-      related: node.related_slugs ?? [],
-      influenced_by: node.influenced_by_slugs ?? [],
-      fusion_of: node.fusion_of_slugs ?? [],
+    const previous = baselineNode.current;
+    setDescriptionDraft((current) =>
+      current === (previous.description ?? "")
+        ? (node.description ?? "")
+        : current,
+    );
+    setTopLevelDraft((current) =>
+      current === previous.top_level ? node.top_level : current,
+    );
+    setRelationDrafts((current) => {
+      const next = { ...current };
+      for (const config of RELATION_EDITOR_CONFIG) {
+        if (
+          sameTaxonomyRelations(
+            current[config.key] ?? previous[config.field] ?? [],
+            previous[config.field] ?? [],
+          )
+        ) {
+          next[config.key] = node[config.field] ?? [];
+        }
+      }
+      return next;
     });
-    setProposal(null);
+    baselineNode.current = node;
   }, [node]);
 
   useEffect(() => {
@@ -368,12 +391,6 @@ function NodeDetailPanel({
       toast.success(genreDeleteSummary(result));
       setDeleteOpen(false);
       onDeleted?.();
-    } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? `Failed to delete genre: ${error.message}`
-          : "Failed to delete genre",
-      );
     } finally {
       setSavingKey(null);
     }
@@ -824,9 +841,14 @@ function NodeDetailPanel({
           description="This removes the taxonomy node, aliases, relations, and all mapped raw genre assignments from artists and albums. This cannot be undone."
           confirmLabel="Delete Genre"
           variant="destructive"
-          onConfirm={() => {
-            void deleteNode();
-          }}
+          onConfirm={deleteNode}
+          onError={(error) =>
+            toast.error(
+              error instanceof ApiError
+                ? `Failed to delete genre: ${error.message}`
+                : "Failed to delete genre",
+            )
+          }
           eyebrow="Confirm action"
           consequence={`${node.name} · removes taxonomy, aliases, relations and mapped genre assignments`}
         />
@@ -877,6 +899,8 @@ export function GenreTaxonomyTree({
     controlledSelectedSlug === undefined
       ? internalSelectedSlug
       : controlledSelectedSlug;
+  const selectionRef = useRef(selectedSlug);
+  selectionRef.current = selectedSlug;
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   const updateSelection = useCallback(
@@ -1018,6 +1042,8 @@ export function GenreTaxonomyTree({
 
   const isBusy = useCallback((key: string) => !!busy[key], [busy]);
 
+  const treeId = useId();
+
   if (!data) return null;
 
   const toggleExpand = (slug: string) => {
@@ -1032,7 +1058,12 @@ export function GenreTaxonomyTree({
   const isExpanded = (slug: string) =>
     expanded.has(slug) || autoExpanded.has(slug);
 
-  const renderNode = (slug: string, depth: number): React.ReactNode => {
+  const renderNode = (
+    slug: string,
+    depth: number,
+    path = slug,
+  ): React.ReactNode => {
+    const childrenId = `${treeId}-${encodeURIComponent(path)}`;
     const node = nodeMap.get(slug);
     if (!node) return null;
     if (visibleSlugs && !visibleSlugs.has(slug)) return null;
@@ -1049,34 +1080,33 @@ export function GenreTaxonomyTree({
     return (
       <div key={slug}>
         <div
-          className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+          className={`group flex w-full items-center gap-3 rounded-lg border px-3 py-0 text-left text-sm transition-colors ${
             isSelected
               ? "border-accent-action/40 bg-accent-action/10"
-              : "border-white/6 bg-white/[0.02] hover:bg-[var(--hover-bg)]"
+              : "border-white/6 bg-white/[0.02]"
           }`}
           style={{ paddingLeft: depth * 16 + 10 }}
         >
           {hasChildren ? (
-            <button
-              type="button"
-              aria-label={`${open ? "Collapse" : "Expand"} ${node.name}`}
-              className="flex-shrink-0 p-0.5 rounded hover:bg-white/10"
+            <ActionButton
+              label={`${open ? "Collapse" : "Expand"} ${node.name}`}
+              aria-expanded={open}
+              aria-controls={childrenId}
               onClick={() => toggleExpand(slug)}
             >
               <ChevronRight
-                size={12}
-                className={`text-white/40 transition-transform ${
-                  open ? "rotate-90" : ""
-                }`}
+                data-admin-ux="genre-tree-expand"
+                aria-hidden="true"
+                className={`transition-transform ${open ? "rotate-90" : ""}`}
               />
-            </button>
+            </ActionButton>
           ) : (
-            <span className="w-4 flex-shrink-0" />
+            <span className="w-11 flex-shrink-0" aria-hidden="true" />
           )}
           <button
             type="button"
             aria-pressed={isSelected}
-            className="flex min-w-0 flex-1 items-center gap-3 border-0 bg-transparent p-0 text-left text-sm"
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-3 border-0 bg-transparent p-0 text-left text-sm"
             onClick={() => updateSelection(isSelected ? null : slug)}
           >
             <span
@@ -1109,23 +1139,28 @@ export function GenreTaxonomyTree({
             )}
           </button>
         </div>
-        {open &&
-          node.children_slugs.map((childSlug) =>
-            renderNode(childSlug, depth + 1),
-          )}
+        {hasChildren ? (
+          <div id={childrenId} hidden={!open}>
+            {open &&
+              node.children_slugs.map((childSlug) =>
+                renderNode(childSlug, depth + 1, `${path}/${childSlug}`),
+              )}
+          </div>
+        ) : null}
       </div>
     );
   };
 
   const detail = selectedNode ? (
     <NodeDetailPanel
+      key={selectedNode.slug}
       node={selectedNode}
       nodeMap={nodeMap}
       onAction={runAction}
       actionBusy={isBusy}
       onRefetch={refetch}
       onDeleted={() => {
-        updateSelection(null);
+        if (selectionRef.current === selectedNode.slug) updateSelection(null);
         refetch();
         onChanged?.();
       }}

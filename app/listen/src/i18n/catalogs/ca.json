@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Buida",
   "native.logs.hide": "Amaga",
   "native.logs.empty": "Encara no hi ha esdeveniments de reproducció.",
-  "native.logs.trigger": "Registre · {count}"
+  "native.logs.trigger": "Registre · {count}",
+  "library.liked.loadFailed": "No s’han pogut carregar les cançons que t’agraden.",
+  "library.liked.stateUnavailable": "Estat de favorit no disponible",
+  "settings.offline.removeConfirmTitle": "Vols eliminar les còpies baixades?",
+  "settings.offline.removeConfirmDescription": "S’eliminaran d’aquest dispositiu {itemCount, plural, one {# element baixat} other {# elements baixats}} amb {trackCount, plural, one {# cançó} other {# cançons}} ({size}). La biblioteca es manté al servidor i la pots tornar a baixar.",
+  "settings.offline.removeConfirmAction": "Elimina les còpies baixades",
+  "home.playlists.arrivals.thisWeek": "Aquesta setmana",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {La setmana passada} other {Fa # setmanes}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Aquesta setmana + # setmana anterior} other {Aquesta setmana + # setmanes anteriors}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {# setmana de llançaments anterior} other {# setmanes de llançaments anteriors}}",
+  "crate.page.loadFailed": "No s’ha pogut carregar aquesta Crate. Torna-ho a provar.",
+  "crate.page.refreshFailed": "No s’ha pogut actualitzar aquesta Crate. Es mostren les dades desades.",
+  "crate.page.playbackLoadFailed": "No s’han pogut carregar les cançons per reproduir-les. Torna-ho a provar.",
+  "artist.topTracks.unavailable": "Cançons destacades no disponibles",
+  "player.mix.label": "Transició",
+  "player.mix.gapless": "Sense pauses",
+  "player.mix.paused": "En pausa",
+  "player.mix.buffering": "Carregant àudio"
 }

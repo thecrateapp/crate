@@ -1,39 +1,28 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { StatusBadge } from "./StatusBadge";
 
-import { StatusBadge, type StatusTone } from "./StatusBadge";
-
-describe("StatusBadge", () => {
+describe("StatusBadge shared adapter", () => {
   it.each([
-    ["neutral", "border-border-quiet", "bg-raised-surface", "text-text-subtle"],
-    [
-      "info",
-      "border-accent-action/25",
-      "bg-accent-action/10",
-      "text-accent-action",
-    ],
-    [
-      "success",
-      "border-accent-action/25",
-      "bg-accent-action/10",
-      "text-accent-action-hi",
-    ],
-    [
-      "warning",
-      "border-state-warning/25",
-      "bg-state-warning/10",
-      "text-state-warning-text",
-    ],
-    [
-      "danger",
-      "border-state-warning/25",
-      "bg-state-warning/10",
-      "text-state-warning-text",
-    ],
-  ] as const)("uses shared semantic tokens for %s", (tone, ...classes) => {
-    render(<StatusBadge tone={tone as StatusTone}>Connected</StatusBadge>);
-    const badge = screen.getByText("Connected");
-    expect(badge).toHaveAttribute("data-tone", tone);
-    expect(badge).toHaveClass(...classes);
-  });
+    ["neutral", "neutral"],
+    ["info", "accent"],
+    ["success", "accent"],
+    ["warning", "warning"],
+    ["danger", "warning"],
+  ] as const)(
+    "preserves Admin %s semantics with shared %s presentation",
+    (tone, presentation) => {
+      render(<StatusBadge tone={tone}>Connected</StatusBadge>);
+      const badge = screen.getByText("Connected");
+      expect(badge).toHaveAttribute("data-status-tone", tone);
+      expect(badge).toHaveAttribute("data-tone", presentation);
+      expect(badge).toHaveAttribute("data-slot", "info-badge");
+      expect(badge).toHaveClass("crate-info-badge", "font-mono", "font-normal");
+      expect(badge).not.toHaveClass(
+        "font-medium",
+        "py-0.5",
+        "bg-raised-surface",
+      );
+    },
+  );
 });

@@ -28,15 +28,63 @@ function violations(
   const program = sharedChecker
     ? undefined
     : ts.createProgram(
-        ["source.tsx"],
+        [sourceTree.fileName],
         { noLib: true, noResolve: true },
         {
           ...ts.createCompilerHost({}),
           getSourceFile: (file) =>
-            file === "source.tsx" ? sourceTree : undefined,
+            file === sourceTree.fileName ? sourceTree : undefined,
         },
       );
   const checker = sharedChecker ?? program!.getTypeChecker();
+  // Diego explicitly retained these three genre delete controls as icon-only
+  // danger actions. Keep approval tied to the original file, shared import,
+  // row variant and exact contextual title; it does not allow arbitrary danger.
+  const reviewedDeletes = new Set([
+    'components/genres/GenreTaxonomyTree.tsx:"Delete genre"',
+    "pages/Genres.tsx:{`Delete ${genre.name}`}",
+    "pages/Genres.tsx:{`Delete ${g.name}`}",
+  ]);
+  const usedDeletes = new Set<string>();
+  function reviewedDelete(
+    node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  ) {
+    if (
+      node.tagName.getText(sourceTree) !== "ActionIconButton" ||
+      node.attributes.properties.some(ts.isJsxSpreadAttribute)
+    )
+      return false;
+    const attributes = node.attributes.properties.filter(ts.isJsxAttribute);
+    const prop = (name: string) =>
+      attributes
+        .find((attr) => attr.name.getText(sourceTree) === name)
+        ?.initializer?.getText(sourceTree);
+    const key = `${relative(root, sourceTree.fileName)}:${prop("title")}`;
+    const sharedImport = sourceTree.statements.some(
+      (statement) =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text ===
+          "@crate/ui/primitives/ActionIconButton" &&
+        statement.importClause?.namedBindings &&
+        ts.isNamedImports(statement.importClause.namedBindings) &&
+        statement.importClause.namedBindings.elements.some(
+          (binding) =>
+            binding.name.text === "ActionIconButton" &&
+            (binding.propertyName?.text ?? binding.name.text) ===
+              "ActionIconButton",
+        ),
+    );
+    if (
+      !sharedImport ||
+      prop("variant") !== '"row"' ||
+      !reviewedDeletes.has(key) ||
+      usedDeletes.has(key)
+    )
+      return false;
+    usedDeletes.add(key);
+    return true;
+  }
   function visit(node: ts.Node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const component = node.tagName.getText(sourceTree);
@@ -75,9 +123,14 @@ function violations(
                   /(?:IconButton|IconLink)$/.test(component)),
             )
           )
-            found.push(
-              `${component}: ${attr.name.getText(sourceTree)} outside ConfirmDialog`,
-            );
+            if (!(
+              attr.name.getText(sourceTree) === "tone" &&
+              values.includes("danger") &&
+              reviewedDelete(node)
+            ))
+              found.push(
+                `${component}: ${attr.name.getText(sourceTree)} outside ConfirmDialog`,
+              );
         }
       }
     }
@@ -157,4 +210,43 @@ describe("Admin status colour contract", () => {
     });
     expect(found).toEqual([]);
   });
+});
+
+it("bounds the explicitly approved genre delete actions without allowing other danger controls", () => {
+  const path = resolve(root, "components/genres/GenreTaxonomyTree.tsx");
+  const source =
+    'import {ActionIconButton} from "@crate/ui/primitives/ActionIconButton"; const view=<ActionIconButton variant="row" tone="danger" title="Delete genre"/>;';
+  const check = (value: string) =>
+    violations(
+      value,
+      ts.createSourceFile(
+        path,
+        value,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      ),
+    );
+  expect(check(source)).toEqual([]);
+  expect(
+    check(
+      source.replace('title="Delete genre"', 'title="Delete something else"'),
+    ),
+  ).toHaveLength(1);
+  expect(
+    check(
+      source.replace(
+        "@crate/ui/primitives/ActionIconButton",
+        "./LocalIconButton",
+      ),
+    ),
+  ).toHaveLength(1);
+  expect(
+    check(
+      source.replace(
+        "/>;",
+        '/>; const duplicate=<ActionIconButton variant="row" tone="danger" title="Delete genre"/>;',
+      ),
+    ),
+  ).toHaveLength(1);
 });

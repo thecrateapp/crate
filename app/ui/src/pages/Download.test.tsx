@@ -1,5 +1,6 @@
 import {
   fireEvent,
+  act,
   render,
   screen,
   waitFor,
@@ -8,6 +9,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 const {
   refetch,
@@ -15,9 +17,11 @@ const {
   mockSurface,
   mockArtistAlbums,
   mockArtistSuggestions,
+  mockUseApi,
 } = vi.hoisted(() => ({
   refetch: vi.fn(),
   mockApi: vi.fn(),
+  mockUseApi: vi.fn(),
   mockSurface: {
     tidal_authenticated: true,
     tidal_queue: [
@@ -145,7 +149,11 @@ const {
   },
 }));
 vi.mock("@/hooks/use-api", () => ({
-  useApi: (path: string) => ({
+  useApi: mockUseApi,
+}));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+function defaultRead(path: string) {
+  return {
     data:
       path === "/api/acquisition/snapshot"
         ? mockSurface
@@ -157,8 +165,8 @@ vi.mock("@/hooks/use-api", () => ({
     loading: false,
     error: null,
     refetch,
-  }),
-}));
+  };
+}
 vi.mock("@/lib/api", () => ({
   api: mockApi,
   apiSseUrl: (path: string) => path,
@@ -167,6 +175,8 @@ vi.mock("@/lib/api", () => ({
 import { DownloadPage } from "./Download";
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  mockUseApi.mockImplementation(defaultRead);
   sessionStorage.clear();
   mockApi.mockReset();
   mockApi.mockImplementation(async (path: string) => {
@@ -203,6 +213,176 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it("does not claim disconnection or an empty queue while acquisition is unknown", async () => {
+  mockUseApi.mockImplementation((path: string) =>
+    path === "/api/acquisition/snapshot"
+      ? { data: null, loading: true, error: null, refetch }
+      : defaultRead(path),
+  );
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("Tidal disconnected")).toBeNull();
+  expect(screen.queryByText("0 active downloads")).toBeNull();
+  await userEvent.click(screen.getByRole("tab", { name: /Queue/ }));
+  expect(
+    screen.getByRole("status", { name: "Loading acquisition queue" }),
+  ).toBeVisible();
+  expect(screen.queryByText("Queue is clear")).toBeNull();
+});
+
+it("offers recovery when loading an album tracklist fails", async () => {
+  let attempts = 0;
+  mockApi.mockImplementation(async (path: string) => {
+    if (path.startsWith("/api/tidal/search"))
+      return { albums: [mockArtistAlbums.albums[0]], artists: [], tracks: [] };
+    if (path.endsWith("/tracks")) {
+      if (attempts++ === 0) throw new Error("offline");
+      return {
+        tracks: [
+          {
+            id: "recovered",
+            title: "Recovered track",
+            artist: "Caspian",
+            track_number: 1,
+            duration: 60,
+            url: "https://tidal.test/track",
+            quality: [],
+          },
+        ],
+      };
+    }
+    return { search_id: "sample-search" };
+  });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  await user.type(
+    screen.getByRole("textbox", { name: "Search music" }),
+    "Caspian",
+  );
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await user.click(await screen.findByRole("button", { name: "View tracks" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not load album tracks",
+  );
+  expect(screen.queryByText("No tracks found")).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("Recovered track")).toBeVisible();
+});
+
+it("reports partial wishlist promotion instead of claiming the whole batch succeeded", async () => {
+  const surface = {
+    ...mockSurface,
+    tidal_queue: [
+      ...mockSurface.tidal_queue,
+      { ...mockSurface.tidal_queue[1], id: 45, title: "Second wish" },
+    ],
+  };
+  mockUseApi.mockImplementation((path: string) =>
+    path === "/api/acquisition/snapshot"
+      ? { ...defaultRead(path), data: surface }
+      : defaultRead(path),
+  );
+  mockApi.mockImplementation(async (path: string) => {
+    if (path.endsWith("/42")) throw new Error("offline");
+    return {};
+  });
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  await userEvent.click(screen.getByRole("tab", { name: /Wishlist/ }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "Download all (2)" }),
+  );
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith(
+      "1 queued · 1 failed. Failed items remain in Wishlist.",
+    ),
+  );
+  expect(screen.getByRole("article", { name: "On Circles" })).toBeVisible();
+  expect(screen.queryByRole("article", { name: "Second wish" })).toBeNull();
+});
+
+it("keeps failed wishlist promotions visible and never announces success", async () => {
+  mockApi.mockRejectedValue(new Error("network unavailable"));
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("tab", { name: /Wishlist/ }));
+  await user.click(screen.getByRole("button", { name: "Download all (1)" }));
+  await waitFor(() => expect(toast.error).toHaveBeenCalled());
+  expect(toast.success).not.toHaveBeenCalled();
+  expect(screen.getByRole("article", { name: "On Circles" })).toBeVisible();
+});
+
+it("clears and disconnects Soulseek results when a new search is below its minimum", async () => {
+  const streams: {
+    url: string;
+    onmessage: ((event: MessageEvent) => void) | null;
+    close: ReturnType<typeof vi.fn>;
+  }[] = [];
+  vi.stubGlobal("EventSource", function (url: string) {
+    const stream = { url, onmessage: null, close: vi.fn() };
+    streams.push(stream);
+    return stream;
+  });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  const search = screen.getByRole("textbox", { name: "Search music" });
+  await user.type(search, "Caspian");
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() =>
+    expect(
+      streams.some((stream) => stream.url.includes("sample-search/stream")),
+    ).toBe(true),
+  );
+  const old = streams.find((stream) =>
+    stream.url.includes("sample-search/stream"),
+  )!;
+  act(() =>
+    old.onmessage?.(
+      new MessageEvent("message", {
+        data: JSON.stringify({
+          results: [
+            {
+              username: "old-peer",
+              artist: "Caspian",
+              album: "Obsolete Soulseek release",
+              quality: "FLAC",
+              files: [],
+              totalSize: 1,
+              speed: 0,
+              freeSlot: true,
+            },
+          ],
+          isComplete: false,
+        }),
+      }),
+    ),
+  );
+  await user.clear(search);
+  await user.type(search, "PJ");
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await user.click(screen.getByRole("tab", { name: /Soulseek/ }));
+  expect(screen.queryByText("Obsolete Soulseek release")).toBeNull();
+  expect(old.close).toHaveBeenCalled();
+});
+
 it("keeps Tidal artist browsing and release actions accessible without hover", async () => {
   const user = userEvent.setup();
   render(
@@ -229,11 +409,22 @@ it("keeps Tidal artist browsing and release actions accessible without hover", a
     name: "Add Dewy to wishlist",
   });
   expect(wishlistTrack).not.toHaveAttribute("title");
+  expect(wishlistTrack).not.toHaveClass("opacity-0");
+  expect(wishlistTrack).toHaveClass(
+    "pointer-fine:opacity-0",
+    "pointer-fine:group-focus-within:opacity-100",
+  );
   await user.hover(wishlistTrack);
   expect(await screen.findByRole("tooltip")).toHaveTextContent(
     "Add to wishlist",
   );
 
+  await user.click(wishlistTrack);
+  expect(mockApi).toHaveBeenCalledWith(
+    "/api/tidal/wishlist",
+    "POST",
+    expect.objectContaining({ title: "Dewy", content_type: "track" }),
+  );
   await user.click(artistResult);
 
   expect(
@@ -255,6 +446,32 @@ it("keeps Tidal artist browsing and release actions accessible without hover", a
   expect(
     screen.getByRole("button", { name: "Download 1 missing album" }),
   ).toBeVisible();
+});
+
+it("keeps an unavailable artist discography distinct from zero albums", async () => {
+  mockUseApi.mockImplementation((path: string) =>
+    path.includes("/api/tidal/artists/")
+      ? { data: null, loading: false, error: "offline", refetch }
+      : defaultRead(path),
+  );
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <DownloadPage />
+    </MemoryRouter>,
+  );
+  await user.type(
+    screen.getByRole("textbox", { name: "Search music" }),
+    "Caspian",
+  );
+  await user.click(screen.getByRole("button", { name: "Search" }));
+  await user.click(
+    await screen.findByRole("button", { name: /browse albums/i }),
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Could not load Tidal artist albums",
+  );
+  expect(screen.queryByText("0 albums")).toBeNull();
 });
 
 it("keeps Download's five real panels reachable after the shared tab restyle", async () => {
@@ -352,6 +569,9 @@ it("submits the music search from the search form", async () => {
   await waitFor(() => {
     expect(mockApi).toHaveBeenCalledWith(
       "/api/tidal/search?q=Caspian&limit=20",
+      "GET",
+      undefined,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
   expect(

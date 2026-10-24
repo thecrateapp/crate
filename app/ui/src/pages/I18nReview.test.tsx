@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -110,77 +110,76 @@ const exportedBundle = {
   },
 };
 
-describe("I18nReview", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.unstubAllEnvs();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.reject(new Error("fetch disabled in tests"))),
-    );
-    mockApi.mockImplementation((url: string, method = "GET") => {
-      if (url === "/api/admin/i18n/listen/requests") {
-        return Promise.resolve({ aiConfigured: true, requests: [request] });
-      }
-      if (url === "/api/admin/i18n/listen/bundles") {
-        return Promise.resolve({
-          bundles: [bundleSummary, publishedBundleSummary],
-        });
-      }
-      if (url === "/api/admin/i18n/listen/bundles/bundle-es") {
-        return Promise.resolve(bundleDetail);
-      }
-      if (
-        url ===
-        "/api/admin/i18n/listen/quality?locale=es&source_version=sha256%3Atest"
-      ) {
-        return Promise.resolve(qualityReport);
-      }
-      if (
-        url === "/api/admin/i18n/listen/bundles/bundle-es/publish" &&
-        method === "POST"
-      ) {
-        return Promise.resolve({
-          ...bundleDetail,
-          status: "published",
-          publishedAt: "2026-07-05T10:10:00+00:00",
-        });
-      }
-      if (
-        url === "/api/admin/i18n/listen/bundles/bundle-es/reject" &&
-        method === "POST"
-      ) {
-        return Promise.resolve({ ...bundleDetail, status: "rejected" });
-      }
-      if (
-        url ===
-          "/api/admin/i18n/listen/bundles/bundle-es/messages/player.play" &&
-        method === "PATCH"
-      ) {
-        return Promise.resolve({
-          ...bundleDetail,
-          messages: {
-            ...bundleDetail.messages,
-            "player.play": "Dale",
-          },
-        });
-      }
-      if (url === "/api/admin/i18n/listen/bundles/bundle-es/export") {
-        return Promise.resolve(exportedBundle);
-      }
-      if (
-        url === "/api/admin/i18n/listen/locales/es/draft-missing" &&
-        method === "POST"
-      ) {
-        return Promise.resolve({
-          requestId: "request-es",
-          status: "drafting_ai",
-        });
-      }
-      return Promise.reject(new Error(`Unexpected request: ${method} ${url}`));
-    });
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.reject(new Error("fetch disabled in tests"))),
+  );
+  mockApi.mockImplementation((url: string, method = "GET") => {
+    if (url === "/api/admin/i18n/listen/requests") {
+      return Promise.resolve({ aiConfigured: true, requests: [request] });
+    }
+    if (url === "/api/admin/i18n/listen/bundles") {
+      return Promise.resolve({
+        bundles: [bundleSummary, publishedBundleSummary],
+      });
+    }
+    if (url === "/api/admin/i18n/listen/bundles/bundle-es") {
+      return Promise.resolve(bundleDetail);
+    }
+    if (
+      url ===
+      "/api/admin/i18n/listen/quality?locale=es&source_version=sha256%3Atest"
+    ) {
+      return Promise.resolve(qualityReport);
+    }
+    if (
+      url === "/api/admin/i18n/listen/bundles/bundle-es/publish" &&
+      method === "POST"
+    ) {
+      return Promise.resolve({
+        ...bundleDetail,
+        status: "published",
+        publishedAt: "2026-07-05T10:10:00+00:00",
+      });
+    }
+    if (
+      url === "/api/admin/i18n/listen/bundles/bundle-es/reject" &&
+      method === "POST"
+    ) {
+      return Promise.resolve({ ...bundleDetail, status: "rejected" });
+    }
+    if (
+      url === "/api/admin/i18n/listen/bundles/bundle-es/messages/player.play" &&
+      method === "PATCH"
+    ) {
+      return Promise.resolve({
+        ...bundleDetail,
+        messages: {
+          ...bundleDetail.messages,
+          "player.play": "Dale",
+        },
+      });
+    }
+    if (url === "/api/admin/i18n/listen/bundles/bundle-es/export") {
+      return Promise.resolve(exportedBundle);
+    }
+    if (
+      url === "/api/admin/i18n/listen/locales/es/draft-missing" &&
+      method === "POST"
+    ) {
+      return Promise.resolve({
+        requestId: "request-es",
+        status: "drafting_ai",
+      });
+    }
+    return Promise.reject(new Error(`Unexpected request: ${method} ${url}`));
   });
+});
 
+describe("I18nReview", () => {
   it("renders the Listen translation manager overview", async () => {
     render(<I18nReview />);
 
@@ -528,3 +527,184 @@ it("keeps manual review available when AI draft action is unavailable", async ()
     screen.getByText(/AI drafts unavailable · manual review ready/),
   ).toBeVisible();
 });
+
+function pendingResponse<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+it("does not expose actions for the previous bundle while the next one is pending", async () => {
+  const user = userEvent.setup();
+  const pending = pendingResponse<typeof bundleDetail>();
+  const second = { ...bundleSummary, id: "bundle-fr", locale: "fr" };
+  const implementation = mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((url, method, body, options) => {
+    if (url === "/api/admin/i18n/listen/bundles")
+      return Promise.resolve({ bundles: [bundleSummary, second] });
+    if (url === "/api/admin/i18n/listen/bundles/bundle-fr")
+      return pending.promise;
+    if (url === "/api/admin/i18n/listen/bundles/bundle-fr/publish")
+      return Promise.resolve({
+        ...second,
+        messages: { greeting: "Bonjour" },
+        status: "published",
+      });
+    if (url.startsWith("/api/admin/i18n/listen/quality?locale=fr"))
+      return Promise.resolve(qualityReport);
+    return implementation(url, method, body, options);
+  });
+  render(<I18nReview />);
+  await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+  await user.click(await screen.findByRole("button", { name: "Review es" }));
+  await screen.findByDisplayValue("Reproducir");
+  await user.click(screen.getByRole("tab", { name: "Bundles" }));
+  await user.click(screen.getByRole("button", { name: "Review fr" }));
+  expect(
+    screen.getByRole("status", { name: "Loading translations" }),
+  ).toBeVisible();
+  for (const name of ["Publish bundle", "Reject bundle", "Export JSON"]) {
+    const button = screen.queryByRole("button", { name });
+    if (button) expect(button).toBeDisabled();
+  }
+  await act(async () => {
+    pending.resolve({
+      ...second,
+      messages: { "player.play": "Bonjour", "nav.collection": "Bibliothèque" },
+    });
+    await pending.promise;
+  });
+  expect(await screen.findByDisplayValue("Bonjour")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Publish bundle" }));
+  expect(mockApi).toHaveBeenCalledWith(
+    "/api/admin/i18n/listen/bundles/bundle-fr/publish",
+    "POST",
+  );
+});
+
+it("preserves other dirty translations and edits typed while a key is saving", async () => {
+  const user = userEvent.setup();
+  const pending = pendingResponse<typeof bundleDetail>();
+  const implementation = mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((url, method, body, options) => {
+    if (method === "PATCH") return pending.promise;
+    return implementation(url, method, body, options);
+  });
+  render(<I18nReview />);
+  await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+  await user.click(await screen.findByRole("button", { name: "Review es" }));
+  const play = await screen.findByLabelText("Translation for player.play");
+  const collection = screen.getByLabelText("Translation for nav.collection");
+  await user.clear(collection);
+  await user.type(collection, "Mi biblioteca");
+  await user.clear(play);
+  await user.type(play, "Dale");
+  await user.click(screen.getByRole("button", { name: "Save player.play" }));
+  await user.type(play, " ahora");
+  await act(async () => {
+    pending.resolve({
+      ...bundleDetail,
+      messages: { ...bundleDetail.messages, "player.play": "Dale" },
+    });
+    await pending.promise;
+  });
+  expect(collection).toHaveValue("Mi biblioteca");
+  expect(play).toHaveValue("Dale ahora");
+});
+
+it("offers retry for the requested bundle after a failed detail read", async () => {
+  const user = userEvent.setup();
+  let reads = 0;
+  const implementation = mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((url, method, body, options) => {
+    if (url === "/api/admin/i18n/listen/bundles/bundle-es") {
+      reads += 1;
+      if (reads === 1) return Promise.reject(new Error("temporary"));
+    }
+    return implementation(url, method, body, options);
+  });
+  render(<I18nReview />);
+  await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+  await user.click(await screen.findByRole("button", { name: "Review es" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(/bundle/i);
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByDisplayValue("Reproducir")).toBeVisible();
+});
+
+it("ignores a previous bundle read that finishes after the newly selected bundle", async () => {
+  const user = userEvent.setup();
+  const pending = pendingResponse<typeof bundleDetail>();
+  const second = {
+    ...bundleSummary,
+    id: "bundle-fr",
+    locale: "fr",
+    messages: { greeting: "Bonjour" },
+  };
+  const implementation = mockApi.getMockImplementation()!;
+  mockApi.mockImplementation((url, method, body, options) => {
+    if (url === "/api/admin/i18n/listen/bundles")
+      return Promise.resolve({ bundles: [bundleSummary, second] });
+    if (url === "/api/admin/i18n/listen/bundles/bundle-es")
+      return pending.promise;
+    if (url === "/api/admin/i18n/listen/bundles/bundle-fr")
+      return Promise.resolve(second);
+    if (url.startsWith("/api/admin/i18n/listen/quality?locale=fr"))
+      return Promise.resolve(qualityReport);
+    return implementation(url, method, body, options);
+  });
+  render(<I18nReview />);
+  await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+  await user.click(await screen.findByRole("button", { name: "Review es" }));
+  await user.click(screen.getByRole("tab", { name: "Bundles" }));
+  await user.click(screen.getByRole("button", { name: "Review fr" }));
+  await screen.findByDisplayValue("Bonjour");
+  await act(async () => {
+    pending.resolve(bundleDetail);
+    await pending.promise;
+  });
+  expect(screen.getByDisplayValue("Bonjour")).toBeVisible();
+  expect(screen.queryByDisplayValue("Reproducir")).not.toBeInTheDocument();
+});
+
+it.each(["key", "publish"])(
+  "serializes key saves and review actions while %s is pending",
+  async (operation) => {
+    const user = userEvent.setup();
+    const pending = pendingResponse<typeof bundleDetail>();
+    const implementation = mockApi.getMockImplementation()!;
+    mockApi.mockImplementation((url, method, body, options) => {
+      if (
+        (operation === "key" && method === "PATCH") ||
+        (operation === "publish" && url.endsWith("/publish"))
+      )
+        return pending.promise;
+      return implementation(url, method, body, options);
+    });
+    render(<I18nReview />);
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    await user.click(await screen.findByRole("button", { name: "Review es" }));
+    await screen.findByDisplayValue("Reproducir");
+    if (operation === "key") {
+      await user.click(
+        screen.getByRole("button", { name: "Save player.play" }),
+      );
+      expect(
+        screen.getByRole("button", { name: "Publish bundle" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "Reject bundle" }),
+      ).toBeDisabled();
+    } else {
+      await user.click(screen.getByRole("button", { name: "Publish bundle" }));
+      expect(
+        screen.getByRole("button", { name: "Save player.play" }),
+      ).toBeDisabled();
+    }
+    await act(async () => {
+      pending.resolve(bundleDetail);
+      await pending.promise;
+    });
+  },
+);

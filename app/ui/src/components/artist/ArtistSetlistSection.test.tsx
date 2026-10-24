@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 
 import { ArtistSetlistSection } from "./ArtistSetlistSection";
 
@@ -50,6 +50,11 @@ describe("ArtistSetlistSection", () => {
     );
 
     expect(screen.getByText("Probable Setlist")).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("heading", { name: "Probable Setlist" })
+        .closest('[data-slot="instrument-panel"]'),
+    ).not.toHaveClass("border-t");
     expect(screen.getByText("Una historia con las manos")).toBeInTheDocument();
   });
 
@@ -113,4 +118,44 @@ describe("ArtistSetlistSection", () => {
       screen.getByRole("button", { name: "Refreshing setlist" }),
     ).toBeDisabled();
   });
+});
+
+function Location() {
+  const { pathname } = useLocation();
+  return <output aria-label="Current route">{pathname}</output>;
+}
+it("opens the matched album from the setlist while keeping unmatched songs disabled", async () => {
+  render(
+    <MemoryRouter>
+      <ArtistSetlistSection
+        artistName="Artist"
+        setlistData={{
+          probable_setlist: [
+            { title: "Matched Song", frequency: 0.5, play_count: 2 },
+            { title: "Not In Library", frequency: 0.1, play_count: 1 },
+          ],
+        }}
+        allTrackTitles={[
+          {
+            title: "Matched Song",
+            album: "Album",
+            album_id: 2,
+            album_slug: "album",
+            path: "/track.flac",
+          },
+        ]}
+        onTrackTitlesLoaded={vi.fn()}
+      />
+      <Location />
+    </MemoryRouter>,
+  );
+  const matched = screen.getByText("Matched Song").closest("button")!;
+  expect(screen.getByText("Not In Library").closest("button")).toBeDisabled();
+  await userEvent.click(matched);
+  expect(screen.getByLabelText("Current route")).toHaveTextContent(
+    "/artists/artist/album",
+  );
+  expect(
+    screen.getByRole("progressbar", { name: "Matched Song frequency" }),
+  ).toHaveAttribute("aria-valuenow", "50");
 });

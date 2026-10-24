@@ -277,6 +277,7 @@ function ReleaseTimelineRow({
       <UpcomingEventRow
         artwork={
           <MediaCover
+            data-admin-ux="releases-timeline-cover"
             src={release.cover_url}
             alt=""
             fallbackIcon={Disc3}
@@ -351,6 +352,7 @@ function ReleaseGridCard({
     >
       <div className="relative aspect-square bg-surface-canvas">
         <MediaCover
+          data-admin-ux="releases-card-cover"
           src={release.cover_url}
           alt=""
           fallbackIcon={Disc3}
@@ -573,6 +575,8 @@ export function NewReleases() {
         toast.success("Release check complete");
         setLiveSurface(null);
         refetch();
+      } else {
+        toast.error(task.error || `Release check ${task.status}`);
       }
     } catch {
       setChecking(false);
@@ -774,23 +778,32 @@ export function NewReleases() {
               Downloaded
             </FilterChip>
           </div>
-          <label className="crate-form-field">
+          <div className="crate-form-field">
             <MonoLabel as="span">Release date</MonoLabel>
-            <AdminSelect
-              value={dateFilter}
-              onChange={(value) => {
-                setDateFilter(value as DateFilter);
-                setPage(1);
-              }}
-              options={[
+            <div
+              role="group"
+              aria-label="Release date"
+              className="flex flex-wrap gap-2"
+            >
+              {[
+                { value: "", label: "Any date" },
                 { value: "upcoming", label: "Upcoming" },
                 { value: "released", label: "Released" },
                 { value: "unknown", label: "Date unknown" },
-              ]}
-              placeholder="Any date"
-              triggerClassName="min-h-11 min-w-[150px]"
-            />
-          </label>
+              ].map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={dateFilter === option.value}
+                  onClick={() => {
+                    setDateFilter(option.value as DateFilter);
+                    setPage(1);
+                  }}
+                >
+                  {option.label}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
           <label className="crate-form-field">
             <MonoLabel as="span">Release type</MonoLabel>
             <AdminSelect

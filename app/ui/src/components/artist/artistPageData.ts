@@ -128,7 +128,6 @@ export function buildArtistTabs(
     { key: "similar", label: "Similar Artists" },
     { key: "stats", label: "Stats" },
     { key: "artwork", label: "Artwork" },
-    { key: "about", label: "About" },
   ];
 }
 

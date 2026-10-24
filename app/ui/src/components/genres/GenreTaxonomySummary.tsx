@@ -1,3 +1,4 @@
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { TaxonomyNode } from "@/components/genres/GenreTaxonomyTree";
 
@@ -15,7 +16,7 @@ function formatPercent(value: number | null | undefined): string {
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="genre-taxonomy-summary__metric">
-      <MonoLabel as="span" size="label" tone="subtle" className="text-[9px]">
+      <MonoLabel as="span" size="label" tone="subtle">
         {label}
       </MonoLabel>
       <strong>{new Intl.NumberFormat().format(value)}</strong>
@@ -36,7 +37,7 @@ function Share({
   return (
     <div className="genre-taxonomy-summary__share">
       <div className="flex items-baseline justify-between gap-3">
-        <MonoLabel as="span" size="label" tone="subtle" className="text-[9px]">
+        <MonoLabel as="span" size="label" tone="subtle">
           {label}
         </MonoLabel>
         <strong>{formatPercent(value)}</strong>
@@ -76,23 +77,23 @@ function RelationGroup({
   if (!relations.length) return null;
 
   return (
-    <div className="genre-taxonomy-summary__relation">
+    <div
+      className="genre-taxonomy-summary__relation"
+      role="group"
+      aria-label={label}
+    >
       <h4 className="mb-2 mt-0">
-        <MonoLabel as="span" size="label" tone="subtle" className="text-[9px]">
+        <MonoLabel as="span" size="label" tone="subtle">
           {label}
         </MonoLabel>
       </h4>
       <div className="flex flex-wrap gap-1.5">
         {relations.map((relation) => (
-          <button
+          <GenrePill
             key={relation.slug}
-            type="button"
-            className="genre-taxonomy-summary__relation-link"
+            item={{ name: relation.name, slug: relation.slug }}
             onClick={() => onSelectGenre(relation.slug)}
-            aria-label={`Select ${relation.name}, ${label.toLowerCase()}`}
-          >
-            {relation.name}
-          </button>
+          />
         ))}
       </div>
     </div>
@@ -144,14 +145,16 @@ export function GenreTaxonomySummary({
         <MonoLabel as="h3" tone="accent" size="eyebrow">
           Genre summary
         </MonoLabel>
-        <span className="genre-taxonomy-summary__origin">
+        <MonoLabel as="span">
           {node.origin === "core" ? "CORE" : "OVERLAY"}
           {node.top_level ? " · ROOT" : ""}
-        </span>
+        </MonoLabel>
       </header>
 
       <h2 className="genre-taxonomy-summary__title">{node.name}</h2>
-      <p className="genre-taxonomy-summary__eq">{eqSummary}</p>
+      <MonoLabel as="p" className="m-0">
+        {eqSummary}
+      </MonoLabel>
 
       <div
         className="genre-taxonomy-summary__metrics"
@@ -182,12 +185,7 @@ export function GenreTaxonomySummary({
       {node.mapped_raw_tags?.length ? (
         <div className="genre-taxonomy-summary__raw-tags">
           <h4 className="mb-2 mt-0">
-            <MonoLabel
-              as="span"
-              size="label"
-              tone="subtle"
-              className="text-[9px]"
-            >
+            <MonoLabel as="span" size="label" tone="subtle">
               Mapped library tags ·{" "}
               {node.raw_tag_count ?? node.mapped_raw_tags.length}
             </MonoLabel>

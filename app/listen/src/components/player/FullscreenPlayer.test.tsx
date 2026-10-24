@@ -1,4 +1,6 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { AppModal } from "@crate/ui/primitives/AppModal";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +25,10 @@ vi.mock("@crate/ui/lib/notify", () => ({
   },
 }));
 
+const likesReadState = vi.hoisted(() => ({ hasLoaded: true }));
+afterEach(() => {
+  likesReadState.hasLoaded = true;
+});
 const apiMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 const resolvedArtistMock = vi.hoisted(() => ({
@@ -143,6 +149,7 @@ vi.mock("@/hooks/use-crossfade-progress", () => ({
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
+    hasLoaded: likesReadState.hasLoaded,
     isLiked: vi.fn(() => false),
     toggleTrackLike: vi.fn(() => Promise.resolve(true)),
   }),
@@ -151,14 +158,6 @@ vi.mock("@/contexts/LikedTracksContext", () => ({
 vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
-
-vi.mock("@crate/ui/lib/use-escape-key", () => ({
-  useEscapeKey: vi.fn(),
-}));
-
-const { useEscapeKey: mockUseEscapeKey } = await import(
-  "@crate/ui/lib/use-escape-key"
-);
 
 vi.mock("@/lib/mobile-audio-mode", () => ({
   canUseWebAudioEffects: true,
@@ -272,6 +271,43 @@ describe("FullscreenPlayer", () => {
   // Rendering states
   // ════════════════════════════════════════════════════════════════════
   describe("rendering states", () => {
+    it("shows only the actual native technique above progress and sends the same tone to the disc", async () => {
+      const track = makeTrack();
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: {
+          currentTrack: track,
+          queue: [track, makeQueueTrack()],
+          currentIndex: 0,
+        },
+        playerState: {
+          isPlaying: true,
+          nativeMixAvailable: true,
+          mixState: {
+            revision: "q1",
+            executionId: 9,
+            mode: "beatmatch",
+            phase: "mixing",
+            bassHandoff: true,
+            outgoingTrackId: track.id,
+            incomingTrackId: "q0",
+          },
+        },
+      });
+      const indicator = await screen.findByRole("status", {
+        name: "Transition",
+      });
+      expect(indicator).toHaveTextContent("Beatmatch");
+      expect(
+        indicator.compareDocumentPosition(screen.getByTestId("seek-bar")) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        JSON.parse(
+          screen.getByTestId("spinning-disc").getAttribute("data-props")!,
+        ).mixTone,
+      ).toBe("beatmatch");
+    });
+
     it("renders nothing when open is false", () => {
       const track = makeTrack();
       const { container } = renderWithListenProviders(
@@ -1026,14 +1062,6 @@ describe("FullscreenPlayer", () => {
       const track = makeTrack();
       const onClose = vi.fn();
 
-      // Capture the escape handler registered by useEscapeKey
-      let capturedHandler: ((e: KeyboardEvent) => void) | null = null;
-      vi.mocked(mockUseEscapeKey).mockImplementation(
-        (_active: boolean, onEscape: (e: KeyboardEvent) => void) => {
-          capturedHandler = onEscape;
-        },
-      );
-
       renderWithListenProviders(<FullscreenPlayer open onClose={onClose} />, {
         playerActions: createMockPlayerActions({
           currentTrack: track,
@@ -1043,13 +1071,15 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(capturedHandler).not.toBeNull();
+        expect(
+          screen.getByRole("dialog", { name: "Now Playing" }),
+        ).toBeInTheDocument();
       });
 
       const event = new KeyboardEvent("keydown", { key: "Escape" });
       vi.spyOn(event, "preventDefault");
       vi.spyOn(event, "stopImmediatePropagation");
-      capturedHandler!(event);
+      fireEvent(window, event);
 
       expect(event.preventDefault).toHaveBeenCalled();
       expect(event.stopImmediatePropagation).toHaveBeenCalled();
@@ -1060,15 +1090,6 @@ describe("FullscreenPlayer", () => {
       const track = makeTrack();
       const onClose = vi.fn();
       const user = userEvent.setup();
-
-      // For this test we use real useEscapeKey mock with full implementation
-      // We need to control the escape callback sequence
-      let capturedHandler: ((e: KeyboardEvent) => void) | null = null;
-      vi.mocked(mockUseEscapeKey).mockImplementation(
-        (_active: boolean, onEscape: (e: KeyboardEvent) => void) => {
-          capturedHandler = onEscape;
-        },
-      );
 
       renderWithListenProviders(<FullscreenPlayer open onClose={onClose} />, {
         playerActions: createMockPlayerActions({
@@ -1090,7 +1111,7 @@ describe("FullscreenPlayer", () => {
 
       // Now escape should return to player tab, not close
       const event = new KeyboardEvent("keydown", { key: "Escape" });
-      capturedHandler!(event);
+      fireEvent(window, event);
 
       // onClose should NOT have been called
       expect(onClose).not.toHaveBeenCalled();
@@ -1459,11 +1480,8 @@ describe("FullscreenPlayer", () => {
       });
 
       const like = screen.getByLabelText("Like track");
-      expect(like).toHaveClass(
-        "border-border-subtle",
-        "bg-surface-control",
-        "active:bg-surface-control-hover",
-      );
+      expect(like).toHaveClass("size-11", "hover:text-accent-action-hi");
+      expect(like.className).not.toMatch(/(?:^|\s)(?:border|bg-|active:bg-)/);
       expect(like).toHaveAttribute("aria-pressed", "false");
       expect(screen.getByTestId("fullscreen-like-heart")).toBeInTheDocument();
 
@@ -1479,13 +1497,9 @@ describe("FullscreenPlayer", () => {
       await user.click(equalizer);
       expect(equalizer).toHaveAttribute("aria-pressed", "true");
 
-      expect(screen.getByTestId("player-track-menu")).toHaveClass(
-        "border-border-subtle",
-        "bg-surface-control",
-        "text-text-secondary",
-        "active:bg-surface-control-hover",
-        "active:text-text-primary",
-      );
+      const more = screen.getByTestId("player-track-menu");
+      expect(more).toHaveClass("size-11", "hover:text-accent-action-hi");
+      expect(more.className).not.toMatch(/(?:^|\s)(?:border|bg-|active:bg-)/);
     });
   });
 
@@ -1559,4 +1573,107 @@ describe("FullscreenPlayer", () => {
       // listener plugin, not available in jsdom.
     });
   });
+});
+
+it("isolates fullscreen, contains keyboard focus and restores its recreated dock launcher", async () => {
+  const user = userEvent.setup();
+  const track = makeTrack();
+  function PlayerHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <main>
+          <button>Background action</button>
+        </main>
+        {!open ? (
+          <button
+            data-player-surface-launcher="fullscreen"
+            onClick={() => setOpen(true)}
+          >
+            Open fullscreen player
+          </button>
+        ) : null}
+        <FullscreenPlayer open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
+  renderWithListenProviders(<PlayerHarness />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+      currentIndex: 0,
+    }),
+  });
+  await user.click(
+    screen.getByRole("button", { name: "Open fullscreen player" }),
+  );
+  const dialog = await screen.findByRole("dialog", { name: "Now Playing" });
+  expect(dialog).toHaveAttribute("aria-modal", "true");
+  const close = within(dialog).getByRole("button", { name: "Close player" });
+  await waitFor(() => expect(close).toHaveFocus());
+  expect(
+    screen
+      .getByRole("button", { name: "Background action", hidden: true })
+      .closest("[inert]"),
+  ).not.toBeNull();
+  await user.tab({ shift: true });
+  expect(dialog).toContainElement(document.activeElement as HTMLElement);
+  expect(close).not.toHaveFocus();
+  await user.tab();
+  expect(close).toHaveFocus();
+  await user.click(close);
+  expect(
+    screen.getByRole("button", { name: "Open fullscreen player" }),
+  ).toHaveFocus();
+  expect(
+    screen
+      .getByRole("button", { name: "Background action" })
+      .closest("[inert]"),
+  ).toBeNull();
+  expect(dialog).toHaveAttribute("inert");
+  expect(dialog).toHaveAttribute("aria-hidden", "true");
+});
+
+it("gives a portalled dialog priority over the fullscreen player Escape handler", async () => {
+  const closePlayer = vi.fn();
+  const closeDialog = vi.fn();
+  const track = makeTrack();
+  renderWithListenProviders(
+    <>
+      <FullscreenPlayer open onClose={closePlayer} />
+      <AppModal open onClose={closeDialog} title="Track actions">
+        <button>Dialog action</button>
+      </AppModal>
+    </>,
+    {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+      }),
+    },
+  );
+  const child = await screen.findByRole("dialog", { name: "Track actions" });
+  await waitFor(() =>
+    expect(child).toContainElement(document.activeElement as HTMLElement),
+  );
+  fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+  expect(closeDialog).toHaveBeenCalledOnce();
+  expect(closePlayer).not.toHaveBeenCalled();
+});
+
+it("disables the fullscreen heart until liked state has a confirmed read", async () => {
+  likesReadState.hasLoaded = false;
+  const track = makeTrack();
+  renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+    }),
+  });
+  expect(
+    await screen.findByRole("button", { name: "Liked status unavailable" }),
+  ).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Like track" }),
+  ).not.toBeInTheDocument();
 });

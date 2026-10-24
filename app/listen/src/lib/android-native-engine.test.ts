@@ -47,9 +47,8 @@ describe("android native engine flags", () => {
 
   it("uses the native player by default on Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
   });
@@ -70,9 +69,8 @@ describe("android native engine flags", () => {
 
   it("ignores the flag outside Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: false }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
@@ -81,9 +79,8 @@ describe("android native engine flags", () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     localStorage.setItem("listen-player-crossfade-seconds", "4");
     localStorage.setItem("crate-native-player-crossfade-enabled", "true");
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
     expect(
@@ -692,7 +689,7 @@ describe("android native engine flags", () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(2);
-    await expect(loadPromise).resolves.toEqual(state);
+    await expect(loadPromise).resolves.toEqual({ ...state, mixState: null });
     expect(nativePlaybackMock.addListener).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
@@ -763,7 +760,7 @@ describe("android native engine flags", () => {
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(3);
     signalReady();
 
-    await expect(statePromise).resolves.toEqual(state);
+    await expect(statePromise).resolves.toEqual({ ...state, mixState: null });
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(4);
     vi.useRealTimers();
   });
@@ -837,9 +834,8 @@ describe("android native engine flags", () => {
 
     it("follows Smart Mix mode changes in the continuation context", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-      const { continuationWithModes } = await import(
-        "@/lib/android-native-engine"
-      );
+      const { continuationWithModes } =
+        await import("@/lib/android-native-engine");
       const capabilities = {
         available: true,
         androidNativeCrossfade: true,

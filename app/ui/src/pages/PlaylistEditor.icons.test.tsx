@@ -72,7 +72,11 @@ beforeEach(() => {
     available: true,
   } as ReturnType<typeof useActionLLMStatus>);
   mockUseApi.mockImplementation((url: string | null) => ({
-    data: url?.endsWith("editor-snapshot") ? surface : fixture.filterOptions,
+    data: url?.endsWith("editor-snapshot")
+      ? loading
+        ? null
+        : surface
+      : fixture.filterOptions,
     error: null,
     loading: url?.endsWith("editor-snapshot") ? loading : false,
     refetch,
@@ -97,18 +101,34 @@ afterEach(() => {
 });
 
 describe("PlaylistEditor text actions with real consumers", () => {
-  it("keeps only marked UX glyphs and names the formerly icon-only removals", () => {
+  it("keeps approved action glyphs and shared search/select glyphs with named removals", () => {
     render(<PlaylistEditor />);
     const disclosures = [
       ...document.querySelectorAll("svg:not([data-admin-ux])"),
     ].filter((glyph) => !glyph.closest("[data-admin-ux]"));
-    expect(disclosures).toHaveLength(7);
-    for (const glyph of disclosures)
-      expect(glyph.closest('[data-slot="select-trigger"]')).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Remove rule 1" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Remove Marea" })).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "Remove Marea" }).textContent,
+      disclosures.filter((glyph) =>
+        glyph.closest('[data-slot="select-trigger"]'),
+      ),
+    ).toHaveLength(7);
+    expect(
+      disclosures.filter((glyph) =>
+        glyph.closest('[data-slot="search-input"]'),
+      ),
+    ).toHaveLength(1);
+    for (const glyph of disclosures)
+      expect(
+        glyph.closest(
+          '[data-slot="select-trigger"], [data-slot="search-input"]',
+        ),
+      ).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Remove rule 1" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Remove Marea, position 1" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Remove Marea, position 1" })
+        .textContent,
     ).toBe("");
     expect(
       screen
@@ -144,11 +164,16 @@ describe("PlaylistEditor text actions with real consumers", () => {
         ),
       ).not.toBeNull();
     }
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Limit" }), {
+    const limit = screen.getByRole("textbox", { name: "Limit" });
+    expect(limit).toHaveAttribute("inputmode", "numeric");
+    expect(
+      screen.getAllByRole("button", { name: "Save changes" }),
+    ).toHaveLength(1);
+    fireEvent.change(limit, {
       target: { value: "75" },
     });
     expect(
-      screen.getByRole("button", { name: "Save + generate" }),
+      screen.getByRole("button", { name: "Save rules + generate" }),
     ).not.toHaveAttribute("title");
   });
 
@@ -193,21 +218,21 @@ describe("PlaylistEditor text actions with real consumers", () => {
   it("uses a scope Select, accurate placeholder and unchanged scoped search requests", async () => {
     render(<PlaylistEditor />);
     const user = userEvent.setup();
-    const search = screen.getByRole("textbox", { name: "Search tracks" });
+    const search = screen.getByRole("searchbox", { name: "Search tracks" });
     const scope = screen.getByRole("combobox", { name: "Search scope" });
     expect(scope).toHaveTextContent("Matching rules");
     expect(search).toHaveAttribute(
       "placeholder",
-      "Search tracks matching this playlist...",
+      "Search tracks matching this playlist…",
     );
     await user.click(scope);
     await user.click(screen.getByRole("option", { name: "Entire library" }));
-    expect(search).toHaveAttribute("placeholder", "Search library tracks...");
+    expect(search).toHaveAttribute("placeholder", "Search library tracks…");
     await user.click(scope);
     await user.click(screen.getByRole("option", { name: "Matching rules" }));
     expect(search).toHaveAttribute(
       "placeholder",
-      "Search tracks matching this playlist...",
+      "Search tracks matching this playlist…",
     );
     await user.type(search, "Bruma");
     await waitFor(() =>
@@ -223,7 +248,7 @@ describe("PlaylistEditor text actions with real consumers", () => {
       ),
     );
     expect(search).toHaveValue("Bruma");
-    expect(search).toHaveAttribute("placeholder", "Search library tracks...");
+    expect(search).toHaveAttribute("placeholder", "Search library tracks…");
   });
 
   it("saves the same metadata and smart-rule payload through named controls", async () => {
@@ -267,10 +292,12 @@ describe("PlaylistEditor text actions with real consumers", () => {
       "POST",
       { smart_rules: fixture.surface.playlist.smart_rules },
     );
-    fireEvent.change(screen.getByRole("spinbutton", { name: "Limit" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Limit" }), {
       target: { value: "75" },
     });
-    await user.click(screen.getByRole("button", { name: "Save + generate" }));
+    await user.click(
+      screen.getByRole("button", { name: "Save rules + generate" }),
+    );
     await waitFor(() =>
       expect(mockApi).toHaveBeenCalledWith(
         "/api/admin/system-playlists/42",
@@ -351,10 +378,12 @@ describe("PlaylistEditor text actions with real consumers", () => {
     render(<PlaylistEditor />);
     const user = userEvent.setup();
     await user.type(
-      screen.getByRole("textbox", { name: "Search tracks" }),
+      screen.getByRole("searchbox", { name: "Search tracks" }),
       "Bruma",
     );
-    await user.click(await screen.findByRole("button", { name: "Add locked" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Add Bruma and lock" }),
+    );
     await waitFor(() =>
       expect(mockApi).toHaveBeenCalledWith(
         "/api/admin/system-playlists/42/tracks",
@@ -376,15 +405,20 @@ describe("PlaylistEditor text actions with real consumers", () => {
         },
       ),
     );
-    await user.click(screen.getByRole("button", { name: "Remove Marea" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove Marea, position 1" }),
+    );
     expect(mockApi).toHaveBeenCalledWith(
       "/api/admin/system-playlists/42/tracks/1",
       "DELETE",
     );
-    const rows = document.querySelectorAll("[draggable=true]");
-    fireEvent.dragStart(rows[0]!);
-    fireEvent.dragOver(rows[1]!);
-    fireEvent.drop(rows[1]!);
+    const trackList = screen.getByRole("list", { name: "Playlist tracks" });
+    const rows = within(trackList).getAllByRole("listitem");
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+    fireEvent.dragStart(rows[0]!, { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith("text/plain", "1");
+    fireEvent.dragOver(rows[1]!, { dataTransfer });
+    fireEvent.drop(rows[1]!, { dataTransfer });
     await waitFor(() =>
       expect(mockApi).toHaveBeenCalledWith(
         "/api/admin/system-playlists/42/tracks/reorder",
@@ -392,6 +426,33 @@ describe("PlaylistEditor text actions with real consumers", () => {
         { track_ids: [2, 1] },
       ),
     );
+  });
+
+  it("reorders playlist-entry IDs from keyboard actions and respects the list boundaries", async () => {
+    render(<PlaylistEditor />);
+    const user = userEvent.setup();
+    expect(
+      screen.getByRole("button", { name: "Move Marea up, position 1" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Move Horizonte down, position 2" }),
+    ).toBeDisabled();
+    const moveDown = screen.getByRole("button", {
+      name: "Move Marea down, position 1",
+    });
+    expect(moveDown).toHaveAttribute("data-size", "icon-lg");
+    expect(moveDown).toHaveAttribute("data-variant", "ghost");
+    expect(moveDown).not.toHaveAttribute("title");
+    moveDown.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() =>
+      expect(mockApi).toHaveBeenCalledWith(
+        "/api/admin/system-playlists/42/tracks/reorder",
+        "POST",
+        { track_ids: [2, 1] },
+      ),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Track order locked");
   });
 
   it("retains static mode, duplicate/back navigation and unavailable AI", async () => {
@@ -414,6 +475,9 @@ describe("PlaylistEditor text actions with real consumers", () => {
         name: "Suggest refinements",
       }),
     ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Generate description with AI" }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Duplicate" }));
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/playlists/99"));
     await user.click(screen.getByRole("button", { name: "Back to playlists" }));

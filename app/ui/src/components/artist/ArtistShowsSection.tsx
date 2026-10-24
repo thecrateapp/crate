@@ -1,13 +1,13 @@
-import { Badge } from "@crate/ui/shadcn/badge";
+import { EntityRow, EntityAvatar } from "@crate/ui/domain/entity";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { artistPhotoApiUrl } from "@/lib/library-routes";
-import { ExternalLink, MapPin } from "lucide-react";
 
 interface ShowPriceRange {
   min: number;
   max: number;
   currency: string;
 }
-
 export interface ArtistShowEvent {
   id: string;
   artist_id?: number;
@@ -26,7 +26,6 @@ export interface ArtistShowEvent {
   price_range?: ShowPriceRange | null;
   status: string;
 }
-
 interface ArtistShowsSectionProps {
   artistName: string;
   artistId?: number;
@@ -40,90 +39,78 @@ export function ArtistShowsSection({
   artistSlug,
   shows,
 }: ArtistShowsSectionProps) {
+  if (!shows.length)
+    return (
+      <p className="py-8 text-sm text-text-muted">
+        No upcoming shows available
+      </p>
+    );
   return (
-    <div className="space-y-1">
+    <div className="space-y-[var(--content-list-gap)]">
       {shows.map((show) => {
-        const dateObj = show.date
+        const date = show.date
           ? new Date(show.date + (show.date.includes("T") ? "" : "T12:00:00"))
           : null;
-        const dateStr = dateObj
-          ? dateObj.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })
+        const dateText = date
+          ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
           : show.local_date;
-        const location = [show.city, show.country].filter(Boolean).join(", ");
+        const support = show.lineup.filter(
+          (name) => name.toLowerCase() !== artistName.toLowerCase(),
+        );
         return (
-          <a
+          <EntityRow
             key={show.id || `${show.date}-${show.name}-${show.venue}`}
-            href={show.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 p-3 rounded-md border border-accent-action/10 hover:border-accent-action/20 transition-[border-color,background-color]  group"
-          >
-            <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
-              <img
+            title={show.name || show.venue}
+            href={show.url || undefined}
+            external={Boolean(show.url)}
+            openLabel={
+              show.url
+                ? `Open tickets for ${show.name || show.venue}`
+                : undefined
+            }
+            menuButton="none"
+            leading={
+              <EntityAvatar
                 src={artistPhotoApiUrl({ artistId, artistSlug, artistName })}
+                name={artistName}
                 alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
+                size="lg"
+                shape="rounded"
               />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm truncate">
-                  {show.name || show.venue}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
-                <MapPin
-                  size={10}
-                  className="text-accent-action-hi/60 flex-shrink-0"
-                />
-                <span>{show.venue}</span>
-                <span className="text-muted-foreground/40">&middot;</span>
-                <span>{location}</span>
-              </div>
-              {show.lineup.length > 1 && (
-                <div className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
-                  with{" "}
-                  {show.lineup
-                    .filter(
-                      (lineupArtist) =>
-                        lineupArtist.toLowerCase() !== artistName.toLowerCase(),
-                    )
-                    .join(", ")}
+            }
+            subtitle={
+              <MonoLabel
+                as="span"
+                meta={[
+                  show.venue,
+                  [show.city, show.country].filter(Boolean).join(", "),
+                ]}
+              />
+            }
+            meta={
+              support.length ? (
+                <MonoLabel as="span">with {support.join(", ")}</MonoLabel>
+              ) : undefined
+            }
+            trailing={
+              <>
+                <div className="space-y-1 text-right">
+                  <MonoLabel as="span" tone="accent">
+                    {dateText}
+                  </MonoLabel>
+                  {show.price_range ? (
+                    <MonoLabel>
+                      {show.price_range.min}–{show.price_range.max}{" "}
+                      {show.price_range.currency}
+                    </MonoLabel>
+                  ) : null}
                 </div>
-              )}
-            </div>
-
-            <div className="text-right flex-shrink-0 text-accent-action-hi">
-              <div className="text-xs font-semibold">{dateStr}</div>
-              {show.price_range && (
-                <div className="text-[10px] text-muted-foreground">
-                  {show.price_range.min}–{show.price_range.max}{" "}
-                  {show.price_range.currency}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {show.status === "onsale" && (
-                <Badge
-                  variant="outline"
-                  className="border-accent-action/30 text-accent-action-hi"
-                >
-                  On Sale
-                </Badge>
-              )}
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-accent-action/10">
-                <ExternalLink size={14} className="text-accent-action-hi" />
-              </span>
-            </div>
-          </a>
+                {show.status === "onsale" ? (
+                  <InfoBadge tone="accent">On Sale</InfoBadge>
+                ) : null}
+              </>
+            }
+          />
         );
       })}
     </div>

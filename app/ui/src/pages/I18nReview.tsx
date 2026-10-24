@@ -8,7 +8,7 @@ import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -16,6 +16,7 @@ import { Card } from "@crate/ui/shadcn/card";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import {
   Tabs,
@@ -189,6 +190,11 @@ export function I18nReview() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [requestedBundle, setRequestedBundle] =
+    useState<TranslationBundleSummary | null>(null);
+  const bundleRequest = useRef(0);
+  const activeBundleId = useRef<string | null>(null);
   const [actionBusy, setActionBusy] = useState<"publish" | "reject" | null>(
     null,
   );
@@ -298,6 +304,9 @@ export function I18nReview() {
 
   useEffect(() => {
     void loadReviewData();
+    return () => {
+      bundleRequest.current += 1;
+    };
   }, [loadReviewData]);
 
   useEffect(() => {
@@ -327,6 +336,15 @@ export function I18nReview() {
   }, []);
 
   const selectBundle = useCallback(async (bundle: TranslationBundleSummary) => {
+    const request = ++bundleRequest.current;
+    activeBundleId.current = bundle.id;
+    setRequestedBundle(bundle);
+    setSelectedBundle(null);
+    setDetailError(null);
+    setActionBusy(null);
+    setSavingKey(null);
+    setWorkspaceSavingKey(null);
+    setExportBusy(false);
     setDetailLoading(true);
     setQualityReport(null);
     setExportedJson(null);
@@ -342,26 +360,38 @@ export function I18nReview() {
           )}&source_version=${encodeURIComponent(bundle.sourceVersion)}`,
         ),
       ]);
+      if (request !== bundleRequest.current) return;
       setSelectedBundle(detail);
       setMessageDrafts(detail.messages);
       setQualityReport(quality);
     } catch (nextError) {
+      if (request !== bundleRequest.current) return;
+      setDetailError("The translation bundle could not be loaded. Try again.");
       toast.error("Failed to load translation bundle");
       console.error(nextError);
     } finally {
-      setDetailLoading(false);
+      if (request === bundleRequest.current) setDetailLoading(false);
     }
   }, []);
 
   const reviewAction = useCallback(
     async (action: "publish" | "reject") => {
-      if (!selectedBundle) return;
+      if (
+        !selectedBundle ||
+        detailLoading ||
+        activeBundleId.current !== selectedBundle.id ||
+        actionBusy ||
+        savingKey !== null
+      )
+        return;
+      const request = bundleRequest.current;
       setActionBusy(action);
       try {
         const next = await api<TranslationBundleDetail>(
           `/api/admin/i18n/listen/bundles/${selectedBundle.id}/${action}`,
           "POST",
         );
+        if (request !== bundleRequest.current) return;
         setSelectedBundle(next);
         toast.success(
           action === "publish"
@@ -370,6 +400,7 @@ export function I18nReview() {
         );
         await loadReviewData();
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error(
           action === "publish"
             ? "Failed to publish translation bundle"
@@ -377,15 +408,24 @@ export function I18nReview() {
         );
         console.error(nextError);
       } finally {
-        setActionBusy(null);
+        if (request === bundleRequest.current) setActionBusy(null);
       }
     },
-    [loadReviewData, selectedBundle],
+    [loadReviewData, selectedBundle, detailLoading, actionBusy, savingKey],
   );
 
   const saveBundleMessage = useCallback(
     async (key: string) => {
-      if (!selectedBundle) return;
+      if (
+        !selectedBundle ||
+        detailLoading ||
+        savingKey !== null ||
+        actionBusy !== null ||
+        activeBundleId.current !== selectedBundle.id
+      )
+        return;
+      const request = bundleRequest.current;
+      const sentValue = messageDrafts[key] ?? "";
       setSavingKey(key);
       try {
         const next = await api<TranslationBundleDetail>(
@@ -393,24 +433,45 @@ export function I18nReview() {
             selectedBundle.id
           }/messages/${encodeURIComponent(key)}`,
           "PATCH",
-          { value: messageDrafts[key] ?? "" },
+          { value: sentValue },
         );
-        setSelectedBundle(next);
-        setMessageDrafts(next.messages);
+        if (request !== bundleRequest.current) return;
+        const savedValue = next.messages[key] ?? sentValue;
+        setSelectedBundle((current) =>
+          current
+            ? {
+                ...current,
+                messages: { ...current.messages, [key]: savedValue },
+              }
+            : current,
+        );
+        setMessageDrafts((current) =>
+          current[key] === sentValue
+            ? { ...current, [key]: savedValue }
+            : current,
+        );
         toast.success("Translation key saved");
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error("Failed to save translation key");
         console.error(nextError);
       } finally {
-        setSavingKey(null);
+        if (request === bundleRequest.current) setSavingKey(null);
       }
     },
-    [messageDrafts, selectedBundle],
+    [messageDrafts, selectedBundle, detailLoading, savingKey, actionBusy],
   );
 
   const saveWorkspaceMessage = useCallback(
     async (key: string) => {
-      if (!selectedBundle || !localCatalogOrigin) return;
+      if (
+        !selectedBundle ||
+        !localCatalogOrigin ||
+        detailLoading ||
+        activeBundleId.current !== selectedBundle.id
+      )
+        return;
+      const request = bundleRequest.current;
       setWorkspaceSavingKey(key);
       try {
         const response = await fetch(
@@ -434,15 +495,17 @@ export function I18nReview() {
           );
         }
 
-        toast.success("Translation key saved to workspace JSON");
+        if (request === bundleRequest.current)
+          toast.success("Translation key saved to workspace JSON");
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error("Failed to save translation key to workspace JSON");
         console.error(nextError);
       } finally {
-        setWorkspaceSavingKey(null);
+        if (request === bundleRequest.current) setWorkspaceSavingKey(null);
       }
     },
-    [localCatalogOrigin, messageDrafts, selectedBundle],
+    [localCatalogOrigin, messageDrafts, selectedBundle, detailLoading],
   );
 
   const draftMissingForLocale = useCallback(
@@ -469,21 +532,29 @@ export function I18nReview() {
   );
 
   const exportSelectedBundle = useCallback(async () => {
-    if (!selectedBundle) return;
+    if (
+      !selectedBundle ||
+      detailLoading ||
+      activeBundleId.current !== selectedBundle.id
+    )
+      return;
+    const request = bundleRequest.current;
     setExportBusy(true);
     try {
       const exported = await api<TranslationBundleExport>(
         `/api/admin/i18n/listen/bundles/${selectedBundle.id}/export`,
       );
+      if (request !== bundleRequest.current) return;
       setExportedJson(JSON.stringify(exported, null, 2));
       toast.success("Translation bundle exported");
     } catch (nextError) {
+      if (request !== bundleRequest.current) return;
       toast.error("Failed to export translation bundle");
       console.error(nextError);
     } finally {
-      setExportBusy(false);
+      if (request === bundleRequest.current) setExportBusy(false);
     }
-  }, [selectedBundle]);
+  }, [selectedBundle, detailLoading]);
 
   const messageRows = selectedBundle
     ? Object.keys(selectedBundle.messages)
@@ -587,6 +658,10 @@ export function I18nReview() {
           <EditorSection
             selectedBundle={selectedBundle}
             detailLoading={detailLoading}
+            detailError={detailError}
+            onRetry={() => {
+              if (requestedBundle) void selectBundle(requestedBundle);
+            }}
             actionBusy={actionBusy}
             savingKey={savingKey}
             workspaceSavingKey={workspaceSavingKey}
@@ -889,6 +964,8 @@ function BundlesSection({
 function EditorSection({
   selectedBundle,
   detailLoading,
+  detailError,
+  onRetry,
   actionBusy,
   savingKey,
   workspaceSavingKey,
@@ -905,6 +982,8 @@ function EditorSection({
 }: {
   selectedBundle: TranslationBundleDetail | null;
   detailLoading: boolean;
+  detailError: string | null;
+  onRetry: () => void;
   actionBusy: "publish" | "reject" | null;
   savingKey: string | null;
   workspaceSavingKey: string | null;
@@ -956,7 +1035,9 @@ function EditorSection({
                 className="min-h-11"
                 onClick={() => void onReviewAction("reject")}
                 disabled={
-                  !!actionBusy || selectedBundle.status !== "needs_review"
+                  !!actionBusy ||
+                  savingKey !== null ||
+                  selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "reject" ? (
@@ -974,7 +1055,9 @@ function EditorSection({
                 className="min-h-11"
                 onClick={() => void onReviewAction("publish")}
                 disabled={
-                  !!actionBusy || selectedBundle.status !== "needs_review"
+                  !!actionBusy ||
+                  savingKey !== null ||
+                  selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "publish" ? (
@@ -995,6 +1078,12 @@ function EditorSection({
 
       {detailLoading ? (
         <LoadingBlock />
+      ) : detailError ? (
+        <ErrorState
+          title="Translation bundle unavailable"
+          message={detailError}
+          onRetry={onRetry}
+        />
       ) : selectedBundle ? (
         <div className="space-y-4 p-5">
           <div className="grid gap-3 md:grid-cols-4">
@@ -1047,7 +1136,7 @@ function EditorSection({
                         className="min-h-11"
                         aria-label={`Save ${key}`}
                         onClick={() => void onSaveMessage(key)}
-                        disabled={savingKey === key}
+                        disabled={savingKey !== null || actionBusy !== null}
                       >
                         {savingKey === key ? (
                           <Loader2
@@ -1144,7 +1233,9 @@ function QualityIssues({
         </InfoBadge>
       </div>
       {issues.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-text-muted">No quality issues</div>
+        <div className="px-4 py-3 text-sm text-text-muted">
+          No quality issues
+        </div>
       ) : (
         <div className="divide-y divide-border-quiet-subtle">
           {issues.map((issue) => (
@@ -1188,9 +1279,7 @@ function MessageStatusBadge({
 }) {
   const issue = qualityReport?.issues.find((item) => item.key === keyName);
   if (!issue) {
-    return (
-      <InfoBadge tone="success">ok</InfoBadge>
-    );
+    return <InfoBadge tone="success">ok</InfoBadge>;
   }
   const status =
     issue.code === "stale_translation"

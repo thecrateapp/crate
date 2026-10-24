@@ -40,7 +40,7 @@ export function ListPagination({
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
-          <ChevronLeft aria-hidden="true" />
+          <ChevronLeft data-admin-ux="pagination-previous" aria-hidden="true" />
           Previous
         </Button>
         <Button
@@ -52,7 +52,7 @@ export function ListPagination({
           onClick={() => onPageChange(page + 1)}
         >
           Next
-          <ChevronRight aria-hidden="true" />
+          <ChevronRight data-admin-ux="pagination-next" aria-hidden="true" />
         </Button>
       </div>
     </nav>

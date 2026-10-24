@@ -20,7 +20,7 @@ const STALE_PLAN_MESSAGE = "The plan changed. Reload and review it again.";
 // `--surface-panel` is a CSS variable, not a theme colour, so the translucent
 // background is spelled as an arbitrary value.
 const barClassName =
-  "sticky bottom-0 z-10 rounded-t-md border-t border-white/10 bg-[color-mix(in_srgb,var(--surface-panel)_95%,transparent)] px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
+  "sticky bottom-0 z-10 rounded-t-md border-t border-border-quiet bg-[color-mix(in_srgb,var(--surface-panel)_95%,transparent)] px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
 
 export function DecisionBar({
   plan,
@@ -101,13 +101,13 @@ export function DecisionBar({
             className="mt-0.5 size-4 shrink-0 text-state-warning-text"
           />
           {validExpiry ? (
-            <p className="text-white/80">
+            <p className="text-text-secondary">
               This plan expired{" "}
               <RelativeTime value={plan.expires_at} now={now} />. Ask the agent
               to prepare it again.
             </p>
           ) : (
-            <p className="text-white/80">
+            <p className="text-text-secondary">
               This plan expired. Ask the agent to prepare it again.
             </p>
           )}
@@ -164,7 +164,7 @@ export function DecisionBar({
                 )
               }
             />
-            <label htmlFor={checkboxId} className="text-sm text-white/80">
+            <label htmlFor={checkboxId} className="text-sm text-text-secondary">
               {plan.operation === "editorial_change"
                 ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
                 : plan.changes.length === 1

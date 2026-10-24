@@ -38,11 +38,11 @@ function TrackRow({ track }: { track: Record<string, unknown> }) {
         <StructuredValue value={track.position} />
       </TableCell>
       <TableCell className="min-w-48 align-top whitespace-normal">
-        <p className="break-words text-white">
+        <p className="break-words text-text-primary">
           {nonemptyText(track.title) ?? "Untitled"}
         </p>
         {credits ? (
-          <p className="break-words text-xs text-white/50">{credits}</p>
+          <p className="break-words text-xs text-text-muted">{credits}</p>
         ) : null}
       </TableCell>
       <TableCell className="align-top tabular-nums">
@@ -69,7 +69,9 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
 
   return (
     <section aria-label="Complete editorial details" className="space-y-4">
-      <h3 className="font-medium text-white font-display">Editorial playlist content</h3>
+      <h3 className="font-medium text-text-primary font-display">
+        Editorial playlist content
+      </h3>
       {selection.length > 0 ? (
         <Table>
           <TableCaption className="sr-only">
@@ -99,13 +101,13 @@ export function EditorialChanges({ plan }: { plan: AgentPlan }) {
           </TableBody>
         </Table>
       ) : (
-        <p className="text-sm text-white/55">
+        <p className="text-sm text-text-muted">
           {policyOnly
             ? "This policy change preserves the existing playlist selection."
             : "The proposed playlist selection is empty."}
         </p>
       )}
-      <div className="text-sm text-white/80">
+      <div className="text-sm text-text-secondary">
         <StructuredValue value={details} />
       </div>
       {identities.length > 0 ? (

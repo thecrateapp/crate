@@ -16,8 +16,12 @@ export function PlayerStage({
       style={{ containerType: "size" }}
     >
       <div
-        className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-5 px-6 pt-4"
-        style={{ paddingBottom: bottomClearance }}
+        className="mx-auto flex min-h-full w-full max-w-xl flex-col items-center justify-center gap-5 pt-4"
+        style={{
+          paddingBottom: bottomClearance,
+          paddingLeft: "max(1.5rem, var(--listen-safe-left))",
+          paddingRight: "max(1.5rem, var(--listen-safe-right))",
+        }}
       >
         <div
           className="relative z-10 shrink-0"

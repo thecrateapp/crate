@@ -28,7 +28,7 @@ describe("runtime token bridge", () => {
     expect(surfaces).not.toMatch(/data-surface|glass/);
   });
 
-  it("paints the fullscreen player on an opaque canvas underlay", () => {
+  it("paints fullscreen header and body on one continuous opaque canvas", () => {
     const recipes = readTokenFile("recipes.css");
     const surface = recipes.match(
       /\.fullscreen-player-surface\s*\{(?<rules>[^}]*)\}/s,
@@ -36,6 +36,7 @@ describe("runtime token bridge", () => {
 
     expect(surface).toMatch(/background-color:\s*var\(--surface-canvas\)/);
     expect(surface).not.toMatch(/(?:^|\s)background:/);
+    expect(surface).not.toMatch(/linear-gradient|color-mix/);
   });
 
   it("keeps an inset focus indicator for links inside truncating containers", () => {
@@ -127,7 +128,9 @@ describe("runtime token bridge", () => {
     expect(recipes).toMatch(
       /\.stats-digging-progress span\s*\{[^}]*height:\s*1px/s,
     );
-    expect(recipes).not.toMatch(/\.crate-(?:progress-hairline|meter-track)\[data-thickness=/);
+    expect(recipes).not.toMatch(
+      /\.crate-(?:progress-hairline|meter-track)\[data-thickness=/,
+    );
   });
 
   it("keeps the legacy focus utility bridge without a redundant semantic alias", () => {

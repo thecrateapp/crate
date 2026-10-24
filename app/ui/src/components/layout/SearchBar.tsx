@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useEffectEvent } from "react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useState, useRef, useEffect, useEffectEvent, useId } from "react";
 import { useNavigate } from "react-router";
 import { Loader2, Search, X } from "lucide-react";
 
@@ -49,6 +50,7 @@ interface ResultItem {
 interface SearchBarProps {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   onQueryChange?: (query: string) => void;
+  onNavigate?: () => void;
 }
 
 const RECENTS_KEY = "search-recents:v1";
@@ -95,7 +97,7 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover bg-white/5 ${
+        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover bg-canvas-surface ${
           item.type === "artist" ? "rounded-md" : "rounded"
         }`}
         onError={(event) => {
@@ -107,7 +109,12 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
   return null;
 }
 
-export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
+export function SearchBar({
+  inputRef,
+  onQueryChange,
+  onNavigate,
+}: SearchBarProps) {
+  const inputId = useId();
   const [query, setQuery] = useState("");
   const [localResults, setLocalResults] = useState<LocalResults | null>(null);
   const [open, setOpen] = useState(false);
@@ -182,6 +189,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
     setQuery("");
     setOpen(false);
     setSelectedIdx(-1);
+    onNavigate?.();
   }
 
   const items: ResultItem[] = [];
@@ -353,14 +361,14 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
                 data-admin-ux="search-field"
                 aria-hidden="true"
                 size={17}
-                className="pointer-events-none absolute left-4 text-white/40"
+                className="pointer-events-none absolute left-4 text-text-subtle"
               />
               {loading ? (
                 <Loader2
                   data-admin-ux="search-loading"
                   aria-hidden="true"
                   size={15}
-                  className="absolute right-4 animate-spin text-white/40"
+                  className="absolute right-4 animate-spin text-text-subtle"
                 />
               ) : null}
               {!loading && query ? (
@@ -381,12 +389,12 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
                   />
                 </button>
               ) : null}
-              <label htmlFor="library-search" className="sr-only">
+              <label htmlFor={inputId} className="sr-only">
                 Search library
               </label>
               <input
                 ref={searchInputRef}
-                id="library-search"
+                id={inputId}
                 type="text"
                 aria-busy={loading || undefined}
                 value={query}
@@ -397,7 +405,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
                 onFocus={handleFocus}
                 onKeyDown={handleKeyDown}
                 placeholder="Search library…"
-                className="h-12 w-full rounded-md border border-white/8 bg-black/25 pl-11 pr-12 text-[15px] text-white transition-[background-color,border-color,box-shadow] placeholder:text-white/40 focus:border-accent-action/25 focus:bg-black/40"
+                className="h-12 w-full rounded-md border border-border-quiet bg-canvas-surface pl-11 pr-12 text-[15px] text-text-primary transition-[background-color,border-color,box-shadow] placeholder:text-text-subtle focus:border-accent-action/25 focus:bg-canvas-surface"
               />
             </div>
           </div>
@@ -427,30 +435,32 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
         >
           {showResults ? (
             <div className="py-1">
-              <div className="px-3 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/40 font-mono">
+              <MonoLabel tone="accent" className="px-3 py-2">
                 In Library
-              </div>
+              </MonoLabel>
               {items.map((item, index) => (
                 <button
                   key={`${item.type}-${item.path}`}
                   type="button"
                   onClick={() => go(item.path)}
-                  className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                    index === selectedIdx ? "bg-white/10" : "hover:bg-white/5"
+                  className={`group flex min-h-11 w-full items-center gap-3 border-l-2 px-3 py-2 text-left transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi ${
+                    index === selectedIdx
+                      ? "border-accent-action-hi text-accent-action-hi"
+                      : "border-transparent text-text-primary"
                   }`}
                 >
                   <SearchResultThumb item={item} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] text-white/80">
+                    <p className="truncate text-caption text-inherit">
                       {item.label}
                     </p>
-                    <p className="truncate text-[11px] text-white/40">
+                    <p className="truncate text-xs text-text-subtle">
                       {item.sublabel}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[10px] capitalize text-white/20">
+                  <MonoLabel as="span" className="shrink-0">
                     {item.type}
-                  </span>
+                  </MonoLabel>
                 </button>
               ))}
             </div>
@@ -458,19 +468,21 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
           {showRecents ? (
             <div className="py-1">
-              <p className="px-3 py-1.5 text-[10px] font-normal uppercase tracking-wider text-white/40 font-mono">
+              <MonoLabel tone="accent" className="px-3 py-2">
                 Recent
-              </p>
+              </MonoLabel>
               {recents.map((recent, index) => (
                 <button
                   key={recent}
                   type="button"
                   onClick={() => selectRecent(recent)}
-                  className={`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                    index === selectedIdx ? "bg-white/10" : "hover:bg-white/5"
+                  className={`group flex min-h-11 w-full items-center gap-3 border-l-2 px-3 py-2 text-left transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi ${
+                    index === selectedIdx
+                      ? "border-accent-action-hi text-accent-action-hi"
+                      : "border-transparent text-text-primary"
                   }`}
                 >
-                  <span className="truncate text-[13px] text-white/60">
+                  <span className="truncate text-caption text-inherit">
                     {recent}
                   </span>
                 </button>
@@ -480,7 +492,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
           {showNoResults ? (
             <div className="py-6 text-center">
-              <div className="flex items-center justify-center gap-2 text-sm text-white/45">
+              <div className="flex items-center justify-center gap-2 text-sm text-text-muted">
                 No library matches
               </div>
             </div>

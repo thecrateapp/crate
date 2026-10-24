@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { FilterBar } from "@crate/ui/domain/filters";
 import { TrackList, type TrackListProps } from "@crate/ui/domain/tracks";
+import { EmptyState } from "@crate/ui/domain/states";
 import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
@@ -34,7 +35,7 @@ export function LibraryLikedView<T>({
       <FilterBar
         align="end"
         leading={
-          <Button onClick={onPlay}>
+          <Button onClick={onPlay} disabled={list.items.length === 0}>
             <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
             {list.items.length < totalCount
               ? t("library.liked.playFiltered", { count: list.items.length })
@@ -71,7 +72,11 @@ export function LibraryLikedView<T>({
           </FormField>
         }
       />
-      <TrackList {...list} />
+      {list.items.length === 0 ? (
+        <EmptyState variant="inline" message={t("playlist.empty.noFilter")} />
+      ) : (
+        <TrackList {...list} />
+      )}
     </div>
   );
 }

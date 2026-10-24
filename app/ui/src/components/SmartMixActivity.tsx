@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 export const ACTIVITY_POLL_MS = 5_000;
 export const COUNTS_REFRESH_EVERY = 2;
@@ -102,30 +103,32 @@ export function SmartMixActivity({
   const eta = formatEta(remaining, activity.tracksPerMinute);
 
   return (
-    <div className="space-y-2 rounded-sm border border-white/6 bg-black/20 p-3">
+    <div className="space-y-3 border-t border-border-quiet py-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 font-mono">
+        <MonoLabel as="span" tone="accent">
           {activity.running.length > 0 ? "Analyzing now" : "Recent activity"}
-        </span>
-        <CrateChip className="text-[10px]">
-          {activity.tracksPerMinute} tracks/min
-        </CrateChip>
-        <CrateChip className="text-[10px]">
-          {activity.queued.toLocaleString()} queued
-        </CrateChip>
-        {live && eta ? (
-          <CrateChip className="text-[10px]">{eta}</CrateChip>
-        ) : null}
+        </MonoLabel>
+        <InfoBadge>{activity.tracksPerMinute} tracks/min</InfoBadge>
+        <InfoBadge>{activity.queued.toLocaleString()} queued</InfoBadge>
+        {live && eta ? <InfoBadge>{eta}</InfoBadge> : null}
       </div>
 
       {activity.running.map((track) => (
         <div
           key={track.taskId}
-          className="flex items-center gap-2 text-sm text-white/85"
+          className="flex items-center gap-2 text-sm text-text-accent-action-hi"
         >
-          <Loader2 size={13} className="animate-spin text-primary" />
-          <span className="truncate">{trackLabel(track)}</span>
-          <span className="text-xs text-white/40">
+          <Loader2
+            data-admin-ux="mix-activity-loading"
+            size={13}
+            className="animate-spin text-accent-action-hi"
+          />
+          <TooltipHint content={trackLabel(track)}>
+            <span className="min-w-0 truncate" tabIndex={0}>
+              {trackLabel(track)}
+            </span>
+          </TooltipHint>
+          <span className="text-xs text-text-muted">
             {seconds(track.elapsedMs)}
           </span>
         </div>
@@ -136,22 +139,28 @@ export function SmartMixActivity({
           {activity.recent.map((track) => (
             <li
               key={track.taskId}
-              className="flex items-center gap-2 text-xs text-white/55"
-              title={track.error ?? undefined}
+              className="space-y-1 text-xs text-text-secondary"
             >
-              <CrateChip
-                className={cn(
-                  "text-[10px]",
-                  track.outcome === "failed" && "text-state-warning-text",
-                  track.outcome !== "published" &&
-                    track.outcome !== "failed" &&
-                    "text-state-warning-text",
-                )}
-              >
-                {track.outcome}
-              </CrateChip>
-              <span className="truncate">{trackLabel(track)}</span>
-              <span className="text-white/35">{seconds(track.durationMs)}</span>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <InfoBadge
+                  tone={track.outcome === "published" ? "neutral" : "warning"}
+                >
+                  {track.outcome}
+                </InfoBadge>
+                <TooltipHint content={trackLabel(track)}>
+                  <span className="min-w-0 truncate" tabIndex={0}>
+                    {trackLabel(track)}
+                  </span>
+                </TooltipHint>
+                <span className="text-text-subtle">
+                  {seconds(track.durationMs)}
+                </span>
+              </div>
+              {track.error ? (
+                <p className="whitespace-normal wrap-anywhere text-state-warning-text">
+                  {track.error}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>

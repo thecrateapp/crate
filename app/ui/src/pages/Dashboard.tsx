@@ -8,13 +8,14 @@ import {
   Wrench as HeaderWrench,
   Loader2,
 } from "lucide-react";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { getDashboardModel } from "@/components/admin/dashboard-model";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -41,6 +42,10 @@ export function Dashboard() {
   } = useOpsSnapshot();
   const { isAdmin, hasCapability } = useAuth();
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const maintenanceBusyRef = useRef(false);
+  const maintenanceController = useRef<AbortController | null>(null);
+  useEffect(() => () => maintenanceController.current?.abort(), []);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
   const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
   const [, expireReport] = useReducer((version: number) => version + 1, 0);
@@ -81,13 +86,56 @@ export function Dashboard() {
     canAnalysis = hasCapability("library.analysis.manage");
   const canSync = hasCapability("library.import.manage"),
     canMaintain = isAdmin && hasCapability("library.maintenance.manage");
+  async function runMaintenanceTask(
+    path: string,
+    queued: string,
+    completed: string,
+    failure: string,
+    body?: Record<string, unknown>,
+  ) {
+    if (maintenanceBusyRef.current) return;
+    maintenanceBusyRef.current = true;
+    setMaintenanceBusy(true);
+    const controller = new AbortController();
+    maintenanceController.current = controller;
+    try {
+      let response: { task_id: string };
+      try {
+        response = body
+          ? await api<{ task_id: string }>(path, "POST", body)
+          : await api<{ task_id: string }>(path, "POST");
+      } catch {
+        throw new Error(failure);
+      }
+      toast.success(queued);
+      const task = await waitForTask(
+        response.task_id,
+        10 * 60 * 1000,
+        controller.signal,
+      );
+      if (task.status !== "completed")
+        throw new Error(task.error || `Library task ${task.status}`);
+      toast.success(completed);
+      await refresh(true);
+    } finally {
+      maintenanceBusyRef.current = false;
+      maintenanceController.current = null;
+      setMaintenanceBusy(false);
+    }
+  }
   async function triggerLibrarySync() {
     try {
-      await api("/api/tasks/sync-library", "POST");
-      toast.success("Library sync started");
-      void refresh(true);
-    } catch {
-      toast.error("Sync already running or failed");
+      await runMaintenanceTask(
+        "/api/tasks/sync-library",
+        "Library sync started",
+        "Library sync complete",
+        "Sync already running or failed",
+      );
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError"))
+        toast.error(
+          error instanceof Error ? error.message : "Library sync failed",
+        );
     }
   }
   const attentionBlock = (
@@ -401,9 +449,13 @@ export function Dashboard() {
         eyebrow="Maintenance"
         description="Library operations. Rebuild and wipe require typed confirmation."
         closeLabel="Close maintenance"
-        closeOnEscape={!showWipeConfirm && !showRebuildConfirm}
-        closeOnOverlay={!showWipeConfirm && !showRebuildConfirm}
-        closeDisabled={showWipeConfirm || showRebuildConfirm}
+        closeOnEscape={
+          !showWipeConfirm && !showRebuildConfirm && !maintenanceBusy
+        }
+        closeOnOverlay={
+          !showWipeConfirm && !showRebuildConfirm && !maintenanceBusy
+        }
+        closeDisabled={showWipeConfirm || showRebuildConfirm || maintenanceBusy}
         size="sm"
       >
         <ModalBody className="grid gap-6 px-6 py-5">
@@ -411,6 +463,8 @@ export function Dashboard() {
             <Button
               variant="outline"
               className="min-h-11"
+              disabled={maintenanceBusy}
+              aria-busy={maintenanceBusy}
               onClick={() => void triggerLibrarySync()}
             >
               Sync library
@@ -422,6 +476,7 @@ export function Dashboard() {
               <Button
                 variant="outline"
                 className="min-h-11"
+                disabled={maintenanceBusy}
                 onClick={() => setShowRebuildConfirm(true)}
               >
                 Rebuild library
@@ -429,6 +484,7 @@ export function Dashboard() {
               <Button
                 variant="outline"
                 className="min-h-11"
+                disabled={maintenanceBusy}
                 onClick={() => setShowWipeConfirm(true)}
               >
                 Wipe database
@@ -444,17 +500,19 @@ export function Dashboard() {
         description="This will wipe the entire library database and rebuild from scratch. This includes: wipe DB, health check, repair, full sync, and re-enrichment. This may take a while."
         confirmLabel="Rebuild Library"
         variant="destructive"
-        onConfirm={() => {
-          void (async () => {
-            try {
-              await api("/api/manage/rebuild", "POST");
-              toast.success("Library rebuild started");
-              void refresh(true);
-            } catch {
-              toast.error("Failed to start rebuild");
-            }
-          })();
-        }}
+        onConfirm={() =>
+          runMaintenanceTask(
+            "/api/manage/rebuild",
+            "Library rebuild started",
+            "Library rebuild complete",
+            "Failed to start rebuild",
+          )
+        }
+        onError={(error) =>
+          toast.error(
+            error instanceof Error ? error.message : "Library rebuild failed",
+          )
+        }
         eyebrow="Confirm action"
         consequence="Resets library database · health check · repair · full sync · re-enrichment"
         confirmation={{ value: "REBUILD", label: "Type REBUILD to confirm" }}
@@ -467,17 +525,20 @@ export function Dashboard() {
         description="This will permanently delete ALL library data (artists, albums, tracks) from the database. Files on disk will NOT be affected. This action cannot be undone."
         confirmLabel="Wipe Database"
         variant="destructive"
-        onConfirm={() => {
-          void (async () => {
-            try {
-              await api("/api/manage/wipe", "POST", { rebuild: false });
-              toast.success("Library database wiped");
-              void refresh(true);
-            } catch {
-              toast.error("Failed to wipe database");
-            }
-          })();
-        }}
+        onConfirm={() =>
+          runMaintenanceTask(
+            "/api/manage/wipe",
+            "Library database wipe queued",
+            "Library database wiped",
+            "Failed to wipe database",
+            { rebuild: false },
+          )
+        }
+        onError={(error) =>
+          toast.error(
+            error instanceof Error ? error.message : "Library wipe failed",
+          )
+        }
         eyebrow="Confirm action"
         consequence="Database only · files remain on disk"
         confirmation={{ value: "WIPE", label: "Type WIPE to confirm" }}

@@ -25,7 +25,14 @@ export function PlayerPanels({
       onValueChange={onValueChange}
       className="flex min-h-0 flex-1 flex-col"
     >
-      <div className="flex shrink-0 items-center gap-2 px-4">
+      <div
+        data-slot="player-panels-header"
+        className="flex shrink-0 items-center gap-2"
+        style={{
+          paddingLeft: "max(1rem, var(--listen-safe-left))",
+          paddingRight: "max(1rem, var(--listen-safe-right))",
+        }}
+      >
         <div>{leading}</div>
         <div className="min-w-0 flex-1">
           <TabsList aria-label={label}>

@@ -60,6 +60,8 @@ export interface EntityPrimaryActionProps {
   href?: string;
   external?: boolean;
   openLabel?: string;
+  /** Selection belongs to the primary callback button, independently of playback. */
+  pressed?: boolean;
 }
 
 export interface EntityMenuProps {

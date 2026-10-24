@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import data from "../../../../tests/admin-e2e/fixtures/dashboard-snapshot.json";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
+vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Dashboard } from "./Dashboard";
 vi.mock("@/contexts/OpsSnapshotContext", () => ({ useOpsSnapshot: vi.fn() }));
@@ -62,6 +64,7 @@ function mount(isAdmin = true, capabilities?: string[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api).mockReset().mockResolvedValue({ task_id: "sample" });
+  vi.mocked(waitForTask).mockReset().mockResolvedValue({ status: "completed" });
   vi.spyOn(Date, "now").mockReturnValue(now);
   snapshot();
 });
@@ -70,6 +73,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("Dashboard three-block operational summary", () => {
+  it("keeps wipe pending and reports its terminal failure rather than announcing completion at enqueue", async () => {
+    let finish!: (value: { status: string; error?: string }) => void;
+    vi.mocked(waitForTask).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    mount();
+    await user.click(screen.getByRole("button", { name: "Maintenance" }));
+    await user.click(screen.getByRole("button", { name: "Wipe database" }));
+    await user.type(screen.getByLabelText("Type WIPE to confirm"), "WIPE");
+    await user.click(screen.getByRole("button", { name: "Wipe Database" }));
+    expect(toast.success).not.toHaveBeenCalledWith("Library database wiped");
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    ).toBeDisabled();
+    await act(async () =>
+      finish({ status: "failed", error: "worker could not wipe" }),
+    );
+    expect(toast.error).toHaveBeenCalledWith("worker could not wipe");
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Wipe Database",
+      }),
+    ).toBeEnabled();
+  });
   it("keeps three named regions and removes unrelated content and repeated readouts", () => {
     const { container } = mount();
     for (const name of ["System", "Work in progress", "Needs attention"])

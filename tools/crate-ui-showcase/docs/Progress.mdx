@@ -1,0 +1,33 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Progress.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Progress</DocHeading>
+<EntryDetails
+  id="shadcn-progress"
+  review="Existing Radix facade · contract documented"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- The Radix facade accepts a numeric value on the interval0 to `max` (100 by default), unlike
+  ProgressHairline's ratio0 to1. Native props, accessible naming and `getValueLabel` reach Radix.
+- Value0 is confirmed zero, the midpoint is loading and the maximum is complete. The fill uses
+  `value / max`; for example50 of200 paints25% while ARIA reports the actual50 and200 range.
+- Null, undefined or invalid progress remains indeterminate with no invented numeric
+  `aria-valuenow` and no fabricated fill. Radix validates invalid maximum/value input. The
+  facade has no timer or indeterminate animation; use ProgressHairline for the motion-gated
+  indeterminate pattern where that contract fits.
+- The shared default is a one-pixel rail. `className` preserves the existing facade API;
+  ordinary consumers should keep canonical geometry. App-specific playback/EQ instruments
+  retain their separate semantics and do not become ordinary progress bars.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.RangesAndUnknown} />
+<Controls />
+
+Documentation closes an existing pending entry. It does not claim that every older usage has
+adopted the canonical scale, naming or geometry. Focused shared tests cover the live facade
+and retain its native semantics, custom maximum and value-label behavior.

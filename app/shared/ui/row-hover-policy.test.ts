@@ -5,6 +5,55 @@ import ts from "typescript";
 import scope from "../../../scripts/design-system/row-hover-scope.json";
 const root = resolve(process.cwd(), "../../..");
 const fill = /(?:^|\s)(?:\S*:)?hover:bg-[^\s]+/;
+
+function classFragments(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+) {
+  const fragments: string[] = [];
+  for (const attribute of opening.attributes.properties) {
+    if (
+      !ts.isJsxAttribute(attribute) ||
+      attribute.name.getText() !== "className"
+    )
+      continue;
+    function visit(node: ts.Node) {
+      if (
+        ts.isStringLiteral(node) ||
+        ts.isNoSubstitutionTemplateLiteral(node) ||
+        ts.isTemplateHead(node)
+      )
+        fragments.push(node.text);
+      ts.forEachChild(node, visit);
+    }
+    visit(attribute);
+  }
+  return fragments;
+}
+
+function isWithinLabel(node: ts.Node, label: string) {
+  let parent: ts.Node | undefined = node.parent;
+  while (parent) {
+    const opening = ts.isJsxElement(parent)
+      ? parent.openingElement
+      : ts.isJsxSelfClosingElement(parent)
+        ? parent
+        : null;
+    if (
+      opening &&
+      opening.attributes.properties.some(
+        (attribute) =>
+          ts.isJsxAttribute(attribute) &&
+          attribute.name.getText() === "label" &&
+          attribute.initializer &&
+          ts.isStringLiteral(attribute.initializer) &&
+          attribute.initializer.text === label,
+      )
+    )
+      return true;
+    parent = parent.parent;
+  }
+  return false;
+}
 describe("shared row interaction contract", () => {
   it("does not illuminate reviewed list rows on pointer hover", () => {
     for (const entry of scope) {
@@ -17,7 +66,36 @@ describe("shared row interaction contract", () => {
         ts.ScriptKind.TSX,
       );
       const fragments: string[] = [];
+      let owners = 0;
       function visit(node: ts.Node) {
+        if ("component" in entry) {
+          if (
+            (ts.isJsxOpeningElement(node) ||
+              ts.isJsxSelfClosingElement(node)) &&
+            node.tagName.getText() === entry.component &&
+            (typeof entry.ownerLabel !== "string" ||
+              isWithinLabel(node, entry.ownerLabel))
+          ) {
+            owners++;
+            fragments.push(...classFragments(node));
+            if (ts.isJsxElement(node.parent)) {
+              for (const child of node.parent.children) {
+                const opening = ts.isJsxElement(child)
+                  ? child.openingElement
+                  : ts.isJsxSelfClosingElement(child)
+                    ? child
+                    : null;
+                if (
+                  opening &&
+                  ["Link", "a", "button"].includes(opening.tagName.getText())
+                )
+                  fragments.push(...classFragments(opening));
+              }
+            }
+          }
+          ts.forEachChild(node, visit);
+          return;
+        }
         if (
           (ts.isStringLiteral(node) ||
             ts.isNoSubstitutionTemplateLiteral(node) ||
@@ -28,9 +106,19 @@ describe("shared row interaction contract", () => {
         ts.forEachChild(node, visit);
       }
       visit(tree);
-      expect(fragments.length, entry.path + ":" + entry.prefix).toBeGreaterThan(
-        0,
-      );
+      if ("component" in entry) {
+        expect(source, entry.path).toMatch(
+          new RegExp(
+            `import\\s*\\{[^}]*\\b${entry.component}\\b[^}]*\\}\\s*from\\s*["']@crate/ui/`,
+          ),
+        );
+      }
+      expect(
+        "component" in entry ? owners : fragments.length,
+        entry.path +
+          ":" +
+          ("component" in entry ? entry.component : entry.prefix),
+      ).toBeGreaterThan(0);
       for (const fragment of fragments)
         expect(fragment, entry.path).not.toMatch(
           entry.kind === "row" ? fill : /group-hover:opacity-/,

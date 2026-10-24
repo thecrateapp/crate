@@ -237,9 +237,76 @@ class ArtistMetadataUpdate(BaseModel):
         return urls
 
 
+class ArtistSmartMixProfileResponse(BaseModel):
+    """Scalar metadata; binary beat grids are excluded from this collection read."""
+
+    profile_version: int | None = None
+    profile_revision: str | None = None
+    analyzer: str | None = None
+    analyzer_version: str | None = None
+    source_revision: str | None = None
+    quality: str | None = None
+    analyzed_at: datetime | None = None
+    source_stale_at: datetime | None = None
+    duration_ms: int | None = None
+    integrated_lufs: float | None = None
+    measurement_version: str | None = None
+    true_peak_dbfs: float | None = None
+    intro_lufs: float | None = None
+    outro_lufs: float | None = None
+    bpm: float | None = None
+    bpm_confidence: float | None = None
+    tempo_stability: float | None = None
+    beat_anchor_ms: int | None = None
+    downbeat_anchor_ms: int | None = None
+    time_signature: int | None = None
+    beat_grid_format: str | None = None
+    key_confidence: float | None = None
+    intro_cue_ms: int | None = None
+    outro_cue_ms: int | None = None
+    active_start_ms: int | None = None
+    active_end_ms: int | None = None
+    intro_bpm: float | None = None
+    outro_bpm: float | None = None
+    intro_beat_ms: int | None = None
+    outro_beat_ms: int | None = None
+    intro_tempo_stability: float | None = None
+    outro_tempo_stability: float | None = None
+    intro_downbeat_ms: int | None = None
+    outro_downbeat_ms: int | None = None
+    intro_energy: float | None = None
+    outro_energy: float | None = None
+    intro_spectral_density: float | None = None
+    outro_spectral_density: float | None = None
+    global_energy: float | None = None
+    danceability: float | None = None
+    valence: float | None = None
+    bliss_vector_revision: str | None = None
+    key: str | None = None
+    scale: str | None = None
+    camelot: str | None = None
+    status: str | None = None
+
+
+class ArtistBlissReferenceResponse(BaseModel):
+    available: bool
+    dimensions: int | None = None
+    state: str | None = None
+    computed_at: datetime | None = None
+    revision: str | None = None
+    revision_source: str | None = None
+
+
 class ArtistAnalysisTrackResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
+    track_id: int | None = None
+    track_entity_uid: str | None = None
+    album_id: int | None = None
+    analysis_state: str | None = None
+    analysis_completed_at: datetime | None = None
+    smart_mix: ArtistSmartMixProfileResponse | None = None
+    bliss: ArtistBlissReferenceResponse | None = None
     mood: dict[str, Any] | None = None
 
 

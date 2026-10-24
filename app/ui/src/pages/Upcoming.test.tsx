@@ -4,9 +4,12 @@ import { useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
+import { toast } from "sonner";
 import { Upcoming } from "./Upcoming";
 
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function show(id: number, artist: string, date: string, venue: string) {
@@ -78,6 +81,7 @@ function cached(events = ITEMS) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(waitForTask).mockReset().mockResolvedValue({ status: "completed" });
   HTMLElement.prototype.scrollIntoView = scrollIntoView;
   vi.mocked(api).mockImplementation(async (url: string, method?: string) => {
     if (url.startsWith("/api/shows/cached?")) return cached();
@@ -462,3 +466,77 @@ describe("exact twin shows", () => {
     ).toBeNull();
   });
 });
+
+it("distinguishes unavailable shows from an empty calendar and retries the read", async () => {
+  const user = userEvent.setup();
+  vi.mocked(api).mockRejectedValueOnce(new Error("offline"));
+  renderWithAdminProviders(<Upcoming />, { route: "/upcoming" });
+  const error = await screen.findByRole("alert");
+  expect(error).toHaveTextContent(/shows/i);
+  expect(screen.queryByText("No upcoming shows")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("0 shows", { exact: true }),
+  ).not.toBeInTheDocument();
+  await user.click(within(error).getByRole("button", { name: "Retry" }));
+  expect(
+    await screen.findByRole("button", { name: /Other Act/ }),
+  ).toBeVisible();
+});
+
+it.each(["completed", "failed"])(
+  "keeps sync pending until the task is %s and reports its outcome",
+  async (status) => {
+    const user = userEvent.setup();
+    let finish!: (task: { status: string; error?: string }) => void;
+    const pending = new Promise<{ status: string; error?: string }>(
+      (resolve) => {
+        finish = resolve;
+      },
+    );
+    vi.mocked(waitForTask).mockReturnValue(pending);
+    const implementation = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((url, method, body, options) =>
+      url === "/api/tasks/sync-shows"
+        ? Promise.resolve({ task_id: "show-sync" })
+        : implementation(url, method, body, options),
+    );
+    renderWithAdminProviders(<Upcoming />, { route: "/upcoming" });
+    await screen.findByRole("button", { name: /Other Act/ });
+    const before = vi
+      .mocked(api)
+      .mock.calls.filter(([url]) =>
+        url.startsWith("/api/shows/cached?"),
+      ).length;
+    const sync = screen.getByRole("button", { name: "Sync shows" });
+    await user.click(sync);
+    expect(waitForTask).toHaveBeenCalledWith(
+      "show-sync",
+      expect.any(Number),
+      expect.any(AbortSignal),
+    );
+    expect(sync).toBeDisabled();
+    expect(
+      vi
+        .mocked(api)
+        .mock.calls.filter(([url]) => url.startsWith("/api/shows/cached?")),
+    ).toHaveLength(before);
+    await act(async () => {
+      finish({
+        status,
+        error: status === "failed" ? "Sync worker failed" : undefined,
+      });
+      await pending;
+    });
+    expect(sync).toBeEnabled();
+    if (status === "completed") {
+      expect(
+        vi
+          .mocked(api)
+          .mock.calls.filter(([url]) => url.startsWith("/api/shows/cached?")),
+      ).toHaveLength(before + 1);
+      expect(toast.success).toHaveBeenCalledWith("Show sync completed");
+    } else {
+      expect(toast.error).toHaveBeenCalledWith("Sync worker failed");
+    }
+  },
+);

@@ -2,14 +2,10 @@ import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Loader2,
-  RefreshCw,
-  Wrench,
-  XCircle,
-} from "lucide-react";
+import { Loader2, RefreshCw } from "@crate/ui/icons";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -400,9 +396,9 @@ export function ArtistRepairDialog({
       .toLowerCase();
     const latestMessageLooksSuccessful = Boolean(
       latestEventMessage &&
-        /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
-          latestEventMessage,
-        ),
+      /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
+        latestEventMessage,
+      ),
     );
     const resultIncomplete = [
       "partial",
@@ -419,8 +415,7 @@ export function ArtistRepairDialog({
           doneStatus !== "cancelled"));
     const errorMessage = done.error || latestEventMessage || "Task failed";
     const revalidation = done.result?.revalidation as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const remainingIssues = Number(revalidation?.issue_count ?? NaN);
     const successMessage =
       latestEventMessage ||
@@ -596,7 +591,9 @@ export function ArtistRepairDialog({
     >
       <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="font-display">Repair {artistName}</DialogTitle>
+          <DialogTitle className="font-display">
+            Repair {artistName}
+          </DialogTitle>
           <DialogDescription>
             Preview the fixes Crate can execute for this artist, then run them
             one by one or all at once.
@@ -606,27 +603,21 @@ export function ArtistRepairDialog({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-2">
             <InfoBadge>{plan?.total ?? 0} issues</InfoBadge>
-            <InfoBadge className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
-              {plan?.executable ?? 0} executable
-            </InfoBadge>
+            <InfoBadge active>{plan?.executable ?? 0} executable</InfoBadge>
             <InfoBadge>{plan?.manual_only ?? 0} manual</InfoBadge>
             {executableItems.length ? (
               <InfoBadge>{selectedExecutableItems.length} selected</InfoBadge>
             ) : null}
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-auto gap-2"
-              onClick={() => void loadPlan()}
-              disabled={loading || runningAll || runningItemKey != null}
-            >
-              {loading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <RefreshCw size={14} />
-              )}
-              Refresh plan
-            </Button>
+            <div className="ml-auto">
+              <ActionButton
+                label="Refresh plan"
+                onClick={() => void loadPlan()}
+                disabled={loading || runningAll || runningItemKey != null}
+                loading={loading}
+              >
+                <RefreshCw data-admin-ux="repair-refresh" aria-hidden="true" />
+              </ActionButton>
+            </div>
           </div>
 
           {executableItems.length ? (
@@ -642,7 +633,6 @@ export function ArtistRepairDialog({
                   )
                 }
               >
-                <CheckCircle2 size={14} />
                 Select all auto
               </Button>
               <Button
@@ -656,7 +646,6 @@ export function ArtistRepairDialog({
                 }
                 onClick={() => setSelectedItemKeys([])}
               >
-                <XCircle size={14} />
                 Clear selection
               </Button>
             </div>
@@ -673,21 +662,24 @@ export function ArtistRepairDialog({
               }`}
             >
               <div className="flex items-center gap-2">
-                {done?.status === "failed" ? (
-                  <XCircle size={15} />
-                ) : done?.status === "completed" ? (
-                  <CheckCircle2 size={15} />
-                ) : (
-                  <Loader2 size={15} className="animate-spin" />
-                )}
+                {!done ? (
+                  <Loader2
+                    data-admin-ux="repair-plan-loading"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
                 <span>{latestEventMessage || "Processing repair task…"}</span>
               </div>
             </div>
           ) : null}
 
           {loading && !plan ? (
-            <div className="flex items-center justify-center py-16 text-white/45">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <div className="flex items-center justify-center py-16 text-text-muted">
+              <Loader2
+                data-admin-ux="repair-issues-loading"
+                className="h-5 w-5 animate-spin text-primary"
+              />
             </div>
           ) : plan && plan.items.length === 0 ? (
             <div className="rounded-md border border-accent-action/15 bg-accent-action/[0.06] px-4 py-5 text-sm text-accent-action-hi">
@@ -714,15 +706,14 @@ export function ArtistRepairDialog({
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         {item.executable ? (
                           <div className="mt-1 flex shrink-0 cursor-pointer items-center">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               aria-label={`Select ${checkLabel(
                                 item.check_type,
                               )}`}
-                              className="h-4 w-4 rounded border-white/20 bg-black/25 accent-accent-action"
+
                               checked={isSelected}
                               disabled={runningAll || runningItemKey != null}
-                              onChange={() => toggleSelected(item)}
+                              onCheckedChange={() => toggleSelected(item)}
                             />
                           </div>
                         ) : null}
@@ -733,13 +724,7 @@ export function ArtistRepairDialog({
                               label={item.severity || "low"}
                             />
                             <InfoBadge>{checkLabel(item.check_type)}</InfoBadge>
-                            <InfoBadge
-                              className={
-                                item.executable
-                                  ? "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi"
-                                  : "border-white/10 bg-white/[0.04] text-white/50"
-                              }
-                            >
+                            <InfoBadge active={item.executable}>
                               {supportLabel(item.support)}
                             </InfoBadge>
                             {riskLabel(item.risk) ? (
@@ -759,18 +744,16 @@ export function ArtistRepairDialog({
                               </InfoBadge>
                             ) : null}
                             {item.fs_write ? (
-                              <InfoBadge className="border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi">
-                                Filesystem
-                              </InfoBadge>
+                              <InfoBadge active>Filesystem</InfoBadge>
                             ) : null}
                           </div>
-                          <div className="mt-2 text-sm font-medium text-white">
+                          <div className="mt-2 text-sm font-medium text-text-primary">
                             {item.message ||
                               item.description ||
                               checkLabel(item.check_type)}
                           </div>
                           {item.target ? (
-                            <div className="mt-1 text-xs text-white/45">
+                            <div className="mt-1 text-xs text-text-muted">
                               {item.target}
                             </div>
                           ) : null}
@@ -781,7 +764,7 @@ export function ArtistRepairDialog({
                             </div>
                           ) : null}
                           {!item.supports_artist_scope ? (
-                            <div className="mt-2 text-xs text-white/45">
+                            <div className="mt-2 text-xs text-text-muted">
                               This repair is not available from the artist-level
                               flow.
                             </div>
@@ -800,7 +783,7 @@ export function ArtistRepairDialog({
                             </div>
                           ) : null}
                           {detailsSummary ? (
-                            <div className="mt-2 text-xs text-white/40">
+                            <div className="mt-2 text-xs text-text-muted">
                               {detailsSummary}
                             </div>
                           ) : null}
@@ -821,14 +804,12 @@ export function ArtistRepairDialog({
                             onClick={() => void runRepair([item], "one")}
                           >
                             {isRunning || runState.state === "running" ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : runState.state === "success" ? (
-                              <CheckCircle2 size={14} />
-                            ) : runState.state === "error" ? (
-                              <XCircle size={14} />
-                            ) : (
-                              <Wrench size={14} />
-                            )}
+                              <Loader2
+                                data-admin-ux="repair-scope-loading"
+                                size={14}
+                                className="animate-spin"
+                              />
+                            ) : null}
                             {runState.state === "success"
                               ? "Fixed"
                               : runState.state === "error"
@@ -836,8 +817,7 @@ export function ArtistRepairDialog({
                                 : "Run fix"}
                           </Button>
                         ) : (
-                          <div className="inline-flex items-center gap-2 rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/45">
-                            <AlertTriangle size={12} />
+                          <div className="inline-flex items-center gap-2 rounded-md border border-border-quiet bg-surface-object px-3 py-2 text-xs text-text-muted">
                             Manual review
                           </div>
                         )}
@@ -853,7 +833,7 @@ export function ArtistRepairDialog({
         <DialogFooter className="items-center justify-between sm:justify-between">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
-              <div className="text-xs text-white/40">
+              <div className="text-xs text-text-muted">
                 {loading && !plan
                   ? "Loading repair plan..."
                   : plan?.executable
@@ -864,9 +844,9 @@ export function ArtistRepairDialog({
               </div>
               {pendingRunSummary ? (
                 <div className="rounded-md border border-state-warning/20 bg-state-warning/[0.08] px-3 py-3 text-xs text-state-warning-text">
-                  <div className="font-medium text-state-warning-text">
+                  <MonoLabel as="div" className="text-state-warning-text">
                     Confirm risky repair
-                  </div>
+                  </MonoLabel>
                   <div className="mt-1 text-state-warning-text/85">
                     This will run {pendingRunSummary.total} selected fix
                     {pendingRunSummary.total === 1 ? "" : "es"} for {artistName}
@@ -896,7 +876,6 @@ export function ArtistRepairDialog({
                         void executeRepair(nextRun.items, nextRun.mode);
                       }}
                     >
-                      <AlertTriangle size={14} />
                       Run confirmed repair
                     </Button>
                   </div>
@@ -918,10 +897,12 @@ export function ArtistRepairDialog({
                 onClick={() => void runRepair(executableItems, "all")}
               >
                 {runningAll ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={14} />
-                )}
+                  <Loader2
+                    data-admin-ux="repair-preview-loading"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Run all auto-fixable
               </Button>
               <Button
@@ -944,10 +925,12 @@ export function ArtistRepairDialog({
                 }
               >
                 {runningAll ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Wrench size={14} />
-                )}
+                  <Loader2
+                    data-admin-ux="repair-queue-loading"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Run selected
               </Button>
             </div>

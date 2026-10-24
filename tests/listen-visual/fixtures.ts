@@ -15,6 +15,12 @@ interface ListenVisualFixtures {
     options?: {
       mode?: ColorMode;
       player?: boolean;
+      playerIdentity?: {
+        title?: string;
+        artist?: string;
+        album?: string;
+        source?: string;
+      };
       smartEq?: boolean;
       preset?: AppearancePreset;
       preferences?: Partial<FunctionalPreferences>;
@@ -847,24 +853,34 @@ function appearancePreferences(
   };
 }
 
-function playerSnapshot() {
+function playerSnapshot(
+  identity: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    source?: string;
+  } = {},
+) {
   return {
     queue: [
       {
         id: "High Vis/Guided Tour/01 Mob DLA.flac",
         libraryTrackId: 1,
         path: "High Vis/Guided Tour/01 Mob DLA.flac",
-        title: "Mob DLA",
-        artist: "High Vis",
+        title: identity.title ?? "Mob DLA",
+        artist: identity.artist ?? "High Vis",
         artistId: 7,
         artistSlug: "high-vis",
-        album: "Guided Tour",
+        album: identity.album ?? "Guided Tour",
         albumId: 71,
         albumSlug: "guided-tour",
         albumCover: svgDataUrl("GUIDED"),
         duration: 198,
       },
     ],
+    playSource: identity.source
+      ? { type: "playlist", name: identity.source, id: 10 }
+      : null,
     currentIndex: 0,
     currentTime: 42,
     wasPlaying: false,
@@ -946,7 +962,9 @@ export const test = base.extend<ListenVisualFixtures>({
         },
         {
           appearance: appearancePreferences(mode, preset, options.preferences),
-          player: options.player ? playerSnapshot() : null,
+          player: options.player
+            ? playerSnapshot(options.playerIdentity)
+            : null,
           smartEq: options.smartEq ?? false,
         },
       );

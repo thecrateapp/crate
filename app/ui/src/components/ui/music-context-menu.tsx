@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router";
 import { api } from "@/lib/api";
 import {
@@ -48,6 +49,7 @@ export function MusicContextMenu({
   onQuarantineTrack,
 }: MusicContextMenuProps) {
   const navigate = useNavigate();
+  const { hasCapability } = useAuth();
 
   return (
     <ContextMenu>
@@ -120,7 +122,7 @@ export function MusicContextMenu({
             </ContextMenuItem>
           </>
         )}
-        {artistId != null && (
+        {artistId != null && hasCapability("library.metadata.write") && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem

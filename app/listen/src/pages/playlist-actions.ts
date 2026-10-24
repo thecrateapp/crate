@@ -35,6 +35,11 @@ import {
 import type { PlaylistOfflinePresentation } from "@/pages/playlist-page-model";
 import type { UserSearchResult } from "@/pages/people-types";
 import type { PlaylistData, PlaylistSavePayload } from "@/pages/playlist-types";
+import {
+  createPlaylistTrackEditSession,
+  persistPlaylistTracks,
+  type PlaylistTrackEditSession,
+} from "@/pages/persist-playlist-tracks";
 
 const EMPTY_PAGE_ACTIONS: PlaylistPageActions = {
   offlineIcon: getPlaylistOfflineIcon("idle", { busy: false }),
@@ -70,6 +75,7 @@ interface PlaylistActionInput {
   t: TFunction;
   togglePlaylistOffline: ReturnType<typeof useOffline>["togglePlaylistOffline"];
   togglingFollow: boolean;
+  trackEditSession?: PlaylistTrackEditSession;
 }
 
 export interface PlaylistActions {
@@ -121,6 +127,7 @@ export function buildPlaylistActions({
   t,
   togglePlaylistOffline,
   togglingFollow,
+  trackEditSession = createPlaylistTrackEditSession(),
 }: PlaylistActionInput): PlaylistActions {
   function handlePlay() {
     if (!playerTracks.length) return;
@@ -261,43 +268,12 @@ export function buildPlaylistActions({
           : {}),
       });
 
-      const originalByEntryId = new Map(
-        editableTracks
-          .filter((track) => track.playlistEntryId != null)
-          .map((track) => [track.playlistEntryId as number, track]),
+      await persistPlaylistTracks(
+        id,
+        editableTracks,
+        payload.tracks,
+        trackEditSession,
       );
-      const nextEntryIds = new Set(
-        payload.tracks
-          .map((track) => track.playlistEntryId)
-          .filter((value): value is number => value != null),
-      );
-      const removedTracks = [...originalByEntryId.values()]
-        .filter((track) => !nextEntryIds.has(track.playlistEntryId as number))
-        .sort((a, b) => (b.playlistPosition || 0) - (a.playlistPosition || 0));
-
-      for (const track of removedTracks) {
-        if (track.playlistPosition != null) {
-          await api(
-            `/api/playlists/${id}/tracks/${track.playlistPosition}`,
-            "DELETE",
-          );
-        }
-      }
-
-      const newTracks = payload.tracks.filter(
-        (track) => track.playlistEntryId == null && hasTrackReference(track),
-      );
-      if (newTracks.length > 0) {
-        await api(`/api/playlists/${id}/tracks`, "POST", {
-          tracks: newTracks.map((track) =>
-            toTrackReferencePayload({
-              ...track,
-              album: track.album || "",
-              duration: track.duration || 0,
-            }),
-          ),
-        });
-      }
 
       notify.success(t("playlist.toasts.updated"));
       setEditorOpen(false);

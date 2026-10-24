@@ -6,33 +6,28 @@ import {
   GenrePillRow,
   type GenreProfileItem,
 } from "@/components/genres/GenrePill";
-import { Button } from "@crate/ui/shadcn/button";
-
+import { PageHero } from "@crate/ui/domain/hero";
+import { ArtistHeroFrame } from "@crate/ui/domain/ArtistHeroFrame";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import {
+  AlignLeft,
+  Archive,
+  AudioLines,
+  Link as LinkIcon,
+  ListMusic,
+  Pencil,
+  RefreshCw,
+  SlidersHorizontal,
+  Tag,
+  Trash2,
+} from "@crate/ui/icons";
 import {
   artistArtworkApiPath,
   artistBackgroundApiUrl,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 import { formatCompact, formatNumber, formatSize } from "@/lib/utils";
-import {
-  Calendar,
-  Disc3,
-  Archive,
-  FileJson,
-  GitMerge,
-  HardDrive,
-  Headphones,
-  ListMusic,
-  MapPin,
-  Music,
-  AudioWaveform,
-  Pencil,
-  RefreshCw,
-  Tags,
-  Trash2,
-  Users,
-  Wrench,
-} from "lucide-react";
 
 import type { ArtistShowEvent } from "./ArtistShowsSection";
 
@@ -163,66 +158,155 @@ export function ArtistHeroSection({
     photoCacheBust ? `&t=${photoCacheBust}` : ""
   }`;
 
-  return (
-    <div className="relative h-[420px] overflow-hidden -mx-4 md:-mx-8 md:h-[560px] group/hero">
-      <img
-        key={bgCacheBust || "bg"}
-        src={backgroundSrc}
-        alt=""
-        className={`absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 transition-opacity duration-1000 ${
-          bgLoaded ? "opacity-40" : "opacity-0"
-        }`}
-        onLoad={onBackgroundLoad}
-        onError={() => {}}
-      />
-      <div className="absolute inset-0 bg-black/28" />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.14) 34%, rgba(8, 10, 14, 0.46) 60%, var(--surface-app) 100%)",
-        }}
-      />
-
-      {canEditArtwork ? (
-        <ImageCropUpload
-          endpoint={artistArtworkApiPath(
-            { artistId, artistEntityUid },
-            "upload-background",
-          )}
-          aspect={21 / 9}
-          onUploaded={onBackgroundUploaded}
-          label="Edit background"
-          className="absolute bottom-6 right-4 z-30 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-black/65 px-3 py-2 text-xs font-medium text-white/85 shadow-lg shadow-black/30 backdrop-blur-sm transition-colors hover:bg-black/80 hover:text-white md:bottom-8 md:right-8"
-        />
+  const actions = (
+    <ActionGroup label="Artist actions">
+      {canEnrich ? (
+        <ActionButton
+          label={enriching ? "Enriching artist" : "Enrich"}
+          loading={enriching}
+          onClick={onEnrich}
+        >
+          <RefreshCw data-admin-ux="artist-enrich" aria-hidden="true" />
+        </ActionButton>
       ) : null}
+      {canAnalyze ? (
+        <ActionButton label="Analyze" onClick={onAnalyze}>
+          <AudioLines data-admin-ux="artist-analyze" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canEditMetadata && onEditMetadata ? (
+        <ActionButton label="Edit" onClick={onEditMetadata}>
+          <Pencil data-admin-ux="artist-edit" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canCreateCorePlaylist && onCreateCorePlaylist ? (
+        <ActionButton
+          label="Core Tracks"
+          onClick={onCreateCorePlaylist}
+          loading={corePlaylistCreating}
+        >
+          <ListMusic data-admin-ux="artist-core-playlist" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canQueueMetadata && onSyncLyrics ? (
+        <ActionButton
+          label="Lyrics"
+          onClick={onSyncLyrics}
+          disabled={metadataAction !== null}
+          loading={metadataAction === "lyrics"}
+        >
+          <AlignLeft data-admin-ux="artist-sync-lyrics" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canQueueMetadata && onWritePortableMetadata ? (
+        <ActionButton
+          label="Metadata"
+          onClick={onWritePortableMetadata}
+          disabled={metadataAction !== null}
+          loading={metadataAction === "portable"}
+        >
+          <Tag data-admin-ux="artist-write-metadata" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canQueueMetadata && onExportRichMetadata ? (
+        <ActionButton
+          label="Export"
+          onClick={onExportRichMetadata}
+          disabled={metadataAction !== null}
+          loading={metadataAction === "export"}
+        >
+          <Archive data-admin-ux="artist-export-metadata" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canRepair && showRepairAction ? (
+        <ActionButton
+          label={(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
+          onClick={onRepair}
+        >
+          <SlidersHorizontal data-admin-ux="artist-repair" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canMerge && onMerge ? (
+        <ActionButton label="Merge Alias" onClick={onMerge}>
+          <LinkIcon data-admin-ux="artist-merge" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canDelete ? (
+        <ActionButton label="Delete" onClick={onDelete}>
+          <Trash2 data-admin-ux="artist-delete" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+    </ActionGroup>
+  );
 
-      <div className="absolute inset-0 flex items-end">
-        <div className="mx-auto flex w-full max-w-[1480px] items-end gap-4 px-4 pb-6 md:gap-6 md:px-8 md:pb-8">
-          <div className="relative group/photo w-[150px] h-[150px] md:w-[200px] md:h-[200px] rounded-md overflow-hidden flex-shrink-0 ring-2 ring-white/10 shadow-2xl shadow-black/50">
+  return (
+    <div className="group/hero relative min-w-0">
+      <PageHero
+        variant="artist"
+        title={artistName}
+        contentClassName="mx-0 max-w-none px-0 sm:px-0"
+        artworkClassName="overflow-visible"
+        eyebrow={
+          <Link to="/browse">
+            <MonoLabel as="span">Browse</MonoLabel>
+          </Link>
+        }
+        background={{
+          overlay: <></>,
+          render: () => (
+            <>
+              <div className="h-full sm:hidden">
+                <ArtistHeroFrame
+                  composition="mobile"
+                  aspectRatio="auto"
+                  className="h-full"
+                  artwork={
+                    <img
+                      src={photoError ? backgroundSrc : photoSrc}
+                      alt=""
+                      className={`absolute inset-0 size-full object-cover object-[right_20%] brightness-[0.72] contrast-110 transition-opacity duration-300 ${(photoError ? bgLoaded : photoLoaded) ? "opacity-80" : "opacity-0"}`}
+                      onLoad={photoError ? onBackgroundLoad : onPhotoLoad}
+                      onError={photoError ? undefined : onPhotoError}
+                    />
+                  }
+                />
+              </div>
+              <div className="hidden h-full sm:block">
+                <ArtistHeroFrame
+                  composition="desktop"
+                  aspectRatio="auto"
+                  className="h-full"
+                  artwork={
+                    <img
+                      key={bgCacheBust || "bg"}
+                      src={backgroundSrc}
+                      alt=""
+                      className={`absolute inset-0 size-full object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 transition-opacity duration-500 ${bgLoaded ? "opacity-45" : "opacity-0"}`}
+                      onLoad={onBackgroundLoad}
+                    />
+                  }
+                />
+              </div>
+            </>
+          ),
+        }}
+        artwork={
+          <div className="group/cover relative size-full rounded-full bg-surface-object">
             {!photoError ? (
               <img
                 key={photoCacheBust || "photo"}
                 src={photoSrc}
                 alt={artistName}
-                className={`w-full h-full object-cover transition-opacity duration-500 ${
-                  photoLoaded ? "opacity-100" : "opacity-0"
-                }`}
+                className={`size-full rounded-full object-cover transition-opacity duration-300 ${photoLoaded ? "opacity-100" : "opacity-0"}`}
                 onLoad={onPhotoLoad}
                 onError={onPhotoError}
               />
             ) : null}
-            {(photoError || !photoLoaded) && (
-              <div
-                className={`w-full h-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center ${
-                  photoLoaded && !photoError ? "hidden" : ""
-                }`}
-              >
-                <span className="text-5xl font-black text-white/40">
-                  {letter}
-                </span>
-              </div>
-            )}
+            {photoError || !photoLoaded ? (
+              <span className="absolute inset-0 flex items-center justify-center rounded-full font-display text-5xl text-text-muted">
+                {letter}
+              </span>
+            ) : null}
             {canEditArtwork ? (
               <ImageCropUpload
                 endpoint={artistArtworkApiPath(
@@ -231,237 +315,113 @@ export function ArtistHeroSection({
                 )}
                 aspect={1}
                 onUploaded={onPhotoUploaded}
-                className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/60 px-2 py-1.5 text-xs font-medium text-white/75 opacity-0 shadow-lg shadow-black/30 transition-[background-color,opacity,transform,color] duration-200 group-hover/photo:translate-y-0 group-hover/photo:opacity-100 hover:bg-black/80 hover:text-white"
+                label="Edit photo"
               />
             ) : null}
           </div>
-
-          <div className="flex-1 min-w-0 pb-1">
-            <div className="text-xs text-white/40 mb-2">
-              <Link
-                to="/browse"
-                className="hover:text-white/70 transition-colors"
-              >
-                Browse
-              </Link>
-              <span className="mx-1.5">/</span>
-              <span className="text-white/60">{artistName}</span>
-            </div>
-
-            <h1 className="text-2xl md:text-5xl font-black tracking-tight text-white leading-none mb-2 truncate font-display">
-              {artistName}
-            </h1>
-
-            {(musicbrainz?.country || musicbrainz?.begin_date) && (
-              <div className="hidden md:flex items-center gap-3 text-sm text-white/50 mb-2">
-                {musicbrainz?.country && (
-                  <span className="flex items-center gap-1">
-                    <MapPin size={13} />
-                    {musicbrainz.area ? `${musicbrainz.area}, ` : ""}
-                    {musicbrainz.country}
-                  </span>
-                )}
-                {musicbrainz?.begin_date && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={13} />
-                    Est. {musicbrainz.begin_date}
-                  </span>
-                )}
-                {musicbrainz?.type && (
-                  <span className="flex items-center gap-1">
-                    <Users size={13} />
-                    {musicbrainz.type}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-white/50 mb-2 flex-wrap">
-              <span className="flex items-center gap-1.5">
-                <Disc3 size={14} />
-                {albumCount} albums
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Music size={14} />
-                {formatNumber(totalTracks)} tracks
-              </span>
-              <span className="flex items-center gap-1.5">
-                <HardDrive size={14} />
-                {formatSize(totalSizeMb)}
-              </span>
-              {(lastfmListeners ?? 0) > 0 && (
-                <span className="flex items-center gap-1.5">
-                  <Headphones size={14} />
-                  {formatCompact(lastfmListeners!)} listeners
-                </span>
-              )}
-            </div>
-
-            {upcomingShow && (
-              <a
-                href={upcomingShow.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent-action/10 border border-accent-action/20 text-accent-action-hi hover:bg-accent-action/20 transition-colors text-xs mb-2"
-              >
-                <Calendar size={13} />
-                <span className="font-medium">
-                  Next show:{" "}
-                  {new Date(upcomingShow.date).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-                <span className="text-accent-action-hi/70">
-                  {upcomingShow.venue}
-                  {upcomingShow.city
-                    ? ` — ${[upcomingShow.city, upcomingShow.country]
-                        .filter(Boolean)
-                        .join(", ")}`
-                    : ""}
-                </span>
-              </a>
-            )}
-
-            {popularityScore > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-white/40">Popularity</span>
-                <div className="w-[60px] h-px bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${popularityScore}%`,
-                      background: "linear-gradient(90deg, #06b6d433, #06b6d4)",
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-white/40">
-                  {popularityScore}%
-                </span>
-              </div>
-            )}
-
-            {genreProfile && genreProfile.length > 0 ? (
-              <GenrePillRow items={genreProfile} max={6} className="mb-3" />
-            ) : tags.length > 0 ? (
-              <div className="hidden md:flex gap-1.5 flex-wrap mb-3">
-                {tags.slice(0, 8).map((tag) => (
-                  <InfoBadge key={tag}>{tag.toLowerCase()}</InfoBadge>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="flex gap-2 flex-wrap">
-              {canEnrich ? (
-                <Button
-                  size="sm"
-                  variant="default"
-                  disabled={enriching}
-                  onClick={onEnrich}
-                >
-                  <RefreshCw
-                    size={14}
-                    className={`mr-1 ${enriching ? "animate-spin" : ""}`}
-                  />{" "}
-                  {enriching ? "Enriching..." : "Enrich"}
-                </Button>
+        }
+        subtitle={
+          musicbrainz?.area ||
+          musicbrainz?.country ||
+          musicbrainz?.begin_date ||
+          musicbrainz?.type ? (
+            <>
+              {musicbrainz.area || musicbrainz.country ? (
+                <MonoLabel as="span">
+                  {[musicbrainz.area, musicbrainz.country]
+                    .filter(Boolean)
+                    .join(", ")}
+                </MonoLabel>
               ) : null}
-              {canAnalyze ? (
-                <Button size="sm" variant="outline" onClick={onAnalyze}>
-                  <AudioWaveform size={14} className="mr-1" /> Analyze
-                </Button>
+              {musicbrainz.begin_date ? (
+                <MonoLabel as="span">Est. {musicbrainz.begin_date}</MonoLabel>
               ) : null}
-              {canEditMetadata && onEditMetadata ? (
-                <Button size="sm" variant="outline" onClick={onEditMetadata}>
-                  <Pencil size={14} className="mr-1" /> Edit
-                </Button>
+              {musicbrainz.type ? (
+                <MonoLabel as="span">{musicbrainz.type}</MonoLabel>
               ) : null}
-              {canCreateCorePlaylist && onCreateCorePlaylist ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onCreateCorePlaylist}
-                  disabled={corePlaylistCreating}
-                >
-                  {corePlaylistCreating ? (
-                    <RefreshCw size={14} className="mr-1 animate-spin" />
-                  ) : (
-                    <ListMusic size={14} className="mr-1" />
-                  )}
-                  Core Tracks
-                </Button>
-              ) : null}
-              {canQueueMetadata && onSyncLyrics ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onSyncLyrics}
-                  disabled={metadataAction !== null}
-                >
-                  {metadataAction === "lyrics" ? (
-                    <RefreshCw size={14} className="mr-1 animate-spin" />
-                  ) : (
-                    <FileJson size={14} className="mr-1" />
-                  )}
-                  Lyrics
-                </Button>
-              ) : null}
-              {canQueueMetadata && onWritePortableMetadata ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onWritePortableMetadata}
-                  disabled={metadataAction !== null}
-                >
-                  {metadataAction === "portable" ? (
-                    <RefreshCw size={14} className="mr-1 animate-spin" />
-                  ) : (
-                    <Tags size={14} className="mr-1" />
-                  )}
-                  Metadata
-                </Button>
-              ) : null}
-              {canQueueMetadata && onExportRichMetadata ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onExportRichMetadata}
-                  disabled={metadataAction !== null}
-                >
-                  {metadataAction === "export" ? (
-                    <RefreshCw size={14} className="mr-1 animate-spin" />
-                  ) : (
-                    <Archive size={14} className="mr-1" />
-                  )}
-                  Export
-                </Button>
-              ) : null}
-              {canRepair && showRepairAction && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-state-warning-text hover:bg-state-warning/10"
-                  onClick={onRepair}
-                >
-                  <Wrench size={14} className="mr-1" />{" "}
-                  {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
-                </Button>
-              )}
-              {canMerge && onMerge ? (
-                <Button size="sm" variant="outline" onClick={onMerge}>
-                  <GitMerge size={14} className="mr-1" /> Merge Alias
-                </Button>
-              ) : null}
-              {canDelete && (
-                <Button size="sm" variant="outline" onClick={onDelete}>
-                  <Trash2 size={14} className="mr-1" /> Delete
-                </Button>
-              )}
-            </div>
+            </>
+          ) : undefined
+        }
+        meta={[
+          <MonoLabel as="span" key="albums">
+            {albumCount} albums
+          </MonoLabel>,
+          <MonoLabel as="span" key="tracks">
+            {formatNumber(totalTracks)} tracks
+          </MonoLabel>,
+          <MonoLabel as="span" key="size">
+            {formatSize(totalSizeMb)}
+          </MonoLabel>,
+          (lastfmListeners ?? 0) > 0 ? (
+            <MonoLabel as="span" key="listeners">
+              {formatCompact(lastfmListeners!)} listeners
+            </MonoLabel>
+          ) : null,
+          (issueCount ?? 0) > 0 ? (
+            <InfoBadge key="issues" tone="warning">
+              {issueCount} issues
+            </InfoBadge>
+          ) : null,
+        ]}
+        actions={actions}
+        actionsClassName="border-b border-border-quiet px-0 sm:px-0"
+      >
+        {popularityScore > 0 ? (
+          <MonoLabel as="p" className="mt-3">
+            Popularity {popularityScore}%
+          </MonoLabel>
+        ) : null}
+        {upcomingShow ? (
+          <a
+            href={upcomingShow.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex text-sm text-accent-action-hi hover:underline"
+          >
+            Next show:{" "}
+            {new Date(upcomingShow.date).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+            {upcomingShow.venue ? ` · ${upcomingShow.venue}` : ""}
+            {upcomingShow.city ? `, ${upcomingShow.city}` : ""}
+          </a>
+        ) : null}
+        {genreProfile && genreProfile.length > 0 ? (
+          <GenrePillRow items={genreProfile} max={6} className="mt-3" />
+        ) : tags.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {tags.slice(0, 8).map((tag) => (
+              <InfoBadge key={tag}>{tag.toLowerCase()}</InfoBadge>
+            ))}
           </div>
-        </div>
-      </div>
+        ) : null}
+      </PageHero>
+      {canEditArtwork ? (
+        <>
+          <ImageCropUpload
+            endpoint={artistArtworkApiPath(
+              { artistId, artistEntityUid },
+              "upload-photo",
+            )}
+            aspect={1}
+            onUploaded={onPhotoUploaded}
+            label="Edit photo"
+            className="absolute right-14 top-2 z-20 inline-flex sm:hidden"
+          />
+          <ImageCropUpload
+            endpoint={artistArtworkApiPath(
+              { artistId, artistEntityUid },
+              "upload-background",
+            )}
+            aspect={21 / 9}
+            onUploaded={onBackgroundUploaded}
+            label="Edit background"
+            className="absolute right-2 top-2 z-20 inline-flex"
+          />
+        </>
+      ) : null}
     </div>
   );
 }

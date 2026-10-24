@@ -3,9 +3,13 @@ import { useCallback, useRef } from "react";
 import type { PlaySource, Track } from "@/contexts/player-types";
 import type {
   EnginePositionEvent,
+  EngineMixState,
+  EngineMixStateChangedEvent,
   EngineState,
   NativeEventMetadata,
 } from "@/lib/playback-engine";
+import { androidNativeEngine } from "@/lib/android-native-engine";
+import { actualNativeMixState } from "@/lib/native-mix-state";
 
 type ValueRef<T> = { readonly current: T };
 
@@ -121,6 +125,7 @@ export interface UseNativePlaybackReconciliationParams {
     playSource: PlaySource | null,
   ) => void;
   scheduleNativeBufferingWatchdog: () => void;
+  setMixState?: (state: EngineMixState | null) => void;
 }
 
 export function useNativePlaybackReconciliation({
@@ -141,6 +146,7 @@ export function useNativePlaybackReconciliation({
   repeatRef,
   rotateTrackerSession,
   scheduleNativeBufferingWatchdog,
+  setMixState,
 }: UseNativePlaybackReconciliationParams) {
   const nativeEventWatermarkRef = useRef<NativeEventWatermark>(null);
   const isNativeEventStale = useCallback(
@@ -151,6 +157,11 @@ export function useNativePlaybackReconciliation({
 
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
+      if (
+        setMixState &&
+        !androidNativeEngine.isCurrentQueueRevision?.(event.revision)
+      )
+        return;
       if (isNativeEventStale(event)) {
         return;
       }
@@ -181,6 +192,7 @@ export function useNativePlaybackReconciliation({
       queueRef,
       recordProgress,
       isNativeEventStale,
+      setMixState,
     ],
   );
 
@@ -189,8 +201,20 @@ export function useNativePlaybackReconciliation({
       state: EngineState,
       options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
     ) => {
+      if (
+        setMixState &&
+        !androidNativeEngine.isCurrentQueueRevision?.(state.revision)
+      )
+        return;
       if (isNativeEventStale(state)) {
         return;
+      }
+      if (androidNativeEngine.isCurrentQueueRevision?.(state.revision)) {
+        setMixState?.(
+          state.queueSize > 0
+            ? actualNativeMixState(state.mixState, state.revision)
+            : null,
+        );
       }
       const positionSeconds = projectedNativePositionSeconds(
         state.positionMs,
@@ -275,6 +299,7 @@ export function useNativePlaybackReconciliation({
       currentIndexRef,
       ensureTrackerSession,
       isNativeEventStale,
+      setMixState,
       playSourceRef,
       queueRef,
       recordProgress,
@@ -285,8 +310,25 @@ export function useNativePlaybackReconciliation({
     ],
   );
 
+  const applyNativeMixState = useCallback(
+    (event: EngineMixStateChangedEvent) => {
+      if (
+        !androidNativeEngine.isCurrentQueueRevision?.(event.revision) ||
+        isNativeEventStale(event)
+      )
+        return;
+      setMixState?.(actualNativeMixState(event.mixState, event.revision));
+    },
+    [isNativeEventStale, setMixState],
+  );
+
   const applyNativeTrackChange = useCallback(
     (event: EnginePositionEvent & { reason?: string }) => {
+      if (
+        setMixState &&
+        !androidNativeEngine.isCurrentQueueRevision?.(event.revision)
+      )
+        return;
       if (isNativeEventStale(event)) {
         return;
       }
@@ -349,6 +391,7 @@ export function useNativePlaybackReconciliation({
       currentIndexRef,
       ensureTrackerSession,
       isNativeEventStale,
+      setMixState,
       playSourceRef,
       queueRef,
       rememberActiveTrack,
@@ -361,6 +404,7 @@ export function useNativePlaybackReconciliation({
     applyNativePosition,
     applyNativeState,
     applyNativeTrackChange,
+    applyNativeMixState,
     isNativeEventStale,
   };
 }

@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -89,6 +89,35 @@ function serveTasks(progress: Record<string, unknown>) {
 }
 
 describe("Tasks progress", () => {
+  it("retains cancellation confirmation while its request is pending", async () => {
+    let finish!: (value: unknown) => void;
+    vi.mocked(api).mockImplementation((path, method) =>
+      method === "POST"
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve(
+            path.startsWith("/api/admin/tasks-snapshot")
+              ? taskSnapshot({ percent: 10 })
+              : null,
+          ),
+    );
+    renderWithAdminProviders(<Tasks />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Cancel task",
+      }),
+    );
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Cancel",
+      }),
+    ).toBeDisabled();
+    await act(async () => finish({ status: "cancelled" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
   beforeEach(() => {
     vi.mocked(api).mockReset();
     TestEventSource.taskStream = undefined;
@@ -160,7 +189,7 @@ describe("Tasks progress", () => {
     const notice = await screen.findByRole("alert");
     expect(notice).toHaveTextContent("Showing the last successful snapshot.");
     expect(screen.getByRole("progressbar")).toBeVisible();
-    expect(screen.getByText("Snapshot current")).toBeVisible();
+    expect(screen.getByText("Snapshot stale")).toBeVisible();
   });
 
   it("reuses the active task stream when its live event log is expanded", async () => {

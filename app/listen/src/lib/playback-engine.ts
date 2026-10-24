@@ -1,20 +1,29 @@
 export type EngineRepeatMode = "off" | "one" | "all";
 export type EnginePlaybackState =
-  | "idle"
-  | "buffering"
-  | "ready"
-  | "playing"
-  | "paused"
-  | "ended";
+  "idle" | "buffering" | "ready" | "playing" | "paused" | "ended";
 export type EngineTransitionType =
-  | "gapless"
-  | "crossfade"
-  | "manual-skip"
-  | "seek";
+  "gapless" | "crossfade" | "manual-skip" | "seek";
 
 export interface NativeEventMetadata {
   nativeSequence?: number;
   nativeTimeMs?: number;
+}
+
+/** Discrete native execution telemetry; this never describes a planned blend. */
+export interface EngineMixState {
+  revision: string;
+  executionId: number;
+  mode: "gapless" | "crossfade" | "beatmatch";
+  phase: "idle" | "mixing";
+  bassHandoff: boolean;
+  outgoingTrackId?: string;
+  incomingTrackId?: string;
+  durationMs?: number;
+}
+
+export interface EngineMixStateChangedEvent extends NativeEventMetadata {
+  revision: string;
+  mixState: EngineMixState | null;
 }
 
 export interface EngineTrack {
@@ -105,6 +114,7 @@ export interface EngineState extends NativeEventMetadata {
   queueSize: number;
   crossfadeMs: number;
   eqEnabled: boolean;
+  mixState?: EngineMixState | null;
 }
 
 export interface EnginePositionEvent extends NativeEventMetadata {
@@ -152,6 +162,7 @@ export interface EngineTransitionCancelledEvent extends NativeEventMetadata {
 export interface EngineEventMap {
   ready: EngineState;
   stateChanged: EngineState;
+  mixStateChanged: EngineMixStateChangedEvent;
   positionChanged: EnginePositionEvent;
   playEventCheckpoint: EnginePositionEvent & { checkpointMs?: number };
   trackChanged: EnginePositionEvent & { reason?: string };

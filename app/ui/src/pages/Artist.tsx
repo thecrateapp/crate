@@ -1,3 +1,4 @@
+import { useLibrarySearch } from "@/hooks/use-library-search";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useApi } from "@/hooks/use-api";
@@ -11,7 +12,6 @@ import { ArtistMetadataEditor } from "@/components/artist/ArtistMetadataEditor";
 import { ArtistBioResearchDialog } from "@/components/artist/ArtistBioResearchDialog";
 import { ArtistRepairDialog } from "@/components/artist/ArtistRepairDialog";
 import { ArtistDiscographySection } from "@/components/artist/ArtistDiscographySection";
-import { ArtistAboutSection } from "@/components/artist/ArtistAboutSection";
 import { ArtistLoadingState } from "@/components/artist/ArtistLoadingState";
 import { ArtistOverviewSection } from "@/components/artist/ArtistOverviewSection";
 import { ArtistSetlistSection } from "@/components/artist/ArtistSetlistSection";
@@ -59,7 +59,7 @@ import {
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
 import { Input } from "@crate/ui/shadcn/input";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search } from "@crate/ui/icons";
 
 interface ArtistRepairPlanSummary {
   total: number;
@@ -72,10 +72,6 @@ interface ArtistSearchResult {
   entity_uid?: string;
   slug?: string;
   name: string;
-}
-
-interface SearchResponse {
-  artists?: ArtistSearchResult[];
 }
 
 interface ArtistIdentity {
@@ -123,51 +119,14 @@ export function MergeArtistDialog({
   onOpenChange: (open: boolean) => void;
   onMerge: (artist: ArtistSearchResult) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ArtistSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setResults([]);
-    setSearching(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<SearchResponse>(
-        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      )
-        .then((payload) => {
-          if (!active) return;
-          setResults(payload.artists ?? []);
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          toast.error("Artist search failed");
-        })
-        .finally(() => {
-          if (active) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [open, query]);
+  const {
+    query,
+    setQuery,
+    results,
+    searching,
+    error: searchError,
+    retry: retrySearch,
+  } = useLibrarySearch<ArtistSearchResult>(open, "", "artists");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,6 +146,7 @@ export function MergeArtistDialog({
             </label>
             <div className="relative">
               <Search
+                data-admin-ux="artist-merge-search"
                 size={15}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
@@ -202,9 +162,15 @@ export function MergeArtistDialog({
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
-            {searching ? (
+            {searchError ? (
+              <ErrorState message={searchError} onRetry={retrySearch} />
+            ) : searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="artist-merge-search-loading"
+                  size={15}
+                  className="animate-spin"
+                />
                 Searching artists...
               </div>
             ) : results.length ? (
@@ -218,7 +184,7 @@ export function MergeArtistDialog({
                       type="button"
                       disabled={busy || isCurrentArtist || artist.id == null}
                       onClick={() => onMerge(artist)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <span className="truncate text-sm font-medium">
                         {artist.name}
@@ -266,7 +232,6 @@ interface ArtistTabContentProps {
   onToggleBioExpanded: () => void;
   topTracks: ReturnType<typeof useTopTracks>;
   mb: EnrichmentData["musicbrainz"];
-  activeMembersCount: number;
   lastfm: EnrichmentData["lastfm"];
   spotify: EnrichmentData["spotify"];
   setlistData: EnrichmentData["setlist"];
@@ -325,7 +290,6 @@ function ArtistTabContent({
   onToggleBioExpanded,
   topTracks,
   mb,
-  activeMembersCount,
   lastfm,
   spotify,
   setlistData,
@@ -355,7 +319,7 @@ function ArtistTabContent({
     refreshingSetlist,
   } = flags;
   return (
-    <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 pt-6 md:px-8">
+    <div className="min-w-0 pb-8 pt-4">
       {activeTab === "overview" ? (
         <ArtistOverviewSection
           bioText={bioText}
@@ -363,7 +327,15 @@ function ArtistTabContent({
           onToggleBioExpanded={onToggleBioExpanded}
           topTracks={topTracks}
           musicbrainz={mb}
-          activeMembersCount={activeMembersCount}
+          albumCount={data.albums.length}
+          totalTracks={
+            data.total_tracks ??
+            data.albums.reduce((sum, album) => sum + album.tracks, 0)
+          }
+          totalSizeMb={
+            data.total_size_mb ??
+            data.albums.reduce((sum, album) => sum + album.size_mb, 0)
+          }
           lastfm={lastfm}
           spotify={spotify}
           externalLinks={externalLinks}
@@ -445,26 +417,6 @@ function ArtistTabContent({
           canEdit={canEditMetadata}
         />
       ) : null}
-      {activeTab === "about" ? (
-        <ArtistAboutSection
-          bioText={bioText}
-          bioExpanded={bioExpanded}
-          onToggleBioExpanded={onToggleBioExpanded}
-          musicbrainz={mb}
-          lastfm={lastfm}
-          spotify={spotify}
-          externalLinks={externalLinks}
-          albumCount={data.albums.length}
-          totalTracks={
-            data.total_tracks ??
-            data.albums.reduce((sum, album) => sum + album.tracks, 0)
-          }
-          totalSizeMb={
-            data.total_size_mb ??
-            data.albums.reduce((sum, album) => sum + album.size_mb, 0)
-          }
-        />
-      ) : null}
     </div>
   );
 }
@@ -526,9 +478,8 @@ function ArtistPageDialogs({
         description={`This will permanently delete ${data.name} and all their albums/tracks from the database AND the filesystem. This action cannot be undone.`}
         confirmLabel="Delete Artist"
         variant="destructive"
-        onConfirm={() => {
-          void onDelete();
-        }}
+        onConfirm={onDelete}
+        onError={() => {}}
         eyebrow="Confirm action"
         consequence={`${data.albums.length} albums · ${
           data.total_tracks ??
@@ -589,6 +540,7 @@ async function deleteArtist(data: ArtistData) {
         ? error.message
         : "Failed to queue artist deletion";
     toast.error(message);
+    throw error;
   }
 }
 
@@ -644,6 +596,7 @@ function useArtistPageData() {
     refetch: refetchEnrichment,
   } = useArtistEnrichment(data?.id, data?.entity_uid);
   const { isAdmin, hasCapability } = useAuth();
+  const canAnalyze = hasCapability("library.analysis.manage");
   const canEditMetadata = hasCapability("library.metadata.write");
   const canRepairArtist = hasCapability("library.repair.run");
   const canCreatePlaylists = hasCapability("curation.playlists.write");
@@ -681,6 +634,7 @@ function useArtistPageData() {
     enrichmentLoading,
     refetchEnrichment,
     isAdmin,
+    canAnalyze,
     canEditMetadata,
     canRepairArtist,
     canCreatePlaylists,
@@ -777,6 +731,21 @@ function useArtistPageAuxiliaryData({
   data: ArtistData | null;
   activeTab: TabKey;
 }) {
+  const [auxiliaryErrors, setAuxiliaryErrors] = useState<
+    Partial<Record<"shows" | "tracks" | "missing" | "tidal", string>>
+  >({});
+  const [retryAttempts, setRetryAttempts] = useState({
+    shows: 0,
+    tracks: 0,
+    missing: 0,
+    tidal: 0,
+  });
+  const clearAuxiliaryError = (feed: keyof typeof retryAttempts) =>
+    setAuxiliaryErrors((current) => ({ ...current, [feed]: undefined }));
+  const retryAuxiliaryData = (feed: keyof typeof retryAttempts) => {
+    clearAuxiliaryError(feed);
+    setRetryAttempts((current) => ({ ...current, [feed]: current[feed] + 1 }));
+  };
   const [upcomingShows, setUpcomingShows] = useState<ArtistShowEvent[]>([]);
   const [showsLoaded, setShowsLoaded] = useState(false);
   const [missingAlbums, setMissingAlbums] = useState<ArtistMissingAlbum[]>([]);
@@ -791,13 +760,25 @@ function useArtistPageAuxiliaryData({
       "shows",
     );
     if (!endpoint || showsLoaded) return;
+    let cancelled = false;
     api<{ events: ArtistShowEvent[]; configured: boolean }>(endpoint)
       .then((payload) => {
+        if (cancelled) return;
+        clearAuxiliaryError("shows");
         setUpcomingShows(payload.events || []);
         setShowsLoaded(true);
       })
-      .catch(() => setShowsLoaded(true));
-  }, [data?.entity_uid, data?.id, showsLoaded]);
+      .catch(() => {
+        if (!cancelled)
+          setAuxiliaryErrors((current) => ({
+            ...current,
+            shows: "Upcoming shows could not be loaded.",
+          }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.entity_uid, data?.id, showsLoaded, retryAttempts.shows]);
 
   useEffect(() => {
     const endpoint = artistActionApiPath(
@@ -807,12 +788,30 @@ function useArtistPageAuxiliaryData({
     if (!endpoint || activeTab !== "setlist" || allTrackTitles.length > 0) {
       return;
     }
+    let cancelled = false;
     api<ArtistTrackTitle[]>(endpoint)
       .then((payload) => {
+        if (cancelled) return;
+        clearAuxiliaryError("tracks");
         if (Array.isArray(payload)) setAllTrackTitles(payload);
       })
-      .catch(() => {});
-  }, [data?.entity_uid, data?.id, activeTab, allTrackTitles.length]);
+      .catch(() => {
+        if (!cancelled)
+          setAuxiliaryErrors((current) => ({
+            ...current,
+            tracks: "Artist tracks could not be loaded.",
+          }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    data?.entity_uid,
+    data?.id,
+    activeTab,
+    allTrackTitles.length,
+    retryAttempts.tracks,
+  ]);
 
   useEffect(() => {
     const endpoint = artistActionApiPath(
@@ -824,16 +823,27 @@ function useArtistPageAuxiliaryData({
     api<{ missing: ArtistMissingAlbum[] }>(endpoint)
       .then((payload) => {
         if (cancelled) return;
+        clearAuxiliaryError("missing");
         setMissingAlbums(payload.missing ?? []);
         setMissingLoaded(true);
       })
       .catch(() => {
-        if (!cancelled) setMissingLoaded(true);
+        if (!cancelled)
+          setAuxiliaryErrors((current) => ({
+            ...current,
+            missing: "Missing albums could not be loaded.",
+          }));
       });
     return () => {
       cancelled = true;
     };
-  }, [data?.entity_uid, data?.id, activeTab, missingLoaded]);
+  }, [
+    data?.entity_uid,
+    data?.id,
+    activeTab,
+    missingLoaded,
+    retryAttempts.missing,
+  ]);
 
   useEffect(() => {
     const endpoint = tidalMissingArtistApiPath({
@@ -841,15 +851,35 @@ function useArtistPageAuxiliaryData({
       artistEntityUid: data?.entity_uid,
     });
     if (!endpoint || activeTab !== "discography" || tidalMissingLoaded) return;
+    let cancelled = false;
     api<{ albums: ArtistTidalAlbum[]; authenticated: boolean }>(endpoint)
       .then((payload) => {
+        if (cancelled) return;
+        clearAuxiliaryError("tidal");
         if (payload.albums) setTidalMissing(payload.albums);
         setTidalMissingLoaded(true);
       })
-      .catch(() => setTidalMissingLoaded(true));
-  }, [data?.entity_uid, data?.id, activeTab, tidalMissingLoaded]);
+      .catch(() => {
+        if (!cancelled)
+          setAuxiliaryErrors((current) => ({
+            ...current,
+            tidal: "Tidal missing albums could not be loaded.",
+          }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    data?.entity_uid,
+    data?.id,
+    activeTab,
+    tidalMissingLoaded,
+    retryAttempts.tidal,
+  ]);
 
   return {
+    auxiliaryErrors,
+    retryAuxiliaryData,
     upcomingShows,
     missingAlbums,
     tidalMissing,
@@ -1163,6 +1193,7 @@ function useArtistPageModel() {
     topTracks,
     enrichmentLoading,
     isAdmin,
+    canAnalyze,
     canEditMetadata,
     canRepairArtist,
     canCreatePlaylists,
@@ -1227,7 +1258,6 @@ function useArtistPageModel() {
   const mergedSimilar = buildMergedSimilarArtists(enrichment);
   const externalLinks = buildExternalLinks(enrichment);
   const tabs = buildArtistTabs(upcomingShows.length);
-  const activeMembers = mb?.members?.filter((member) => !member.end) ?? [];
   const popularityScore =
     data.popularity_score != null
       ? Math.round(data.popularity_score * 100)
@@ -1251,7 +1281,6 @@ function useArtistPageModel() {
     allTags,
     mergedSimilar,
     tabs,
-    activeMembers,
     popularityScore,
     topTracks,
     externalLinks,
@@ -1272,6 +1301,7 @@ function useArtistPageModel() {
     canDeleteArtist,
     canMergeArtist,
     isAdmin,
+    canAnalyze,
     enriching,
     refreshingSetlist,
     creatingCorePlaylist,
@@ -1297,6 +1327,8 @@ function useArtistPageModel() {
     setShowMissing: uiState.setShowMissing,
     setSort: uiState.setSort,
     setAllTrackTitles: auxiliaryState.setAllTrackTitles,
+    auxiliaryErrors: auxiliaryState.auxiliaryErrors,
+    retryAuxiliaryData: auxiliaryState.retryAuxiliaryData,
     setShowDeleteConfirm: uiState.setShowDeleteConfirm,
     setShowRepairDialog: uiState.setShowRepairDialog,
     setShowMetadataEditor: uiState.setShowMetadataEditor,
@@ -1333,7 +1365,6 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     allTags,
     mergedSimilar,
     tabs,
-    activeMembers,
     popularityScore,
     topTracks,
     externalLinks,
@@ -1354,6 +1385,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     canDeleteArtist,
     canMergeArtist,
     isAdmin,
+    canAnalyze,
     enriching,
     refreshingSetlist,
     creatingCorePlaylist,
@@ -1397,7 +1429,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     mergeArtistInto,
   } = model;
   return (
-    <div className="-mt-16 md:-mt-[6.5rem]">
+    <div className="min-w-0 space-y-6">
       <ArtistHeroSection
         artistName={artistName}
         artistId={data.id}
@@ -1420,7 +1452,7 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
         isAdmin={isAdmin}
         canEditArtwork={canEditMetadata}
         canEnrich={canEditMetadata}
-        canAnalyze={isAdmin}
+        canAnalyze={canAnalyze}
         canEditMetadata={canEditMetadata}
         canCreateCorePlaylist={canCreatePlaylists}
         canQueueMetadata={canEditMetadata}
@@ -1463,48 +1495,59 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
         onDelete={() => setShowDeleteConfirm(true)}
         onMerge={() => setShowMergeArtist(true)}
       />
-      <ArtistTabsNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-      />
-      <ArtistTabContent
-        activeTab={activeTab}
-        artistName={artistName}
-        data={data}
-        sortedAlbums={sortedAlbums}
-        bioText={bioText}
-        onToggleBioExpanded={() => setBioExpanded(!bioExpanded)}
-        topTracks={topTracks}
-        mb={mb}
-        activeMembersCount={activeMembers.length}
-        lastfm={lastfm}
-        spotify={spotify}
-        setlistData={setlistData}
-        externalLinks={externalLinks}
-        flags={{
-          bioExpanded,
-          enrichmentLoading,
-          canResearchBio: canEditMetadata,
-          showMissing,
-          downloadingDiscog,
-          canDownloadTidal,
-          canEditMetadata,
-          refreshingSetlist,
-        }}
-        onResearchBio={() => setShowBioResearch(true)}
-        missingAlbums={missingAlbums}
-        tidalMissing={tidalMissing}
-        sort={sort}
-        onToggleShowMissing={() => setShowMissing(!showMissing)}
-        onSortChange={setSort}
-        onDownloadDiscography={() => void downloadMissingDiscography()}
-        allTrackTitles={allTrackTitles}
-        onTrackTitlesLoaded={setAllTrackTitles}
-        onRefreshSetlist={() => void refreshProbableSetlist()}
-        upcomingShows={upcomingShows}
-        mergedSimilar={mergedSimilar}
-      />
+      {(
+        [
+          "shows",
+          ...(activeTab === "discography" ? ["missing", "tidal"] : []),
+          ...(activeTab === "setlist" ? ["tracks"] : []),
+        ] as Array<keyof typeof model.auxiliaryErrors>
+      ).map((feed) =>
+        model.auxiliaryErrors[feed] ? (
+          <ErrorState
+            key={feed}
+            message={model.auxiliaryErrors[feed]}
+            onRetry={() => model.retryAuxiliaryData(feed)}
+          />
+        ) : null,
+      )}
+      <ArtistTabsNav tabs={tabs} activeTab={activeTab} onChange={setActiveTab}>
+        <ArtistTabContent
+          activeTab={activeTab}
+          artistName={artistName}
+          data={data}
+          sortedAlbums={sortedAlbums}
+          bioText={bioText}
+          onToggleBioExpanded={() => setBioExpanded(!bioExpanded)}
+          topTracks={topTracks}
+          mb={mb}
+          lastfm={lastfm}
+          spotify={spotify}
+          setlistData={setlistData}
+          externalLinks={externalLinks}
+          flags={{
+            bioExpanded,
+            enrichmentLoading,
+            canResearchBio: canEditMetadata,
+            showMissing,
+            downloadingDiscog,
+            canDownloadTidal,
+            canEditMetadata,
+            refreshingSetlist,
+          }}
+          onResearchBio={() => setShowBioResearch(true)}
+          missingAlbums={missingAlbums}
+          tidalMissing={tidalMissing}
+          sort={sort}
+          onToggleShowMissing={() => setShowMissing(!showMissing)}
+          onSortChange={setSort}
+          onDownloadDiscography={() => void downloadMissingDiscography()}
+          allTrackTitles={allTrackTitles}
+          onTrackTitlesLoaded={setAllTrackTitles}
+          onRefreshSetlist={() => void refreshProbableSetlist()}
+          upcomingShows={upcomingShows}
+          mergedSimilar={mergedSimilar}
+        />
+      </ArtistTabsNav>
       <ArtistPageDialogs
         data={data}
         artistName={artistName}
@@ -1537,7 +1580,7 @@ type ArtistPageReadyModel = Extract<
   { data: ArtistData }
 >;
 
-export function Artist() {
+function ArtistRouteContent() {
   const model = useArtistPageModel();
   if (model.loading) return <ArtistLoadingState />;
   if (model.error && !model.data) {
@@ -1566,4 +1609,10 @@ export function Artist() {
     );
   }
   return <ArtistPageView model={model} />;
+}
+
+// Route identity owns the full artist model, including auxiliary reads and drafts.
+export function Artist() {
+  const { artistId, artistSlug } = useParams();
+  return <ArtistRouteContent key={artistId ?? artistSlug ?? "missing"} />;
 }

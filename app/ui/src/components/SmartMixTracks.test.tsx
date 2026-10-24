@@ -85,10 +85,10 @@ describe("SmartMixTracks", () => {
     expect(screen.getAllByText("smart-mix-audio-v3")).toHaveLength(1);
     expect(screen.getByText("121.0 to 121.6")).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: /^Outdated · 4\D?000$/ }),
+      screen.getByRole("radio", { name: /^Outdated · 4\D?000$/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("tab", { name: /^No profile · 15\D?688$/ }),
+      screen.getByRole("radio", { name: /^No profile · 15\D?688$/ }),
     ).toBeInTheDocument();
     expect(lastUrl()).toBe("/api/admin/smart-mix/tracks?status=all");
   });
@@ -97,7 +97,7 @@ describe("SmartMixTracks", () => {
     const user = userEvent.setup();
     render(<SmartMixTracks counts={counts} />);
 
-    await user.click(screen.getByRole("tab", { name: /File changed/ }));
+    await user.click(screen.getByRole("radio", { name: /File changed/ }));
     expect(lastUrl()).toBe("/api/admin/smart-mix/tracks?status=source_changed");
 
     await user.click(
@@ -106,6 +106,53 @@ describe("SmartMixTracks", () => {
     expect(lastUrl()).toBe(
       "/api/admin/smart-mix/tracks?status=source_changed&version=smart-mix-audio-v3",
     );
+    await user.click(
+      screen.getByRole("button", { name: /smart-mix-audio-v3 · 4\D?000/ }),
+    );
+    expect(lastUrl()).toBe("/api/admin/smart-mix/tracks?status=source_changed");
+  });
+
+  it("provides a single keyboard entry into status filters and supports arrow navigation", async () => {
+    const user = userEvent.setup();
+    render(<SmartMixTracks counts={counts} />);
+    const all = screen.getByRole("radio", { name: /^All ·/ });
+    expect(all).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: /^Current ·/ })).toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+    all.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: /^Current ·/ })).toHaveFocus();
+    expect(lastUrl()).toBe("/api/admin/smart-mix/tracks?status=current");
+    await user.keyboard("{End}");
+    expect(screen.getByRole("radio", { name: "Failed" })).toBeChecked();
+    expect(lastUrl()).toBe("/api/admin/smart-mix/tracks?status=failed");
+  });
+
+  it("keeps pipeline errors visible without a native tooltip and uses text-only reanalysis", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        tracks: [
+          track(1, {
+            processingState: "failed",
+            processingError: "Audio decoder failed",
+          }),
+        ],
+        nextBefore: null,
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const { container } = render(<SmartMixTracks counts={counts} />);
+    expect(screen.getByText("Audio decoder failed")).toBeVisible();
+    expect(container.querySelector("[title]")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Reanalyze track" })
+        .querySelector("svg"),
+    ).toBeNull();
   });
 
   it("only searches from three characters on", async () => {

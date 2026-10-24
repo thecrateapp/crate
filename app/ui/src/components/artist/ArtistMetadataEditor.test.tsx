@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,18 +59,15 @@ describe("ArtistMetadataEditor", () => {
       />,
     );
 
-    await userEvent.clear(screen.getByRole("textbox", { name: /bio/i }));
-    await userEvent.type(
-      screen.getByRole("textbox", { name: /bio/i }),
-      "New bio",
-    );
-    await userEvent.clear(
-      screen.getByRole("textbox", { name: /external urls/i }),
-    );
-    await userEvent.type(
-      screen.getByRole("textbox", { name: /external urls/i }),
-      "official=https://highvis.example\nbandcamp=https://highvis.bandcamp.com",
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: /bio/i }), {
+      target: { value: "New bio" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: /external urls/i }), {
+      target: {
+        value:
+          "official=https://highvis.example\nbandcamp=https://highvis.bandcamp.com",
+      },
+    });
     await userEvent.click(
       screen.getByRole("button", { name: /save metadata/i }),
     );
@@ -91,6 +88,27 @@ describe("ArtistMetadataEditor", () => {
       }),
     );
     expect(mockWaitForTask).toHaveBeenCalledWith("task-1", 60000);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+  it("reviews unsaved changes through the shared confirmation before closing", async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ArtistMetadataEditor open onOpenChange={onOpenChange} artist={artist} />,
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", { name: /bio/i }),
+      " changed",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(
+      screen.getByRole("alertdialog", {
+        name: "Discard artist metadata changes?",
+      }),
+    ).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Discard changes" }),
+    );
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

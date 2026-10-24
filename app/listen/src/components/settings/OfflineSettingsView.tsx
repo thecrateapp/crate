@@ -15,6 +15,7 @@ interface OfflineSettingsViewProps {
   readOnly?: boolean;
   downloads?: ReactNode;
   syncing: boolean;
+  clearing?: boolean;
   summary: {
     itemCount: number;
     readyItemCount: number;
@@ -35,6 +36,7 @@ export function OfflineSettingsView({
   readOnly = false,
   downloads,
   syncing: offlineSyncing,
+  clearing = false,
   summary: offlineSummary,
   storageQuota,
   bytesText,
@@ -109,6 +111,7 @@ export function OfflineSettingsView({
             !offlineSupported ||
             readOnly ||
             offlineSyncing ||
+            clearing ||
             offlineSummary.itemCount === 0
           }
           onClick={onSync}
@@ -125,11 +128,15 @@ export function OfflineSettingsView({
             !offlineSupported ||
             readOnly ||
             offlineSyncing ||
+            clearing ||
             offlineSummary.itemCount === 0
           }
           onClick={onClear}
+          loading={clearing}
         >
-          <Trash2 size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
+          {!clearing ? (
+            <Trash2 size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
+          ) : null}
           {t("settings.offline.removeCopies")}
         </Button>
       </div>

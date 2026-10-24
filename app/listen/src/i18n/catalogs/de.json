@@ -2114,5 +2114,22 @@
   "native.logs.clear": "Leeren",
   "native.logs.hide": "Ausblenden",
   "native.logs.empty": "Noch keine Wiedergabeereignisse.",
-  "native.logs.trigger": "Protokoll · {count}"
+  "native.logs.trigger": "Protokoll · {count}",
+  "library.liked.loadFailed": "Die Lieblingssongs konnten nicht geladen werden.",
+  "library.liked.stateUnavailable": "Favoritenstatus nicht verfügbar",
+  "settings.offline.removeConfirmTitle": "Heruntergeladene Kopien entfernen?",
+  "settings.offline.removeConfirmDescription": "{itemCount, plural, one {# heruntergeladenes Element} other {# heruntergeladene Elemente}} mit {trackCount, plural, one {# Titel} other {# Titeln}} ({size}) von diesem Gerät entfernen. Deine Bibliothek bleibt auf dem Server und kann erneut heruntergeladen werden.",
+  "settings.offline.removeConfirmAction": "Heruntergeladene Kopien entfernen",
+  "home.playlists.arrivals.thisWeek": "Diese Woche",
+  "home.playlists.arrivals.weeksAgo": "{count, plural, one {Letzte Woche} other {Vor # Wochen}}",
+  "home.playlists.arrivals.currentAndPrevious": "{count, plural, one {Diese Woche + # vorherige Woche} other {Diese Woche + # vorherige Wochen}}",
+  "home.playlists.arrivals.pastWeeks": "{count, plural, one {Letzte # Veröffentlichungswoche} other {Letzte # Veröffentlichungswochen}}",
+  "crate.page.loadFailed": "Diese Crate konnte nicht geladen werden. Versuche es erneut.",
+  "crate.page.refreshFailed": "Diese Crate konnte nicht aktualisiert werden. Gespeicherte Details werden angezeigt.",
+  "crate.page.playbackLoadFailed": "Die Titel für die Wiedergabe konnten nicht geladen werden. Versuche es erneut.",
+  "artist.topTracks.unavailable": "Top-Titel nicht verfügbar",
+  "player.mix.label": "Übergang",
+  "player.mix.gapless": "Nahtlos",
+  "player.mix.paused": "Pausiert",
+  "player.mix.buffering": "Audio wird geladen"
 }

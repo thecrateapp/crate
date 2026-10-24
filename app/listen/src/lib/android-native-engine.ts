@@ -35,6 +35,7 @@ import {
   NATIVE_PLAYER_DISABLED_KEY,
   registerNativeMixRuntime,
 } from "@/lib/player-playback-prefs";
+import { actualNativeMixState } from "./native-mix-state";
 
 const NATIVE_PLAYER_CROSSFADE_KEY = "crate-native-player-crossfade-enabled";
 const NATIVE_SMART_MIX_KILL_SWITCH_KEY = "crate-native-smart-mix-kill-switch";
@@ -232,6 +233,7 @@ export function isAndroidNativeEqEnabled(): boolean {
 export class AndroidNativeEngine implements PlaybackEngine {
   private readyPromise: Promise<void> | null = null;
   private queueRevision = "";
+  private queueGeneration = 0;
   private notificationPermissionPrompted = false;
   private queueMixRequested = false;
   private appliedCrossfadeMs: number | null = null;
@@ -373,28 +375,35 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async loadQueue(snapshot: EngineQueueSnapshot): Promise<EngineState> {
+    this.queueRevision = snapshot.revision;
+    const generation = ++this.queueGeneration;
+    const pendingGeneration = ++this.planInstallGeneration;
     await this.ensureReady();
+    if (generation !== this.queueGeneration)
+      throw new Error("Native queue load superseded");
     if (snapshot.autoplay) {
       await this.ensureNotificationPermission();
     }
+    if (generation !== this.queueGeneration)
+      throw new Error("Native queue load superseded");
     const {
       pendingTransitionPlans,
       replanTransitionPlans,
       continuation,
       ...queue
     } = snapshot;
-    this.queueRevision = queue.revision;
     this.replanTransitionPlans = replanTransitionPlans;
     this.installedPlans = [];
     this.continuationContext = continuation;
     this.adoptedSequence = 0;
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
-    const pendingGeneration = ++this.planInstallGeneration;
     const state = await nativePlayback.setQueue({
       ...queue,
       crossfadeMs: this.appliedCrossfadeMs,
     });
+    if (generation !== this.queueGeneration)
+      throw new Error("Native queue load superseded");
     if (pendingTransitionPlans) {
       void this.installTransitionPlans(
         queue.revision,
@@ -404,7 +413,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
     }
     this.replanForCapabilities();
     void this.configureContinuation();
-    return state;
+    return {
+      ...state,
+      mixState: actualNativeMixState(state.mixState, state.revision),
+    };
   }
 
   async takeAppendedTracks(): Promise<EngineAppendedTrack[]> {
@@ -586,14 +598,27 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async getState(): Promise<EngineState | null> {
+    const generation = this.queueGeneration;
     try {
       await this.ensureReady();
       const state = await nativePlayback.getState();
+      if (
+        generation !== this.queueGeneration ||
+        (this.queueRevision && state.revision !== this.queueRevision)
+      )
+        return null;
       if (state.revision) this.queueRevision = state.revision;
-      return state;
+      return {
+        ...state,
+        mixState: actualNativeMixState(state.mixState, state.revision),
+      };
     } catch {
       return null;
     }
+  }
+
+  isCurrentQueueRevision(revision: string): boolean {
+    return Boolean(revision) && revision === this.queueRevision;
   }
 
   async drainEvents(): Promise<

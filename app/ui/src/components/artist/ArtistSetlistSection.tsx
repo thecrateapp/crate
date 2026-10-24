@@ -2,8 +2,12 @@ import { useNavigate } from "react-router";
 import { fuzzyMatchTrack } from "@/components/artist/ArtistPageBits";
 import { api } from "@/lib/api";
 import { albumPagePath, artistActionApiPath } from "@/lib/library-routes";
-import { Button } from "@crate/ui/shadcn/button";
-import { Loader2, RefreshCw } from "lucide-react";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { RefreshCw } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 interface SetlistSong {
@@ -105,129 +109,104 @@ export function ArtistSetlistSection({
   }
 
   return (
-    <div className="max-w-3xl">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold font-display">Probable Setlist</h2>
-          {probableSetlist.length > 0 ? (
-            <p className="text-xs text-white/40 mt-0.5">
-              Based on {totalShows} recent concerts
-              {lastShow && (
-                <>
-                  {" "}
-                  &middot; Last show: {lastShow.date} at {lastShow.venue},{" "}
-                  {lastShow.city}
-                </>
-              )}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Predicted from recent Setlist.fm concerts
-            </p>
-          )}
-        </div>
-        {canRefresh && onRefresh ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={refreshing}
-            aria-label={refreshing ? "Refreshing setlist" : "Refresh setlist"}
+    <InstrumentPanel
+      as="section"
+      headingLevel={2}
+      className="max-w-3xl"
+      ruled={false}
+      label={{ children: "Probable Setlist", tone: "accent" }}
+      description={
+        probableSetlist.length > 0 ? (
+          <>
+            Based on {totalShows} recent concerts
+            {lastShow
+              ? ` · Last show: ${lastShow.date} at ${lastShow.venue}, ${lastShow.city}`
+              : ""}
+          </>
+        ) : (
+          "Predicted from recent Setlist.fm concerts"
+        )
+      }
+      actions={
+        canRefresh && onRefresh ? (
+          <ActionButton
+            label={refreshing ? "Refreshing setlist" : "Refresh setlist"}
+            loading={refreshing}
             onClick={onRefresh}
           >
-            {refreshing ? (
-              <Loader2 className="animate-spin" aria-hidden="true" />
-            ) : (
-              <RefreshCw aria-hidden="true" />
-            )}
-            {refreshing ? "Refreshing..." : "Refresh setlist"}
-          </Button>
-        ) : null}
-      </div>
-
+            <RefreshCw
+              data-admin-ux="artist-refresh-setlist"
+              aria-hidden="true"
+            />
+          </ActionButton>
+        ) : undefined
+      }
+    >
       {probableSetlist.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
+        <p className="py-8 text-sm text-text-muted">
           No concert data available from Setlist.fm
-        </div>
+        </p>
       ) : (
-        <div>
-          <div className="flex items-center gap-4 px-4 py-2 text-xs text-white/30 border-b border-white/5 mb-1">
-            <span className="w-8 text-right">#</span>
-            <span className="flex-1">Song</span>
-            <span className="w-28">Frequency</span>
-            <span className="w-16 text-right">Plays</span>
-            <span className="w-24 text-right hidden sm:block">Last Played</span>
-          </div>
-
-          <div className="space-y-0.5">
-            {probableSetlist.map((song, i) => {
-              const libraryMatch = fuzzyMatchTrack(song.title, allTrackTitles);
-              const isPlayable = !!libraryMatch;
-              return (
+        <HairlineList label="Probable setlist" ruled={false}>
+          {probableSetlist.map((song, index) => {
+            const match = fuzzyMatchTrack(song.title, allTrackTitles);
+            const frequency = Math.max(0, Math.min(1, song.frequency));
+            return (
+              <HairlineRow
+                key={song.title}
+                index={index + 1}
+                muted={!match}
+                truncate={false}
+                asChild
+                trailing={
+                  <span className="inline-flex max-w-full flex-wrap items-center justify-end gap-3">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-12">
+                        <ProgressHairline
+                          label={`${song.title} frequency`}
+                          value={frequency}
+                        />
+                      </span>
+                      <MonoLabel as="span">
+                        {Math.round(frequency * 100)}%
+                      </MonoLabel>
+                    </span>
+                    <MonoLabel as="span">{song.play_count} plays</MonoLabel>
+                    {song.last_played ? (
+                      <MonoLabel as="span" className="hidden sm:inline">
+                        {song.last_played}
+                      </MonoLabel>
+                    ) : null}
+                  </span>
+                }
+              >
                 <button
-                  key={song.title}
-                  className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-md  transition-colors text-left group ${
-                    !isPlayable ? "opacity-50" : ""
-                  }`}
+                  type="button"
+                  disabled={!match}
                   onClick={() => {
-                    if (libraryMatch) {
+                    if (match)
                       navigate(
                         albumPagePath({
-                          albumId: libraryMatch.album_id,
-                          albumSlug: libraryMatch.album_slug,
+                          albumId: match.album_id,
+                          albumSlug: match.album_slug,
                           artistName,
-                          albumName: libraryMatch.album,
+                          albumName: match.album,
                         }),
                       );
-                    } else {
-                      void ensureTrackTitles().catch(() => {
-                        toast.error("Failed to load artist tracks");
-                      });
-                    }
+                    else
+                      void ensureTrackTitles().catch(() =>
+                        toast.error("Failed to load artist tracks"),
+                      );
                   }}
-                  disabled={!isPlayable}
+                  className="disabled:cursor-default hover:enabled:bg-text-primary/5 focus-visible:outline-2 focus-visible:outline-focus-ring"
                 >
-                  {isPlayable ? (
-                    <>
-                      <span className="w-8 text-right text-sm text-white/30">
-                        {i + 1}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="w-8 text-right text-sm text-white/20">
-                      {i + 1}
-                    </span>
-                  )}
-                  <span className="flex-1 text-sm text-white/90 truncate">
-                    {song.title}
-                  </span>
-                  <div className="w-28 flex items-center gap-2">
-                    <div className="flex-1 h-px bg-white/10 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.round(song.frequency * 100)}%`,
-                          background:
-                            "linear-gradient(90deg, #88c0d0, #81a1c1)",
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-white/40 w-8 text-right">
-                      {Math.round(song.frequency * 100)}%
-                    </span>
-                  </div>
-                  <span className="w-16 text-right text-xs text-white/40">
-                    {song.play_count}
-                  </span>
-                  <span className="w-24 text-right text-xs text-white/30 hidden sm:block">
-                    {song.last_played ?? "-"}
-                  </span>
+                  <span className="text-sm">{song.title}</span>
                 </button>
-              );
-            })}
-          </div>
-        </div>
+              </HairlineRow>
+            );
+          })}
+        </HairlineList>
       )}
-    </div>
+    </InstrumentPanel>
   );
 }

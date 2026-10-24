@@ -61,6 +61,31 @@ const delivery = {
 };
 
 describe("PlaybackDelivery", () => {
+  it("uses shared loading and empty states without claiming cache data before it arrives", async () => {
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: true,
+      error: null,
+      refetch: refetchMock,
+    });
+    const view = renderWithAdminProviders(<PlaybackDelivery />, {
+      route: "/playback",
+    });
+    expect(
+      await screen.findByRole("status", { name: "Loading playback delivery" }),
+    ).toHaveAttribute("data-variant", "page");
+    expect(screen.queryByText("No playback variants prepared yet.")).toBeNull();
+    useApiMock.mockReturnValue({
+      data: { ...delivery, recent_variants: [] },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    view.rerender(<PlaybackDelivery />);
+    expect(
+      screen.getByText("No playback variants prepared yet."),
+    ).toBeVisible();
+  });
   beforeEach(() => {
     useApiMock.mockReset();
     refetchMock.mockReset();

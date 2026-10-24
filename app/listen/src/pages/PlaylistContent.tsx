@@ -128,6 +128,7 @@ export function PlaylistContent({
       <PlaylistCreateModal
         open={page.editorOpen}
         mode="edit"
+        editorIdentity={data.id}
         initialName={data.name}
         initialDescription={data.description}
         initialCoverDataUrl={data.cover_data_url}

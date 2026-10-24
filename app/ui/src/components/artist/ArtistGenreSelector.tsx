@@ -1,6 +1,9 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
+import { Button } from "@crate/ui/shadcn/button";
+import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search } from "@crate/ui/icons";
 
 import {
   Popover,
@@ -82,52 +85,56 @@ export function ArtistGenreSelector({
       }}
     >
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="outline"
           disabled={disabled}
           aria-label="Genres"
-          className={cn(
-            "flex min-h-11 w-full items-center gap-2 rounded-md border border-white/10 bg-black/25 px-3 text-left text-sm transition-colors hover:border-white/20",
-            disabled && "cursor-not-allowed opacity-50",
-          )}
+          className="h-auto min-h-10 w-full justify-between py-2 text-left"
         >
           <span className="flex min-w-0 flex-1 flex-wrap gap-1">
             {value.length ? (
               value.map((slug) => (
-                <InfoBadge key={slug} active className="max-w-[180px] truncate">
-                  {labels.get(slug) ?? slug}
-                </InfoBadge>
+                <GenrePill
+                  key={slug}
+                  item={{ name: labels.get(slug) ?? slug, slug }}
+                />
               ))
             ) : (
-              <span className="text-white/40">Select canonical genres</span>
+              <span className="text-text-muted">Select canonical genres</span>
             )}
           </span>
-          <ChevronDown size={15} className="shrink-0 text-white/35" />
-        </button>
+          <ChevronDown
+            data-admin-ux="artist-genres-disclosure"
+            size={15}
+            className="shrink-0 text-text-subtle"
+          />
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         layer="dropdown"
         className="w-[min(420px,calc(100vw-2rem))] overflow-hidden p-2"
       >
-        <div className="border-b border-white/5 px-1 pb-2">
+        <div className="border-b border-border-quiet px-1 pb-2">
           <div className="relative">
             <Search
+              data-admin-ux="artist-genres-search"
               size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
             />
             <Input
               autoFocus
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search taxonomy genres..."
-              className="h-10 border-white/10 bg-black/25 pl-9"
+              className="pl-9"
             />
           </div>
         </div>
         <div className="max-h-64 overflow-y-auto p-1">
           {loading ? (
-            <p className="px-3 py-5 text-sm text-white/45">
+            <p className="px-3 py-5 text-sm text-text-muted">
               Loading taxonomy...
             </p>
           ) : error ? (
@@ -138,34 +145,29 @@ export function ArtistGenreSelector({
             filteredNodes.map((node) => {
               const selected = selectedGenres.has(node.slug);
               return (
-                <button
+                <label
                   key={node.slug}
-                  type="button"
-                  onClick={() => toggle(node.slug)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.06]",
-                    selected && "bg-primary/10 text-primary",
+                    "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-surface-control-hover hover:text-accent-action-hi",
+                    selected && "text-accent-action-hi",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border border-white/20",
-                      selected && "border-primary bg-primary text-black",
-                    )}
-                  >
-                    {selected ? <Check size={12} /> : null}
-                  </span>
+                  <Checkbox
+                    checked={selected}
+                    onCheckedChange={() => toggle(node.slug)}
+                    aria-label={node.name}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{node.name}</span>
-                    <span className="block truncate text-[11px] text-white/35">
+                    <MonoLabel as="span" className="block truncate">
                       {node.slug}
-                    </span>
+                    </MonoLabel>
                   </span>
-                </button>
+                </label>
               );
             })
           ) : (
-            <p className="px-3 py-5 text-center text-sm text-white/40">
+            <p className="px-3 py-5 text-center text-sm text-text-muted">
               No matching genres
             </p>
           )}

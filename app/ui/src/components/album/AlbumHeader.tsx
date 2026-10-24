@@ -1,11 +1,18 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Loader2 } from "lucide-react";
+import { Bot, Download, AlignLeft, Save, Share2 } from "@crate/ui/icons";
+import { PageHero } from "@crate/ui/domain/hero";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import {
+  ActionButton,
+  ActionGroup,
+  ActionLink,
+} from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { toast } from "sonner";
 
 import { ImageLightbox } from "@crate/ui/primitives/ImageLightbox";
-import { Button } from "@crate/ui/shadcn/button";
 
 import {
   GenrePillRow,
@@ -51,6 +58,7 @@ interface AlbumHeaderProps {
   popularityConfidence?: number | null;
   genres?: string[];
   genreProfile?: GenreProfileItem[];
+  onGenreSelect?: (genre: GenreProfileItem) => void;
   hasAnalysis?: boolean;
   onAnalysisComplete?: () => void;
   onMetadataTaskQueued?: (
@@ -98,6 +106,8 @@ export function AlbumHeader({
   popularity,
   popularityScore,
   genreProfile,
+  genres,
+  onGenreSelect,
   onAnalysisComplete,
   onMetadataTaskQueued,
   isAdmin = false,
@@ -108,12 +118,9 @@ export function AlbumHeader({
   children,
 }: AlbumHeaderProps) {
   const [coverCacheBust, setCoverCacheBust] = useState("");
-  const [coverLoaded, setCoverLoaded] = useState(false);
-  const [coverError, setCoverError] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [metadataAction, setMetadataAction] =
     useState<AlbumMetadataAction>(null);
-  const [bgLoaded, setBgLoaded] = useState(false);
 
   const baseCoverUrl = albumCoverApiUrl({
     albumId,
@@ -135,7 +142,6 @@ export function AlbumHeader({
   });
   const resolvedDisplayName = albumTags.album || explicitDisplayName || album;
   const displayArtist = albumTags.artist || artist;
-  const letter = resolvedDisplayName.charAt(0).toUpperCase();
   const popularityPercent =
     popularityScore != null
       ? Math.round(popularityScore * 100)
@@ -229,59 +235,42 @@ export function AlbumHeader({
   }
 
   return (
-    <div className="relative mb-6 h-[420px] overflow-hidden -mx-4 md:-mx-8 md:h-[560px]">
-      <img
-        src={bgUrl}
-        alt=""
-        className={`absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.48] contrast-110 transition-opacity duration-1000 ${
-          bgLoaded ? "opacity-36" : "opacity-0"
-        }`}
-        onLoad={() => setBgLoaded(true)}
-        onError={(event) => {
-          (event.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-      <div className="absolute inset-0 bg-black/30" />
-
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.14) 34%, rgba(8, 10, 14, 0.46) 60%, var(--surface-app) 100%)",
-        }}
-      />
-
-      <div className="absolute inset-0 flex items-end">
-        <div className="mx-auto flex w-full max-w-[1480px] items-end gap-4 px-4 pb-6 md:gap-6 md:px-8 md:pb-8">
-          <div className="relative group/cover flex-shrink-0">
+    <div className="space-y-4">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex min-w-0 flex-wrap items-center gap-2"
+      >
+        <Link to="/browse">
+          <MonoLabel as="span">Browse</MonoLabel>
+        </Link>
+        <span aria-hidden="true" className="text-text-subtle">
+          /
+        </span>
+        <Link to={artistPagePath({ artistId, artistSlug, artistName: artist })}>
+          <MonoLabel as="span">{artist}</MonoLabel>
+        </Link>
+      </nav>
+      <PageHero
+        variant="media"
+        title={resolvedDisplayName}
+        height="content"
+        className="min-h-hero-md"
+        contentClassName="mx-0 max-w-none px-0 sm:px-0"
+        actionsClassName="px-0 sm:px-0"
+        background={{ src: bgUrl }}
+        artworkClassName="block size-36 sm:size-48 lg:size-56"
+        artwork={
+          <div className="group/cover relative size-full">
             <ImageLightbox
               src={coverUrl}
               alt={`${resolvedDisplayName} cover art`}
             >
-              <div className="h-[150px] w-[150px] overflow-hidden rounded-md ring-2 ring-white/10 shadow-2xl shadow-black/50 md:h-[200px] md:w-[200px]">
-                {!coverError ? (
-                  <img
-                    src={coverUrl}
-                    alt={resolvedDisplayName}
-                    className={`h-full w-full object-cover transition-opacity duration-500 ${
-                      coverLoaded ? "opacity-100" : "opacity-0"
-                    }`}
-                    onLoad={() => setCoverLoaded(true)}
-                    onError={() => setCoverError(true)}
-                  />
-                ) : null}
-                {coverError || !coverLoaded ? (
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/40 to-primary/20 transition-opacity duration-500 ${
-                      coverLoaded && !coverError ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <span className="text-5xl font-black text-text-subtle">
-                      {letter}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+              <MediaCover
+                key={coverUrl}
+                src={coverUrl}
+                alt={resolvedDisplayName}
+                className="size-full"
+              />
             </ImageLightbox>
             {canEditArtwork ? (
               <ImageCropUpload
@@ -290,174 +279,140 @@ export function AlbumHeader({
                   "upload-cover",
                 )}
                 aspect={1}
-                onUploaded={() => {
-                  setCoverError(false);
-                  setCoverLoaded(false);
-                  setCoverCacheBust(String(Date.now()));
-                }}
-                className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/60 px-2 py-1.5 text-xs font-medium text-white/75 opacity-0 shadow-lg shadow-black/30 transition-[background-color,opacity,transform,color] duration-200 group-hover/cover:translate-y-0 group-hover/cover:opacity-100 hover:bg-black/80 hover:text-white"
+                onUploaded={() => setCoverCacheBust(String(Date.now()))}
+                className="absolute bottom-2 right-2 z-20"
               />
             ) : null}
           </div>
-
-          <div className="min-w-0 flex-1 pb-1">
-            <div className="mb-2 text-xs text-text-subtle">
-              <Link
-                to="/browse"
-                className="transition-colors hover:text-accent-action-hi"
+        }
+        subtitle={
+          <Link
+            className="hover:text-accent-action-hi"
+            to={artistPagePath({ artistId, artistSlug, artistName: artist })}
+          >
+            {displayArtist}
+          </Link>
+        }
+        meta={[
+          albumTags.year ? (
+            <MonoLabel as="span" key="year">
+              {albumTags.year}
+            </MonoLabel>
+          ) : null,
+          <MonoLabel as="span" key="tracks">
+            {trackCount} tracks
+          </MonoLabel>,
+          <MonoLabel as="span" key="duration">
+            {formatDuration(totalLengthSec)}
+          </MonoLabel>,
+          <MonoLabel as="span" key="size">
+            {formatSize(totalSizeMb)}
+          </MonoLabel>,
+          popularityPercent > 0 ? (
+            <MonoLabel as="span" key="popularity">
+              Popularity {popularityPercent}%
+            </MonoLabel>
+          ) : null,
+        ]}
+        metaSeparator="dot"
+        actions={
+          <ActionGroup label="Album actions">
+            {canEnrich ? (
+              <ActionButton
+                label="Enrich"
+                onClick={handleEnrich}
+                loading={analyzing}
               >
-                Browse
-              </Link>
-              <span className="mx-1.5">/</span>
-              <Link
-                to={artistPagePath({
-                  artistId,
-                  artistSlug,
-                  artistName: artist,
-                })}
-                className="transition-colors hover:text-accent-action-hi"
+                <Bot data-admin-ux="album-enrich" aria-hidden="true" />
+              </ActionButton>
+            ) : null}
+            {canDownload ? (
+              <ActionLink
+                label="Download"
+                href={
+                  albumActionApiPath({ albumId, albumEntityUid }, "download") ||
+                  undefined
+                }
+                download
               >
-                {artist}
-              </Link>
-              <span className="mx-1.5">/</span>
-              <span className="text-text-muted">{resolvedDisplayName}</span>
-            </div>
-
-            <h1 className="mb-1.5 truncate text-xl font-black leading-none tracking-tight text-text-primary md:text-4xl font-display">
-              {resolvedDisplayName}
-            </h1>
-            <Link
-              to={artistPagePath({ artistId, artistSlug, artistName: artist })}
-              className="text-base text-text-muted transition-colors hover:text-accent-action-hi"
-            >
-              {displayArtist}
-            </Link>
-
-            <div className="mb-3 mt-3 flex flex-wrap items-center gap-4 text-sm text-text-muted">
-              {albumTags.year ? (
-                <span className="font-medium text-text-primary">
-                  {albumTags.year}
-                </span>
-              ) : null}
-              <span className="flex items-center gap-1.5">
-                {trackCount} tracks
-              </span>
-              <span>{formatDuration(totalLengthSec)}</span>
-              <span>{formatSize(totalSizeMb)}</span>
-            </div>
-
-            {popularityPercent > 0 ? (
-              <div className="mb-3 flex items-center gap-2">
-                <span className="text-xs text-text-subtle">Popularity</span>
-                <div className="h-px w-[72px] overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${popularityPercent}%`,
-                      background: "linear-gradient(90deg, #06b6d433, #06b6d4)",
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-text-subtle">
-                  {popularityPercent}%
-                </span>
-              </div>
+                <Download data-admin-ux="album-download" aria-hidden="true" />
+              </ActionLink>
             ) : null}
-
-            {genreProfile && genreProfile.length > 0 ? (
-              <GenrePillRow items={genreProfile} max={6} className="mb-3" />
-            ) : null}
-
-            <div className="mb-4 flex flex-wrap gap-2">
-              {hasCover ? (
-                <InfoBadge>Cover</InfoBadge>
-              ) : (
-                <InfoBadge active>No cover</InfoBadge>
-              )}
-              {albumTags.musicbrainz_albumid ? (
-                <InfoBadge>
-                  MBID {albumTags.musicbrainz_albumid.slice(0, 8)}
-                </InfoBadge>
-              ) : (
-                <InfoBadge active>No MBID</InfoBadge>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {canEnrich ? (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={handleEnrich}
-                  disabled={analyzing}
+            {canQueueMetadata ? (
+              <>
+                <ActionButton
+                  label="Lyrics"
+                  tooltip="Sync album lyrics"
+                  onClick={() => void queueAlbumMetadataAction("lyrics")}
+                  loading={metadataAction === "lyrics"}
+                  disabled={metadataAction !== null}
                 >
-                  {analyzing ? (
-                    <>
-                      <Loader2 size={14} className="mr-1 animate-spin" />
-                      Enriching...
-                    </>
-                  ) : (
-                    <>Enrich</>
-                  )}
-                </Button>
-              ) : null}
-              {canDownload ? (
-                <Button size="sm" variant="outline" asChild>
-                  <a
-                    href={
-                      albumActionApiPath(
-                        { albumId, albumEntityUid },
-                        "download",
-                      ) || "#"
-                    }
-                    download
-                  >
-                    Download
-                  </a>
-                </Button>
-              ) : null}
-              {canQueueMetadata ? (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void queueAlbumMetadataAction("lyrics")}
-                    disabled={metadataAction !== null}
-                  >
-                    {metadataAction === "lyrics" ? (
-                      <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : null}
-                    Lyrics
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void queueAlbumMetadataAction("portable")}
-                    disabled={metadataAction !== null}
-                  >
-                    {metadataAction === "portable" ? (
-                      <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : null}
-                    Metadata
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void queueAlbumMetadataAction("export")}
-                    disabled={metadataAction !== null}
-                  >
-                    {metadataAction === "export" ? (
-                      <Loader2 size={14} className="mr-1 animate-spin" />
-                    ) : null}
-                    Export
-                  </Button>
-                </>
-              ) : null}
-              {children}
-            </div>
-          </div>
+                  <AlignLeft
+                    data-admin-ux="album-sync-lyrics"
+                    aria-hidden="true"
+                  />
+                </ActionButton>
+                <ActionButton
+                  label="Metadata"
+                  tooltip="Write portable album metadata"
+                  onClick={() => void queueAlbumMetadataAction("portable")}
+                  loading={metadataAction === "portable"}
+                  disabled={metadataAction !== null}
+                >
+                  <Save
+                    data-admin-ux="album-write-metadata"
+                    aria-hidden="true"
+                  />
+                </ActionButton>
+                <ActionButton
+                  label="Export"
+                  tooltip="Export rich album metadata"
+                  onClick={() => void queueAlbumMetadataAction("export")}
+                  loading={metadataAction === "export"}
+                  disabled={metadataAction !== null}
+                >
+                  <Share2
+                    data-admin-ux="album-export-metadata"
+                    aria-hidden="true"
+                  />
+                </ActionButton>
+              </>
+            ) : null}
+            {children}
+          </ActionGroup>
+        }
+      >
+        {genreProfile?.length || genres?.length ? (
+          <GenrePillRow
+            items={
+              genreProfile?.length
+                ? genreProfile
+                : (genres ?? []).map((name) => ({ name }))
+            }
+            max={8}
+            className="mt-4"
+            onSelect={onGenreSelect}
+          />
+        ) : null}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <InfoBadge tone={hasCover ? "neutral" : "warning"}>
+            {hasCover ? "Cover" : "No cover"}
+          </InfoBadge>
+          {albumTags.musicbrainz_albumid ? (
+            <a
+              href={`https://musicbrainz.org/release/${albumTags.musicbrainz_albumid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <InfoBadge title="View on MusicBrainz">
+                MBID {albumTags.musicbrainz_albumid.slice(0, 8)}
+              </InfoBadge>
+            </a>
+          ) : (
+            <InfoBadge tone="warning">No MBID</InfoBadge>
+          )}
         </div>
-      </div>
+      </PageHero>
     </div>
   );
 }

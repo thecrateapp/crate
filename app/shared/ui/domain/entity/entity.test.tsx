@@ -36,6 +36,34 @@ function menuItem() {
 const INTERACTIVE_SELECTOR =
   "button, a[href], input, select, textarea, [role='button'], [tabindex]";
 
+describe.each([EntityCard, EntityRow])("entity selection", (Entity) => {
+  it("announces selection on the callback button independently of playback", () => {
+    const onOpen = vi.fn();
+    const { rerender } = render(
+      <Entity title="Discovery" onOpen={onOpen} pressed={false} active />,
+    );
+    const button = screen.getByRole("button", { name: "Discovery" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).toHaveAttribute("aria-current", "true");
+    fireEvent.click(button);
+    expect(onOpen).toHaveBeenCalledOnce();
+    rerender(<Entity title="Discovery" onOpen={onOpen} pressed active />);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(article()).not.toHaveAttribute("aria-pressed");
+  });
+
+  it("retains native link semantics without a toggle state", () => {
+    render(
+      <MemoryRouter>
+        <Entity title="Discovery" href="/albums/discovery" pressed />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole("link", { name: "Discovery" });
+    expect(link).toHaveAttribute("href", "/albums/discovery");
+    expect(link).not.toHaveAttribute("aria-pressed");
+  });
+});
+
 describe("EntityCard", () => {
   beforeEach(() => {
     isDesktop = false;

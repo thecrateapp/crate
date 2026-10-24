@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { toast } from "sonner";
 
 import {
@@ -152,34 +154,18 @@ function ReviewTabs({
   onChange: (tab: ReviewTab) => void;
 }) {
   return (
-    <div
-      className="flex flex-wrap gap-2 border-b border-border-quiet pb-3"
-      role="tablist"
-      aria-label="Biography research views"
-    >
-      {(["preview", "review", "edit", "sources"] as const).map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === tab}
-          onClick={() => onChange(tab)}
-          className={
-            activeTab === tab
-              ? "rounded-md bg-accent-action/15 px-3 py-1.5 text-sm font-medium text-accent-action"
-              : "rounded-md px-3 py-1.5 text-sm text-text-muted transition-colors hover:bg-surface-quiet-subtle hover:text-text-secondary-strong"
-          }
-        >
-          {tab === "preview"
-            ? "Listen preview"
-            : tab === "review"
-              ? "Review changes"
-              : tab === "edit"
-                ? "Edit"
-                : "Sources"}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      as="tabs"
+      label="Biography research views"
+      value={activeTab}
+      onValueChange={onChange}
+      items={[
+        { value: "preview", label: "Listen preview" },
+        { value: "review", label: "Review changes" },
+        { value: "edit", label: "Edit" },
+        { value: "sources", label: "Sources" },
+      ]}
+    />
   );
 }
 
@@ -200,10 +186,10 @@ function ResearchSourceList({ sources }: { sources: ResearchSource[] }) {
           href={source.url}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="block rounded-md border border-border-quiet-subtle bg-surface-canvas/20 p-3 transition-colors hover:border-border-interactive"
+          className="block border-b border-border-quiet py-3 transition-colors hover:text-accent-action-hi"
         >
           <span className="flex items-center gap-2 text-xs font-medium text-accent-action">
-            {source.title} <ExternalLink size={11} />
+            {source.title}
           </span>
           <span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-text-muted">
             {source.excerpt}
@@ -238,7 +224,7 @@ function ReviewSummary({ result }: { result: ResearchResult }) {
   return (
     <div
       data-testid="artist-bio-review-summary"
-      className="rounded-lg border border-border-quiet-subtle bg-surface-quiet-subtle/40 p-3"
+      className="border-y border-border-quiet py-3"
     >
       <p className="text-sm font-medium text-text-secondary-strong">
         {preserved
@@ -258,9 +244,9 @@ function ReviewSummary({ result }: { result: ResearchResult }) {
                 finding.source_ids?.join(",") ?? ""
               }`}
             >
-              <span className="mr-2 text-xs font-normal uppercase tracking-wide text-accent-action font-mono">
+              <MonoLabel as="span" tone="accent" className="mr-2">
                 {finding.kind.split("_").join(" ")}
-              </span>
+              </MonoLabel>
               {finding.summary}
             </li>
           ))}
@@ -487,7 +473,11 @@ function ResearchDialogBody({
           aria-live="polite"
           className="flex items-center gap-3 rounded-lg border border-accent-action/20 bg-accent-action/5 p-5 text-sm text-text-secondary-strong"
         >
-          <Loader2 className="animate-spin text-accent-action" size={18} />
+          <Loader2
+            data-admin-ux="bio-research-loading"
+            className="animate-spin text-accent-action"
+            size={18}
+          />
           Searching MusicBrainz, Wikipedia, Last.fm and official pages, then
           consolidating evidence…
         </div>
@@ -497,11 +487,11 @@ function ResearchDialogBody({
           role="alert"
           className="flex items-start gap-3 rounded-lg border border-state-warning/25 bg-state-warning/5 p-4 text-sm text-state-warning-text"
         >
-          <AlertTriangle size={17} className="mt-0.5 shrink-0" />
           <div className="space-y-2">
             <p>{error}</p>
             <Button size="sm" variant="outline" onClick={onRetry}>
-              <RefreshCw size={14} className="mr-2" /> Retry research
+              {" "}
+              Retry research
             </Button>
           </div>
         </div>
@@ -603,7 +593,9 @@ export function ArtistBioResearchDialog({
         onOpenAutoFocus={() => void runResearch()}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle className="font-display">Research biography with AI</DialogTitle>
+          <DialogTitle className="font-display">
+            Research biography with AI
+          </DialogTitle>
           <DialogDescription>
             Internet sources are collected and consolidated into an editable
             proposal for {artist.name}. Nothing is saved until you apply it.
@@ -635,7 +627,11 @@ export function ArtistBioResearchDialog({
             disabled={!result || !proposal.trim() || applying}
           >
             {applying ? (
-              <Loader2 size={14} className="mr-2 animate-spin" />
+              <Loader2
+                data-admin-ux="bio-apply-loading"
+                size={14}
+                className="mr-2 animate-spin"
+              />
             ) : null}
             Apply biography
           </Button>

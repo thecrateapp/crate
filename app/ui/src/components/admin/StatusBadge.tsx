@@ -1,16 +1,15 @@
 import type { ReactNode } from "react";
-
-import { cn } from "@/lib/utils";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger";
 
-const toneClassName: Record<StatusTone, string> = {
-  neutral: "border-border-quiet bg-raised-surface text-text-subtle",
-  info: "border-accent-action/25 bg-accent-action/10 text-accent-action",
-  success: "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
-  warning:
-    "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
-  danger: "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+// Admin's operational vocabulary keeps its reviewed accent/warning semantics.
+const visualTone: Record<StatusTone, InfoBadgeTone> = {
+  neutral: "neutral",
+  info: "accent",
+  success: "accent",
+  warning: "warning",
+  danger: "warning",
 };
 
 export function StatusBadge({
@@ -23,15 +22,12 @@ export function StatusBadge({
   className?: string;
 }) {
   return (
-    <span
-      data-tone={tone}
-      className={cn(
-        "inline-flex w-fit shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-        toneClassName[tone],
-        className,
-      )}
+    <InfoBadge
+      data-status-tone={tone}
+      tone={visualTone[tone]}
+      className={className}
     >
       {children}
-    </span>
+    </InfoBadge>
   );
 }

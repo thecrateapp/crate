@@ -13,6 +13,7 @@ import {
 } from "@/components/player/spinning-disc-math";
 import { useSpinningDiscPlayback } from "@/components/player/use-spinning-disc-playback";
 import { clamp } from "@/lib/utils";
+import type { PlayerMixTone } from "./player-mix-presentation";
 
 type JogSeekMode = "live" | "commit";
 
@@ -33,6 +34,7 @@ interface SpinningDiscProps {
   onSeek?: (time: number) => void;
   onTogglePlay: () => void;
   disabled?: boolean;
+  mixTone?: PlayerMixTone;
 }
 
 export function SpinningDisc({
@@ -52,6 +54,7 @@ export function SpinningDisc({
   onSeek,
   onTogglePlay,
   disabled = false,
+  mixTone,
 }: SpinningDiscProps) {
   const seekTimerRef = useRef<number | null>(null);
   const lastSeekFlushAtRef = useRef(0);
@@ -279,6 +282,7 @@ export function SpinningDisc({
       className={className}
       disabled={disabled}
       jogEnabled={jogEnabled && Boolean(onSeek)}
+      mixTone={isPlaying && !isBuffering && !disabled ? mixTone : undefined}
       rotorRef={rotorRef}
       surfaceProps={{
         onPointerDown: handlePointerDown,

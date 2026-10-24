@@ -74,9 +74,9 @@ describe("SmartMixActivity", () => {
     expect(screen.getByText("16.5 tracks/min")).toBeInTheDocument();
     expect(screen.getByText("18 queued")).toBeInTheDocument();
     expect(screen.getByText("~20 min left")).toBeInTheDocument();
-    expect(screen.getByText("failed").closest("li")).toHaveAttribute(
+    expect(screen.getByText("decoder exploded")).toBeVisible();
+    expect(screen.getByText("failed").closest("li")).not.toHaveAttribute(
       "title",
-      "decoder exploded",
     );
   });
 

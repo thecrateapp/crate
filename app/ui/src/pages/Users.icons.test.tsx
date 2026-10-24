@@ -171,6 +171,8 @@ describe("Users compact list and preserved real detail/actions", () => {
       expect(errors).toHaveBeenCalledWith("Failed to delete user"),
     );
     expect(apiMock).toHaveBeenCalledWith("/api/auth/users/2", "DELETE");
+    expect(dialog).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("row", { name: /Bruno Mar/ })).toBeInTheDocument();
   });
   it("keeps role update body, disabled pending action and returned detail", async () => {

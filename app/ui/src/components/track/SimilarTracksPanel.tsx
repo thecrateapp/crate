@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
-import { X, Loader2, ArrowUpRight } from "lucide-react";
+import { Link } from "react-router";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { LoadingState, EmptyState } from "@crate/ui/domain/states";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { api } from "@/lib/api";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 
@@ -36,125 +41,100 @@ export function SimilarTracksPanel({
 }: SimilarTracksPanelProps) {
   const [tracks, setTracks] = useState<SimilarTrack[]>([]);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!open || !trackPath) return;
+    let active = true;
     setLoading(true);
+    setError(null);
+    setTracks([]);
     api<{ tracks: SimilarTrack[] }>(
       `/api/similar-tracks?path=${encodeURIComponent(trackPath)}&limit=20`,
     )
-      .then((d) => setTracks(d.tracks || []))
-      .catch(() => setTracks([]))
-      .finally(() => setLoading(false));
-  }, [open, trackPath]);
-
-  if (!open) return null;
-
+      .then((data) => {
+        if (active) setTracks(data.tracks ?? []);
+      })
+      .catch(() => {
+        if (active) setError("Similar tracks could not be loaded. Try again.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, trackPath, attempt]);
   return (
-    <dialog
-      open
-      aria-modal="true"
-      aria-label={`Similar tracks to ${trackTitle}`}
-      className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-      }}
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title={<span className="wrap-anywhere">Similar to {trackTitle}</span>}
+      description={artist}
+      closeLabel="Close similar tracks"
+      size="md"
+      panelClassName="flex min-h-0 max-h-[calc(100dvh-2rem)] flex-col"
+      headerClassName="shrink-0"
+      mobileSafeArea
     >
-      <button
-        type="button"
-        aria-label="Close similar tracks"
-        className="absolute inset-0 border-0 bg-transparent p-0"
-        onClick={onClose}
-      />
-      <div
-        role="presentation"
-        className="bg-card border border-border rounded-md w-[500px] max-h-[600px] shadow-2xl overflow-hidden"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div>
-            <h3 className="text-sm font-semibold font-display">Similar to "{trackTitle}"</h3>
-            <p className="text-xs text-muted-foreground">{artist}</p>
-          </div>
-          <button
-            type="button"
-            aria-label="Close similar tracks"
-            onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="overflow-y-auto max-h-[500px]">
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-primary" />
-            </div>
-          )}
-          {!loading && tracks.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              No similar tracks found
-            </div>
-          )}
-          {tracks.map((t, i) => (
-            <button
-              key={t.path || `${t.artist}-${t.album}-${t.title}`}
-              className="w-full flex items-center gap-3 px-4 py-2.5  transition-colors text-left group"
-              onClick={() => {
-                if (t.album) {
-                  navigate(
-                    albumPagePath({
-                      albumId: t.album_id,
-                      albumSlug: t.album_slug,
-                      artistName: t.artist,
-                      albumName: t.album,
-                    }),
-                  );
-                } else if (t.artist) {
-                  navigate(
-                    artistPagePath({
-                      artistId: t.artist_id,
-                      artistSlug: t.artist_slug,
-                      artistName: t.artist,
-                    }),
-                  );
-                }
-                onClose();
-              }}
-            >
-              <div className="w-8 text-center text-xs text-muted-foreground/40">
-                {i + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm truncate">{t.title || "Unknown"}</div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {t.artist} — {t.album}
-                </div>
-              </div>
-              {t.score != null && (
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div className="w-16 h-px bg-primary/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${Math.round(t.score * 100)}%` }}
+      <ModalBody className="min-h-0 p-5">
+        {loading ? (
+          <LoadingState label="Loading similar tracks" />
+        ) : error ? (
+          <ErrorState
+            message={error}
+            onRetry={() => setAttempt((value) => value + 1)}
+          />
+        ) : tracks.length === 0 ? (
+          <EmptyState message="No similar tracks found" />
+        ) : (
+          <HairlineList label="Similar tracks" ruled={false}>
+            {tracks.map((track, index) => {
+              const href = track.album
+                ? albumPagePath({
+                    albumId: track.album_id,
+                    albumSlug: track.album_slug,
+                    artistName: track.artist,
+                    albumName: track.album,
+                  })
+                : artistPagePath({
+                    artistId: track.artist_id,
+                    artistSlug: track.artist_slug,
+                    artistName: track.artist,
+                  });
+              return (
+                <HairlineRow
+                  key={
+                    track.path ||
+                    `${track.artist}-${track.album}-${track.title}`
+                  }
+                  index={index + 1}
+                  asChild
+                  truncate={false}
+                  trailing={
+                    track.score != null ? (
+                      <InfoBadge>{Math.round(track.score * 100)}%</InfoBadge>
+                    ) : undefined
+                  }
+                >
+                  <Link
+                    to={href}
+                    onClick={onClose}
+                    className="hover:text-accent-action-hi focus-visible:outline-2 focus-visible:outline-focus-ring"
+                  >
+                    <span className="block">{track.title || "Unknown"}</span>
+                    <MonoLabel
+                      as="span"
+                      className="mt-1 block"
+                      meta={[track.artist, track.album]}
                     />
-                  </div>
-                  <span className="text-[9px] text-muted-foreground font-mono">
-                    {Math.round(t.score * 100)}%
-                  </span>
-                </div>
-              )}
-              <ArrowUpRight
-                size={14}
-                className="text-muted-foreground/30 group-hover:text-primary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              />
-            </button>
-          ))}
-        </div>
-      </div>
-    </dialog>
+                  </Link>
+                </HairlineRow>
+              );
+            })}
+          </HairlineList>
+        )}
+      </ModalBody>
+    </AppModal>
   );
 }

@@ -242,9 +242,7 @@ describe("GenreTaxonomyExplorer", () => {
       screen.getByRole("region", { name: "Genre summary" }),
     );
     expect(content).not.toContainElement(tree);
-    const visual = container.querySelector(
-      ".genre-taxonomy-explorer__visual",
-    );
+    const visual = container.querySelector(".genre-taxonomy-explorer__visual");
     expect(visual?.nextElementSibling).toBe(management);
   });
 
@@ -305,9 +303,10 @@ describe("GenreTaxonomyExplorer", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Rock4" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Select Punk, subgenres" }),
-    );
+    const subgenres = within(
+      screen.getByRole("region", { name: "Genre summary for Rock" }),
+    ).getByRole("group", { name: "Subgenres" });
+    fireEvent.click(within(subgenres).getByRole("button", { name: "punk" }));
 
     expect(
       screen.getByRole("region", { name: "Genre summary for Punk" }),

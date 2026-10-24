@@ -19,6 +19,10 @@ and contract evidence do not certify every route or native/AT qualification.
 <Canvas of={Stories.Base} />
 <Controls of={Stories.Base} />
 
+Selection mode uses a native callback button: `pressed` announces its state while `selected` owns the frame treatment. Normal destinations remain native links and never expose a toggle state.
+
+<Canvas of={Stories.SelectionToggle} />
+
 <Canvas of={Stories.Active} />
 
 <Canvas of={Stories.Selected} />
@@ -33,3 +37,5 @@ Optional `titleContent` places a rich identity link inside the existing title re
 plain `title` for menu identity and artwork alternative text. Never nest another link inside an
 interactive primary destination; member rows use a neutral primary frame, with trailing actions
 independent. Names and handles retain their case. This additive slot changes no visual recipe.
+
+Use an explicit `openLabel` for selection actions; `pressed={false}` keeps an unselected toggle announced, and href destinations do not receive aria-pressed.

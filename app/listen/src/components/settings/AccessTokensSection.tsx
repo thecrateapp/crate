@@ -9,6 +9,7 @@ import { Section, ToggleRow } from "@/components/settings/SettingsPrimitives";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { SERVER_STORE_EVENT } from "@/lib/server-store";
+import { useSettingsOverlay } from "./settings-panel-activity";
 
 const TOKENS_URL = "/api/auth/access-tokens";
 
@@ -89,7 +90,12 @@ export function AccessTokensSection() {
   const [error, setError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [confirmOpen, setConfirmOpen] = useSettingsOverlay();
   const copyInProgress = useRef(false);
+
+  useEffect(() => {
+    if (!confirmOpen) setPending(null);
+  }, [confirmOpen]);
 
   useEffect(() => {
     let active = true;
@@ -166,7 +172,7 @@ export function AccessTokensSection() {
   }
 
   async function confirmPending() {
-    if (!pending) return;
+    if (!pending || !confirmOpen || busy) return;
     const { kind, token } = pending;
     setBusy(true);
     setError(null);
@@ -333,7 +339,10 @@ export function AccessTokensSection() {
                     aria-label={t("settings.accessTokens.rotateNamed", {
                       name: token.name,
                     })}
-                    onClick={() => setPending({ kind: "rotate", token })}
+                    onClick={() => {
+                      setPending({ kind: "rotate", token });
+                      setConfirmOpen(true);
+                    }}
                   >
                     {t("settings.accessTokens.rotate")}
                   </Button>
@@ -345,7 +354,10 @@ export function AccessTokensSection() {
                     aria-label={t("settings.accessTokens.revokeNamed", {
                       name: token.name,
                     })}
-                    onClick={() => setPending({ kind: "revoke", token })}
+                    onClick={() => {
+                      setPending({ kind: "revoke", token });
+                      setConfirmOpen(true);
+                    }}
                   >
                     {t("settings.accessTokens.revoke")}
                   </Button>
@@ -439,8 +451,9 @@ export function AccessTokensSection() {
       )}
 
       <ConfirmDialog
-        open={pending !== null}
+        open={confirmOpen && pending !== null}
         onOpenChange={(open) => {
+          setConfirmOpen(open);
           if (!open) setPending(null);
         }}
         onConfirm={confirmPending}

@@ -14,6 +14,7 @@ import {
 } from "@crate/ui/icons";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { buttonVariants } from "@crate/ui/shadcn/button";
 
 import { PlayerSurfaceModeSwitch } from "./PlayerSurfaceModeSwitch";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
@@ -118,13 +119,29 @@ function FullscreenPlayerUtilityControls({
     <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2">
       <FollowHeartButton
         following={state.liked}
-        label={t("actions.track.like")}
-        labelActive={t("actions.track.unlike")}
+        disabled={state.likeStateAvailable === false}
+        label={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : "actions.track.like",
+        )}
+        labelActive={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : "actions.track.unlike",
+        )}
         heartTestId="fullscreen-like-heart"
         particlesTestId="fullscreen-like-particles"
         iconSize={CRATE_ICON_SIZE.md}
+        title={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : state.liked
+              ? "actions.track.unlike"
+              : "actions.track.like",
+        )}
         onClick={() => void actions.toggleLikeWithFeedback()}
-        className="size-12 touch-manipulation rounded-full border border-border-subtle bg-surface-control active:bg-surface-control-hover"
+        className={buttonVariants({ variant: "ghost", size: "icon-lg" })}
       />
       {state.allowMobileEqualizer ? (
         <ActionButton
@@ -149,7 +166,7 @@ function FullscreenPlayerUtilityControls({
       />
       <PlayerTrackMenu
         currentTrack={player.currentTrack}
-        className=" size-12 rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
+        className={buttonVariants({ variant: "ghost", size: "icon-lg" })}
       />
     </div>
   );

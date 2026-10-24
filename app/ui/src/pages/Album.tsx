@@ -1,6 +1,8 @@
+import { useLibrarySearch } from "@/hooks/use-library-search";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useApi } from "@/hooks/use-api";
+import { analysisForTrack } from "@/components/album/audio-analysis";
 import { AlbumHeader } from "@/components/album/AlbumHeader";
 import { AudioProfileCard } from "@/components/album/AudioProfileCard";
 import {
@@ -10,10 +12,7 @@ import {
 } from "@/components/album/TrackTable";
 import { TagEditor } from "@/components/album/TagEditor";
 import { RelatedAlbums } from "@/components/album/RelatedAlbums";
-import {
-  GenrePillRow,
-  type GenreProfileItem,
-} from "@/components/genres/GenrePill";
+import type { GenreProfileItem } from "@/components/genres/GenrePill";
 import { MatchCard } from "@/components/scanner/MatchCard";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -26,7 +25,6 @@ import {
 } from "@crate/ui/shadcn/dialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { api } from "@/lib/api";
 import {
@@ -41,9 +39,22 @@ import {
 } from "@/lib/library-routes";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import { waitForTask } from "@/lib/tasks";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { LoadingState, EmptyState } from "@crate/ui/domain/states";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { Disc3, Loader2, Search } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  Tag,
+  ArrowRight,
+  Link as MergeIcon,
+  Copy,
+  RefreshCw,
+  BarChart3,
+  Trash2,
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -154,11 +165,6 @@ interface AlbumSearchResult {
   year?: string | number | null;
 }
 
-interface SearchResponse {
-  artists?: ArtistSearchResult[];
-  albums?: AlbumSearchResult[];
-}
-
 function lyricOverrideKeyFromEvent(data: Record<string, unknown>) {
   if (data.track_id != null) return `id:${data.track_id}`;
   if (data.track_entity_uid) return `uid:${data.track_entity_uid}`;
@@ -232,51 +238,14 @@ export function MoveAlbumToArtistDialog({
   onOpenChange: (open: boolean) => void;
   onMove: (artist: ArtistSearchResult) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ArtistSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setResults([]);
-    setSearching(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<SearchResponse>(
-        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      )
-        .then((payload) => {
-          if (!active) return;
-          setResults(payload.artists ?? []);
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          toast.error("Artist search failed");
-        })
-        .finally(() => {
-          if (active) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [open, query]);
+  const {
+    query,
+    setQuery,
+    results,
+    searching,
+    error: searchError,
+    retry: retrySearch,
+  } = useLibrarySearch<ArtistSearchResult>(open, "", "artists");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -298,6 +267,7 @@ export function MoveAlbumToArtistDialog({
             </label>
             <div className="relative">
               <Search
+                data-admin-ux="album-move-search"
                 size={15}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
@@ -313,9 +283,15 @@ export function MoveAlbumToArtistDialog({
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
-            {searching ? (
+            {searchError ? (
+              <ErrorState message={searchError} onRetry={retrySearch} />
+            ) : searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="album-move-search-loading"
+                  size={15}
+                  className="animate-spin"
+                />
                 Searching artists...
               </div>
             ) : results.length ? (
@@ -329,14 +305,12 @@ export function MoveAlbumToArtistDialog({
                       type="button"
                       disabled={busy || isCurrentArtist || artist.id == null}
                       onClick={() => onMove(artist)}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       <span className="truncate text-sm font-medium">
                         {artist.name}
                       </span>
-                      {isCurrentArtist ? (
-                        <Badge variant="secondary">Current</Badge>
-                      ) : null}
+                      {isCurrentArtist ? <InfoBadge>Current</InfoBadge> : null}
                     </button>
                   );
                 })}
@@ -385,51 +359,14 @@ export function MergeAlbumDialog({
   onOpenChange: (open: boolean) => void;
   onMerge: (album: AlbumSearchResult) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AlbumSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery(currentAlbumName);
-    setResults([]);
-    setSearching(false);
-  }, [currentAlbumName, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<SearchResponse>(
-        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      )
-        .then((payload) => {
-          if (!active) return;
-          setResults(payload.albums ?? []);
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          toast.error("Album search failed");
-        })
-        .finally(() => {
-          if (active) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [open, query]);
+  const {
+    query,
+    setQuery,
+    results,
+    searching,
+    error: searchError,
+    retry: retrySearch,
+  } = useLibrarySearch<AlbumSearchResult>(open, currentAlbumName, "albums");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -451,6 +388,7 @@ export function MergeAlbumDialog({
             </label>
             <div className="relative">
               <Search
+                data-admin-ux="album-merge-search"
                 size={15}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
               />
@@ -466,9 +404,15 @@ export function MergeAlbumDialog({
           </div>
 
           <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
-            {searching ? (
+            {searchError ? (
+              <ErrorState message={searchError} onRetry={retrySearch} />
+            ) : searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="album-merge-search-loading"
+                  size={15}
+                  className="animate-spin"
+                />
                 Searching albums...
               </div>
             ) : results.length ? (
@@ -484,11 +428,12 @@ export function MergeAlbumDialog({
                       type="button"
                       disabled={busy || isCurrentAlbum || album.id == null}
                       onClick={() => onMerge(album)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:bg-accent-action/8 hover:text-accent-action-hi focus-visible:bg-accent-action/8 focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border-quiet bg-surface-object text-text-subtle">
-                        <Disc3 size={16} />
-                      </div>
+                      <MediaCover
+                        alt={album.name}
+                        className="size-12 shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">
                           {album.name}
@@ -498,9 +443,7 @@ export function MergeAlbumDialog({
                           {album.year ? ` - ${album.year}` : ""}
                         </div>
                       </div>
-                      {isCurrentAlbum ? (
-                        <Badge variant="secondary">Current</Badge>
-                      ) : null}
+                      {isCurrentAlbum ? <InfoBadge>Current</InfoBadge> : null}
                     </button>
                   );
                 })}
@@ -666,7 +609,13 @@ export function SplitAlbumDialog({
             disabled={!canSubmit}
             onClick={() => onSplit(targetAlbumName.trim(), selectedIds)}
           >
-            {busy ? <Loader2 size={14} className="mr-2 animate-spin" /> : null}
+            {busy ? (
+              <Loader2
+                data-admin-ux="album-split-loading"
+                size={14}
+                className="mr-2 animate-spin"
+              />
+            ) : null}
             Split Album
           </Button>
         </DialogFooter>
@@ -878,7 +827,6 @@ export function Album() {
           release: match,
         },
       );
-      setPendingMatch(null);
       toast.success("Applying tags...");
       const task = await waitForTask(task_id, 60000);
       if (task.status === "completed") {
@@ -887,10 +835,11 @@ export function Album() {
         );
         refetch();
       } else if (task.status === "failed") {
-        toast.error("Failed to apply tags");
+        throw new Error("Failed to apply tags");
       }
-    } catch {
-      toast.error("Failed to start tag apply");
+    } catch (error) {
+      toast.error("Failed to apply tags");
+      throw error;
     }
   }
 
@@ -1015,24 +964,7 @@ export function Album() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="-mt-16 md:-mt-[6.5rem]">
-        <div className="-mx-4 h-[420px] animate-pulse bg-card md:-mx-8 md:h-[560px]" />
-        <div className="mx-auto w-full max-w-[1480px] px-4 pt-6 md:px-8">
-          <Skeleton className="mb-4 h-6 w-48" />
-          <div className="space-y-2">
-            {Array.from(
-              { length: 6 },
-              (_, index) => `album-track-skeleton-${index}`,
-            ).map((key) => (
-              <Skeleton key={key} className="h-10 w-full" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState variant="route" label="Loading album" />;
 
   if (error && !data) {
     return (
@@ -1072,7 +1004,7 @@ export function Album() {
     hasCapability("library.view") && !data.is_pre_release;
 
   return (
-    <div className="-mt-16 md:-mt-[6.5rem]">
+    <div className="min-w-0 space-y-6">
       <AlbumHeader
         albumId={data.id}
         albumEntityUid={data.entity_uid}
@@ -1093,6 +1025,11 @@ export function Album() {
         popularityConfidence={data.popularity_confidence}
         genres={data.genres}
         genreProfile={data.genre_profile}
+        onGenreSelect={(genre) =>
+          navigate(
+            `/browse?genre=${encodeURIComponent(genre.name.toLowerCase())}`,
+          )
+        }
         hasAnalysis={
           analysisData != null &&
           Object.values(analysisData).some((t) => t.tempo != null)
@@ -1122,62 +1059,54 @@ export function Album() {
         }}
       >
         {canEditMetadata ? (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Edit Tags"
             onClick={() => setShowTags(!showTags)}
+            aria-pressed={showTags}
           >
-            Edit Tags
-          </Button>
+            <Tag data-admin-ux="album-edit-tags" aria-hidden="true" />
+          </ActionButton>
         ) : null}
         {canMoveAlbum ? (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Move Album"
             onClick={() => setShowMoveAlbum(true)}
           >
-            Move Album
-          </Button>
+            <ArrowRight data-admin-ux="album-move" aria-hidden="true" />
+          </ActionButton>
         ) : null}
         {canMoveAlbum ? (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Merge Duplicate"
             onClick={() => setShowMergeAlbum(true)}
           >
-            Merge Duplicate
-          </Button>
+            <MergeIcon data-admin-ux="album-merge" aria-hidden="true" />
+          </ActionButton>
         ) : null}
         {canMoveAlbum ? (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Split Album"
             onClick={() => setShowSplitAlbum(true)}
           >
-            Split Album
-          </Button>
+            <Copy data-admin-ux="album-split" aria-hidden="true" />
+          </ActionButton>
         ) : null}
         {canEditMetadata && !hasMusicBrainzAlbumId ? (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Sync MusicBrainz"
             onClick={findMatches}
             disabled={matching}
+            loading={matching}
           >
-            {matching ? (
-              <>
-                <Loader2 size={14} className="animate-spin mr-1" />
-                Searching...
-              </>
-            ) : (
-              "Sync MusicBrainz"
-            )}
-          </Button>
+            <RefreshCw
+              data-admin-ux="album-sync-musicbrainz"
+              aria-hidden="true"
+            />
+          </ActionButton>
         ) : null}
-        {isAdmin ? (
-          <Button
-            size="sm"
-            variant="outline"
+        {hasCapability("library.analysis.manage") ? (
+          <ActionButton
+            label="Analyze"
             onClick={async () => {
               try {
                 const endpoint = albumReanalyzeApiPath({
@@ -1194,21 +1123,20 @@ export function Album() {
               }
             }}
           >
-            Analyze
-          </Button>
+            <BarChart3 data-admin-ux="album-analyze" aria-hidden="true" />
+          </ActionButton>
         ) : null}
         {canDeleteAlbum && (
-          <Button
-            size="sm"
-            variant="outline"
+          <ActionButton
+            label="Delete"
             onClick={() => setShowDeleteConfirm(true)}
           >
-            Delete
-          </Button>
+            <Trash2 data-admin-ux="album-delete" aria-hidden="true" />
+          </ActionButton>
         )}
       </AlbumHeader>
 
-      <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 pt-6 md:px-8">
+      <div className="min-w-0 space-y-6 pb-12">
         {showTags && canEditMetadata && data.id != null && (
           <TagEditor
             albumId={data.id}
@@ -1231,13 +1159,11 @@ export function Album() {
 
         {matches !== null && (
           <div className="mb-8">
-            <h3 className="font-semibold mb-3 font-display">
-              MusicBrainz Matches
-            </h3>
+            <MonoLabel as="h2" tone="accent" className="mb-4">
+              MusicBrainz matches
+            </MonoLabel>
             {matches.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No matches found on MusicBrainz
-              </div>
+              <EmptyState message="No matches found on MusicBrainz" />
             ) : (
               matches.map((m) => (
                 <MatchCard
@@ -1250,77 +1176,20 @@ export function Album() {
           </div>
         )}
 
-        {data.album_tags.musicbrainz_albumid && (
-          <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline">
-              MBID {data.album_tags.musicbrainz_albumid.slice(0, 8)}
-            </Badge>
-            <a
-              href={`https://musicbrainz.org/release/${data.album_tags.musicbrainz_albumid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors"
-            >
-              View on MusicBrainz ↗
-            </a>
-          </div>
-        )}
-
-        {data.genre_profile && data.genre_profile.length > 0 ? (
-          <div className="mb-4">
-            <GenrePillRow
-              items={data.genre_profile}
-              max={8}
-              onSelect={(genre) =>
-                navigate(
-                  `/browse?genre=${encodeURIComponent(
-                    genre.name.toLowerCase(),
-                  )}`,
-                )
-              }
-            />
-          </div>
-        ) : (
-          data.genres &&
-          data.genres.length > 0 && (
-            <div className="mb-4 flex gap-1.5 flex-wrap">
-              {data.genres.map((g) => (
-                <Badge
-                  key={g}
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-primary/20"
-                  onClick={() =>
-                    navigate(
-                      `/browse?genre=${encodeURIComponent(g.toLowerCase())}`,
-                    )
-                  }
-                >
-                  {g.toLowerCase()}
-                </Badge>
-              ))}
-            </div>
-          )
-        )}
-
-        {analysisData &&
-          data &&
-          (() => {
-            const albumTitles = new Set(
-              data.tracks.map(
-                (t: { tags: { title?: string }; filename: string }) =>
-                  (t.tags.title || t.filename).toLowerCase(),
-              ),
-            );
-            const filtered = Object.fromEntries(
-              Object.entries(analysisData).filter(([k]) => albumTitles.has(k)),
-            );
-            return Object.keys(filtered).length > 0 ? (
-              <AudioProfileCard analysisData={filtered} />
-            ) : null;
-          })()}
+        <AudioProfileCard
+          analysisData={Object.fromEntries(
+            data.tracks.flatMap((track, index) => {
+              const analysis = analysisForTrack(analysisData, track);
+              return analysis ? [[String(index), analysis]] : [];
+            }),
+          )}
+          totalTracks={data.track_count}
+        />
 
         <div>
-          <h3 className="font-semibold mb-3 font-display">Tracks</h3>
+          <MonoLabel as="h2" tone="accent" className="mb-4">
+            Tracks
+          </MonoLabel>
           <TrackTable
             tracks={tableTracks}
             artist={data.artist}
@@ -1338,7 +1207,9 @@ export function Album() {
             })}
             analysisData={analysisData ?? undefined}
             syncingLyricsTrackKey={syncingLyricsTrackKey}
-            onSyncTrackLyrics={queueTrackLyricsSync}
+            onSyncTrackLyrics={
+              canEditMetadata ? queueTrackLyricsSync : undefined
+            }
             onTrackQuarantined={refetch}
           />
         </div>
@@ -1383,9 +1254,10 @@ export function Album() {
           description="This will overwrite current tags with MusicBrainz data. Are you sure?"
           confirmLabel="Apply Tags"
           variant="destructive"
-          onConfirm={() => {
-            void (() => pendingMatch && applyMatch(pendingMatch))();
+          onConfirm={async () => {
+            if (pendingMatch) await applyMatch(pendingMatch);
           }}
+          onError={() => {}}
           eyebrow="Confirm action"
           consequence={`${data.track_count} tracks · overwrites existing tags with MusicBrainz data`}
         />
@@ -1401,36 +1273,36 @@ export function Album() {
           } from the database AND the filesystem. This action cannot be undone.`}
           confirmLabel="Delete Album"
           variant="destructive"
-          onConfirm={() => {
-            void (async () => {
-              try {
-                const endpoint = albumManagementApiPath(
-                  { albumId: data.id, albumEntityUid: data.entity_uid },
-                  "delete",
-                );
-                if (!endpoint) throw new Error("album reference missing");
-                await api<{ task_id: string }>(endpoint, "POST", {
-                  mode: "full",
-                });
-                toast.success("Album deletion queued", {
-                  description:
-                    "The worker will delete the album in the background.",
-                });
-                navigate(
-                  artistPagePath({
-                    artistId: data.artist_id,
-                    artistSlug: data.artist_slug,
-                    artistName: data.artist,
-                  }),
-                );
-              } catch (error) {
-                const message =
-                  error instanceof Error && error.message
-                    ? error.message
-                    : "Failed to queue album deletion";
-                toast.error(message);
-              }
-            })();
+          onError={() => {}}
+          onConfirm={async () => {
+            try {
+              const endpoint = albumManagementApiPath(
+                { albumId: data.id, albumEntityUid: data.entity_uid },
+                "delete",
+              );
+              if (!endpoint) throw new Error("album reference missing");
+              await api<{ task_id: string }>(endpoint, "POST", {
+                mode: "full",
+              });
+              toast.success("Album deletion queued", {
+                description:
+                  "The worker will delete the album in the background.",
+              });
+              navigate(
+                artistPagePath({
+                  artistId: data.artist_id,
+                  artistSlug: data.artist_slug,
+                  artistName: data.artist,
+                }),
+              );
+            } catch (error) {
+              const message =
+                error instanceof Error && error.message
+                  ? error.message
+                  : "Failed to queue album deletion";
+              toast.error(message);
+              throw error;
+            }
           }}
           eyebrow="Confirm action"
           consequence={`${data.track_count} tracks · ${data.total_size_mb} MB · permanently deletes database entries and files`}
