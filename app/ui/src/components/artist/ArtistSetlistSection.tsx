@@ -2,8 +2,9 @@ import { useNavigate } from "react-router";
 import { fuzzyMatchTrack } from "@/components/artist/ArtistPageBits";
 import { api } from "@/lib/api";
 import { albumPagePath, artistActionApiPath } from "@/lib/library-routes";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
-import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
@@ -109,12 +110,8 @@ export function ArtistSetlistSection({
   }
 
   return (
-    <InstrumentPanel
-      as="section"
-      headingLevel={2}
-      className="max-w-3xl"
-      ruled={false}
-      label={{ children: "Probable Setlist", tone: "accent" }}
+    <ArtistDetailSection
+      title="Probable Setlist"
       description={
         probableSetlist.length > 0 ? (
           <>
@@ -143,11 +140,13 @@ export function ArtistSetlistSection({
       }
     >
       {probableSetlist.length === 0 ? (
-        <p className="py-8 text-sm text-text-muted">
-          No concert data available from Setlist.fm
-        </p>
+        <EmptyState title="No concert data available from Setlist.fm" />
       ) : (
-        <HairlineList label="Probable setlist" ruled={false}>
+        <HairlineList
+          label="Probable setlist"
+          ruled={false}
+          className="max-w-4xl"
+        >
           {probableSetlist.map((song, index) => {
             const match = fuzzyMatchTrack(song.title, allTrackTitles);
             const frequency = Math.max(0, Math.min(1, song.frequency));
@@ -207,6 +206,6 @@ export function ArtistSetlistSection({
           })}
         </HairlineList>
       )}
-    </InstrumentPanel>
+    </ArtistDetailSection>
   );
 }

@@ -30,7 +30,8 @@ from crate.db.queries.user_library_stats_range import (
     StatsRangeError,
     get_instance_stats_range,
 )
-from crate.missing import find_missing_albums
+from crate.db.queries.missing_albums import get_artist_album_inventory
+from crate.missing import compare_missing_albums, find_missing_albums
 from crate.api._deps import (
     artist_name_from_entity_uid,
     artist_name_from_id,
@@ -277,11 +278,13 @@ def api_quality_refresh(request: Request, body: QualityRefreshRequest):
 
 def api_missing_albums(request: Request, artist: str):
     _require_auth(request)
+    inventory = get_artist_album_inventory(artist)
+    if inventory is not None:
+        return compare_missing_albums(inventory["artist"], inventory["local"])
+
     lib = library_path()
-    db_artist = get_library_artist(artist)
     artist_dir = resolve_artist_dir(
         lib,
-        db_artist,
         fallback_name=artist,
         existing_only=True,
     )
@@ -289,8 +292,7 @@ def api_missing_albums(request: Request, artist: str):
         raise HTTPException(status_code=404, detail="Artist not found")
 
     exts = extensions()
-    artist_name = str(db_artist.get("name") or artist) if db_artist else artist
-    result = find_missing_albums(artist_dir, exts, artist_name=artist_name)
+    result = find_missing_albums(artist_dir, exts, artist_name=artist)
     return result
 
 

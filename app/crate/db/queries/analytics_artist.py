@@ -49,7 +49,7 @@ def get_artist_audio_by_album(artist_name: str) -> list[dict]:
             session.execute(
                 text(
                     """
-                SELECT a.name AS album,
+                SELECT a.name AS album, a.year AS year,
                        AVG(t.bpm) AS avg_bpm,
                        AVG(t.energy) AS avg_energy,
                        AVG(t.danceability) AS avg_danceability,

@@ -1,3 +1,5 @@
+import { MemoryRouter } from "react-router";
+import { AuthContext } from "@/contexts/AuthContext";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -196,12 +198,12 @@ describe("SystemHealth Resources instrument", () => {
     }
   });
 
-  it("uses the solid operational surface for resource and chart cards", () => {
+  it("keeps resource surfaces and opens chart plots on the page", () => {
     const { container } = renderWithAdminProviders(<SystemHealth />, {
       route: "/system",
     });
 
-    for (const label of ["Music Volume", "API Latency"]) {
+    for (const label of ["Music Volume"]) {
       const surface = screen.getByText(label).closest(".rounded-md");
       expect(surface).toHaveClass(
         "border-border-quiet",
@@ -210,6 +212,10 @@ describe("SystemHealth Resources instrument", () => {
       );
       expect(surface?.className).not.toMatch(/backdrop-blur|bg-black\//);
     }
+    expect(
+      screen.getByText("API Latency").closest('[data-slot="metric-chart"]'),
+    ).toHaveClass("border-t");
+    expect(screen.getByText("API Latency").closest(".rounded-md")).toBeNull();
     const healthScore = screen.getByText("Health Score").closest(".rounded-md");
     expect(healthScore).toHaveClass("shadow-none");
     expect(
@@ -222,6 +228,52 @@ describe("SystemHealth Resources instrument", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps stale metric bucket provenance through window changes and refresh errors", async () => {
+    const user = userEvent.setup();
+    const minuteData = {
+      ...dashboard,
+      timeseries: {
+        "api.requests": [
+          { timestamp: "2026-10-24T10:00:00Z", count: 1 },
+          { timestamp: "2026-10-24T10:03:00Z", count: 2 },
+        ],
+      },
+    };
+    const result = {
+      data: minuteData,
+      loading: false,
+      error: null as string | null,
+      refetch: refetchMock,
+    };
+    useApiMock.mockImplementation(() => result);
+    const view = renderWithAdminProviders(<SystemHealth />);
+    const chart = () => screen.getByRole("region", { name: "Request Volume" });
+    await user.click(screen.getByRole("radio", { name: "24h" }));
+    expect(within(chart()).getByText(/60 s buckets/)).toBeVisible();
+    expect(charts[charts.length - 1]?.data as unknown).toBeDefined();
+    result.error = "hour request failed";
+    view.rerender(
+      <MemoryRouter>
+        <AuthContext.Provider value={view.authValue}>
+          <SystemHealth />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(within(chart()).getByText(/60 s buckets/)).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Showing the last successful sample.",
+    );
+    result.data = { ...minuteData };
+    result.error = null;
+    view.rerender(
+      <MemoryRouter>
+        <AuthContext.Provider value={view.authValue}>
+          <SystemHealth />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(within(chart()).getByText(/3,600 s buckets/)).toBeVisible();
+  });
   it("retains the metrics window and refresh controls", async () => {
     const user = userEvent.setup();
     renderWithAdminProviders(<SystemHealth />, { route: "/system" });

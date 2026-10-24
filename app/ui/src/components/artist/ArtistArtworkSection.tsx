@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@crate/ui/shadcn/button";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { toast } from "sonner";
 import { ImageCropUpload } from "@/components/ImageCropUpload";
 import {
@@ -68,41 +67,37 @@ export function ArtistArtworkSection({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <MonoLabel as="h2" tone="accent">
-            Artwork
-          </MonoLabel>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage each artist image by its intended surface and aspect ratio.
-          </p>
-        </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            loading={backfilling}
-            onClick={() => void backfillEligibleArtists()}
-          >
-            Backfill eligible artists
-          </Button>
-        ) : null}
-      </div>
-
-      <ArtistArtworkGallery
-        artistId={artistId}
-        artistName={artistName}
-        canEdit={canEdit}
-        onChanged={() => setRefresh((value) => value + 1)}
-        onHeroChanged={(composition) =>
-          setHeroReload((current) => ({
-            token: (current?.token ?? 0) + 1,
-            composition,
-          }))
+    <div className="space-y-8">
+      <ArtistDetailSection
+        title="Artwork"
+        description="Manage each artist image by its intended surface and aspect ratio."
+        actions={
+          canEdit ? (
+            <Button
+              variant="outline"
+              loading={backfilling}
+              onClick={() => void backfillEligibleArtists()}
+            >
+              Backfill eligible artists
+            </Button>
+          ) : undefined
         }
-      />
+      >
+        <ArtistArtworkGallery
+          artistId={artistId}
+          artistName={artistName}
+          canEdit={canEdit}
+          onChanged={() => setRefresh((value) => value + 1)}
+          onHeroChanged={(composition) =>
+            setHeroReload((current) => ({
+              token: (current?.token ?? 0) + 1,
+              composition,
+            }))
+          }
+        />
+      </ArtistDetailSection>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <ArtworkCard
           title="Avatar"
           description="Square artist identity used in cards, rows and search."
@@ -161,10 +156,10 @@ function ArtworkCard({
   onUploaded: () => void;
 }) {
   return (
-    <InstrumentPanel
-      as="section"
+    <ArtistDetailSection
       headingLevel={3}
-      label={{ children: title, tone: "accent" }}
+      title={title}
+      ruled
       description={description}
     >
       <div className="group/cover relative overflow-hidden rounded-md border border-border-quiet bg-surface-control">
@@ -183,6 +178,6 @@ function ArtworkCard({
           />
         ) : null}
       </div>
-    </InstrumentPanel>
+    </ArtistDetailSection>
   );
 }

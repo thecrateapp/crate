@@ -6,14 +6,21 @@ import type { ReactNode } from "react";
 
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
-const { mockUseApi, mockArtistEnrichment, mockOverview, mockHero } = vi.hoisted(
-  () => ({
-    mockUseApi: vi.fn(),
-    mockArtistEnrichment: vi.fn(),
-    mockOverview: vi.fn(),
-    mockHero: vi.fn(),
-  }),
-);
+const {
+  mockUseApi,
+  mockArtistEnrichment,
+  mockOverview,
+  mockHero,
+  mockBioDialog,
+  mockStats,
+} = vi.hoisted(() => ({
+  mockUseApi: vi.fn(),
+  mockArtistEnrichment: vi.fn(),
+  mockOverview: vi.fn(),
+  mockHero: vi.fn(),
+  mockBioDialog: vi.fn(),
+  mockStats: vi.fn(),
+}));
 
 import {
   Artist,
@@ -55,6 +62,14 @@ vi.mock("@/components/artist/ArtistHeroSection", () => ({
 vi.mock("@/components/artist/ArtistMetadataEditor", () => ({
   ArtistMetadataEditor: () => null,
 }));
+vi.mock("@/components/artist/ArtistBioResearchDialog", () => ({
+  ArtistBioResearchDialog: (props: {
+    onApply: (bio: string) => Promise<void>;
+  }) => {
+    mockBioDialog(props);
+    return null;
+  },
+}));
 
 vi.mock("@/components/artist/ArtistRepairDialog", () => ({
   ArtistRepairDialog: () => null,
@@ -88,7 +103,10 @@ vi.mock("@/components/artist/ArtistSimilarSection", () => ({
 }));
 
 vi.mock("@/components/artist/ArtistStatsSection", () => ({
-  ArtistStatsSection: () => null,
+  ArtistStatsSection: (props: Record<string, unknown>) => {
+    mockStats(props);
+    return null;
+  },
 }));
 
 vi.mock("@/components/artist/ArtistTopTracksSection", () => ({
@@ -96,7 +114,18 @@ vi.mock("@/components/artist/ArtistTopTracksSection", () => ({
 }));
 
 vi.mock("@/components/artist/ArtistTabsNav", () => ({
-  ArtistTabsNav: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ArtistTabsNav: ({
+    children,
+    onChange,
+  }: {
+    children: ReactNode;
+    onChange: (value: string) => void;
+  }) => (
+    <>
+      <button onClick={() => onChange("stats")}>Open stats test tab</button>
+      {children}
+    </>
+  ),
 }));
 
 vi.mock("@/components/artist/artistPageData", () => ({
@@ -364,5 +393,125 @@ it("enables analysis for a capable non-admin role", async () => {
   });
   expect(mockHero).toHaveBeenLastCalledWith(
     expect.objectContaining({ canAnalyze: true, canEditMetadata: false }),
+  );
+});
+
+it("persists the Overview biography proposal before refetch and displays canonical saved text over old provider prose", async () => {
+  let completeSave!: (value: Awaited<ReturnType<typeof waitForTask>>) => void;
+  const saved = new Promise<Awaited<ReturnType<typeof waitForTask>>>(
+    (resolve) => {
+      completeSave = resolve;
+    },
+  );
+  mockApi.mockResolvedValue({ task_id: "save-reviewed-bio" });
+  mockWaitForTask.mockReturnValue(saved);
+  let canonicalBio = "Old canonical biography";
+  const refetch = vi.fn();
+  mockArtistEnrichment.mockReturnValue({
+    enrichment: { lastfm: { bio: "Old provider biography" } },
+    loading: false,
+    refetch: vi.fn(),
+  });
+  mockUseApi.mockImplementation((url: string | null) => ({
+    data:
+      url === "/api/artist-slugs/artist"
+        ? {
+            id: 7,
+            entity_uid: "artist-uid",
+            slug: "artist",
+            name: "Artist",
+            bio: canonicalBio,
+            albums: [],
+          }
+        : null,
+    loading: false,
+    error: null,
+    refetch,
+  }));
+  const routes = (
+    <Routes>
+      <Route path="/artists/:artistSlug" element={<Artist />} />
+    </Routes>
+  );
+  const { unmount } = renderWithAdminProviders(routes, {
+    route: "/artists/artist",
+  });
+  await waitFor(() => expect(mockBioDialog).toHaveBeenCalled());
+  const proposal = "Reviewed canonical biography";
+  const { onApply } = mockBioDialog.mock.lastCall![0] as {
+    onApply: (bio: string) => Promise<void>;
+  };
+  const applying = onApply(proposal);
+  await waitFor(() =>
+    expect(mockWaitForTask).toHaveBeenCalledWith("save-reviewed-bio", 60000),
+  );
+  expect(refetch).not.toHaveBeenCalled();
+  await act(async () => {
+    canonicalBio = proposal;
+    completeSave({ status: "completed", result: { changed_fields: ["bio"] } });
+    await applying;
+  });
+  expect(mockApi).toHaveBeenCalledWith(
+    "/api/artists/by-entity/artist-uid/metadata",
+    "PUT",
+    { bio: proposal },
+  );
+  expect(refetch).toHaveBeenCalledTimes(1);
+  unmount();
+  renderWithAdminProviders(routes, { route: "/artists/artist" });
+  await waitFor(() =>
+    expect(mockOverview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bioText: proposal }),
+    ),
+  );
+});
+
+it("passes the loaded catalogue identity to Stats without another catalogue request", async () => {
+  const albums = [
+    {
+      id: 44,
+      entity_uid: "album-44",
+      name: "Full catalogue album",
+      year: "2004",
+      tracks: 4,
+      formats: ["FLAC"],
+      size_mb: 100,
+      has_cover: true,
+    },
+  ];
+  mockUseApi.mockImplementation((url: string | null) => ({
+    data:
+      url === "/api/artist-slugs/camel"
+        ? {
+            id: 7,
+            entity_uid: "artist-7",
+            slug: "camel",
+            name: "Camel",
+            albums,
+            total_tracks: 20,
+            genre_profile: [{ name: "Rock", weight: 0.8 }],
+          }
+        : null,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+  renderWithAdminProviders(
+    <Routes>
+      <Route path="/artists/:artistSlug" element={<Artist />} />
+    </Routes>,
+    { route: "/artists/camel" },
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Open stats test tab" }),
+  );
+  expect(mockStats).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      artistId: 7,
+      artistEntityUid: "artist-7",
+      catalogueAlbums: albums,
+      totalTracks: 20,
+      genreProfile: [{ name: "Rock", weight: 0.8 }],
+    }),
   );
 });

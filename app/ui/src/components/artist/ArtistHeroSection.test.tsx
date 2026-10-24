@@ -195,6 +195,7 @@ describe("ArtistHeroSection", () => {
       </MemoryRouter>,
     );
     const actions = screen.getByRole("group", { name: "Artist actions" });
+    expect(actions.parentElement).not.toHaveClass("border-b");
     const artwork = screen.getByTestId("page-hero-artwork");
     const photoActions = screen.getAllByRole("button", { name: "Edit photo" });
     expect(photoActions.some((action) => artwork.contains(action))).toBe(true);

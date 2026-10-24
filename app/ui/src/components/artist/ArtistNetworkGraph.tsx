@@ -1,8 +1,7 @@
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
-import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { ArrowRight, Plus } from "@crate/ui/icons";
@@ -73,6 +72,7 @@ export function ArtistNetworkGraph({
   centerArtistId,
   centerArtistEntityUid,
 }: ArtistNetworkGraphProps) {
+  const graphId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>(undefined);
   const navigate = useNavigate();
@@ -300,6 +300,9 @@ export function ArtistNetworkGraph({
   const nodeSet = new Map(
     networkData.nodes.map((node) => [node.id.toLowerCase(), node]),
   );
+  const selectedIndex = networkData.nodes.findIndex(
+    (node) => node.id === selectedNode?.id,
+  );
 
   return (
     <div className="min-w-0 space-y-4">
@@ -348,8 +351,60 @@ export function ArtistNetworkGraph({
       <div
         ref={containerRef}
         style={{ height }}
-        className="w-full overflow-hidden"
+        role="listbox"
+        aria-label="Artist network"
+        aria-describedby={`${graphId}-instructions`}
+        aria-activedescendant={
+          selectedIndex >= 0 ? `${graphId}-node-${selectedIndex}` : undefined
+        }
+        tabIndex={0}
+        className="w-full overflow-hidden focus-visible:outline-2 focus-visible:outline-focus-ring"
+        onKeyDown={(event) => {
+          let nextIndex = selectedIndex;
+          if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+            nextIndex = (selectedIndex + 1) % networkData.nodes.length;
+          } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+            nextIndex =
+              selectedIndex < 0
+                ? networkData.nodes.length - 1
+                : (selectedIndex - 1 + networkData.nodes.length) %
+                  networkData.nodes.length;
+          } else if (event.key === "Home") {
+            nextIndex = 0;
+          } else if (event.key === "End") {
+            nextIndex = networkData.nodes.length - 1;
+          } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            const node = selectedNode ?? networkData.nodes[0];
+            if (node) {
+              setSelectedNode(node);
+              expandNode(node);
+            }
+            return;
+          } else {
+            return;
+          }
+          event.preventDefault();
+          const node = networkData.nodes[nextIndex];
+          if (node) setSelectedNode(node);
+        }}
       >
+        <p id={`${graphId}-instructions`} className="sr-only">
+          Use arrow keys to select an artist. Press Enter or Space to expand its
+          neighbours. Use the selected artist actions to open its page.
+        </p>
+        <div className="sr-only">
+          {networkData.nodes.map((node, index) => (
+            <div
+              key={node.id}
+              id={`${graphId}-node-${index}`}
+              role="option"
+              aria-selected={selectedNode?.id === node.id}
+            >
+              {node.id}
+            </div>
+          ))}
+        </div>
         <ForceGraph2D
           ref={fgRef}
           width={width}
@@ -377,6 +432,7 @@ export function ArtistNetworkGraph({
             const hasShows = artistsWithShows.has(node.id.toLowerCase());
             const isCenter =
               node.id?.toLowerCase() === centerArtist.toLowerCase();
+            const isSelected = selectedNode?.id === node.id;
 
             const baseSize = isCenter ? 14 : inLibrary ? 7 : 5;
             const scoreBonus = score * 8;
@@ -385,12 +441,12 @@ export function ArtistNetworkGraph({
             const x = node.x ?? 0;
             const y = node.y ?? 0;
 
-            // Glow for center and in-library
-            if (isCenter || inLibrary) {
+            // Keep the current selection visible, including artists outside the library.
+            if (isCenter || inLibrary || isSelected) {
               ctx.beginPath();
               ctx.arc(x, y, size + 6, 0, 2 * Math.PI);
               ctx.fillStyle = palette.accent;
-              ctx.globalAlpha = isCenter ? 0.12 : 0.06;
+              ctx.globalAlpha = isCenter || isSelected ? 0.12 : 0.06;
               ctx.fill();
               ctx.globalAlpha = 1;
             }
@@ -409,7 +465,7 @@ export function ArtistNetworkGraph({
             // Main circle
             ctx.beginPath();
             ctx.arc(x, y, size, 0, 2 * Math.PI);
-            if (isCenter) {
+            if (isCenter || isSelected) {
               ctx.fillStyle = palette.accent;
             } else if (inLibrary) {
               ctx.fillStyle = palette.accent;
@@ -419,12 +475,14 @@ export function ArtistNetworkGraph({
             ctx.fill();
 
             // Border
-            ctx.strokeStyle = isCenter
-              ? palette.accentHi
-              : inLibrary
-                ? palette.accent
-                : palette.border;
-            ctx.lineWidth = isCenter ? 2.5 : inLibrary ? 1.5 : 0.5;
+            ctx.strokeStyle =
+              isCenter || isSelected
+                ? palette.accentHi
+                : inLibrary
+                  ? palette.accent
+                  : palette.border;
+            ctx.lineWidth =
+              isCenter || isSelected ? 2.5 : inLibrary ? 1.5 : 0.5;
             ctx.stroke();
 
             // Label
@@ -432,11 +490,12 @@ export function ArtistNetworkGraph({
             ctx.font = `400 ${fontSize}px ${palette.font}`;
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
-            ctx.fillStyle = isCenter
-              ? palette.primary
-              : inLibrary
-                ? palette.muted
-                : palette.subtle;
+            ctx.fillStyle =
+              isCenter || isSelected
+                ? palette.primary
+                : inLibrary
+                  ? palette.muted
+                  : palette.subtle;
             ctx.fillText(node.id, x, y + size + 4);
 
             // In-library satellite dot
@@ -463,7 +522,12 @@ export function ArtistNetworkGraph({
             ).toLowerCase();
             const sNode = nodeSet.get(sId);
             const tNode = nodeSet.get(tId);
-            if (sNode?.in_library && tNode?.in_library) return palette.accent;
+            if (
+              selectedNode?.id.toLowerCase() === sId ||
+              selectedNode?.id.toLowerCase() === tId ||
+              (sNode?.in_library && tNode?.in_library)
+            )
+              return palette.accent;
             return palette.border;
           }}
           linkWidth={(link: any) => {
@@ -521,12 +585,14 @@ export function ArtistNetworkGraph({
                   ? `<span style="color:var(--state-warning-text)">Shows</span>`
                   : ""
               }
-              <span style="color:var(--color-primary)">Select for actions</span>
+              <span style="color:var(--color-primary)">Click to expand · Right-click to open</span>
             </div>
           </div>`;
           }}
           onNodeClick={(node: any) => {
-            setSelectedNode(node as NetworkNode);
+            const selected = node as NetworkNode;
+            setSelectedNode(selected);
+            expandNode(selected);
           }}
           onNodeRightClick={(node: any) => {
             const currentNode = nodeSet.get((node.id ?? "").toLowerCase()) as
@@ -555,38 +621,6 @@ export function ArtistNetworkGraph({
           }}
         />
       </div>
-      <HairlineList label="Network artists" ruled={false}>
-        {networkData.nodes.map((node) => (
-          <HairlineRow
-            key={node.id}
-            active={selectedNode?.id === node.id}
-            trailing={
-              <ActionButton
-                label={`Expand ${node.id}`}
-                disabled={
-                  Boolean(expandingNode) ||
-                  expandedNodesRef.current.has(node.id)
-                }
-                loading={expandingNode === node.id}
-                onClick={() => expandNode(node)}
-              >
-                <Plus
-                  data-admin-ux="artist-network-expand"
-                  aria-hidden="true"
-                />
-              </ActionButton>
-            }
-          >
-            <Link
-              to={nodeHref(node)}
-              aria-label={`Open ${node.id}`}
-              className="font-display text-sm hover:text-accent-action-hi focus-visible:outline-2 focus-visible:outline-focus-ring"
-            >
-              {node.id}
-            </Link>
-          </HairlineRow>
-        ))}
-      </HairlineList>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -21,6 +21,7 @@ import { ArtistBioResearchAction } from "./ArtistBioResearchAction";
 import { api } from "@/lib/api";
 import { artistActionApiPath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
+import { saveArtistBiography } from "@/lib/artist-biography";
 
 import type { ArtistData } from "./artistPageTypes";
 import { ArtistGenreSelector } from "./ArtistGenreSelector";
@@ -98,9 +99,23 @@ export function ArtistMetadataEditor({
   const [saving, setSaving] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const baseline = useRef(initialState(artist));
+  const editorSession = useRef({ artistKey: "", open: false });
 
   useEffect(() => {
-    if (open) setValues(initialState(artist));
+    const artistKey = artist.entity_uid ?? `id:${artist.id ?? artist.name}`;
+    if (
+      open &&
+      (!editorSession.current.open ||
+        editorSession.current.artistKey !== artistKey)
+    ) {
+      const initial = initialState(artist);
+      baseline.current = initial;
+      setValues(initial);
+      setDiscardOpen(false);
+      setResearchOpen(false);
+    }
+    editorSession.current = { artistKey, open };
   }, [artist, open]);
 
   function updateField<K extends keyof ArtistMetadataFormState>(
@@ -111,15 +126,31 @@ export function ArtistMetadataEditor({
   }
 
   function closeEditor(nextOpen: boolean) {
-    if (!nextOpen && !saving) {
-      const dirty =
-        JSON.stringify(values) !== JSON.stringify(initialState(artist));
+    if (!nextOpen) {
+      if (saving) return;
+      const dirty = JSON.stringify(values) !== JSON.stringify(baseline.current);
       if (dirty) {
         setDiscardOpen(true);
         return;
       }
     }
     onOpenChange(nextOpen);
+  }
+
+  async function applyBiography(proposal: string) {
+    setSaving(true);
+    try {
+      const biography = await saveArtistBiography(
+        { artistId: artist.id, artistEntityUid: artist.entity_uid },
+        proposal,
+      );
+      // Applying a biography commits only this field; other editorial edits stay in draft.
+      baseline.current = { ...baseline.current, bio: biography };
+      updateField("bio", biography);
+      onSaved?.();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function save() {
@@ -188,6 +219,7 @@ export function ArtistMetadataEditor({
               <FormField label="Biography" hint={`${values.bio.length}/4000`}>
                 <Textarea
                   aria-label="Bio"
+                  disabled={saving}
                   value={values.bio}
                   onChange={(event) => updateField("bio", event.target.value)}
                   rows={5}
@@ -228,6 +260,7 @@ export function ArtistMetadataEditor({
                 ).map(([field, label]) => (
                   <FormField key={field} label={label}>
                     <Input
+                      disabled={saving}
                       value={values[field]}
                       onChange={(event) =>
                         updateField(field, event.target.value)
@@ -246,6 +279,7 @@ export function ArtistMetadataEditor({
                   {(control) => (
                     <AdminSelect
                       {...control}
+                      disabled={saving}
                       value={values.artist_type}
                       onChange={(value) => updateField("artist_type", value)}
                       placeholder="Not specified"
@@ -272,6 +306,7 @@ export function ArtistMetadataEditor({
               >
                 <Textarea
                   aria-label="External URLs"
+                  disabled={saving}
                   value={values.urls}
                   onChange={(event) => updateField("urls", event.target.value)}
                   rows={4}
@@ -317,7 +352,7 @@ export function ArtistMetadataEditor({
         onOpenChange={setResearchOpen}
         artist={artist}
         currentBio={values.bio}
-        onApply={(bio) => updateField("bio", bio)}
+        onApply={applyBiography}
       />
     </>
   );

@@ -85,7 +85,7 @@ interface ArtistBioResearchDialogProps {
   onOpenChange: (open: boolean) => void;
   artist: ArtistData;
   currentBio: string;
-  onApply: (bio: string) => Promise<void> | void;
+  onApply: (bio: string) => Promise<void>;
 }
 
 function getProposalParagraphs(result: ResearchResult): string[] {
@@ -573,7 +573,7 @@ export function ArtistBioResearchDialog({
     setApplying(true);
     try {
       await onApply(value);
-      toast.success("Biography proposal applied");
+      toast.success("Biography saved");
       onOpenChange(false);
     } catch (nextError) {
       toast.error(
@@ -587,7 +587,12 @@ export function ArtistBioResearchDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!applying) onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent
         className="flex h-[min(92dvh,960px)] w-[min(92vw,72rem)] max-h-[min(92dvh,960px)] !max-w-5xl flex-col overflow-hidden"
         onOpenAutoFocus={() => void runResearch()}
@@ -598,7 +603,9 @@ export function ArtistBioResearchDialog({
           </DialogTitle>
           <DialogDescription>
             Internet sources are collected and consolidated into an editable
-            proposal for {artist.name}. Nothing is saved until you apply it.
+            proposal for {artist.name}. Apply biography saves the reviewed text
+            to the library. Other metadata edits remain in the editor until
+            saved.
           </DialogDescription>
         </DialogHeader>
         <ResearchDialogBody

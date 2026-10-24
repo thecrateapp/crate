@@ -234,6 +234,9 @@ it("keeps unavailable artist shows visible as a retryable read error", async () 
     { route: "/artists/alpha" },
   );
   await screen.findByText("Upcoming shows could not be loaded.");
+  expect(
+    screen.getByRole("alert").closest('[data-slot="artist-tab-content"]'),
+  ).not.toBeNull();
   await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   await waitFor(() =>
     expect(

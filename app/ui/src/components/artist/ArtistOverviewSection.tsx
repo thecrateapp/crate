@@ -1,7 +1,7 @@
 import { StatCard } from "@/components/artist/ArtistPageBits";
 import { ArtistBioText } from "@crate/ui/domain/ArtistBioText";
 import { SectionActionButton } from "@crate/ui/domain/lists/SectionHeader";
-import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -87,11 +87,9 @@ export function ArtistOverviewSection({
   return (
     <div className="min-w-0 space-y-8">
       {showBiography ? (
-        <InstrumentPanel
-          as="section"
+        <ArtistDetailSection
+          title="Biography"
           headingLevel={3}
-          ruled={false}
-          label={{ children: "Biography", tone: "accent" }}
           actions={
             canResearchBio && onResearchBio ? (
               <ArtistBioResearchAction onClick={onResearchBio} />
@@ -117,23 +115,24 @@ export function ArtistOverviewSection({
               {bioExpanded ? "Less" : "More"}
             </SectionActionButton>
           ) : null}
-        </InstrumentPanel>
+        </ArtistDetailSection>
       ) : null}
       {topTracks.length > 0 ? (
-        <InstrumentPanel
-          as="section"
+        <ArtistDetailSection
           headingLevel={3}
           ruled={showBiography}
-          label={{ children: "Top Tracks", tone: "accent" }}
+          title="Top Tracks"
         >
-          <ArtistTopTracksSection topTracks={topTracks.slice(0, 5)} />
-        </InstrumentPanel>
+          <ArtistTopTracksSection
+            topTracks={topTracks.slice(0, 5)}
+            withHeading={false}
+          />
+        </ArtistDetailSection>
       ) : null}
-      <InstrumentPanel
-        as="section"
+      <ArtistDetailSection
         headingLevel={3}
         ruled={showBiography || topTracks.length > 0}
-        label={{ children: "Stats", tone: "accent" }}
+        title="Stats"
       >
         {stats.length > 0 ? (
           <div className="grid max-w-3xl grid-cols-2 gap-x-6 sm:grid-cols-3 md:grid-cols-4">
@@ -147,13 +146,9 @@ export function ArtistOverviewSection({
           <InfoBadge>{formatNumber(totalTracks)} tracks</InfoBadge>
           <InfoBadge>{formatSize(totalSizeMb)}</InfoBadge>
         </div>
-      </InstrumentPanel>
+      </ArtistDetailSection>
       {members.length > 0 ? (
-        <InstrumentPanel
-          as="section"
-          headingLevel={3}
-          label={{ children: "Members", tone: "accent" }}
-        >
+        <ArtistDetailSection headingLevel={3} title="Members" ruled>
           <HairlineList label="Artist members" ruled={false}>
             {members.map((member) => (
               <HairlineRow
@@ -174,14 +169,10 @@ export function ArtistOverviewSection({
               </HairlineRow>
             ))}
           </HairlineList>
-        </InstrumentPanel>
+        </ArtistDetailSection>
       ) : null}
       {externalLinks.length > 0 ? (
-        <InstrumentPanel
-          as="section"
-          headingLevel={3}
-          label={{ children: "Links", tone: "accent" }}
-        >
+        <ArtistDetailSection headingLevel={3} title="Links" ruled>
           <div className="flex flex-wrap gap-2">
             {externalLinks.map((link) => (
               <Button key={link.label} asChild variant="ghost" size="sm">
@@ -191,7 +182,7 @@ export function ArtistOverviewSection({
               </Button>
             ))}
           </div>
-        </InstrumentPanel>
+        </ArtistDetailSection>
       ) : null}
       {enrichmentLoading ? (
         <LoadingState label="Loading artist enrichment" />

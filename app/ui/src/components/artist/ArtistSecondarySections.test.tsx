@@ -10,6 +10,7 @@ import { ArtistShowsSection, type ArtistShowEvent } from "./ArtistShowsSection";
 import { ArtistSimilarSection } from "./ArtistSimilarSection";
 import { ArtistStatsSection } from "./ArtistStatsSection";
 import { ArtistTopTracksSection } from "./ArtistTopTracksSection";
+import { ArtistSetlistSection } from "./ArtistSetlistSection";
 import { SimilarArtistCard, StatCard } from "./ArtistPageBits";
 
 vi.mock("./ArtistBioResearchAction", () => ({
@@ -29,8 +30,12 @@ vi.mock("@/components/ui/music-context-menu", () => ({
 vi.mock("./ArtistNetworkGraph", () => ({
   ArtistNetworkGraph: () => <div>Network instrument</div>,
 }));
+const { statsProps } = vi.hoisted(() => ({ statsProps: vi.fn() }));
 vi.mock("./ArtistStats", () => ({
-  ArtistStats: () => <div>Artist statistics</div>,
+  ArtistStats: (props: Record<string, unknown>) => {
+    statsProps(props);
+    return <div>Artist statistics</div>;
+  },
 }));
 vi.mock("@/components/album/AlbumCard", () => ({
   AlbumCard: ({ name }: { name: string }) => <div>{name}</div>,
@@ -62,6 +67,75 @@ beforeEach(() => {
 });
 
 describe("artist secondary presentation contracts", () => {
+  it.each([
+    ["Overview", "Biography"],
+    ["Top Tracks", "Top Tracks"],
+    ["Discography", "Albums"],
+    ["Setlist", "Probable Setlist"],
+    ["Shows", "Upcoming Shows"],
+    ["Similar", "Artist Network"],
+    ["Stats", "Stats"],
+  ])(
+    "keeps the first %s section in the shared artist tab frame",
+    (tab, heading) => {
+      const content: Record<string, ReactNode> = {
+        Overview: (
+          <ArtistOverviewSection
+            bioText="Artist biography"
+            bioExpanded={false}
+            onToggleBioExpanded={vi.fn()}
+            topTracks={[]}
+            externalLinks={[]}
+            albumCount={0}
+            totalTracks={0}
+            totalSizeMb={0}
+            enrichmentLoading={false}
+          />
+        ),
+        "Top Tracks": <ArtistTopTracksSection topTracks={[]} />,
+        Discography: (
+          <ArtistDiscographySection
+            artistName="Artist"
+            albums={[]}
+            sortedAlbums={[]}
+            missingAlbums={[]}
+            tidalMissing={[]}
+            showMissing={false}
+            sort="name"
+            downloadingDiscog={false}
+            onToggleShowMissing={vi.fn()}
+            onSortChange={vi.fn()}
+            onDownloadDiscography={vi.fn()}
+          />
+        ),
+        Setlist: (
+          <ArtistSetlistSection
+            artistName="Artist"
+            allTrackTitles={[]}
+            onTrackTitlesLoaded={vi.fn()}
+          />
+        ),
+        Shows: <ArtistShowsSection artistName="Artist" shows={[]} />,
+        Similar: <ArtistSimilarSection artistName="Artist" artists={[]} />,
+        Stats: <ArtistStatsSection artistName="Artist" />,
+      };
+      const { container } = frame(content[tab]);
+      const firstSection = container.querySelector(
+        '[data-slot="artist-detail-section"]',
+      );
+      expect(firstSection).toContainElement(
+        screen.getByRole("heading", { name: heading }),
+      );
+      expect(firstSection).not.toHaveClass("border-t", "pt-5.5");
+      expect(
+        firstSection?.querySelector('[data-slot="artist-detail-header"]'),
+      ).toHaveClass("min-h-11", "mb-3", "items-center");
+      expect(
+        firstSection?.querySelector('[data-slot="artist-detail-body"]'),
+      ).toBeTruthy();
+    },
+  );
+
   it.each(["Biography", "Top Tracks", "Stats"])(
     "leaves %s unruled when it is the first visible Overview panel",
     (firstPanel) => {
@@ -98,9 +172,7 @@ describe("artist secondary presentation contracts", () => {
         />,
       );
       for (const [index, name] of panels.slice(first).entries()) {
-        const panel = screen
-          .getByRole("heading", { name })
-          .closest('[data-slot="instrument-panel"]');
+        const panel = screen.getByRole("heading", { name }).closest("section");
         if (index === 0) expect(panel).not.toHaveClass("border-t");
         else expect(panel).toHaveClass("border-t");
       }
@@ -224,7 +296,7 @@ describe("artist secondary presentation contracts", () => {
     expect(
       screen
         .getByRole("heading", { name: "Members" })
-        .closest('[data-slot="instrument-panel"]'),
+        .closest('[data-slot="artist-detail-section"]'),
     ).toHaveClass("border-t");
     await userEvent.click(
       screen.getByRole("button", { name: "Research with AI" }),
@@ -427,7 +499,31 @@ describe("artist secondary presentation contracts", () => {
     expect(onDownload).toHaveBeenCalledOnce();
   });
 
-  it("uses the same section frame around the network in both sections", () => {
+  it("shows the shared empty state across the discography grid when no albums are available", () => {
+    frame(
+      <ArtistDiscographySection
+        artistName="Artist"
+        albums={[]}
+        sortedAlbums={[]}
+        missingAlbums={[]}
+        tidalMissing={[]}
+        showMissing={false}
+        sort="name"
+        downloadingDiscog={false}
+        onToggleShowMissing={vi.fn()}
+        onSortChange={vi.fn()}
+        onDownloadDiscography={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("status", { name: "No albums in library" }),
+    ).toHaveClass("col-span-full");
+    expect(
+      screen.getByText("Albums added to this artist will appear here."),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the network in Similar and removes the duplicated Stats request", () => {
     frame(
       <>
         <ArtistSimilarSection artistName="Artist" artists={[]} />
@@ -436,20 +532,44 @@ describe("artist secondary presentation contracts", () => {
     );
     expect(
       screen.getAllByRole("heading", { name: "Artist Network" }),
-    ).toHaveLength(2);
-    const [similarNetwork, statsNetwork] = screen.getAllByRole("heading", {
-      name: "Artist Network",
-    });
-    if (!similarNetwork || !statsNetwork) {
-      throw new Error("Expected the Similar and Stats network headings");
-    }
+    ).toHaveLength(1);
+    expect(screen.getAllByText("Network instrument")).toHaveLength(1);
     expect(
-      similarNetwork.closest('[data-slot="instrument-panel"]'),
-    ).not.toHaveClass("border-t");
-    expect(statsNetwork.closest('[data-slot="instrument-panel"]')).toHaveClass(
-      "border-t",
-    );
-    expect(screen.getAllByText("Network instrument")).toHaveLength(2);
-    expect(screen.getByText("Artist statistics")).toBeInTheDocument();
+      within(screen.getByRole("region", { name: "Stats" })).getByText(
+        "Artist statistics",
+      ),
+    ).toBeInTheDocument();
   });
+});
+
+it("forwards the existing album catalogue through the Stats section", () => {
+  const albums = [
+    {
+      id: 44,
+      entity_uid: "album-44",
+      name: "Album",
+      year: "2004",
+      tracks: 4,
+      formats: ["FLAC"],
+      size_mb: 100,
+      has_cover: true,
+    },
+  ];
+  frame(
+    <ArtistStatsSection
+      artistName="Artist"
+      artistId={7}
+      catalogueAlbums={albums}
+      totalTracks={20}
+      genreProfile={[{ name: "Rock", weight: 0.8 }]}
+    />,
+  );
+  expect(statsProps).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      catalogueAlbums: albums,
+      artistId: 7,
+      totalTracks: 20,
+      genreProfile: [{ name: "Rock", weight: 0.8 }],
+    }),
+  );
 });

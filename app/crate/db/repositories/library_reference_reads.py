@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.tx import read_scope
+from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
 
 def get_artist_analysis_tracks(
@@ -38,6 +39,11 @@ def get_artist_analysis_tracks(
                            'analyzer_version', mp.analyzer_version,
                            'source_revision', mp.source_revision,
                            'quality', mp.quality,
+                           'is_current_full_profile',
+                               mp.quality = 'full'
+                               AND mp.profile_version = :mix_profile_version
+                               AND mp.analyzer_version = :mix_analyzer_version
+                               AND mp.source_stale_at IS NULL,
                            'analyzed_at', mp.analyzed_at,
                            'source_stale_at', mp.source_stale_at,
                            'duration_ms', mp.duration_ms,
@@ -95,7 +101,11 @@ def get_artist_analysis_tracks(
                 ORDER BY t.id
                 """
                 ),
-                {"artist_name": artist_name},
+                {
+                    "artist_name": artist_name,
+                    "mix_profile_version": PROFILE_SCHEMA_VERSION,
+                    "mix_analyzer_version": ANALYZER_VERSION,
+                },
             )
             .mappings()
             .all()

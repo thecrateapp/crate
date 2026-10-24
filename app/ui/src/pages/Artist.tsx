@@ -43,6 +43,7 @@ import {
   tidalMissingArtistApiPath,
 } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
+import { saveArtistBiography } from "@/lib/artist-biography";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -279,6 +280,12 @@ interface ArtistTabContentProps {
   onRefreshSetlist: () => void;
   upcomingShows: ArtistShowEvent[];
   mergedSimilar: ReturnType<typeof buildMergedSimilarArtists>;
+  auxiliaryErrors: Partial<
+    Record<"shows" | "tracks" | "missing" | "tidal", string>
+  >;
+  onRetryAuxiliaryData: (
+    feed: "shows" | "tracks" | "missing" | "tidal",
+  ) => void;
 }
 
 function ArtistTabContent({
@@ -307,6 +314,8 @@ function ArtistTabContent({
   onRefreshSetlist,
   upcomingShows,
   mergedSimilar,
+  auxiliaryErrors,
+  onRetryAuxiliaryData,
 }: ArtistTabContentProps) {
   const {
     bioExpanded,
@@ -319,7 +328,7 @@ function ArtistTabContent({
     refreshingSetlist,
   } = flags;
   return (
-    <div className="min-w-0 pb-8 pt-4">
+    <div data-slot="artist-tab-content" className="min-w-0 pb-8 pt-4">
       {activeTab === "overview" ? (
         <ArtistOverviewSection
           bioText={bioText}
@@ -345,12 +354,10 @@ function ArtistTabContent({
         />
       ) : null}
       {activeTab === "top-tracks" ? (
-        <div className="max-w-4xl">
-          <ArtistTopTracksSection
-            topTracks={topTracks}
-            spotifyTopTracks={spotify?.top_tracks}
-          />
-        </div>
+        <ArtistTopTracksSection
+          topTracks={topTracks}
+          spotifyTopTracks={spotify?.top_tracks}
+        />
       ) : null}
       {activeTab === "discography" ? (
         <ArtistDiscographySection
@@ -405,6 +412,9 @@ function ArtistTabContent({
           artistName={artistName}
           artistId={data.id}
           artistEntityUid={data.entity_uid}
+          catalogueAlbums={data.albums}
+          totalTracks={data.total_tracks}
+          genreProfile={data.genre_profile}
         />
       ) : null}
       {activeTab === "artwork" && data.id != null ? (
@@ -417,6 +427,23 @@ function ArtistTabContent({
           canEdit={canEditMetadata}
         />
       ) : null}
+      {(activeTab === "discography"
+        ? ["missing", "tidal"]
+        : activeTab === "setlist"
+          ? ["tracks"]
+          : activeTab === "overview" || activeTab === "shows"
+            ? ["shows"]
+            : []
+      ).map((feed) => {
+        const key = feed as keyof typeof auxiliaryErrors;
+        return auxiliaryErrors[key] ? (
+          <ErrorState
+            key={key}
+            message={auxiliaryErrors[key]}
+            onRetry={() => onRetryAuxiliaryData(key)}
+          />
+        ) : null;
+      })}
     </div>
   );
 }
@@ -984,18 +1011,10 @@ function useArtistPageActions({
   }
 
   async function applyBioResearchProposal(proposal: string) {
-    const endpoint = artistActionApiPath(
+    await saveArtistBiography(
       { artistId: data?.id, artistEntityUid: data?.entity_uid },
-      "metadata",
+      proposal,
     );
-    if (!endpoint) throw new Error("Artist reference missing");
-    const queued = await api<{ task_id: string }>(endpoint, "PUT", {
-      bio: proposal,
-    });
-    const task = await waitForTask(queued.task_id, 60000);
-    if (task.status !== "completed") {
-      throw new Error(task.error || "Failed to save biography");
-    }
     refetch();
   }
 
@@ -1495,21 +1514,6 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
         onDelete={() => setShowDeleteConfirm(true)}
         onMerge={() => setShowMergeArtist(true)}
       />
-      {(
-        [
-          "shows",
-          ...(activeTab === "discography" ? ["missing", "tidal"] : []),
-          ...(activeTab === "setlist" ? ["tracks"] : []),
-        ] as Array<keyof typeof model.auxiliaryErrors>
-      ).map((feed) =>
-        model.auxiliaryErrors[feed] ? (
-          <ErrorState
-            key={feed}
-            message={model.auxiliaryErrors[feed]}
-            onRetry={() => model.retryAuxiliaryData(feed)}
-          />
-        ) : null,
-      )}
       <ArtistTabsNav tabs={tabs} activeTab={activeTab} onChange={setActiveTab}>
         <ArtistTabContent
           activeTab={activeTab}
@@ -1546,6 +1550,8 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
           onRefreshSetlist={() => void refreshProbableSetlist()}
           upcomingShows={upcomingShows}
           mergedSimilar={mergedSimilar}
+          auxiliaryErrors={model.auxiliaryErrors}
+          onRetryAuxiliaryData={model.retryAuxiliaryData}
         />
       </ArtistTabsNav>
       <ArtistPageDialogs

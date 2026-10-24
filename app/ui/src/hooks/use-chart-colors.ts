@@ -13,6 +13,7 @@ function readChartColors() {
     subtle: color("--text-subtle"),
     border: color("--border-quiet"),
     surface: color("--surface-app"),
+    warning: color("--state-warning"),
   };
 }
 

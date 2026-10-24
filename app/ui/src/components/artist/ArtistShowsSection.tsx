@@ -1,3 +1,5 @@
+import { ArtistDetailSection } from "./ArtistDetailSection";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { EntityRow, EntityAvatar } from "@crate/ui/domain/entity";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -39,80 +41,89 @@ export function ArtistShowsSection({
   artistSlug,
   shows,
 }: ArtistShowsSectionProps) {
-  if (!shows.length)
-    return (
-      <p className="py-8 text-sm text-text-muted">
-        No upcoming shows available
-      </p>
-    );
   return (
-    <div className="space-y-[var(--content-list-gap)]">
-      {shows.map((show) => {
-        const date = show.date
-          ? new Date(show.date + (show.date.includes("T") ? "" : "T12:00:00"))
-          : null;
-        const dateText = date
-          ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-          : show.local_date;
-        const support = show.lineup.filter(
-          (name) => name.toLowerCase() !== artistName.toLowerCase(),
-        );
-        return (
-          <EntityRow
-            key={show.id || `${show.date}-${show.name}-${show.venue}`}
-            title={show.name || show.venue}
-            href={show.url || undefined}
-            external={Boolean(show.url)}
-            openLabel={
-              show.url
-                ? `Open tickets for ${show.name || show.venue}`
-                : undefined
-            }
-            menuButton="none"
-            leading={
-              <EntityAvatar
-                src={artistPhotoApiUrl({ artistId, artistSlug, artistName })}
-                name={artistName}
-                alt=""
-                size="lg"
-                shape="rounded"
+    <ArtistDetailSection title="Upcoming Shows">
+      {shows.length === 0 ? (
+        <EmptyState title="No upcoming shows available" />
+      ) : (
+        <div className="space-y-[var(--content-list-gap)]">
+          {shows.map((show) => {
+            const date = show.date
+              ? new Date(
+                  show.date + (show.date.includes("T") ? "" : "T12:00:00"),
+                )
+              : null;
+            const dateText = date
+              ? date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : show.local_date;
+            const support = show.lineup.filter(
+              (name) => name.toLowerCase() !== artistName.toLowerCase(),
+            );
+            return (
+              <EntityRow
+                key={show.id || `${show.date}-${show.name}-${show.venue}`}
+                title={show.name || show.venue}
+                href={show.url || undefined}
+                external={Boolean(show.url)}
+                openLabel={
+                  show.url
+                    ? `Open tickets for ${show.name || show.venue}`
+                    : undefined
+                }
+                menuButton="none"
+                leading={
+                  <EntityAvatar
+                    src={artistPhotoApiUrl({
+                      artistId,
+                      artistSlug,
+                      artistName,
+                    })}
+                    name={artistName}
+                    alt=""
+                    size="lg"
+                    shape="rounded"
+                  />
+                }
+                subtitle={
+                  <MonoLabel
+                    as="span"
+                    meta={[
+                      show.venue,
+                      [show.city, show.country].filter(Boolean).join(", "),
+                    ]}
+                  />
+                }
+                meta={
+                  support.length ? (
+                    <MonoLabel as="span">with {support.join(", ")}</MonoLabel>
+                  ) : undefined
+                }
+                trailing={
+                  <>
+                    <div className="space-y-1 text-right">
+                      <MonoLabel as="span" tone="accent">
+                        {dateText}
+                      </MonoLabel>
+                      {show.price_range ? (
+                        <MonoLabel>
+                          {show.price_range.min}–{show.price_range.max}{" "}
+                          {show.price_range.currency}
+                        </MonoLabel>
+                      ) : null}
+                    </div>
+                    {show.status === "onsale" ? (
+                      <InfoBadge tone="accent">On Sale</InfoBadge>
+                    ) : null}
+                  </>
+                }
               />
-            }
-            subtitle={
-              <MonoLabel
-                as="span"
-                meta={[
-                  show.venue,
-                  [show.city, show.country].filter(Boolean).join(", "),
-                ]}
-              />
-            }
-            meta={
-              support.length ? (
-                <MonoLabel as="span">with {support.join(", ")}</MonoLabel>
-              ) : undefined
-            }
-            trailing={
-              <>
-                <div className="space-y-1 text-right">
-                  <MonoLabel as="span" tone="accent">
-                    {dateText}
-                  </MonoLabel>
-                  {show.price_range ? (
-                    <MonoLabel>
-                      {show.price_range.min}–{show.price_range.max}{" "}
-                      {show.price_range.currency}
-                    </MonoLabel>
-                  ) : null}
-                </div>
-                {show.status === "onsale" ? (
-                  <InfoBadge tone="accent">On Sale</InfoBadge>
-                ) : null}
-              </>
-            }
-          />
-        );
-      })}
-    </div>
+            );
+          })}
+        </div>
+      )}
+    </ArtistDetailSection>
   );
 }

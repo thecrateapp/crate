@@ -222,12 +222,10 @@ class TestMissingAlbumsAPI:
             resp = test_app.get("/api/artists/by-entity/nonexistent/missing")
         assert resp.status_code == 404
 
-    def test_missing_albums_by_entity_uid_resolves_managed_storage(
+    def test_missing_albums_by_entity_uid_uses_indexed_inventory(
         self, test_app, tmp_path
     ):
         entity_uid = "695179a0-3863-50c2-9302-61f5cf144daa"
-        artist_dir = tmp_path / entity_uid
-        artist_dir.mkdir()
         result = {
             "artist": "Birds In Row",
             "local": [],
@@ -243,25 +241,43 @@ class TestMissingAlbumsAPI:
                 return_value="Birds In Row",
             ),
             patch(
-                "crate.api.analytics.get_library_artist",
+                "crate.api.analytics.get_artist_album_inventory",
                 return_value={
-                    "name": "Birds In Row",
-                    "folder_name": entity_uid,
-                    "entity_uid": entity_uid,
+                    "artist": "Birds In Row",
+                    "local": [],
                 },
             ),
             patch("crate.api.analytics.library_path", return_value=tmp_path),
-            patch("crate.api.analytics.extensions", return_value={".flac"}),
             patch(
-                "crate.api.analytics.find_missing_albums", return_value=result
+                "crate.api.analytics.compare_missing_albums", return_value=result
             ) as missing_albums,
         ):
             resp = test_app.get(f"/api/artists/by-entity/{entity_uid}/missing")
 
         assert resp.status_code == 200
         assert resp.json() == result
+        missing_albums.assert_called_once_with("Birds In Row", [])
+
+    def test_missing_search_unindexed_artist_keeps_filesystem_fallback(
+        self, test_app, tmp_path
+    ):
+        artist_dir = tmp_path / "Legacy Artist"
+        artist_dir.mkdir()
+        result = {"artist": "Legacy Artist", "local": [], "missing": []}
+        with (
+            patch("crate.api.analytics.get_artist_album_inventory", return_value=None),
+            patch("crate.api.analytics.library_path", return_value=tmp_path),
+            patch("crate.api.analytics.extensions", return_value={".flac"}),
+            patch(
+                "crate.api.analytics.find_missing_albums", return_value=result
+            ) as missing_albums,
+        ):
+            response = test_app.get("/api/missing-search?q=Legacy%20Artist")
+
+        assert response.status_code == 200
+        assert response.json() == result
         missing_albums.assert_called_once_with(
-            Path(artist_dir), {".flac"}, artist_name="Birds In Row"
+            Path(artist_dir), {".flac"}, artist_name="Legacy Artist"
         )
 
     def test_missing_search_empty_query_returns_404(self, test_app):

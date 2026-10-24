@@ -1,13 +1,12 @@
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
-import { FormField } from "@crate/ui/primitives/FormField";
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { AdminSelect } from "@/components/ui";
 import { AlbumCard } from "@/components/album/AlbumCard";
 import { MissingAlbumCard } from "@/components/album/MissingAlbumCard";
 import { TidalAlbumCard } from "@/components/album/TidalAlbumCard";
 import type { ArtistAlbumSummary } from "@/components/artist/artistPageTypes";
 import { Button } from "@crate/ui/shadcn/button";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface MissingAlbum {
   title: string;
@@ -60,15 +59,11 @@ export function ArtistDiscographySection({
   onDownloadDiscography,
 }: ArtistDiscographySectionProps) {
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <MonoLabel as="h2" tone="accent">
-              Albums
-            </MonoLabel>
-            <InfoBadge variant="counter">{albums.length}</InfoBadge>
-          </div>
+    <ArtistDetailSection
+      title="Albums"
+      count={albums.length}
+      actions={
+        <>
           {missingAlbums.length > 0 && (
             <FilterChip active={showMissing} onClick={onToggleShowMissing}>
               {showMissing ? "Hide" : "Show"} missing ({missingAlbums.length})
@@ -86,23 +81,23 @@ export function ArtistDiscographySection({
               Complete Discography ({tidalMissing.length} from Tidal)
             </Button>
           )}
-        </div>
-        <FormField label="Sort albums" className="w-44">
-          <AdminSelect
-            ariaLabel="Sort albums"
-            placeholder="Sort albums"
-            value={sort}
-            onChange={onSortChange}
-            allowClear={false}
-            options={[
-              { value: "name", label: "Name" },
-              { value: "year", label: "Newest" },
-              { value: "tracks", label: "Most Tracks" },
-            ]}
-          />
-        </FormField>
-      </div>
-
+          <div className="w-44">
+            <AdminSelect
+              ariaLabel="Sort albums"
+              placeholder="Sort albums"
+              value={sort}
+              onChange={onSortChange}
+              allowClear={false}
+              options={[
+                { value: "name", label: "Name" },
+                { value: "year", label: "Newest" },
+                { value: "tracks", label: "Most Tracks" },
+              ]}
+            />
+          </div>
+        </>
+      }
+    >
       <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
         {(() => {
           type GridItem =
@@ -146,6 +141,16 @@ export function ArtistDiscographySection({
                     : b.album.first_release_date || "";
               return yearB.localeCompare(yearA);
             });
+          }
+
+          if (items.length === 0) {
+            return (
+              <EmptyState
+                className="col-span-full"
+                title="No albums in library"
+                description="Albums added to this artist will appear here."
+              />
+            );
           }
 
           return items.map((item) =>
@@ -193,6 +198,6 @@ export function ArtistDiscographySection({
           );
         })()}
       </div>
-    </div>
+    </ArtistDetailSection>
   );
 }

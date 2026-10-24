@@ -246,6 +246,7 @@ class ArtistSmartMixProfileResponse(BaseModel):
     analyzer_version: str | None = None
     source_revision: str | None = None
     quality: str | None = None
+    is_current_full_profile: bool = False
     analyzed_at: datetime | None = None
     source_stale_at: datetime | None = None
     duration_ms: int | None = None

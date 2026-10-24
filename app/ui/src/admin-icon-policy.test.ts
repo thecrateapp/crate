@@ -46,7 +46,10 @@ const libraryScope = [
   "app/ui/src/components/artist/ArtistShowsSection.tsx",
   "app/ui/src/components/artist/ArtistSimilarSection.tsx",
   "app/ui/src/components/artist/ArtistStats.tsx",
+  "app/ui/src/components/artist/ArtistStatsSummary.tsx",
   "app/ui/src/components/artist/ArtistStatsSection.tsx",
+  "app/ui/src/components/charts/InstrumentChart.tsx",
+  "app/ui/src/components/system-health/MetricChart.tsx",
   "app/ui/src/components/artist/ArtistTabsNav.tsx",
   "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
   "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
@@ -786,6 +789,26 @@ const approvedLibraryControls = new Map<string, number>([
     1,
   ],
   [
+    "app/ui/src/components/artist/ArtistStats.tsx:@crate/ui/composites/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/components/system-health/MetricChart.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
+    1,
+  ],
+  [
+    "app/ui/src/components/system-health/MetricChart.tsx:@crate/ui/shadcn/select:SelectTrigger",
+    1,
+  ],
+  [
+    "app/ui/src/components/system-health/MetricChart.tsx:@crate/ui/shadcn/select:SelectContent",
+    1,
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@/components/system-health/MetricChart:MetricChart",
+    1,
+  ],
+  [
     "app/ui/src/components/artist/ArtistStatsSection.tsx:@/components/artist/ArtistStats:ArtistStats",
     1,
   ],
@@ -1132,7 +1155,6 @@ const approvedUx = new Map([
     "ArtistNetworkGraph:artist-network-expand-selected",
     ["@crate/ui/icons", "Plus"],
   ],
-  ["ArtistNetworkGraph:artist-network-expand", ["@crate/ui/icons", "Plus"]],
 
   ["I18nReview:translations-refresh", ["lucide-react", "Loader2"]],
   ["I18nReview:translations-draft", ["lucide-react", "Loader2"]],
@@ -1232,6 +1254,30 @@ const approvedFallbacks = new Map([
   ["NewReleases:releases-card-cover", "Disc3"],
   ["Upcoming:upcoming-show-cover", "Calendar"],
 ]);
+// These two marked SVGs encode chart data. Their path, tag, semantics and
+// one source site each are fixed; other inline SVGs still fail the inventory.
+const approvedNativeInstruments = new Map<
+  string,
+  readonly (readonly [string, string])[]
+>([
+  [
+    "app/ui/src/components/artist/ArtistStats.tsx:artist-release-timeline",
+    [
+      ["role", '"group"'],
+      ["aria-label", '"Chronological releases"'],
+      ["viewBox", "{`0 0 ${timelineWidth} ${height}`}"],
+    ],
+  ],
+  [
+    "app/ui/src/components/charts/InstrumentChart.tsx:chart-series-legend",
+    [
+      ["aria-hidden", '"true"'],
+      ["width", "{22}"],
+      ["height", "{10}"],
+      ["viewBox", '"0 0 22 10"'],
+    ],
+  ],
+]);
 function violations(sources: Map<string, string>, entries: IconEntry[]) {
   const found: string[] = [];
   const controlUses = new Map<string, number>();
@@ -1258,6 +1304,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         "glyph-jsx",
         "owned-icon-consumer",
         "owned-vector-consumer",
+        "native-visual",
         "icon-prop",
         "icon-property",
       ].includes(entry.kind)
@@ -1360,6 +1407,37 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
         (attr) => ts.isJsxAttribute(attr) && attr.name.getText(tree) === name,
       ) as ts.JsxAttribute | undefined;
     const unknownSpread = attrs.some(ts.isJsxSpreadAttribute);
+    const instrumentMarker = prop("data-admin-instrument")?.initializer;
+    if (entry.kind === "native-visual") {
+      const parent = attributes.parent;
+      const site =
+        instrumentMarker && ts.isStringLiteral(instrumentMarker)
+          ? `${entry.path}:${instrumentMarker.text}`
+          : "";
+      const required = approvedNativeInstruments.get(site);
+      if (
+        !unknownSpread &&
+        entry.name === "svg" &&
+        (ts.isJsxOpeningElement(parent) ||
+          ts.isJsxSelfClosingElement(parent)) &&
+        parent.tagName.getText(tree) === "svg" &&
+        attrs.filter(
+          (attr) =>
+            ts.isJsxAttribute(attr) &&
+            attr.name.getText(tree) === "data-admin-instrument",
+        ).length === 1 &&
+        required?.every(
+          ([name, expected]) =>
+            prop(name)?.initializer?.getText(tree) === expected,
+        ) &&
+        !usedUx.has(site)
+      ) {
+        usedUx.add(site);
+        continue;
+      }
+      found.push(entry.id);
+      continue;
+    }
     const fallbackMarker = prop("data-admin-ux")?.initializer;
     if (fallbackMarker && ts.isStringLiteral(fallbackMarker)) {
       const marker = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${fallbackMarker.text}`;
@@ -1961,6 +2039,23 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       violations(new Map([[path, source]]), analyzeSource(path, source).entries)
         .length,
     ).toBeGreaterThan(0);
+  });
+  it("bounds native instruments to their marker, source file and one SVG site", () => {
+    const path = "app/ui/src/components/charts/InstrumentChart.tsx";
+    const legend =
+      '<svg data-admin-instrument="chart-series-legend" aria-hidden="true" width={22} height={10} viewBox="0 0 22 10"><line/></svg>';
+    const cases = [
+      [path, legend.replace("chart-series-legend", "unknown-instrument")],
+      [path, `<>${legend}${legend}</>`],
+      ["app/ui/src/components/artist/ArtistStats.tsx", legend],
+    ] as const;
+    for (const [file, source] of cases) {
+      const entries = analyzeSource(file, source).entries;
+      expect(
+        entries.filter((entry) => entry.kind === "native-visual"),
+      ).toHaveLength(source.includes("</svg><svg") ? 2 : 1);
+      expect(violations(new Map([[file, source]]), entries)).toHaveLength(1);
+    }
   });
   it("does not extend an Album glyph approval to another symbol or duplicate site", () => {
     const path = "app/ui/src/components/album/AlbumHeader.tsx";

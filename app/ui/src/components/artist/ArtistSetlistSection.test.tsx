@@ -24,7 +24,9 @@ describe("ArtistSetlistSection", () => {
     );
 
     expect(
-      screen.getByText("No concert data available from Setlist.fm"),
+      screen.getByRole("status", {
+        name: "No concert data available from Setlist.fm",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -53,7 +55,7 @@ describe("ArtistSetlistSection", () => {
     expect(
       screen
         .getByRole("heading", { name: "Probable Setlist" })
-        .closest('[data-slot="instrument-panel"]'),
+        .closest('[data-slot="artist-detail-section"]'),
     ).not.toHaveClass("border-t");
     expect(screen.getByText("Una historia con las manos")).toBeInTheDocument();
   });
@@ -79,7 +81,9 @@ describe("ArtistSetlistSection", () => {
 
     expect(onRefresh).toHaveBeenCalledOnce();
     expect(
-      screen.getByText("No concert data available from Setlist.fm"),
+      screen.getByRole("status", {
+        name: "No concert data available from Setlist.fm",
+      }),
     ).toBeInTheDocument();
   });
 

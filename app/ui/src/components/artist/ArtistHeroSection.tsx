@@ -364,7 +364,7 @@ export function ArtistHeroSection({
           ) : null,
         ]}
         actions={actions}
-        actionsClassName="border-b border-border-quiet px-0 sm:px-0"
+        actionsClassName="px-0 sm:px-0"
       >
         {popularityScore > 0 ? (
           <MonoLabel as="p" className="mt-3">

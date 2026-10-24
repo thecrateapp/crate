@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -288,4 +288,34 @@ describe("ArtistBioResearchDialog", () => {
       screen.getByRole("textbox", { name: "Proposed biography" }),
     ).toHaveValue(currentBio);
   });
+});
+
+it("keeps Apply pending and prevents closing until persistence completes", async () => {
+  let finish!: () => void;
+  const pendingSave = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const onOpenChange = vi.fn();
+  render(
+    <ArtistBioResearchDialog
+      open
+      onOpenChange={onOpenChange}
+      artist={artist}
+      currentBio="Old bio"
+      onApply={() => pendingSave}
+    />,
+  );
+  await screen.findByTestId("artist-bio-preview");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply biography" }),
+  );
+  await userEvent.keyboard("{Escape}");
+  expect(onOpenChange).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("dialog", { name: "Research biography with AI" }),
+  ).toBeInTheDocument();
+  await act(async () => {
+    finish();
+  });
+  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 });

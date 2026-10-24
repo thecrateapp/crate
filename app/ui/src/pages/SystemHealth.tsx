@@ -8,8 +8,8 @@ import {
 import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { ResponsiveLine } from "@nivo/line";
-import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
+import { MetricChart } from "@/components/system-health/MetricChart";
+import { metricStreams } from "@/components/system-health/metric-stream-model";
 
 import {
   OpsPageHero,
@@ -284,34 +284,6 @@ function formatRouteErrorRate(value: number | null | undefined) {
   return `${pct >= 10 ? pct.toFixed(0) : pct.toFixed(1)}%`;
 }
 
-function ChartTooltip({
-  title,
-  items,
-}: {
-  title: string;
-  items: { label: string; value: string }[];
-}) {
-  return (
-    <OpsSurface className="min-w-[180px] rounded-sm bg-panel-surface px-3 py-3 text-xs text-text-primary">
-      <MonoLabel as="div" tone="accent">
-        Metric slice
-      </MonoLabel>
-      <div className="mt-2 font-medium text-text-primary">{title}</div>
-      <div className="mt-3 space-y-1.5">
-        {items.map((item) => (
-          <div
-            key={`${item.label}-${item.value}`}
-            className="flex items-center justify-between gap-4 border-b border-border-quiet pb-1 last:border-b-0 last:pb-0"
-          >
-            <span className="text-text-muted">{item.label}</span>
-            <span className="font-medium text-text-primary">{item.value}</span>
-          </div>
-        ))}
-      </div>
-    </OpsSurface>
-  );
-}
-
 function HealthSignal({
   score,
   summary,
@@ -396,136 +368,6 @@ function ResourceMeter({
         <InfoBadge tone="warning">Elevated</InfoBadge>
       ) : null}
     </div>
-  );
-}
-
-function MetricChart({
-  title,
-  data,
-  yLabel,
-  series,
-}: {
-  title: string;
-  data: TimeseriesPoint[];
-  yLabel: string;
-  series?: { id: string; field: keyof TimeseriesPoint }[];
-}) {
-  const motionAllowed = useMotionAllowed();
-  const { chartData, tickValues } = useMemo(() => {
-    if (!data?.length) return { chartData: [], tickValues: [] as string[] };
-    const labels = data.map((point) =>
-      new Date(point.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-    const maxTicks = 6;
-    const step = Math.max(1, Math.floor(labels.length / maxTicks));
-    const picks: string[] = [];
-    for (let i = 0; i < labels.length; i += step) {
-      const label = labels[i];
-      if (label) picks.push(label);
-    }
-
-    const lines = series ?? [
-      { id: "avg", field: "avg" as const },
-      { id: "max", field: "max" as const },
-    ];
-
-    return {
-      chartData: lines.map((line) => ({
-        id: line.id,
-        data: data.map((point, index) => ({
-          x: labels[index] ?? "",
-          y: (point[line.field] as number) ?? 0,
-        })),
-      })),
-      tickValues: picks,
-    };
-  }, [data, series]);
-
-  if (!chartData.length) {
-    return (
-      <OpsSurface className="p-4">
-        <div className="mb-2 font-display text-xl font-bold text-text-primary">
-          {title}
-        </div>
-        <EmptyState
-          message="No data yet"
-          className="h-48 items-center text-center"
-        />
-      </OpsSurface>
-    );
-  }
-
-  return (
-    <OpsSurface className="p-4">
-      <div className="mb-2 font-display text-xl font-bold text-text-primary">
-        {title}
-      </div>
-      <div className="h-48">
-        <ResponsiveLine
-          animate={motionAllowed}
-          data={chartData}
-          margin={{ top: 8, right: 16, bottom: 32, left: 48 }}
-          xScale={{ type: "point" }}
-          yScale={{ type: "linear", min: 0, max: "auto" }}
-          curve="monotoneX"
-          colors={[
-            "var(--color-accent-action-hi)",
-            "color-mix(in srgb, var(--color-accent-action-hi) 30%, transparent)",
-            "var(--color-state-warning)",
-            "color-mix(in srgb, var(--color-state-warning) 30%, transparent)",
-          ]}
-          lineWidth={2}
-          pointSize={0}
-          enableArea={true}
-          areaOpacity={0.08}
-          enableGridX={false}
-          gridYValues={4}
-          theme={{
-            text: { fill: "var(--color-text-subtle)", fontSize: 10 },
-            grid: { line: { stroke: "var(--color-border-quiet)" } },
-            crosshair: {
-              line: {
-                stroke: "var(--color-accent-action-hi)",
-                strokeWidth: 1,
-              },
-            },
-            tooltip: {
-              container: {
-                background: "transparent",
-                border: "none",
-                boxShadow: "none",
-                padding: 0,
-              },
-            },
-          }}
-          axisBottom={{ tickSize: 0, tickPadding: 8, tickValues }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 8,
-            tickValues: 4,
-            legend: yLabel,
-            legendPosition: "middle",
-            legendOffset: -40,
-          }}
-          enableSlices="x"
-          sliceTooltip={({ slice }) => (
-            <ChartTooltip
-              title={String(slice.points[0]?.data.x ?? "")}
-              items={slice.points.map((point) => ({
-                label: String(point.seriesId),
-                value:
-                  typeof point.data.y === "number"
-                    ? (point.data.y as number).toFixed(1)
-                    : String(point.data.y ?? "0"),
-              }))}
-            />
-          )}
-        />
-      </div>
-    </OpsSurface>
   );
 }
 
@@ -699,26 +541,22 @@ export function SystemHealth() {
     `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
   );
 
+  // useApi retains its previous response while a different window loads (or fails).
+  // Bind bucket semantics to each response identity, never to the selected control.
+  const [metricSnapshot, setMetricSnapshot] = useState({
+    data: dashboard,
+    period,
+  });
+  if (dashboard !== metricSnapshot.data) {
+    setMetricSnapshot({ data: dashboard, period });
+  }
+  const samplePeriod =
+    dashboard === metricSnapshot.data ? metricSnapshot.period : period;
+
   const summary = dashboard?.summary ?? null;
   const system = dashboard?.system ?? null;
   const tasks = dashboard?.tasks ?? [];
-  const latencyTs = dashboard?.timeseries?.["api.latency"] ?? [];
-  const requestsTs = dashboard?.timeseries?.["api.requests"] ?? [];
-  const errorsTs = dashboard?.timeseries?.["api.errors"] ?? [];
-  const apiSlowTs = dashboard?.timeseries?.["api.slow"] ?? [];
-  const streamTs = dashboard?.timeseries?.["stream.requests"] ?? [];
-  const transcodeDurationTs =
-    dashboard?.timeseries?.["stream.transcode.duration"] ?? [];
-  const homeComputeTs = dashboard?.timeseries?.["home.compute.ms"] ?? [];
-  const homeEndpointComputeTs =
-    dashboard?.timeseries?.["home.endpoint_compute.ms"] ?? [];
-  const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
-  const taskDurationTs = dashboard?.timeseries?.["worker.task.duration"] ?? [];
-  const queueWaitTs = dashboard?.timeseries?.["worker.queue.wait"] ?? [];
-  const resourceDeferredTs =
-    dashboard?.timeseries?.["worker.resource.deferred"] ?? [];
-  const resourceLoadTs =
-    dashboard?.timeseries?.["worker.resource.load_ratio"] ?? [];
+
   const playbackDelivery = dashboard?.playback_delivery;
   const routeLatency = dashboard?.route_latency ?? [];
 
@@ -774,6 +612,7 @@ export function SystemHealth() {
           ? "The system is usable, but latency or load deserve attention before they become user-facing."
           : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
+  const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
   const runningTasks = tasks.length;
   const queueDepth = queueTs.length
     ? (queueTs[queueTs.length - 1]?.max ?? 0)
@@ -1237,62 +1076,14 @@ export function SystemHealth() {
         description="Latency, request volume, queue pressure and task execution trends over the selected time window."
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <MetricChart title="API Latency" data={latencyTs} yLabel="ms" />
-          <MetricChart title="Request Volume" data={requestsTs} yLabel="req" />
-          <MetricChart
-            title="Error Rate"
-            data={errorsTs}
-            yLabel="errors"
-            series={[{ id: "errors", field: "count" }]}
-          />
-          <MetricChart
-            title="Slow Requests"
-            data={apiSlowTs}
-            yLabel="slow"
-            series={[{ id: "slow", field: "count" }]}
-          />
-          <MetricChart
-            title="Stream Activity"
-            data={streamTs}
-            yLabel="streams"
-          />
-          <MetricChart
-            title="Transcode Duration"
-            data={transcodeDurationTs}
-            yLabel="sec"
-          />
-          <MetricChart
-            title="Home Core Compute"
-            data={homeComputeTs}
-            yLabel="ms"
-          />
-          <MetricChart
-            title="Home Endpoint Compute"
-            data={homeEndpointComputeTs}
-            yLabel="ms"
-          />
-          <MetricChart
-            title="Task Duration"
-            data={taskDurationTs}
-            yLabel="sec"
-          />
-          <MetricChart
-            title="Queue Wait Time"
-            data={queueWaitTs}
-            yLabel="sec"
-          />
-          <MetricChart title="Queue Depth" data={queueTs} yLabel="tasks" />
-          <MetricChart
-            title="Resource Deferrals"
-            data={resourceDeferredTs}
-            yLabel="deferrals"
-            series={[{ id: "deferred", field: "count" }]}
-          />
-          <MetricChart
-            title="Resource Load Ratio"
-            data={resourceLoadTs}
-            yLabel="ratio"
-          />
+          {metricStreams.map((stream) => (
+            <MetricChart
+              key={stream.id}
+              stream={stream}
+              data={dashboard?.timeseries?.[stream.id] ?? []}
+              intervalSeconds={samplePeriod === "minute" ? 60 : 3600}
+            />
+          ))}
         </div>
       </OpsPanel>
 
