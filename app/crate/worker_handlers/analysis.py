@@ -314,6 +314,19 @@ def _handle_refresh_instance_stats_dashboard_snapshot(
     return {"ok": True, "window": window}
 
 
+def _handle_refresh_collection_insights(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    from crate.db.collection_insights_surface import refresh_collection_insights
+    from crate.api.cache_events import broadcast_invalidation
+
+    window = str(params.get("window") or "30d")
+    refresh_collection_insights(window=window)
+    broadcast_invalidation("collection-insights")
+    return {"ok": True, "window": window}
+
+
 def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict:
     """Analyze audio + compute bliss vectors for a single album."""
     artist = params.get("artist", "")
@@ -1421,6 +1434,7 @@ ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,
     "refresh_user_stats_dashboard_snapshot": _handle_refresh_user_stats_dashboard_snapshot,
     "refresh_instance_stats_dashboard_snapshot": _handle_refresh_instance_stats_dashboard_snapshot,
+    "refresh_collection_insights": _handle_refresh_collection_insights,
     "index_genres": _handle_index_genres,
     "infer_genre_taxonomy": _handle_infer_genre_taxonomy,
     "rebuild_genre_taxonomy_proposals": _handle_rebuild_genre_taxonomy_proposals,

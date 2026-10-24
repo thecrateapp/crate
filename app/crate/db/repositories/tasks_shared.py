@@ -9,6 +9,7 @@ from crate.db.tx import register_after_commit
 log = logging.getLogger(__name__)
 
 DB_HEAVY_TASKS = {
+    "refresh_collection_insights",
     "library_sync",
     "library_pipeline",
     "wipe_library",

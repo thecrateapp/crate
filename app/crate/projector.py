@@ -23,6 +23,8 @@ from crate.db.instance_stats_dashboard_surface import (
     schedule_instance_stats_dashboard_refresh,
 )
 
+from crate.db.collection_insights_surface import schedule_collection_insights_refresh
+
 log = logging.getLogger(__name__)
 
 _OPS_EVENT_TYPES = {
@@ -228,6 +230,17 @@ def _projection_actions(
         raise ValueError("Domain event payload must be an object")
     payload: Mapping[str, Any] = payload_raw
     actions: set[tuple[str, int | None]] = set()
+    if event_type in {
+        "library.scan.completed",
+        "track.analysis.updated",
+        "track.bliss.updated",
+        "user.listening_aggregates.updated",
+    }:
+        actions.add(("collection-insights", None))
+    if scope == "ui.invalidate" and str(
+        payload.get("scope") or event.get("subject_key") or ""
+    ).startswith(("library", "genres", "artist:", "album:", "analysis")):
+        actions.add(("collection-insights", None))
 
     if (
         event_type in _OPS_EVENT_TYPES
@@ -281,6 +294,9 @@ def _execute_projection_action(action: tuple[str, int | None]) -> tuple[int, int
         return 1, 0
     if name == "recent-global":
         return 0, _warm_recent_home_discovery_snapshots()
+    if name == "collection-insights":
+        schedule_collection_insights_refresh()
+        return 0, 0
     if name == "stats-instance":
         schedule_instance_stats_dashboard_refresh()
         return 0, 0

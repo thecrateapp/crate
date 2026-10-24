@@ -1,5 +1,6 @@
 import re as _re
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -26,6 +27,8 @@ from crate.api.schemas.analytics import (
     TimelineResponse,
 )
 from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
+from crate.api.schemas.collection_insights import CollectionInsightsResponse
+from crate.db.collection_insights_surface import get_collection_insights
 from crate.db.queries.user_library_stats_range import (
     StatsRangeError,
     get_instance_stats_range,
@@ -376,6 +379,21 @@ def api_artist_stats_by_entity_uid(request: Request, artist_entity_uid: str):
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return api_artist_stats(request, artist_name)
+
+
+@router.get(
+    "/api/admin/collection-insights",
+    response_model=CollectionInsightsResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Compare the indexed local collection with registered instance listening",
+)
+def api_collection_insights(
+    request: Request,
+    window: Literal["30d", "90d", "365d"] = Query("30d"),
+    fresh: bool = False,
+):
+    require_permission(request, "library.view")
+    return get_collection_insights(window=window, fresh=fresh)
 
 
 @router.get(

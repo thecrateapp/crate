@@ -76,6 +76,7 @@ from crate.api.schemas.analytics import (
     TimelineAlbumResponse,
     TimelineResponse,
 )
+from crate.api.schemas.collection_insights import CollectionInsightsResponse
 from crate.api.schemas.browse import (
     AlbumDetailResponse,
     ArtistsWithShowsResponse,

@@ -65,6 +65,11 @@ const libraryScope = [
   "app/ui/src/components/album/TrackTable.tsx",
 ];
 const supportingScope = [
+  "app/ui/src/pages/Insights.tsx",
+  "app/ui/src/components/insights/InsightComparison.tsx",
+  "app/ui/src/components/insights/InsightTimeline.tsx",
+  "app/ui/src/components/insights/InsightSummary.tsx",
+  "app/ui/src/components/insights/InsightEntityLists.tsx",
   "app/ui/src/components/layout/HeaderUserMenu.tsx",
   "app/ui/src/components/admin/ListPagination.tsx",
   "app/ui/src/components/SmartMixCoverage.tsx",
@@ -113,6 +118,10 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Insights.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
   // Reviewed composition owns no glyph; its shared primitives are scanned directly.
   [
     "app/ui/src/pages/PlaylistEditor.tsx:@/components/layout/PageHeader",
@@ -329,6 +338,26 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  [
+    "app/ui/src/components/insights/InsightComparison.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
+    1,
+  ],
+  [
+    "app/ui/src/components/insights/InsightTimeline.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Insights.tsx:@crate/ui/composites/AdminSelect:AdminSelect",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Insights.tsx:@/components/insights/InsightComparison:InsightComparison",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Insights.tsx:@/components/insights/InsightTimeline:InsightTimeline",
+    1,
+  ],
   // 24 October review: recovery states and functional graph/calendar actions.
   [
     "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/ErrorState:ErrorState",
@@ -936,6 +965,7 @@ const approvedUx = new Map([
   // HeroCompositionCanvas's static IconToolButton wrapper is misclassified as dynamic
   // by the inventory name heuristic. Only its six individually named calls are accepted;
   // the wrapper's actual ActionButton and each child glyph are still audited below.
+  ["Insights:insights-refresh", ["@crate/ui/icons", "RefreshCw"]],
   ["Artist:artist-merge-search", ["@crate/ui/icons", "Search"]],
   ["Artist:artist-merge-search-loading", ["@crate/ui/icons", "Loader2"]],
   ["Album:album-move-search", ["@crate/ui/icons", "Search"]],
@@ -1440,7 +1470,9 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
     }
     const fallbackMarker = prop("data-admin-ux")?.initializer;
     if (fallbackMarker && ts.isStringLiteral(fallbackMarker)) {
-      const marker = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${fallbackMarker.text}`;
+      const marker = `${entry.path.split("/").pop()?.replace(".tsx", "")}:${
+        fallbackMarker.text
+      }`;
       const glyph = approvedFallbacks.get(marker);
       const parent = attributes.parent;
       const imports = new Map<string, { source: string; imported: string }>();
@@ -1823,7 +1855,10 @@ describe("Admin icon retirement policy — migrated Admin surfaces", () => {
       );
       const liveMarkers = glyphs.map(
         (entry) =>
-          `${component}:${entry.snippet.match(/data-admin-ux="([^"]+)"/)?.[1] ?? "unregistered"}`,
+          `${component}:${
+            entry.snippet.match(/data-admin-ux="([^"]+)"/)?.[1] ??
+            "unregistered"
+          }`,
       );
       expect(new Set(liveMarkers).size).toBe(glyphs.length);
       expect(liveMarkers.sort()).toEqual(

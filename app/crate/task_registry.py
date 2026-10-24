@@ -178,6 +178,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "refresh_instance_stats_dashboard_snapshot": TaskTypeInfo(
         "Instance Stats Refresh", "analysis"
     ),
+    "refresh_collection_insights": TaskTypeInfo(
+        "Collection Insights Refresh", "analysis"
+    ),
     "compute_popularity": TaskTypeInfo("Popularity Update", "analysis"),
     "backfill_track_audio_fingerprints": TaskTypeInfo(
         "Track Fingerprint Backfill", "analysis"
