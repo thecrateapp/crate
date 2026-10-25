@@ -104,13 +104,14 @@ def update_task(
         fields.append("error = :set_error")
         params["set_error"] = error
 
+    returning = "*" if status is not None else "id"
     # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     with optional_scope(session) as s:
         register_tasks_surface_signal_fn(s)
         row = (
             s.execute(
                 text(
-                    f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id AND status NOT IN ('completed','failed','cancelled') RETURNING *"
+                    f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id AND status NOT IN ('completed','failed','cancelled') RETURNING {returning}"
                 ),
                 params,
             )
