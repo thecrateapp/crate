@@ -183,7 +183,7 @@ describe("Collection Insights", () => {
     expect(
       screen.getByRole("heading", { name: "Sonic explorer" }),
     ).toBeVisible();
-    expect(screen.getAllByRole("combobox", { name: "Period" })).toHaveLength(1);
+    expect(screen.getAllByRole("group", { name: "Period" })).toHaveLength(1);
     expect(screen.getAllByRole("heading", { name: "Insights" })).toHaveLength(
       1,
     );
@@ -206,8 +206,7 @@ describe("Collection Insights", () => {
     setup();
     await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     report = { ...fixture(), window: "90d" };
-    await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-    await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+    await userEvent.click(screen.getByRole("button", { name: "90 days" }));
     expect(screen.getByRole("tab", { name: "Collection" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -337,8 +336,7 @@ describe("Collection Insights", () => {
   });
   it("never presents a retained previous-window payload as the newly selected period", async () => {
     setup();
-    await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-    await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+    await userEvent.click(screen.getByRole("button", { name: "90 days" }));
     expect(useApiMock).toHaveBeenCalledWith(
       "/api/admin/collection-insights?window=90d",
     );
@@ -493,8 +491,7 @@ describe("Insights snapshot task completion", () => {
     waitForTaskMock.mockImplementation(() => new Promise(() => {}));
     setup();
     const signal = waitForTaskMock.mock.calls[0]![2] as AbortSignal;
-    await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-    await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+    await userEvent.click(screen.getByRole("button", { name: "90 days" }));
     expect(signal.aborted).toBe(true);
     expect(apiMock).not.toHaveBeenCalled();
   });
@@ -688,15 +685,13 @@ it("follows the newly arrived task when revisiting a period after a manual respo
     screen.getByRole("button", { name: "Refresh insights" }),
   );
   report = { ...fixture(), window: "90d" };
-  await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-  await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+  await userEvent.click(screen.getByRole("button", { name: "90 days" }));
   report = {
     ...fixture(),
     snapshot: { ...fixture().snapshot, task_id: "new-30d-task" },
   } as unknown as ReturnType<typeof fixture>;
   waitForTaskMock.mockImplementation(() => new Promise(() => {}));
-  await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-  await userEvent.click(screen.getByRole("option", { name: "30 days" }));
+  await userEvent.click(screen.getByRole("button", { name: "30 days" }));
   expect(waitForTaskMock).toHaveBeenCalledWith(
     "new-30d-task",
     120000,
@@ -719,11 +714,9 @@ it("accepts newly arrived recovery status when revisiting a period after a faile
     screen.getByText(/Showing the last successful snapshot/),
   ).toBeVisible();
   report = { ...fixture(), window: "90d" };
-  await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-  await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+  await userEvent.click(screen.getByRole("button", { name: "90 days" }));
   report = fixture();
-  await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
-  await userEvent.click(screen.getByRole("option", { name: "30 days" }));
+  await userEvent.click(screen.getByRole("button", { name: "30 days" }));
   expect(
     screen.queryByText(/could not refresh|could not be loaded/),
   ).not.toBeInTheDocument();

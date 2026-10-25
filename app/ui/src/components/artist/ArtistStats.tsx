@@ -9,7 +9,7 @@ import { ResponsiveScatterPlot } from "@nivo/scatterplot";
 import { Bar } from "@nivo/bar";
 import { useApi } from "@/hooks/use-api";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
-import { AdminSelect } from "@crate/ui/composites/AdminSelect";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { Button } from "@crate/ui/shadcn/button";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { Meter } from "@crate/ui/primitives/Meter";
@@ -455,17 +455,24 @@ function ArtistStatsConsole({
               title="Album rankings"
               ruled={!!releases.length || !!audio.length}
               actions={
-                <AdminSelect
-                  ariaLabel="Album ranking unit"
-                  placeholder="Album ranking unit"
-                  allowClear={false}
-                  value={albumUnit}
-                  onChange={(value) => setAlbumUnit(value as typeof albumUnit)}
-                  options={[
-                    { value: "popularity", label: "Popularity" },
-                    { value: "lastfm_listeners", label: "Last.fm listeners" },
-                  ]}
-                />
+                <div
+                  role="group"
+                  aria-label="Album ranking unit"
+                  className="flex flex-wrap gap-2"
+                >
+                  <FilterChip
+                    active={albumUnit === "popularity"}
+                    onClick={() => setAlbumUnit("popularity")}
+                  >
+                    Popularity
+                  </FilterChip>
+                  <FilterChip
+                    active={albumUnit === "lastfm_listeners"}
+                    onClick={() => setAlbumUnit("lastfm_listeners")}
+                  >
+                    Last.fm listeners
+                  </FilterChip>
+                </div>
               }
             >
               <p className="mb-3 min-h-10 font-mono text-xs text-text-subtle">

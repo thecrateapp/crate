@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
-import { AdminSelect } from "@crate/ui/composites/AdminSelect";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import {
@@ -29,6 +29,12 @@ import {
   number,
   type InsightsWindow,
 } from "@/components/insights/insights-model";
+
+const PERIOD_OPTIONS: { value: InsightsWindow; label: string }[] = [
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
+  { value: "365d", label: "Year" },
+];
 
 export interface InsightsData {
   countries: Record<string, number>;
@@ -102,18 +108,21 @@ export function Insights() {
         compactActions
         actions={
           <div className="flex flex-wrap items-center gap-3">
-            <AdminSelect
-              placeholder="Period"
-              ariaLabel="Period"
-              allowClear={false}
-              value={window}
-              onChange={changeWindow}
-              options={[
-                { value: "30d", label: "30 days" },
-                { value: "90d", label: "90 days" },
-                { value: "365d", label: "Year" },
-              ]}
-            />
+            <div
+              role="group"
+              aria-label="Period"
+              className="flex flex-wrap gap-2"
+            >
+              {PERIOD_OPTIONS.map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={window === option.value}
+                  onClick={() => changeWindow(option.value)}
+                >
+                  {option.label}
+                </FilterChip>
+              ))}
+            </div>
             <PageHeaderActions label="Insights actions">
               <PageHeaderAction
                 label={refreshing ? "Refreshing insights" : "Refresh insights"}

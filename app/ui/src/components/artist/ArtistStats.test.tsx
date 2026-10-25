@@ -312,10 +312,7 @@ it("keeps track popularity and album listeners in separate units", async () => {
   show();
   expect(screen.queryByRole("combobox", { name: /track.*unit/i })).toBeNull();
   await userEvent.click(
-    screen.getByRole("combobox", { name: "Album ranking unit" }),
-  );
-  await userEvent.click(
-    screen.getByRole("option", { name: "Last.fm listeners" }),
+    screen.getByRole("button", { name: "Last.fm listeners" }),
   );
   const albums = screen.getByRole("region", { name: "Album rankings" });
   expect(within(albums).getAllByText("Same")).toHaveLength(1);
@@ -651,10 +648,7 @@ it("shares the Nivo linear valueScale across rows in each ranking unit", async (
   }
   barProps.length = 0;
   await userEvent.click(
-    screen.getByRole("combobox", { name: "Album ranking unit" }),
-  );
-  await userEvent.click(
-    screen.getByRole("option", { name: "Last.fm listeners" }),
+    screen.getByRole("button", { name: "Last.fm listeners" }),
   );
   const albumScales = barProps.filter((props) =>
     (props.data as { id: string }[])[0]?.id.startsWith("release-"),
@@ -860,7 +854,7 @@ it("does not add a release audio profile when same-name/year observations are am
   );
   expect(
     within(screen.getByRole("region", { name: "Album rankings" })).getByRole(
-      "combobox",
+      "group",
       { name: "Album ranking unit" },
     ),
   ).toBeInTheDocument();

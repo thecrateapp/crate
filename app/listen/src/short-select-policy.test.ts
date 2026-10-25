@@ -38,6 +38,8 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Available decades are catalog facets and may grow with the library.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:format":
     "Available audio formats are catalog facets.",
+  'app/ui/src/components/system-health/MetricChart.tsx:Select:selected ?? ""':
+    "Inspectable samples are the points of the live metric series.",
   "app/ui/src/pages/Logs.tsx:AdminSelect:category":
     "Log categories come from the operational API.",
   "app/ui/src/pages/Logs.tsx:AdminSelect:workerId":
