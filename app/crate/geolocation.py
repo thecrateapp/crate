@@ -18,6 +18,7 @@ from contextlib import contextmanager
 import requests
 
 log = logging.getLogger(__name__)
+_FAILED_LOOKUP_TTL = 600
 
 _NOMINATIM_DELAY = 1.1  # seconds between Nominatim requests
 _NOMINATIM_LAST_REQUEST = 0.0
@@ -108,16 +109,17 @@ def detect_location_from_ip(ip: str) -> dict | None:
     cache_key = f"geo:ip:{ip}"
     cached = get_cache(cache_key, max_age_seconds=86400)
     if cached:
-        return cached
+        return None if cached.get("failed") else cached
 
     try:
         resp = requests.get(
             f"http://ip-api.com/json/{ip}",
             params={"fields": "status,city,country,countryCode,lat,lon"},
-            timeout=5,
+            timeout=2,
         )
         data = resp.json()
         if data.get("status") != "success":
+            set_cache(cache_key, {"failed": True}, ttl=_FAILED_LOOKUP_TTL)
             return None
 
         result = {
@@ -131,6 +133,7 @@ def detect_location_from_ip(ip: str) -> dict | None:
         return result
     except Exception:
         log.debug("IP geolocation failed for %s", ip, exc_info=True)
+        set_cache(cache_key, {"failed": True}, ttl=_FAILED_LOOKUP_TTL)
         return None
 
 

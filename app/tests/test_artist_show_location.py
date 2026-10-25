@@ -169,3 +169,35 @@ def test_ungeocoded_madrid_show_is_not_hidden_by_earlier_foreign_dates(pg_db):
         user_country="ES",
     )
     assert [row["city"] for row in rows] == ["Madrid", "Getafe"]
+
+
+def test_failed_ip_lookups_are_cached_so_requests_do_not_retry_the_provider(
+    monkeypatch,
+):
+    import requests
+
+    from crate import geolocation
+    from crate.db import cache_store
+
+    store: dict = {}
+    calls: list[str] = []
+    monkeypatch.setattr(
+        cache_store, "get_cache", lambda key, max_age_seconds=None: store.get(key)
+    )
+    monkeypatch.setattr(
+        cache_store,
+        "set_cache",
+        lambda key, value, ttl=None: store.__setitem__(key, value),
+    )
+
+    def unreachable(url, **kwargs):
+        calls.append(url)
+        assert kwargs["timeout"] == 2
+        raise requests.Timeout("ip-api unreachable")
+
+    monkeypatch.setattr(geolocation.requests, "get", unreachable)
+
+    assert geolocation.detect_location_from_ip("203.0.113.7") is None
+    assert geolocation.detect_location_from_ip("203.0.113.7") is None
+    assert len(calls) == 1
+    assert store["geo:ip:203.0.113.7"] == {"failed": True}
