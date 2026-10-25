@@ -94,7 +94,7 @@ export function useBandcampConnection() {
         });
         notify.success(t("settings.bandcamp.toasts.connected"));
         setBandcampCookie("");
-        await loadBandcamp();
+        await loadBandcamp().catch(() => {});
       } catch (error) {
         notify.error(
           (error as Error).message ||
@@ -165,7 +165,7 @@ export function useBandcampConnection() {
           `/api/tasks/${encodeURIComponent(result.task_id)}`,
         );
         if (task.status === "completed") {
-          await loadBandcamp();
+          await loadBandcamp().catch(() => {});
           const synced = task.result?.synced;
           const importsQueued = task.result?.imports_queued ?? 0;
           const skippedExisting = task.result?.imports_skipped_existing ?? 0;
@@ -215,7 +215,7 @@ export function useBandcampConnection() {
     try {
       await api("/api/bandcamp/me/disconnect", "POST");
       notify.success(t("settings.bandcamp.toasts.disconnected"));
-      await loadBandcamp();
+      await loadBandcamp().catch(() => {});
     } catch (error) {
       notify.error(
         (error as Error).message ||
