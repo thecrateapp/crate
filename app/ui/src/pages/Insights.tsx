@@ -15,6 +15,7 @@ import {
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
 import { useApi } from "@/hooks/use-api";
+import { useTabParam } from "@/hooks/use-tab-param";
 import { useCollectionInsights } from "@/components/insights/use-collection-insights";
 import { InsightSummary } from "@/components/insights/InsightSummary";
 import { InsightComparison } from "@/components/insights/InsightComparison";
@@ -29,6 +30,8 @@ import {
   number,
   type InsightsWindow,
 } from "@/components/insights/insights-model";
+
+const INSIGHTS_TABS = ["listening", "collection", "sonic"] as const;
 
 const PERIOD_OPTIONS: { value: InsightsWindow; label: string }[] = [
   { value: "30d", label: "30 days" },
@@ -81,8 +84,9 @@ export interface InsightsData {
 
 export function Insights() {
   const [window, setWindow] = useState<InsightsWindow>("30d");
-  const [tab, setTab] = useState("listening");
-  const [visited, setVisited] = useState(["listening"]);
+  const [tab, changeTab] = useTabParam(INSIGHTS_TABS, "listening");
+  const [visited, setVisited] = useState<string[]>([tab]);
+  if (!visited.includes(tab)) setVisited([...visited, tab]);
   const { data, error, refreshing, refresh } = useCollectionInsights(window);
   const capabilities = useApi<{ smart_mix?: { available?: boolean } }>(
     "/api/capabilities",
@@ -93,12 +97,6 @@ export function Insights() {
     capabilities.data?.smart_mix?.available === true;
   function changeWindow(value: string) {
     setWindow(value as InsightsWindow);
-  }
-  function changeTab(value: string) {
-    setTab(value);
-    setVisited((current) =>
-      current.includes(value) ? current : [...current, value],
-    );
   }
   return (
     <div className="grid min-w-0 gap-8">

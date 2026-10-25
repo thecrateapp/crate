@@ -155,6 +155,17 @@ beforeEach(() => {
     );
 });
 describe("Collection Insights", () => {
+  it("opens the tab named in the URL so it survives reloads and shared links", () => {
+    renderWithAdminProviders(<Insights />, { route: "/insights?tab=sonic" });
+
+    expect(
+      screen.getByRole("tab", { name: "Sonic explorer" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      screen.getByRole("heading", { name: "Sonic explorer" }),
+    ).toBeVisible();
+  });
+
   it("groups the report into shared tabs below one common header", async () => {
     setup();
     const tabs = screen.getByRole("tablist", { name: "Insights sections" });
