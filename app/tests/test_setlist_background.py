@@ -215,3 +215,66 @@ def test_force_refresh_setlist_returns_not_found_for_unknown_artist(monkeypatch)
         enrichment.refresh_probable_setlist_by_id(request, 404)
 
     assert exc.value.status_code == 404
+
+
+def test_billed_show_artist_names_dedupes_headliners_and_lineups():
+    from crate.setlistfm import billed_show_artist_names
+
+    names = billed_show_artist_names(
+        [
+            {"artist_name": "Main Act", "lineup": ["Main Act", " support   act "]},
+            {"artist_name": "Support Act", "lineup": None},
+            {"artist_name": "", "lineup": ["Another Act"]},
+        ]
+    )
+
+    assert names == ["Main Act", "support act", "Another Act"]
+
+
+def test_outdated_show_setlists_skip_fresh_and_legacy_unknown_caches(monkeypatch):
+    from crate import setlistfm
+
+    queued: list[tuple[list[str], bool]] = []
+    monkeypatch.setattr(
+        setlistfm,
+        "get_probable_setlist_health",
+        lambda names: {
+            "fresh act": {"status": "fresh"},
+            "legacy act": {"status": "unknown"},
+            "missing act": {"status": "missing"},
+            "stale act": {"status": "stale"},
+        },
+    )
+    monkeypatch.setattr(
+        setlistfm,
+        "queue_probable_setlist_refreshes",
+        lambda names, *, force=False: queued.append((names, force)) or ["t1", "t2"],
+    )
+
+    result = setlistfm.queue_outdated_show_setlist_refreshes(
+        ["Fresh Act", "Legacy Act", "Missing Act", "Stale Act"]
+    )
+
+    assert result == ["t1", "t2"]
+    assert queued == [(["Missing Act", "Stale Act"], True)]
+
+
+def test_show_setlist_worker_queues_outdated_billed_artists(monkeypatch):
+    from crate import setlistfm
+    from crate.db.queries import shows
+    from crate.worker_handlers.enrichment import ENRICHMENT_TASK_HANDLERS
+
+    monkeypatch.setattr(
+        shows,
+        "get_upcoming_shows",
+        lambda **kwargs: [{"artist_name": "Main Act", "lineup": ["Support Act"]}],
+    )
+    monkeypatch.setattr(
+        setlistfm,
+        "queue_outdated_show_setlist_refreshes",
+        lambda names: ["task-1"] if names == ["Main Act", "Support Act"] else [],
+    )
+
+    result = ENRICHMENT_TASK_HANDLERS["refresh_show_probable_setlists"]("task", {}, {})
+
+    assert result == {"artist_count": 2, "queued": 1}

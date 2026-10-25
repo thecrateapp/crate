@@ -2157,13 +2157,16 @@ class TestShowsAPI:
             data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
         )
 
-    def test_refresh_show_setlists_queues_each_non_fresh_billed_artist(self, test_app):
+    def test_refresh_show_setlists_delegates_outdated_artists_to_one_worker_task(
+        self, test_app
+    ):
         shows = [
             {
                 "artist_name": "Main Act",
                 "lineup": ["Main Act", "Support Act", " support   act "],
             },
             {"artist_name": "Another Act", "lineup": ["Another Act"]},
+            {"artist_name": "Legacy Act", "lineup": []},
         ]
         with (
             patch("crate.api.browse_artist.db_get_shows", return_value=shows),
@@ -2173,25 +2176,51 @@ class TestShowsAPI:
                     "main act": {"status": "fresh"},
                     "support act": {"status": "missing"},
                     "another act": {"status": "stale"},
+                    "legacy act": {"status": "unknown"},
                 },
             ),
             patch(
-                "crate.setlistfm.queue_probable_setlist_refreshes",
-                return_value=["task-a", "task-b"],
-            ) as queue,
+                "crate.api.browse_artist.create_task_dedup", return_value="task-1"
+            ) as create_task,
+            patch("crate.setlistfm.queue_probable_setlist_refreshes") as queue,
         ):
             response = test_app.post("/api/shows/probable-setlists/refresh")
 
         assert response.status_code == 200
         assert response.json() == {
-            "artist_count": 3,
+            "artist_count": 4,
             "fresh": 1,
             "stale": 1,
             "missing": 1,
-            "unknown": 0,
+            "unknown": 1,
             "queued": 2,
         }
-        queue.assert_called_once_with(["Support Act", "Another Act"], force=True)
+        create_task.assert_called_once_with(
+            "refresh_show_probable_setlists",
+            {},
+            dedup_key="probable-setlists:shows",
+        )
+        queue.assert_not_called()
+
+    def test_refresh_show_setlists_queues_nothing_when_no_setlist_is_outdated(
+        self, test_app
+    ):
+        with (
+            patch(
+                "crate.api.browse_artist.db_get_shows",
+                return_value=[{"artist_name": "Main Act", "lineup": []}],
+            ),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={"main act": {"status": "unknown"}},
+            ),
+            patch("crate.api.browse_artist.create_task_dedup") as create_task,
+        ):
+            response = test_app.post("/api/shows/probable-setlists/refresh")
+
+        assert response.status_code == 200
+        assert response.json()["queued"] == 0
+        create_task.assert_not_called()
 
 
 class TestAdminLogsAPI:

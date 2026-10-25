@@ -1853,13 +1853,13 @@ def api_artists_with_shows(request: Request):
 def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
     _require_auth(request)
 
+    from crate import setlistfm
+
     shows = db_get_shows(limit=limit)
-    artist_names = _billed_show_artist_names(shows)
+    artist_names = setlistfm.billed_show_artist_names(shows)
     genre_map = get_all_artist_genre_map(artist_names, limit=3)
 
     refs_by_name = _lookup_artist_refs(artist_names)
-    from crate import setlistfm
-
     setlist_health = setlistfm.get_probable_setlist_health(artist_names)
     events = []
     for show in shows:
@@ -1909,9 +1909,7 @@ def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
                 "probable_setlist_status": health["status"],
                 "probable_setlist_generated_at": health.get("generated_at"),
                 "probable_setlist_song_count": health.get("song_count", 0),
-                "probable_setlist_source_show_count": health.get(
-                    "source_show_count"
-                ),
+                "probable_setlist_source_show_count": health.get("source_show_count"),
                 "probable_setlist_mode": health.get("mode"),
                 "probable_setlist_tour_name": health.get("tour_name"),
             }
@@ -1939,38 +1937,26 @@ def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
 def api_refresh_show_probable_setlists(request: Request):
     require_permission(request, "library.metadata.write")
     shows = db_get_shows(limit=5000)
-    artist_names = _billed_show_artist_names(shows)
     from crate import setlistfm
 
+    artist_names = setlistfm.billed_show_artist_names(shows)
     health = setlistfm.get_probable_setlist_health(artist_names)
-    refresh_names = [
-        name
-        for name in artist_names
-        if health.get(name.casefold(), {}).get("status") != "fresh"
-    ]
-    task_ids = setlistfm.queue_probable_setlist_refreshes(
-        refresh_names, force=True
-    )
     counts = {"fresh": 0, "stale": 0, "missing": 0, "unknown": 0}
     for status in health.values():
         if status.get("status") in counts:
             counts[status["status"]] += 1
+    outdated = counts["missing"] + counts["stale"]
+    if outdated:
+        create_task_dedup(
+            "refresh_show_probable_setlists",
+            {},
+            dedup_key="probable-setlists:shows",
+        )
     return {
         "artist_count": len(artist_names),
         **counts,
-        "queued": len(task_ids),
+        "queued": outdated,
     }
-
-
-def _billed_show_artist_names(shows: list[dict[str, Any]]) -> list[str]:
-    """Return each credited artist once, matching the setlist cache key rules."""
-    unique: dict[str, str] = {}
-    for show in shows:
-        for raw_name in [show.get("artist_name"), *(show.get("lineup") or [])]:
-            name = " ".join(str(raw_name or "").split())
-            if name:
-                unique.setdefault(name.casefold(), name)
-    return list(unique.values())
 
 
 @router.get(

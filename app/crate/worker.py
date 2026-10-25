@@ -666,6 +666,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",
+            "refresh_show_probable_setlists",
             "normalize_artist_bios",
             "research_artist_bio",
         ),

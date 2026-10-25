@@ -131,6 +131,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),
     "refresh_collection_insights": TaskPoolConfig("maintenance", 2, 600, 1),
     "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
+    "refresh_show_probable_setlists": TaskPoolConfig("fast", 1, 300, 1),
     "generate_cast_spectrum": TaskPoolConfig("heavy", 1, 1200, 2),
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),

@@ -437,16 +437,18 @@ def get_probable_setlist_health(
         cached = cached_values.get(cache_key)
         raw_songs = cached.get("songs") if isinstance(cached, Mapping) else cached
         songs = _normalize_cached_songs(raw_songs)
-        generated_at = cached.get("generated_at") if isinstance(cached, Mapping) else None
+        generated_at = (
+            cached.get("generated_at") if isinstance(cached, Mapping) else None
+        )
         context = cached.get("context") if isinstance(cached, Mapping) else None
         mode = _clean_text(context.get("mode")) if isinstance(context, Mapping) else ""
-        freshness_seconds = 24 * 60 * 60 if mode == "active_tour" else _PROBABLE_TTL_SECONDS
+        freshness_seconds = (
+            24 * 60 * 60 if mode == "active_tour" else _PROBABLE_TTL_SECONDS
+        )
         parsed_at: datetime | None = None
         if isinstance(generated_at, str):
             try:
-                parsed_at = datetime.fromisoformat(
-                    generated_at.replace("Z", "+00:00")
-                )
+                parsed_at = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
                 if parsed_at.tzinfo is None:
                     parsed_at = parsed_at.replace(tzinfo=timezone.utc)
             except ValueError:
@@ -538,6 +540,28 @@ def queue_probable_setlist_refreshes(
         if task_id:
             queued.append(task_id)
     return queued
+
+
+def billed_show_artist_names(shows: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Return each credited artist once, matching the setlist cache key rules."""
+    unique: dict[str, str] = {}
+    for show in shows:
+        for raw_name in [show.get("artist_name"), *(show.get("lineup") or [])]:
+            name = " ".join(str(raw_name or "").split())
+            if name:
+                unique.setdefault(name.casefold(), name)
+    return list(unique.values())
+
+
+def queue_outdated_show_setlist_refreshes(artist_names: list[str]) -> list[str]:
+    """Force refreshes only where a setlist is missing or past its freshness window."""
+    health = get_probable_setlist_health(artist_names)
+    outdated = [
+        name
+        for name in artist_names
+        if health.get(name.casefold(), {}).get("status") in {"missing", "stale"}
+    ]
+    return queue_probable_setlist_refreshes(outdated, force=True)
 
 
 def refresh_probable_setlist(artist_name: str, *, force: bool = False) -> dict:

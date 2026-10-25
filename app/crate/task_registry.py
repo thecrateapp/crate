@@ -145,6 +145,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "compute_completeness": TaskTypeInfo("Discography Completeness", "enrichment"),
     "refresh_probable_setlist": TaskTypeInfo("Probable Setlist Refresh", "enrichment"),
+    "refresh_show_probable_setlists": TaskTypeInfo(
+        "Show Setlist Refresh", "enrichment"
+    ),
     "normalize_artist_bios": TaskTypeInfo("Normalize Artist Bios", "enrichment"),
     "research_artist_bio": TaskTypeInfo("Research Artist Bio", "enrichment"),
     "sync_shows": TaskTypeInfo("Shows Sync", "enrichment"),
