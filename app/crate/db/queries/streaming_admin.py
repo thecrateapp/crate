@@ -2,7 +2,27 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.tx import read_scope
+
+_LIBRARY_STATS_CACHE_KEY = "playback_delivery:library_stats:v1"
+_LIBRARY_STATS_CACHE_TTL = 600
+_LIBRARY_STATS_SQL = """
+SELECT
+    COUNT(*) AS tracks,
+    COUNT(*) FILTER (
+        WHERE lower(COALESCE(format, '')) IN ('flac', 'wav', 'alac', 'aiff', 'aif')
+           OR lower(path) LIKE '%.flac'
+           OR lower(path) LIKE '%.wav'
+           OR lower(path) LIKE '%.aiff'
+           OR lower(path) LIKE '%.aif'
+    ) AS lossless_tracks,
+    COUNT(*) FILTER (
+        WHERE COALESCE(sample_rate, 0) > 48000
+           OR COALESCE(bit_depth, 0) > 16
+    ) AS hires_tracks
+FROM library_tracks
+"""
 
 
 def _int(value) -> int:
@@ -66,31 +86,16 @@ def get_playback_delivery_snapshot(*, limit: int = 20) -> dict:
             .first()
             or {}
         )
-        library_stats = (
-            session.execute(
-                text(
-                    """
-                SELECT
-                    COUNT(*) AS tracks,
-                    COUNT(*) FILTER (
-                        WHERE lower(COALESCE(format, '')) IN ('flac', 'wav', 'alac', 'aiff', 'aif')
-                           OR lower(path) LIKE '%.flac'
-                           OR lower(path) LIKE '%.wav'
-                           OR lower(path) LIKE '%.aiff'
-                           OR lower(path) LIKE '%.aif'
-                    ) AS lossless_tracks,
-                    COUNT(*) FILTER (
-                        WHERE COALESCE(sample_rate, 0) > 48000
-                           OR COALESCE(bit_depth, 0) > 16
-                    ) AS hires_tracks
-                FROM library_tracks
-                """
-                )
-            )
-            .mappings()
-            .first()
-            or {}
+        library_stats = get_volatile_cache(
+            _LIBRARY_STATS_CACHE_KEY, _LIBRARY_STATS_CACHE_TTL
         )
+        if library_stats is None:
+            library_stats = dict(
+                session.execute(text(_LIBRARY_STATS_SQL)).mappings().first() or {}
+            )
+            set_volatile_cache(
+                _LIBRARY_STATS_CACHE_KEY, library_stats, _LIBRARY_STATS_CACHE_TTL
+            )
         recent_rows = (
             session.execute(
                 text(

@@ -59,6 +59,8 @@ def test_playback_delivery_snapshot_separates_pending_variant_states(monkeypatch
         yield Session()
 
     monkeypatch.setattr(streaming_admin, "read_scope", scope)
+    monkeypatch.setattr(streaming_admin, "get_volatile_cache", lambda *_a: None)
+    monkeypatch.setattr(streaming_admin, "set_volatile_cache", lambda *_a: None)
 
     snapshot = streaming_admin.get_playback_delivery_snapshot(limit=8)
 
@@ -69,6 +71,56 @@ def test_playback_delivery_snapshot_separates_pending_variant_states(monkeypatch
     assert "LEFT JOIN tasks" in executed[0]
     assert "pending_active" in executed[0]
     assert "pending_stale" in executed[0]
+
+
+def test_playback_delivery_snapshot_reuses_cached_library_totals(monkeypatch):
+    from crate.db.queries import streaming_admin
+
+    executed: list[str] = []
+
+    class Result:
+        def __init__(self, row=None):
+            self.row = row
+
+        def mappings(self):
+            return self
+
+        def first(self):
+            return self.row
+
+        def all(self):
+            return []
+
+    class Session:
+        def execute(self, statement, _params=None):
+            executed.append(str(statement))
+            return Result({})
+
+    @contextmanager
+    def scope():
+        yield Session()
+
+    store: dict = {}
+    monkeypatch.setattr(streaming_admin, "read_scope", scope)
+    monkeypatch.setattr(
+        streaming_admin, "get_volatile_cache", lambda key, _ttl: store.get(key)
+    )
+    monkeypatch.setattr(
+        streaming_admin,
+        "set_volatile_cache",
+        lambda key, value, _ttl: store.__setitem__(key, value),
+    )
+    store["playback_delivery:library_stats:v1"] = {
+        "tracks": 136_000,
+        "lossless_tracks": 90_000,
+        "hires_tracks": 12_000,
+    }
+
+    snapshot = streaming_admin.get_playback_delivery_snapshot(limit=8)
+
+    assert snapshot["stats"]["tracks"] == 136_000
+    assert snapshot["stats"]["lossless_tracks"] == 90_000
+    assert not any("AS lossless_tracks" in query for query in executed)
 
 
 def test_mark_variant_missing_detaches_previous_task(monkeypatch):

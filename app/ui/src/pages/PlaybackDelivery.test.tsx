@@ -161,6 +161,33 @@ describe("PlaybackDelivery", () => {
     ).toHaveAttribute("data-tone", "danger");
   });
 
+  it("polls only while the tab is visible and refreshes when it returns", () => {
+    vi.useFakeTimers();
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    try {
+      useApiMock.mockReturnValue({
+        data: delivery,
+        loading: false,
+        error: null,
+        refetch: refetchMock,
+      });
+      renderWithAdminProviders(<PlaybackDelivery />, { route: "/playback" });
+
+      visibility.mockReturnValue("hidden");
+      vi.advanceTimersByTime(45_000);
+      expect(refetchMock).not.toHaveBeenCalled();
+
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      expect(refetchMock).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(15_000);
+      expect(refetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      visibility.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("supports cold-error recovery and refresh without discarding the last sample", async () => {
     const user = userEvent.setup();
     useApiMock.mockReturnValue({

@@ -94,8 +94,15 @@ export function PlaybackDelivery() {
   } = useApi<PlaybackDeliverySnapshot>("/api/admin/playback-delivery?limit=20");
 
   useEffect(() => {
-    const timer = window.setInterval(refetch, 15_000);
-    return () => window.clearInterval(timer);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    const timer = window.setInterval(refreshIfVisible, 15_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, [refetch]);
 
   return (
