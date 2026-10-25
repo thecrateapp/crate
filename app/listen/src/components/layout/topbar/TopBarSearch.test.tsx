@@ -508,6 +508,29 @@ describe("TopBarSearch", () => {
       localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY),
     ).not.toBeNull();
   });
+  it("stops showing a pending search as busy once IME composition starts", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockReturnValue(new Promise(() => {}));
+    renderWithListenProviders(<TopBarSearch />);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(input).toHaveAttribute("aria-busy", "true");
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "high v" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(input).toHaveAttribute("aria-busy", "false");
+  });
+
   it("defers API search during IME composition and exposes the active option", async () => {
     vi.useFakeTimers();
     mockSearchBoxRect();

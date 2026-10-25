@@ -120,7 +120,10 @@ export function useTopBarSearchState() {
       return;
     }
 
-    if (composing) return;
+    if (composing) {
+      dispatch({ type: "set-loading", value: false });
+      return;
+    }
     let cancelled = false;
     dispatch({ type: "set-loading", value: true });
     dispatch({ type: "set-completed-query", value: null });
