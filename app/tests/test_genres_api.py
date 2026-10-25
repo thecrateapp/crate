@@ -381,6 +381,43 @@ class TestGenreTaxonomyAPI:
         assert node["influences_slugs"] == ["screamo"]
         assert node["fusion_genre_slugs"] == ["swancore"]
 
+    def _get_tree_counting_builds(self, test_app, store: dict, *, role: str) -> int:
+        async def resolve_user(_self, _request):
+            return {"id": 2, "email": "u@test.com", "role": role, "username": "u"}
+
+        catalog = {"rock": {"name": "Rock", "parents": [], "top_level": True}}
+        with (
+            patch("crate.api.auth.AuthMiddleware.resolve_user", resolve_user),
+            patch(
+                "crate.api.genres.get_volatile_cache",
+                lambda key, _ttl: store.get(key),
+            ),
+            patch(
+                "crate.api.genres.set_volatile_cache",
+                lambda key, value, _ttl: store.__setitem__(key, value),
+            ),
+            patch(
+                "crate.genre_taxonomy.get_genre_catalog", return_value=catalog
+            ) as build,
+            patch("crate.db.genres.get_all_genres", return_value=[]),
+            patch(
+                "crate.db.queries.genres_taxonomy_admin_stats.get_genre_taxonomy_admin_stats",
+                return_value={},
+            ),
+            patch("crate.genre_taxonomy.resolve_genre_eq_preset", return_value=None),
+        ):
+            for _ in range(2):
+                resp = test_app.get("/api/genres/taxonomy/tree")
+                assert resp.status_code == 200
+                assert [n["slug"] for n in resp.json()["nodes"]] == ["rock"]
+        return build.call_count
+
+    def test_taxonomy_tree_serves_listeners_from_the_cache(self, test_app):
+        assert self._get_tree_counting_builds(test_app, {}, role="user") == 1
+
+    def test_taxonomy_tree_always_rebuilds_for_genre_curators(self, test_app):
+        assert self._get_tree_counting_builds(test_app, {}, role="admin") == 2
+
     def test_taxonomy_tree_requires_auth(self, test_app):
         with patch("crate.api.auth.AuthMiddleware.resolve_user", _unauthenticated):
             resp = test_app.get("/api/genres/taxonomy/tree")
@@ -553,7 +590,9 @@ class TestGenreTaxonomyAPI:
                 "crate.api.genres.assign_genre_alias_value",
                 side_effect=[True, True, False],
             ) as assign_alias,
-            patch("crate.api.genres.clear_raw_genre_classification") as clear_classification,
+            patch(
+                "crate.api.genres.clear_raw_genre_classification"
+            ) as clear_classification,
             patch("crate.api.genres.invalidate_runtime_taxonomy_cache") as invalidate,
             patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
         ):
@@ -672,7 +711,9 @@ class TestGenreTaxonomyAPI:
                 "crate.api.genres.assign_genre_alias_value",
                 return_value=True,
             ) as assign_alias,
-            patch("crate.api.genres.clear_raw_genre_classification") as clear_classification,
+            patch(
+                "crate.api.genres.clear_raw_genre_classification"
+            ) as clear_classification,
             patch(
                 "crate.api.genres.replace_genre_taxonomy_edges",
                 return_value={"updated": True, "added": ["post-punk"], "missing": []},

@@ -13,7 +13,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
-from crate.api.permissions import require_permission
+from crate.api.permissions import has_capability, require_permission
 from crate.api.schemas.genres import (
     EqPresetUpdateResponse,
     GenreDeleteResponse,
@@ -52,6 +52,7 @@ from crate.db.genres import (
     set_genre_eq_gains,
 )
 from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
+from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.auth import get_user_by_id
 from crate.db.repositories.tasks import create_task
@@ -87,6 +88,9 @@ from crate.genre_taxonomy import (
 from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
+
+_TAXONOMY_TREE_CACHE_KEY = "genres:taxonomy-tree:v1"
+_TAXONOMY_TREE_CACHE_TTL = 300
 
 _GENRE_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -399,7 +403,17 @@ def rebuild_taxonomy_proposal(
     summary="Full taxonomy tree with parent/children refs, EQ preset status, and counts",
 )
 def taxonomy_tree(request: Request):
-    _require_auth(request)
+    user = _require_auth(request)
+    if not has_capability(user, "curation.genres.write"):
+        cached = get_volatile_cache(_TAXONOMY_TREE_CACHE_KEY, _TAXONOMY_TREE_CACHE_TTL)
+        if cached is not None:
+            return cached
+    tree = _build_taxonomy_tree()
+    set_volatile_cache(_TAXONOMY_TREE_CACHE_KEY, tree, _TAXONOMY_TREE_CACHE_TTL)
+    return tree
+
+
+def _build_taxonomy_tree() -> dict:
     from crate.genre_taxonomy import (
         get_core_taxonomy_descriptor,
         get_genre_catalog,
