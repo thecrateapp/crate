@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.queries.sonic_insights import sonic_track_reading
+from crate.db.queries.user_library_stats_range import instance_stats_today
 from crate.db.tx import read_scope
 from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
@@ -92,7 +93,7 @@ def get_sonic_neighbors(
     """Read indexed local neighbors; absent eligible seed differs from unavailable Bliss."""
     if track_id < 1 or window not in _WINDOWS or not 1 <= limit <= 12:
         raise ValueError("Unsupported sonic neighbor request")
-    end = today or date.today()
+    end = today or instance_stats_today()
     params = {
         "track_id": track_id,
         "limit": limit,

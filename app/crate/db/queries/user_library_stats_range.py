@@ -8,7 +8,7 @@ returned rows only.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
@@ -283,8 +283,8 @@ def get_public_user_stats_range(
 
 
 def instance_stats_today() -> date:
-    """Today's date in UTC, the instance tape's day boundary."""
-    return datetime.now(ZoneInfo("UTC")).date()
+    """The latest listener-local date anywhere, since instance days are listener-local."""
+    return (datetime.now(ZoneInfo("UTC")) + timedelta(hours=14)).date()
 
 
 def get_instance_stats_range(

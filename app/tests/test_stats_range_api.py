@@ -178,9 +178,19 @@ def test_instance_range_route_returns_the_summary_and_validates(test_app):
     q.assert_not_called()
 
 
-def test_instance_stats_today_is_the_utc_day():
-    from datetime import datetime, timezone
+def test_instance_stats_today_admits_the_furthest_ahead_listener_day(monkeypatch):
+    from datetime import date, datetime, timezone
 
-    from crate.db.queries.user_library_stats_range import instance_stats_today
+    from crate.db.queries import user_library_stats_range as module
 
-    assert abs((instance_stats_today() - datetime.now(timezone.utc).date()).days) <= 1
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 24, 22, 30, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(module, "datetime", FixedDatetime)
+
+    assert module.instance_stats_today() == date(2026, 10, 25)
+    module.validate_stats_range(
+        date(2026, 10, 25), date(2026, 10, 25), today=module.instance_stats_today()
+    )
