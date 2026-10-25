@@ -113,6 +113,56 @@ describe("useNativePlaybackEventBridge subscription", () => {
     unmount();
   });
 
+  it("applies events buffered by native before the first reconcile learns the queue revision", async () => {
+    const { useNativePlaybackEventBridge } =
+      await import("./use-native-playback-event-bridge");
+    const { androidNativeEngine } = await import("@/lib/android-native-engine");
+    const engine = androidNativeEngine as unknown as {
+      isCurrentQueueRevision: (revision: string) => boolean;
+    };
+    const original = engine.isCurrentQueueRevision;
+    let known = "";
+    engine.isCurrentQueueRevision = (revision) =>
+      !known || revision === known;
+    vi.mocked(androidNativeEngine.drainEvents).mockResolvedValueOnce([
+      {
+        event: "playEventCheckpoint",
+        payload: { revision: "queue-a", nativeSequence: 1, positionMs: 30000 },
+      },
+      {
+        event: "trackChanged",
+        payload: { revision: "queue-a", nativeSequence: 2, index: 1 },
+      },
+    ] as never);
+    vi.mocked(androidNativeEngine.getState).mockImplementationOnce(
+      async () => {
+        known = "queue-a";
+        return null;
+      },
+    );
+    const applyNativePosition = vi.fn();
+    const applyNativeTrackChange = vi.fn();
+    const { unmount } = renderHook(() =>
+      useNativePlaybackEventBridge(
+        params({
+          applyNativePosition,
+          applyNativeTrackChange,
+          setMixState: vi.fn(),
+        }),
+      ),
+    );
+
+    await vi.waitFor(() => expect(known).toBe("queue-a"));
+    expect(applyNativePosition).toHaveBeenCalledWith(
+      expect.objectContaining({ positionMs: 30000 }),
+    );
+    expect(applyNativeTrackChange).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 1 }),
+    );
+    engine.isCurrentQueueRevision = original;
+    unmount();
+  });
+
   it("rejects old-queue side effects before they consume freshness or clear current telemetry", async () => {
     const { useNativePlaybackEventBridge } =
       await import("./use-native-playback-event-bridge");

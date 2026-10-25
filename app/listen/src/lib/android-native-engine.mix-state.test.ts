@@ -67,6 +67,18 @@ describe("native mix snapshots", () => {
     });
     expect(engine.isCurrentQueueRevision("queue-a")).toBe(true);
   });
+  it("accepts buffered events while the queue revision is unknown and filters once it is known", async () => {
+    const { AndroidNativeEngine } = await import("./android-native-engine");
+    const engine = new AndroidNativeEngine();
+    expect(engine.isCurrentQueueRevision("queue-old")).toBe(true);
+    expect(engine.isCurrentQueueRevision("queue-a")).toBe(true);
+
+    await engine.getState();
+
+    expect(engine.isCurrentQueueRevision("queue-a")).toBe(true);
+    expect(engine.isCurrentQueueRevision("queue-old")).toBe(false);
+    expect(engine.isCurrentQueueRevision("")).toBe(false);
+  });
   it("restores real technique and applied bass handoff without consulting transition plans", async () => {
     native.getState.mockResolvedValue({ ...state, mixState: mix });
     const { AndroidNativeEngine } = await import("./android-native-engine");

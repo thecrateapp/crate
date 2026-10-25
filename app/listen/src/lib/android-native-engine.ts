@@ -618,7 +618,8 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   isCurrentQueueRevision(revision: string): boolean {
-    return Boolean(revision) && revision === this.queueRevision;
+    if (!this.queueRevision) return true;
+    return revision === this.queueRevision;
   }
 
   async drainEvents(): Promise<
