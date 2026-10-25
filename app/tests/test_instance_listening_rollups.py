@@ -666,3 +666,12 @@ def test_instance_range_hides_items_below_three_listeners(pg_db):
     assert result["top_albums"] == []
     assert result["top_tracks"] == []
     assert result["discoveries"] == []
+
+
+def test_full_backfill_runs_off_the_fast_pool_and_day_rebuilds_stay_on_it():
+    from crate.actors import TASK_POOL_CONFIG
+
+    assert (
+        TASK_POOL_CONFIG["backfill_instance_listening_rollups"].queue == "maintenance"
+    )
+    assert TASK_POOL_CONFIG["rebuild_instance_listening_days"].queue == "fast"

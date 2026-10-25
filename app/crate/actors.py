@@ -125,7 +125,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Idempotent rebuilds from user_track_daily; one retry keeps the days of a
     # transient failure, since the task params are their only record.
     "rebuild_instance_listening_days": TaskPoolConfig("fast", 1, 300, 1),
-    "backfill_instance_listening_rollups": TaskPoolConfig("fast", 3, 600, 1),
+    "backfill_instance_listening_rollups": TaskPoolConfig("maintenance", 3, 600, 1),
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
     "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),
