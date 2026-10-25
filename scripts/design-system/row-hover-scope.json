@@ -25,11 +25,6 @@
     "kind": "row"
   },
   {
-    "path": "app/ui/src/pages/Stack.tsx",
-    "prefix": "flex gap-3 rounded-sm px-2 py-1 font-mono text-label text-text-secondary",
-    "kind": "row"
-  },
-  {
     "path": "app/ui/src/components/shows/ShowCard.tsx",
     "prefix": "relative w-full overflow-hidden transition-[height,border-color]",
     "kind": "row"
