@@ -58,17 +58,20 @@ WITH seed AS MATERIALIZED (
     LEFT JOIN track_mix_profiles p ON p.track_id=t.id
     WHERE n.distance >= 0 AND n.distance < 'Infinity'::float8
 ), listening AS MATERIALIZED (
-    SELECT e.id,
+    SELECT COALESCE(u.id,i.id,f.id) AS id,
            SUM(GREATEST(d.play_count,0)) AS current_plays,
            SUM(CASE WHEN d.minutes_listened>=0 AND d.minutes_listened<'Infinity'::float8
                THEN d.minutes_listened ELSE 0 END) AS current_minutes
-    FROM eligible e JOIN instance_track_daily d ON (
-        (d.track_entity_uid IS NOT NULL AND d.track_entity_uid::text=e.track_uid)
-        OR (d.track_entity_uid IS NULL AND d.track_id IS NOT NULL AND d.track_id=e.id)
-        OR (d.track_entity_uid IS NULL AND d.track_id IS NULL
-            AND d.global_track_uid IS NULL AND d.track_path=e.path)
-    ) AND d.day BETWEEN :start AND :end
-    GROUP BY e.id
+    FROM instance_track_daily d
+    LEFT JOIN eligible u ON d.track_entity_uid IS NOT NULL
+        AND u.track_uid=d.track_entity_uid::text
+    LEFT JOIN eligible i ON d.track_entity_uid IS NULL
+        AND d.track_id IS NOT NULL AND i.id=d.track_id
+    LEFT JOIN eligible f ON d.track_entity_uid IS NULL AND d.track_id IS NULL
+        AND d.global_track_uid IS NULL AND f.path=d.track_path
+    WHERE d.day BETWEEN :start AND :end
+      AND COALESCE(u.id,i.id,f.id) IS NOT NULL
+    GROUP BY 1
 )
 SELECT seed.id AS seed_track_id, seed.available,e.*,
        COALESCE(l.current_plays,0) AS current_plays,

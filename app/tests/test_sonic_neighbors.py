@@ -192,3 +192,36 @@ def test_collection_contract_accepts_old_snapshots_and_validates_sonic_payload()
     payload["sonic"]["planes"][0]["cells"][0]["examples"][0]["energy"] = float("nan")
     with pytest.raises(ValidationError):
         CollectionInsightsResponse.model_validate(payload)
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_neighbors_attribute_path_only_listening_but_not_global_rows(pg_db):
+    from uuid import uuid4
+
+    from crate.db.queries.sonic_neighbors import get_sonic_neighbors
+
+    with read_scope() as s:
+        album = _album(s)
+        seed = _neighbor(s, album, 1, [1.0] + [0.0] * 19)
+        close = _neighbor(s, album, 2, [1.0, 0.1] + [0.0] * 18)
+        path = s.execute(
+            text("SELECT path FROM library_tracks WHERE id=:id"), {"id": close["id"]}
+        ).scalar_one()
+        _play(s, date(2026, 10, 24), path=path, plays=4, minutes=12)
+        _play(
+            s,
+            date(2026, 10, 24),
+            path=path,
+            global_uid=str(uuid4()),
+            plays=50,
+            minutes=50,
+        )
+
+        result = get_sonic_neighbors(
+            seed["id"], today=date(2026, 10, 24), limit=1, session=s
+        )
+
+        reading = result["items"][0]["track"]
+        assert reading["id"] == close["id"]
+        assert reading["plays"] == 4
+        assert reading["minutes"] == 12
