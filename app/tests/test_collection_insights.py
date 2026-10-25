@@ -457,3 +457,30 @@ def test_categories_and_unheard_samples_are_bounded_without_losing_total(library
     assert len(report["unheard"]["items"]) == 6
     # The denominator remains the complete inventory after response truncation.
     assert report["genres"][0]["catalogue_share"] == pytest.approx(100 / 28)
+
+
+def test_report_streams_one_small_row_per_track_without_internal_columns(library):
+    from crate.db.queries.collection_insights_sql import _REPORT_SQL
+
+    with read_scope() as s:
+        album = _album(s)
+        _track(s, album, n=1, genre="Rock")
+        _track(s, album, n=2)
+        rows = s.execute(
+            text(_REPORT_SQL),
+            {
+                "today": date(2026, 10, 24),
+                "start": date(2026, 9, 25),
+                "previous_start": date(2026, 8, 26),
+                "previous_end": date(2026, 9, 24),
+                "profile_version": PROFILE_SCHEMA_VERSION,
+                "analyzer_version": ANALYZER_VERSION,
+            },
+        ).all()
+
+    kinds = [kind for kind, _payload in rows]
+    tracks = [payload for kind, payload in rows if kind == "track"]
+    assert kinds.count("track") == 2
+    assert kinds.count("meta") == 1
+    assert all("path" not in t and "genre" not in t for t in tracks)
+    assert all("genres" in t and "current_minutes" in t for t in tracks)

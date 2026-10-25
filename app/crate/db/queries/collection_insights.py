@@ -198,8 +198,17 @@ def build_collection_insights(
     }
 
     def _impl(current: Session) -> dict:
-        raw = current.execute(text(_REPORT_SQL), params).mappings().one()
-        tracks = raw["tracks"]
+        tracks: list[dict] = []
+        daily_rows: list[dict] = []
+        raw: dict = {}
+        for kind, payload in current.execute(text(_REPORT_SQL), params):
+            if kind == "track":
+                tracks.append(payload)
+            elif kind == "daily":
+                daily_rows.append(payload)
+            else:
+                raw = payload
+        tracks.sort(key=lambda t: t["id"])
         for t in tracks:
             for field in (
                 "current_plays",
@@ -243,7 +252,7 @@ def build_collection_insights(
                     "albums": samples[:6],
                 }
             )
-        daily = {d["day"]: _number(d["minutes"]) for d in raw["daily"]}
+        daily = {d["day"]: _number(d["minutes"]) for d in daily_rows}
         timeline = [
             {
                 "day": (start + timedelta(days=offset)).isoformat(),

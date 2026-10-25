@@ -124,13 +124,16 @@ WITH eligible AS MATERIALIZED (
 ), user_history AS (
     SELECT MIN(day) AS first_day FROM user_track_daily WHERE day <= :today
 )
-SELECT
-    COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.id) FROM track_rows t), '[]'::jsonb) AS tracks,
-    COALESCE((SELECT jsonb_agg(to_jsonb(d) ORDER BY d.day) FROM daily d), '[]'::jsonb) AS daily,
-    LEAST(h.first_day, u.first_day)::text AS history_start,
-    (u.first_day IS NOT NULL AND (h.first_day IS NULL OR u.first_day < h.first_day)) AS incomplete,
-    COALESCE((SELECT SUM(plays) FROM resolved WHERE id IS NULL AND day >= :start), 0) AS excluded_plays,
-    COALESCE((SELECT SUM(minutes) FROM resolved WHERE id IS NULL AND day >= :start), 0) AS excluded_minutes
+SELECT 'track' AS kind, to_jsonb(t) - 'path' - 'genre' AS payload FROM track_rows t
+UNION ALL
+SELECT 'daily', to_jsonb(d) FROM daily d
+UNION ALL
+SELECT 'meta', jsonb_build_object(
+    'history_start', LEAST(h.first_day, u.first_day)::text,
+    'incomplete', u.first_day IS NOT NULL AND (h.first_day IS NULL OR u.first_day < h.first_day),
+    'excluded_plays', COALESCE((SELECT SUM(plays) FROM resolved WHERE id IS NULL AND day >= :start), 0),
+    'excluded_minutes', COALESCE((SELECT SUM(minutes) FROM resolved WHERE id IS NULL AND day >= :start), 0)
+)
 FROM history h CROSS JOIN user_history u
 """
 
