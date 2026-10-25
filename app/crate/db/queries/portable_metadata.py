@@ -75,7 +75,7 @@ def get_portable_album_payload(
         album_row = (
             session.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     alb.id,
                     alb.storage_id,
@@ -246,9 +246,7 @@ def get_portable_album_payload(
         portable_status = {
             "sidecar_path": album.pop("_portable_sidecar_path", None),
             "sidecar_written_at": album.pop("_portable_sidecar_written_at", None),
-            "audio_tags_written_at": album.pop(
-                "_portable_audio_tags_written_at", None
-            ),
+            "audio_tags_written_at": album.pop("_portable_audio_tags_written_at", None),
             "tracks": album.pop("_portable_tracks", 0) or 0,
             "tags_written": album.pop("_portable_tags_written", 0) or 0,
             "tag_errors": album.pop("_portable_tag_errors", 0) or 0,
