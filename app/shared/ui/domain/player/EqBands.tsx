@@ -213,15 +213,7 @@ export const EqBands = memo(function EqBands({
     if (edited) callbacksRef.current.onBandChange?.(edited.band, edited.gain);
   }, [flushInput]);
 
-  useEffect(
-    () => () => {
-      if (inputFrameRef.current !== null)
-        cancelAnimationFrame(inputFrameRef.current);
-      if (keyCommitTimerRef.current !== null)
-        clearTimeout(keyCommitTimerRef.current);
-    },
-    [],
-  );
+  useEffect(() => () => commit(), [commit]);
 
   const gainFromPointer = (band: number, clientY: number): number | null => {
     const rect =

@@ -237,6 +237,24 @@ describe("EqBands", () => {
     expect(onBandChange).toHaveBeenCalledWith(2, 3);
   });
 
+  it("commits a pending keyboard edit when the bands unmount before the delay", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const onBandChange = vi.fn();
+    const { unmount } = render(
+      <EqBands gains={FLAT} onBandChange={onBandChange} />,
+    );
+    const slider = screen.getAllByRole("slider")[4]!;
+
+    fireEvent.keyDown(slider, { key: "ArrowUp" });
+    act(() => vi.advanceTimersByTime(50));
+    unmount();
+
+    expect(onBandChange).toHaveBeenCalledTimes(1);
+    expect(onBandChange).toHaveBeenCalledWith(4, 0.5);
+    act(() => vi.advanceTimersByTime(200));
+    expect(onBandChange).toHaveBeenCalledTimes(1);
+  });
+
   it("maps page, home and end keys to their steps and limits", () => {
     const onBandChange = vi.fn();
     render(<EqBands gains={FLAT} onBandChange={onBandChange} />);
