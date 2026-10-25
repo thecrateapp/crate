@@ -136,6 +136,11 @@ function connectTaskEventStream(taskId: string, stream: TaskEventStreamEntry) {
           : "info";
       const normalized = normalizeTaskEvent(payload, fallbackType);
       publishTaskEventState(stream, (current) => {
+        if (
+          normalized.id > 0 &&
+          current.events.some((existing) => existing.id === normalized.id)
+        )
+          return current;
         const next = [...current.events, normalized];
         return {
           ...current,

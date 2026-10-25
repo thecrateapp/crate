@@ -95,6 +95,38 @@ describe("normalizeTaskEvent", () => {
 });
 
 describe("useTaskEvents", () => {
+  it("keeps one copy of each event when a reconnect replays recent history", () => {
+    vi.useFakeTimers();
+    render(<TaskEventProbe taskId="replayed-task" label="consumer" />);
+
+    act(() => {
+      taskEventSource(0).onopen?.(new Event("open"));
+      taskEventSource(0).dispatch("task_event", {
+        id: 1,
+        type: "info",
+        data: { message: "Started" },
+      });
+      taskEventSource(0).dispatch("task_event", { id: 2, type: "info", data: {} });
+      taskEventSource(0).onerror?.(new Event("error"));
+      vi.advanceTimersByTime(5000);
+    });
+    expect(taskEventSources).toHaveLength(2);
+
+    act(() => {
+      taskEventSource(1).dispatch("task_event", {
+        id: 1,
+        type: "info",
+        data: { message: "Started" },
+      });
+      taskEventSource(1).dispatch("task_event", { id: 2, type: "info", data: {} });
+      taskEventSource(1).dispatch("task_event", { id: 3, type: "info", data: {} });
+    });
+
+    expect(screen.getByLabelText("consumer")).toHaveTextContent(
+      /^3:(true|false):Started:$/,
+    );
+  });
+
   it("shares and fans out one task stream, then closes it after the last consumer leaves", () => {
     const { rerender, unmount } = render(
       <>
