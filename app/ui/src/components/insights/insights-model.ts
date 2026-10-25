@@ -1,4 +1,77 @@
 export type InsightsWindow = "30d" | "90d" | "365d";
+export interface SonicTrack {
+  id: number;
+  entity_uid: string | null;
+  title: string;
+  album_id: number;
+  album_entity_uid: string | null;
+  album: string;
+  album_slug: string | null;
+  artist: string;
+  artist_slug: string | null;
+  year: string | null;
+  has_cover: boolean;
+  heard: boolean;
+  plays: number;
+  minutes: number;
+  bpm: number | null;
+  bpm_confidence: number | null;
+  energy: number | null;
+  integrated_lufs: number | null;
+  true_peak_dbfs: number | null;
+  key_camelot: string | null;
+  key_confidence: number | null;
+  tempo_stability: number | null;
+  quality: string | null;
+  has_bliss: boolean;
+  acousticness: number | null;
+  instrumentalness: number | null;
+  valence: number | null;
+}
+export interface SonicCell {
+  id: string;
+  column: number;
+  row: number;
+  x_min: number;
+  x_max: number;
+  y_min: number;
+  y_max: number;
+  tracks: number;
+  albums: number;
+  heard_tracks: number;
+  heard_albums: number;
+  plays: number;
+  minutes: number;
+  catalogue_share: number;
+  listening_share: number;
+  examples: SonicTrack[];
+}
+export interface SonicPlane {
+  key: "tempo_energy" | "tempo_lufs";
+  x: { label: string; unit: string; min: number; max: number; bins: number };
+  y: { label: string; unit: string; min: number; max: number; bins: number };
+  coverage: {
+    catalogue_tracks: number;
+    paired_tracks: number;
+    heard_tracks: number;
+    paired_heard_tracks: number;
+  };
+  cells: SonicCell[];
+}
+export interface SonicReport {
+  version: 1;
+  source: {
+    analyzer_version: string;
+    profile_version: number;
+    measurement_version: string;
+  };
+  planes: SonicPlane[];
+}
+export interface SonicNeighbors {
+  seed_track_id: number;
+  available: boolean;
+  items: { track: SonicTrack; distance: number }[];
+}
 export interface InsightAlbum {
   id: number;
   entity_uid: string | null;
@@ -45,6 +118,7 @@ interface ListeningReading {
   concentration_pct: number | null;
 }
 export interface CollectionInsights {
+  sonic?: SonicReport | null;
   ready: boolean;
   window: InsightsWindow;
   period: {
@@ -95,5 +169,7 @@ export function change(current: number, previous: number) {
     ? current === 0
       ? "No activity in either period"
       : "No activity in previous period"
-    : `${absolute} (${delta > 0 ? "+" : ""}${number((delta / previous) * 100)}%) vs previous`;
+    : `${absolute} (${delta > 0 ? "+" : ""}${number(
+        (delta / previous) * 100,
+      )}%) vs previous`;
 }

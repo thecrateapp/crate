@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.queries.collection_insights_sql import _REPORT_SQL
+from crate.db.queries.sonic_insights import build_sonic_insights
 from crate.db.tx import read_scope
 from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
@@ -282,6 +283,7 @@ def build_collection_insights(
             "unheard": {"total": len(unheard), "items": unheard[:6]},
             "rediscover": {"total": len(rediscover), "items": rediscover[:6]},
             "improvements": improvements,
+            "sonic": build_sonic_insights(tracks),
         }
 
     if session is not None:

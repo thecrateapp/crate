@@ -159,6 +159,7 @@ for (const width of [1440, 390, 320]) {
           (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length,
         );
       expect(columns).toBe(width >= 1024 ? 4 : 2);
+      await page.getByRole("tab", { name: "Collection", exact: true }).click();
       await page.getByRole("button", { name: /Inspect ambient:/ }).click();
       const reading = page.getByRole("group", {
         name: "Selected collection category",
@@ -168,6 +169,9 @@ for (const width of [1440, 390, 320]) {
       await expect(
         page.getByRole("link", { name: "Explore ambient", exact: true }),
       ).toHaveAttribute("href", "/genres?genre=ambient");
+      await expect(
+        page.getByRole("link", { name: "Explore ambient", exact: true }),
+      ).toHaveAttribute("data-variant", "secondary");
       const lastCategory = page.getByRole("button", {
         name: /Inspect Genre 22:/,
       });
@@ -183,8 +187,9 @@ for (const width of [1440, 390, 320]) {
       });
       expect(scroll?.top).toBeGreaterThan(0);
       expect(scroll?.height).toBeLessThanOrEqual(520);
-      await page.getByRole("button", { name: "Decades", exact: true }).click();
+      await page.getByRole("radio", { name: "Decades", exact: true }).click();
       await expect(reading).toContainText("2020s");
+      await page.getByRole("tab", { name: "Listening", exact: true }).click();
       const trace = page.getByRole("slider", { name: "Inspect listening day" });
       await trace.focus();
       await trace.press("Home");
@@ -194,11 +199,17 @@ for (const width of [1440, 390, 320]) {
       await expect(
         page.getByRole("link", { name: /Quicksand 60 min/i }),
       ).toHaveAttribute("href", "/artists/quicksand");
+      await page.getByRole("tab", { name: "Collection", exact: true }).click();
       await expect(
         page.getByRole("heading", {
           name: "Improvements with listening impact",
         }),
       ).toBeVisible();
+      for (const action of await page
+        .getByRole("link", { name: /^Open (Discovery|Analysis)$/ })
+        .all()) {
+        await expect(action).toHaveAttribute("data-variant", "secondary");
+      }
       expect(await page.locator("main [title]").count()).toBe(0);
       const geometry = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,

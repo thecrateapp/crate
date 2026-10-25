@@ -155,6 +155,71 @@ beforeEach(() => {
     );
 });
 describe("Collection Insights", () => {
+  it("groups the report into shared tabs below one common header", async () => {
+    setup();
+    const tabs = screen.getByRole("tablist", { name: "Insights sections" });
+    expect(within(tabs).getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getByRole("tab", { name: "Listening" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("region", { name: "Collection listening summary" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Collection versus listening" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Sonic explorer" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
+    expect(
+      screen.getByRole("heading", { name: "Collection versus listening" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Listening pulse" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Sonic explorer" }));
+    expect(
+      screen.getByRole("heading", { name: "Sonic explorer" }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("combobox", { name: "Period" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "Insights" })).toHaveLength(
+      1,
+    );
+  });
+
+  it("retains a pinned collection reading when returning from another tab", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Inspect Unknown genre/ }),
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "Listening" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
+    expect(
+      screen.getByRole("group", { name: "Selected collection category" }),
+    ).toHaveTextContent("Unknown genre");
+  });
+
+  it("keeps the selected tab while the common period changes", async () => {
+    setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
+    report = { ...fixture(), window: "90d" };
+    await userEvent.click(screen.getByRole("combobox", { name: "Period" }));
+    await userEvent.click(screen.getByRole("option", { name: "90 days" }));
+    expect(screen.getByRole("tab", { name: "Collection" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Collection versus listening" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Listening pulse" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows a recoverable loading state with no invented zero readings", () => {
     report = null;
     loading = true;
@@ -187,7 +252,7 @@ describe("Collection Insights", () => {
       "/api/admin/collection-insights?window=30d&fresh=true",
     );
   });
-  it("shows scope, denominators, metadata and real entity links", () => {
+  it("shows scope, denominators, metadata and real entity links", async () => {
     setup();
     expect(useApiMock).toHaveBeenCalledWith(
       "/api/admin/collection-insights?window=30d",
@@ -196,6 +261,8 @@ describe("Collection Insights", () => {
     expect(screen.getByText(/6 \/ 100 indexed tracks/)).toBeVisible();
     expect(screen.getByText(/3 \/ 10 indexed albums/)).toBeVisible();
     expect(screen.getByText(/2 excluded plays/)).toBeVisible();
+    expect(screen.getByText(/No activity in previous period/)).toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     const reading = screen.getByRole("group", {
       name: "Selected collection category",
     });
@@ -211,10 +278,10 @@ describe("Collection Insights", () => {
       screen.getByRole("link", { name: "Open Discovery" }),
     ).toHaveAttribute("href", "/discover");
     expect(screen.getAllByText(/Caspian · 2025/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/No activity in previous period/)).toBeVisible();
   });
   it("supports persistent keyboard and tap category readings including unknown metadata", async () => {
     setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     const unknown = screen.getByRole("button", {
       name: /Inspect Unknown genre/,
     });
@@ -230,7 +297,7 @@ describe("Collection Insights", () => {
     expect(
       screen.getByRole("button", { name: /Inspect Post-rock/ }),
     ).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "Decades" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Decades" }));
     expect(screen.getByRole("button", { name: /Inspect 2020s/ })).toBeVisible();
   });
   it("reads the timeline using arrow keys without a redundant day selector", async () => {
@@ -255,10 +322,11 @@ describe("Collection Insights", () => {
       screen.queryByRole("combobox", { name: "Inspect day" }),
     ).not.toBeInTheDocument();
   });
-  it("retains successful readings on refresh failure and stale data", () => {
+  it("retains successful readings on refresh failure and stale data", async () => {
     report!.snapshot.stale = true;
     error = "Snapshot failed";
     setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     expect(
       screen.getByText(/Showing the last successful snapshot/),
     ).toBeVisible();
@@ -305,9 +373,10 @@ describe("Collection Insights", () => {
   });
   it.each([undefined, { smart_mix: { available: false } }])(
     "hides Full opportunities when disabled or unknown: %j",
-    (value) => {
+    async (value) => {
       capabilities = value;
       setup();
+      await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
       expect(
         screen.queryByRole("heading", {
           name: "Current Full profiles missing",
@@ -318,8 +387,9 @@ describe("Collection Insights", () => {
       ).toBeVisible();
     },
   );
-  it("shows Full opportunities only when enabled and never starts repairs", () => {
+  it("shows Full opportunities only when enabled and never starts repairs", async () => {
     setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     expect(
       screen.getByRole("heading", { name: "Current Full profiles missing" }),
     ).toBeVisible();
@@ -401,6 +471,7 @@ describe("Insights snapshot task completion", () => {
       error: "Builder unavailable",
     });
     setup();
+    await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
     await userEvent.click(
       screen.getByRole("button", { name: "Refresh insights" }),
     );
@@ -445,6 +516,7 @@ it("recovers from an initial load error after a successful manual refresh", asyn
 });
 it("preserves the selected category when the same window finishes refreshing", async () => {
   setup();
+  await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
   await userEvent.click(
     screen.getByRole("button", { name: /Inspect Unknown genre/ }),
   );
@@ -481,7 +553,7 @@ it("keeps the last report and enables retry after the bounded task wait times ou
   expect(apiMock).toHaveBeenCalledTimes(1);
 });
 
-it("withholds exploration claims and counts while instance history is being reconciled", () => {
+it("withholds exploration claims and counts while instance history is being reconciled", async () => {
   report!.period.history_complete = false;
   report!.unheard = {
     total: 137,
@@ -492,6 +564,7 @@ it("withholds exploration claims and counts while instance history is being reco
     items: [{ ...album, title: "Withheld rediscover album" }],
   };
   setup();
+  await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
   expect(
     screen.getByText(
       "Listening history is still being reconciled; exploration lists are unavailable.",
@@ -513,9 +586,10 @@ it("withholds exploration claims and counts while instance history is being reco
     screen.getByRole("heading", { name: "Improvements with listening impact" }),
   ).toBeVisible();
 });
-it("allows exploration when complete available history is shorter than the prior comparison window", () => {
+it("allows exploration when complete available history is shorter than the prior comparison window", async () => {
   report!.period.previous_complete = false;
   setup();
+  await userEvent.click(screen.getByRole("tab", { name: "Collection" }));
   expect(
     screen.getByRole("heading", { name: "Explore the unheard" }),
   ).toBeVisible();

@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from crate.api.schemas.common import SnapshotMetadataResponse
+from crate.api.schemas.sonic_insights import SonicReport
 
 
 class CollectionInsightAlbum(BaseModel):
@@ -120,4 +121,5 @@ class CollectionInsightsResponse(BaseModel):
     unheard: CollectionInsightAlbums
     rediscover: CollectionInsightAlbums
     improvements: list[CollectionInsightImprovement] = Field(default_factory=list)
+    sonic: SonicReport | None = None
     snapshot: CollectionInsightSnapshot

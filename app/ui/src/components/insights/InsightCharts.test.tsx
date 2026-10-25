@@ -92,6 +92,55 @@ const data: CollectionInsights = {
   improvements: [],
 };
 describe("Insights Nivo geometry", () => {
+  it("switches collection dimensions with shared radio controls and resets the category reading", () => {
+    render(
+      <MemoryRouter>
+        <InsightComparison
+          data={{
+            ...data,
+            decades: [{ ...row, key: "1990s", label: "1990s" }],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    const dimensions = screen.getByRole("radiogroup", {
+      name: "Collection comparison dimension",
+    });
+    const genres = within(dimensions).getByRole("radio", { name: "Genres" });
+    const decades = within(dimensions).getByRole("radio", { name: "Decades" });
+    expect(genres).toBeChecked();
+    expect(genres).toHaveAttribute("data-state", "active");
+    fireEvent.click(screen.getByRole("button", { name: /Inspect Other:/ }));
+    fireEvent.keyDown(genres, { key: "ArrowRight" });
+    expect(decades).toBeChecked();
+    expect(decades).toHaveFocus();
+    expect(decades).toHaveAttribute("data-state", "active");
+    expect(
+      screen.getByRole("group", { name: "Selected collection category" }),
+    ).toHaveTextContent("1990s");
+    fireEvent.keyDown(decades, { key: "ArrowLeft" });
+    expect(genres).toBeChecked();
+    expect(
+      screen.getByRole("button", { name: /Inspect Unknown genre:/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+  it("uses a secondary navigation button for the selected genre without losing its destination", () => {
+    render(
+      <MemoryRouter>
+        <InsightComparison
+          data={{
+            ...data,
+            genres: [{ ...row, label: "Post-rock", genre_slug: "post-rock" }],
+          }}
+        />
+      </MemoryRouter>,
+    );
+    const explore = screen.getByRole("link", { name: "Explore Post-rock" });
+    expect(explore).toHaveAttribute("href", "/genres?genre=post-rock");
+    expect(explore).toHaveAttribute("data-slot", "button");
+    expect(explore).toHaveAttribute("data-variant", "secondary");
+    expect(explore).not.toHaveAttribute("title");
+  });
   it("uses one scale for coincident catalogue and listening endpoints", () => {
     const { container } = render(
       <MemoryRouter>

@@ -2,7 +2,7 @@ import re as _re
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 
 from crate.api.auth import _require_auth
 from crate.api.permissions import require_permission
@@ -28,7 +28,9 @@ from crate.api.schemas.analytics import (
 )
 from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
 from crate.api.schemas.collection_insights import CollectionInsightsResponse
+from crate.api.schemas.sonic_insights import SonicNeighborsResponse
 from crate.db.collection_insights_surface import get_collection_insights
+from crate.db.queries.sonic_neighbors import get_sonic_neighbors
 from crate.db.queries.user_library_stats_range import (
     StatsRangeError,
     get_instance_stats_range,
@@ -394,6 +396,25 @@ def api_collection_insights(
 ):
     require_permission(request, "library.view")
     return get_collection_insights(window=window, fresh=fresh)
+
+
+@router.get(
+    "/api/admin/collection-insights/sonic-neighbors/{track_id}",
+    response_model=SonicNeighborsResponse,
+    responses=_ANALYTICS_RESPONSES,
+    summary="Read local Bliss neighbors and their registered listening in the selected period",
+)
+def api_sonic_neighbors(
+    request: Request,
+    track_id: int = Path(..., ge=1),
+    window: Literal["30d", "90d", "365d"] = Query("30d"),
+    limit: int = Query(6, ge=1, le=12),
+):
+    require_permission(request, "library.view")
+    result = get_sonic_neighbors(track_id, window=window, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Local track not found")
+    return result
 
 
 @router.get(

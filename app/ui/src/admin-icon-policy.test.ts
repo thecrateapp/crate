@@ -70,6 +70,8 @@ const supportingScope = [
   "app/ui/src/components/insights/InsightTimeline.tsx",
   "app/ui/src/components/insights/InsightSummary.tsx",
   "app/ui/src/components/insights/InsightEntityLists.tsx",
+  "app/ui/src/components/insights/InsightSonicExplorer.tsx",
+  "app/ui/src/components/insights/InsightSonicReading.tsx",
   "app/ui/src/components/layout/HeaderUserMenu.tsx",
   "app/ui/src/components/admin/ListPagination.tsx",
   "app/ui/src/components/SmartMixCoverage.tsx",
@@ -338,6 +340,22 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  [
+    "app/ui/src/pages/Insights.tsx:@/components/insights/InsightEntityLists:InsightOpportunities",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Insights.tsx:@/components/insights/InsightSonicExplorer:InsightSonicExplorer",
+    1,
+  ],
+  [
+    "app/ui/src/components/insights/InsightSonicExplorer.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
+    1,
+  ],
+  [
+    "app/ui/src/components/insights/InsightSonicExplorer.tsx:./InsightSonicReading:InsightSonicReading",
+    1,
+  ],
   [
     "app/ui/src/components/insights/InsightComparison.tsx:@/components/charts/InstrumentChart:InstrumentChartLegend",
     1,

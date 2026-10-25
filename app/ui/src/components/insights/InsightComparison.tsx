@@ -4,6 +4,7 @@ import { ResponsiveScatterPlot } from "@nivo/scatterplot";
 import { Button } from "@crate/ui/shadcn/button";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import {
   InstrumentChartLegend,
   InstrumentChartPoint,
@@ -19,7 +20,13 @@ import {
   type InsightComparison as Comparison,
 } from "./insights-model";
 
-export function InsightComparison({ data }: { data: CollectionInsights }) {
+export function InsightComparison({
+  data,
+  ruled = true,
+}: {
+  data: CollectionInsights;
+  ruled?: boolean;
+}) {
   const [mode, setMode] = useState<"genres" | "decades">("genres");
   const [selection, setSelection] = useState<string | null>(null);
   const rows = data[mode];
@@ -28,29 +35,25 @@ export function InsightComparison({ data }: { data: CollectionInsights }) {
   return (
     <InstrumentPanel
       as="section"
+      ruled={ruled}
+      className={ruled ? undefined : "pt-0"}
       headingLevel={2}
       label={{ tone: "accent", children: "Collection versus listening" }}
       description="Catalogue share counts indexed tracks; listening share counts registered local plays. Canonical genres split each track and play equally across its mapped genres. Unknown metadata remains separate."
       actions={
-        <div
-          className="flex flex-wrap gap-1"
-          role="group"
-          aria-label="Collection comparison dimension"
-        >
-          {(["genres", "decades"] as const).map((value) => (
-            <Button
-              key={value}
-              variant="ghost"
-              aria-pressed={mode === value}
-              onClick={() => {
-                setMode(value);
-                setSelection(null);
-              }}
-            >
-              {value === "genres" ? "Genres" : "Decades"}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl<"genres" | "decades">
+          as="radio"
+          label="Collection comparison dimension"
+          value={mode}
+          items={[
+            { value: "genres", label: "Genres" },
+            { value: "decades", label: "Decades" },
+          ]}
+          onValueChange={(value) => {
+            setMode(value);
+            setSelection(null);
+          }}
+        />
       }
     >
       <div className="mb-5">
@@ -77,7 +80,7 @@ export function InsightComparison({ data }: { data: CollectionInsights }) {
             onSelect={setSelection}
           />
           {selected ? (
-            <div className="min-w-0 space-y-5">
+            <div className="flex min-w-0 flex-col gap-5">
               <InstrumentChartReadout
                 label="Selected collection category"
                 tone="accent"
@@ -86,16 +89,22 @@ export function InsightComparison({ data }: { data: CollectionInsights }) {
                   {
                     label: "Catalogue",
                     value: percent(selected.catalogue_share),
-                    unit: `of ${number(data.catalogue?.tracks ?? 0)} indexed tracks`,
+                    unit: `of ${number(
+                      data.catalogue?.tracks ?? 0,
+                    )} indexed tracks`,
                   },
                   {
                     label: "Listening",
                     value: percent(selected.listening_share),
-                    unit: `of ${number(data.current?.plays ?? 0)} registered local plays`,
+                    unit: `of ${number(
+                      data.current?.plays ?? 0,
+                    )} registered local plays`,
                   },
                   {
                     label: "Membership",
-                    value: `${number(selected.tracks)} tracks · ${number(selected.albums)} albums`,
+                    value: `${number(selected.tracks)} tracks · ${number(
+                      selected.albums,
+                    )} albums`,
                     fullWidth: true,
                   },
                   {
@@ -111,19 +120,33 @@ export function InsightComparison({ data }: { data: CollectionInsights }) {
                     ? [
                         {
                           label: "Listening share change",
-                          value: `${selected.listening_share - selected.previous_listening_share > 0 ? "+" : ""}${number(selected.listening_share - selected.previous_listening_share)} pp`,
+                          value: `${
+                            selected.listening_share -
+                              selected.previous_listening_share >
+                            0
+                              ? "+"
+                              : ""
+                          }${number(
+                            selected.listening_share -
+                              selected.previous_listening_share,
+                          )} pp`,
                         },
                       ]
                     : []),
                 ]}
               />
               {selected.genre_slug ? (
-                <Link
-                  className="inline-flex min-h-11 items-center text-sm text-accent-action-hi underline-offset-4 hover:underline"
-                  to={`/genres?genre=${encodeURIComponent(selected.genre_slug)}`}
-                >
-                  Explore {selected.label}
-                </Link>
+                <div className="flex flex-wrap gap-3">
+                  <Button asChild variant="secondary">
+                    <Link
+                      to={`/genres?genre=${encodeURIComponent(
+                        selected.genre_slug,
+                      )}`}
+                    >
+                      Explore {selected.label}
+                    </Link>
+                  </Button>
+                </div>
               ) : null}
               {selected.examples.length ? (
                 <InsightAlbumList albums={selected.examples} />
@@ -178,9 +201,9 @@ function ComparisonRails({
   // Row buttons own a full-width keyboard/touch target. Nivo keeps both endpoints on one scale,
   // including coincident points; category selection never depends on hitting a tiny SVG point.
   return (
-    <div className="min-w-0">
+    <div className="flex min-w-0 flex-col gap-3">
       <div
-        className="mb-2 grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
+        className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
         aria-hidden="true"
       >
         <span />
@@ -279,7 +302,9 @@ function ComparisonRails({
             <button
               type="button"
               key={row.key}
-              aria-label={`Inspect ${row.label}: catalogue ${percent(row.catalogue_share)}, listening ${percent(row.listening_share)}`}
+              aria-label={`Inspect ${row.label}: catalogue ${percent(
+                row.catalogue_share,
+              )}, listening ${percent(row.listening_share)}`}
               aria-pressed={row.key === selected}
               onFocus={() => onSelect(row.key)}
               onPointerEnter={() => onSelect(row.key)}
@@ -294,7 +319,7 @@ function ComparisonRails({
           ))}
         </div>
       </div>
-      <MonoLabel as="p" className="mt-3 wrap-anywhere">
+      <MonoLabel as="p" className="wrap-anywhere">
         {number(rows.length)} categories shown · Select a row to read exact
         shares and album examples.
       </MonoLabel>

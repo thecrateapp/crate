@@ -7,6 +7,7 @@ one identity. Genre membership is deduplicated before any listening attribution.
 _REPORT_SQL = """
 WITH eligible AS MATERIALIZED (
     SELECT t.id, t.entity_uid::text AS track_uid, t.path, t.genre,
+           COALESCE(NULLIF(t.title, ''), t.filename) AS track_title,
            COALESCE(NULLIF(t.year, ''), a.year) AS track_year,
            a.id AS album_id, a.entity_uid::text AS entity_uid, a.slug,
            a.name AS title, a.artist, a.year, a.has_cover <> 0 AS has_cover,
@@ -15,7 +16,17 @@ WITH eligible AS MATERIALIZED (
            COALESCE(p.quality = 'full' AND p.profile_version = :profile_version
                AND p.analyzer_version = :analyzer_version
                AND p.source_stale_at IS NULL, false) AS full_current,
-           COALESCE(cardinality(t.bliss_vector), 0) > 0 AS has_bliss
+           COALESCE(cardinality(t.bliss_vector), 0) > 0 AS has_bliss,
+           COALESCE(p.quality IN ('full', 'partial') AND p.profile_version = :profile_version
+               AND p.analyzer_version = :analyzer_version
+               AND p.source_stale_at IS NULL, false) AS profile_current,
+           p.bpm AS mix_bpm, p.bpm_confidence AS mix_bpm_confidence,
+           p.global_energy AS mix_energy, p.integrated_lufs AS mix_integrated_lufs,
+           p.measurement_version AS mix_measurement_version,
+           p.true_peak_dbfs AS mix_true_peak_dbfs,
+           p.key_camelot AS mix_key_camelot, p.key_confidence AS mix_key_confidence,
+           p.tempo_stability AS mix_tempo_stability, p.quality AS mix_quality,
+           t.acousticness, t.instrumentalness, t.valence
     FROM library_tracks t
     JOIN library_albums a ON a.id = t.album_id AND a.quarantined_at IS NULL
     JOIN library_artists ar ON ar.name = a.artist

@@ -3,6 +3,12 @@ import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@crate/ui/composites/AdminSelect";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@crate/ui/shadcn/tabs";
 import { RefreshCw } from "@crate/ui/icons";
 import {
   PageHeaderAction,
@@ -13,6 +19,7 @@ import { useCollectionInsights } from "@/components/insights/use-collection-insi
 import { InsightSummary } from "@/components/insights/InsightSummary";
 import { InsightComparison } from "@/components/insights/InsightComparison";
 import { InsightTimeline } from "@/components/insights/InsightTimeline";
+import { InsightSonicExplorer } from "@/components/insights/InsightSonicExplorer";
 import {
   InsightChanges,
   InsightOpportunities,
@@ -68,6 +75,8 @@ export interface InsightsData {
 
 export function Insights() {
   const [window, setWindow] = useState<InsightsWindow>("30d");
+  const [tab, setTab] = useState("listening");
+  const [visited, setVisited] = useState(["listening"]);
   const { data, error, refreshing, refresh } = useCollectionInsights(window);
   const capabilities = useApi<{ smart_mix?: { available?: boolean } }>(
     "/api/capabilities",
@@ -79,8 +88,14 @@ export function Insights() {
   function changeWindow(value: string) {
     setWindow(value as InsightsWindow);
   }
+  function changeTab(value: string) {
+    setTab(value);
+    setVisited((current) =>
+      current.includes(value) ? current : [...current, value],
+    );
+  }
   return (
-    <div className="min-w-0 space-y-10">
+    <div className="grid min-w-0 gap-8">
       <OpsPageHero
         title="Insights"
         description="Listening and curation across your indexed collection."
@@ -116,7 +131,7 @@ export function Insights() {
         }
       >
         {data?.period ? (
-          <div className="space-y-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <MonoLabel as="p">
               Instance · {data.period.start} – {data.period.end}
             </MonoLabel>
@@ -153,38 +168,90 @@ export function Insights() {
           </div>
         ) : null}
       </OpsPageHero>
-      {error ? (
-        <div role="status" className="space-y-2 text-sm text-text-muted">
-          <p>
-            {data?.ready
-              ? "Insights could not refresh. Showing the last successful snapshot."
-              : "Collection insights could not be loaded."}
-          </p>
-          <p>Use Refresh insights to retry.</p>
-        </div>
-      ) : null}
-      {!data && !error ? (
-        <LoadingState label="Loading collection insights" />
-      ) : null}
-      {data && !data.ready && !error ? (
-        <section aria-label="Insights pending" className="space-y-3">
-          <h2 className="font-display text-lg">Insights are being prepared</h2>
-          <p className="text-sm text-text-muted">
-            {refreshing
-              ? "Waiting for the collection snapshot to finish."
-              : "The first snapshot is pending. Use Refresh insights to check again."}
-          </p>
-        </section>
-      ) : null}
-      {data?.ready ? (
-        <div className="space-y-10" key={window}>
-          <InsightSummary data={data} />
-          <InsightComparison data={data} />
-          <InsightTimeline data={data} />
-          <InsightChanges data={data} />
-          <InsightOpportunities data={data} fullEnabled={fullEnabled} />
-        </div>
-      ) : null}
+      <Tabs value={tab} onValueChange={changeTab} className="gap-6">
+        <TabsList aria-label="Insights sections">
+          <TabsTrigger value="listening">Listening</TabsTrigger>
+          <TabsTrigger value="collection">Collection</TabsTrigger>
+          <TabsTrigger value="sonic">Sonic explorer</TabsTrigger>
+        </TabsList>
+        {error ? (
+          <div
+            role="status"
+            className="flex flex-col gap-2 text-sm text-text-muted"
+          >
+            <p>
+              {data?.ready
+                ? "Insights could not refresh. Showing the last successful snapshot."
+                : "Collection insights could not be loaded."}
+            </p>
+            <p>Use Refresh insights to retry.</p>
+          </div>
+        ) : null}
+        {!data && !error ? (
+          <LoadingState label="Loading collection insights" />
+        ) : null}
+        {data && !data.ready && !error ? (
+          <section
+            aria-label="Insights pending"
+            className="flex flex-col gap-3"
+          >
+            <h2 className="font-display text-lg">
+              Insights are being prepared
+            </h2>
+            <p className="text-sm text-text-muted">
+              {refreshing
+                ? "Waiting for the collection snapshot to finish."
+                : "The first snapshot is pending. Use Refresh insights to check again."}
+            </p>
+          </section>
+        ) : null}
+        <TabsContent
+          value="listening"
+          forceMount
+          hidden={tab !== "listening"}
+          className={tab === "listening" ? undefined : "hidden"}
+        >
+          {data?.ready ? (
+            <div className="grid min-w-0 gap-10" key={window}>
+              <InsightSummary data={data} />
+              <InsightTimeline data={data} />
+              <InsightChanges data={data} />
+            </div>
+          ) : null}
+        </TabsContent>
+        <TabsContent
+          value="collection"
+          forceMount
+          hidden={tab !== "collection"}
+          className={tab === "collection" ? undefined : "hidden"}
+        >
+          {data?.ready && visited.includes("collection") ? (
+            <div className="grid min-w-0 gap-10" key={window}>
+              <InsightComparison data={data} ruled={false} />
+              <InsightOpportunities data={data} fullEnabled={fullEnabled} />
+            </div>
+          ) : null}
+        </TabsContent>
+        <TabsContent
+          value="sonic"
+          forceMount
+          hidden={tab !== "sonic"}
+          className={tab === "sonic" ? undefined : "hidden"}
+        >
+          {data?.ready && visited.includes("sonic") ? (
+            <div className="min-w-0" key={window}>
+              <InsightSonicExplorer
+                report={data.sonic}
+                window={window}
+                onRefresh={() => void refresh()}
+                refreshing={refreshing}
+                active={tab === "sonic"}
+                ruled={false}
+              />
+            </div>
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
