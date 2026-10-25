@@ -207,6 +207,35 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
         pass
 
 
+def get_volatile_cache(key: str, max_age_seconds: int) -> Any | None:
+    value = _mem_get(key, max_age_seconds=max_age_seconds)
+    if value is not None:
+        return value
+    redis_client = get_redis()
+    if not redis_client:
+        return None
+    try:
+        raw = redis_client.get(f"cache:{key}")
+    except Exception:
+        return None
+    if raw is None:
+        return None
+    value = json.loads(raw)
+    _mem_set(key, value, min(max_age_seconds, 300))
+    return value
+
+
+def set_volatile_cache(key: str, value: Any, ttl: int) -> None:
+    _mem_set(key, value, min(ttl, 300))
+    redis_client = get_redis()
+    if not redis_client:
+        return
+    try:
+        redis_client.setex(f"cache:{key}", ttl, json.dumps(value, default=str))
+    except Exception:
+        pass
+
+
 def get_smart_mix_plan_caches(plan_keys: Sequence[str]) -> dict[str, dict[str, Any]]:
     found: dict[str, dict[str, Any]] = {}
     missing: list[str] = []
@@ -358,6 +387,8 @@ __all__ = [
     "get_caches",
     "get_cache_stats",
     "get_smart_mix_plan_caches",
+    "get_volatile_cache",
     "set_cache",
     "set_smart_mix_plan_caches",
+    "set_volatile_cache",
 ]
