@@ -329,7 +329,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
             try:
                 from crate.importer import ImportQueue
                 from crate.config import load_config
+                from crate.db.import_queue_mutations import (
+                    release_orphaned_import_claims,
+                )
 
+                release_orphaned_import_claims()
                 queue = ImportQueue(load_config())
                 count = len(queue.refresh_pending_state())
                 set_cache("imports_pending", {"count": count})

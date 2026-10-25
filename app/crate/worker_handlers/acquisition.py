@@ -2754,8 +2754,10 @@ def _handle_import_queue_item(task_id: str, params: dict, config: dict) -> dict:
     )
     try:
         result = queue.import_item(source_path, artist, album)
-    except Exception as error:
-        mark_import_queue_item_pending(source_path, error=str(error))
+    except BaseException as error:
+        mark_import_queue_item_pending(
+            source_path, error=str(error) or type(error).__name__
+        )
         raise
     if result.get("error"):
         mark_import_queue_item_pending(source_path, error=str(result["error"]))
@@ -2851,6 +2853,13 @@ def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
             progress.item = entity_label(artist=item_artist, album=item_album)
             emit_progress(task_id, progress)
             continue
+        except BaseException as error:
+            mark_import_queue_item_pending(
+                source_path,
+                source=source,
+                error=str(error) or type(error).__name__,
+            )
+            raise
         result["source"] = source
         result["source_path"] = source_path
         results.append(result)

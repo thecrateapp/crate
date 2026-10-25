@@ -110,6 +110,57 @@ def mark_import_queue_item_pending(
     )
 
 
+def release_orphaned_import_claims() -> int:
+    """Return staged albums to pending when their import task is no longer active."""
+    with transaction_scope() as session:
+        released = (
+            session.execute(
+                text(
+                    """
+                    UPDATE import_queue_items item
+                    SET status = 'pending',
+                        payload_json = COALESCE(item.payload_json, '{}'::jsonb)
+                            || jsonb_build_object(
+                                'status', 'pending',
+                                'task_id', NULL,
+                                'last_error', 'Import task stopped before finishing'
+                            ),
+                        updated_at = NOW()
+                    WHERE item.status = 'importing'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM tasks task
+                          WHERE task.id = item.payload_json->>'task_id'
+                            AND task.status IN ('pending', 'running', 'delegated', 'completing')
+                      )
+                    RETURNING item.path
+                    """
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not released:
+            return 0
+        pending_count = int(
+            session.execute(
+                text("SELECT COUNT(*) FROM import_queue_items WHERE status = 'pending'")
+            ).scalar()
+            or 0
+        )
+        set_ops_runtime_state(
+            "imports_pending", {"count": pending_count}, session=session
+        )
+        mark_ui_snapshots_stale(scope="ops", subject_key="dashboard", session=session)
+        append_domain_event(
+            "library.import_queue.changed",
+            {"pending_count": pending_count, "released": len(released)},
+            scope="ops",
+            subject_key="import_queue",
+            session=session,
+        )
+        return len(released)
+
+
 def remove_import_queue_item(source_path: str, *, source: str | None = None) -> bool:
     with transaction_scope() as session:
         if source:
@@ -231,5 +282,6 @@ __all__ = [
     "mark_import_queue_item_imported",
     "mark_import_queue_item_importing",
     "mark_import_queue_item_pending",
+    "release_orphaned_import_claims",
     "remove_import_queue_item",
 ]
