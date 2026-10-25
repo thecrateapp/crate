@@ -18,6 +18,8 @@ SCOPE = "admin:collection-insights"
 WINDOWS = ("30d", "90d", "365d")
 _MAX_AGE = 300
 _STALE_RETENTION = 365 * 86400
+_WARM_WINDOW = "30d"
+_WARM_INTERVAL = 3600
 
 
 def _subject(window: str) -> str:
@@ -115,13 +117,13 @@ def refresh_collection_insights(*, window: str = "30d") -> dict[str, Any]:
 
 
 def schedule_collection_insights_refresh() -> int:
-    key = "collection_insights_refresh_debounce_v1"
-    if get_cache(key, max_age_seconds=_MAX_AGE):
+    key = "collection_insights_refresh_debounce_v2"
+    if get_cache(key, max_age_seconds=_WARM_INTERVAL):
         return 0
-    scheduled = sum(_schedule(window)[0] for window in WINDOWS)
-    if scheduled == len(WINDOWS):
-        set_cache(key, True, ttl=_MAX_AGE)
-    return scheduled
+    scheduled, _task_id = _schedule(_WARM_WINDOW)
+    if scheduled:
+        set_cache(key, True, ttl=_WARM_INTERVAL)
+    return int(scheduled)
 
 
 __all__ = [

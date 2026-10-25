@@ -89,18 +89,22 @@ def test_old_snapshot_survives_and_refresh_failure_is_reported(monkeypatch):
     assert result["snapshot"]["refresh_error"] is True
 
 
-def test_schedule_refresh_is_debounced_and_bounds_windows(monkeypatch):
+def test_schedule_refresh_warms_only_the_default_window_hourly(monkeypatch):
     from crate.db import collection_insights_surface as surface
 
-    cache, queued = {}, []
+    cache, queued, ttls = {}, [], []
+
+    def set_cache(key, value, **kwargs):
+        cache[key] = value
+        ttls.append(kwargs.get("ttl"))
+
     monkeypatch.setattr(surface, "get_cache", lambda key, **_k: cache.get(key))
-    monkeypatch.setattr(
-        surface, "set_cache", lambda key, value, **_k: cache.__setitem__(key, value)
-    )
+    monkeypatch.setattr(surface, "set_cache", set_cache)
     monkeypatch.setattr(surface, "create_task_dedup", lambda *a, **_k: queued.append(a))
-    assert surface.schedule_collection_insights_refresh() == 3
+    assert surface.schedule_collection_insights_refresh() == 1
     assert surface.schedule_collection_insights_refresh() == 0
-    assert [item[1]["window"] for item in queued] == ["30d", "90d", "365d"]
+    assert [item[1]["window"] for item in queued] == ["30d"]
+    assert ttls == [3600]
     with pytest.raises(ValueError):
         surface.get_collection_insights(window="unbounded")
 
