@@ -1857,6 +1857,7 @@
   "stats.explorer.nothingPlayed": "Nothing played that day.",
   "stats.explorer.plays": "{count, plural, one {# play} other {# plays}}",
   "stats.explorer.unavailable": "Top items for this stretch are still being prepared.",
+  "stats.explorer.fewListeners": "Top items for this stretch appear once at least {count, plural, one {# listener has} other {# listeners have}} played music in it.",
   "stats.explorer.openDay": "Select to see the day",
   "stats.explorer.error": "This stretch could not be loaded.",
   "stats.headline.minutes": "minutes",

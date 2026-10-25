@@ -244,6 +244,19 @@ def test_range_days_follow_user_timezone(pg_db):
     assert [item["track_id"] for item in local_day["top_tracks"]] == [track_id]
 
 
+@pytest.fixture(autouse=True)
+def _isolated_range_cache(monkeypatch):
+    from crate.db.queries import user_library_stats_range as module
+
+    store: dict = {}
+    monkeypatch.setattr(module, "get_volatile_cache", lambda key, _ttl: store.get(key))
+    monkeypatch.setattr(
+        module,
+        "set_volatile_cache",
+        lambda key, value, _ttl: store.__setitem__(key, value),
+    )
+
+
 @pytest.fixture
 def opened_scopes(monkeypatch):
     """Count every read or write scope opened through ``crate.db.tx``."""
@@ -279,6 +292,28 @@ def test_range_routes_open_one_read_scope(history, test_app, opened_scopes, rout
 
     assert response.status_code == 200, response.text[:300]
     assert len(opened_scopes) == 1
+
+
+def test_instance_range_route_serves_repeat_requests_from_cache(
+    history, test_app, opened_scopes
+):
+    from crate.db.jobs.instance_listening_rollups import (
+        rebuild_instance_listening_days,
+    )
+
+    with transaction_scope() as session:
+        rebuild_instance_listening_days(session, None)
+    path = "/api/stats/range?start=2026-09-01&end=2026-10-06&limit=5"
+    first = test_app.get(path)
+    assert first.status_code == 200, first.text[:300]
+    assert first.json()["available"] is True
+    opened_scopes.clear()
+
+    repeat = test_app.get(path)
+
+    assert repeat.status_code == 200
+    assert repeat.json() == first.json()
+    assert opened_scopes == []
 
 
 def test_user_range_validates_against_the_listeners_today(pg_db, monkeypatch):

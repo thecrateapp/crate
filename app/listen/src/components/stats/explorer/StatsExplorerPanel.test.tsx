@@ -238,6 +238,49 @@ describe("StatsExplorerPanel", () => {
     expect(screen.queryByText("None in this stretch")).not.toBeInTheDocument();
   });
 
+  it("explains a stretch hidden for having too few listeners", () => {
+    renderWithListenProviders(
+      panel({ data: range({ hidden_reason: "few_listeners" }) }),
+      { locale: "en" },
+    );
+
+    expect(
+      screen.getByText(
+        "Top items for this stretch appear once at least 3 listeners have played music in it.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("None in this stretch")).not.toBeInTheDocument();
+  });
+
+  it("explains a day hidden for having too few listeners", () => {
+    renderWithListenProviders(
+      panel({
+        day: {
+          bucket: "2026-09-12",
+          start: "2026-09-12",
+          end: "2026-09-12",
+          minutes: 95,
+          plays: 21,
+          tracks: [],
+          loading: false,
+          error: false,
+          available: true,
+          hiddenReason: "few_listeners",
+        },
+      }),
+      { locale: "en" },
+    );
+
+    expect(
+      screen.getByText(
+        "Top items for this stretch appear once at least 3 listeners have played music in it.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Nothing played that day."),
+    ).not.toBeInTheDocument();
+  });
+
   it("hides silent days on weekly tapes", () => {
     renderWithListenProviders(panel({ granularity: "week" }), {
       locale: "en",

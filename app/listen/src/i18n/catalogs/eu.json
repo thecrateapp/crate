@@ -1849,6 +1849,7 @@
   "stats.explorer.nothingPlayed": "Egun horretan ez zen ezer entzun.",
   "stats.explorer.plays": "{count, plural, one {# entzunaldi} other {# entzunaldi}}",
   "stats.explorer.unavailable": "Tarte honetako nabarmenenak prestatzen ari dira oraindik.",
+  "stats.explorer.fewListeners": "Tarte honetako nabarmenenak bertan gutxienez {count, plural, one {# entzulek musika entzun duenean} other {# entzulek musika entzun dutenean}} agertzen dira.",
   "stats.explorer.openDay": "Hautatu eguna ikusteko",
   "stats.explorer.error": "Ezin izan da tarte hau kargatu.",
   "stats.headline.minutes": "minutu",

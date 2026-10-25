@@ -33,6 +33,19 @@ ROLLUPS = "crate.db.jobs.instance_listening_rollups"
 DAYS_TASK = "rebuild_instance_listening_days"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_range_cache(monkeypatch):
+    from crate.db.queries import user_library_stats_range as module
+
+    store: dict = {}
+    monkeypatch.setattr(module, "get_volatile_cache", lambda key, _ttl: store.get(key))
+    monkeypatch.setattr(
+        module,
+        "set_volatile_cache",
+        lambda key, value, _ttl: store.__setitem__(key, value),
+    )
+
+
 def _create_listener(username: str = "second", tz: str | None = None) -> int:
     with transaction_scope() as session:
         return session.execute(
@@ -576,7 +589,16 @@ def test_instance_range_sums_listeners(pg_db):
         get_user_stats_range,
     )
 
-    _seed_two_listeners()
+    _, track_ids = _seed_two_listeners()
+    third = _create_listener(username="third", tz="UTC")
+    seed_listening_history(
+        user_id=third,
+        events=60,
+        days=10,
+        end_at="2026-10-04T12:00:00+00:00",
+        track_ids=track_ids,
+    )
+    recompute_user_listening_aggregates(third)
     _rebuild_all()
     # The seeded listening sits in 2026-05..10; the range functions validate
     # bounds against today, so stay inside a past 400-day stretch.
@@ -628,3 +650,19 @@ def test_instance_range_unavailable_before_backfill(pg_db):
     assert result["available"] is False
     assert result["top_artists"] == result["top_albums"] == []
     assert result["top_tracks"] == result["discoveries"] == []
+
+
+def test_instance_range_hides_items_below_three_listeners(pg_db):
+    from crate.db.queries.user_library_stats_range import get_instance_stats_range
+
+    _seed_two_listeners()
+    _rebuild_all()
+
+    result = get_instance_stats_range(date(2026, 1, 1), date(2026, 10, 10), limit=5)
+
+    assert result["available"] is True
+    assert result["hidden_reason"] == "few_listeners"
+    assert result["top_artists"] == []
+    assert result["top_albums"] == []
+    assert result["top_tracks"] == []
+    assert result["discoveries"] == []

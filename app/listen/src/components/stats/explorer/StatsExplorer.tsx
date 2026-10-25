@@ -218,6 +218,7 @@ function ExplorerSession({
           error: dayResult.error,
           unsupported: dayResult.unsupported,
           available: dayResult.data?.available ?? true,
+          hiddenReason: dayResult.data?.hidden_reason ?? null,
         }
       : null;
 

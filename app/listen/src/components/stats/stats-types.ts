@@ -446,6 +446,8 @@ export interface StatsRange {
   start: string;
   end: string;
   available: boolean;
+  /** "few_listeners": the instance range has fewer than three listeners (PD43). */
+  hidden_reason?: string | null;
   top_artists: StatsRangeArtist[];
   top_albums: StatsRangeAlbum[];
   top_tracks: StatsRangeTrack[];

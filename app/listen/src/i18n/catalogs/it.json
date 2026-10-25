@@ -1849,6 +1849,7 @@
   "stats.explorer.nothingPlayed": "Quel giorno non hai ascoltato nulla.",
   "stats.explorer.plays": "{count, plural, one {# ascolto} other {# ascolti}}",
   "stats.explorer.unavailable": "I punti salienti di questo periodo sono ancora in preparazione.",
+  "stats.explorer.fewListeners": "I punti salienti di questo periodo compaiono quando almeno {count, plural, one {# ascoltatore ha} other {# ascoltatori hanno}} ascoltato musica in questo periodo.",
   "stats.explorer.openDay": "Seleziona per vedere il giorno",
   "stats.explorer.error": "Impossibile caricare questo periodo.",
   "stats.headline.minutes": "minuti",

@@ -1849,6 +1849,7 @@
   "stats.explorer.nothingPlayed": "Aquell dia no va sonar res.",
   "stats.explorer.plays": "{count, plural, one {# reproducció} other {# reproduccions}}",
   "stats.explorer.unavailable": "Els destacats d'aquest tram encara s'estan preparant.",
+  "stats.explorer.fewListeners": "Els destacats d'aquest tram apareixen quan almenys {count, plural, one {# oient ha} other {# oients han}} escoltat música en aquest tram.",
   "stats.explorer.openDay": "Selecciona per veure el dia",
   "stats.explorer.error": "No s'ha pogut carregar aquest tram.",
   "stats.headline.minutes": "minuts",

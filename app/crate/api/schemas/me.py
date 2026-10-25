@@ -870,6 +870,7 @@ class StatsRangeResponse(BaseModel):
     start: str
     end: str
     available: bool = True
+    hidden_reason: str | None = None
     top_artists: list[StatsRangeArtistResponse] = Field(default_factory=list)
     top_albums: list[StatsRangeAlbumResponse] = Field(default_factory=list)
     top_tracks: list[StatsRangeTrackResponse] = Field(default_factory=list)

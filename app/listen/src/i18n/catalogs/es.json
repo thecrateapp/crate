@@ -1857,6 +1857,7 @@
   "stats.explorer.nothingPlayed": "Ese día no sonó nada.",
   "stats.explorer.plays": "{count, plural, one {# reproducción} other {# reproducciones}}",
   "stats.explorer.unavailable": "Los destacados de este tramo aún se están preparando.",
+  "stats.explorer.fewListeners": "Los destacados de este tramo aparecen cuando al menos {count, plural, one {# oyente ha} other {# oyentes han}} escuchado música en él.",
   "stats.explorer.openDay": "Selecciona para ver el día",
   "stats.explorer.error": "No se pudo cargar este tramo.",
   "stats.headline.minutes": "minutos",

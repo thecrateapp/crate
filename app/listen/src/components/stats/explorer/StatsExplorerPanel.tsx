@@ -10,6 +10,10 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { Button } from "@crate/ui/shadcn/button";
 
+import {
+  HEATMAP_HIDDEN_FEW_LISTENERS,
+  HEATMAP_MIN_LISTENERS,
+} from "../heatmap-model";
 import { formatStatsMinutes, formatStatsPercent } from "../stats-format";
 import type {
   StatsRange,
@@ -43,6 +47,7 @@ export interface ExplorerDayDetail {
   /** The request failed: never shown as "nothing played". */
   error: boolean;
   available: boolean;
+  hiddenReason?: string | null;
   unsupported?: boolean;
 }
 
@@ -227,6 +232,10 @@ function StretchSummaryView({
         <p className="stats-explorer-block m-0 text-sm text-text-muted">
           {t("stats.explorer.unavailable")}
         </p>
+      ) : data?.hidden_reason === HEATMAP_HIDDEN_FEW_LISTENERS ? (
+        <p className="stats-explorer-block m-0 text-sm text-text-muted">
+          {t("stats.explorer.fewListeners", { count: HEATMAP_MIN_LISTENERS })}
+        </p>
       ) : data ? (
         // While the next stretch loads, the previous blocks stay (dimmed) so
         // the stacked panel does not jump; fresh client numbers sit above.
@@ -340,6 +349,12 @@ function DayDetail({
     body = (
       <p className="m-0 text-sm text-text-muted">
         {t("stats.explorer.unavailable")}
+      </p>
+    );
+  } else if (day.hiddenReason === HEATMAP_HIDDEN_FEW_LISTENERS) {
+    body = (
+      <p className="m-0 text-sm text-text-muted">
+        {t("stats.explorer.fewListeners", { count: HEATMAP_MIN_LISTENERS })}
       </p>
     );
   } else if (!day.tracks.length) {

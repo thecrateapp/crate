@@ -1849,6 +1849,7 @@
   "stats.explorer.nothingPlayed": "Rien écouté ce jour-là.",
   "stats.explorer.plays": "{count, plural, one {# écoute} other {# écoutes}}",
   "stats.explorer.unavailable": "Les incontournables de cette période sont encore en préparation.",
+  "stats.explorer.fewListeners": "Les incontournables de cette période apparaissent dès qu'au moins {count, plural, one {# auditeur a} other {# auditeurs ont}} écouté de la musique sur cette période.",
   "stats.explorer.openDay": "Sélectionne pour voir le jour",
   "stats.explorer.error": "Impossible de charger cette période.",
   "stats.headline.minutes": "minutes",

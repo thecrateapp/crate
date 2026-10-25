@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
+from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.queries.instance_listening_status import (
     instance_listening_rollups_incomplete,
 )
@@ -23,6 +24,7 @@ from crate.db.tx import read_scope
 
 __all__ = [
     "MAX_RANGE_DAYS",
+    "MIN_RANGE_LISTENERS",
     "StatsRangeError",
     "get_instance_stats_range",
     "get_public_user_stats_range",
@@ -33,7 +35,14 @@ __all__ = [
 ]
 
 MAX_RANGE_DAYS = 400
+MIN_RANGE_LISTENERS = 3
 _DISCOVERY_LIMIT = 10
+_INSTANCE_RANGE_CACHE_TTL = 300
+
+_RANGE_LISTENERS_SQL = """
+SELECT COUNT(DISTINCT user_id) FROM user_track_daily
+WHERE day BETWEEN :start AND :end
+"""
 
 
 def _range_sql(daily_table: str, firsts_table: str, *, scoped: bool) -> str:
@@ -292,19 +301,34 @@ def get_instance_stats_range(
     """
     validate_stats_range(start, end, today=instance_stats_today())
 
+    def _empty(**flags) -> dict:
+        return {
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            **flags,
+            **{section: [] for section in _SECTIONS.values()},
+        }
+
     def _impl(current) -> dict:
         if instance_listening_rollups_incomplete(current):
-            return {
-                "start": start.isoformat(),
-                "end": end.isoformat(),
-                "available": False,
-                **{section: [] for section in _SECTIONS.values()},
-            }
+            return _empty(available=False)
+        listeners = current.execute(
+            text(_RANGE_LISTENERS_SQL), {"start": start, "end": end}
+        ).scalar_one()
+        if listeners < MIN_RANGE_LISTENERS:
+            return _empty(available=True, hidden_reason="few_listeners")
         return _run_range(
             _INSTANCE_RANGE_SQL, {"limit": limit}, start, end, session=current
         )
 
     if session is not None:
         return _impl(session)
+    key = f"instance_stats_range:v1:{start.isoformat()}:{end.isoformat()}:{limit}"
+    cached = get_volatile_cache(key, _INSTANCE_RANGE_CACHE_TTL)
+    if cached is not None:
+        return cached
     with read_scope() as current:
-        return _impl(current)
+        result = _impl(current)
+    if result["available"]:
+        set_volatile_cache(key, result, _INSTANCE_RANGE_CACHE_TTL)
+    return result

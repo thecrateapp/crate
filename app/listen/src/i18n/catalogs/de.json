@@ -1849,6 +1849,7 @@
   "stats.explorer.nothingPlayed": "An diesem Tag lief nichts.",
   "stats.explorer.plays": "{count, plural, one {# Wiedergabe} other {# Wiedergaben}}",
   "stats.explorer.unavailable": "Die Highlights dieses Zeitraums werden noch vorbereitet.",
+  "stats.explorer.fewListeners": "Die Highlights dieses Zeitraums erscheinen, sobald darin mindestens {count, plural, one {# Person Musik gehört hat} other {# Personen Musik gehört haben}}.",
   "stats.explorer.openDay": "Auswählen, um den Tag zu sehen",
   "stats.explorer.error": "Dieser Zeitraum konnte nicht geladen werden.",
   "stats.headline.minutes": "Minuten",
