@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 export interface TaskEvent {
   id: number;
@@ -228,10 +228,11 @@ export function useTaskEvents(taskId: string | null) {
     [stream],
   );
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const [clearedState, setClearedState] = useState<TaskEventState | null>(null);
   const reset = useCallback(() => {
-    if (!stream) return;
-    publishTaskEventState(stream, () => EMPTY_TASK_EVENT_STATE);
+    setClearedState(stream?.state ?? null);
   }, [stream]);
+  const visible = clearedState === state ? EMPTY_TASK_EVENT_STATE : state;
 
-  return { ...state, reset };
+  return { ...visible, reset };
 }

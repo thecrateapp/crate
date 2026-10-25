@@ -95,6 +95,31 @@ describe("normalizeTaskEvent", () => {
 });
 
 describe("useTaskEvents", () => {
+  it("resets only the consumer that asked, not every view of the task", () => {
+    function ResettableProbe() {
+      const { events, done, reset } = useTaskEvents("shared-reset");
+      return (
+        <button type="button" onClick={reset}>
+          {`${events.length}:${done?.status ?? ""}`}
+        </button>
+      );
+    }
+    render(
+      <>
+        <ResettableProbe />
+        <TaskEventProbe taskId="shared-reset" label="other consumer" />
+      </>,
+    );
+
+    act(() => {
+      taskEventSource().dispatch("task_event", { id: 1, type: "info", data: {} });
+    });
+    act(() => screen.getByRole("button").click());
+
+    expect(screen.getByRole("button")).toHaveTextContent(/^0:$/);
+    expect(screen.getByLabelText("other consumer")).toHaveTextContent(/^1:/);
+  });
+
   it("keeps one copy of each event when a reconnect replays recent history", () => {
     vi.useFakeTimers();
     render(<TaskEventProbe taskId="replayed-task" label="consumer" />);
