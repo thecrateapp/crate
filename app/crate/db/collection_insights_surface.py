@@ -89,9 +89,10 @@ def get_collection_insights(
         else get_ui_snapshot(SCOPE, subject, max_age_seconds=_STALE_RETENTION)
     )
     scheduled, task_id = _schedule(window)
+    snapshot = row or stale
     result = (
-        decorate_snapshot(row or stale, stale=not bool(row))
-        if row or stale
+        decorate_snapshot(snapshot, stale=not bool(row))
+        if snapshot
         else cold_collection_insights(window)
     )
     result["snapshot"]["pending"] = scheduled

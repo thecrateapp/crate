@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
+from typing import Any
 
 from crate.smart_mix.versions import (
     ANALYZER_VERSION,
@@ -17,7 +18,7 @@ from crate.smart_mix.versions import (
 )
 
 
-def _finite(value: object) -> float | None:
+def _finite(value: Any) -> float | None:
     if value is None or isinstance(value, bool):
         return None
     try:

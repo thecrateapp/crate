@@ -145,9 +145,7 @@ def test_finalization_cannot_be_cancelled_or_partially_propagated(
     assert _row(pending_child)["cancellation_requested_at"] is None
 
 
-def test_completed_siblings_publish_parent_finalizing_transition(
-    controls, monkeypatch
-):
+def test_completed_siblings_publish_parent_finalizing_transition(controls, monkeypatch):
     from crate.db.repositories.tasks_maintenance import check_siblings_complete
 
     transitions = []

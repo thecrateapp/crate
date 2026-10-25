@@ -132,9 +132,9 @@ def test_openapi_marks_genre_routes_as_authenticated_and_typed(test_app):
         {"cookieAuth": []},
         {"bearerAuth": []},
     ]
-    assert raw_tag_classification["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]["$ref"].endswith("/GenreTaxonomyRawTagClassificationUpdateResponse")
+    assert raw_tag_classification["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/GenreTaxonomyRawTagClassificationUpdateResponse")
 
 
 def test_openapi_types_jam_routes_and_marks_them_authenticated(test_app):

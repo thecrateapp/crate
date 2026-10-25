@@ -222,7 +222,9 @@ def build_genre_taxonomy_node_proposal(
         try:
             facet_suggestions = normalize_genre_facets(raw_facets)
         except (AttributeError, TypeError, ValueError):
-            log.info("Invalid facet suggestion returned for raw genre %s", canonical_slug)
+            log.info(
+                "Invalid facet suggestion returned for raw genre %s", canonical_slug
+            )
         if not facet_suggestions:
             recommended_action = "needs_review"
 
@@ -257,8 +259,7 @@ def build_genre_taxonomy_node_proposal(
             numeric_eq_gains = [float(value) for value in raw_eq_gains]
             if all(math.isfinite(value) for value in numeric_eq_gains):
                 eq_gains = [
-                    round(max(-12.0, min(12.0, value)), 1)
-                    for value in numeric_eq_gains
+                    round(max(-12.0, min(12.0, value)), 1) for value in numeric_eq_gains
                 ]
         except (TypeError, ValueError):
             eq_gains = []

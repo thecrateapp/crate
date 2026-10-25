@@ -50,7 +50,9 @@ def normalize_genre_facets(
         }
     if len(normalized) > 32:
         raise ValueError("A genre may have at most 32 facets")
-    return sorted(normalized.values(), key=lambda item: (item["dimension"], item["slug"]))
+    return sorted(
+        normalized.values(), key=lambda item: (item["dimension"], item["slug"])
+    )
 
 
 __all__ = ["GENRE_FACET_DIMENSIONS", "normalize_genre_facets", "slugify_facet"]

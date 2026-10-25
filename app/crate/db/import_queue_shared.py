@@ -64,7 +64,10 @@ def row_to_import_item(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def coerce_import_status(existing_status: str | None, discovered_status: str) -> str:
-    if existing_status in {"imported", "merged", "importing"} and discovered_status == "pending":
+    if (
+        existing_status in {"imported", "merged", "importing"}
+        and discovered_status == "pending"
+    ):
         return existing_status
     return discovered_status or existing_status or "pending"
 

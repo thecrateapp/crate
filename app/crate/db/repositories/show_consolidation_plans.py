@@ -136,9 +136,7 @@ def apply_show_consolidation(execution: dict, task_id: str, *, session=None) -> 
             )
         transition = (
             current.execute(
-                text(
-                    "UPDATE tasks SET status='completing' WHERE id=:id RETURNING *"
-                ),
+                text("UPDATE tasks SET status='completing' WHERE id=:id RETURNING *"),
                 {"id": task_id},
             )
             .mappings()

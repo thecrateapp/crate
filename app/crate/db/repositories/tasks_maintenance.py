@@ -66,18 +66,22 @@ def check_siblings_complete(parent_task_id: str) -> dict:
             acknowledge_cancellation(parent_task_id, session=session)
             all_done = False
         if all_done:
-            claimed = session.execute(
-                text(
-                    """
+            claimed = (
+                session.execute(
+                    text(
+                        """
                     UPDATE tasks
                     SET status = 'completing',
                         updated_at = NOW()
                     WHERE id = :pid AND status IN ('running', 'delegated')
                     RETURNING *
                     """
-                ),
-                {"pid": parent_task_id},
-            ).mappings().first()
+                    ),
+                    {"pid": parent_task_id},
+                )
+                .mappings()
+                .first()
+            )
             if claimed is None:
                 all_done = False
             else:

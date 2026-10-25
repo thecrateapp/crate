@@ -134,9 +134,7 @@ def test_admin_show_plan_works_without_mcp_flags_or_llm_and_replays_durable_ids(
     job, result = apply(show_world, plan)
     assert result["verification"]["status"] == "passed", result
     job_transitions = [
-        transition
-        for transition in transitions
-        if transition["id"] == job["job_id"]
+        transition for transition in transitions if transition["id"] == job["job_id"]
     ]
     statuses = [transition["status"] for transition in job_transitions]
     assert statuses.index("completing") < statuses.index("completed")

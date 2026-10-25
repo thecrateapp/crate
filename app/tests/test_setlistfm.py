@@ -267,12 +267,25 @@ def test_probable_setlist_health_classifies_recent_stale_missing_and_legacy():
     }
     with patch("crate.setlistfm.get_caches", return_value=cached) as read_batch:
         health = get_probable_setlist_health(
-            [" Fresh   Artist ", "Stale Artist", "Tour Artist", "Legacy Artist", "Missing Artist"]
+            [
+                " Fresh   Artist ",
+                "Stale Artist",
+                "Tour Artist",
+                "Legacy Artist",
+                "Missing Artist",
+            ]
         )
 
-    assert [health[key]["status"] for key in (
-        "fresh artist", "stale artist", "tour artist", "legacy artist", "missing artist"
-    )] == ["fresh", "stale", "stale", "unknown", "missing"]
+    assert [
+        health[key]["status"]
+        for key in (
+            "fresh artist",
+            "stale artist",
+            "tour artist",
+            "legacy artist",
+            "missing artist",
+        )
+    ] == ["fresh", "stale", "stale", "unknown", "missing"]
     assert health["fresh artist"]["song_count"] == 1
     assert health["fresh artist"]["source_show_count"] == 3
     read_batch.assert_called_once()
@@ -282,9 +295,13 @@ def test_probable_setlist_persists_generation_time_and_prediction_context(monkey
     from crate.setlistfm import _probable_cache_key
 
     writes = []
-    monkeypatch.setattr("crate.setlistfm.get_cached_probable_setlist", lambda _name: None)
+    monkeypatch.setattr(
+        "crate.setlistfm.get_cached_probable_setlist", lambda _name: None
+    )
     monkeypatch.setattr("crate.setlistfm.search_artist", lambda _name: "artist-mbid")
-    monkeypatch.setattr("crate.setlistfm._fetch_raw_setlists", lambda *_args: [object()])
+    monkeypatch.setattr(
+        "crate.setlistfm._fetch_raw_setlists", lambda *_args: [object()]
+    )
     monkeypatch.setattr(
         "crate.setlistfm._predict_setlist_with_context",
         lambda _setlists: (

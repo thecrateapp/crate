@@ -100,9 +100,10 @@ def test_raw_tag_facet_classification_is_persisted_and_removed_from_genre_lists(
     assert all(row["slug"] != slug for row in get_unmapped_genres(limit=2000))
     assert list_unmapped_genres_for_inference(10, slug) == []
     with read_scope() as session:
-        classification = session.execute(
-            text(
-                """
+        classification = (
+            session.execute(
+                text(
+                    """
                 SELECT classification.classification, facet.dimension, facet.slug,
                        EXISTS (
                            SELECT 1 FROM genre_taxonomy_aliases alias
@@ -122,9 +123,12 @@ def test_raw_tag_facet_classification_is_persisted_and_removed_from_genre_lists(
                 JOIN genre_taxonomy_facet_values facet ON facet.id = raw_facet.facet_id
                 WHERE classification.genre_id = :genre_id
                 """
-            ),
-            {"slug": slug, "genre_id": genre_id},
-        ).mappings().one()
+                ),
+                {"slug": slug, "genre_id": genre_id},
+            )
+            .mappings()
+            .one()
+        )
     assert classification["classification"] == "facet"
     assert classification["dimension"] == "vocals"
     assert classification["slug"] == "instrumental"

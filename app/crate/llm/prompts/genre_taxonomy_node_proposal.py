@@ -63,7 +63,9 @@ class GenreTaxonomyNodeProposalResponse(BaseModel):
     )
     aliases: list[str] = Field(default_factory=list, max_length=12)
     relations: list[GenreTaxonomyRelationSuggestion] = Field(default_factory=list)
-    facets: list[GenreTaxonomyFacetSuggestion] = Field(default_factory=list, max_length=32)
+    facets: list[GenreTaxonomyFacetSuggestion] = Field(
+        default_factory=list, max_length=32
+    )
     eq_gains: list[float] = Field(
         default_factory=list,
         max_length=10,

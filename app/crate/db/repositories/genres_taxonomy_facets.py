@@ -48,9 +48,7 @@ def replace_genre_taxonomy_facets(
         )
 
     session.execute(
-        text(
-            "DELETE FROM genre_taxonomy_node_facets WHERE genre_id = :genre_id"
-        ),
+        text("DELETE FROM genre_taxonomy_node_facets WHERE genre_id = :genre_id"),
         {"genre_id": node_id},
     )
     if normalized:

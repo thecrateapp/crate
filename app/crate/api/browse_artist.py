@@ -1871,7 +1871,7 @@ def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
             == artist_name.strip().casefold()
             for artist in lineup_artists
         ):
-            primary = {"name": artist_name}
+            primary: dict[str, Any] = {"name": artist_name}
             if artist_ref:
                 primary.update(
                     {"id": artist_ref.get("id"), "slug": artist_ref.get("slug")}

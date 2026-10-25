@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from unittest.mock import MagicMock
 
 from crate import equalizer
@@ -23,9 +24,6 @@ def _track_context(energy=None):
         acousticness=None,
         instrumentalness=None,
     )
-
-
-from dataclasses import asdict
 
 
 def test_inventory_uses_one_read_and_limits_private_presets_to_user():

@@ -74,7 +74,7 @@ def mark_new_items(
         if user_id is not None
         else ("instance_entity_firsts", "")
     )
-    params = {
+    params: dict[str, object] = {
         "tracks": sorted(keys_by_type["track"]),
         "artists": sorted(keys_by_type["artist"]),
         "albums": sorted(keys_by_type["album"]),

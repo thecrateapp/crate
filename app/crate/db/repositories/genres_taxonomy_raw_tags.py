@@ -28,9 +28,10 @@ def update_raw_genre_classification(
         return None
 
     with optional_scope(session) as current:
-        row = current.execute(
-            text(
-                """
+        row = (
+            current.execute(
+                text(
+                    """
                 SELECT
                     g.id,
                     EXISTS (
@@ -41,9 +42,12 @@ def update_raw_genre_classification(
                 FROM genres g
                 WHERE LOWER(g.slug) = :slug
                 """
-            ),
-            {"slug": canonical_slug},
-        ).mappings().first()
+                ),
+                {"slug": canonical_slug},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             return None
         if row["is_mapped"]:
