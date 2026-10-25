@@ -227,17 +227,18 @@ describe("Artist page load state", () => {
     expect(screen.getByTestId("artist-overview")).toBeInTheDocument();
   });
 
-  it("loads an artist reached through the legacy numeric-ID URL", async () => {
+  it("loads an artist whose slug is all digits by slug, not as a database ID", async () => {
     renderWithAdminProviders(
       <Routes>
-        <Route path="/artists/:artistSlug/:albumSlug" element={<Artist />} />
+        <Route path="/artists/:artistSlug" element={<Artist />} />
       </Routes>,
-      { route: "/artists/42/the-clash" },
+      { route: "/artists/311" },
     );
 
     await waitFor(() => {
-      expect(mockUseApi).toHaveBeenCalledWith("/api/artists/42");
+      expect(mockUseApi).toHaveBeenCalledWith("/api/artist-slugs/311");
     });
+    expect(mockUseApi).not.toHaveBeenCalledWith("/api/artists/311");
   });
 
   it("shows a retryable error when the artist request fails", async () => {

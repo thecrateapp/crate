@@ -602,10 +602,7 @@ function useArtistPageData() {
     artistSlug?: string;
   }>();
   const navigate = useNavigate();
-  const legacyId =
-    artistIdParam ??
-    (artistSlug && /^\d+$/.test(artistSlug) ? artistSlug : undefined);
-  const parsedArtistId = legacyId ? Number(legacyId) : undefined;
+  const parsedArtistId = artistIdParam ? Number(artistIdParam) : undefined;
   const artistId =
     parsedArtistId != null && Number.isSafeInteger(parsedArtistId)
       ? parsedArtistId

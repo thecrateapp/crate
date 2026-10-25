@@ -24,11 +24,6 @@ const Browse = lazy(() =>
 const Artist = lazy(() =>
   import("@/pages/Artist").then((m) => ({ default: m.Artist })),
 );
-const ArtistAlbumRoute = lazy(() =>
-  import("@/pages/ArtistAlbumRoute").then((m) => ({
-    default: m.ArtistAlbumRoute,
-  })),
-);
 const Album = lazy(() =>
   import("@/pages/Album").then((m) => ({ default: m.Album })),
 );
@@ -315,7 +310,7 @@ export default function App() {
                   path="artists/:artistSlug/:albumSlug"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <ArtistAlbumRoute artist={<Artist />} album={<Album />} />
+                      <Album />
                     </RequireCapabilities>
                   }
                 />
