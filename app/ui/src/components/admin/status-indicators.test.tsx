@@ -1,30 +1,47 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { SeverityMeter } from "./status-indicators";
+import { SeverityMeter, severityTone } from "./status-indicators";
 
 describe("SeverityMeter", () => {
   it.each([
-    ["safe", 1],
-    ["caution", 2],
-    ["destructive", 3],
-    ["debug", 0],
-    ["info", 1],
-    ["warn", 2],
-    ["error", 3],
-    ["critical", 3],
-    ["unknown", 0],
-  ] as const)("shows %s as neutral segments plus its word", (level, active) => {
+    ["debug", "debug", "text-text-subtle"],
+    ["info", "info", "text-accent-action-hi"],
+    ["low", "info", "text-accent-action-hi"],
+    ["safe", "info", "text-accent-action-hi"],
+    ["warn", "warn", "text-state-warning-text"],
+    ["caution", "warn", "text-state-warning-text"],
+    ["error", "error", "text-state-danger-text"],
+    ["destructive", "error", "text-state-danger-text"],
+    ["critical", "critical", "text-state-danger-text"],
+    ["progress", "neutral", "text-text-secondary"],
+  ] as const)("shows %s as a %s dot and mono word", (level, tone, color) => {
     const { container } = render(<SeverityMeter level={level} label={level} />);
+    const severity = container.querySelector('[data-slot="severity"]');
+    expect(severity).toHaveAttribute("data-tone", tone);
+    expect(severity).toHaveClass("font-mono", "uppercase", color);
     expect(screen.getByText(level)).toBeVisible();
-    expect(container.querySelectorAll("[data-segment]")).toHaveLength(3);
-    expect(
-      container.querySelectorAll('[data-segment][data-active="true"]'),
-    ).toHaveLength(active);
-    for (const segment of container.querySelectorAll("[data-segment]"))
-      expect(segment.className).toMatch(/text-primary|text-subtle/);
-    expect(container.innerHTML).not.toMatch(
-      /(?:state-warning|state-danger|accent-action)/,
+    expect(severity?.querySelector('[aria-hidden="true"]')).toHaveClass(
+      "rounded-full",
+      "bg-current",
     );
-    expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
+  });
+
+  it("rings only the critical dot", () => {
+    const { container } = render(
+      <>
+        <SeverityMeter level="fatal" label="fatal" />
+        <SeverityMeter level="error" label="error" />
+      </>,
+    );
+    const [fatal, error] = container.querySelectorAll(
+      '[data-slot="severity"] > [aria-hidden="true"]',
+    );
+    expect(fatal).toHaveClass("outline-1");
+    expect(error).not.toHaveClass("outline-1");
+  });
+
+  it("normalizes casing and whitespace", () => {
+    expect(severityTone(" WARNING ")).toBe("warn");
+    expect(severityTone(null)).toBe("neutral");
   });
 });

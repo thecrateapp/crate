@@ -142,10 +142,10 @@ state carrier.
 | On, ok, active, live                   | `StatusDot tone="on"` with accent-hi text                                                                                                                                 |
 | Warn, waiting, stale, degraded, failed | `StatusDot tone="warn"` with `--state-warning` (`#fbbf24`) and a word ("failed", "stale")                                                                                 |
 | Off, never, idle                       | Ring dot (`tone="off"`) with `text-subtle`                                                                                                                                |
-| Severity                               | Monochrome 3-segment `SeverityMeter` plus a word; never red, orange or yellow ramps                                                                                       |
+| Severity                               | `SeverityMeter`: a dot plus the uppercase mono word, coloured by level (debug grey, info cyan, warn amber, error red, critical red with a ring)                           |
 | Destructive                            | Neutral control everywhere, except the confirm button inside a destructive dialog, which uses `--state-danger` (`#ef4444`) and states the consequence ("Delete 12 files") |
 
-There are no green or blue status colours. `--state-success` (`#22c55e`) and `--state-info`
+Severity and log levels are the one place red marks status (Diego, 2026-10-26); `status-colour-policy.test.ts` allows it only in `components/admin/status-indicators.tsx`. Otherwise there are no green or blue status colours. `--state-success` (`#22c55e`) and `--state-info`
 (`#3b82f6`) exist for legacy and product slots (mix indicator, genre tones), not for status.
 `app/ui/src/status-colour-policy.test.ts` enforces this in Admin.
 

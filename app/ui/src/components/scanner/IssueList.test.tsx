@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { IssueList } from "./IssueList";
-it("keeps severity and repair advice readable without colour-coded risk", () => {
+it("keeps severity and repair advice readable with a coloured severity level", () => {
   const { container } = render(
     <IssueList
       issues={[
@@ -20,9 +20,10 @@ it("keeps severity and repair advice readable without colour-coded risk", () => 
   expect(screen.getByText("critical")).toBeVisible();
   expect(screen.getByText("Service unavailable")).toBeVisible();
   expect(screen.getByText("Retry connection")).toBeVisible();
-  expect(
-    container.querySelectorAll('[data-segment][data-active="true"]'),
-  ).toHaveLength(3);
+  expect(container.querySelector('[data-slot="severity"]')).toHaveAttribute(
+    "data-tone",
+    "critical",
+  );
 });
 it("retains the empty state", () => {
   render(<IssueList issues={[]} />);

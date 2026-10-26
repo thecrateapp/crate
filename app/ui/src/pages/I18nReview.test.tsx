@@ -316,18 +316,14 @@ describe("I18nReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("settings.profile.bio")).toBeInTheDocument();
     expect(screen.getByText("Translation value is empty.")).toBeInTheDocument();
-    for (const [code, severity, active] of [
-      ["empty_value", "error", 3],
-      ["stale_translation", "warning", 2],
+    for (const [code, severity, tone] of [
+      ["empty_value", "error", "error"],
+      ["stale_translation", "warning", "warn"],
     ] as const) {
       const issue = screen.getByText(code).parentElement!;
-      expect(within(issue).getByText(severity)).toHaveClass(
-        "text-text-secondary",
-      );
-      expect(issue.querySelectorAll('[data-active="true"]')).toHaveLength(
-        active,
-      );
-      expect(issue.className).not.toMatch(/state-warning/);
+      expect(
+        within(issue).getByText(severity).closest('[data-slot="severity"]'),
+      ).toHaveAttribute("data-tone", tone);
     }
 
     await user.click(screen.getByRole("button", { name: "Publish bundle" }));

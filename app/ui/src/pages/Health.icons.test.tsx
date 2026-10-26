@@ -552,7 +552,7 @@ describe("Library Health text controls and preserved UX", () => {
     ).toBeVisible();
     view.unmount();
   });
-  it("gates scan by its endpoint capability and keeps neutral risk instruments", async () => {
+  it("gates scan by its endpoint capability and colours severity by level", async () => {
     renderWithAdminProviders(<Health />, {
       auth: { isAdmin: false, hasCapability: () => false },
     });
@@ -564,7 +564,7 @@ describe("Library Health text controls and preserved UX", () => {
       0,
     );
     expect(
-      document.querySelector('[data-segment][data-active="true"]'),
+      document.querySelector('[data-slot="severity"][data-tone="error"]'),
     ).toBeInTheDocument();
   });
   it("names loading, empty and retry states without decorative icons", async () => {

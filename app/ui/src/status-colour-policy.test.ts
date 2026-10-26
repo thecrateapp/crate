@@ -4,6 +4,9 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const root = resolve(process.cwd(), "src");
+// Diego, 2026-10-26: severity and log levels use a colour scale where error
+// and critical are red. Only the shared severity indicator may use it.
+const SEVERITY_SCALE = "components/admin/status-indicators.tsx";
 const hues =
   "emerald|green|red|rose|amber|yellow|orange|violet|fuchsia|blue|sky|indigo|purple|cyan|teal|lime|pink";
 const forbidden = new RegExp(
@@ -204,9 +207,13 @@ describe("Admin status colour contract", () => {
           true,
           ts.ScriptKind.TSX,
         );
-      return violations(source, tree, checker).map(
-        (value) => `${relative(root, file)}: ${value}`,
-      );
+      const path = relative(root, file);
+      return violations(source, tree, checker)
+        .filter(
+          (value) =>
+            !(path === SEVERITY_SCALE && value === "text-state-danger-text"),
+        )
+        .map((value) => `${path}: ${value}`);
     });
     expect(found).toEqual([]);
   });
