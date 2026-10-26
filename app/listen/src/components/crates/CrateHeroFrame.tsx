@@ -28,7 +28,8 @@ export function CrateHeroFrame({
         variant="media"
         height="content"
         contentClassName={contentClassName}
-        artworkClassName="block aspect-auto w-full overflow-visible rounded-none bg-transparent shadow-none ring-0 sm:w-1/2 lg:w-[58%] lg:max-w-[720px]"
+        artworkFrame="none"
+        artworkClassName="block aspect-auto w-full overflow-visible rounded-none sm:w-1/2 lg:w-[58%] lg:max-w-[720px]"
         titleSize="compact"
         actionsClassName="pt-0"
         background={{ treatment: "blur", render: renderBackground }}

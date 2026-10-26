@@ -255,10 +255,9 @@ export function AlbumHeader({
         title={resolvedDisplayName}
         height="content"
         className="min-h-hero-md"
-        contentClassName="mx-0 max-w-none px-0 sm:px-0"
-        actionsClassName="px-0 sm:px-0"
+        inset="none"
         background={{ src: bgUrl }}
-        artworkClassName="block size-36 sm:size-48 lg:size-56"
+        artworkSize="md"
         artwork={
           <div className="group/cover relative size-full">
             <ImageLightbox

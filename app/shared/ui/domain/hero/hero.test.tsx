@@ -138,6 +138,55 @@ describe("PageHero", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("drops the page inset when the parent already pads the page", () => {
+    render(
+      <PageHero
+        title="Album"
+        inset="none"
+        actions={<button type="button">Play</button>}
+      />,
+    );
+    const content = screen.getByRole("heading", { name: "Album" })
+      .parentElement!.parentElement!.parentElement!;
+    expect(content).not.toHaveClass("max-w-content", "px-4");
+    expect(
+      screen.getByRole("button", { name: "Play" }).parentElement,
+    ).toHaveClass("py-4");
+    expect(
+      screen.getByRole("button", { name: "Play" }).parentElement,
+    ).not.toHaveClass("p-4");
+  });
+
+  it("bleeds past the Listen page gutter", () => {
+    render(<PageHero variant="editorial" title="Shoegaze" bleed />);
+    expect(screen.getByRole("region", { name: "Shoegaze" })).toHaveClass(
+      "-mx-4",
+      "-mt-4",
+      "sm:-mx-6",
+    );
+  });
+
+  it.each([
+    ["lg", "w-[200px]", "lg:w-[280px]"],
+    ["md", "size-36", "lg:size-56"],
+  ] as const)(
+    "sizes album artwork at the %s scale",
+    (artworkSize, base, large) => {
+      render(
+        <PageHero
+          title="Album"
+          artwork={<img alt="" />}
+          artworkSize={artworkSize}
+          artworkFrame="none"
+        />,
+      );
+      const artwork = screen.getByTestId("page-hero-artwork");
+      expect(artwork).toHaveClass("block", base, large);
+      expect(artwork).toHaveClass("shadow-none", "ring-0");
+      expect(artwork).not.toHaveClass("hidden");
+    },
+  );
 });
 
 describe("HeroActionBar", () => {

@@ -172,8 +172,9 @@ it("uses MonoLabel for release, collection and popularity metadata", () => {
 });
 it("keeps the hero and action inset on the same Admin content edge", () => {
   const { container } = renderHeader(<AlbumHeader {...baseProps} />);
-  const heroContent = container.querySelector(".max-w-none");
-  expect(heroContent).toHaveClass("mx-0", "px-0", "sm:px-0");
+  const hero = container.querySelector('[data-testid="page-hero"]')!;
+  expect(hero.querySelector(".max-w-content, .px-4")).toBeNull();
   const actions = screen.getByRole("group", { name: "Album actions" });
-  expect(actions.parentElement).toHaveClass("px-0", "sm:px-0");
+  expect(actions.parentElement).toHaveClass("py-4");
+  expect(actions.parentElement).not.toHaveClass("p-4");
 });

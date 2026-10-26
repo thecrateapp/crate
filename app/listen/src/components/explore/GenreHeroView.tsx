@@ -24,7 +24,7 @@ export function GenreHeroView({
   return (
     <PageHero
       variant="editorial"
-      className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mt-8"
+      bleed
       title={name}
       description={description}
       meta={[
@@ -48,7 +48,6 @@ export function GenreHeroView({
           </>
         ),
       }}
-      actionsClassName="mt-6 px-0 py-1 sm:px-0"
       actions={actions}
     />
   );

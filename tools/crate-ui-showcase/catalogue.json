@@ -736,9 +736,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/PageHero.tsx": "5e4596cd02a7138e1e6f8d17a14cbdf0d811a930db07f772b4d7b2f52ee36a3b",
+        "app/shared/ui/domain/hero/PageHero.tsx": "aa57915ab95ae58645fac9c02d5c684e630159d6d5f3ab1262a3743fb3740e7e",
         "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "d38c9d7e81898c3e8fd7e450575076acc149606aa9a0dae34ebc95b1fee21fc4",
-        "tools/crate-ui-showcase/docs/PageHero.mdx": "52ea0579141b470803050c365b96cf984890a078521bb68fb4f4cca24cf98355"
+        "tools/crate-ui-showcase/docs/PageHero.mdx": "8c0f61b28a7a8e76e810aa39472b20e8c9cf42d7d90ffd3d20396c0ea7a9c46b"
       },
       "category": "Layout"
     },

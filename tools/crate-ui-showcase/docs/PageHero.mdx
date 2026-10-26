@@ -38,3 +38,16 @@ The approved mockup and Diego’s confirmed amendments are the visual reference.
 <Controls of={Stories.Media} />
 
 <Canvas of={Stories.OverlayHeader} />
+
+Placement and artwork options (2026-10-26):
+
+- `inset="none"` drops the centred max width and page padding from content and actions, for Admin
+  pages whose shell already pads the content edge.
+- `bleed` cancels the Listen page gutter so an editorial hero reaches the viewport edges; its
+  actions stay in page flow below it.
+- `artworkSize` keeps the two approved album scales: `lg` for Listen (200/240/280px, centred on
+  mobile) and `md` for Admin (144/192/224px). Both are visible on mobile.
+- `artworkFrame="none"` removes the frame when the supplied artwork draws its own.
+
+Callers do not rebuild these with `contentClassName`, `actionsClassName` or `artworkClassName`.
+Listen's album mobile choreography and the Crate cover flow remain product composition.

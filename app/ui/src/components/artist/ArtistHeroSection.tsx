@@ -245,7 +245,7 @@ export function ArtistHeroSection({
       <PageHero
         variant="artist"
         title={artistName}
-        contentClassName="mx-0 max-w-none px-0 sm:px-0"
+        inset="none"
         artworkClassName="overflow-visible"
         eyebrow={
           <Link to="/browse">
@@ -365,7 +365,6 @@ export function ArtistHeroSection({
           ) : null,
         ]}
         actions={actions}
-        actionsClassName="px-0 sm:px-0"
       >
         {popularityScore > 0 ? (
           <MonoLabel as="p" className="mt-3">

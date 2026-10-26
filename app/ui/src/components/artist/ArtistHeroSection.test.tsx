@@ -186,7 +186,9 @@ describe("ArtistHeroSection", () => {
     expect(origin.parentElement).not.toContainElement(popularity);
     expect(popularity.tagName).toBe("P");
     // The Admin content edge must not inherit Listen's centered maximum width.
-    expect(container.querySelector(".max-w-none")).toHaveClass("mx-0");
+    expect(
+      container.querySelector('[data-testid="page-hero"] .max-w-content'),
+    ).toBeNull();
   });
   it("shows the next show as an accent capsule linking to its listing", () => {
     render(

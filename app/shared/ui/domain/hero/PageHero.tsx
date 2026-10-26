@@ -35,8 +35,22 @@ export interface PageHeroProps {
   titleClassName?: string;
   titleSize?: "default" | "compact";
   height?: "default" | "content";
+  /** none aligns content and actions with a parent that already pads the page. */
+  inset?: "default" | "none";
+  /** Cancels the Listen page gutter so the hero reaches the viewport edges. */
+  bleed?: boolean;
+  /** Album artwork scale: lg in Listen (200/240/280px), md in Admin (144/192/224px). */
+  artworkSize?: "default" | "lg" | "md";
+  /** none drops the frame when the artwork brings its own. */
+  artworkFrame?: "default" | "none";
   actionsClassName?: string;
 }
+
+const ARTWORK_SIZE_CLASS_NAME = {
+  default: undefined,
+  lg: "block w-[200px] self-center sm:w-[240px] sm:self-auto lg:w-[280px]",
+  md: "block size-36 sm:size-48 lg:size-56",
+} as const;
 
 const ROOT_CLASS_NAME: Record<PageHeroVariant, string> = {
   media: "relative flex min-h-hero-md overflow-hidden lg:min-h-hero-xl",
@@ -185,6 +199,10 @@ export function PageHero({
   titleClassName,
   titleSize = "default",
   height = "default",
+  inset = "default",
+  bleed = false,
+  artworkSize = "default",
+  artworkFrame = "default",
   actionsClassName,
 }: PageHeroProps) {
   const generatedId = useId();
@@ -258,7 +276,12 @@ export function PageHero({
   const artworkNode =
     artwork && variant !== "editorial" ? (
       <div
-        className={cn(ARTWORK_CLASS_NAME[variant], artworkClassName)}
+        className={cn(
+          ARTWORK_CLASS_NAME[variant],
+          ARTWORK_SIZE_CLASS_NAME[artworkSize],
+          artworkFrame === "none" && "bg-transparent shadow-none ring-0",
+          artworkClassName,
+        )}
         data-testid="page-hero-artwork"
       >
         {artwork}
@@ -305,13 +328,15 @@ export function PageHero({
         className={cn(
           ROOT_CLASS_NAME[variant],
           height === "content" && "h-auto min-h-0 lg:min-h-0",
+          bleed && "-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mt-8",
           className,
         )}
       >
         {background ? <HeroBackground background={background} /> : null}
         <div
           className={cn(
-            "relative mx-auto flex w-full self-stretch max-w-content items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
+            "relative flex w-full self-stretch items-end pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:pt-0",
+            inset === "default" && "mx-auto max-w-content px-4 sm:px-6",
             contentClassName,
           )}
         >
@@ -322,7 +347,13 @@ export function PageHero({
         </div>
       </section>
       {actions ? (
-        <div className={cn("relative z-10 p-4 sm:px-6", actionsClassName)}>
+        <div
+          className={cn(
+            "relative z-10",
+            bleed ? "mt-6 py-1" : inset === "none" ? "py-4" : "p-4 sm:px-6",
+            actionsClassName,
+          )}
+        >
           {actions}
         </div>
       ) : null}

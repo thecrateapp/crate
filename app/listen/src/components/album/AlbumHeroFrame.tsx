@@ -17,7 +17,8 @@ export function AlbumHeroFrame(
       titleSize="compact"
       className="h-auto min-h-hero-2xl sm:h-hero-lg sm:min-h-0 lg:h-hero-xl"
       contentClassName="translate-y-[var(--album-mobile-info-y)] pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))] pt-[var(--listen-mobile-page-top)] sm:translate-y-0 sm:pb-6"
-      artworkClassName="block w-[200px] self-center bg-transparent shadow-none ring-0 sm:w-[240px] sm:self-auto lg:w-[280px]"
+      artworkSize="lg"
+      artworkFrame="none"
       actionsClassName="-mt-[var(--album-mobile-action-overlap)] pt-0 sm:mt-0"
     />
   );

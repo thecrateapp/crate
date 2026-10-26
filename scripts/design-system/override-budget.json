@@ -182,12 +182,10 @@
     "radius": 1
   },
   "PageHero": {
-    "background": 2,
     "height": 2,
-    "margin": 5,
-    "padding": 5,
-    "radius": 1,
-    "shadow": 2
+    "margin": 2,
+    "padding": 2,
+    "radius": 1
   },
   "PopoverContent": {
     "height": 1,
