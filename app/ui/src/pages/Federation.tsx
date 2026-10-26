@@ -62,12 +62,9 @@ export function Federation() {
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as Tab)}
-        className="min-w-0 gap-5"
+        className="gap-5"
       >
-        <TabsList
-          aria-label="Federation operations"
-          className="w-full min-w-0 max-w-full"
-        >
+        <TabsList aria-label="Federation operations">
           {TABS.map((item) => (
             <TabsTrigger key={item.key} value={item.key}>
               {item.label}

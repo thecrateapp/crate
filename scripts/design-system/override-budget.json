@@ -64,7 +64,6 @@
     "typography": 4
   },
   "Checkbox": {
-    "height": 2,
     "margin": 4
   },
   "ContextMenuItem": {
@@ -219,7 +218,6 @@
     "textSize": 2
   },
   "SectionHeader": {
-    "margin": 6,
     "padding": 3
   },
   "SegmentedControl": {

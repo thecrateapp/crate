@@ -10,8 +10,8 @@ export function ArtistAlbumGroupFrame({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={title}>
-      <SectionHeader title={title} className="mb-4" />
+    <section className="space-y-4" aria-label={title}>
+      <SectionHeader title={title} />
       <MediaGrid density="comfortable">{children}</MediaGrid>
     </section>
   );
@@ -28,10 +28,10 @@ export function ArtistTopTracksFrame({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={title}>
+    <section className="space-y-4" aria-label={title}>
       <SectionHeader
         title={title}
-        className="mb-4"
+
         actionLabel={actionLabel}
         onAction={onAction}
       />
@@ -49,8 +49,8 @@ export function ArtistCommunityGroupFrame({
   children: ReactNode;
 }) {
   return (
-    <section aria-label={title}>
-      <SectionHeader title={title} className="mb-4" />
+    <section className="space-y-4" aria-label={title}>
+      <SectionHeader title={title} />
       <MediaGrid
         density="comfortable"
         className="md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"

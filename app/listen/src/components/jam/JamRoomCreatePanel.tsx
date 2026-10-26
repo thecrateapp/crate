@@ -108,7 +108,6 @@ export function JamRoomCreatePanel({
           <Checkbox
             checked={roomPermanent}
             onCheckedChange={(checked) => setRoomPermanent(checked === true)}
-            className="size-4"
           />
         </label>
         <Button

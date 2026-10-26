@@ -18,8 +18,8 @@ export function SearchAlbumResultsView({
   items: SearchAlbumViewItem[];
 }) {
   return (
-    <section>
-      <SectionHeader className="mb-3" title={title} />
+    <section className="space-y-3">
+      <SectionHeader title={title} />
       <MediaGrid>
         {items.map((item) =>
           "content" in item ? (

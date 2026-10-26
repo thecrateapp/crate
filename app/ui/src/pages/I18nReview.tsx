@@ -609,12 +609,9 @@ export function I18nReview() {
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as ManagerTab)}
-        className="min-w-0 gap-5"
+        className="gap-5"
       >
-        <TabsList
-          aria-label="Listen translation manager sections"
-          className="w-full min-w-0 max-w-full"
-        >
+        <TabsList aria-label="Listen translation manager sections">
           {TABS.map((tab) => (
             <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}

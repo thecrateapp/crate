@@ -140,7 +140,7 @@ describe("artist mobile modals", () => {
     const panel = screen.getByText("Kneecap").closest("[data-app-modal-panel]");
     expect(panel).toHaveClass("crate-overlay-panel");
     expect(panel).not.toHaveClass("listen-glass-panel");
-    expect(panel).toHaveClass("sm:max-w-4xl", "max-w-4xl");
+    expect(panel).toHaveAttribute("data-overlay-size", "xl");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
       "listen-mobile-bottom-chrome-height",

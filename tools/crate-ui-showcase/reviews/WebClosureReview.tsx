@@ -69,7 +69,7 @@ export function WebClosureReview() {
           title="Listen web closure"
           subtitle="Actual components, local callbacks and explicit remaining coverage. No production requests or saved preferences change in this preview."
         />
-        <Tabs defaultValue="playback" className="min-w-0">
+        <Tabs defaultValue="playback">
           <TabsList
             aria-label="Web closure groups"
             data-dismissible-layer-boundary

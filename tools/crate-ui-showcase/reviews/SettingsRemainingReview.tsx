@@ -20,10 +20,7 @@ import {
   type SettingsReadState,
 } from "./SettingsRemainingFixtures";
 export type SettingsRemainingTab =
-  | "location"
-  | "connections"
-  | "offline"
-  | "navigation";
+  "location" | "connections" | "offline" | "navigation";
 export function SettingsRemainingReview({
   initialTab = "connections",
 }: { initialTab?: SettingsRemainingTab } = {}) {
@@ -109,11 +106,7 @@ export function SettingsRemainingReview({
             value={tab}
             onValueChange={(value) => setTab(value as SettingsRemainingTab)}
           >
-            <TabsList
-              aria-label="Settings review sections"
-              variant="line"
-              className="max-w-full overflow-x-auto"
-            >
+            <TabsList aria-label="Settings review sections" variant="line">
               <TabsTrigger value="location">Location</TabsTrigger>
               <TabsTrigger value="connections">Connections</TabsTrigger>
               <TabsTrigger value="offline">Offline</TabsTrigger>

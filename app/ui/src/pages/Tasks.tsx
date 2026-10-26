@@ -1623,9 +1623,9 @@ export function Tasks() {
         <Tabs
           value={taskTab}
           onValueChange={(value) => setTaskTab(value as typeof taskTab)}
-          className="min-w-0 gap-5"
+          className="gap-5"
         >
-          <TabsList aria-label="Task views" className="w-full max-w-full">
+          <TabsList aria-label="Task views">
             <TabsTrigger value="active">Active &amp; queued</TabsTrigger>
             <TabsTrigger value="attention">Needs attention</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>

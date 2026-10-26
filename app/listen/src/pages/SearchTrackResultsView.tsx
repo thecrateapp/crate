@@ -13,9 +13,8 @@ export function SearchTrackResultsView<T>({
   onPlay: () => void;
 }) {
   return (
-    <section>
+    <section className="space-y-3">
       <SectionHeader
-        className="mb-3"
         title={title}
         action={
           <Button onClick={onPlay}>

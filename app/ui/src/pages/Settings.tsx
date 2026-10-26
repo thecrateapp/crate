@@ -472,15 +472,8 @@ export function Settings() {
         description="Runtime, library, enrichment and notification controls."
       />
 
-      <Tabs
-        value={section}
-        onValueChange={selectSection}
-        className="min-w-0 gap-5"
-      >
-        <TabsList
-          aria-label="Settings sections"
-          className="w-full min-w-0 max-w-full"
-        >
+      <Tabs value={section} onValueChange={selectSection} className="gap-5">
+        <TabsList aria-label="Settings sections">
           {NAV_ITEMS.map(({ id, label }) => (
             <TabsTrigger key={id} value={id}>
               {label}
