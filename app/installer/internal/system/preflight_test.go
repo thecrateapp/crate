@@ -23,11 +23,18 @@ func TestArchitectureCheck(t *testing.T) {
 }
 
 func TestMemoryCheck(t *testing.T) {
-	cases := map[float64]Status{0: Warn, 2: Warn, 6: Warn, 8: OK, 32: OK}
+	cases := map[float64]Status{0: Warn, 2: Warn, 6: Warn, 7.4: Warn, 7.7: OK, 8: OK, 32: OK}
 	for gb, want := range cases {
 		if got := MemoryCheck(Host{MemoryGB: gb}).Status; got != want {
-			t.Errorf("%.0f GB: got %v, want %v", gb, got, want)
+			t.Errorf("%.1f GB: got %v, want %v", gb, got, want)
 		}
+	}
+}
+
+func TestMemoryCheckJudgesTheFigureItShows(t *testing.T) {
+	check := MemoryCheck(Host{MemoryGB: 7.7})
+	if check.Detail != "8 GB" || check.Status != OK || check.Fix != "" {
+		t.Errorf("got %q %v %q, want 8 GB OK with no fix", check.Detail, check.Status, check.Fix)
 	}
 }
 

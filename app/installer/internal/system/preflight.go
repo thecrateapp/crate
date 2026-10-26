@@ -2,6 +2,7 @@ package system
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -41,13 +42,14 @@ func ArchitectureCheck(host Host) Check {
 }
 
 func MemoryCheck(host Host) Check {
-	detail := fmt.Sprintf("%.0f GB", host.MemoryGB)
+	gb := math.Round(host.MemoryGB)
+	detail := fmt.Sprintf("%.0f GB", gb)
 	switch {
 	case host.MemoryGB == 0:
 		return Check{Title: "Memory", Status: Warn, Detail: "could not be measured"}
-	case host.MemoryGB < minimumMemoryGB:
+	case gb < minimumMemoryGB:
 		return Check{Title: "Memory", Status: Warn, Detail: detail, Fix: "Crate needs about 8 GB to analyse a library comfortably; expect slow analysis and playback preparation."}
-	case host.MemoryGB < recommendedMemoryGB:
+	case gb < recommendedMemoryGB:
 		return Check{Title: "Memory", Status: Warn, Detail: detail, Fix: "8 GB or more is recommended; the analysis worker will be slower."}
 	default:
 		return Check{Title: "Memory", Status: OK, Detail: detail}
