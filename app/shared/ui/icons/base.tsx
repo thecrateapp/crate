@@ -1,4 +1,4 @@
-import type { IconProps as SolarIconProps } from "@solar-icons/react-perf";
+import type { IconProps as SolarIconProps } from "@solar-icons/react/lib/types";
 import {
   forwardRef,
   type ForwardRefExoticComponent,
@@ -6,8 +6,10 @@ import {
   type SVGProps,
 } from "react";
 
-export interface CrateIconProps
-  extends Omit<SVGProps<SVGSVGElement>, "ref" | "width" | "height"> {
+export interface CrateIconProps extends Omit<
+  SVGProps<SVGSVGElement>,
+  "ref" | "width" | "height"
+> {
   size?: number | string;
   width?: number | string;
   height?: number | string;
@@ -38,6 +40,10 @@ type SolarIcon = ForwardRefExoticComponent<
   Omit<SolarIconProps, "ref"> & RefAttributes<SVGSVGElement>
 >;
 
+function cssLength(value: number | string) {
+  return typeof value === "number" ? `${value}px` : value;
+}
+
 export function createIcon(Icon: SolarIcon, displayName: string): CrateIcon {
   const WrappedIcon = forwardRef<SVGSVGElement, CrateIconProps>(
     (
@@ -46,17 +52,22 @@ export function createIcon(Icon: SolarIcon, displayName: string): CrateIcon {
         width,
         height,
         absoluteStrokeWidth: _absoluteStrokeWidth,
+        style,
         ...props
       },
       ref,
-    ) => {
-      const dimensions: Pick<SVGProps<SVGSVGElement>, "width" | "height"> = {};
-
-      if (width !== undefined) dimensions.width = width;
-      if (height !== undefined) dimensions.height = height;
-
-      return <Icon ref={ref} size={size} {...dimensions} {...props} />;
-    },
+    ) => (
+      <Icon
+        ref={ref}
+        {...props}
+        style={{
+          fontSize: cssLength(size),
+          ...(width !== undefined ? { width: cssLength(width) } : {}),
+          ...(height !== undefined ? { height: cssLength(height) } : {}),
+          ...style,
+        }}
+      />
+    ),
   );
 
   WrappedIcon.displayName = displayName;

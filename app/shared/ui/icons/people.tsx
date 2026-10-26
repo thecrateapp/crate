@@ -1,21 +1,19 @@
-import {
-  Calendar as SolarCalendar,
-  CalendarAdd as SolarCalendarAdd,
-  CalendarMark as SolarCalendarMark,
-  ChatRound as SolarChatRound,
-  Lock as SolarLock,
-  Logout as SolarLogout,
-  Plain as SolarPlain,
-  Ticket as SolarTicket,
-  User as SolarUser,
-  UserCheck as SolarUserCheck,
-  UserCheckRounded as SolarUserCheckRounded,
-  UserMinus as SolarUserMinus,
-  UserPlus as SolarUserPlus,
-  UserPlusRounded as SolarUserPlusRounded,
-  UserRounded as SolarUserRounded,
-  UsersGroupRounded as SolarUsersGroupRounded,
-} from "@solar-icons/react-perf/Outline";
+import { CalendarIcon as SolarCalendar } from "@solar-icons/react/outline/calendar";
+import { CalendarAddIcon as SolarCalendarAdd } from "@solar-icons/react/outline/calendar-add";
+import { CalendarMarkIcon as SolarCalendarMark } from "@solar-icons/react/outline/calendar-mark";
+import { ChatRoundIcon as SolarChatRound } from "@solar-icons/react/outline/chat-round";
+import { LockIcon as SolarLock } from "@solar-icons/react/outline/lock";
+import { LogoutIcon as SolarLogout } from "@solar-icons/react/outline/logout";
+import { PlaneIcon as SolarPlain } from "@solar-icons/react/outline/plane";
+import { TicketIcon as SolarTicket } from "@solar-icons/react/outline/ticket";
+import { UserIcon as SolarUser } from "@solar-icons/react/outline/user";
+import { UserCheckIcon as SolarUserCheck } from "@solar-icons/react/outline/user-check";
+import { UserCheckRoundedIcon as SolarUserCheckRounded } from "@solar-icons/react/outline/user-check-rounded";
+import { UserMinusIcon as SolarUserMinus } from "@solar-icons/react/outline/user-minus";
+import { UserPlusIcon as SolarUserPlus } from "@solar-icons/react/outline/user-plus";
+import { UserPlusRoundedIcon as SolarUserPlusRounded } from "@solar-icons/react/outline/user-plus-rounded";
+import { UserRoundedIcon as SolarUserRounded } from "@solar-icons/react/outline/user-rounded";
+import { UsersGroupRoundedIcon as SolarUsersGroupRounded } from "@solar-icons/react/outline/users-group-rounded";
 
 import { createIcon } from "./base";
 

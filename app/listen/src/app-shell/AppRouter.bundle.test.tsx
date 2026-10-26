@@ -95,7 +95,7 @@ describe("AppRouter mobile bundle boundary", () => {
       path.join(iconDirectory, "index.tsx"),
       "utf8",
     );
-    expect(iconIndex).not.toContain("@solar-icons/react-perf");
+    expect(iconIndex).not.toContain("@solar-icons/react");
     expect(iconIndex).toContain('export * from "./media"');
     expect(iconIndex).toContain('export * from "./navigation"');
 

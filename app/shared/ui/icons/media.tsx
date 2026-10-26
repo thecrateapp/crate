@@ -1,37 +1,33 @@
-import {
-  Cassette2 as SolarCassette2,
-  Dislike as SolarDislike,
-  HeadphonesRoundSound as SolarHeadphonesRoundSound,
-  Heart as SolarHeart,
-  InboxArchive as SolarInboxArchive,
-  Like as SolarLike,
-  Microphone as SolarMicrophone,
-  Microphone2 as SolarMicrophone2,
-  Microphone3 as SolarMicrophone3,
-  MusicLibrary as SolarMusicLibrary,
-  MusicLibrary2 as SolarMusicLibrary2,
-  MusicNote2 as SolarMusicNote2,
-  MusicNotes as SolarMusicNotes,
-  Playlist2 as SolarPlaylist2,
-  Radar2 as SolarRadar2,
-  Repeat as SolarRepeat,
-  RepeatOne as SolarRepeatOne,
-  Screencast as SolarScreencast,
-  Shuffle as SolarShuffle,
-  SkipNext as SolarSkipNext,
-  SkipPrevious as SolarSkipPrevious,
-  Soundwave as SolarSoundwave,
-  Station as SolarStation,
-  Stop as SolarStop,
-  VinylRecord as SolarVinylRecord,
-  VolumeCross as SolarVolumeCross,
-  VolumeLoud as SolarVolumeLoud,
-} from "@solar-icons/react-perf/Outline";
-import {
-  Heart as SolarHeartBold,
-  Pause as SolarPauseBold,
-  Play as SolarPlayBold,
-} from "@solar-icons/react-perf/Bold";
+import { Cassette2Icon as SolarCassette2 } from "@solar-icons/react/outline/cassette-2";
+import { DislikeIcon as SolarDislike } from "@solar-icons/react/outline/dislike";
+import { HeadphonesRoundSoundIcon as SolarHeadphonesRoundSound } from "@solar-icons/react/outline/headphones-round-sound";
+import { HeartIcon as SolarHeart } from "@solar-icons/react/outline/heart";
+import { InboxArchiveIcon as SolarInboxArchive } from "@solar-icons/react/outline/inbox-archive";
+import { LikeIcon as SolarLike } from "@solar-icons/react/outline/like";
+import { MicrophoneIcon as SolarMicrophone } from "@solar-icons/react/outline/microphone";
+import { Microphone2Icon as SolarMicrophone2 } from "@solar-icons/react/outline/microphone-2";
+import { Microphone3Icon as SolarMicrophone3 } from "@solar-icons/react/outline/microphone-3";
+import { MusicLibraryIcon as SolarMusicLibrary } from "@solar-icons/react/outline/music-library";
+import { MusicLibrary2Icon as SolarMusicLibrary2 } from "@solar-icons/react/outline/music-library-2";
+import { MusicNote2Icon as SolarMusicNote2 } from "@solar-icons/react/outline/music-note-2";
+import { MusicNotesIcon as SolarMusicNotes } from "@solar-icons/react/outline/music-notes";
+import { Playlist2Icon as SolarPlaylist2 } from "@solar-icons/react/outline/playlist-2";
+import { Radar2Icon as SolarRadar2 } from "@solar-icons/react/outline/radar-2";
+import { RepeatIcon as SolarRepeat } from "@solar-icons/react/outline/repeat";
+import { RepeatOneIcon as SolarRepeatOne } from "@solar-icons/react/outline/repeat-one";
+import { ScreencastIcon as SolarScreencast } from "@solar-icons/react/outline/screencast";
+import { ShuffleIcon as SolarShuffle } from "@solar-icons/react/outline/shuffle";
+import { SkipNextIcon as SolarSkipNext } from "@solar-icons/react/outline/skip-next";
+import { SkipPreviousIcon as SolarSkipPrevious } from "@solar-icons/react/outline/skip-previous";
+import { SoundwaveIcon as SolarSoundwave } from "@solar-icons/react/outline/soundwave";
+import { StationIcon as SolarStation } from "@solar-icons/react/outline/station";
+import { StopIcon as SolarStop } from "@solar-icons/react/outline/stop";
+import { VinylRecordIcon as SolarVinylRecord } from "@solar-icons/react/outline/vinyl-record";
+import { VolumeCrossIcon as SolarVolumeCross } from "@solar-icons/react/outline/volume-cross";
+import { VolumeLoudIcon as SolarVolumeLoud } from "@solar-icons/react/outline/volume-loud";
+import { HeartIcon as SolarHeartBold } from "@solar-icons/react/bold/heart";
+import { PauseIcon as SolarPauseBold } from "@solar-icons/react/bold/pause";
+import { PlayIcon as SolarPlayBold } from "@solar-icons/react/bold/play";
 
 import { createIcon } from "./base";
 

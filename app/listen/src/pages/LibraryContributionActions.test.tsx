@@ -246,8 +246,9 @@ it.each([
     expect(caption).toHaveClass("crate-mono-label", "uppercase", colorClass);
     expect(caption.closest('[data-slot="info-badge"]')).toBeNull();
     const icon = caption.querySelector("svg");
-    expect(icon).toHaveAttribute("width", "12");
-    expect(icon).toHaveAttribute("height", "12");
+    expect(icon?.style.fontSize || `${icon?.getAttribute("width")}px`).toBe(
+      "12px",
+    );
     expect(icon).toHaveAttribute("aria-hidden", "true");
   },
 );

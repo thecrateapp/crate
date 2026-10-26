@@ -13,8 +13,8 @@ describe("OverlayCloseButton", () => {
     expect(button).toHaveAttribute("type", "button");
     const icon = button.querySelector("svg");
     expect(icon).toHaveAttribute("aria-hidden", "true");
-    expect(icon).toHaveAttribute("width", "24");
-    expect(icon).toHaveAttribute("height", "24");
+    expect(icon).toHaveStyle({ fontSize: "24px" });
+    expect(icon).toHaveAttribute("width", "1em");
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 

@@ -1,20 +1,18 @@
-import {
-  Atom as SolarAtom,
-  Bolt as SolarBolt,
-  CheckCircle as SolarCheckCircle,
-  ClockCircle as SolarClockCircle,
-  Danger as SolarDanger,
-  DangerTriangle as SolarDangerTriangle,
-  Flame as SolarFlame,
-  Graph as SolarGraph,
-  InfoCircle as SolarInfoCircle,
-  Pulse as SolarPulse,
-  RecordCircle as SolarRecordCircle,
-  Refresh as SolarRefresh,
-  ShieldCheck as SolarShieldCheck,
-  Star as SolarStar,
-  Stars as SolarStars,
-} from "@solar-icons/react-perf/Outline";
+import { AtomIcon as SolarAtom } from "@solar-icons/react/outline/atom";
+import { BoltIcon as SolarBolt } from "@solar-icons/react/outline/bolt";
+import { CheckCircleIcon as SolarCheckCircle } from "@solar-icons/react/outline/check-circle";
+import { ClockCircleIcon as SolarClockCircle } from "@solar-icons/react/outline/clock-circle";
+import { DangerIcon as SolarDanger } from "@solar-icons/react/outline/danger";
+import { DangerTriangleIcon as SolarDangerTriangle } from "@solar-icons/react/outline/danger-triangle";
+import { FlameIcon as SolarFlame } from "@solar-icons/react/outline/flame";
+import { GraphIcon as SolarGraph } from "@solar-icons/react/outline/graph";
+import { InfoCircleIcon as SolarInfoCircle } from "@solar-icons/react/outline/info-circle";
+import { PulseIcon as SolarPulse } from "@solar-icons/react/outline/pulse";
+import { RecordCircleIcon as SolarRecordCircle } from "@solar-icons/react/outline/record-circle";
+import { RefreshIcon as SolarRefresh } from "@solar-icons/react/outline/refresh";
+import { ShieldCheckIcon as SolarShieldCheck } from "@solar-icons/react/outline/shield-check";
+import { StarIcon as SolarStar } from "@solar-icons/react/outline/star";
+import { StarsIcon as SolarStars } from "@solar-icons/react/outline/stars";
 
 import { createIcon } from "./base";
 

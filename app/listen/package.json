@@ -39,7 +39,7 @@
     "@nivo/line": "^0.99.0",
     "@sentry/capacitor": "^4.4.0",
     "@sentry/react": "^10.69.0",
-    "@solar-icons/react-perf": "^2.1.1",
+    "@solar-icons/react": "^2.3.3",
     "@tanstack/react-virtual": "^3.13.24",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
