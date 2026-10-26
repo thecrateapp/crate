@@ -48,7 +48,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
@@ -183,9 +183,7 @@ export function MergeArtistDialog({
                       <span className="truncate text-sm font-medium">
                         {artist.name}
                       </span>
-                      {isCurrentArtist ? (
-                        <Badge variant="secondary">Current</Badge>
-                      ) : null}
+                      {isCurrentArtist ? <InfoBadge>Current</InfoBadge> : null}
                     </button>
                   );
                 })}

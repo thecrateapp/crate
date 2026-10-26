@@ -30,7 +30,6 @@ import {
 import { useSearchParams } from "react-router";
 
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
 import {
   Tabs,
   TabsList,
@@ -949,19 +948,17 @@ export function DownloadPage() {
           <TabsTrigger value="search">Search Results</TabsTrigger>
           <TabsTrigger value="upload">Upload</TabsTrigger>
           <TabsTrigger value="queue">
-            Queue{" "}
+            Queue
             {activeQueue.length + slskDownloads.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
+              <InfoBadge variant="counter">
                 {activeQueue.length + slskDownloads.length}
-              </Badge>
+              </InfoBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="wishlist">
-            Wishlist{" "}
+            Wishlist
             {wishlist.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {wishlist.length}
-              </Badge>
+              <InfoBadge variant="counter">{wishlist.length}</InfoBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>

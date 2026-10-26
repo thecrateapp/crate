@@ -19,7 +19,7 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import {
@@ -387,7 +387,7 @@ export function GlobalCatalog() {
                       className="p-4"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{candidate.entity_type}</Badge>
+                        <InfoBadge>{candidate.entity_type}</InfoBadge>
                         <span className="min-w-0 break-all font-mono text-sm text-text-primary">
                           {candidate.match_key}
                         </span>
@@ -478,9 +478,9 @@ function RunSummary({ run }: { run: GlobalCatalogRun }) {
     <OpsSurface as="article" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge variant={run.status === "completed" ? "default" : "secondary"}>
+          <InfoBadge tone={run.status === "completed" ? "accent" : "neutral"}>
             {run.status}
-          </Badge>
+          </InfoBadge>
           <MonoLabel as="span" tone="accent">
             {run.mode}
           </MonoLabel>

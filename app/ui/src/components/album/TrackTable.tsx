@@ -12,7 +12,6 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Dialog,
@@ -433,9 +432,7 @@ function MoveTrackDialog({
                           {album.year ? ` - ${album.year}` : ""}
                         </div>
                       </div>
-                      {isCurrentAlbum ? (
-                        <Badge variant="secondary">Current</Badge>
-                      ) : null}
+                      {isCurrentAlbum ? <InfoBadge>Current</InfoBadge> : null}
                     </button>
                   );
                 })}

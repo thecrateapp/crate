@@ -1,4 +1,4 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -24,7 +24,6 @@ import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
 
 import { api } from "@/lib/api";
 import { waitForTask } from "@/lib/tasks";
@@ -499,10 +498,10 @@ function MatchRow({
       <ItemCover item={match} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{match.entity_type}</Badge>
-          <Badge className="bg-accent-action/10 text-accent-action-hi">
+          <InfoBadge>{match.entity_type}</InfoBadge>
+          <InfoBadge tone="accent">
             {Math.round((match.confidence || 0) * 100)}%
-          </Badge>
+          </InfoBadge>
           <MonoLabel as="span">{match.source || "sync"}</MonoLabel>
         </div>
         <h3 className="mt-2 truncate text-base font-bold text-text-primary font-display">
@@ -570,7 +569,7 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
       <ItemCover item={match} large />
       <div className="mt-3 min-w-0">
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{match.entity_type}</Badge>
+          <InfoBadge>{match.entity_type}</InfoBadge>
         </div>
         <h3 className="mt-2 truncate text-sm font-bold text-text-primary font-display">
           {match.entity_name || itemTitle(match)}
@@ -637,9 +636,9 @@ function CompactImportList({ imports }: { imports: BandcampImport[] }) {
               {item.requested_format || "flac"} · {item.status || "queued"}
             </p>
           </div>
-          <Badge className={cn("capitalize", importStatusClass(item.status))}>
+          <InfoBadge tone={importStatusTone(item.status)}>
             {item.status || "queued"}
-          </Badge>
+          </InfoBadge>
         </div>
       ))}
     </div>
@@ -673,16 +672,11 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
             </p>
           </div>
           {item.latest_import_status ? (
-            <Badge
-              className={cn(
-                "capitalize",
-                importStatusClass(item.latest_import_status),
-              )}
-            >
+            <InfoBadge tone={importStatusTone(item.latest_import_status)}>
               {item.latest_import_status}
-            </Badge>
+            </InfoBadge>
           ) : (
-            <Badge variant="outline">synced</Badge>
+            <InfoBadge>synced</InfoBadge>
           )}
         </button>
       ))}
@@ -753,12 +747,8 @@ function itemTitle(item: BandcampItem) {
   );
 }
 
-function importStatusClass(status?: string | null) {
-  if (status === "completed")
-    return "border-accent-action/25 bg-accent-action/10 text-accent-action";
-  if (status === "failed")
-    return "border-state-warning/25 bg-state-warning/10 text-state-warning-text";
-  if (status === "running")
-    return "border-accent-action-hi/40 bg-accent-action/10 text-accent-action-hi";
-  return "border-border-quiet bg-transparent text-text-secondary";
+function importStatusTone(status?: string | null): InfoBadgeTone {
+  if (status === "completed" || status === "running") return "accent";
+  if (status === "failed") return "warning";
+  return "neutral";
 }

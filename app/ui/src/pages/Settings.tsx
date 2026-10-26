@@ -17,7 +17,7 @@ import {
 } from "react";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Input } from "@crate/ui/shadcn/input";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -570,20 +570,20 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
           <FieldRow label="Status">
             <div className="flex items-center gap-3">
               {worker && worker.running_tasks.length > 0 ? (
-                <Badge className="border-primary/30 bg-primary/15 text-primary">
+                <InfoBadge tone="accent">
                   {worker.running_tasks.length} running
-                </Badge>
+                </InfoBadge>
               ) : (
-                <Badge variant="secondary">Idle</Badge>
+                <InfoBadge>Idle</InfoBadge>
               )}
               {pendingTasks > 0 && (
-                <Badge variant="secondary">{pendingTasks} pending</Badge>
+                <InfoBadge>{pendingTasks} pending</InfoBadge>
               )}
               {dbHeavyGate &&
                 (dbHeavyGate.active > 0 || dbHeavyGate.pending > 0) && (
-                  <Badge variant="secondary">
+                  <InfoBadge>
                     DB-heavy {dbHeavyGate.active}/{dbHeavyGate.pending}
-                  </Badge>
+                  </InfoBadge>
                 )}
             </div>
           </FieldRow>
@@ -605,7 +605,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
                   <Loader2 size={10} className="animate-spin text-primary" />
                   <span className="font-mono">{t.type}</span>
                   <span className="text-text-subtle">{t.id}</span>
-                  <Badge variant="outline">{t.pool}</Badge>
+                  <InfoBadge>{t.pool}</InfoBadge>
                 </div>
               ))}
             </div>
@@ -1054,17 +1054,11 @@ function DownloadPolicyForm({
   return (
     <div aria-busy={write.saving}>
       <FieldRow label="Current status">
-        <Badge
-          className={
-            policy.downloads_allowed_now
-              ? "bg-accent-action/10 text-accent-action-hi border-accent-action/20"
-              : "bg-state-warning/10 text-state-warning-text border-state-warning/20"
-          }
-        >
+        <InfoBadge tone={policy.downloads_allowed_now ? "accent" : "warning"}>
           {policy.downloads_allowed_now
             ? "Downloads active"
             : "Downloads paused"}
-        </Badge>
+        </InfoBadge>
         {policy.active_users > 0 ? (
           <span className="text-xs text-muted-foreground">
             {policy.active_users} user{policy.active_users > 1 ? "s" : ""}{" "}
@@ -1248,9 +1242,9 @@ function SchedulesSection({
                 }
               />
               <span className="text-xs text-muted-foreground">min</span>
-              <Badge variant={active ? "default" : "secondary"}>
+              <InfoBadge tone={active ? "accent" : "neutral"}>
                 {active ? "Active" : "Off"}
-              </Badge>
+              </InfoBadge>
               <Button
                 size="sm"
                 variant="outline"
@@ -1317,12 +1311,9 @@ function AIRefinementStatus({
           disabled={savingPaths}
           ariaLabel="AI refinement"
         />
-        <Badge
-          variant={llmRefinementEnabled ? "default" : "secondary"}
-          className="text-[10px]"
-        >
+        <InfoBadge tone={llmRefinementEnabled ? "accent" : "neutral"}>
           {llmRefinementEnabled ? "Enabled" : "Disabled"}
-        </Badge>
+        </InfoBadge>
         {savingPaths ? (
           <Loader2 size={13} className="animate-spin text-muted-foreground" />
         ) : null}
@@ -1624,7 +1615,7 @@ function EnrichmentSection({
           <div className="flex flex-wrap gap-1.5">
             {audioExts.map((ext) => (
               <div key={ext} className="inline-flex items-center gap-1">
-                <Badge variant="secondary">{ext}</Badge>
+                <InfoBadge>{ext}</InfoBadge>
                 <ActionButton
                   label={`Remove ${ext}`}
                   tooltip="Remove extension"
@@ -1728,9 +1719,9 @@ function NotificationsSection({
             onChange={setEnabled}
             ariaLabel="Telegram notifications"
           />
-          <Badge variant={enabled ? "default" : "secondary"}>
+          <InfoBadge tone={enabled ? "accent" : "neutral"}>
             {enabled ? "Active" : "Disabled"}
-          </Badge>
+          </InfoBadge>
         </FieldRow>
         <FieldRow label="Bot Token">
           <Input
@@ -2005,7 +1996,7 @@ function AuditSection() {
                       </TooltipHint>
                     </TableCell>
                     <TableCell className="py-1.5">
-                      <Badge variant="outline">{entry.action}</Badge>
+                      <InfoBadge>{entry.action}</InfoBadge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground py-1.5">
                       {entry.target_type}

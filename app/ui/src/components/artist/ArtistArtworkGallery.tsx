@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Bot, ImagePlus, Loader2, Search, Trash2 } from "@crate/ui/icons";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
@@ -397,9 +397,7 @@ export function ArtistArtworkGallery({
                 {asset.slots.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {asset.slots.map((slot) => (
-                      <Badge key={slot} variant="secondary">
-                        {slotLabel(slot)}
-                      </Badge>
+                      <InfoBadge key={slot}>{slotLabel(slot)}</InfoBadge>
                     ))}
                   </div>
                 ) : null}
@@ -470,12 +468,8 @@ export function ArtistArtworkGallery({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline">
-                        Desktop {candidate.desktop.score}
-                      </Badge>
-                      <Badge variant="outline">
-                        Mobile {candidate.mobile.score}
-                      </Badge>
+                      <InfoBadge>Desktop {candidate.desktop.score}</InfoBadge>
+                      <InfoBadge>Mobile {candidate.mobile.score}</InfoBadge>
                     </div>
                     {analysis ? (
                       <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">

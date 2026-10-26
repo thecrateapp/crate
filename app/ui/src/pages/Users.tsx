@@ -1,4 +1,4 @@
-import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { FilterChip } from "@crate/ui/primitives/FilterChip";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { OpsPageHero } from "@/components/admin/ops-surfaces";
@@ -36,7 +36,6 @@ import {
 } from "@crate/ui/shadcn/card";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
-import { Badge } from "@crate/ui/shadcn/badge";
 import {
   Dialog,
   DialogContent,
@@ -352,13 +351,10 @@ function activityBadgeClass(status: string) {
   return "border-accent-action/20 text-accent-action-hi";
 }
 
-function statusBadgeClass(status: string) {
-  if (status === "active")
-    return "border-accent-action/20 text-accent-action-hi";
-  if (status === "suspended")
-    return "border-state-warning/25 text-state-warning-text";
-  if (status === "deleted") return "border-border-quiet text-text-subtle";
-  return "border-border-quiet text-text-muted";
+function statusBadgeTone(status: string): InfoBadgeTone {
+  if (status === "active") return "accent";
+  if (status === "suspended") return "warning";
+  return "neutral";
 }
 
 function statusLabel(status: string) {
@@ -441,34 +437,31 @@ function getSessionStatus(session: UserSession) {
       return {
         key: "revoked",
         label: "Revoked",
-        className: "border-border-quiet bg-transparent text-text-secondary",
+        tone: "neutral" as const,
       };
     case "expired":
       return {
         key: "expired",
         label: "Expired",
-        className:
-          "border-state-warning/25 bg-state-warning/10 text-state-warning-text",
+        tone: "warning" as const,
       };
     case "active":
       return {
         key: "active",
         label: "Active now",
-        className:
-          "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
+        tone: "accent" as const,
       };
     case "recent":
       return {
         key: "recent",
         label: "Recent",
-        className:
-          "border-accent-action/25 bg-accent-action/10 text-accent-action-hi",
+        tone: "accent" as const,
       };
     default:
       return {
         key: "history",
         label: "History",
-        className: "border-border-quiet bg-card text-text-muted",
+        tone: "neutral" as const,
       };
   }
 }
@@ -1022,9 +1015,7 @@ export function Users() {
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                         {rolesForUser(user).map((role) => (
-                          <Badge key={role} variant="outline">
-                            {roleLabel(role)}
-                          </Badge>
+                          <InfoBadge key={role}>{roleLabel(role)}</InfoBadge>
                         ))}
                         {user.username ? (
                           <span className="break-all font-mono text-[10px] text-text-subtle">
@@ -1041,12 +1032,9 @@ export function Users() {
                     <MonoLabel as="span" className="lg:hidden">
                       Status
                     </MonoLabel>
-                    <Badge
-                      variant="outline"
-                      className={statusBadgeClass(userStatus(user))}
-                    >
+                    <InfoBadge tone={statusBadgeTone(userStatus(user))}>
                       {statusLabel(userStatus(user))}
-                    </Badge>
+                    </InfoBadge>
                     {userActivityStatus(user) !== "active" ? (
                       <span
                         className={`text-xs ${activityBadgeClass(userActivityStatus(user))}`}
@@ -1491,25 +1479,22 @@ function UserDetailDialog({
                             {detail.name || detail.email}
                           </h3>
                           {rolesForUser(detail).map((role) => (
-                            <Badge
+                            <InfoBadge
                               key={role}
-                              variant={
+                              tone={
                                 role === "admin" || role === "owner"
-                                  ? "default"
-                                  : "secondary"
+                                  ? "accent"
+                                  : "neutral"
                               }
                             >
                               {roleLabel(role)}
-                            </Badge>
+                            </InfoBadge>
                           ))}
-                          <Badge
-                            variant="outline"
-                            className={statusBadgeClass(userStatus(detail))}
-                          >
+                          <InfoBadge tone={statusBadgeTone(userStatus(detail))}>
                             {statusLabel(userStatus(detail))}
-                          </Badge>
+                          </InfoBadge>
                           {detail.username ? (
-                            <Badge variant="outline">@{detail.username}</Badge>
+                            <InfoBadge>@{detail.username}</InfoBadge>
                           ) : null}
                         </div>
                         <div className="break-all text-sm text-text-muted">
@@ -1935,9 +1920,9 @@ function UserDetailDialog({
                               <div className="text-sm font-medium text-text-primary">
                                 {sessionDisplayName(session)}
                               </div>
-                              <Badge className={status.className}>
+                              <InfoBadge tone={status.tone}>
                                 {status.label}
-                              </Badge>
+                              </InfoBadge>
                               <InfoBadge>{session.app_id || "web"}</InfoBadge>
                             </div>
                             <div className="flex flex-wrap gap-4 text-sm text-text-muted">

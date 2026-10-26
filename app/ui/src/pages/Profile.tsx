@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { toast } from "sonner";
 import { User, Lock, Link2, Unlink } from "lucide-react";
 
@@ -109,9 +109,9 @@ export function Profile() {
               {user.name || user.email}
             </div>
             <div className="text-sm text-muted-foreground">{user.email}</div>
-            <Badge variant="secondary" className="mt-1">
-              {user.role}
-            </Badge>
+            <div className="mt-1">
+              <InfoBadge>{user.role}</InfoBadge>
+            </div>
           </div>
         </div>
 

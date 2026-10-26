@@ -7,7 +7,7 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { ArtistHeroPresentation } from "@crate/ui/domain/ArtistHeroPresentation";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { Heart, Loader2, Play } from "@crate/ui/icons";
@@ -545,30 +545,30 @@ export function ArtistHeroArtworkEditor({
           {profile ? (
             <div className="flex flex-wrap justify-end gap-2">
               <div className="flex gap-2">
-                <Badge variant="outline">{provenanceLabel(profile)}</Badge>
-                <Badge variant="secondary">{reviewLabel(profile)}</Badge>
-                <Badge
-                  variant={
+                <InfoBadge>{provenanceLabel(profile)}</InfoBadge>
+                <InfoBadge>{reviewLabel(profile)}</InfoBadge>
+                <InfoBadge
+                  tone={
                     profile.featured_devices?.includes("desktop")
-                      ? "secondary"
-                      : "outline"
+                      ? "neutral"
+                      : "neutral"
                   }
                 >
                   {profile.featured_devices?.includes("desktop")
                     ? "Desktop ready"
                     : "Desktop not ready"}
-                </Badge>
-                <Badge
-                  variant={
+                </InfoBadge>
+                <InfoBadge
+                  tone={
                     profile.featured_devices?.includes("mobile")
-                      ? "secondary"
-                      : "outline"
+                      ? "neutral"
+                      : "neutral"
                   }
                 >
                   {profile.featured_devices?.includes("mobile")
                     ? "Mobile ready"
                     : "Mobile not ready"}
-                </Badge>
+                </InfoBadge>
               </div>
               {canEdit && profile.provenance === "derived_background" ? (
                 <div className="flex gap-2">
@@ -617,7 +617,7 @@ export function ArtistHeroArtworkEditor({
               ) : null}
             </div>
           ) : (
-            <Badge variant="outline">Background fallback</Badge>
+            <InfoBadge>Background fallback</InfoBadge>
           )}
         </div>
 

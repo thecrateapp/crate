@@ -30,14 +30,6 @@
   "BackLink": {
     "margin": 1
   },
-  "Badge": {
-    "background": 5,
-    "border": 6,
-    "margin": 3,
-    "textColor": 7,
-    "textSize": 1,
-    "typography": 2
-  },
   "Button": {
     "background": 3,
     "border": 2,

@@ -29,7 +29,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
 import { Bot, ChevronRight } from "@crate/ui/icons";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Tooltip,
@@ -547,36 +547,15 @@ function NodeDetailPanel({
               {node.name}
             </h3>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              {node.top_level && (
-                <Badge
-                  variant="outline"
-                  className="border-primary/30 bg-primary/10 text-primary"
-                >
-                  top-level
-                </Badge>
-              )}
-              <Badge
-                variant="outline"
-                className={
-                  hasPreset
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-white/15 text-white/55"
-                }
-              >
+              {node.top_level && <InfoBadge tone="accent">top-level</InfoBadge>}
+              <InfoBadge tone={hasPreset ? "accent" : "neutral"}>
                 {node.eq_preset_source === "direct"
                   ? "direct preset"
                   : node.eq_preset_source === "inherited"
                     ? `inherits from ${node.eq_preset_inherited_from}`
                     : "no preset"}
-              </Badge>
-              {empty && (
-                <Badge
-                  variant="outline"
-                  className="border-white/15 text-white/40"
-                >
-                  empty
-                </Badge>
-              )}
+              </InfoBadge>
+              {empty && <InfoBadge>empty</InfoBadge>}
             </div>
           </div>
           {nodeManagementActions}
@@ -717,9 +696,7 @@ function NodeDetailPanel({
                   <div className="mt-2 space-y-2">
                     <div className="flex flex-wrap gap-1.5">
                       {proposal.aliases.map((alias) => (
-                        <Badge key={alias} variant="outline">
-                          alias: {alias}
-                        </Badge>
+                        <InfoBadge key={alias}>alias: {alias}</InfoBadge>
                       ))}
                     </div>
                     <Button

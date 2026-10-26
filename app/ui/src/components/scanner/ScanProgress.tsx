@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Check, Circle, Loader2 } from "lucide-react";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { cn } from "@/lib/utils";
 
 export interface ScanProgressData {
@@ -32,12 +32,8 @@ const ALL_SCANNERS = [
   "incomplete",
 ];
 
-const ISSUE_COLORS: Record<string, string> = {
-  nested_library: "text-state-warning-text border-state-warning/40",
-  duplicate_album: "text-state-warning-text border-state-warning/40",
-  bad_naming: "text-state-warning-text border-state-warning/40",
-  mergeable_album: "text-state-warning-text border-state-warning/40",
-  incomplete_album: "text-accent-action-hi border-accent-action/40",
+const ISSUE_TONES: Record<string, InfoBadgeTone> = {
+  incomplete_album: "accent",
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -124,19 +120,13 @@ export function ScanProgress({ progress }: ScanProgressProps) {
       {/* Issue counters */}
       <div className="flex gap-2 flex-wrap">
         {Object.entries(progress.issues_by_type).map(([type, count]) => (
-          <Badge
+          <InfoBadge
             key={type}
-            variant="outline"
-            className={cn(
-              "",
-              count > 0
-                ? (ISSUE_COLORS[type] ??
-                    "text-state-warning-text border-state-warning/40")
-                : "text-muted-foreground border-border",
-            )}
+
+            tone={count > 0 ? (ISSUE_TONES[type] ?? "warning") : "neutral"}
           >
             {ISSUE_LABELS[type] ?? type.replace(/_/g, " ")}: {count}
-          </Badge>
+          </InfoBadge>
         ))}
       </div>
 
