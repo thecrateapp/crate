@@ -69,7 +69,7 @@ describe("Discovery text presentation with real hooks", () => {
   it("keeps readings, asset URLs and only reviewed search glyphs at rest", async () => {
     await ready();
     expect(screen.getByRole("heading", { name: "Discovery" })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     const search = screen.getByRole("searchbox", { name: "Search discovery" });
     expect(search).toHaveAttribute(

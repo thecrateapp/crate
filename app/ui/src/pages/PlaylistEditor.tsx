@@ -1105,7 +1105,7 @@ export function PlaylistEditor() {
             <div className="grid min-w-0 gap-2">
               <h1
                 id="playlist-editor-title"
-                className="m-0 min-w-0 wrap-anywhere font-display text-2xl font-semibold leading-tight tracking-tight text-text-primary md:text-3xl"
+                className="crate-page-title min-w-0 wrap-anywhere"
               >
                 {name || playlist.name}
               </h1>

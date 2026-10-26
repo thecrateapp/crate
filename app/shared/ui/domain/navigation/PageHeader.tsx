@@ -47,8 +47,10 @@ export function PageHeaderLayout({
   );
 }
 
-export interface PageHeaderProps
-  extends Omit<HTMLAttributes<HTMLElement>, "title"> {
+export interface PageHeaderProps extends Omit<
+  HTMLAttributes<HTMLElement>,
+  "title"
+> {
   title: ReactNode;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
@@ -59,10 +61,6 @@ export interface PageHeaderProps
   size?: PageHeaderSize;
 }
 
-const TITLE_CLASS_NAME: Record<PageHeaderSize, string> = {
-  md: "text-2xl",
-  lg: "text-3xl",
-};
 const hasContent = (node: ReactNode) =>
   node !== undefined && node !== null && node !== false && node !== "";
 
@@ -103,10 +101,8 @@ export function PageHeader({
             ) : null}
             <h1
               id={titleId}
-              className={cn(
-                "min-w-0 wrap-anywhere font-display font-semibold leading-tight tracking-tight text-text-primary",
-                TITLE_CLASS_NAME[size],
-              )}
+              data-size={size}
+              className="crate-page-title min-w-0 wrap-anywhere"
             >
               {title}
             </h1>

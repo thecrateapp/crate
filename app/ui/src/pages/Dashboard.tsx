@@ -212,7 +212,7 @@ export function Dashboard() {
         }
       >
         <div>
-          <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance">
+          <h1 className="crate-page-title">
             Dashboard
           </h1>
           <p className="mt-3 text-sm text-text-muted">

@@ -143,8 +143,7 @@ it("opens a linked show's detail, scrolls to it and drops the link", async () =>
 it("matches Listen's collapsed show row pattern and replaces it with the ticket detail", async () => {
   renderWithAdminProviders(<Upcoming />, { route: "/upcoming" });
   expect(screen.getByRole("heading", { name: "Show Management" })).toHaveClass(
-    "font-display",
-    "font-extrabold",
+    "crate-page-title",
   );
   const headerActions = screen.getByRole("group", {
     name: "Show management actions",

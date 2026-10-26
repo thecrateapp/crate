@@ -261,3 +261,7 @@ HamburgerMenu, Ticket and MagicStick (now Solar Magic Wand).
 Empty states (2026-10-26): `crate-empty-state` centres its content (items and text) with 24px inline
 padding inside any container, and keeps its 32px block padding and 160px minimum. The recipe is
 unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.
+
+Page titles (2026-10-26): `crate-page-title` is the single 800 page-title recipe (Bricolage 800,
+`clamp(2.25rem,4vw,3.75rem)`, display leading, -0.045em, balanced). `data-size="md"` fixes it at
+2.25rem. PageHeader and the Admin page titles use it instead of hand-written utility copies.

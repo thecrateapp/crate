@@ -151,8 +151,7 @@ describe("Imports", () => {
 
     await screen.findByText("Moss On Stone", { exact: true });
     expect(screen.getByRole("heading", { name: "Staged Imports" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     const actions = screen.getByRole("group", {
       name: "Staged import actions",

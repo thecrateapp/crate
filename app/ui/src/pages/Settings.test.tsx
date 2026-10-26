@@ -178,8 +178,7 @@ describe("Settings", () => {
       </>,
     );
     expect(screen.getByRole("heading", { name: "Settings" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
 
     await user.click(screen.getByRole("tab", { name: "Downloads" }));

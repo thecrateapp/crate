@@ -22,8 +22,7 @@ describe("Contributions text and real contracts", () => {
     renderWithAdminProviders(<Contributions />);
     await screen.findByText("Luz de octubre");
     expect(screen.getByRole("heading", { name: "Contributions" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     const refresh = screen.getByRole("button", { name: "Refresh" });
     expect(refresh).toHaveAttribute("data-size", "icon-lg");

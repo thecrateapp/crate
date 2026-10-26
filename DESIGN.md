@@ -237,9 +237,9 @@ Numerals use `leading-numeral` (.85) and `tracking-numeral` (−0.05em).
 | Overlay title      | Bricolage 700, `clamp(1.4rem,2.5vw,1.6rem)`, −0.03em                                                        |
 | Card title         | Roboto 16/24                                                                                                |
 
-The 800 page-title scale is the standard for both apps (Diego, 2026-10-25). Admin already uses it
-through `OpsPageHero` (26 pages, plus a hand copy in Dashboard and Genres). Listen `PageHeader`
-(600, `text-2xl`/`text-3xl`) and Admin PlaylistEditor have not migrated yet (see §14).
+The 800 page-title scale is the standard for both apps (Diego, 2026-10-25). It lives in one recipe,
+`crate-page-title`, used by Listen `PageHeader` (`size="md"` fixes it at 2.25rem), Admin
+`OpsPageHero`, Dashboard, Genres and PlaylistEditor. Do not rebuild it from utilities.
 
 ### Casing and typographic conventions
 

@@ -32,8 +32,7 @@ describe("Trash text controls and retained UX", () => {
   it("uses text actions and the shared heading font without redundant glyphs", async () => {
     await ready();
     expect(screen.getByRole("heading", { name: "Library Trash" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     for (const name of ["Refresh", "Empty trash"]) {
       const action = screen.getByRole("button", { name });

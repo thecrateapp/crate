@@ -108,8 +108,7 @@ it("keeps the V3 page display, ruled-panel caption and metric hierarchy", () => 
     </>,
   );
   expect(screen.getByRole("heading", { name: "Analysis" })).toHaveClass(
-    "font-display",
-    "font-extrabold",
+    "crate-page-title",
   );
   expect(screen.getByRole("heading", { name: "Coverage" })).toHaveClass(
     "font-mono",
@@ -355,7 +354,7 @@ describe("OpsPageHero header layout opt-in", () => {
       screen.getByRole("button", { name: "Existing action" }).parentElement,
     ).toHaveClass("xl:justify-end");
     expect(screen.getByRole("heading", { name: "Tasks" })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     expect(screen.getByText("Existing status")).toBeVisible();
   });

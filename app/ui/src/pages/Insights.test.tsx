@@ -158,9 +158,10 @@ describe("Collection Insights", () => {
   it("opens the tab named in the URL so it survives reloads and shared links", () => {
     renderWithAdminProviders(<Insights />, { route: "/insights?tab=sonic" });
 
-    expect(
-      screen.getByRole("tab", { name: "Sonic explorer" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Sonic explorer" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       screen.getByRole("heading", { name: "Sonic explorer" }),
     ).toBeVisible();
@@ -670,8 +671,8 @@ it("shows initial stale HTTP-200 failure and clears it on successful refresh", a
 it("uses the canonical Admin title recipe, accent section captions and human snapshot date", () => {
   const { container } = setup();
   expect(
-    screen.getByRole("heading", { name: "Insights", level: 1 }).className,
-  ).toContain("text-[clamp(2.25rem,4vw,3.75rem)]");
+    screen.getByRole("heading", { name: "Insights", level: 1 }),
+  ).toHaveClass("crate-page-title");
   for (const heading of screen
     .getAllByRole("heading")
     .filter((item) => item.closest('[data-slot="instrument-panel-header"]'))) {

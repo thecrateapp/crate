@@ -25,7 +25,7 @@ describe("Translations reviewed visual contract", () => {
     const { container } = render(<I18nReview />);
     await screen.findByRole("article", { name: "es locale health" });
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     expect(
       container.querySelectorAll('svg[data-admin-ux="header-refresh"]'),

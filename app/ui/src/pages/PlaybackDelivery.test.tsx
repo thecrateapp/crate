@@ -102,7 +102,7 @@ describe("PlaybackDelivery", () => {
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Playback Delivery" }),
-    ).toHaveClass("font-display", "font-extrabold");
+    ).toHaveClass("crate-page-title");
     const actions = screen.getByRole("group", {
       name: "Playback delivery actions",
     });

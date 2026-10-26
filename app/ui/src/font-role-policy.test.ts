@@ -138,7 +138,10 @@ describe("Admin typography roles", () => {
   });
 
   it("uses display for semantic headings and mono for uppercase labels and numeric readouts", () => {
-    const roles = cssFontRoles(sourceRoot);
+    const roles = new Set([
+      ...cssFontRoles(sourceRoot),
+      ...cssFontRoles(resolve(sourceRoot, "../../shared/ui/tokens")),
+    ]);
     const violations = sourceFiles(sourceRoot).flatMap((file) =>
       typographyViolations(
         file,

@@ -217,7 +217,7 @@ describe("Home", () => {
       within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
         name: /Good (morning|afternoon|evening)/,
       }),
-    ).toHaveClass("font-display");
+    ).toHaveClass("crate-page-title");
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
       "max-w-content",
       "relative",

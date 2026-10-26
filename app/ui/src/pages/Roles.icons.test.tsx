@@ -24,7 +24,7 @@ describe("Roles text catalog with the real component and mount request", () => {
     expect(document.querySelectorAll("svg")).toHaveLength(0);
     expect(
       screen.getByRole("heading", { name: "Roles & Permissions" }),
-    ).toHaveClass("font-display");
+    ).toHaveClass("crate-page-title");
     expect(screen.getByText("Preset roles")).toHaveClass("font-mono");
     expect(screen.getByText("Capability matrix")).toHaveClass("font-display");
     expect(
@@ -45,8 +45,7 @@ describe("Roles text catalog with the real component and mount request", () => {
         .getByRole("heading", { name: "Librarian", level: 3 })
         .compareDocumentPosition(
           screen.getByRole("heading", { name: "Observer", level: 3 }),
-        ) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.getByText("3 grants")).toBeInTheDocument();
     expect(screen.getByText("2 grants")).toBeInTheDocument();

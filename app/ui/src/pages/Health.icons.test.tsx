@@ -306,8 +306,7 @@ describe("Library Health text controls and preserved UX", () => {
       ),
     ).toBeNull();
     expect(screen.getByRole("heading", { name: "Library Health" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     const scanAction = screen.getByRole("button", { name: "Run scan" });
     expect(scanAction).toHaveAttribute("data-size", "icon-lg");

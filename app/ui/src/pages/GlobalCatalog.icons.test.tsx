@@ -45,8 +45,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
       0,
     );
     expect(screen.getByRole("heading", { name: "Global Catalog" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     expect(document.querySelectorAll(".crate-form-field")).toHaveLength(4);
     expect(screen.getByText("Artists")).toHaveClass("font-mono");

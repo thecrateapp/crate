@@ -136,7 +136,7 @@ describe("System Playlists reviewed rendering and contracts", () => {
     await screen.findByRole("heading", { name: "Costa de noche" });
     expect(
       screen.getByRole("heading", { name: "System Playlists" }),
-    ).toHaveClass("font-display");
+    ).toHaveClass("crate-page-title");
     for (const name of [
       "Edit Costa de noche",
       "Deactivate Costa de noche",

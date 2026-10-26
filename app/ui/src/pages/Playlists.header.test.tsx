@@ -25,7 +25,7 @@ describe("System Playlists page header", () => {
 
     expect(
       await screen.findByRole("heading", { name: "System Playlists" }),
-    ).toHaveClass("font-display", "font-extrabold");
+    ).toHaveClass("crate-page-title");
     const actions = screen.getByRole("group", { name: "Page actions" });
     for (const name of ["New static", "New smart"]) {
       const button = screen.getByRole("button", { name });

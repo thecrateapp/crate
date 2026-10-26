@@ -136,7 +136,7 @@ describe("PlaylistEditor text actions with real consumers", () => {
         .querySelector('svg[data-admin-ux="editor-remove-rule"]'),
     ).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Costa de noche" })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
       "Costa de noche",

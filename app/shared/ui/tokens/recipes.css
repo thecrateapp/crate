@@ -1965,6 +1965,20 @@ button.genre-pill:hover,
   }
 }
 
+.crate-page-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4vw, 3.75rem);
+  font-weight: 800;
+  line-height: var(--leading-display);
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  color: var(--text-primary);
+}
+.crate-page-title[data-size="md"] {
+  font-size: 2.25rem;
+}
+
 .stats-signal-title {
   font-size: clamp(2.25rem, 4.6vw, 3.25rem);
   font-weight: 800;

@@ -110,7 +110,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
         .closest(".crate-form-field"),
     ).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Release Radar" })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     expect(
       screen.getByRole("link", { name: "Luz de octubre" }),

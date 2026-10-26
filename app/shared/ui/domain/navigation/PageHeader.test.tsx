@@ -61,10 +61,15 @@ describe("PageHeader", () => {
     ).toBeInTheDocument();
   });
 
-  it("applies the md title size", () => {
-    render(<PageHeader title="Decade" size="md" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveClass("text-2xl");
-  });
+  it.each(["md", "lg"] as const)(
+    "renders the %s title through the page-title recipe",
+    (size) => {
+      render(<PageHeader title="Decade" size={size} />);
+      const heading = screen.getByRole("heading", { level: 1 });
+      expect(heading).toHaveClass("crate-page-title");
+      expect(heading).toHaveAttribute("data-size", size);
+    },
+  );
 });
 
 it("keeps page identity, artwork and zero-valued metadata named while preserving footer content", () => {

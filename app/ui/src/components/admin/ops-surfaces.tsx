@@ -44,7 +44,7 @@ export function OpsPageHero({
   const identity = (
     <div className="space-y-4">
       <div>
-        <h1 className="m-0 font-display text-[clamp(2.25rem,4vw,3.75rem)] font-extrabold leading-display tracking-[-0.045em] text-balance text-text-primary">
+        <h1 className="crate-page-title">
           {title}
         </h1>
         <p className="mt-3 text-sm text-text-muted">{description}</p>

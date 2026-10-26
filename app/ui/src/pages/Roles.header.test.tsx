@@ -19,6 +19,6 @@ describe("Roles page header", () => {
 
     expect(
       await screen.findByRole("heading", { name: "Roles & Permissions" }),
-    ).toHaveClass("font-display", "font-extrabold");
+    ).toHaveClass("crate-page-title");
   });
 });

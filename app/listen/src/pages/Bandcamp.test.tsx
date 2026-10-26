@@ -29,7 +29,7 @@ describe("Bandcamp", () => {
   it("uses canonical page identity and metrics with real zero readings", () => {
     renderWithListenProviders(<Bandcamp />, { locale: "en" });
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "font-display",
+      "crate-page-title",
     );
     expect(screen.getByText("Owned", { exact: true })).toHaveClass(
       "font-mono",

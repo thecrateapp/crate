@@ -88,7 +88,7 @@ describe("Bandcamp text presentation and real contracts", () => {
     await ready();
     expect(
       screen.getByRole("heading", { level: 1, name: "Bandcamp" }),
-    ).toHaveClass("font-display");
+    ).toHaveClass("crate-page-title");
     expect(screen.getByText("2 pending", { exact: true })).toHaveTextContent(
       /^2 pending$/,
     );

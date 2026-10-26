@@ -72,8 +72,7 @@ describe("Users compact list and preserved real detail/actions", () => {
       0,
     );
     expect(screen.getByRole("heading", { name: "Users" })).toHaveClass(
-      "font-display",
-      "font-extrabold",
+      "crate-page-title",
     );
     const actionGroup = screen.getByRole("group", { name: "Page actions" });
     for (const name of ["Invite user", "Add user"]) {
