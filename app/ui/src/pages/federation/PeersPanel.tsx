@@ -10,6 +10,7 @@ import { DirectoriesPanel } from "./DirectoriesPanel";
 import { PairingPanel } from "./PairingPanel";
 import { PanelState } from "./PanelState";
 import type { FederationStatus } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function PeersPanel({ canManage }: { canManage: boolean }) {
   const status = useApi<FederationStatus>("/api/admin/federation/status");
@@ -32,7 +33,7 @@ export function PeersPanel({ canManage }: { canManage: boolean }) {
         <DirectoriesPanel canManage={canManage} />
         <div className="space-y-3">
           {(status.data?.peers ?? []).length === 0 ? (
-            <p className="text-sm text-text-muted">No peers configured.</p>
+            <EmptyState title="No peers configured" />
           ) : (
             status.data?.peers.map((peer) => (
               <Card key={peer.node_uid}>

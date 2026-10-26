@@ -27,6 +27,7 @@ import {
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface TranslationRequest {
   id: string;
@@ -893,14 +894,10 @@ function BundlesSection({
       ) : error ? (
         <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : bundles.length === 0 ? (
-        <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-center">
-          <div>
-            <p className="font-semibold text-white">No bundles match filters</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Change filters to see draft, published, or rejected bundles.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          title="No bundles match the filters"
+          message="Change the filters to see draft, published or rejected bundles."
+        />
       ) : (
         <div className="divide-y divide-border-quiet-subtle">
           {bundles.map((bundle) => {

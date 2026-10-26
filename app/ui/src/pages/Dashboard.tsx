@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { Button } from "@crate/ui/shadcn/button";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 function ReportTime({ value }: { value: string | null }) {
   return value ? (
@@ -365,7 +366,7 @@ export function Dashboard() {
             ))}
           </ul>
         ) : (
-          <p className="m-0 text-sm text-text-muted">No task rows reported.</p>
+          <EmptyState title="No task rows reported" />
         )}
         {model.work.length > 5 ? (
           <p className="mt-3 text-sm text-text-muted">

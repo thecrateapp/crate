@@ -17,5 +17,5 @@ it("renders an explicit empty peer state", () => {
     refetch: vi.fn(),
   }));
   renderWithAdminProviders(<PeersPanel canManage />);
-  expect(screen.getByText("No peers configured.")).toBeInTheDocument();
+  expect(screen.getByText("No peers configured")).toBeInTheDocument();
 });

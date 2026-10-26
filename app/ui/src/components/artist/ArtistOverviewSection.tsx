@@ -17,6 +17,7 @@ import type {
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import type { TopTrack } from "@/hooks/use-artist-data";
 import { formatCompact, formatNumber, formatSize } from "@/lib/utils";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface ArtistOverviewSectionProps {
   bioText: string;
@@ -105,7 +106,7 @@ export function ArtistOverviewSection({
               />
             </p>
           ) : (
-            <p className="text-sm text-text-muted">No biography available.</p>
+            <EmptyState title="No biography available" />
           )}
           {bioText.length > 600 ? (
             <SectionActionButton

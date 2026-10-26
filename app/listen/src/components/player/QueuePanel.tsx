@@ -11,6 +11,7 @@ import { formatPlayerTime } from "./bar/player-bar-utils";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
 import { QueueTrackRow } from "@/components/player/QueueTrackRow";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface QueuePanelProps {
   open: boolean;
@@ -96,9 +97,7 @@ export const QueuePanel = memo(function QueuePanel({
         </div>
 
         {upcoming.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-text-faint">
-            {t("player.queue.empty")}
-          </div>
+          <EmptyState title={t("player.queue.empty")} />
         )}
 
         {/* Previously played */}

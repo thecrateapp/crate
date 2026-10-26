@@ -12,6 +12,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { PanelState } from "./PanelState";
 import type { FederationStatus } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const PRESETS = ["off", "discovery", "catalog", "listen", "trusted_library"];
 
@@ -114,7 +115,7 @@ export function PoliciesPanel({ canManage }: { canManage: boolean }) {
     <PanelState loading={status.loading} error={status.error}>
       <div className="space-y-3">
         {peers.length === 0 ? (
-          <p className="text-sm text-text-muted">No approved peers.</p>
+          <EmptyState title="No approved peers" />
         ) : (
           peers.map((peer) => (
             <PeerPolicy

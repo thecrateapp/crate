@@ -19,8 +19,8 @@ it("keeps the empty state at the top when there are no peer summaries", () => {
   }));
   renderWithAdminProviders(<StreamsPanel canManage={false} />);
 
-  const emptyState = screen.getByText("No active stream tickets.");
-  expect(emptyState).toHaveClass("text-text-muted");
+  const emptyState = screen.getByTestId("empty-state");
+  expect(emptyState).toHaveTextContent("No active stream tickets");
   expect(emptyState.parentElement?.children).toHaveLength(1);
   expect(emptyState.parentElement).toHaveClass("space-y-4");
 });

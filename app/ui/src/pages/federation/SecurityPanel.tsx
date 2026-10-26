@@ -156,7 +156,7 @@ export function SecurityPanel({ canManage }: { canManage: boolean }) {
             </CardContent>
           </Card>
         ) : (
-          <p className="text-sm text-text-muted">No peers to evaluate.</p>
+          <EmptyState title="No peers to evaluate" />
         )}
       </div>
     </PanelState>

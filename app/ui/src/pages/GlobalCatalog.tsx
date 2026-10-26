@@ -31,6 +31,7 @@ import {
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface GlobalCatalogStatus {
   serving_mode:
@@ -360,7 +361,7 @@ export function GlobalCatalog() {
                     <RunSummary key={run.run_id} run={run} />
                   ))
                 ) : (
-                  <p className="m-0 text-sm text-text-muted">No runs found.</p>
+                  <EmptyState title="No runs found" />
                 )}
               </div>
             </CatalogReadState>

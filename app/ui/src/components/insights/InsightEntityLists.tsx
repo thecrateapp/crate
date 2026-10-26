@@ -17,6 +17,7 @@ import {
   type InsightAlbum,
   type InsightArtistChange,
 } from "./insights-model";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function InsightAlbumList({
   albums,
@@ -230,7 +231,7 @@ export function InsightOpportunities({
                 reason="rediscover"
               />
             ) : (
-              <p className="text-sm text-text-muted">No albums in this set.</p>
+              <EmptyState title="No albums in this set" />
             )}
           </InstrumentPanel>
         </div>

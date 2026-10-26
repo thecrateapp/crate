@@ -32,7 +32,7 @@ it("renders node identity and the empty streaming state without peers", () => {
   expect(screen.getByText("node-a")).toBeInTheDocument();
   expect(screen.getByText("https://node-a.test")).toBeInTheDocument();
   expect(screen.getByText("APPROVED PEERS")).toBeInTheDocument();
-  expect(screen.getByText("No active peer usage.")).toBeInTheDocument();
+  expect(screen.getByText("No active peer usage")).toBeInTheDocument();
 });
 
 it("uses the shared federation loading state and announces unavailable data", () => {

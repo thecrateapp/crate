@@ -8,6 +8,7 @@ import { JamRoomCard } from "@/components/jam/JamRoomCard";
 import type { JamRoom } from "@/pages/jam-reducer";
 
 import type { JamOpenRoomsPanelProps } from "./jam-lobby-types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function JamOpenRoomsPanel({
   roomsLoading,
@@ -130,9 +131,7 @@ function RoomList({
           />
         ))}
         {!roomsLoading && rooms.length === 0 ? (
-          <div className="jam-empty-state rounded-lg p-5 text-sm text-text-muted">
-            {emptyLabel}
-          </div>
+          <EmptyState message={emptyLabel} />
         ) : null}
       </div>
     </div>

@@ -14,6 +14,7 @@ import { fetchTrackRadio } from "@/lib/radio";
 
 import { SuggestedTrackRow } from "./SuggestedTrackRow";
 import { useSuggestedTracks } from "./use-suggested-tracks";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function SuggestedTab() {
   const { t } = useTranslation();
@@ -76,9 +77,7 @@ export function SuggestedTab() {
 
   if (tracks.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-text-primary/20">
-        {t("player.suggested.empty")}
-      </div>
+      <EmptyState title={t("player.suggested.empty")} className="flex-1" />
     );
   }
 

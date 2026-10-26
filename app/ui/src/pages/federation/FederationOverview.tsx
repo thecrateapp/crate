@@ -6,6 +6,7 @@ import { StatNumber } from "@crate/ui/primitives/StatNumber";
 import { PanelState } from "./PanelState";
 import type { FederationStatus, StreamingPeerStat } from "./types";
 import { formatBytes } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function FederationOverview() {
   const status = useApi<FederationStatus>("/api/admin/federation/status");
@@ -77,7 +78,7 @@ export function FederationOverview() {
                   Streaming usage is unavailable.
                 </p>
               ) : peers.length === 0 ? (
-                <p className="text-sm text-text-muted">No active peer usage.</p>
+                <EmptyState title="No active peer usage" />
               ) : (
                 <div className="divide-y divide-border-quiet">
                   {peers.map((peer) => (

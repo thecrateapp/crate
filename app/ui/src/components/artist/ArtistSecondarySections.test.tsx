@@ -333,7 +333,7 @@ describe("artist secondary presentation contracts", () => {
         onResearchBio={onResearchBio}
       />,
     );
-    expect(screen.getByText("No biography available.")).toBeInTheDocument();
+    expect(screen.getByText("No biography available")).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "Research with AI" }),
     );

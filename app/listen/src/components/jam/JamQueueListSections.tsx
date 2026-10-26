@@ -23,6 +23,7 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
 import type { JamQueuePanelProps } from "./JamQueueSections";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const jamQueueItemClassName =
   "jam-queue-item flex items-center gap-3 rounded-lg px-3 py-3";
@@ -260,22 +261,26 @@ export function JamQueueList(props: JamQueueListProps) {
         </SortableContext>
       </DndContext>
       {queueItems.length === 0 ? (
-        <div className="space-y-3">
-          <p className="text-sm text-text-muted">
-            {t("jam.room.emptyQueuePrefix")} <b>{queuePrimaryActionLabel}</b>{" "}
-            {t("jam.room.emptyQueueSuffix")}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={focusQueueSearch}
-            className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
-          >
-            <Search size={CRATE_ICON_SIZE.sm} />
-            {t("jam.room.browseLibrary")}
-          </Button>
-        </div>
+        <EmptyState
+          message={
+            <>
+              {t("jam.room.emptyQueuePrefix")} <b>{queuePrimaryActionLabel}</b>{" "}
+              {t("jam.room.emptyQueueSuffix")}
+            </>
+          }
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={focusQueueSearch}
+              className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
+            >
+              <Search size={CRATE_ICON_SIZE.sm} />
+              {t("jam.room.browseLibrary")}
+            </Button>
+          }
+        />
       ) : null}
     </div>
   );

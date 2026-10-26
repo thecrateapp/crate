@@ -12,6 +12,7 @@ import { configSummary, connectionName, findConnection } from "@/lib/ai-models";
 import { BillableTestDialog } from "./BillableTestDialog";
 import { ProfileForm } from "./ProfileForm";
 import type { Profile, Snapshot, Version } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const LEGACY_NOTE = "Kept from server settings. It can't be tested.";
 
@@ -106,7 +107,9 @@ function ProfileItem({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-medium text-white font-display">{profile.label}</h3>
+          <h3 className="font-medium text-white font-display">
+            {profile.label}
+          </h3>
           <p className="text-sm text-white/50">
             Updated{" "}
             <RelativeTime value={current?.created_at ?? profile.created_at} />
@@ -185,8 +188,8 @@ export function AdvancedPanel({
   // The form reads the profile from the latest snapshot so that, after a
   // conflict, it can adopt the refreshed current version.
   const formProfile = form?.profile
-    ? snapshot.profiles.find((item) => item.id === form.profile?.id) ??
-      form.profile
+    ? (snapshot.profiles.find((item) => item.id === form.profile?.id) ??
+      form.profile)
     : null;
 
   function openForm(profile: Profile | null) {
@@ -218,7 +221,7 @@ export function AdvancedPanel({
             <Button onClick={() => openForm(null)}>New profile</Button>
           ) : null}
           {count === 0 ? (
-            <p className="text-sm text-white/60">No saved profiles yet.</p>
+            <EmptyState title="No saved profiles yet" />
           ) : (
             snapshot.profiles.map((profile) => (
               <ProfileItem

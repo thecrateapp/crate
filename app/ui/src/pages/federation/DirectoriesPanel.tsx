@@ -10,6 +10,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Card, CardContent, CardHeader } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface DirectoryCandidate {
   id: number;
@@ -142,7 +143,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       ) : null}
 
       {!data?.length ? (
-        <p className="text-sm text-text-muted">No directory subscriptions.</p>
+        <EmptyState title="No directory subscriptions" />
       ) : (
         data.map((subscription) => (
           <Card key={subscription.subscription_uid}>

@@ -10,6 +10,7 @@ import { getPlaySourceLabel } from "@/components/player/player-source";
 import { QueueTabCurrentTrack } from "./QueueTabCurrentTrack";
 import { QueueTabPastTracks } from "./QueueTabPastTracks";
 import { QueueTabUpcoming } from "./QueueTabUpcoming";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export const QueueTab = memo(function QueueTab() {
   const { t } = useTranslation();
@@ -72,9 +73,7 @@ export const QueueTab = memo(function QueueTab() {
         onRemove={removeFromQueue}
       />
       {upcoming.length === 0 && !currentTrack ? (
-        <div className="py-12 text-center text-sm text-text-faint">
-          {t("player.queue.empty")}
-        </div>
+        <EmptyState title={t("player.queue.empty")} />
       ) : null}
       <QueueTabPastTracks
         tracks={history}

@@ -9,6 +9,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { PanelState } from "./PanelState";
 import type { StreamingPeerStat } from "./types";
 import { formatBytes } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface Ticket {
   ticket_uid: string;
@@ -57,7 +58,7 @@ export function StreamsPanel({ canManage }: { canManage: boolean }) {
           </div>
         ) : null}
         {activeTickets.length === 0 ? (
-          <p className="text-sm text-text-muted">No active stream tickets.</p>
+          <EmptyState title="No active stream tickets" />
         ) : (
           activeTickets.map((ticket) => (
             <Card key={ticket.ticket_uid}>

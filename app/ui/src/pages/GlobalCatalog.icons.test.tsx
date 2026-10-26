@@ -232,7 +232,7 @@ describe("Global Catalog presentation with real hook and page handlers", () => {
     await ready();
     expect(screen.getByText("No reconciliation runs yet.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Runs" }));
-    expect(screen.getByText("No runs found.")).toBeInTheDocument();
+    expect(screen.getByText("No runs found")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Duplicates" }));
     expect(
       screen.getByText(

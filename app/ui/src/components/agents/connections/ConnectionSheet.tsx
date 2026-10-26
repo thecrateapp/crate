@@ -45,6 +45,7 @@ import { humanizeKey } from "@/lib/humanize";
 import { ConnectionSnippets } from "./ConnectionSnippets";
 import { PermissionPicker } from "./PermissionPicker";
 import { useCursorList } from "./use-cursor-list";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const base = "/api/admin/agent-integrations";
 const ACCESS_CHANGE_NOTE =
@@ -132,9 +133,7 @@ function GrantedPermissions({
   catalog: AgentCatalog;
 }) {
   if (grants.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No permissions granted.</p>
-    );
+    return <EmptyState title="No permissions granted" />;
   }
   const byScope = new Map(catalog.scopes.map((scope) => [scope.scope, scope]));
   const knownGroups = new Set(catalog.scope_groups.map((group) => group.id));

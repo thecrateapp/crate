@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { SERVER_STORE_EVENT } from "@/lib/server-store";
 import { useSettingsOverlay } from "./settings-panel-activity";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const TOKENS_URL = "/api/auth/access-tokens";
 
@@ -280,9 +281,7 @@ export function AccessTokensSection() {
       ) : null}
 
       {tokens !== null && activeTokens.length === 0 ? (
-        <p className="text-sm text-text-muted">
-          {t("settings.accessTokens.empty")}
-        </p>
+        <EmptyState message={t("settings.accessTokens.empty")} />
       ) : null}
 
       {activeTokens.length > 0 ? (

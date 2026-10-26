@@ -21,6 +21,7 @@ import {
   type DiffRowView,
 } from "@/lib/agent-plan-technical";
 import { humanizeKey } from "@/lib/humanize";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 function BeforeAfter({
   current,
@@ -250,9 +251,7 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
           </li>
         ))}
       </ul>
-      {changes.length === 0 ? (
-        <p className="text-sm text-text-muted">No changes listed.</p>
-      ) : null}
+      {changes.length === 0 ? <EmptyState title="No changes listed" /> : null}
     </div>
   );
 }

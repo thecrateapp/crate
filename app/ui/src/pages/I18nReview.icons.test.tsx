@@ -37,7 +37,7 @@ describe("Translations reviewed visual contract", () => {
     ).toHaveLength(1);
     await user.click(screen.getByRole("tab", { name: "Bundles" }));
     await user.click(screen.getByRole("radio", { name: "Rejected" }));
-    expect(screen.getByText("No bundles match filters")).toBeVisible();
+    expect(screen.getByText("No bundles match the filters")).toBeVisible();
     expect(
       container.querySelectorAll('svg[data-admin-ux="header-refresh"]'),
     ).toHaveLength(1);

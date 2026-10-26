@@ -47,6 +47,7 @@ import {
   taskNeedsAttention,
   type TaskInsightLike,
 } from "@/lib/task-insights";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface HealthIssue {
   id: number;
@@ -1174,7 +1175,7 @@ export function Health() {
               </Button>
             </>
           ) : (
-            <p>No repair or health runs recorded yet.</p>
+            <EmptyState title="No repair or health runs recorded yet" />
           )}
         </div>
       </details>

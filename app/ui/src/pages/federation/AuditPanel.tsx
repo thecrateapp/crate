@@ -2,6 +2,7 @@ import { useApi } from "@/hooks/use-api";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 
 import { PanelState } from "./PanelState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface AuditEvent {
   id: number;
@@ -17,7 +18,7 @@ export function AuditPanel() {
     <PanelState loading={audit.loading} error={audit.error}>
       <div className="space-y-1">
         {(audit.data ?? []).length === 0 ? (
-          <p className="text-sm text-text-muted">No audit events.</p>
+          <EmptyState title="No audit events" />
         ) : (
           audit.data?.map((event) => (
             <div

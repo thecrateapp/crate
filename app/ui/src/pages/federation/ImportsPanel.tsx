@@ -8,6 +8,7 @@ import { Card, CardContent } from "@crate/ui/shadcn/card";
 
 import { PanelState } from "./PanelState";
 import { formatBytes } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface ImportRequest {
   request_id: string;
@@ -45,7 +46,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
     <PanelState loading={requests.loading} error={requests.error}>
       <div className="space-y-3">
         {(requests.data ?? []).length === 0 ? (
-          <p className="text-sm text-text-muted">No remote import requests.</p>
+          <EmptyState title="No remote import requests" />
         ) : (
           requests.data?.map((item) => {
             const pending = item.status === "awaiting_approval";
@@ -57,7 +58,13 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                     <p className="font-medium">
                       {item.title}{" "}
                       <InfoBadge
-                        tone={pending ? "warning" : item.status === "completed" ? "success" : "neutral"}
+                        tone={
+                          pending
+                            ? "warning"
+                            : item.status === "completed"
+                              ? "success"
+                              : "neutral"
+                        }
                       >
                         {item.status}
                       </InfoBadge>
