@@ -152,7 +152,7 @@ func LayoutOf(values *envfile.Values, mode Mode) Layout {
 }
 
 var (
-	botPattern   = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]{30,}$`)
+	BotPattern   = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]{30,}$`)
 	UsersPattern = regexp.MustCompile(`^[1-9][0-9]*(,[1-9][0-9]*)*$`)
 )
 
@@ -167,7 +167,7 @@ type Stored struct {
 func StoredSecrets(values *envfile.Values, mode Mode) Stored {
 	secrets := LayoutOf(values, mode).Secrets
 	return Stored{
-		Bot:   matches(filepath.Join(secrets, "telegram-token"), botPattern.MatchString),
+		Bot:   matches(filepath.Join(secrets, "telegram-token"), BotPattern.MatchString),
 		Users: matches(filepath.Join(secrets, "allowed-users"), UsersPattern.MatchString),
 		keys:  filepath.Join(secrets, "model-keys"),
 	}

@@ -217,7 +217,6 @@ var integrationOptions = map[string]string{
 	"ai":       `Set OLLAMA_URL (default http://host.docker.internal:11434) and LLM_PROVIDER, for example gemini/gemini-2.5-flash, openai/gpt-4o-mini, anthropic/claude-sonnet-5-5 or ollama/llama3.1:8b. Ask for provider keys through crate_request_secrets.`,
 	"mcp":      `crate_set_integration option "mcp_actions": true lets agents change things, false keeps them read-only. OAuth is configured automatically with public HTTPS.`,
 	"tidal":    `Nothing to set now. After Crate starts, the user connects Tidal in Admin > Settings > Downloads with a code at tidal.com/activate.`,
-	"telegram": `After the bot token is accepted, ask the user to send the bot a message and set TELEGRAM_CHAT_ID (crate_set_integration can find it: option "telegram_find_chat": true).`,
 }
 
 func (s *Session) toolIntegrations(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, CatalogOut, error) {
@@ -335,12 +334,11 @@ func (s *Session) toolSetAccess(ctx context.Context, _ *mcp.CallToolRequest, in 
 }
 
 type IntegrationInput struct {
-	ID               string            `json:"id" jsonschema:"integration id from crate_integrations"`
-	Enabled          bool              `json:"enabled" jsonschema:"false turns the integration off and clears its settings"`
-	Values           map[string]string `json:"values,omitempty" jsonschema:"non-secret variables only, such as SLSKD_URL or LLM_PROVIDER; secrets go through crate_request_secrets"`
-	Soulseek         string            `json:"soulseek,omitempty" jsonschema:"bundled or external"`
-	MCPActions       bool              `json:"mcp_actions,omitempty" jsonschema:"let agents change things, not only read"`
-	TelegramFindChat bool              `json:"telegram_find_chat,omitempty" jsonschema:"read the chat id from the last message sent to the bot"`
+	ID         string            `json:"id" jsonschema:"integration id from crate_integrations"`
+	Enabled    bool              `json:"enabled" jsonschema:"false turns the integration off and clears its settings"`
+	Values     map[string]string `json:"values,omitempty" jsonschema:"non-secret variables only, such as SLSKD_URL or LLM_PROVIDER; secrets go through crate_request_secrets"`
+	Soulseek   string            `json:"soulseek,omitempty" jsonschema:"bundled or external"`
+	MCPActions bool              `json:"mcp_actions,omitempty" jsonschema:"let agents change things, not only read"`
 }
 
 func (s *Session) toolSetIntegration(ctx context.Context, _ *mcp.CallToolRequest, in IntegrationInput) (*mcp.CallToolResult, IntegrationState, error) {
@@ -390,18 +388,6 @@ func (s *Session) toolSetIntegration(ctx context.Context, _ *mcp.CallToolRequest
 		}
 	case "mcp":
 		d.EnableMCP(in.MCPActions)
-	case "telegram":
-		if in.TelegramFindChat {
-			token := d.Value("TELEGRAM_BOT_TOKEN")
-			if token == "" {
-				return nil, IntegrationState{}, errors.New("set the bot token first with crate_request_secrets")
-			}
-			chat, err := s.deps.Validate.TelegramLatestChat(ctx, token)
-			if err != nil || chat == "" {
-				return nil, IntegrationState{}, errors.New("no message reached the bot yet; ask the user to send it /start and try again")
-			}
-			d.Set("TELEGRAM_CHAT_ID", chat)
-		}
 	}
 	if !d.Enabled(integration) && in.ID != "tidal" {
 		return nil, s.integrationState(in.ID), nil

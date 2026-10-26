@@ -2,9 +2,17 @@ package validate
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+)
+
+var (
+	goodBot     = "123456:" + strings.Repeat("A", 35)
+	badBot      = "123456:" + strings.Repeat("B", 35)
+	conflictBot = "123456:" + strings.Repeat("C", 35)
 )
 
 // fakeProviders answers like each provider does for the key "good" and
@@ -70,11 +78,22 @@ func fakeProviders(t *testing.T) Client {
 		}
 	})
 	mux.HandleFunc("/ollama/api/tags", func(w http.ResponseWriter, r *http.Request) {})
-	mux.HandleFunc("/telegram/botgood/getMe", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/telegram/bot"+goodBot+"/getMe", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"ok":true,"result":{"username":"crate_bot"}}`))
 	})
-	mux.HandleFunc("/telegram/botgood/getUpdates", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"ok":true,"result":[{"message":{"chat":{"id":111}}},{"message":{"chat":{"id":4242}}}]}`))
+	mux.HandleFunc("/telegram/bot"+goodBot+"/getUpdates", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"result":[
+			{"message":{"chat":{"id":111,"type":"private"},"from":{"id":111,"first_name":"Ana","username":"ana"}}},
+			{"message":{"chat":{"id":-500,"type":"group"},"from":{"id":222,"first_name":"Group"}}},
+			{"message":{"chat":{"id":333,"type":"private"},"from":{"id":333,"first_name":"Bot","is_bot":true}}},
+			{"message":{"chat":{"id":444,"type":"private"},"from":{"id":444,"first_name":"Luis"}}},
+			{"message":{"chat":{"id":111,"type":"private"},"from":{"id":111,"first_name":"Ana","username":"ana"}}},
+			{"edited_message":{}}
+		]}`))
+	})
+	mux.HandleFunc("/telegram/bot"+conflictBot+"/getUpdates", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"ok":false,"error_code":409}`))
 	})
 	mux.HandleFunc("/telegram/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -124,8 +143,23 @@ func TestProbes(t *testing.T) {
 		{"ai", Values{"OPENAI_API_KEY": "bad"}, Rejected},
 		{"ai", Values{"OLLAMA_URL": ollama}, Valid},
 		{"ai", Values{"LLM_PROVIDER": "gemini/gemini-2.5-flash"}, Incomplete},
-		{"telegram", Values{"TELEGRAM_BOT_TOKEN": "good"}, Valid},
-		{"telegram", Values{"TELEGRAM_BOT_TOKEN": "bad"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "AGENT_TELEGRAM_TOKEN": goodBot}, Valid},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "AGENT_TELEGRAM_TOKEN": badBot}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "AGENT_TELEGRAM_TOKEN": "good"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent"}, Valid},
+		{"agent", Values{}, Incomplete},
+		{"agent", Values{"CRATE_AGENT_MODE": "admin"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "AGENT_ALLOWED_USERS": "111, 444"}, Valid},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "AGENT_ALLOWED_USERS": "@ana"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "ollama"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "anthropic"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "anthropic", "CRATE_AGENT_MODEL": "claude-sonnet-5", "AGENT_MODEL_API_KEY": "good-key-1234"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "openai-codex", "AGENT_MODEL_API_KEY": "sk-0123456789"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "deepseek", "CRATE_AGENT_MODEL": "deepseek-chat", "AGENT_MODEL_API_KEY": "sk-0123456789"}, Valid},
+		{"agent", Values{"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": "custom", "CRATE_AGENT_MODEL": "qwen3", "CRATE_AGENT_BASE_URL": "http://192.168.1.20:11434/v1"}, Valid},
+		{"agent", Values{"CRATE_AGENT_MODE": "operator", "AGENT_ALLOWED_USERS": "111", "AGENT_APPROVER_TELEGRAM_ID": "444"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "operator", "AGENT_APPROVER_EMAIL": "admin"}, Rejected},
+		{"agent", Values{"CRATE_AGENT_MODE": "operator", "AGENT_ALLOWED_USERS": "111,444", "AGENT_APPROVER_TELEGRAM_ID": "444", "AGENT_APPROVER_EMAIL": "admin@cratemusic.app"}, Valid},
 		{"tidal", Values{}, Skipped},
 	}
 	for _, tc := range cases {
@@ -144,11 +178,42 @@ func TestUnreachableProvidersAreNotRejections(t *testing.T) {
 	}
 }
 
-func TestTelegramLatestChatPicksTheNewestMessage(t *testing.T) {
+func TestAgentModelKeysAreCheckedWithTheirProvider(t *testing.T) {
 	client := fakeProviders(t)
-	chat, err := client.TelegramLatestChat(context.Background(), "good")
-	if err != nil || chat != "4242" {
-		t.Fatalf("got %q, %v", chat, err)
+	cases := []struct {
+		provider, model, baseURL, key string
+		want                          Status
+	}{
+		{"anthropic", "claude-sonnet-5", "", "goodgood", Rejected},
+		{"openai-api", "gpt-5", "", "badbadbad", Rejected},
+		{"openai-api", "gpt-5", "https://gateway.example.test/v1", "badbadbad", Valid},
+		{"gemini", "gemini-pro", "", "badbadbad", Rejected},
+	}
+	for _, tc := range cases {
+		got := client.Check(context.Background(), "agent", Values{
+			"CRATE_AGENT_MODE": "agent", "CRATE_AGENT_PROVIDER": tc.provider, "CRATE_AGENT_MODEL": tc.model,
+			"CRATE_AGENT_BASE_URL": tc.baseURL, "AGENT_MODEL_API_KEY": tc.key,
+		})
+		if got.Status != tc.want {
+			t.Errorf("%s: got %v (%s)", tc.provider, got.Status, got.Message)
+		}
+	}
+}
+
+func TestTelegramPrivateUsersListsPeopleOnce(t *testing.T) {
+	client := fakeProviders(t)
+	users, err := client.TelegramPrivateUsers(context.Background(), goodBot)
+	if err != nil || len(users) != 2 || users[0].ID != 111 || users[1].ID != 444 {
+		t.Fatalf("got %+v, %v", users, err)
+	}
+	if users[0].Label() != "Ana @ana (111)" || users[1].Label() != "Luis (444)" {
+		t.Fatalf("labels %q %q", users[0].Label(), users[1].Label())
+	}
+	cases := map[string]error{conflictBot: ErrTelegramConflict, badBot: ErrRejected, "not-a-token": ErrRejected}
+	for token, want := range cases {
+		if _, err := client.TelegramPrivateUsers(context.Background(), token); !errors.Is(err, want) {
+			t.Errorf("%s: got %v", token, err)
+		}
 	}
 }
 

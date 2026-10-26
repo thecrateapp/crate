@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/huh"
 
@@ -175,8 +174,6 @@ func (w *wizard) integrationForm(ctx context.Context, in manifest.Integration) e
 		return w.aiForm(in)
 	case "mcp":
 		return w.mcpForm(in)
-	case "telegram":
-		return w.telegramForm(ctx, in)
 	case "google-login":
 		return w.fieldsForm(in, in.Env, "Redirect URI: "+w.cfg.PublicURLs().API+"/api/auth/oauth/google/callback")
 	case "apple-login":
@@ -361,58 +358,6 @@ func (w *wizard) mcpForm(in manifest.Integration) error {
 		return err
 	}
 	w.draft().EnableMCP(actions)
-	return nil
-}
-
-func (w *wizard) telegramForm(ctx context.Context, in manifest.Integration) error {
-	token := w.value("TELEGRAM_BOT_TOKEN")
-	err := w.form(huh.NewGroup(
-		huh.NewNote().Title(in.Title).Description(guide(in)),
-		huh.NewInput().Title("Bot token").EchoMode(huh.EchoModePassword).Value(&token),
-	))
-	if err != nil {
-		return err
-	}
-	token = strings.TrimSpace(token)
-	w.set("TELEGRAM_BOT_TOKEN", token)
-	bot, result := w.validate.TelegramBot(ctx, token)
-	if result.Status != validate.Valid {
-		return nil
-	}
-	if w.value("TELEGRAM_CHAT_ID") != "" {
-		return nil
-	}
-	sent := true
-	err = w.form(huh.NewGroup(huh.NewConfirm().
-		Title("Send @" + bot + " a message").
-		Description("Open Telegram, find @" + bot + " and send it anything, for example /start. Crate replies to that chat.").
-		Affirmative("I sent it").
-		Negative("Enter the chat ID myself").
-		Value(&sent)))
-	if err != nil {
-		return err
-	}
-	chat := ""
-	if sent {
-		ui.Spin(w.out, true, "Waiting for your message", func() error {
-			deadline := time.Now().Add(60 * time.Second)
-			for chat == "" && time.Now().Before(deadline) {
-				chat, _ = w.validate.TelegramLatestChat(ctx, token)
-				if chat == "" {
-					time.Sleep(2 * time.Second)
-				}
-			}
-			return nil
-		})
-	}
-	if chat == "" {
-		if err := w.form(huh.NewGroup(huh.NewInput().Title("Chat ID").Description("A number; @userinfobot tells you yours.").Value(&chat))); err != nil {
-			return err
-		}
-	} else {
-		ui.Success(w.out, "Found your chat")
-	}
-	w.set("TELEGRAM_CHAT_ID", chat)
 	return nil
 }
 

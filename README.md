@@ -211,8 +211,9 @@ runs it. The wizard checks Docker, memory, disk and ports, then asks for the mus
 library, access mode and admin password, shows a review, starts Crate and waits
 until it answers. Run `crate install` again at any time to change the
 installation; it keeps your secrets and manual edits. `crate configure` sets up
-integrations such as Last.fm, Soulseek or Telegram, checking each key with its
-provider, and `crate doctor` checks the whole installation. `crate mcp` lets an
+integrations such as Last.fm, Soulseek or Crate Agent (the Telegram assistant),
+checking each key with its provider, and `crate doctor` checks the whole
+installation. `crate mcp` lets an
 AI agent such as Claude Code or Codex install Crate with you; your API keys go
 into a private local page, never into the chat.
 
@@ -366,7 +367,7 @@ The variables most people touch:
 | `TICKETMASTER_API_KEY`                             | Ticketmaster upcoming shows                                                                                     |
 | `SLSKD_URL` / `SLSKD_API_KEY`                      | slskd server for Soulseek downloads                                                                             |
 | `SLSKD_SLSK_USERNAME` / `SLSKD_SLSK_PASSWORD`      | Soulseek account for the slskd that Crate runs                                                                  |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`          | Telegram alerts                                                                                                 |
+| `CRATE_AGENT_PROVIDER` / `CRATE_AGENT_MODEL`       | Model of Crate Agent, the Telegram assistant (`crate configure agent`)                                          |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`        | Sign in with Google                                                                                             |
 | `CRATE_USER_INACTIVE_AFTER_DAYS`                   | Days without activity before Admin labels a user `Inactive` (default 30)                                        |
 | `CRATE_IMAGE_OWNER` / `CRATE_IMAGE_REGISTRY`       | Container image namespace and registry (default `thecrateapp` / `ghcr.io`)                                      |
