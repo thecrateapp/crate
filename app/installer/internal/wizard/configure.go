@@ -7,13 +7,14 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/huh"
 
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
-	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
@@ -30,12 +31,16 @@ func Configure(ctx context.Context, opts Options, ids []string) error {
 		return errors.New("`crate configure` asks questions; run it in a terminal")
 	}
 	w := &wizard{
-		opts:         opts,
-		out:          os.Stdout,
-		run:          system.ExecRunner{Stdin: os.Stdin},
-		validate:     validate.NewClient(),
-		manifest:     m,
-		detectDocker: system.DetectDocker,
+		opts:           opts,
+		out:            os.Stdout,
+		run:            system.ExecRunner{Stdin: os.Stdin},
+		validate:       validate.NewClient(),
+		manifest:       m,
+		detectDocker:   system.DetectDocker,
+		startupTimeout: 10 * time.Minute,
+		agentTimeout:   2 * time.Minute,
+		telegramWait:   time.Minute,
+		configuring:    true,
 	}
 	return w.configure(ctx, ids)
 }
@@ -53,6 +58,14 @@ func (w *wizard) configure(ctx context.Context, ids []string) error {
 	}
 	w.cfg = install.FromEnvFile(install.Defaults(dir), w.existing)
 	ui.Banner(w.out, w.opts.Version)
+	if w.opts.SignIn {
+		for _, id := range ids {
+			if in, ok := w.integration(id); !ok || in.ID != "agent" {
+				return errors.New("--sign-in works only with the agent: `" + agent.SignInCommand + "`")
+			}
+		}
+		return w.signInOnly(ctx, dir)
+	}
 	if len(ids) == 0 {
 		if ids, err = w.chooseIntegrations(false); err != nil {
 			return w.cancelled(err)
@@ -62,7 +75,7 @@ func (w *wizard) configure(ctx context.Context, ids []string) error {
 		}
 	} else {
 		for _, id := range ids {
-			in, ok := w.manifest.Integration(id)
+			in, ok := w.integration(id)
 			if !ok {
 				return fmt.Errorf("unknown integration %q; choose from %s", id, w.integrationIDs())
 			}
@@ -71,7 +84,7 @@ func (w *wizard) configure(ctx context.Context, ids []string) error {
 			}
 		}
 	}
-	if len(w.cfg.Integrations) == 0 && w.cfg.Profiles == nil {
+	if w.nothingToApply() {
 		ui.Success(w.out, "Nothing changed")
 		return nil
 	}
@@ -84,6 +97,21 @@ func (w *wizard) configure(ctx context.Context, ids []string) error {
 	}
 	ui.Success(w.out, "Saved to "+install.EnvPath(dir))
 	return w.restart(ctx, dir)
+}
+
+// nothingToApply is true when no answer changed and the agent runs as the
+// settings ask.
+func (w *wizard) nothingToApply() bool {
+	return len(w.cfg.Integrations) == 0 && w.cfg.Profiles == nil && agent.Wanted(w.existing) == agent.Active(w.existing)
+}
+
+// integration finds an integration by id; telegram is what the agent was
+// called before.
+func (w *wizard) integration(id string) (manifest.Integration, bool) {
+	if id == "telegram" {
+		id = "agent"
+	}
+	return w.manifest.Integration(id)
 }
 
 func (w *wizard) cancelled(err error) error {
@@ -109,22 +137,44 @@ func (w *wizard) restart(ctx context.Context, dir string) error {
 	docker, state := w.detectDocker(ctx, w.run, w.host)
 	if state != system.DockerReady {
 		ui.Warning(w.out, "Docker is not reachable; the changes apply the next time Crate starts.")
+		w.agentAnswersDropped()
 		return nil
 	}
-	now, err := w.confirm("Apply the changes now?", "Crate restarts only the services that use these settings, usually in under a minute.", true)
+	description := "Crate restarts only the services that use these settings, usually in under a minute."
+	if len(w.agentAnswers()) > 0 {
+		description += " Crate Agent is set up now too; the bot token and keys you entered are kept only until then."
+	}
+	now, err := w.confirm("Apply the changes now?", description, true)
 	if err != nil || !now {
 		if err == nil {
 			ui.Success(w.out, "Apply them later with `docker compose up -d` in "+dir)
+			w.agentAnswersDropped()
 		}
 		return w.cancelled(err)
 	}
-	s := stack.Stack{Run: w.run, Compose: docker.Compose, Dir: dir}
+	w.docker = docker
+	s, err := w.stack(dir)
+	if err != nil {
+		return err
+	}
 	if err := s.Up(ctx, w.out); err != nil {
 		return fmt.Errorf("restart Crate: %w", err)
 	}
 	ui.Success(w.out, "Crate restarted with the new settings")
+	w.setUpAgent(ctx, s, w.cfg.LocalURLs().API)
+	for _, step := range w.agentNextSteps() {
+		ui.Success(w.out, step)
+	}
 	if w.tidal {
 		ui.Success(w.out, "Connect Tidal in Admin > Settings > Downloads and enter the code at tidal.com/activate")
 	}
 	return nil
+}
+
+// agentAnswersDropped tells the user that the agent answers only the setup
+// sees were not kept, since they are never written to .env.
+func (w *wizard) agentAnswersDropped() {
+	if len(w.agentAnswers()) > 0 {
+		ui.Warning(w.out, "Crate Agent was not set up. The bot token, allowed users and API key you entered were not saved; run `"+agent.SetupCommand+"` again to enter them.")
+	}
 }

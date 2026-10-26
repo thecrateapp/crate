@@ -19,16 +19,22 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
 
-type composeRunner struct{ ps string }
+type composeRunner struct{ ps, check string }
 
 func (r composeRunner) Output(_ context.Context, name string, args ...string) (string, error) {
-	if strings.Contains(strings.Join(args, " "), "ps --all --format json") {
+	line := strings.Join(args, " ")
+	switch {
+	case strings.Contains(line, "ps --all --format json"):
 		return r.ps, nil
+	case strings.Contains(line, "runtime.py --check"):
+		return r.check, nil
 	}
 	return "", nil
 }
 
 func (composeRunner) Stream(context.Context, io.Writer, string, string, ...string) error { return nil }
+
+func (composeRunner) Run(context.Context, system.Command) error { return nil }
 
 func installAt(t *testing.T, apiURL string, extra map[string]string) string {
 	t.Helper()
@@ -148,5 +154,58 @@ func TestReportsPrintForPeopleAndAgents(t *testing.T) {
 	var decoded Report
 	if err := json.Unmarshal(machine.Bytes(), &decoded); err != nil || decoded.Items[0].Status != Fail {
 		t.Errorf("json output: %s", machine.String())
+	}
+}
+
+func TestDoctorChecksCrateAgent(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer api.Close()
+	overlay := "docker-compose.yaml:deploy/operator/compose.operator.yaml"
+	unhealthy := `{"Service":"crate-agent","State":"running","Health":"unhealthy"}`
+	cases := []struct {
+		name     string
+		settings map[string]string
+		ps       string
+		check    string
+		status   Status
+		detail   string
+		service  Status
+	}{
+		{"running", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, "", `{"mcp": "12 tools", "model_credentials": "configured"}`, OK, "reaches Crate (12 tools)", ""},
+		{"not started", map[string]string{"CRATE_AGENT_MODE": "agent"}, "", "", Fail, "set up in the settings but not running", ""},
+		{"turned off", map[string]string{"COMPOSE_PROFILES": "agent"}, "", "", Fail, "runs although the settings turned it off", ""},
+		{"operator without overlay", map[string]string{"CRATE_AGENT_MODE": "operator", "COMPOSE_PROFILES": "crate-operator"}, "", "", Fail, "runs without its compose overlay", ""},
+		{"operator", map[string]string{"CRATE_AGENT_MODE": "operator", "COMPOSE_PROFILES": "crate-operator", "COMPOSE_FILE": overlay}, "", `{"mcp": "69 tools", "model_credentials": "configured"}`, OK, "reaches Crate (69 tools)", ""},
+		{"sign-in pending", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, unhealthy, `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`, Warn, "Sign-in pending: run `crate configure agent --sign-in` in a terminal", Warn},
+		{"rejected credential", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, unhealthy, `{"mcp": "unreachable or rejected; check the credential and MCP flags"}`, Fail, "unreachable or rejected; check the credential and MCP flags", Fail},
+		{"not running", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, "", "", Fail, "crate-agent is not running", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := installAt(t, api.URL, tc.settings)
+			d := deps(tc.ps, nil)
+			d.Run = composeRunner{ps: tc.ps, check: tc.check}
+			report, err := Run(context.Background(), dir, d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var item Item
+			for _, candidate := range report.Items {
+				if candidate.Section == "Crate Agent" {
+					item = candidate
+				}
+			}
+			if item.Status != tc.status || item.Detail != tc.detail {
+				t.Fatalf("got %+v", item)
+			}
+			if tc.status == Fail && !strings.Contains(item.Fix, "crate configure agent") {
+				t.Errorf("fix %q", item.Fix)
+			}
+			if tc.service != "" {
+				if service := find(report, "Services", "crate-agent"); service.Status != tc.service {
+					t.Errorf("service %+v", service)
+				}
+			}
+		})
 	}
 }

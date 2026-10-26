@@ -23,14 +23,25 @@ import (
 
 type fakeRunner struct{}
 
-func (fakeRunner) Output(context.Context, string, ...string) (string, error) { return "", nil }
+func (fakeRunner) Output(_ context.Context, _ string, args ...string) (string, error) {
+	if strings.Contains(strings.Join(args, " "), "runtime.py --check") {
+		return `{"mcp": "12 tools", "model_credentials": "configured"}`, nil
+	}
+	return "", nil
+}
 
 func (fakeRunner) Stream(_ context.Context, w io.Writer, _ string, _ string, args ...string) error {
 	io.WriteString(w, "compose "+args[len(args)-1]+" done\n")
 	return nil
 }
 
-const fanartKey = "fanart-secret-value-1234"
+func (fakeRunner) Run(context.Context, system.Command) error { return nil }
+
+const (
+	fanartKey = "fanart-secret-value-1234"
+	botToken  = "123456789:BotSecretBotSecretBotSecretBotSecret"
+	modelKey  = "sk-ant-model-secret-0123456789"
+)
 
 type harness struct {
 	t      *testing.T
@@ -43,8 +54,19 @@ type harness struct {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	providers := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("api_key") != fanartKey {
-			w.WriteHeader(http.StatusUnauthorized)
+		switch r.URL.Path {
+		case "/telegram/bot" + botToken + "/getMe":
+			w.Write([]byte(`{"ok":true,"result":{"username":"crate_home_bot"}}`))
+		case "/telegram/bot" + botToken + "/getUpdates":
+			w.Write([]byte(`{"ok":true,"result":[{"message":{"chat":{"id":111,"type":"private"},"from":{"id":111,"first_name":"Ana"}}}]}`))
+		case "/anthropic/models":
+			if r.Header.Get("x-api-key") != modelKey {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
+		default:
+			if r.URL.Query().Get("api_key") != fanartKey {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		}
 	}))
 	t.Cleanup(providers.Close)
@@ -53,6 +75,8 @@ func newHarness(t *testing.T) *harness {
 	client := validate.NewClient()
 	client.HTTP = providers.Client()
 	client.Endpoints.Fanart = providers.URL
+	client.Endpoints.Telegram = providers.URL + "/telegram"
+	client.Endpoints.Anthropic = providers.URL + "/anthropic"
 	dir := filepath.Join(t.TempDir(), "crate")
 	deps := Deps{
 		Run:      fakeRunner{},
@@ -126,8 +150,20 @@ func TestAnAgentInstallsCrateWithoutSeeingSecrets(t *testing.T) {
 		t.Fatal("secrets must be refused as plain values")
 	}
 
+	if r := h.call("crate_set_integration", map[string]any{"id": "agent", "enabled": true, "agent_mode": "operator"}, nil); !r.IsError {
+		t.Fatal("Crate Operator is left to crate configure agent")
+	}
+	var agentState IntegrationState
+	h.call("crate_set_integration", map[string]any{"id": "agent", "enabled": true, "values": map[string]any{"CRATE_AGENT_PROVIDER": "anthropic", "CRATE_AGENT_MODEL": "claude-sonnet-5"}}, &agentState)
+	if len(agentState.SecretsMissing) != 2 {
+		t.Fatalf("the bot token and the model key must be asked for: %+v", agentState)
+	}
+	if r := h.call("crate_set_integration", map[string]any{"id": "agent", "enabled": true, "telegram_find_users": true}, nil); !r.IsError {
+		t.Fatal("finding users needs the bot token first")
+	}
+
 	var secrets SecretsOut
-	h.call("crate_request_secrets", map[string]any{"items": []string{"fanart", "admin_password"}}, &secrets)
+	h.call("crate_request_secrets", map[string]any{"items": []string{"fanart", "admin_password", "agent"}}, &secrets)
 	if !strings.HasPrefix(secrets.URL, "http://127.0.0.1:") {
 		t.Fatalf("the page must be local: %q", secrets.URL)
 	}
@@ -135,9 +171,21 @@ func TestAnAgentInstallsCrateWithoutSeeingSecrets(t *testing.T) {
 	if !strings.Contains(page, "fanart.tv/get-an-api-key") || !strings.Contains(page, `type="password"`) {
 		t.Fatalf("the page must guide the user:\n%s", page)
 	}
-	answer := post(t, secrets.URL, url.Values{"FANART_API_KEY": {fanartKey}, "admin_password": {"listen-to-crate"}})
+	answer := post(t, secrets.URL, url.Values{"FANART_API_KEY": {fanartKey}, "admin_password": {"listen-to-crate"}, "AGENT_TELEGRAM_TOKEN": {botToken}, "AGENT_MODEL_API_KEY": {modelKey}})
 	if !strings.Contains(answer, "fanart.tv accepted the credentials") || strings.Contains(answer, fanartKey) {
 		t.Fatalf("the page must confirm without echoing the key:\n%s", answer)
+	}
+	if !strings.Contains(answer, "connected to @crate_home_bot") || strings.Contains(answer, botToken) || strings.Contains(answer, modelKey) {
+		t.Fatalf("the page must check the bot and the model key without echoing them:\n%s", answer)
+	}
+	h.call("crate_status", nil, &status)
+	if !strings.Contains(strings.Join(status.NextSteps, " "), "telegram_find_users") {
+		t.Fatalf("the agent must ask who may use the bot: %v", status.NextSteps)
+	}
+	var found IntegrationState
+	h.call("crate_set_integration", map[string]any{"id": "agent", "enabled": true, "telegram_find_users": true}, &found)
+	if found.Check != "accepted" || len(found.SecretsMissing) != 0 {
+		t.Fatalf("agent: %+v", found)
 	}
 
 	h.call("crate_status", nil, &status)
@@ -160,6 +208,14 @@ func TestAnAgentInstallsCrateWithoutSeeingSecrets(t *testing.T) {
 	if key, _ := values.Get("FANART_API_KEY"); key != fanartKey {
 		t.Fatal("the key typed in the page must reach .env")
 	}
+	if mode, _ := values.Get("CRATE_AGENT_MODE"); mode != "agent" {
+		t.Fatalf("CRATE_AGENT_MODE = %q", mode)
+	}
+	for _, transient := range []string{"AGENT_TELEGRAM_TOKEN", "AGENT_MODEL_API_KEY", "AGENT_ALLOWED_USERS"} {
+		if _, ok := values.Get(transient); ok {
+			t.Fatalf("%s reached .env", transient)
+		}
+	}
 
 	var progress jobState
 	h.call("crate_start", nil, &progress)
@@ -168,8 +224,12 @@ func TestAnAgentInstallsCrateWithoutSeeingSecrets(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		h.call("crate_progress", nil, &progress)
 	}
-	if progress.Phase != PhaseReady {
+	if progress.Phase != PhaseReady || progress.Agent != AgentRunning {
 		t.Fatalf("start: %+v", progress)
+	}
+	values, _ = envfile.Read(install.EnvPath(h.dir))
+	if profiles, _ := values.Get("COMPOSE_PROFILES"); profiles != "agent" {
+		t.Fatalf("COMPOSE_PROFILES = %q", profiles)
 	}
 
 	var credentials CredentialsOut
@@ -179,7 +239,7 @@ func TestAnAgentInstallsCrateWithoutSeeingSecrets(t *testing.T) {
 	}
 
 	for _, output := range h.seen {
-		for _, secret := range []string{fanartKey, "listen-to-crate"} {
+		for _, secret := range []string{fanartKey, "listen-to-crate", botToken, modelKey} {
 			if strings.Contains(output, secret) {
 				t.Fatalf("a tool output leaked a secret: %s", output)
 			}

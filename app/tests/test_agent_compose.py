@@ -39,6 +39,13 @@ def test_agent_service_is_isolated_inside_the_crate_project():
     assert "./.env" not in str(service)
 
 
+def test_home_installs_run_the_same_agent_service():
+    base = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
+    home = yaml.safe_load((ROOT / "docker-compose.home.yaml").read_text())
+    assert home["services"]["crate-agent"] == base["services"]["crate-agent"]
+    assert "TELEGRAM_BOT_TOKEN" not in (ROOT / "docker-compose.home.yaml").read_text()
+
+
 def test_agent_image_bakes_runtime_and_release_context():
     dockerfile = (ROOT / "deploy/hermes/Dockerfile").read_text()
     assert "FROM nousresearch/hermes-agent:v0.22.2@sha256:" in dockerfile

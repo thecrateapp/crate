@@ -166,3 +166,25 @@ func TestReconfiguringKeepsSettingsTheWizardDoesNotAsk(t *testing.T) {
 		t.Errorf("changing the access mode must move the public URLs, got %q", got)
 	}
 }
+
+func TestBuildEnvNeverWritesTransientValues(t *testing.T) {
+	m := loadManifest(t)
+	cfg := Defaults("/srv/crate")
+	cfg.Integrations = map[string]string{
+		"CRATE_AGENT_MODE":     "agent",
+		"AGENT_TELEGRAM_TOKEN": "123:secret",
+		"AGENT_MODEL_API_KEY":  "sk-secret",
+	}
+	values, err := BuildEnv(m, cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := values.Get("CRATE_AGENT_MODE"); got != "agent" {
+		t.Errorf("CRATE_AGENT_MODE = %q", got)
+	}
+	for name := range m.Transient() {
+		if _, ok := values.Get(name); ok {
+			t.Errorf("%s reached .env", name)
+		}
+	}
+}

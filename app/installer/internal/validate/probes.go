@@ -5,12 +5,16 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
+
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
 )
 
 type Status int
@@ -75,7 +79,7 @@ func (c Client) Check(ctx context.Context, id string, values Values) Result {
 		"ticketmaster": c.ticketmaster,
 		"slskd":        c.slskd,
 		"ai":           c.ai,
-		"telegram":     c.telegram,
+		"agent":        c.agent,
 	}[id]
 	if !ok {
 		return Result{Skipped, "nothing to check before Crate starts"}
@@ -217,17 +221,75 @@ func (c Client) slskd(ctx context.Context, v Values) Result {
 	return byStatus("slskd", status, err, "slskd rejected this API key")
 }
 
-func (c Client) telegram(ctx context.Context, v Values) Result {
-	token := v["TELEGRAM_BOT_TOKEN"]
-	if token == "" {
-		return incomplete("the bot token is needed")
+// agent checks the answers for Crate Agent: what is set must be right, and
+// the bot token and model key, when given, must work.
+func (c Client) agent(ctx context.Context, v Values) Result {
+	mode, ok := agent.ParseMode(v["CRATE_AGENT_MODE"])
+	switch {
+	case !ok:
+		return rejected("the mode is agent or operator")
+	case mode == agent.Off:
+		return incomplete("choose Crate Agent or Crate Operator")
 	}
-	_, result := c.TelegramBot(ctx, token)
-	return result
+	users := strings.ReplaceAll(v["AGENT_ALLOWED_USERS"], " ", "")
+	if users != "" && !agent.UsersPattern.MatchString(users) {
+		return rejected("allowed users are numeric Telegram user IDs, such as 12345678,87654321")
+	}
+	provider, ok := agent.FindProvider(v["CRATE_AGENT_PROVIDER"])
+	if !ok {
+		return rejected("unknown model provider " + v["CRATE_AGENT_PROVIDER"])
+	}
+	if problem := provider.Problem(v["CRATE_AGENT_MODEL"], v["CRATE_AGENT_BASE_URL"]); problem != "" {
+		return rejected(problem)
+	}
+	if mode == agent.Operator {
+		if email := v["AGENT_APPROVER_EMAIL"]; email != "" && !strings.Contains(email, "@") {
+			return rejected("the approver's email is not an email address")
+		}
+		if approver := v["AGENT_APPROVER_TELEGRAM_ID"]; approver != "" && users != "" && !slices.Contains(strings.Split(users, ","), approver) {
+			return rejected("the approver must be one of the allowed Telegram users")
+		}
+	}
+	if key := v["AGENT_MODEL_API_KEY"]; key != "" {
+		switch {
+		case provider.Key == agent.NoKey:
+			return rejected(provider.Title + " takes no API key")
+		case !agent.ValidKey(key):
+			return rejected("an API key is one value of 8 to 4096 characters without spaces")
+		}
+		if result := c.modelKey(ctx, provider.ID, v["CRATE_AGENT_BASE_URL"], key); result.Status != Valid {
+			return result
+		}
+	}
+	token := strings.TrimSpace(v["AGENT_TELEGRAM_TOKEN"])
+	if token == "" {
+		return valid("the settings look right")
+	}
+	bot, result := c.TelegramBot(ctx, token)
+	if result.Status != Valid {
+		return result
+	}
+	return valid("connected to @" + bot)
+}
+
+// modelKey checks a model key with the providers Crate already knows how
+// to ask; the others are checked by the agent itself once it runs.
+func (c Client) modelKey(ctx context.Context, provider, baseURL, key string) Result {
+	probe := map[string]string{"anthropic": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY"}[provider]
+	if provider == "openai-api" && baseURL == "" {
+		probe = "OPENAI_API_KEY"
+	}
+	if probe == "" {
+		return valid("the key is checked when the agent starts")
+	}
+	return c.ai(ctx, Values{probe: key})
 }
 
 // TelegramBot checks the token and returns the bot's username.
 func (c Client) TelegramBot(ctx context.Context, token string) (string, Result) {
+	if !agent.BotPattern.MatchString(token) {
+		return "", rejected("a bot token looks like 123456789:AA... ; copy it again from @BotFather")
+	}
 	status, body, err := c.get(ctx, c.Endpoints.Telegram+"/bot"+token+"/getMe", nil)
 	if err != nil {
 		return "", unreachable("Telegram", err)
@@ -245,31 +307,71 @@ func (c Client) TelegramBot(ctx context.Context, token string) (string, Result) 
 	return answer.Result.Username, valid("connected to @" + answer.Result.Username)
 }
 
-// TelegramLatestChat returns the id of the most recent chat that wrote to
-// the bot, or "" when nobody has yet.
-func (c Client) TelegramLatestChat(ctx context.Context, token string) (string, error) {
-	_, body, err := c.get(ctx, c.Endpoints.Telegram+"/bot"+token+"/getUpdates", nil)
-	if err != nil {
-		return "", err
+// TelegramUser is a person who wrote to a bot in a private chat.
+type TelegramUser struct {
+	ID       int64
+	Username string
+	Name     string
+}
+
+// Label shows the user the way Telegram does.
+func (u TelegramUser) Label() string {
+	label := u.Name
+	if u.Username != "" {
+		label = strings.TrimSpace(label + " @" + u.Username)
+	}
+	if label == "" {
+		return fmt.Sprint(u.ID)
+	}
+	return fmt.Sprintf("%s (%d)", label, u.ID)
+}
+
+var ErrTelegramConflict = errors.New("another program reads this bot's messages; stop it or use a new bot")
+
+// TelegramPrivateUsers lists the people who sent the bot a private
+// message, oldest first, without marking the messages as read.
+func (c Client) TelegramPrivateUsers(ctx context.Context, token string) ([]TelegramUser, error) {
+	if !agent.BotPattern.MatchString(token) {
+		return nil, ErrRejected
+	}
+	status, body, err := c.get(ctx, c.Endpoints.Telegram+"/bot"+token+"/getUpdates", nil)
+	switch {
+	case err != nil:
+		return nil, err
+	case status == http.StatusConflict:
+		return nil, ErrTelegramConflict
+	case status == http.StatusUnauthorized, status == http.StatusNotFound:
+		return nil, ErrRejected
 	}
 	var answer struct {
 		Result []struct {
 			Message struct {
 				Chat struct {
-					ID int64 `json:"id"`
+					Type string `json:"type"`
 				} `json:"chat"`
+				From struct {
+					ID        int64  `json:"id"`
+					IsBot     bool   `json:"is_bot"`
+					Username  string `json:"username"`
+					FirstName string `json:"first_name"`
+				} `json:"from"`
 			} `json:"message"`
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(body, &answer); err != nil {
-		return "", err
+		return nil, err
 	}
-	for i := len(answer.Result) - 1; i >= 0; i-- {
-		if id := answer.Result[i].Message.Chat.ID; id != 0 {
-			return fmt.Sprint(id), nil
+	var users []TelegramUser
+	for _, update := range answer.Result {
+		from := update.Message.From
+		if update.Message.Chat.Type != "private" || from.ID <= 0 || from.IsBot {
+			continue
+		}
+		if !slices.ContainsFunc(users, func(u TelegramUser) bool { return u.ID == from.ID }) {
+			users = append(users, TelegramUser{ID: from.ID, Username: from.Username, Name: from.FirstName})
 		}
 	}
-	return "", nil
+	return users, nil
 }
 
 func (c Client) ai(ctx context.Context, v Values) Result {

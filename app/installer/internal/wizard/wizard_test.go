@@ -16,12 +16,30 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
 
-type fakeRunner struct{ streamed []string }
+type fakeRunner struct {
+	streamed []string
+	commands []system.Command
+	outputs  map[string]string // argument substring -> output
+}
 
-func (f *fakeRunner) Output(context.Context, string, ...string) (string, error) { return "", nil }
+func (f *fakeRunner) Output(_ context.Context, name string, args ...string) (string, error) {
+	line := name + " " + strings.Join(args, " ")
+	for match, output := range f.outputs {
+		if strings.Contains(line, match) {
+			return output, nil
+		}
+	}
+	return "", nil
+}
 
 func (f *fakeRunner) Stream(_ context.Context, _ io.Writer, _ string, name string, args ...string) error {
 	f.streamed = append(f.streamed, name+" "+strings.Join(args, " "))
+	return nil
+}
+
+func (f *fakeRunner) Run(_ context.Context, c system.Command) error {
+	f.streamed = append(f.streamed, c.Name+" "+strings.Join(c.Args, " "))
+	f.commands = append(f.commands, c)
 	return nil
 }
 

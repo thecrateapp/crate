@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
@@ -107,21 +108,33 @@ func (s *Session) blocksFor(keys []string) ([]block, error) {
 
 // secretFields are the variables of in that only the user may enter. For
 // Crate's own slskd the API key is generated, so only the account password is asked.
+// Crate Agent asks for what it has not stored yet, and for a model key only
+// when the provider takes one.
 func secretFields(in manifest.Integration, s *Session) []manifest.IntegrationEnv {
 	var envs []manifest.IntegrationEnv
+	d := s.draft()
+	stored := agent.StoredSecrets(s.existing, agent.Agent)
+	provider, _ := agent.FindProvider(d.Value("CRATE_AGENT_PROVIDER"))
 	for _, env := range in.Env {
 		if !env.Secret {
 			continue
 		}
-		if env.Name == "SLSKD_API_KEY" && s.draft().Value("SLSKD_URL") == install.BundledSlskdURL {
-			continue
-		}
-		if env.Name == "SLSKD_SLSK_PASSWORD" && s.draft().Value("SLSKD_URL") != install.BundledSlskdURL {
+		switch {
+		case env.Name == "SLSKD_API_KEY" && d.Value("SLSKD_URL") == install.BundledSlskdURL,
+			env.Name == "SLSKD_SLSK_PASSWORD" && d.Value("SLSKD_URL") != install.BundledSlskdURL,
+			env.Name == "AGENT_TELEGRAM_TOKEN" && stored.Bot,
+			env.Name == "AGENT_MODEL_API_KEY" && (provider.Key == agent.NoKey || stored.Key(provider.ID)):
 			continue
 		}
 		envs = append(envs, env)
 	}
 	return envs
+}
+
+// optionalSecret is a secret the integration works without.
+func optionalSecret(env manifest.IntegrationEnv, s *Session) bool {
+	provider, _ := agent.FindProvider(s.draft().Value("CRATE_AGENT_PROVIDER"))
+	return env.Name == "AGENT_MODEL_API_KEY" && provider.Key == agent.OptionalKey
 }
 
 func (p *portal) newRequest(blocks []block) string {

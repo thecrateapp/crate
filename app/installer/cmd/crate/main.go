@@ -23,7 +23,7 @@ const usage = `crate sets up and configures a Crate home server.
 
 Usage:
   crate install [flags]                  install Crate, or change an existing installation
-  crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Telegram…)
+  crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Crate Agent…)
   crate doctor [flags]                   check the installation, its services and its keys
   crate mcp                              let an AI agent install Crate with you (MCP over stdio)
   crate version                          print the installer version
@@ -125,6 +125,7 @@ func runConfigure(args []string, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	flags.StringVar(&opts.InstallDir, "dir", defaultInstallDir(), "install folder (CRATE_INSTALL_DIR)")
 	flags.BoolVar(&opts.Accessible, "accessible", envFlag("ACCESSIBLE"), "plain prompts that work with screen readers")
+	flags.BoolVar(&opts.SignIn, "sign-in", false, "with agent: only sign Crate Agent in to its model provider (ChatGPT, Nous)")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: crate configure [integration...] [flags]\n\nWithout an integration it lists them all.")
 		flags.PrintDefaults()

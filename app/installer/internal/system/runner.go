@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -15,6 +16,19 @@ type Runner interface {
 	Output(ctx context.Context, name string, args ...string) (string, error)
 	// Stream runs a command, copying its output to w as it happens.
 	Stream(ctx context.Context, w io.Writer, dir, name string, args ...string) error
+	// Run runs c with the installer's environment plus c.Env.
+	Run(ctx context.Context, c Command) error
+}
+
+// Command is a process with its own environment, input and output. Secrets
+// go in Env, never in Args, so they do not show in the process list.
+type Command struct {
+	Dir   string
+	Name  string
+	Args  []string
+	Env   []string
+	Stdin io.Reader
+	Out   io.Writer
 }
 
 // ExecRunner runs real commands. Stdin is handed to streamed commands so
@@ -46,6 +60,32 @@ func (r ExecRunner) Stream(ctx context.Context, w io.Writer, dir, name string, a
 		return &CommandError{Command: name, Err: err, Stderr: strings.TrimSpace(stderr.String())}
 	}
 	return nil
+}
+
+func (r ExecRunner) Run(ctx context.Context, c Command) error {
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	cmd.Dir = c.Dir
+	cmd.Env = append(os.Environ(), c.Env...)
+	cmd.Stdin = c.Stdin
+	out := c.Out
+	if out == nil {
+		out = io.Discard
+	}
+	if terminal, ok := out.(*os.File); ok {
+		cmd.Stdout, cmd.Stderr = terminal, terminal
+	} else {
+		cmd.Stdout, cmd.Stderr = out, io.MultiWriter(out, &stderr)
+	}
+	if err := cmd.Run(); err != nil {
+		return &CommandError{Command: c.Name, Err: err, Stderr: lastLine(stderr.String())}
+	}
+	return nil
+}
+
+func lastLine(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 type CommandError struct {

@@ -84,3 +84,18 @@ func TestWriteIsOwnerOnly(t *testing.T) {
 		t.Fatalf("mode %v, want 0600", info.Mode().Perm())
 	}
 }
+
+func TestDeleteDropsAKeyFromTheFile(t *testing.T) {
+	values := New()
+	values.Set("A", "1")
+	values.Set("COMPOSE_FILE", "x")
+	values.Set("B", "2")
+	values.Delete("COMPOSE_FILE")
+	values.Delete("MISSING")
+	if _, ok := values.Get("COMPOSE_FILE"); ok || strings.Join(values.Keys(), ",") != "A,B" {
+		t.Fatalf("keys %v", values.Keys())
+	}
+	if strings.Contains(Render(values, "", nil), "COMPOSE_FILE") {
+		t.Fatal("a deleted key was rendered")
+	}
+}

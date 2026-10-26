@@ -238,27 +238,67 @@ def test_noninteractive_agent_init_writes_private_secrets_and_env(
     assert "make agent-up" in report
 
 
-def test_init_never_replaces_existing_secrets_without_confirmation(
-    tmp_path, monkeypatch
-):
+def test_init_never_replaces_existing_secrets_without_confirmation(tmp_path):
     setup = _setup()
     secrets = tmp_path / "data/crate-agent/secrets"
     _write_secrets(secrets)
-    monkeypatch.setenv("AGENT_TELEGRAM_TOKEN", "999:" + "b" * 35)
-    monkeypatch.setenv("AGENT_ALLOWED_USERS", "99")
     docker = FakeDocker()
-    setup.init(_args(tmp_path), _settings(tmp_path), setup.Prompter(False), docker)
+    setup.init(_args(tmp_path), _settings(tmp_path), setup.Prompter(False, {}), docker)
     assert (secrets / "telegram-token").read_text() == TELEGRAM
     assert (secrets / "allowed-users").read_text() == "12345678"
     assert not any("crate.agent_credentials_cli" in call for call in docker.calls)
+    replaced = {"AGENT_TELEGRAM_TOKEN": "999:" + "b" * 35, "AGENT_ALLOWED_USERS": "99"}
     setup.init(
         _args(tmp_path, replace=True),
         _settings(tmp_path),
-        setup.Prompter(False),
+        setup.Prompter(False, replaced),
         docker,
     )
     assert (secrets / "telegram-token").read_text() == "999:" + "b" * 35
     assert (secrets / "allowed-users").read_text() == "99"
+
+
+def test_explicit_values_replace_only_what_changed(tmp_path):
+    setup = _setup()
+    secrets = tmp_path / "data/crate-agent/secrets"
+    _write_secrets(secrets)
+    docker = FakeDocker()
+    given = {"AGENT_TELEGRAM_TOKEN": TELEGRAM, "AGENT_ALLOWED_USERS": "12345678"}
+    report = "\n".join(
+        setup.init(
+            _args(tmp_path), _settings(tmp_path), setup.Prompter(False, given), docker
+        )
+    )
+    assert report.count("Kept") == 3
+    given["AGENT_ALLOWED_USERS"] = "12345678, 555"
+    setup.init(
+        _args(tmp_path), _settings(tmp_path), setup.Prompter(False, given), docker
+    )
+    assert (secrets / "telegram-token").read_text() == TELEGRAM
+    assert (secrets / "allowed-users").read_text() == "12345678,555"
+    assert (secrets / "mcp-token").read_text() == TOKEN
+    assert not any("crate.agent_credentials_cli" in call for call in docker.calls)
+
+
+def test_an_explicit_model_key_replaces_the_stored_one(tmp_path):
+    setup = _setup()
+    secrets = tmp_path / "data/crate-agent/secrets"
+    _write_secrets(secrets)
+    (secrets / "model-keys").mkdir()
+    (secrets / "model-keys/anthropic").write_text("sk-ant-old-0123")
+    model = {"CRATE_AGENT_PROVIDER": "anthropic", "CRATE_AGENT_MODEL": "claude-x"}
+    for key, expected in (
+        ("", "sk-ant-old-0123"),
+        ("sk-ant-new-4567", "sk-ant-new-4567"),
+    ):
+        given = {**model, "AGENT_MODEL_API_KEY": key} if key else model
+        setup.init(
+            _args(tmp_path),
+            _settings(tmp_path),
+            setup.Prompter(False, given),
+            FakeDocker(),
+        )
+        assert (secrets / "model-keys/anthropic").read_text() == expected
 
 
 @pytest.mark.parametrize(
@@ -730,6 +770,7 @@ def test_rerun_keeps_supervisor_secrets_binding_and_config_edits(tmp_path, monke
     config = json.loads((root / "supervisor-config.json").read_text())
     config["poll_seconds"] = 60
     (root / "supervisor-config.json").write_text(json.dumps(config))
+    monkeypatch.delenv("AGENT_APPROVER_EMAIL")
     _operator_init(setup, tmp_path, docker)
     after = {
         path: path.read_text()
@@ -971,3 +1012,190 @@ def test_status_reports_the_published_provenance(tmp_path, observation, expected
         (evidence / "observation.json").write_text(json.dumps(observation))
     (line,) = setup.provenance_report(settings, now=1000)
     assert expected in line
+
+
+def test_an_explicit_approver_email_rebinds_the_approver(tmp_path, monkeypatch):
+    setup = _setup()
+    _operator_env(
+        monkeypatch,
+        AGENT_APPROVER_EMAIL="admin@example.test",
+        AGENT_APPROVER_TELEGRAM_ID="87654321",
+    )
+    docker = FakeDocker()
+    _operator_init(setup, tmp_path, docker)
+    monkeypatch.setenv("AGENT_APPROVER_EMAIL", "other@example.test")
+    monkeypatch.setenv("AGENT_APPROVER_TELEGRAM_ID", "12345678")
+    report = _operator_init(setup, tmp_path, docker)
+    rebind = docker.cli_calls("bind-approver")[-1]
+    assert len(docker.cli_calls("bind-approver")) == 2
+    assert rebind[rebind.index("--user-email") + 1] == "other@example.test"
+    assert "Bound other@example.test (Telegram user 12345678)" in report
+
+
+def test_env_values_keep_the_owner_when_written_as_root(tmp_path, monkeypatch):
+    setup = _setup()
+    env_file = tmp_path / ".env"
+    env_file.write_text("A=1\n")
+    owner = (env_file.stat().st_uid, env_file.stat().st_gid)
+    calls = []
+    monkeypatch.setattr(setup.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(setup.os, "chown", lambda path, *ids: calls.append(ids))
+    setup.set_env_values(env_file, {"A": "2"})
+    assert calls == [owner]
+    assert env_file.read_text() == "A=2\n"
+
+
+def test_settings_read_the_values_the_installer_quotes(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text('DATA_DIR="/srv/crate \\"data\\" \\$HOME"\nPUID=\'1001\'\n')
+    settings = _setup().load_settings(env_file, {})
+    assert settings["DATA_DIR"] == '/srv/crate "data" $HOME'
+    assert settings["PUID"] == "1001"
+
+
+def test_in_container_init_runs_the_credential_cli_locally_and_starts_nothing(
+    tmp_path, monkeypatch
+):
+    setup = _setup()
+    monkeypatch.setattr(setup, "IN_CONTAINER", True)
+    docker = FakeDocker(running=())
+    given = {
+        "AGENT_TELEGRAM_TOKEN": TELEGRAM,
+        "AGENT_ALLOWED_USERS": "1",
+        "AGENT_SETUP_COMMAND": "crate configure agent",
+    }
+    settings = _settings(tmp_path, **given)
+    report = "\n".join(
+        setup.init(
+            _args(tmp_path, no_start=False),
+            settings,
+            setup.Prompter(False, given),
+            docker,
+        )
+    )
+    assert not any(call[0] == "docker" for call in docker.calls)
+    create = docker.cli_calls("create")[0]
+    call = next(call for call in docker.calls if call[-len(create) :] == create)
+    assert call[:4] == [
+        "env",
+        setup.sys.executable,
+        "-m",
+        "crate.agent_credentials_cli",
+    ]
+    assert (tmp_path / "data/crate-agent/secrets/mcp-token").read_text() == TOKEN
+    assert "crate configure agent changes the bot" in report
+    assert "make agent" not in report
+
+
+def test_in_container_settings_ignore_the_container_environment(tmp_path, monkeypatch):
+    setup = _setup()
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"DATA_DIR={tmp_path / 'data'}\nDOMAIN=crate.example.test\n")
+    monkeypatch.setenv("DATA_DIR", "/data")
+    monkeypatch.setenv("AGENT_ALLOWED_USERS", "12345678")
+    seen = {}
+
+    def check(settings):
+        seen.update(settings)
+        return []
+
+    monkeypatch.setattr(setup, "agent_problems", check)
+    monkeypatch.setattr(setup, "container_running", lambda *args: False)
+    assert setup.main(["check", "--in-container", "--env-file", str(env_file)]) == 0
+    assert seen["DATA_DIR"] == str(tmp_path / "data")
+    assert seen["AGENT_ALLOWED_USERS"] == "12345678"
+    assert setup.IN_CONTAINER is True
+
+
+def test_reuse_copies_the_other_profiles_bot_allowlist_and_model_keys(
+    tmp_path, monkeypatch
+):
+    setup = _setup()
+    secrets = tmp_path / "data/crate-agent/secrets"
+    _write_secrets(secrets)
+    (secrets / "model-keys").mkdir()
+    (secrets / "model-keys/anthropic").write_text("sk-ant-0123456789")
+    monkeypatch.setenv("CRATE_AGENT_PROVIDER", "anthropic")
+    monkeypatch.setenv("CRATE_AGENT_MODEL", "claude-x")
+    report = _operator_init(setup, tmp_path, FakeDocker(), reuse=True)
+    domain = tmp_path / "data/crate-operator/secrets/domain"
+    assert (domain / "telegram-token").read_text() == TELEGRAM
+    assert (domain / "allowed-users").read_text() == "12345678"
+    assert (domain / "model-keys/anthropic").read_text() == "sk-ant-0123456789"
+    assert _mode(domain / "model-keys") == 0o700
+    assert report.count("Reused") == 3
+
+
+def test_revoke_turns_a_profile_off_but_keeps_model_keys(tmp_path, monkeypatch):
+    setup = _setup()
+    _operator_env(monkeypatch)
+    docker = FakeDocker()
+    _operator_init(setup, tmp_path, docker)
+    root = tmp_path / "data/crate-operator"
+    supervisor = (root / "secrets/supervisor/operator_mcp_read").read_text()
+    (root / "secrets/domain/model-keys").mkdir()
+    (root / "secrets/domain/model-keys/anthropic").write_text("sk-ant-0123")
+    env_file = tmp_path / ".env"
+    setup.set_env_values(
+        env_file, {"CRATE_OPERATOR_PRINCIPAL_IDS": f"keep-me,{PRINCIPAL}"}
+    )
+    settings = setup.load_settings(env_file, _settings(tmp_path))
+    report = "\n".join(
+        setup.revoke(_args(tmp_path, profile="operator"), settings, docker)
+    )
+    assert docker.revoked == [
+        docker.issued[TOKEN]["credential_id"],
+        docker.issued[supervisor]["credential_id"],
+    ]
+    for name in ("telegram-token", "allowed-users", "mcp-token"):
+        assert not (root / "secrets/domain" / name).exists()
+    assert not (root / "secrets/supervisor/operator_mcp_read").exists()
+    assert (root / "secrets/domain/model-keys/anthropic").is_file()
+    assert "CRATE_OPERATOR_PRINCIPAL_IDS=keep-me\n" in env_file.read_text()
+    assert "Revoked the MCP credential" in report
+
+
+def test_revoke_warns_about_a_credential_crate_does_not_know(tmp_path):
+    setup = _setup()
+    secrets = tmp_path / "data/crate-agent/secrets"
+    _write_secrets(secrets)
+    docker = FakeDocker()
+    report = "\n".join(setup.revoke(_args(tmp_path), _settings(tmp_path), docker))
+    assert docker.revoked == []
+    assert "does not know the credential" in report
+    assert not (secrets / "mcp-token").exists()
+
+
+@pytest.mark.parametrize(
+    ("answer", "command", "message"),
+    [
+        (
+            SimpleNamespace(returncode=0, stdout="null", stderr=""),
+            "crate configure agent",
+            "Update Crate (run `crate install` again to download the latest images), "
+            "then run `crate configure agent`",
+        ),
+        (
+            SimpleNamespace(
+                returncode=1,
+                stdout="",
+                stderr="ModuleNotFoundError: No module named 'crate.agent_scope_catalog'",
+            ),
+            "",
+            "Update the stack images, then run make agent-init again",
+        ),
+    ],
+)
+def test_an_image_without_the_agent_presets_asks_to_update_crate(
+    monkeypatch, answer, command, message
+):
+    setup = _setup()
+    monkeypatch.setattr(setup, "IN_CONTAINER", True)
+    monkeypatch.setenv("AGENT_SETUP_COMMAND", command)
+    with pytest.raises(setup.SetupError) as error:
+        setup.create_credential("agent", lambda argv, **kwargs: answer)
+    assert str(error.value).startswith(
+        "This Crate version does not support Crate Agent yet."
+    )
+    assert message in str(error.value)
+    assert "StopIteration" not in str(error.value)

@@ -83,3 +83,41 @@ func TestPortsModeTraefikHasNoCertificates(t *testing.T) {
 		t.Error("ports mode must not request certificates")
 	}
 }
+
+func TestApplyWritesTheAgentSetupWithItsRepositoryLayout(t *testing.T) {
+	dir := t.TempDir()
+	if err := Apply(loadManifest(t), Defaults(dir), nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{
+		"scripts/agent_setup.py",
+		"deploy/hermes/runtime.py",
+		"deploy/operator/compose.operator.yaml",
+		"deploy/operator/config.operator.example.json",
+	} {
+		if info, err := os.Stat(filepath.Join(dir, path)); err != nil || info.Size() == 0 {
+			t.Errorf("%s: %v", path, err)
+		}
+	}
+}
+
+func TestComposeFilesFollowComposeFile(t *testing.T) {
+	cases := []struct {
+		value string
+		want  string
+	}{
+		{"", "docker-compose.yaml"},
+		{"docker-compose.yaml:deploy/operator/compose.operator.yaml", "docker-compose.yaml,deploy/operator/compose.operator.yaml"},
+		{" docker-compose.yaml :", "docker-compose.yaml"},
+	}
+	for _, tc := range cases {
+		values := envfile.New()
+		values.Set("COMPOSE_FILE", tc.value)
+		if got := strings.Join(ComposeFiles(values), ","); got != tc.want {
+			t.Errorf("%q: got %s", tc.value, got)
+		}
+	}
+	if got := ComposeFiles(nil); len(got) != 1 {
+		t.Errorf("no settings: %v", got)
+	}
+}

@@ -4,7 +4,12 @@
 Secrets are written with mode 600 and never replaced without explicit confirmation.
 Non-interactive runs read AGENT_TELEGRAM_TOKEN, AGENT_ALLOWED_USERS,
 AGENT_MODEL_API_KEY, AGENT_APPROVER_EMAIL and AGENT_APPROVER_TELEGRAM_ID plus
-CRATE_AGENT_PROVIDER/MODEL/BASE_URL from the environment.
+CRATE_AGENT_PROVIDER/MODEL/BASE_URL from the environment; an explicit value that
+differs from the stored one replaces only that value.
+
+--in-container runs inside a crate-api container with the install folder and the
+data folder mounted at their host paths (the `crate` installer does this, so the
+host needs no Python): the credential CLI runs locally and nothing is started.
 """
 
 from __future__ import annotations
@@ -46,11 +51,24 @@ SUPERVISOR_NAME = "Crate Operator supervisor (read only)"
 SUPERVISOR_GRANTS = ("library.health.read", "ops.jobs.read", "ops.status.read")
 SUPERVISOR_EXAMPLE = REPO / "deploy/operator/config.operator.example.json"
 SHARED_KEY = re.compile(r"[\x21-\x7e]{32,4096}")
+MODEL_KEY = re.compile(r"[\x21-\x7e]{8,4096}")
 SUPERVISOR_SHARED_KEYS = (
     ("supervisor/operator_api", "supervisor-client/read-token"),
     ("supervisor/operator_webhook", "delivery/secret"),
     ("supervisor/operator_human", "supervisor-native/callback-key"),
 )
+CONTAINER_ENVIRONMENT = (
+    "AGENT_TELEGRAM_TOKEN",
+    "AGENT_ALLOWED_USERS",
+    "AGENT_MODEL_API_KEY",
+    "AGENT_APPROVER_EMAIL",
+    "AGENT_APPROVER_TELEGRAM_ID",
+    "AGENT_SETUP_COMMAND",
+    "CRATE_AGENT_PROVIDER",
+    "CRATE_AGENT_MODEL",
+    "CRATE_AGENT_BASE_URL",
+)
+IN_CONTAINER = False
 
 
 class SetupError(Exception):
@@ -96,7 +114,13 @@ def load_settings(env_file: Path, environ=None) -> dict:
             key, _, value = line.partition("=")
             key = key.strip().removeprefix("export ").strip()
             value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            if len(value) >= 2 and value[0] == value[-1] == '"':
+                value = re.sub(
+                    r"\\(.)",
+                    lambda match: "\n" if match[1] == "n" else match[1],
+                    value[1:-1],
+                )
+            elif len(value) >= 2 and value[0] == value[-1] == "'":
                 value = value[1:-1]
             settings[key] = value
     settings.update(os.environ if environ is None else environ)
@@ -113,10 +137,15 @@ def set_env_values(env_file: Path, values: dict) -> None:
             lines[matches[-1]] = f"{key}={value}"
         else:
             lines.append(f"{key}={value}")
-    mode = env_file.stat().st_mode & 0o777 if env_file.exists() else 0o600
+    mode, owner = 0o600, None
+    if env_file.exists():
+        info = env_file.stat()
+        mode, owner = info.st_mode & 0o777, (info.st_uid, info.st_gid)
     staging = env_file.with_name(f".{env_file.name}.{os.getpid()}")
     staging.write_text("\n".join(lines) + "\n")
     staging.chmod(mode)
+    if owner and os.geteuid() == 0:
+        os.chown(staging, *owner)
     os.replace(staging, env_file)
 
 
@@ -291,17 +320,49 @@ def _existing(path: Path, pattern) -> str | None:
     return value if pattern.fullmatch(value) else None
 
 
-def _keep(path: Path, pattern, label: str, prompter, replace: bool) -> bool:
-    if _existing(path, pattern) is None:
+def _keep(path: Path, pattern, label: str, prompter, replace: bool, given="") -> bool:
+    """An explicit value replaces a different stored one without asking."""
+    current = _existing(path, pattern)
+    if current is None:
         return False
+    if given:
+        return given == current
     return not prompter.confirm(
         f"{label} already exists in {path}. Replace it?", False, replace
     )
 
 
+def _other_profile(profile: str) -> str:
+    return "agent" if profile == "operator" else "operator"
+
+
+def reuse_other(paths, settings, args) -> list:
+    """Switching profiles: copy the other profile's bot, allowlist and model keys
+    where this profile has none."""
+    if not getattr(args, "reuse", False):
+        return []
+    source = layout(settings, _other_profile(args.profile)).secrets
+    names = [("telegram-token", TELEGRAM_TOKEN), ("allowed-users", ALLOWED_USERS)]
+    keys = source / "model-keys"
+    if keys.is_dir():
+        names += [(f"model-keys/{key.name}", MODEL_KEY) for key in keys.iterdir()]
+    report = []
+    for name, pattern in names:
+        value = _existing(source / name, pattern)
+        if value is None or (paths.secrets / name).exists():
+            continue
+        _private_dir((paths.secrets / name).parent, settings)
+        write_secret(paths.secrets / name, value, settings)
+        report.append(f"Reused {source / name}")
+    return report
+
+
 def ask_telegram(paths, settings, prompter, args) -> list:
     path = paths.secrets / "telegram-token"
-    if _keep(path, TELEGRAM_TOKEN, "A Telegram bot token", prompter, args.replace):
+    given = prompter.environ.get("AGENT_TELEGRAM_TOKEN", "").strip()
+    if _keep(
+        path, TELEGRAM_TOKEN, "A Telegram bot token", prompter, args.replace, given
+    ):
         return [f"Kept {path}"]
     token = prompter.value(
         "Telegram bot token from @BotFather (/newbot)",
@@ -319,7 +380,10 @@ def ask_telegram(paths, settings, prompter, args) -> list:
 
 def ask_users(paths, settings, prompter, args) -> list:
     path = paths.secrets / "allowed-users"
-    if _keep(path, ALLOWED_USERS, "A Telegram allowlist", prompter, args.replace):
+    given = prompter.environ.get("AGENT_ALLOWED_USERS", "").replace(" ", "")
+    if _keep(
+        path, ALLOWED_USERS, "A Telegram allowlist", prompter, args.replace, given
+    ):
         return [f"Kept {path}"]
     users = prompter.value(
         "Numeric Telegram user IDs allowed to talk to the bot, comma-separated "
@@ -339,7 +403,7 @@ def run(argv, *, check=True, capture=True, timeout=120, interactive=False, input
     try:
         return subprocess.run(
             argv,
-            cwd=REPO,
+            cwd=None if IN_CONTAINER else REPO,
             check=check,
             text=True,
             capture_output=capture and not interactive,
@@ -364,14 +428,29 @@ def container_running(name: str, runner=run) -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
+def api_running(runner=run) -> bool:
+    return IN_CONTAINER or container_running("crate-api", runner)
+
+
+def crate_python(argv, *, stdin=False, environment=()) -> list:
+    """Python with the crate package: crate-api, or this container itself."""
+    if IN_CONTAINER:
+        return ["env", *environment, sys.executable, *argv]
+    command = ["docker", "exec"]
+    if stdin:
+        command.append("-i")
+    for item in environment:
+        command += ["-e", item]
+    return [*command, "crate-api", "python", *argv]
+
+
 def credential_cli(command, runner=run, *, instance=None, stdin=None) -> object:
     """Run crate.agent_credentials_cli inside crate-api and parse its JSON output."""
-    argv = ["docker", "exec"]
-    if stdin is not None:
-        argv.append("-i")
-    if instance:
-        argv += ["-e", f"CRATE_AGENT_INSTANCE_ID={instance}"]
-    argv += ["crate-api", "python", "-m", "crate.agent_credentials_cli", *command]
+    argv = crate_python(
+        ["-m", "crate.agent_credentials_cli", *command],
+        stdin=stdin is not None,
+        environment=[f"CRATE_AGENT_INSTANCE_ID={instance}"] if instance else (),
+    )
     result = runner(argv, check=False, input=stdin)
     if result.returncode != 0:
         detail = (result.stderr or "").strip().splitlines()
@@ -388,7 +467,7 @@ def credential_cli(command, runner=run, *, instance=None, stdin=None) -> object:
 
 
 def issue_credential(name, scopes, runner=run, *, require_approval=False) -> dict:
-    if not container_running("crate-api", runner):
+    if not api_running(runner):
         raise SetupError("crate-api is not running; start the stack first")
     command = ["create", "--name", name, "--expires-in-days", str(CREDENTIAL_DAYS)]
     for scope in scopes:
@@ -406,24 +485,50 @@ def issue_credential(name, scopes, runner=run, *, require_approval=False) -> dic
     return issued
 
 
+def unsupported_release() -> SetupError:
+    command = os.environ.get("AGENT_SETUP_COMMAND", "").strip()
+    if command:
+        return SetupError(
+            "This Crate version does not support Crate Agent yet. Update Crate (run "
+            f"`crate install` again to download the latest images), then run `{command}`"
+        )
+    return SetupError(
+        "This Crate version does not support Crate Agent yet. Update the stack images, "
+        "then run make agent-init again"
+    )
+
+
 def create_credential(profile: str, runner=run) -> dict:
     """Issue the preset's grants with the real CLI inside crate-api."""
-    if not container_running("crate-api", runner):
+    if not api_running(runner):
         raise SetupError("crate-api is not running; start the stack first")
     preset = PROFILES[profile].preset
-    scopes = json.loads(
-        runner(
+    result = runner(
+        crate_python(
             [
-                "docker",
-                "exec",
-                "crate-api",
-                "python",
                 "-c",
                 "import json; from crate.agent_scope_catalog import SCOPE_PRESETS; "
-                f"print(json.dumps(next(p.scopes for p in SCOPE_PRESETS if p.id == {preset!r})))",
+                f"print(json.dumps(next((p.scopes for p in SCOPE_PRESETS if p.id == {preset!r}), None)))",
             ]
-        ).stdout
+        ),
+        check=False,
     )
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip().splitlines()
+        if any(
+            name in "\n".join(detail) for name in ("ImportError", "ModuleNotFoundError")
+        ):
+            raise unsupported_release()
+        raise SetupError(
+            "Reading the credential presets failed"
+            + (f": {detail[-1]}" if detail else "")
+        )
+    try:
+        scopes = json.loads(result.stdout)
+    except ValueError:
+        raise SetupError("crate-api returned unexpected credential presets") from None
+    if not scopes:
+        raise unsupported_release()
     return issue_credential(
         PROFILES[profile].preset_label,
         scopes,
@@ -463,11 +568,7 @@ def ask_credential(paths, settings, prompter, args, runner=run) -> tuple:
         report = [f"Kept {path}"]
         if args.profile != "operator":
             return report, None, None
-        kept = (
-            identify_credential(existing, runner)
-            if container_running("crate-api", runner)
-            else None
-        )
+        kept = identify_credential(existing, runner) if api_running(runner) else None
         if kept is None:
             return report, None, None
         if not kept["require_approval"] and prompter.confirm(
@@ -565,13 +666,18 @@ def migrate_legacy_key(paths, settings, runtime) -> list:
 def ask_model_key(paths, settings, prompter, args, provider, runtime) -> list:
     spec = runtime.PROVIDERS[provider]
     path = runtime.model_key_path(paths.secrets, provider)
-    if path.is_file() and path.read_text().strip():
-        if not prompter.confirm(
+    given = prompter.environ.get("AGENT_MODEL_API_KEY", "").strip()
+    stored = path.read_text().strip() if path.is_file() else ""
+    if stored and (
+        given == stored
+        if given
+        else not prompter.confirm(
             f"An API key for {provider} already exists in {path}. Replace it?",
             False,
             args.replace,
-        ):
-            return [f"Kept {path}"]
+        )
+    ):
+        return [f"Kept {path}"]
     optional = spec.oauth or provider == "custom"
     hint = " (empty to log in with OAuth instead)" if spec.oauth else ""
     hint = " (empty if the endpoint needs none)" if provider == "custom" else hint
@@ -638,7 +744,8 @@ def ask_approver(paths, settings, prompter, args, principal, users, runner=run):
     current = credential_cli(
         ["show-approver", "--principal-id", principal], runner, instance=instance
     )
-    if current:
+    rebind = prompter.environ.get("AGENT_APPROVER_EMAIL", "").strip()
+    if current and not rebind:
         who = current.get("username") or f"user #{current.get('user_id')}"
         if not prompter.confirm(
             f"Plans are approved by {who} from Telegram user "
@@ -937,6 +1044,7 @@ def init(args, settings, prompter, runner=run) -> list:
             recreate_api = True
         else:
             raise SetupError(problem)
+    report += reuse_other(paths, settings, args)
     report += ask_telegram(paths, settings, prompter, args)
     report += ask_users(paths, settings, prompter, args)
     issued, principal, previous = ask_credential(
@@ -976,7 +1084,7 @@ def init(args, settings, prompter, runner=run) -> list:
         report += provision_supervisor(
             paths, settings, prompter, args, users, approver, runner
         )
-    if args.no_start:
+    if args.no_start or IN_CONTAINER:
         return report + next_steps(args, settings, principal, approver)
     if recreate_api and args.profile == "agent":
         runner(
@@ -1001,27 +1109,83 @@ def init(args, settings, prompter, runner=run) -> list:
 
 def next_steps(args, settings, principal, approver=None) -> list:
     profile = "" if args.profile == "agent" else " AGENT_PROFILE=operator"
-    steps = [
-        f"make agent-status{profile} shows health; make agent-logs{profile} follows it",
-        f"make agent-model{profile} PROVIDER=... MODEL=... switches the model",
-    ]
-    if args.no_start:
-        steps.insert(0, f"Start it: make agent-up{profile}")
+    command = settings.get("AGENT_SETUP_COMMAND", "").strip()
+    if command:
+        steps = [f"{command} changes the bot, the allowed users or the model"]
+    else:
+        steps = [
+            f"make agent-status{profile} shows health; make agent-logs{profile} follows it",
+            f"make agent-model{profile} PROVIDER=... MODEL=... switches the model",
+        ]
+        if args.no_start:
+            steps.insert(0, f"Start it: make agent-up{profile}")
     if args.profile == "operator":
         if approver is None:
             steps.append(
                 "Bind the human who approves plans: Admin > Agents > Connections > "
                 f"Telegram approver, connection {principal or 'Crate Operator'}"
             )
+        status = (
+            "crate doctor" if command else "make agent-status AGENT_PROFILE=operator"
+        )
         steps += [
             "Changes open once crate-provenance verifies that every running Crate "
-            "image is an official GHCR image (make agent-status AGENT_PROFILE=operator "
-            "shows it); instances running locally built images stay read-only",
+            f"image is an official GHCR image ({status} shows it); instances running "
+            "locally built images stay read-only",
             "Optional: the infrastructure bridge needs root and systemd on the host "
-            "(deploy/operator/README.infra.md); make agent-up starts the relay only "
-            "once its socket exists",
+            "(deploy/operator/README.infra.md); "
+            + ("the relay starts" if command else "make agent-up starts the relay")
+            + " only once its socket exists",
         ]
     return ["", "Next:"] + [f"  {index}. {step}" for index, step in enumerate(steps, 1)]
+
+
+def revoke(args, settings, runner=run) -> list:
+    """Turn a profile off: revoke its MCP credentials and delete the bot, the
+    allowlist and the tokens. Model keys, the model login and memory stay."""
+    paths = layout(settings, args.profile)
+    token_files = [paths.secrets / "mcp-token"]
+    if args.profile == "operator":
+        token_files.append(paths.root / "secrets/supervisor/operator_mcp_read")
+    report, revoked = [], []
+    for path in token_files:
+        token = _existing(path, MCP_TOKEN)
+        if token is None:
+            continue
+        found = identify_credential(token, runner) if api_running(runner) else None
+        if found is None:
+            report.append(
+                f"Warning: crate-api does not know the credential in {path}; "
+                "check Admin > Agents"
+            )
+            continue
+        try:
+            credential_cli(["revoke", found["credential_id"]], runner)
+        except SetupError as error:
+            report.append(f"Warning: {error}; revoke it in Admin > Agents")
+            continue
+        revoked.append(found["principal_id"])
+        report.append(f"Revoked the MCP credential {found['credential_id']}")
+    known = [
+        value
+        for value in settings.get("CRATE_OPERATOR_PRINCIPAL_IDS", "").split(",")
+        if value
+    ]
+    if any(value in revoked for value in known):
+        set_env_values(
+            args.env_file,
+            {
+                "CRATE_OPERATOR_PRINCIPAL_IDS": ",".join(
+                    value for value in known if value not in revoked
+                )
+            },
+        )
+        report.append("Removed the revoked principal from CRATE_OPERATOR_PRINCIPAL_IDS")
+    for path in [paths.secrets / name for name in SECRET_FILES] + token_files[1:]:
+        if path.is_file():
+            path.unlink()
+            report.append(f"Deleted {path}")
+    return report
 
 
 def secret_status(secrets: Path, runtime) -> tuple:
@@ -1211,7 +1375,8 @@ def model_command(args, settings, prompter, runner=run) -> list:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("init", "check", "model", "auth", "smoke", "scale-args")
+        "command",
+        choices=("init", "check", "model", "auth", "smoke", "scale-args", "revoke"),
     )
     parser.add_argument("--profile", choices=tuple(PROFILES), default="agent")
     parser.add_argument("--env-file", type=Path, default=REPO / ".env")
@@ -1227,19 +1392,43 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--no-start", action="store_true")
     parser.add_argument("--no-network", action="store_true")
+    parser.add_argument(
+        "--in-container",
+        action="store_true",
+        help="run inside crate-api: local credential CLI, no docker, no start",
+    )
+    parser.add_argument(
+        "--reuse",
+        action="store_true",
+        help="copy the other profile's bot, allowlist and model keys it lacks",
+    )
     parser.add_argument("--provider", default="")
     parser.add_argument("--model", default="")
     parser.add_argument("--base-url", default="")
     args = parser.parse_args(argv)
-    settings = load_settings(args.env_file)
-    interactive = not args.non_interactive and sys.stdin.isatty()
-    prompter = Prompter(interactive)
+    global IN_CONTAINER
+    IN_CONTAINER = args.in_container
+    environ = None
+    if args.in_container:
+        environ = {
+            name: os.environ[name]
+            for name in CONTAINER_ENVIRONMENT
+            if name in os.environ
+        }
+    settings = load_settings(args.env_file, environ)
+    interactive = (
+        not args.non_interactive and not args.in_container and sys.stdin.isatty()
+    )
+    prompter = Prompter(interactive, environ)
     try:
         if args.command == "scale-args":
             print(" ".join(scale_args(settings)))
             return 0
         if args.command == "init":
             print("\n".join(init(args, settings, prompter)))
+            return 0
+        if args.command == "revoke":
+            print("\n".join(revoke(args, settings)))
             return 0
         if args.command == "model":
             print("\n".join(model_command(args, settings, prompter)))
