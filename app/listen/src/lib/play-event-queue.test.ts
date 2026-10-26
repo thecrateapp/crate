@@ -313,4 +313,60 @@ describe("postWithRetry", () => {
     await postWithRetry("/api/foo", { a: 1 });
     expect(queueSize()).toBe(1);
   });
+
+  it("persists the event before the request so a killed app still delivers it", async () => {
+    let resolveFetch: (response: Response) => void = () => {};
+    mockApiFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const pending = postWithRetry("/api/foo", { a: 1 });
+
+    expect(queueSize()).toBe(1);
+    resolveFetch(mkResponse(200));
+    await pending;
+    expect(queueSize()).toBe(0);
+  });
+
+  it("does not let the periodic flush resend an event still in flight", async () => {
+    mockApiFetch.mockReturnValue(new Promise<Response>(() => {}));
+    void postWithRetry("/api/foo", { a: 1 });
+
+    mockApiFetch.mockClear();
+    await flushQueue();
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(queueSize()).toBe(1);
+  });
+
+  it("makes a failed first send due for the next flush", async () => {
+    mockApiFetch.mockResolvedValueOnce(mkResponse(503));
+    await postWithRetry("/api/foo", { a: 1 });
+
+    mockApiFetch.mockResolvedValueOnce(mkResponse(200));
+    const result = await flushQueue();
+
+    expect(result.sent).toBe(1);
+    expect(queueSize()).toBe(0);
+  });
+
+  it("keeps an event persisted while a flush was in progress", async () => {
+    enqueueEvent("/api/foo", { queued: true });
+    let resolveFlush: (response: Response) => void = () => {};
+    mockApiFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFlush = resolve;
+      }),
+    );
+    const flushing = flushQueue();
+
+    mockApiFetch.mockReturnValueOnce(new Promise<Response>(() => {}));
+    void postWithRetry("/api/foo", { during: true });
+    resolveFlush(mkResponse(200));
+    await flushing;
+
+    expect(queueSize()).toBe(1);
+  });
 });

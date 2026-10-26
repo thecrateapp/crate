@@ -1388,6 +1388,7 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
                 body.playback_session,
                 user_id=int(user["id"]),
                 global_track_uid=body.global_track_uid,
+                played_at=body.started_at,
             )
         except PlaybackSessionInvalid as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -59,6 +59,35 @@ def test_playback_session_rejects_invalid_origin_and_expired_token(monkeypatch):
         verify_playback_session(token, user_id=7)
 
 
+def test_a_queued_play_is_verified_when_it_started_not_when_it_arrives(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "test-playback-provenance-secret-32")
+
+    from datetime import datetime, timezone
+
+    from crate.playback_provenance import (
+        PlaybackSessionInvalid,
+        issue_playback_session,
+        verify_playback_session,
+    )
+
+    token = issue_playback_session(
+        user_id=7,
+        content_origin="remote",
+        source_node_uid="22222222-2222-4222-8222-222222222222",
+        lifetime=timedelta(seconds=-1),
+    )
+    now = datetime.now(timezone.utc)
+
+    with pytest.raises(PlaybackSessionInvalid):
+        verify_playback_session(token, user_id=7)
+    claims = verify_playback_session(token, user_id=7, played_at=now)
+    assert claims.content_origin == "remote"
+    with pytest.raises(PlaybackSessionInvalid):
+        verify_playback_session(token, user_id=7, played_at=now + timedelta(hours=1))
+    with pytest.raises(PlaybackSessionInvalid):
+        verify_playback_session(token, user_id=7, played_at=now - timedelta(hours=1))
+
+
 def test_local_content_provenance_recognizes_completed_federation_import(pg_db):
     from crate.playback_provenance import resolve_local_content_provenance
 

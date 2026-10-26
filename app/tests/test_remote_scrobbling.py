@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from sqlalchemy import text
@@ -72,6 +73,7 @@ def test_play_event_uses_signed_playback_provenance(test_app):
         "signed-session",
         user_id=1,
         global_track_uid="11111111-1111-4111-8111-111111111111",
+        played_at=datetime(2026, 7, 14, 10, 0, tzinfo=timezone.utc),
     )
     assert record.call_args.kwargs["content_origin"] == "remote"
     assert (

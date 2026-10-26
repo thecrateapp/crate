@@ -11,6 +11,7 @@ from crate.db.queries.playback_provenance import get_imported_track_source_node_
 
 _PLAYBACK_AUDIENCE = "crate-playback"
 _DEFAULT_LIFETIME = timedelta(hours=6)
+_PLAYED_AT_LEEWAY = timedelta(minutes=5)
 _CONTENT_ORIGINS = frozenset({"local", "remote", "imported"})
 
 
@@ -69,19 +70,39 @@ def issue_playback_session(
     )
 
 
+def _session_covers(payload: dict, played_at: datetime) -> bool:
+    if played_at.tzinfo is None:
+        played_at = played_at.replace(tzinfo=timezone.utc)
+    issued, expires = payload.get("iat"), payload.get("exp")
+    if not isinstance(issued, (int, float)) or not isinstance(expires, (int, float)):
+        return False
+    moment = played_at.timestamp()
+    leeway = _PLAYED_AT_LEEWAY.total_seconds()
+    return issued - leeway <= moment <= expires + leeway
+
+
 def verify_playback_session(
     token: str,
     *,
     user_id: int,
     global_track_uid: str | None = None,
+    played_at: datetime | None = None,
 ) -> PlaybackSessionClaims:
+    """Verify a playback session, at ``played_at`` when the play is reported later.
+
+    Clients queue play events offline and resend them for hours; the session
+    must have been valid when the play started, not when it reaches the API.
+    """
     try:
         payload = jwt.decode(
             token,
             _get_jwt_secret(),
             algorithms=[JWT_ALGORITHM],
             audience=_PLAYBACK_AUDIENCE,
+            options={"verify_exp": played_at is None},
         )
+        if played_at is not None and not _session_covers(payload, played_at):
+            raise PlaybackSessionInvalid("Playback session is invalid or expired")
         if payload.get("typ") != "playback" or payload.get("sub") != str(user_id):
             raise PlaybackSessionInvalid("Playback session subject mismatch")
         content_origin = str(payload.get("origin") or "")

@@ -11,6 +11,9 @@
  *  - max retries per event: 5
  *  - backoff: 2s, 4s, 8s, 16s, 32s (capped at 60s)
  *  - single in-flight flush at a time to avoid duplicate deliveries
+ *  - events are persisted before their first POST, so a process killed
+ *    mid-request still delivers them; the server deduplicates by
+ *    client_event_id
  */
 import { apiFetch } from "@/lib/api";
 
@@ -20,6 +23,9 @@ const MAX_QUEUE_SIZE = 500;
 const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 60000;
+// Keeps the periodic flush from resending an event whose first POST is
+// still in flight.
+const FIRST_SEND_GRACE_MS = 30000;
 
 interface QueuedEvent {
   id: string;
@@ -88,7 +94,11 @@ let flushInFlight = false;
  * Enqueue a failed API write for later retry. Oldest entries are dropped
  * when the queue exceeds MAX_QUEUE_SIZE.
  */
-export function enqueueEvent(endpoint: string, payload: unknown): void {
+export function enqueueEvent(
+  endpoint: string,
+  payload: unknown,
+  delayMs = 0,
+): string {
   const now = new Date();
   const event: QueuedEvent = {
     id: generateId(),
@@ -96,9 +106,9 @@ export function enqueueEvent(endpoint: string, payload: unknown): void {
     payload,
     queuedAt: now.toISOString(),
     attempts: 0,
-    // Send immediately on the next flush; backoff only applies after
-    // an actual delivery attempt fails.
-    nextRetryAt: now.toISOString(),
+    // Send on the next flush; backoff only applies after an actual
+    // delivery attempt fails.
+    nextRetryAt: new Date(now.getTime() + delayMs).toISOString(),
   };
   const queue = readQueue();
   queue.push(event);
@@ -107,6 +117,22 @@ export function enqueueEvent(endpoint: string, payload: unknown): void {
     queue.shift();
   }
   writeQueue(queue);
+  return event.id;
+}
+
+function removeQueuedEvent(id: string): void {
+  const queue = readQueue();
+  const remaining = queue.filter((event) => event.id !== id);
+  if (remaining.length !== queue.length) writeQueue(remaining);
+}
+
+function makeQueuedEventDue(id: string): void {
+  const now = new Date().toISOString();
+  writeQueue(
+    readQueue().map((event) =>
+      event.id === id ? { ...event, nextRetryAt: now } : event,
+    ),
+  );
 }
 
 /**
@@ -124,6 +150,7 @@ export async function flushQueue(): Promise<{
   try {
     const queue = readQueue();
     if (queue.length === 0) return { sent: 0, failed: 0, dropped: 0 };
+    const flushedIds = new Set(queue.map((event) => event.id));
 
     const now = Date.now();
     let sent = 0;
@@ -184,7 +211,11 @@ export async function flushQueue(): Promise<{
       }
     }
 
-    writeQueue(remaining);
+    // Keep events persisted by postWithRetry while this flush was sending.
+    const addedDuringFlush = readQueue().filter(
+      (event) => !flushedIds.has(event.id),
+    );
+    writeQueue([...remaining, ...addedDuringFlush].slice(-MAX_QUEUE_SIZE));
     return { sent, failed, dropped };
   } finally {
     flushInFlight = false;
@@ -210,9 +241,10 @@ export function clearQueue(): void {
 }
 
 /**
- * POST with automatic retry-on-failure. If the request fails (network
- * error, 5xx, or 401) the payload is enqueued for later retry. 4xx
- * other than 401 are treated as unrecoverable and logged.
+ * POST with automatic retry-on-failure. The payload is persisted before
+ * the request and removed once the server accepts it or rejects it as
+ * unrecoverable (4xx other than 401). Network errors, 5xx and 401 leave
+ * it queued for the next flush.
  *
  * Fire-and-forget; never throws.
  */
@@ -220,6 +252,7 @@ export async function postWithRetry(
   endpoint: string,
   payload: unknown,
 ): Promise<void> {
+  const id = enqueueEvent(endpoint, payload, FIRST_SEND_GRACE_MS);
   try {
     const response = await apiFetch(endpoint, {
       method: "POST",
@@ -227,7 +260,10 @@ export async function postWithRetry(
       credentials: "include",
       body: JSON.stringify(payload),
     });
-    if (response.ok || response.status === 204) return;
+    if (response.ok || response.status === 204) {
+      removeQueuedEvent(id);
+      return;
+    }
 
     // 4xx non-401 → request is shaped wrong / resource invalid; don't retry.
     if (
@@ -235,15 +271,16 @@ export async function postWithRetry(
       response.status < 500 &&
       response.status !== 401
     ) {
+      removeQueuedEvent(id);
       console.warn(`[${endpoint}] rejected ${response.status}`, payload);
       return;
     }
 
-    // 401 (token expired) + 5xx → enqueue and retry later.
-    enqueueEvent(endpoint, payload);
+    // 401 (token expired) + 5xx → retry on the next flush.
+    makeQueuedEventDue(id);
   } catch (err) {
     // Network error, timeout, etc.
-    enqueueEvent(endpoint, payload);
+    makeQueuedEventDue(id);
     console.warn(`[${endpoint}] network error, queued`, err);
   }
 }
