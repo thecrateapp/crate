@@ -12,6 +12,8 @@ on:
       - "app/config.yaml"
       - "deploy/traefik/federation-readplane.yml"
       - "install.sh"
+      - ".env.example"
+      - "README.md"
       - ".github/workflows/build-installer.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -22,6 +24,8 @@ on:
       - "app/config.yaml"
       - "deploy/traefik/federation-readplane.yml"
       - "install.sh"
+      - ".env.example"
+      - "README.md"
       - ".github/workflows/build-installer.yml"
 
 jobs:

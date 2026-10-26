@@ -90,3 +90,8 @@ para que un agente (Claude, Codex…) instale Crate conversando con el usuario.
   extremo a extremo con un cliente MCP en memoria (sin fugas de secretos en ninguna respuesta),
   por stdio real, y la página con Chrome y validaciones reales de Last.fm y Telegram.
   `CRATE_INSTALLER_ONLY=1` en el bootstrap y guía "Install with an AI agent" en la documentación.
+- **Fase 4 (en curso).** Retirado el wizard web de Setup (página, redirección, rutas `/api/setup` y
+  esquemas; el benchmark de escritorio sonda `/api/status`). `.env.example` sin variables muertas
+  (`TIDARR_PASSWORD`, `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED`) y README con las variables por
+  perfil, sin `PROTONVPN_*` ni requisitos falsos; tests en `internal/manifest` impiden que
+  `.env.example` o el README documenten variables que nada lee.
