@@ -305,6 +305,17 @@ html.menu-open body {
   transition-delay: calc(var(--d, 0ms) + var(--i, 0) * var(--step, 45ms));
 }
 
+:where(html.js) [data-split]:not([aria-label]) {
+  visibility: hidden;
+  animation: split-fallback 0s 2.5s forwards;
+}
+
+@keyframes split-fallback {
+  to {
+    visibility: visible;
+  }
+}
+
 :where(html.js) [data-enter] {
   opacity: 0;
 }
@@ -660,6 +671,10 @@ html.menu-open body {
   }
   .w {
     transform: none !important;
+  }
+  :where(html.js) [data-split]:not([aria-label]) {
+    visibility: visible;
+    animation: none;
   }
   .is-in [data-enter],
   [data-enter].is-in {
