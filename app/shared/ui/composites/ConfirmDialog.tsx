@@ -29,7 +29,6 @@ export interface ConfirmDialogProps {
   ariaLabel?: string;
   backdropLabel?: string;
   tone?: ConfirmDialogTone;
-  variant?: "default" | "destructive";
   pending?: boolean;
   initialFocus?: "cancel" | "confirm";
   size?: AppModalSize;
@@ -55,8 +54,7 @@ function OpenConfirmDialog({
   closeLabel = "Close",
   ariaLabel = "Confirmation dialog",
   backdropLabel = "Close dialog backdrop",
-  tone,
-  variant,
+  tone = "default",
   pending: controlledPending = false,
   initialFocus,
   size = "sm",
@@ -74,10 +72,8 @@ function OpenConfirmDialog({
   const hasTitle = title != null && title !== false;
   const hasDescription = description != null && description !== false;
   const pending = controlledPending || internalPending;
-  const resolvedTone: ConfirmDialogTone =
-    tone ?? (variant === "destructive" ? "danger" : "default");
   const resolvedInitialFocus =
-    initialFocus ?? (resolvedTone === "danger" ? "cancel" : "confirm");
+    initialFocus ?? (tone === "danger" ? "cancel" : "confirm");
   const confirmed = !confirmation || confirmationValue === confirmation.value;
 
   useEffect(() => {
@@ -251,10 +247,10 @@ function OpenConfirmDialog({
               <Button
                 ref={confirmButtonRef}
                 type="button"
-                variant={resolvedTone === "danger" ? "destructive" : "default"}
+                variant={tone === "danger" ? "destructive" : "default"}
                 disabled={pending || !confirmed}
                 aria-busy={pending || undefined}
-                data-tone={resolvedTone}
+                data-tone={tone}
                 onClick={() => void handleConfirm()}
               >
                 {pending ? (

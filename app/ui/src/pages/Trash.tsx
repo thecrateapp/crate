@@ -386,7 +386,7 @@ export function Trash() {
           deleteTarget ? displayTitle(deleteTarget) : "this track"
         }" from .crate-trash? This cannot be undone.`}
         confirmLabel="Delete Permanently"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (deleteTarget) await hardDelete(deleteTarget);
         }}
@@ -409,7 +409,7 @@ export function Trash() {
           totalSizeBytes,
         )}) from .crate-trash? This cannot be undone.`}
         confirmLabel="Empty Trash"
-        variant="destructive"
+        tone="danger"
         onConfirm={hardDeleteAll}
         onError={() => undefined}
         eyebrow="Confirm action"

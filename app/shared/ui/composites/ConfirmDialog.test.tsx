@@ -74,7 +74,7 @@ describe("ConfirmDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("applies destructive styles when variant is destructive", () => {
+  it("applies destructive styles with the danger tone", () => {
     render(
       <ConfirmDialog
         open
@@ -82,7 +82,7 @@ describe("ConfirmDialog", () => {
         title="Delete?"
         description="Are you sure?"
         onConfirm={vi.fn()}
-        variant="destructive"
+        tone="danger"
       />,
     );
     expect(screen.getByRole("button", { name: /Confirm/i })).toHaveClass(

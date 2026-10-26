@@ -836,7 +836,7 @@ export function Imports() {
         }
         consequence="The staged source directory will be removed by a worker task."
         confirmLabel="Remove from staging"
-        variant="destructive"
+        tone="danger"
       />
     </div>
   );

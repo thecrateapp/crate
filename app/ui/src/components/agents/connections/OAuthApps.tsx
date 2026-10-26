@@ -396,7 +396,7 @@ export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
             : "Agents can sign in with this app again, within the permissions it allows."
         }
         confirmLabel={confirmation?.enabled ? "Disable app" : "Enable app"}
-        variant={confirmation?.enabled ? "destructive" : "default"}
+        tone={confirmation?.enabled ? "danger" : "default"}
         onConfirm={() => {
           const pending = confirmation;
           setConfirmation(null);

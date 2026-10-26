@@ -871,7 +871,7 @@ export function ArtistHeroArtworkEditor({
         title={`Delete ${deleteComposition ?? ""} hero composition?`}
         description="This permanently removes the saved composition and its rendered artwork. You can create it again from a new source or the artist background."
         confirmLabel="Delete composition"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (deleteComposition)
             await deletePersistedComposition(deleteComposition);

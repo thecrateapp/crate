@@ -847,7 +847,7 @@ export function TrackTable({
           "this track"
         }" to .crate-trash and remove it from this album? This is reversible from the filesystem.`}
         confirmLabel="Quarantine Track"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (pendingQuarantineTrack)
             await quarantineTrack(pendingQuarantineTrack);

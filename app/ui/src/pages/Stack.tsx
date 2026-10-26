@@ -595,7 +595,7 @@ export function Stack() {
         title="Restart service"
         description={`Restart ${restartTarget}? This interrupts the container and may briefly affect admin or listener traffic.`}
         confirmLabel="Restart"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (restartTarget) await handleRestart(restartTarget);
         }}

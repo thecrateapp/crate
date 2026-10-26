@@ -1236,7 +1236,7 @@ export function Album() {
           title="Apply MusicBrainz Tags"
           description="This will overwrite current tags with MusicBrainz data. Are you sure?"
           confirmLabel="Apply Tags"
-          variant="destructive"
+          tone="danger"
           onConfirm={async () => {
             if (pendingMatch) await applyMatch(pendingMatch);
           }}
@@ -1255,7 +1255,7 @@ export function Album() {
             data.artist
           } from the database AND the filesystem. This action cannot be undone.`}
           confirmLabel="Delete Album"
-          variant="destructive"
+          tone="danger"
           onError={() => {}}
           onConfirm={async () => {
             try {

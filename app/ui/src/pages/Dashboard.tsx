@@ -493,7 +493,7 @@ export function Dashboard() {
         title="Rebuild Library"
         description="This will wipe the entire library database and rebuild from scratch. This includes: wipe DB, health check, repair, full sync, and re-enrichment. This may take a while."
         confirmLabel="Rebuild Library"
-        variant="destructive"
+        tone="danger"
         onConfirm={() =>
           runMaintenanceTask(
             "/api/manage/rebuild",
@@ -518,7 +518,7 @@ export function Dashboard() {
         title="Wipe Library Database"
         description="This will permanently delete ALL library data (artists, albums, tracks) from the database. Files on disk will NOT be affected. This action cannot be undone."
         confirmLabel="Wipe Database"
-        variant="destructive"
+        tone="danger"
         onConfirm={() =>
           runMaintenanceTask(
             "/api/manage/wipe",

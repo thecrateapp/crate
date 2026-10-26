@@ -490,7 +490,7 @@ function ArtistPageDialogs({
         title={`Delete ${data.name}?`}
         description={`This will permanently delete ${data.name} and all their albums/tracks from the database AND the filesystem. This action cannot be undone.`}
         confirmLabel="Delete Artist"
-        variant="destructive"
+        tone="danger"
         onConfirm={onDelete}
         onError={() => {}}
         eyebrow="Confirm action"

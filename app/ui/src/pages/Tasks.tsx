@@ -1762,7 +1762,7 @@ export function Tasks() {
         title="Cancel task"
         description="Cancel this background task? Running jobs may stop mid-operation depending on the worker handler."
         confirmLabel="Cancel task"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (cancelId) await handleCancel(cancelId);
         }}

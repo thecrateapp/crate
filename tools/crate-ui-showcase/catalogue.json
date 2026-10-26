@@ -316,9 +316,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/ConfirmDialog.tsx": "7b1791a0cce721073d65f2049204dfce1a8acd29b53869b0049ca1f67ad52dad",
+        "app/shared/ui/composites/ConfirmDialog.tsx": "00188ba4ffaafa0f632b21b1b79053e83e035b49b070bc018268b063516bf38f",
         "tools/crate-ui-showcase/stories/ConfirmDialog.stories.tsx": "b6c520f1c0b1bf48218632b58ba0505b2c3839646cf4051ffc88d18f5d4250de",
-        "tools/crate-ui-showcase/docs/ConfirmDialog.mdx": "4206260ffe538094af7e9660874805c8e299265c6d0366dba422897ba18cfe48"
+        "tools/crate-ui-showcase/docs/ConfirmDialog.mdx": "82134df7cb6cf97c34eb085c18e851270501f257717a38caa5a7ceb5094f90e9"
       },
       "category": "Overlays"
     },

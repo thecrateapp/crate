@@ -895,7 +895,7 @@ export function ConnectionSheet({
           title={confirmation?.title ?? ""}
           description={confirmation?.description ?? ""}
           confirmLabel={confirmation?.confirmLabel}
-          variant={confirmation?.destructive ? "destructive" : "default"}
+          tone={confirmation?.destructive ? "danger" : "default"}
           onConfirm={() => {
             const pending = confirmation;
             setConfirmation(null);

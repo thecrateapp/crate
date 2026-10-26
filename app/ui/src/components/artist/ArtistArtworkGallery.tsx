@@ -536,7 +536,7 @@ export function ArtistArtworkGallery({
         title={`Delete ${assetToDelete?.label ?? "image"}?`}
         description="This removes the image from the artist gallery. Assigned artwork slots are protected."
         confirmLabel="Delete image"
-        variant="destructive"
+        tone="danger"
         onConfirm={async () => {
           if (assetToDelete) await deleteAsset(assetToDelete);
         }}

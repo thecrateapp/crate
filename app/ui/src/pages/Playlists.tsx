@@ -755,7 +755,7 @@ export function Playlists() {
         title="Delete system playlist"
         description={`Delete "${deleteTarget?.name}"? This cannot be undone.`}
         confirmLabel="Delete"
-        variant="destructive"
+        tone="danger"
         onConfirm={handleDelete}
         onError={() => {
           setDeleteError(true);

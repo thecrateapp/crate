@@ -770,7 +770,7 @@ export function Browse() {
         title="Delete artists"
         description={`This will permanently delete ${selected.size} artist(s) and all their files. This action cannot be undone.`}
         confirmLabel="Delete"
-        variant="destructive"
+        tone="danger"
         onConfirm={batchDelete}
         onError={() => {}}
         eyebrow="Confirm action"

@@ -840,7 +840,7 @@ function NodeDetailPanel({
           title={`Delete ${node.name}?`}
           description="This removes the taxonomy node, aliases, relations, and all mapped raw genre assignments from artists and albums. This cannot be undone."
           confirmLabel="Delete Genre"
-          variant="destructive"
+          tone="danger"
           onConfirm={deleteNode}
           onError={(error) =>
             toast.error(

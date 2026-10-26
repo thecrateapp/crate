@@ -180,7 +180,6 @@ describe("Admin status colour contract", () => {
   it.each([
     "text-accent-action-hi bg-accent-action/10",
     "text-state-warning-text",
-    '<ConfirmDialog variant="destructive" />',
     '<ConfirmDialog tone="danger" />',
     '<OpsStatTile tone="danger" />',
     'const variant = "destructive"; function Neutral() { const variant = "outline"; return <Button variant={variant} />; }',

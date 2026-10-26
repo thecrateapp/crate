@@ -1218,7 +1218,7 @@ function GenreList() {
         title={`Delete ${deleteTarget?.name ?? "genre"}?`}
         description="This removes this raw genre from every artist and album that currently uses it. This cannot be undone."
         confirmLabel="Delete Genre"
-        variant="destructive"
+        tone="danger"
         onConfirm={() => {
           void deleteRawGenre();
         }}

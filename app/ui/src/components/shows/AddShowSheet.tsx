@@ -453,7 +453,7 @@ export function AddShowSheet({
           title={`Discard ${countLabel(discarded, "unsaved show")}?`}
           description="The draft and its source are cleared. Shows you already saved stay in Crate."
           confirmLabel="Discard"
-          variant="destructive"
+          tone="danger"
           onConfirm={reset}
         />
       </SheetContent>

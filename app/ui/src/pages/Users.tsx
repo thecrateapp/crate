@@ -1195,7 +1195,7 @@ export function Users() {
           deleteTarget?.name || deleteTarget?.email
         }? Open sessions will be revoked and owned contributions may be queued for cleanup.`}
         confirmLabel="Delete"
-        variant="destructive"
+        tone="danger"
         onConfirm={handleDelete}
         onError={(err) =>
           toast.error(
