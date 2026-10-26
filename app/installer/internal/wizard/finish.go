@@ -45,7 +45,7 @@ func (w *wizard) dnsHost(ctx context.Context) install.DNSHost {
 }
 
 func (w *wizard) review(ctx context.Context) error {
-	ui.Step(w.out, 5, totalSteps, "Review", "Nothing has been written yet.")
+	ui.Step(w.out, 6, totalSteps, "Review", "Nothing has been written yet.")
 	admin := "the password you chose"
 	switch {
 	case w.existing != nil:
@@ -68,6 +68,16 @@ func (w *wizard) review(ctx context.Context) error {
 		rows = append(rows, [2]string{"Listen", local.Listen}, [2]string{"Admin", local.Admin})
 	}
 	rows = append(rows, [2]string{"Admin account", "admin@cratemusic.app · " + admin})
+	var enabled []string
+	for _, in := range w.ordered() {
+		if w.enabled(in) || (in.ID == "tidal" && w.tidal) {
+			enabled = append(enabled, in.Title)
+		}
+	}
+	if len(enabled) == 0 {
+		enabled = []string{"none yet"}
+	}
+	rows = append(rows, [2]string{"Integrations", strings.Join(enabled, ", ")})
 	ui.Rows(w.out, rows)
 
 	ui.Heading(w.out, "Files")
@@ -102,7 +112,7 @@ func (w *wizard) review(ctx context.Context) error {
 }
 
 func (w *wizard) install(ctx context.Context) error {
-	ui.Step(w.out, 6, totalSteps, "Installing", "")
+	ui.Step(w.out, 7, totalSteps, "Installing", "")
 	if w.opts.DryRun {
 		ui.Success(w.out, "Dry run: nothing was written and no container was started.")
 		return nil
@@ -176,17 +186,26 @@ func (w *wizard) done() {
 	}
 
 	ui.Heading(w.out, "Next")
-	next := [][2]string{
-		{"1", "Copy or mount your albums into " + w.cfg.MusicDir},
-		{"2", "Sign in to Admin; Crate scans the library and starts enriching it"},
-		{"3", "Install the Listen app on your phone and add " + w.cfg.PublicURLs().API},
+	steps := []string{
+		"Copy or mount your albums into " + w.cfg.MusicDir,
+		"Sign in to Admin; Crate scans the library and starts enriching it",
+		"Install the Listen app on your phone and add " + w.cfg.PublicURLs().API,
+	}
+	if w.tidal {
+		steps = append(steps, "Connect Tidal in Admin > Settings > Downloads and enter the code at tidal.com/activate")
+	}
+	var next [][2]string
+	for i, step := range steps {
+		next = append(next, [2]string{fmt.Sprint(i + 1), step})
 	}
 	ui.Rows(w.out, next)
 	ui.Heading(w.out, "Manage")
 	ui.Rows(w.out, [][2]string{
 		{"Status", "cd " + w.cfg.InstallDir + " && docker compose ps"},
 		{"Logs", "cd " + w.cfg.InstallDir + " && docker compose logs -f"},
-		{"Change settings", "crate install --dir " + w.cfg.InstallDir},
+		{"Integrations", "crate configure --dir " + w.cfg.InstallDir},
+		{"Health", "crate doctor --dir " + w.cfg.InstallDir},
+		{"Everything else", "crate install --dir " + w.cfg.InstallDir},
 	})
 	fmt.Fprintln(w.out)
 }

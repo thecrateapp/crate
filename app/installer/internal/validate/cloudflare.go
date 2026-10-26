@@ -16,12 +16,14 @@ var ErrRejected = errors.New("the provider rejected this credential")
 type Client struct {
 	HTTP       *http.Client
 	Cloudflare string // API base, replaced in tests
+	Endpoints  Endpoints
 }
 
 func NewClient() Client {
 	return Client{
 		HTTP:       &http.Client{Timeout: 10 * time.Second},
 		Cloudflare: "https://api.cloudflare.com/client/v4",
+		Endpoints:  DefaultEndpoints(),
 	}
 }
 

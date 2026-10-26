@@ -42,6 +42,10 @@ core:
   - env: CRATE_LOCAL_DOMAIN
     label: Local domain
     installer_only: true
+  # Read by the docker compose CLI itself, not interpolated in the file.
+  - env: COMPOSE_PROFILES
+    label: Optional services
+    installer_only: true
   - env: CF_DNS_API_TOKEN
     label: Cloudflare DNS API token
     secret: true
@@ -189,6 +193,7 @@ integrations:
   - id: lastfm
     group: enrichment
     title: Last.fm
+    tagline: biographies, tags and similar artists
     summary: Artist biographies, tags, similar artists and listening data.
     recommended: true
     env:
@@ -209,6 +214,7 @@ integrations:
   - id: fanart
     group: enrichment
     title: Fanart.tv
+    tagline: artist photos and logos
     summary: Artist photos, logos and backgrounds.
     recommended: true
     env:
@@ -225,6 +231,7 @@ integrations:
   - id: spotify
     group: enrichment
     title: Spotify
+    tagline: popularity and artwork
     summary: Popularity signals and artwork for your artists.
     env:
       - name: SPOTIFY_ID
@@ -243,6 +250,7 @@ integrations:
   - id: discogs
     group: enrichment
     title: Discogs
+    tagline: credits, labels and editions
     summary: Credits, labels and release editions.
     env:
       - name: DISCOGS_CONSUMER_KEY
@@ -260,6 +268,7 @@ integrations:
   - id: setlistfm
     group: shows
     title: Setlist.fm
+    tagline: probable setlists
     summary: Probable setlists for your artists' upcoming shows.
     env:
       - name: SETLISTFM_API_KEY
@@ -275,6 +284,7 @@ integrations:
   - id: ticketmaster
     group: shows
     title: Ticketmaster
+    tagline: upcoming concerts
     summary: Upcoming concerts for the artists in your library.
     env:
       - name: TICKETMASTER_API_KEY
@@ -290,23 +300,54 @@ integrations:
   - id: soulseek
     group: acquisition
     title: Soulseek
+    tagline: downloads through slskd
     summary: Search and download from the Soulseek network through slskd.
     env:
       - name: SLSKD_URL
         label: slskd URL
+        placeholder: http://192.168.1.20:5030
       - name: SLSKD_API_KEY
         label: slskd API key
         secret: true
+      - name: SLSKD_SLSK_USERNAME
+        label: Soulseek username
+      - name: SLSKD_SLSK_PASSWORD
+        label: Soulseek password
+        secret: true
+      - name: SLSKD_LISTEN_PORT
+        label: Soulseek listening port
+        default: "50300"
     get_key:
-      url: https://github.com/slskd/slskd/blob/master/docs/config.md
+      url: https://github.com/slskd/slskd
       steps:
-        - Crate talks to an slskd server; set an API key in its configuration.
-        - Paste the slskd URL and the same API key here.
+        - Crate can run slskd for you, or use an slskd server you already have.
+        - With Crate's slskd, pick a Soulseek username and password; the network creates the account the first time it signs in.
+        - Forward the listening port on your router so other users can reach you; searches work without it, downloads get faster with it.
     validate: slskd
+
+  - id: telegram
+    group: notifications
+    title: Telegram
+    tagline: alerts on your phone
+    summary: Alerts about imports, failures and new releases, and quick actions from your phone.
+    env:
+      - name: TELEGRAM_BOT_TOKEN
+        label: Bot token
+        secret: true
+      - name: TELEGRAM_CHAT_ID
+        label: Chat ID
+    get_key:
+      url: https://t.me/BotFather
+      steps:
+        - Open @BotFather in Telegram and send /newbot.
+        - Pick a name and a username ending in bot; BotFather replies with the token.
+        - Crate finds your chat ID when you send your new bot a message.
+    validate: telegram
 
   - id: tidal
     group: acquisition
     title: Tidal
+    tagline: lossless downloads
     summary: Download lossless albums with your Tidal subscription.
     env: []
     get_key:
@@ -319,6 +360,7 @@ integrations:
   - id: ai
     group: ai
     title: AI models
+    tagline: Gemini, OpenAI, Anthropic or Ollama
     summary: Biographies, playlist ideas and agents through Gemini, OpenAI, Anthropic or a local Ollama.
     env:
       - name: LLM_PROVIDER
@@ -349,6 +391,7 @@ integrations:
   - id: mcp
     group: ai
     title: Agents (MCP)
+    tagline: Claude, Codex and other agents
     summary: Let Claude, Codex and other agents read and operate Crate.
     env:
       - name: CRATE_MCP_ENABLED
@@ -375,6 +418,7 @@ integrations:
   - id: google-login
     group: accounts
     title: Sign in with Google
+    tagline: listeners sign in with Google
     summary: Let listeners sign in with their Google account.
     env:
       - name: GOOGLE_CLIENT_ID
@@ -391,6 +435,7 @@ integrations:
   - id: apple-login
     group: accounts
     title: Sign in with Apple
+    tagline: listeners sign in with Apple
     summary: Let listeners sign in with their Apple ID.
     env:
       - name: APPLE_CLIENT_ID

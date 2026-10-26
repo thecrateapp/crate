@@ -70,3 +70,15 @@ para que un agente (Claude, Codex…) instale Crate conversando con el usuario.
   manuales. `install.sh` es ya el bootstrap con checksum; el workflow `Installer` prueba en cada
   cambio y publica los binarios en los tags.
 - Pendiente de la fase 1: la prueba de arranque completo en una VM limpia (Linux y macOS).
+- **Fase 2 hecha.** Paso de integraciones con selección agrupada (recomendadas preseleccionadas),
+  guía y URL por integración y validación en vivo contra cada proveedor (Last.fm firmado con el
+  secreto, Fanart.tv, Spotify, Discogs, Setlist.fm, Ticketmaster, slskd, Gemini, OpenAI,
+  Anthropic, Ollama y Telegram). Distingue clave rechazada de proveedor inalcanzable y ofrece
+  reintentar, guardar igualmente o dejarlo para luego. Flujos propios para Soulseek (slskd de
+  Crate con el perfil `soulseek` o servidor propio), IA (proveedores y modelo por defecto),
+  agentes MCP (lectura o acciones; OAuth con HTTPS público), Telegram (detecta el chat ID) y
+  Tidal (se conecta tras arrancar). `crate configure [integración]` y `crate doctor [--json]`.
+  Telegram pasa ya al compose home. Reconfigurar no pisa valores que el wizard no pregunta.
+- **Cambio sobre el plan:** sin perfil `cast`. Un receptor de Cast propio solo sirve registrado
+  en Google y con las apps compiladas con su app ID; en una instalación doméstica las apps usan el
+  receptor por defecto.

@@ -139,3 +139,30 @@ func TestSectionsCoverEveryManifestVariable(t *testing.T) {
 		t.Errorf("variables outside any section: %s", strings.Join(missing, ", "))
 	}
 }
+
+func TestReconfiguringKeepsSettingsTheWizardDoesNotAsk(t *testing.T) {
+	m := loadManifest(t)
+	existing := envfile.New()
+	existing.Set("CRATE_ACCESS_MODE", "ports")
+	existing.Set("DOMAIN", "localhost")
+	existing.Set("CRATE_IMAGE_OWNER", "my-fork")
+	existing.Set("CRATE_LISTEN_PUBLIC_BASE_URL", "http://192.168.1.20:8581")
+
+	values, err := BuildEnv(m, Defaults("/srv/crate"), existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := values.Get("CRATE_IMAGE_OWNER"); got != "my-fork" {
+		t.Errorf("CRATE_IMAGE_OWNER = %q", got)
+	}
+	if got, _ := values.Get("CRATE_LISTEN_PUBLIC_BASE_URL"); got != "http://192.168.1.20:8581" {
+		t.Errorf("a hand-set Listen URL was replaced: %q", got)
+	}
+
+	moved := Defaults("/srv/crate")
+	moved.Access, moved.Domain = AccessCloudflare, "music.example.com"
+	values, _ = BuildEnv(m, moved, existing)
+	if got, _ := values.Get("CRATE_LISTEN_PUBLIC_BASE_URL"); got != "https://listen.music.example.com" {
+		t.Errorf("changing the access mode must move the public URLs, got %q", got)
+	}
+}

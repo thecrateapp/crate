@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"strings"
 	"testing"
 )
@@ -38,5 +39,22 @@ func TestRunRejectsUnknownCommands(t *testing.T) {
 	}
 	if code := run([]string{"version"}, &stdout, &stderr); code != 0 || strings.TrimSpace(stdout.String()) != "dev" {
 		t.Fatalf("version: code %d, out %q", code, stdout.String())
+	}
+}
+
+func TestParseInterspersedAcceptsFlagsAfterArguments(t *testing.T) {
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	dir := flags.String("dir", "", "")
+	ids, err := parseInterspersed(flags, []string{"lastfm", "--dir", "/srv/crate", "telegram"})
+	if err != nil || *dir != "/srv/crate" || strings.Join(ids, ",") != "lastfm,telegram" {
+		t.Fatalf("ids %v, dir %q, err %v", ids, *dir, err)
+	}
+}
+
+func TestDoctorFailsWithoutAnInstallation(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"doctor", "--json", "--dir", t.TempDir()}, &stdout, &stderr)
+	if code != 1 || !strings.Contains(stdout.String(), `"healthy": false`) {
+		t.Fatalf("code %d, out %s, err %s", code, stdout.String(), stderr.String())
 	}
 }

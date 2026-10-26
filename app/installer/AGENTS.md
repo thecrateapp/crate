@@ -28,6 +28,13 @@ for linux/darwin × amd64/arm64.
 - The `CRATE_*` environment variables and flags `install.sh` accepted keep working
   (`CRATE_ASSUME_YES`, `CRATE_DRY_RUN`, `CRATE_SKIP_START`, `CRATE_INSTALL_DIR`,
   `CRATE_ACCESS_MODE`, `CRATE_DOMAIN`, `CRATE_MUSIC_DIR`, ...).
+- Integrations live in the manifest: id, group, title, a tagline under 40 characters for the
+  list, summary, variables and how to get the key. A provider check belongs in
+  `internal/validate` and must tell a rejected key from an unreachable provider. Integrations
+  with their own questions (Soulseek, AI, MCP, Telegram, Tidal) have a form in
+  `internal/wizard/integrations.go`; the rest use the generic fields form.
+- `crate doctor --json` is a contract for scripts and the coming MCP server: keep the fields
+  stable.
 - UI copy is English, in Crate's tone: short, concrete, no emojis. Colours come from the V3
   tokens in `internal/ui/theme.go`; status rows use a dot plus a word.
 
@@ -38,4 +45,5 @@ cd app/installer
 go generate ./...                          # refresh embedded files
 go vet ./... && go test ./...
 go run ./cmd/crate install --dry-run       # walk the wizard without writing anything
+go run ./cmd/crate doctor --dir ~/crate    # check an installation
 ```

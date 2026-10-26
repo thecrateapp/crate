@@ -51,6 +51,8 @@ x-crate-env: &crate-env
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   AUDIOMUSE_GEMINI_API_KEY: ${AUDIOMUSE_GEMINI_API_KEY:-}
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
   CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
   CRATE_FEDERATION_IMPORT_MAX_BYTES: ${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
   CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
@@ -138,6 +140,33 @@ services:
       traefik.http.routers.traefik-secure.tls: ${TRAEFIK_TLS_ENABLED:-true}
       traefik.http.routers.traefik-secure.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
       traefik.http.routers.traefik-secure.service: api@internal
+
+  # Soulseek client, started with COMPOSE_PROFILES=soulseek. Crate reaches it
+  # at http://slskd:5030 and imports what lands in DOWNLOADS_DIR.
+  slskd:
+    logging: *default-logging
+    image: slskd/slskd:latest
+    container_name: crate-slskd
+    restart: unless-stopped
+    profiles: [soulseek]
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-UTC}
+      SLSKD_REMOTE_CONFIGURATION: "true"
+      SLSKD_SHARED_DIR: /music
+      SLSKD_DOWNLOADS_DIR: /downloads
+      SLSKD_INCOMPLETE_DIR: /downloads/incomplete
+      SLSKD_WEB_AUTHENTICATION_API_KEYS_CRATE: ${SLSKD_API_KEY:-}
+      SLSKD_SLSK_USERNAME: ${SLSKD_SLSK_USERNAME:-}
+      SLSKD_SLSK_PASSWORD: ${SLSKD_SLSK_PASSWORD:-}
+    volumes:
+      - ${DATA_DIR}/slskd:/app
+      - ${MUSIC_DIR}:/music:ro
+      - ${DOWNLOADS_DIR}:/downloads
+    ports:
+      - "${SLSKD_LISTEN_PORT:-50300}:50300"
+    networks:
+      - crate
 
   crate-redis:
     logging: *default-logging

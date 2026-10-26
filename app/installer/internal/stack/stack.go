@@ -3,10 +3,12 @@ package stack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/thecrateapp/crate/app/installer/internal/system"
@@ -60,4 +62,47 @@ func WaitForAPI(ctx context.Context, client *http.Client, apiURL string, timeout
 		case <-time.After(interval):
 		}
 	}
+}
+
+type Service struct {
+	Name    string `json:"Name"`
+	Service string `json:"Service"`
+	State   string `json:"State"`
+	Health  string `json:"Health"`
+	Status  string `json:"Status"`
+}
+
+// Services lists the project's containers, running or not.
+func (s Stack) Services(ctx context.Context) ([]Service, error) {
+	name, args := s.command("ps", "--all", "--format", "json")
+	out, err := s.Run.Output(ctx, name, args...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseServices(out)
+}
+
+// ParseServices accepts both a JSON array and one JSON object per line;
+// Docker Compose has printed each over the years.
+func ParseServices(out string) ([]Service, error) {
+	out = strings.TrimSpace(out)
+	if out == "" {
+		return nil, nil
+	}
+	var services []Service
+	if strings.HasPrefix(out, "[") {
+		err := json.Unmarshal([]byte(out), &services)
+		return services, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		var service Service
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			return nil, err
+		}
+		services = append(services, service)
+	}
+	return services, nil
 }

@@ -65,3 +65,18 @@ func TestWaitForAPIGivesUp(t *testing.T) {
 		t.Fatal("expected a timeout")
 	}
 }
+
+func TestParseServicesAcceptsBothComposeFormats(t *testing.T) {
+	lines := `{"Name":"crate-api","Service":"crate-api","State":"running","Health":"healthy"}
+{"Name":"crate-worker","Service":"crate-worker","State":"exited","Health":""}`
+	array := `[{"Name":"crate-api","Service":"crate-api","State":"running","Health":"healthy"},{"Name":"crate-worker","Service":"crate-worker","State":"exited","Health":""}]`
+	for name, out := range map[string]string{"lines": lines, "array": array} {
+		services, err := ParseServices(out)
+		if err != nil || len(services) != 2 || services[1].State != "exited" || services[0].Health != "healthy" {
+			t.Errorf("%s: got %+v, %v", name, services, err)
+		}
+	}
+	if services, err := ParseServices("  "); err != nil || services != nil {
+		t.Errorf("empty output: %+v, %v", services, err)
+	}
+}

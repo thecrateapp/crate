@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,18 @@ func (f *fakeRunner) Stream(_ context.Context, _ io.Writer, _ string, name strin
 	return nil
 }
 
+// offlineValidation fails fast instead of calling real providers.
+func offlineValidation() validate.Client {
+	client := validate.NewClient()
+	client.HTTP = &http.Client{Timeout: time.Second}
+	dead := "http://127.0.0.1:1"
+	client.Endpoints = validate.Endpoints{
+		LastFM: dead, Fanart: dead, SpotifyAuth: dead, Discogs: dead, Setlistfm: dead,
+		Ticketmaster: dead, Gemini: dead, OpenAI: dead, Anthropic: dead, Telegram: dead,
+	}
+	return client
+}
+
 func newTestWizard(t *testing.T, opts Options) (*wizard, *bytes.Buffer, *fakeRunner) {
 	t.Helper()
 	m, err := manifest.Load()
@@ -36,7 +49,7 @@ func newTestWizard(t *testing.T, opts Options) (*wizard, *bytes.Buffer, *fakeRun
 		opts:     opts,
 		out:      &out,
 		run:      runner,
-		validate: validate.NewClient(),
+		validate: offlineValidation(),
 		manifest: m,
 		detectDocker: func(context.Context, system.Runner, system.Host) (system.Docker, system.DockerState) {
 			return system.Docker{Docker: []string{"docker"}, Compose: []string{"docker", "compose"}, Version: "test"}, system.DockerReady
@@ -93,5 +106,64 @@ func TestDryRunWritesNothing(t *testing.T) {
 	}
 	if values, _ := install.ReadExisting(dir); values != nil {
 		t.Error("a dry run wrote .env")
+	}
+}
+
+func TestUnattendedInstallTakesIntegrationsFromTheEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("FANART_API_KEY", "from-env")
+	t.Setenv("SLSKD_URL", "http://slskd:5030")
+	t.Setenv("SLSKD_SLSK_USERNAME", "crate-listener")
+	t.Setenv("SLSKD_SLSK_PASSWORD", "secret")
+	w, out, _ := newTestWizard(t, Options{Version: "test", InstallDir: dir, Yes: true, SkipStart: true})
+
+	if err := w.execute(context.Background()); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+
+	values, _ := envfile.Read(install.EnvPath(dir))
+	for key, want := range map[string]string{"FANART_API_KEY": "from-env", "COMPOSE_PROFILES": "soulseek", "SLSKD_SLSK_USERNAME": "crate-listener"} {
+		if got, _ := values.Get(key); got != want {
+			t.Errorf("%s = %q, want %q", key, got, want)
+		}
+	}
+	if key, _ := values.Get("SLSKD_API_KEY"); key == "" {
+		t.Error("Crate's slskd needs a generated API key")
+	}
+	if !strings.Contains(out.String(), "Fanart.tv") || !strings.Contains(out.String(), "Soulseek") {
+		t.Errorf("configured integrations must be reported:\n%s", out.String())
+	}
+}
+
+func TestConfigureNeedsAnInstallationAndKnownIntegrations(t *testing.T) {
+	w, _, _ := newTestWizard(t, Options{Version: "test", InstallDir: t.TempDir()})
+	if err := w.configure(context.Background(), []string{"lastfm"}); err == nil || !strings.Contains(err.Error(), "crate install") {
+		t.Fatalf("got %v", err)
+	}
+
+	dir := t.TempDir()
+	if err := install.Apply(w.manifest, install.Defaults(dir), nil); err != nil {
+		t.Fatal(err)
+	}
+	w, _, _ = newTestWizard(t, Options{Version: "test", InstallDir: dir})
+	err := w.configure(context.Background(), []string{"myspace"})
+	if err == nil || !strings.Contains(err.Error(), "lastfm") {
+		t.Fatalf("an unknown id must list the valid ones, got %v", err)
+	}
+}
+
+func TestTurningSoulseekOffRemovesItsProfile(t *testing.T) {
+	w, _, _ := newTestWizard(t, Options{})
+	w.existing = envfile.New()
+	w.existing.Set("COMPOSE_PROFILES", "soulseek,extra")
+	in, _ := w.manifest.Integration("soulseek")
+
+	w.clear(in)
+
+	if strings.Join(w.cfg.Profiles, ",") != "extra" {
+		t.Fatalf("profiles %v", w.cfg.Profiles)
+	}
+	if value, ok := w.cfg.Integrations["SLSKD_URL"]; !ok || value != "" {
+		t.Fatal("its variables must be cleared")
 	}
 }

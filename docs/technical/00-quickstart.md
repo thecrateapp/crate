@@ -46,9 +46,12 @@ For an interactive installation:
 curl -fsSL https://cratemusic.app/install.sh | bash
 ```
 
-The wizard checks Docker, memory, disk and ports, asks for the music folder,
-the access mode and the admin password, shows a review and waits until the API
-answers. Pass `--dry-run` to see the plan without writing anything, or
+The wizard checks Docker, memory, disk and ports, asks for the music folder
+and the access mode, offers the integrations (Last.fm, Fanart.tv, Spotify,
+Discogs, Setlist.fm, Ticketmaster, Soulseek, Tidal, Telegram, AI models, agents
+and social sign-in) with a link and steps to get each key, checks every key
+against its provider, asks for the admin password, shows a review and waits
+until the API answers. Pass `--dry-run` to see the plan without writing anything, or
 `--accessible` for plain prompts that work with screen readers.
 
 For a non-interactive public installation (the `CRATE_*` variables are the
@@ -81,6 +84,23 @@ authenticates API/readplane traffic, Redis also carries the task broker and
 durable streams, and `CRATE_CREDENTIAL_KEY` encrypts stored AI credentials.
 `deploy/install/integrations.yaml` declares every variable the installer
 writes.
+
+## Integrations and health
+
+```bash
+crate configure            # choose integrations to set up, change or turn off
+crate configure telegram   # go straight to one of them
+crate doctor               # machine, Docker, services, API and every configured key
+crate doctor --json        # the same report for scripts and agents
+```
+
+`crate configure` saves the keys in `.env` and restarts only the services that
+use them. Soulseek can run inside Crate (the `soulseek` compose profile starts
+slskd and imports what it downloads) or point at an slskd server you already
+run. Tidal connects after Crate starts, from Admin > Settings > Downloads, with
+a code you enter at tidal.com/activate. For unattended installs, export the
+integration variables (for example `FANART_API_KEY`) before `crate install
+--yes`; `deploy/install/integrations.yaml` lists them.
 
 ## Access modes and endpoints
 
@@ -141,8 +161,8 @@ tested backup.
 
 ## Next steps
 
-- Configure optional enrichment credentials in `.env`, then recreate the
-  affected services with `docker compose up -d`.
+- Set up or change integrations with `crate configure`, and check the
+  installation with `crate doctor`.
 - Read [Operations](operations.md) for Redis, workers and restore handling.
 - Read [Federation overview](federation-overview.md) before exposing or pairing
   an instance with another node. Federation is not a filesystem replication

@@ -33,7 +33,7 @@ type Options struct {
 // ErrCancelled is returned when the user leaves the wizard.
 var ErrCancelled = errors.New("installation cancelled")
 
-const totalSteps = 6
+const totalSteps = 7
 
 type wizard struct {
 	opts     Options
@@ -49,6 +49,7 @@ type wizard struct {
 	docker   system.Docker
 	cfg      install.Config
 	existing *envfile.Values
+	tidal    bool // the user chose Tidal, which connects after start
 }
 
 func Run(ctx context.Context, opts Options) error {
@@ -77,6 +78,7 @@ func (w *wizard) execute(ctx context.Context) error {
 		w.checks,
 		w.basics,
 		w.access,
+		w.integrations,
 		w.admin,
 		w.review,
 		w.install,

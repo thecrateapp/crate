@@ -64,6 +64,13 @@ type Config struct {
 	PUID      string
 	PGID      string
 	DockerGID string
+
+	// Integrations holds the variables the integrations step set; an empty
+	// value clears a variable that was configured before.
+	Integrations map[string]string
+	// Profiles are the optional compose services to run; nil keeps the
+	// existing COMPOSE_PROFILES.
+	Profiles []string
 }
 
 const LocalDomainDefault = "crate.local"

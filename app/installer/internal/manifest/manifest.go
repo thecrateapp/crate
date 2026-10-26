@@ -25,9 +25,11 @@ type Generated struct {
 }
 
 type IntegrationEnv struct {
-	Name   string `yaml:"name"`
-	Label  string `yaml:"label"`
-	Secret bool   `yaml:"secret"`
+	Name        string `yaml:"name"`
+	Label       string `yaml:"label"`
+	Secret      bool   `yaml:"secret"`
+	Default     string `yaml:"default"`
+	Placeholder string `yaml:"placeholder"`
 }
 
 type KeyGuide struct {
@@ -39,6 +41,7 @@ type Integration struct {
 	ID          string           `yaml:"id"`
 	Group       string           `yaml:"group"`
 	Title       string           `yaml:"title"`
+	Tagline     string           `yaml:"tagline"`
 	Summary     string           `yaml:"summary"`
 	Recommended bool             `yaml:"recommended"`
 	Env         []IntegrationEnv `yaml:"env"`
@@ -119,6 +122,9 @@ func (m *Manifest) validate() error {
 	for _, in := range m.Integrations {
 		if in.ID == "" || ids[in.ID] {
 			return fmt.Errorf("integration id %q is empty or repeated", in.ID)
+		}
+		if len(in.Tagline) > 40 {
+			return fmt.Errorf("integration %s: keep the tagline under 40 characters", in.ID)
 		}
 		ids[in.ID] = true
 		for _, e := range in.Env {

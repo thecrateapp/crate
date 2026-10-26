@@ -137,6 +137,7 @@ func (w *wizard) basics(ctx context.Context) error {
 	if w.cfg, err = install.WithOverrides(w.cfg, os.Getenv); err != nil {
 		return err
 	}
+	w.cfg = install.IntegrationOverrides(w.manifest, w.cfg, os.Getenv)
 	if w.interactive() {
 		err := w.form(huh.NewGroup(
 			huh.NewInput().
@@ -312,7 +313,7 @@ func (w *wizard) askPorts() error {
 }
 
 func (w *wizard) admin(context.Context) error {
-	ui.Step(w.out, 4, totalSteps, "Your admin account", "You sign in to Admin and Listen with this account. Invite other people from Admin later.")
+	ui.Step(w.out, 5, totalSteps, "Your admin account", "You sign in to Admin and Listen with this account. Invite other people from Admin later.")
 	if w.existing != nil {
 		ui.Success(w.out, "The admin account already exists. Change its password from Admin > Users.")
 		w.cfg.AdminPassword = ""
