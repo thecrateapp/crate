@@ -1,4 +1,5 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { NextShowBadge } from "@/components/shows/NextShowBadge";
 import { Link } from "react-router";
 
 import { ImageCropUpload } from "@/components/ImageCropUpload";
@@ -372,21 +373,7 @@ export function ArtistHeroSection({
           </MonoLabel>
         ) : null}
         {upcomingShow ? (
-          <a
-            href={upcomingShow.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex text-sm text-accent-action-hi hover:underline"
-          >
-            Next show:{" "}
-            {new Date(upcomingShow.date).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
-            {upcomingShow.venue ? ` · ${upcomingShow.venue}` : ""}
-            {upcomingShow.city ? `, ${upcomingShow.city}` : ""}
-          </a>
+          <NextShowBadge show={upcomingShow} className="mt-3" />
         ) : null}
         {genreProfile && genreProfile.length > 0 ? (
           <GenrePillRow items={genreProfile} max={6} className="mt-3" />

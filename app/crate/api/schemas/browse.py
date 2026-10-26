@@ -398,6 +398,34 @@ class ArtistNetworkResponse(RootModel[dict[str, Any]]):
     pass
 
 
+class ArtistNetworkLinkedArtist(BaseModel):
+    name: str
+    score: float
+    artist_id: int | None = None
+    artist_slug: str | None = None
+
+
+class ArtistNetworkNextShow(BaseModel):
+    date: str
+    venue: str | None = None
+    city: str | None = None
+    country: str | None = None
+    url: str | None = None
+
+
+class ArtistNetworkCardResponse(BaseModel):
+    name: str
+    in_library: bool
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    album_count: int | None = None
+    track_count: int | None = None
+    listeners: int | None = None
+    genres: list[str] = Field(default_factory=list)
+    linked_by: list[ArtistNetworkLinkedArtist] = Field(default_factory=list)
+    next_show: ArtistNetworkNextShow | None = None
+
+
 class RelatedAlbumResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 

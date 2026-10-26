@@ -188,6 +188,40 @@ describe("ArtistHeroSection", () => {
     // The Admin content edge must not inherit Listen's centered maximum width.
     expect(container.querySelector(".max-w-none")).toHaveClass("mx-0");
   });
+  it("shows the next show as an accent capsule linking to its listing", () => {
+    render(
+      <MemoryRouter>
+        <ArtistHeroSection
+          {...props()}
+          upcomingShow={{
+            id: "s1",
+            name: "Pixies",
+            date: "2027-05-01",
+            local_date: "2027-05-01",
+            venue: "Viejas Arena",
+            city: "San Diego",
+            region: "CA",
+            country: "United States",
+            country_code: "US",
+            url: "https://tickets.example/pixies",
+            image: "",
+            lineup: ["Pixies"],
+            status: "onsale",
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole("link", {
+      name: "Open next show listing: Next show · May 1, 2027 · Viejas Arena, San Diego",
+    });
+    expect(link).toHaveAttribute("href", "https://tickets.example/pixies");
+    expect(link).toHaveAttribute("target", "_blank");
+    const badge = link.querySelector('[data-slot="info-badge"]');
+    expect(badge).toHaveAttribute("data-tone", "accent");
+    expect(badge?.querySelector(".crate-status-dot")).not.toBeNull();
+  });
+
   it("places artwork editing on the images and gives Core Tracks and Lyrics distinct glyphs", () => {
     render(
       <MemoryRouter>

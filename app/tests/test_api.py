@@ -2157,6 +2157,63 @@ class TestShowsAPI:
             data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
         )
 
+    def test_network_artist_card_adds_the_next_show(self, test_app):
+        card = {
+            "name": "Pixies",
+            "in_library": True,
+            "artist_id": 7,
+            "artist_slug": "pixies",
+            "album_count": 7,
+            "track_count": 96,
+            "listeners": 4_400_000,
+            "genres": ["alternative rock"],
+            "linked_by": [],
+        }
+        show = {
+            "date": "2027-05-01",
+            "venue": "Viejas Arena",
+            "city": "San Diego",
+            "country": "United States",
+            "url": "https://tickets.example/pixies",
+        }
+        with (
+            patch(
+                "crate.api.browse_artist.get_network_artist_card", return_value=card
+            ) as get_card,
+            patch(
+                "crate.api.browse_artist.db_get_shows", return_value=[show]
+            ) as get_shows,
+        ):
+            resp = test_app.get("/api/network/artist-card?name=%20Pixies%20")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["album_count"] == 7
+        assert data["next_show"] == {
+            "date": "2027-05-01",
+            "venue": "Viejas Arena",
+            "city": "San Diego",
+            "country": "United States",
+            "url": "https://tickets.example/pixies",
+        }
+        get_card.assert_called_once_with("Pixies")
+        assert get_shows.call_args.kwargs == {"artist_name": "Pixies", "limit": 1}
+
+    def test_cached_shows_filters_by_artist_in_the_query(self, test_app):
+        with (
+            patch("crate.api.browse_artist.db_get_shows", return_value=[]) as shows,
+            patch("crate.api.browse_artist.get_all_artist_genre_map", return_value={}),
+            patch("crate.api.browse_artist._lookup_artist_refs", return_value={}),
+            patch("crate.setlistfm.get_probable_setlist_health", return_value={}),
+        ):
+            resp = test_app.get("/api/shows/cached?limit=50&artist=Pixies")
+            unfiltered = test_app.get("/api/shows/cached?limit=50")
+
+        assert resp.status_code == 200
+        assert unfiltered.status_code == 200
+        assert shows.call_args_list[0].kwargs == {"artist_name": "Pixies", "limit": 50}
+        assert shows.call_args_list[1].kwargs == {"artist_name": None, "limit": 50}
+
     def test_refresh_show_setlists_delegates_outdated_artists_to_one_worker_task(
         self, test_app
     ):

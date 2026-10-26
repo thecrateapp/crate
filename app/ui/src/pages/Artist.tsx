@@ -271,7 +271,6 @@ interface ArtistTabContentProps {
     }[],
   ) => void;
   onRefreshSetlist: () => void;
-  upcomingShows: ArtistShowEvent[];
   mergedSimilar: ReturnType<typeof buildMergedSimilarArtists>;
   auxiliaryErrors: Partial<
     Record<"shows" | "tracks" | "missing" | "tidal", string>
@@ -305,7 +304,6 @@ function ArtistTabContent({
   allTrackTitles,
   onTrackTitlesLoaded,
   onRefreshSetlist,
-  upcomingShows,
   mergedSimilar,
   auxiliaryErrors,
   onRetryAuxiliaryData,
@@ -385,12 +383,7 @@ function ArtistTabContent({
         />
       ) : null}
       {activeTab === "shows" ? (
-        <ArtistShowsSection
-          artistName={artistName}
-          artistId={data.id}
-          artistSlug={data.slug}
-          shows={upcomingShows}
-        />
+        <ArtistShowsSection artistName={artistName} />
       ) : null}
       {activeTab === "similar" ? (
         <ArtistSimilarSection
@@ -1538,7 +1531,6 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
           allTrackTitles={allTrackTitles}
           onTrackTitlesLoaded={setAllTrackTitles}
           onRefreshSetlist={() => void refreshProbableSetlist()}
-          upcomingShows={upcomingShows}
           mergedSimilar={mergedSimilar}
           auxiliaryErrors={model.auxiliaryErrors}
           onRetryAuxiliaryData={model.retryAuxiliaryData}

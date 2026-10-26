@@ -119,9 +119,9 @@
     "kind": "row"
   },
   {
-    "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+    "path": "app/ui/src/components/shows/ShowManagementRow.tsx",
     "kind": "row",
-    "component": "EntityRow"
+    "component": "UpcomingEventRow"
   },
   {
     "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",

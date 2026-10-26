@@ -38,6 +38,7 @@ const libraryScope = [
   "app/ui/src/components/artist/ArtistLoadingState.tsx",
   "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
   "app/ui/src/components/artist/ArtistNetworkGraph.tsx",
+  "app/ui/src/components/artist/network/ArtistNetworkInspector.tsx",
   "app/ui/src/components/artist/ArtistOverviewSection.tsx",
   "app/ui/src/components/artist/ArtistPageBits.tsx",
   "app/ui/src/components/artist/ArtistRepairDialog.tsx",
@@ -110,6 +111,7 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
       "app/ui/src/components/playlists/PlaylistArtwork.tsx",
       "app/ui/src/components/playlists/PlaylistEditorTrackList.tsx",
       "app/ui/src/components/shows/ShowCard.tsx",
+      "app/ui/src/components/shows/ShowManagementRow.tsx",
       "app/ui/src/components/shows/AddShowButton.tsx",
       "app/ui/src/components/shows/MergeShowsButton.tsx",
       "app/ui/src/pages/Imports.tsx",
@@ -267,6 +269,10 @@ const approvedControls = new Map([
     { component: "ShowCard", limit: 2 },
   ],
   [
+    "app/ui/src/pages/Upcoming.tsx:@/components/shows/ShowManagementRow",
+    { component: "ShowManagementRow", limit: 1 },
+  ],
+  [
     "app/ui/src/pages/Users.tsx:@crate/ui/shadcn/dialog",
     { component: "DialogContent", limit: 4 },
   ],
@@ -386,7 +392,15 @@ const approvedLibraryControls = new Map<string, number>([
     2,
   ],
   [
-    "app/ui/src/components/artist/ArtistNetworkGraph.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    "app/ui/src/components/artist/ArtistNetworkGraph.tsx:./network/ArtistNetworkInspector:ArtistNetworkInspector",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/network/ArtistNetworkInspector.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/network/ArtistNetworkInspector.tsx:@crate/ui/shadcn/button:Button",
     3,
   ],
   [
@@ -581,14 +595,18 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
-    3,
+    2,
   ],
   [
-    "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
+    "app/ui/src/components/shows/ShowManagementRow.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
+    1,
+  ],
+  [
+    "app/ui/src/components/shows/ShowManagementRow.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
     4,
   ],
   [
-    "app/ui/src/pages/Upcoming.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
+    "app/ui/src/components/shows/ShowManagementRow.tsx:@crate/ui/domain/genres/GenrePill:GenrePillRow",
     1,
   ],
   [
@@ -878,7 +896,11 @@ const approvedLibraryControls = new Map<string, number>([
     1,
   ],
   [
-    "app/ui/src/components/artist/ArtistShowsSection.tsx:@crate/ui/domain/entity:EntityRow",
+    "app/ui/src/components/artist/ArtistShowsSection.tsx:@crate/ui/domain/states:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistShowsSection.tsx:@/components/shows/ShowManagementRow:ShowManagementRow",
     1,
   ],
   [
@@ -1021,14 +1043,23 @@ const approvedUx = new Map([
   ["Upcoming:upcoming-refresh-setlists-loading", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-refresh-setlists", ["lucide-react", "CalendarSync"]],
   ["Upcoming:upcoming-dismiss-notice", ["lucide-react", "X"]],
-  ["Upcoming:upcoming-close-details", ["lucide-react", "X"]],
-  ["Upcoming:upcoming-detail-open-artist", ["@crate/ui/icons", "UserRound"]],
-  ["Upcoming:upcoming-row-open-artist", ["@crate/ui/icons", "UserRound"]],
+  ["ShowManagementRow:upcoming-close-details", ["lucide-react", "X"]],
   [
-    "Upcoming:upcoming-detail-open-listing",
+    "ShowManagementRow:upcoming-detail-open-artist",
+    ["@crate/ui/icons", "UserRound"],
+  ],
+  [
+    "ShowManagementRow:upcoming-row-open-artist",
+    ["@crate/ui/icons", "UserRound"],
+  ],
+  [
+    "ShowManagementRow:upcoming-detail-open-listing",
     ["@crate/ui/icons", "ExternalLink"],
   ],
-  ["Upcoming:upcoming-row-open-listing", ["@crate/ui/icons", "ExternalLink"]],
+  [
+    "ShowManagementRow:upcoming-row-open-listing",
+    ["@crate/ui/icons", "ExternalLink"],
+  ],
 
   // Functional Artist/Album actions and the search/disclosure/loading sites they use.
   // HeroArtworkEditor's two Play/Heart sites render the non-interactive Listen hero
@@ -1248,11 +1279,6 @@ const approvedUx = new Map([
   ["Browse:browse-batch-delete", ["@crate/ui/icons", "Trash2"]],
   ["Browse:browse-batch-select-all", ["@crate/ui/icons", "Check"]],
   ["Browse:browse-batch-cancel", ["@crate/ui/icons", "X"]],
-  ["ArtistNetworkGraph:artist-network-open", ["@crate/ui/icons", "ArrowRight"]],
-  [
-    "ArtistNetworkGraph:artist-network-expand-selected",
-    ["@crate/ui/icons", "Plus"],
-  ],
 
   ["I18nReview:translations-refresh", ["lucide-react", "Loader2"]],
   ["I18nReview:translations-draft", ["lucide-react", "Loader2"]],
@@ -1339,7 +1365,7 @@ const approvedUx = new Map([
 const approvedFallbacks = new Map([
   ["NewReleases:releases-timeline-cover", "Disc3"],
   ["NewReleases:releases-card-cover", "Disc3"],
-  ["Upcoming:upcoming-show-cover", "Calendar"],
+  ["ShowManagementRow:upcoming-show-cover", "Calendar"],
 ]);
 // These two marked SVGs encode chart data. Their path, tag, semantics and
 // one source site each are fixed; other inline SVGs still fail the inventory.
@@ -1382,7 +1408,7 @@ function violations(sources: Map<string, string>, entries: IconEntry[]) {
       entry.source === "@crate/ui/icons" &&
       ((entry.path === "app/ui/src/pages/NewReleases.tsx" &&
         (entry.origin ?? entry.name) === "Disc3") ||
-        (entry.path === "app/ui/src/pages/Upcoming.tsx" &&
+        (entry.path === "app/ui/src/components/shows/ShowManagementRow.tsx" &&
           (entry.origin ?? entry.name) === "Calendar"));
     if (
       !reviewedLocalComposition &&

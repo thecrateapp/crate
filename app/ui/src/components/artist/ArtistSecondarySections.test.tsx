@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ArtistOverviewSection } from "./ArtistOverviewSection";
 import { ArtistAvatar } from "./ArtistAvatar";
 import { ArtistDiscographySection } from "./ArtistDiscographySection";
-import { ArtistShowsSection, type ArtistShowEvent } from "./ArtistShowsSection";
+import { ArtistShowsSection } from "./ArtistShowsSection";
 import { ArtistSimilarSection } from "./ArtistSimilarSection";
 import { ArtistStatsSection } from "./ArtistStatsSection";
 import { ArtistTopTracksSection } from "./ArtistTopTracksSection";
@@ -47,11 +47,23 @@ vi.mock("@/components/album/TidalAlbumCard", () => ({
   TidalAlbumCard: ({ title }: { title: string }) => <div>{title}</div>,
 }));
 
+const useApiMock = vi.fn();
+vi.mock("@/hooks/use-api", () => ({
+  useApi: (...args: unknown[]) => useApiMock(...args),
+}));
+
 function frame(children: ReactNode) {
   return render(<MemoryRouter>{children}</MemoryRouter>);
 }
 
 beforeEach(() => {
+  useApiMock.mockReset();
+  useApiMock.mockReturnValue({
+    data: { events: [] },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
   vi.stubGlobal(
     "matchMedia",
     vi.fn((query: string) => ({
@@ -115,7 +127,7 @@ describe("artist secondary presentation contracts", () => {
             onTrackTitlesLoaded={vi.fn()}
           />
         ),
-        Shows: <ArtistShowsSection artistName="Artist" shows={[]} />,
+        Shows: <ArtistShowsSection artistName="Artist" />,
         Similar: <ArtistSimilarSection artistName="Artist" artists={[]} />,
         Stats: <ArtistStatsSection artistName="Artist" />,
       };
@@ -369,40 +381,61 @@ describe("artist secondary presentation contracts", () => {
     );
   });
 
-  it("keeps ticket navigation, show metadata and on-sale state", () => {
-    const show: ArtistShowEvent = {
-      id: "show-1",
-      name: "Festival",
-      date: "2026-11-10",
-      local_date: "2026-11-10",
-      venue: "Main Hall",
-      city: "Toronto",
-      country: "Canada",
-      region: "",
-      country_code: "CA",
-      url: "https://tickets.example/show",
-      image: "",
-      lineup: ["Local Artist", "Support Artist"],
-      status: "onsale",
-      price_range: { min: 20, max: 30, currency: "CAD" },
-    };
-    const { container } = frame(
-      <ArtistShowsSection
-        artistName="Local Artist"
-        artistId={7}
-        shows={[show]}
-      />,
+  it("lists upcoming shows with the Show Management row from the shared endpoint", async () => {
+    useApiMock.mockReturnValue({
+      data: {
+        events: [
+          {
+            id: "62",
+            show_id: 62,
+            artist_name: "Local Artist",
+            artist_id: 7,
+            artist_slug: "local-artist",
+            date: "2026-11-10",
+            venue: "Main Hall",
+            city: "Toronto",
+            country: "Canada",
+            url: "https://tickets.example/show",
+            lineup: ["Local Artist", "Support Artist"],
+            probable_setlist_status: "fresh",
+            probable_setlist_song_count: 12,
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    frame(<ArtistShowsSection artistName="Local Artist" />);
+
+    expect(useApiMock).toHaveBeenCalledWith(
+      "/api/shows/cached?limit=50&artist=Local%20Artist",
     );
+    expect(screen.getByText("With Support Artist")).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { expanded: false });
+    await userEvent.click(toggle);
     expect(
-      screen.getByRole("link", { name: "Open tickets for Festival" }),
-    ).toHaveAttribute("href", show.url);
-    expect(screen.getByText("On Sale")).toHaveAttribute(
-      "data-slot",
-      "info-badge",
-    );
-    expect(screen.getByText("with Support Artist")).toBeInTheDocument();
-    expect(screen.getByText("20–30 CAD")).toBeInTheDocument();
-    expect(container.querySelector("svg")).toBeNull();
+      document.querySelector('[data-slot="show-management-ticket"]'),
+    ).not.toBeNull();
+    expect(
+      screen.getAllByRole("link", { name: "Open show listing" })[0],
+    ).toHaveAttribute("href", "https://tickets.example/show");
+  });
+
+  it("keeps a failed shows read retryable instead of empty", () => {
+    const refetch = vi.fn();
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "boom",
+      refetch,
+    });
+    frame(<ArtistShowsSection artistName="Local Artist" />);
+
+    expect(
+      screen.getByText("Upcoming shows could not be loaded."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No upcoming shows available")).toBeNull();
   });
 
   it("preserves library track menus and deduplicates Spotify additions", () => {

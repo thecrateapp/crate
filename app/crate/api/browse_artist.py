@@ -55,6 +55,7 @@ from crate.api.schemas.browse import (
     ArtistDetailResponse,
     ArtistEnqueueResponse,
     ArtistInfoResponse,
+    ArtistNetworkCardResponse,
     ArtistNetworkResponse,
     ArtistPageResponse,
     ArtistSetlistPlayableResponse,
@@ -120,6 +121,7 @@ from crate.db.queries.shows import (
 )
 from crate.db.releases import get_new_releases, get_upcoming_releases_for_artist
 from crate.db.similarities import get_artist_network
+from crate.db.queries.artist_network_card import get_network_artist_card
 from crate.lastfm import (
     get_artist_info,
     get_cached_artist_info,
@@ -1850,12 +1852,16 @@ def api_artists_with_shows(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="List cached upcoming shows",
 )
-def api_cached_shows(request: Request, limit: int = Query(50, ge=1, le=5000)):
+def api_cached_shows(
+    request: Request,
+    limit: int = Query(50, ge=1, le=5000),
+    artist: str | None = Query(None, min_length=1, max_length=300),
+):
     _require_auth(request)
 
     from crate import setlistfm
 
-    shows = db_get_shows(limit=limit)
+    shows = db_get_shows(artist_name=artist, limit=limit)
     artist_names = setlistfm.billed_show_artist_names(shows)
     genre_map = get_all_artist_genre_map(artist_names, limit=3)
 
@@ -2238,6 +2244,34 @@ def api_external_artist_photo(
             "X-Crate-External-Artwork": "pending",
         },
     )
+
+
+@router.get(
+    "/api/network/artist-card",
+    response_model=ArtistNetworkCardResponse,
+    responses=_BROWSE_RESPONSES,
+    summary="Inspector card for an artist in the similarity network",
+)
+def api_network_artist_card(
+    request: Request, name: str = Query(..., min_length=1, max_length=300)
+):
+    _require_auth(request)
+    card = get_network_artist_card(name.strip())
+    shows = db_get_shows(artist_name=card["name"], limit=1)
+    show = shows[0] if shows else None
+    show_date = coerce_date(show.get("date")) if show else None
+    card["next_show"] = (
+        {
+            "date": show_date.isoformat(),
+            "venue": show.get("venue"),
+            "city": show.get("city"),
+            "country": show.get("country"),
+            "url": show.get("url"),
+        }
+        if show and show_date
+        else None
+    )
+    return card
 
 
 @router.get(
