@@ -36,7 +36,7 @@ func (r *recorder) Stream(_ context.Context, _ io.Writer, dir, name string, args
 
 func (r *recorder) Run(_ context.Context, c system.Command) error {
 	r.commands = append(r.commands, c)
-	return nil
+	return r.err
 }
 
 func (r *recorder) lines() []string {
@@ -253,6 +253,30 @@ func TestReplyNeedsAnAnswerFromTheModel(t *testing.T) {
 		err := newSetup("/srv/crate", []string{"docker", "compose"}, &recorder{output: tc.output}).Reply(context.Background(), settings(), Agent)
 		if (err == nil) != tc.ok {
 			t.Errorf("%q: %v", tc.output, err)
+		}
+	}
+}
+
+func TestTheSetupsOwnMessageReachesTheUser(t *testing.T) {
+	m, err := manifest.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	envfile.Write(install.EnvPath(dir), envfile.Render(settings("DATA_DIR", dir), "", nil))
+	unsupported := "This Crate version does not support Crate Agent yet. Update Crate (run `crate install` again to download the latest images), then run `crate configure agent`"
+	cases := []struct {
+		err  error
+		want string
+	}{
+		{&system.CommandError{Command: "docker", Stderr: "Crate Agent setup: " + unsupported}, "set up Crate Agent: " + unsupported},
+		{&system.CommandError{Command: "docker", Stderr: "no such service: crate-api"}, "set up Crate Agent: docker: no such service: crate-api"},
+	}
+	for _, tc := range cases {
+		setup := newSetup(dir, []string{"docker", "compose"}, &recorder{err: tc.err})
+		err := setup.Transition(context.Background(), io.Discard, m, Off, Agent, nil)
+		if err == nil || err.Error() != tc.want {
+			t.Errorf("got %v", err)
 		}
 	}
 }

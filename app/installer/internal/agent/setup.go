@@ -81,7 +81,18 @@ func (s Setup) script(ctx context.Context, out io.Writer, values *envfile.Values
 	if name == "sudo" && len(names) > 0 {
 		full = append([]string{"--preserve-env=" + strings.Join(names, ",")}, full...)
 	}
-	return s.Stack.Run.Run(ctx, system.Command{Dir: dir, Name: name, Args: full, Env: environment, Out: out})
+	return setupError(s.Stack.Run.Run(ctx, system.Command{Dir: dir, Name: name, Args: full, Env: environment, Out: out}))
+}
+
+// setupError keeps the setup's own explanation, which says what to do.
+func setupError(err error) error {
+	var failed *system.CommandError
+	if errors.As(err, &failed) {
+		if message, ok := strings.CutPrefix(failed.Stderr, "Crate Agent setup: "); ok {
+			return errors.New(message)
+		}
+	}
+	return err
 }
 
 // Init sets mode up with the user's answers (AGENT_* variables). With

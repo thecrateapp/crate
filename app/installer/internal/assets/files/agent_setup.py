@@ -485,22 +485,50 @@ def issue_credential(name, scopes, runner=run, *, require_approval=False) -> dic
     return issued
 
 
+def unsupported_release() -> SetupError:
+    command = os.environ.get("AGENT_SETUP_COMMAND", "").strip()
+    if command:
+        return SetupError(
+            "This Crate version does not support Crate Agent yet. Update Crate (run "
+            f"`crate install` again to download the latest images), then run `{command}`"
+        )
+    return SetupError(
+        "This Crate version does not support Crate Agent yet. Update the stack images, "
+        "then run make agent-init again"
+    )
+
+
 def create_credential(profile: str, runner=run) -> dict:
     """Issue the preset's grants with the real CLI inside crate-api."""
     if not api_running(runner):
         raise SetupError("crate-api is not running; start the stack first")
     preset = PROFILES[profile].preset
-    scopes = json.loads(
-        runner(
-            crate_python(
-                [
-                    "-c",
-                    "import json; from crate.agent_scope_catalog import SCOPE_PRESETS; "
-                    f"print(json.dumps(next(p.scopes for p in SCOPE_PRESETS if p.id == {preset!r})))",
-                ]
-            )
-        ).stdout
+    result = runner(
+        crate_python(
+            [
+                "-c",
+                "import json; from crate.agent_scope_catalog import SCOPE_PRESETS; "
+                f"print(json.dumps(next((p.scopes for p in SCOPE_PRESETS if p.id == {preset!r}), None)))",
+            ]
+        ),
+        check=False,
     )
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip().splitlines()
+        if any(
+            name in "\n".join(detail) for name in ("ImportError", "ModuleNotFoundError")
+        ):
+            raise unsupported_release()
+        raise SetupError(
+            "Reading the credential presets failed"
+            + (f": {detail[-1]}" if detail else "")
+        )
+    try:
+        scopes = json.loads(result.stdout)
+    except ValueError:
+        raise SetupError("crate-api returned unexpected credential presets") from None
+    if not scopes:
+        raise unsupported_release()
     return issue_credential(
         PROFILES[profile].preset_label,
         scopes,

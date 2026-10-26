@@ -1164,3 +1164,38 @@ def test_revoke_warns_about_a_credential_crate_does_not_know(tmp_path):
     assert docker.revoked == []
     assert "does not know the credential" in report
     assert not (secrets / "mcp-token").exists()
+
+
+@pytest.mark.parametrize(
+    ("answer", "command", "message"),
+    [
+        (
+            SimpleNamespace(returncode=0, stdout="null", stderr=""),
+            "crate configure agent",
+            "Update Crate (run `crate install` again to download the latest images), "
+            "then run `crate configure agent`",
+        ),
+        (
+            SimpleNamespace(
+                returncode=1,
+                stdout="",
+                stderr="ModuleNotFoundError: No module named 'crate.agent_scope_catalog'",
+            ),
+            "",
+            "Update the stack images, then run make agent-init again",
+        ),
+    ],
+)
+def test_an_image_without_the_agent_presets_asks_to_update_crate(
+    monkeypatch, answer, command, message
+):
+    setup = _setup()
+    monkeypatch.setattr(setup, "IN_CONTAINER", True)
+    monkeypatch.setenv("AGENT_SETUP_COMMAND", command)
+    with pytest.raises(setup.SetupError) as error:
+        setup.create_credential("agent", lambda argv, **kwargs: answer)
+    assert str(error.value).startswith(
+        "This Crate version does not support Crate Agent yet."
+    )
+    assert message in str(error.value)
+    assert "StopIteration" not in str(error.value)
