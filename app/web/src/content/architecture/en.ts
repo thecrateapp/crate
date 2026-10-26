@@ -138,7 +138,7 @@ export const architecture: ArchitecturePage = {
     {
       title: "Your API can't corrupt your library",
       body: [
-        "The API container mounts /music read-only. Tags, moves, deletes and artwork are written by worker tasks, and only the three workers that consume those queues mount the library read-write.",
+        "The API container mounts /music read-only. Tags, moves, deletes and artwork are written by worker tasks, and only the three workers that consume those queues mount the library read-write. In the full stack, Tidarr, the Tidal downloader, does too.",
         "Files are written to a temporary path and renamed into place, so a reader sees the old version or the new one, never half of each.",
       ],
       facts: ["api: ro", "3 workers: rw", "temp + rename"],
@@ -181,7 +181,7 @@ export const architecture: ArchitecturePage = {
       title: "Background work that yields to listeners",
       body: [
         "Each task is a PostgreSQL row, the source of truth, plus a Dramatiq message sent after the transaction commits. An advisory lock and a dedup key stop the same work from being queued twice.",
-        "A resource governor defers heavy work when the load ratio passes 0.85 or iowait 25%, when swap passes 30% while memory is short, or while more than ten people are listening. The heaviest maintenance runs only between 02:00 and 07:00. Daemons claim work with FOR UPDATE SKIP LOCKED, so several run side by side without stepping on each other.",
+        "A resource governor defers heavy work when the load ratio passes 0.85 or iowait 25%, when swap passes 30% while memory is short, or when listeners or streams pass a configurable limit, which a standard install sets to zero. The heaviest maintenance runs only between 02:00 and 07:00. Daemons claim work with FOR UPDATE SKIP LOCKED, so several run side by side without stepping on each other.",
       ],
       facts: [
         `${scale.taskTypes} task types`,
@@ -195,9 +195,9 @@ export const architecture: ArchitecturePage = {
       title: "One planner, two players that don't trust it",
       body: [
         "Smart Mix transitions are planned once, by a pure Python planner on the server. The Android player and the VirtualDJ plugin, still in development, validate every plan again before they run it, against the tracks, cue points and limits they actually have.",
-        "Shared fixtures pin the contract. Python, Rust, Java and C++ all read the same ones, so a plan means the same thing in every language.",
+        "Shared fixtures pin the contract. Python and Java read the same transition plans, Python and Rust the same beat grids, so a plan means the same thing on the server and on the phone.",
       ],
-      facts: ["Python", "Rust", "Java", "C++"],
+      facts: ["Python", "Rust", "Java"],
     },
     {
       title: "Rust and Python analyzers with a parity check",
