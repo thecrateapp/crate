@@ -60,4 +60,13 @@ describe("shared overlay recipes", () => {
     expect(monoMenuRules).toHaveLength(2);
     expect(monoMenuRules.join("\n")).not.toMatch(/background:\s*transparent/);
   });
+
+  it("offers wide overlay sizes for dense dialogs", () => {
+    expect(recipes).toMatch(
+      /\.crate-overlay-panel\[data-overlay-size="2xl"\]\s*\{\s*max-width:\s*1024px;/,
+    );
+    expect(recipes).toMatch(
+      /\.crate-overlay-panel\[data-overlay-size="3xl"\]\s*\{\s*max-width:\s*1280px;/,
+    );
+  });
 });

@@ -371,7 +371,7 @@ function MoveTrackDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-display">
             Move Track to Album

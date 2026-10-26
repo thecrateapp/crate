@@ -589,7 +589,10 @@ export function ArtistRepairDialog({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden sm:max-w-5xl">
+      <DialogContent
+        className="flex max-h-[88vh] flex-col overflow-hidden"
+        size="2xl"
+      >
         <DialogHeader>
           <DialogTitle className="font-display">
             Repair {artistName}

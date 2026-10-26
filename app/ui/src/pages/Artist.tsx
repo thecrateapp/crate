@@ -131,7 +131,7 @@ export function MergeArtistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-display">Merge Artist Alias</DialogTitle>
           <DialogDescription>

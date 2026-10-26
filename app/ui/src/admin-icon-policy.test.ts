@@ -1132,7 +1132,7 @@ const approvedUx = new Map([
   ["ArtistHeroSection:artist-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
   ["ArtistHeroSection:artist-write-metadata", ["@crate/ui/icons", "Tag"]],
   ["ArtistHeroSection:artist-export-metadata", ["@crate/ui/icons", "Archive"]],
-  ["ArtistHeroSection:artist-repair", ["@crate/ui/icons", "SlidersHorizontal"]],
+  ["ArtistHeroSection:artist-repair", ["@crate/ui/icons", "Toolbox"]],
   ["ArtistHeroSection:artist-merge", ["@crate/ui/icons", "Link"]],
   ["ArtistHeroSection:artist-delete", ["@crate/ui/icons", "Trash2"]],
   [

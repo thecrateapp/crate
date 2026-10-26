@@ -310,7 +310,7 @@ export function CommandPalette() {
           event.preventDefault();
           if (openerRef.current?.isConnected) openerRef.current.focus();
         }}
-        className="top-[18vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl"
+        className="top-[18vh] translate-y-0 gap-0 overflow-hidden p-0"
       >
         <DialogTitle className="sr-only font-display">
           Command palette

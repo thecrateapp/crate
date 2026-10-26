@@ -19,6 +19,7 @@ import {
 import {
   Eye,
   Bot,
+  Toolbox,
   ArrowDownToLine,
   ArrowDownToLineBold,
   BarChart3,
@@ -52,6 +53,14 @@ describe("@crate/ui/icons", () => {
     expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(svg).toHaveClass("ai-glyph");
     expect(svg?.querySelectorAll("path")).toHaveLength(4);
+  });
+  it("renders the official Solar Toolbox Outline for repair actions", () => {
+    const { container } = render(<Toolbox aria-hidden="true" />);
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveAttribute("width", "18");
+    expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
+    expect(svg?.querySelectorAll("path")).toHaveLength(1);
+    expect(svg?.querySelector("path")).toHaveAttribute("fill", "currentColor");
   });
   it("maps size to svg dimensions", () => {
     const { container } = render(<Play size={32} />);

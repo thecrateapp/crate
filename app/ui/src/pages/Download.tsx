@@ -2075,7 +2075,7 @@ function TidalAlbumCard({
       </OpsSurface>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <div className="flex min-w-0 items-center gap-3">
               {album.cover && (
@@ -2241,7 +2241,7 @@ function SlskResultCard({
       </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <div className="flex items-center gap-3">
               {cover ? (

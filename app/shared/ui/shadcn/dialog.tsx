@@ -44,13 +44,17 @@ function DialogOverlay({
   );
 }
 
+export type DialogContentSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "md",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
+  size?: DialogContentSize;
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -58,7 +62,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         data-has-close={showCloseButton || undefined}
-        data-overlay-size="md"
+        data-overlay-size={size}
         className={cn(
           "crate-overlay-panel fixed top-1/2 left-1/2 z-app-modal grid w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 p-6",
           className,

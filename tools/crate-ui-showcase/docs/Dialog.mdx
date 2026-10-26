@@ -1,0 +1,27 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Dialog.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Dialog</DocHeading>
+<EntryDetails
+  id="shadcn-dialog"
+  review="Overlay width normalization · 2026-10-26"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Radix dialog on the shared overlay recipe: popover surface, quiet hairline, 14px radius,
+  scrim without blur and the shared close control.
+- Width comes from `size`, mapped to `data-overlay-size`: `sm` 420px, `md` 560px (default),
+  `lg` 760px, `xl` 896px, `2xl` 1024px and `3xl` 1280px.
+- The overlay recipe sits outside Tailwind's utility layer, so caller `max-w-*` classes never
+  resized a dialog: every Admin dialog rendered at 560px until `size` existed. Callers pass a size
+  and keep only layout classes (height caps, scroll ownership).
+- Admin owns its dialogs' workflow, busy state and permissions; Listen uses AppModal.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Sizes} />

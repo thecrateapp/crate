@@ -19,7 +19,7 @@ import {
   ListMusic,
   Pencil,
   RefreshCw,
-  SlidersHorizontal,
+  Toolbox,
   Tag,
   Trash2,
 } from "@crate/ui/icons";
@@ -224,7 +224,7 @@ export function ArtistHeroSection({
           label={(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
           onClick={onRepair}
         >
-          <SlidersHorizontal data-admin-ux="artist-repair" aria-hidden="true" />
+          <Toolbox data-admin-ux="artist-repair" aria-hidden="true" />
         </ActionButton>
       ) : null}
       {canMerge && onMerge ? (

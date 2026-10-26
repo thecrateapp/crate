@@ -594,7 +594,8 @@ export function ArtistBioResearchDialog({
       }}
     >
       <DialogContent
-        className="flex h-[min(92dvh,960px)] w-[min(92vw,72rem)] max-h-[min(92dvh,960px)] !max-w-5xl flex-col overflow-hidden"
+        className="flex h-[min(92dvh,960px)] max-h-[min(92dvh,960px)] flex-col overflow-hidden"
+        size="2xl"
         onOpenAutoFocus={() => void runResearch()}
       >
         <DialogHeader className="shrink-0">

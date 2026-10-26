@@ -3529,6 +3529,12 @@ button.genre-pill:hover,
 .crate-overlay-panel[data-overlay-size="xl"] {
   max-width: 896px;
 }
+.crate-overlay-panel[data-overlay-size="2xl"] {
+  max-width: 1024px;
+}
+.crate-overlay-panel[data-overlay-size="3xl"] {
+  max-width: 1280px;
+}
 
 .crate-overlay-panel[data-state="open"],
 .crate-overlay-surface:not(.crate-overlay-panel),

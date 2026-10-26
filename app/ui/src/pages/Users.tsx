@@ -1447,8 +1447,8 @@ function UserDetailDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          data-overlay-size={undefined}
-          className="flex max-h-[90vh] max-w-7xl flex-col overflow-hidden"
+          className="flex max-h-[90vh] flex-col overflow-hidden"
+          size="3xl"
         >
           <DialogHeader>
             <DialogTitle className="font-display">User Detail</DialogTitle>
@@ -2083,7 +2083,7 @@ function SetPasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="font-display">
             {user?.has_password ? "Reset local password" : "Set local password"}
@@ -2214,7 +2214,7 @@ function AddUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="font-display">Add User</DialogTitle>
           <DialogDescription>
@@ -2360,7 +2360,7 @@ function InviteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-display">Invite user</DialogTitle>
           <DialogDescription>

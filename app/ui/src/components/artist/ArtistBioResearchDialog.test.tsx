@@ -141,7 +141,7 @@ describe("ArtistBioResearchDialog", () => {
     const content = document.querySelector('[data-slot="dialog-content"]');
     expect(body).toHaveClass("flex-1", "overflow-y-auto");
     expect(content).toHaveClass("flex", "flex-col", "overflow-hidden");
-    expect(content).toHaveClass("!max-w-5xl");
+    expect(content).toHaveAttribute("data-overlay-size", "2xl");
   });
 
   it("shows incremental review findings when the existing biography is preserved", async () => {

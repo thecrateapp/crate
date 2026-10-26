@@ -256,7 +256,8 @@ export function Shell() {
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent
           data-admin-ux="help-close"
-          className="sm:max-w-sm [&_[data-slot=dialog-close]]:min-h-11 [&_[data-slot=dialog-close]]:min-w-11"
+          className="[&_[data-slot=dialog-close]]:min-h-11 [&_[data-slot=dialog-close]]:min-w-11"
+          size="sm"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             if (helpOpenerRef.current?.isConnected)

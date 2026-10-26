@@ -249,7 +249,7 @@ export function MoveAlbumToArtistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-display">
             Move Album to Artist
@@ -363,7 +363,7 @@ export function MergeAlbumDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="font-display">
             Merge Duplicate Album
@@ -514,7 +514,7 @@ export function SplitAlbumDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="font-display">Split Album</DialogTitle>
           <DialogDescription>

@@ -194,7 +194,10 @@ export function ArtistMetadataEditor({
   return (
     <>
       <Dialog open={open} onOpenChange={closeEditor}>
-        <DialogContent className="flex max-h-[min(92dvh,960px)] max-w-3xl flex-col overflow-hidden">
+        <DialogContent
+          className="flex max-h-[min(92dvh,960px)] flex-col overflow-hidden"
+          size="lg"
+        >
           <DialogHeader className="shrink-0">
             <DialogTitle className="font-display">
               Edit artist metadata

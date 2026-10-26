@@ -130,7 +130,7 @@ export function AssignmentDialog({
         if (!next && !busy) onCancel();
       }}
     >
-      <DialogContent aria-describedby={undefined} className="sm:max-w-xl">
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="font-display">
             Use {modelId} for all features?
