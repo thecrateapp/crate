@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
@@ -157,7 +157,6 @@ export function ProfileForm({
   onOpenChange: (open: boolean) => void;
   refresh: () => void;
 }) {
-  const checkboxId = useId();
   const [profile] = useState(givenProfile);
   const [initial] = useState(() => initialState(snapshot, profile));
   // The version being replaced is fixed when the form opens, so a newer
@@ -364,18 +363,16 @@ export function ProfileForm({
             </p>
           ) : null}
 
-          <div className="flex items-start gap-3">
+          <FormField
+            layout="inline"
+            label="I reviewed this model's options and limits"
+          >
             <Checkbox
-              id={checkboxId}
-              className="mt-0.5"
               checked={reviewed}
               disabled={busy}
               onCheckedChange={(checked) => setReviewed(checked === true)}
             />
-            <label htmlFor={checkboxId} className="text-sm text-text-secondary">
-              I reviewed this model&apos;s options and limits
-            </label>
-          </div>
+          </FormField>
 
           <DialogFooter>
             <Button

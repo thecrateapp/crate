@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Clock, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -43,7 +44,6 @@ export function DecisionBar({
   onDecided: () => void;
   onReload: () => void;
 }) {
-  const checkboxId = useId();
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
   const [reviewedIdentity, setReviewedIdentity] = useState<string | null>(null);
@@ -153,10 +153,17 @@ export function DecisionBar({
           </div>
         ) : null}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
+          <FormField
+            layout="inline"
+            label={
+              plan.operation === "editorial_change"
+                ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
+                : plan.changes.length === 1
+                  ? "I reviewed this change and its effects."
+                  : `I reviewed all ${plan.changes.length} changes and their effects.`
+            }
+          >
             <Checkbox
-              id={checkboxId}
-              className="mt-0.5"
               checked={reviewed}
               onCheckedChange={(checked) =>
                 setReviewedIdentity(
@@ -164,14 +171,7 @@ export function DecisionBar({
                 )
               }
             />
-            <label htmlFor={checkboxId} className="text-sm text-text-secondary">
-              {plan.operation === "editorial_change"
-                ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
-                : plan.changes.length === 1
-                  ? "I reviewed this change and its effects."
-                  : `I reviewed all ${plan.changes.length} changes and their effects.`}
-            </label>
-          </div>
+          </FormField>
           <div className="flex shrink-0 gap-2">
             <Button
               type="button"

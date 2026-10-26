@@ -1,6 +1,7 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Dialog,
@@ -45,7 +46,6 @@ export function BillableTestDialog({
   /** Re-reads the snapshot after the profile changed under this test. */
   refresh: () => void;
 }) {
-  const checkboxId = useId();
   const [attempt, setAttempt] = useState(newAttempt);
   const [busy, setBusy] = useState(false);
 
@@ -94,7 +94,9 @@ export function BillableTestDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="font-display">Run a billable test?</DialogTitle>
+          <DialogTitle className="font-display">
+            Run a billable test?
+          </DialogTitle>
           <DialogDescription>
             Crate sends one small synthetic request to {version.model_id}. Your
             provider may charge for it. No library data is sent, and there are
@@ -110,10 +112,8 @@ export function BillableTestDialog({
           </p>
         ) : null}
 
-        <div className="flex items-start gap-3">
+        <FormField layout="inline" label="I understand this call may be billed">
           <Checkbox
-            id={checkboxId}
-            className="mt-0.5"
             checked={attempt.acknowledged}
             disabled={busy || attempt.job !== null}
             onCheckedChange={(checked) =>
@@ -123,10 +123,7 @@ export function BillableTestDialog({
               }))
             }
           />
-          <label htmlFor={checkboxId} className="text-sm text-white/80">
-            I understand this call may be billed
-          </label>
-        </div>
+        </FormField>
 
         <JobProgress job={attempt.job} kind="test" onComplete={noop} />
 

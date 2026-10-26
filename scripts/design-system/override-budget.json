@@ -64,7 +64,7 @@
     "typography": 4
   },
   "Checkbox": {
-    "margin": 4
+    "margin": 1
   },
   "ContextMenuItem": {
     "textSize": 7
