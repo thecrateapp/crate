@@ -80,7 +80,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private static final int NOTIFICATION_ID = 7301;
 
     private static final int PLAY_EVENT_CHECKPOINT_MS = 5000;
-    private static final int MAX_BUFFERED_EVENTS = 200;
+    private static final int MAX_BUFFERED_EVENTS = 1000;
     private static final long MIX_PROGRESS_EVENT_INTERVAL_MS = 250L;
 
     private final IBinder binder = new LocalBinder();

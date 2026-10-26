@@ -86,10 +86,23 @@ final class NativePlaybackTelemetry {
         trimBufferedEvents();
     }
 
+    // Without a WebView the buffer fills with play checkpoints. Dropping the
+    // oldest checkpoint first only loses some listened seconds, while
+    // dropping a trackChanged would merge two plays into one.
     private void trimBufferedEvents() {
         while (bufferedEvents.size() > maxBufferedEvents) {
-            bufferedEvents.remove(0);
+            int checkpoint = oldestCheckpointIndex();
+            bufferedEvents.remove(checkpoint >= 0 ? checkpoint : 0);
         }
+    }
+
+    private int oldestCheckpointIndex() {
+        for (int index = 0; index < bufferedEvents.size(); index++) {
+            if ("playEventCheckpoint".equals(bufferedEvents.get(index).eventName)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private static final class BufferedEvent {

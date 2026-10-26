@@ -317,6 +317,24 @@ describe("usePlayEventTracker — explicit lifecycle", () => {
     expect(payload.played_seconds).toBeCloseTo(1, 5);
   });
 
+  it("recordProgress counts native checkpoint steps up to the given delta", () => {
+    const { result } = setup();
+    act(() => {
+      result.current.startSession(TRACK_A, null);
+    });
+    for (const seconds of [0, 5.8, 11.4, 17.1]) {
+      act(() => {
+        result.current.recordProgress(seconds, 6.5);
+      });
+    }
+    act(() => {
+      result.current.flushCurrentPlayEvent("skipped");
+    });
+
+    const payload = mockPost.mock.calls[0]![1] as { played_seconds: number };
+    expect(payload.played_seconds).toBeCloseTo(17.1, 5);
+  });
+
   it("posts global catalog identity for remote/global tracks", () => {
     const { result } = setup();
     const track: Track = {

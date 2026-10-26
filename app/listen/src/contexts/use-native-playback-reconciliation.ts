@@ -65,6 +65,9 @@ export function nativeTransitionFlushReason(
   return movedToSequentialNext ? "completed" : "skipped";
 }
 
+// Native checkpoints advance by their interval plus up to one position tick.
+const NATIVE_CHECKPOINT_TICK_SLACK_SECONDS = 1.5;
+
 function nativeMsToSeconds(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, value / 1000)
@@ -115,7 +118,7 @@ export interface UseNativePlaybackReconciliationParams {
   ) => void;
   playSourceRef: ValueRef<PlaySource | null>;
   queueRef: ValueRef<Track[]>;
-  recordProgress: (positionSeconds: number) => void;
+  recordProgress: (positionSeconds: number, maxDeltaSeconds?: number) => void;
   rememberActiveTrack: (track: Track | undefined) => void;
   repeatRef: ValueRef<"off" | "one" | "all">;
   rotateTrackerSession: (
@@ -155,8 +158,66 @@ export function useNativePlaybackReconciliation({
     [],
   );
 
+  // A transition JS did not drive (a natively replaced queue, a Smart Mix
+  // handoff, a missed trackChanged) still ends the outgoing play. The
+  // expected-track guard in the tracker leaves alone a session JS already
+  // moved to the incoming track.
+  const followTrack = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      const queue = queueRef.current;
+      const outgoingTrack = queue[fromIndex];
+      const incomingTrack = queue[toIndex];
+      if (outgoingTrack) {
+        rotateTrackerSession(
+          nativeTransitionFlushReason(
+            undefined,
+            fromIndex,
+            toIndex,
+            queue.length,
+            repeatRef.current,
+          ) ?? "skipped",
+          outgoingTrack,
+          incomingTrack,
+          playSourceRef.current,
+        );
+      }
+      ensureTrackerSession(incomingTrack, playSourceRef.current);
+    },
+    [
+      ensureTrackerSession,
+      playSourceRef,
+      queueRef,
+      repeatRef,
+      rotateTrackerSession,
+    ],
+  );
+
+  // Native extends long queues and radio while the WebView is frozen; until
+  // JS adopts those tracks, the play that native moved past still ends here.
+  const closeSessionBeyondQueue = useCallback(
+    (toIndex: number, reason?: string) => {
+      const queue = queueRef.current;
+      const fromIndex = currentIndexRef.current;
+      const outgoingTrack = queue[fromIndex];
+      if (!outgoingTrack) return;
+      rotateTrackerSession(
+        nativeTransitionFlushReason(
+          reason,
+          fromIndex,
+          toIndex,
+          queue.length,
+          repeatRef.current,
+        ) ?? "skipped",
+        outgoingTrack,
+        undefined,
+        playSourceRef.current,
+      );
+    },
+    [currentIndexRef, playSourceRef, queueRef, repeatRef, rotateTrackerSession],
+  );
+
   const applyNativePosition = useCallback(
-    (event: EnginePositionEvent) => {
+    (event: EnginePositionEvent & { checkpointMs?: number }) => {
       if (
         setMixState &&
         !androidNativeEngine.isCurrentQueueRevision?.(event.revision)
@@ -181,7 +242,14 @@ export function useNativePlaybackReconciliation({
       }
       commitIsPlaying(event.isPlaying);
       if (event.isPlaying) {
-        recordProgress(positionSeconds);
+        // Count the position native observed, not the projection: events
+        // drained in a burst all project to the same clamped time.
+        recordProgress(
+          nativeMsToSeconds(event.positionMs),
+          event.checkpointMs
+            ? event.checkpointMs / 1000 + NATIVE_CHECKPOINT_TICK_SLACK_SECONDS
+            : undefined,
+        );
       }
     },
     [
@@ -229,6 +297,9 @@ export function useNativePlaybackReconciliation({
       }
 
       const queue = queueRef.current;
+      if (state.index >= queue.length && state.queueSize > queue.length) {
+        closeSessionBeyondQueue(state.index);
+      }
       if (state.index >= 0 && state.index < queue.length) {
         const previousIndex = currentIndexRef.current;
         const incomingTrack = queue[state.index];
@@ -256,7 +327,7 @@ export function useNativePlaybackReconciliation({
               );
             }
           } else if (state.isPlaying) {
-            ensureTrackerSession(incomingTrack, playSourceRef.current);
+            followTrack(previousIndex, state.index);
           }
           commitCurrentIndex(state.index);
           rememberActiveTrack(incomingTrack);
@@ -285,12 +356,13 @@ export function useNativePlaybackReconciliation({
         clearNativeBufferingWatchdog();
       }
       if (state.isPlaying) {
-        recordProgress(positionSeconds);
+        recordProgress(nativeMsToSeconds(state.positionMs));
       }
     },
     [
       clearNativeBufferingRecovery,
       clearNativeBufferingWatchdog,
+      closeSessionBeyondQueue,
       commitCurrentIndex,
       commitCurrentTime,
       commitDuration,
@@ -298,6 +370,7 @@ export function useNativePlaybackReconciliation({
       commitIsPlaying,
       currentIndexRef,
       ensureTrackerSession,
+      followTrack,
       isNativeEventStale,
       setMixState,
       playSourceRef,
@@ -333,7 +406,11 @@ export function useNativePlaybackReconciliation({
         return;
       }
       const queue = queueRef.current;
-      if (event.index < 0 || event.index >= queue.length) return;
+      if (event.index >= queue.length) {
+        closeSessionBeyondQueue(event.index, event.reason);
+        return;
+      }
+      if (event.index < 0) return;
 
       const previousIndex = currentIndexRef.current;
       const incomingTrack = queue[event.index];
@@ -368,13 +445,20 @@ export function useNativePlaybackReconciliation({
             playSourceRef.current,
           );
         } else {
-          ensureTrackerSession(incomingTrack, playSourceRef.current);
+          followTrack(previousIndex, event.index);
         }
         commitCurrentIndex(event.index);
         rememberActiveTrack(incomingTrack);
       } else {
         rememberActiveTrack(incomingTrack);
-        if (event.isPlaying) {
+        if (event.reason === "repeat") {
+          rotateTrackerSession(
+            "completed",
+            incomingTrack,
+            incomingTrack,
+            playSourceRef.current,
+          );
+        } else if (event.isPlaying) {
           ensureTrackerSession(incomingTrack, playSourceRef.current);
         }
       }
@@ -388,8 +472,10 @@ export function useNativePlaybackReconciliation({
       commitDuration,
       commitIsBuffering,
       commitIsPlaying,
+      closeSessionBeyondQueue,
       currentIndexRef,
       ensureTrackerSession,
+      followTrack,
       isNativeEventStale,
       setMixState,
       playSourceRef,
