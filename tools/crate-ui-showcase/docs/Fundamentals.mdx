@@ -264,4 +264,5 @@ unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.
 
 Page titles (2026-10-26): `crate-page-title` is the single 800 page-title recipe (Bricolage 800,
 `clamp(2.25rem,4vw,3.75rem)`, display leading, -0.045em, balanced). `data-size="md"` fixes it at
-2.25rem. PageHeader and the Admin page titles use it instead of hand-written utility copies.
+2.25rem. It declares `font-family: var(--font-display)`, so the Admin font-role policy recognises it as the
+display role. PageHeader and the Admin page titles use it instead of hand-written utility copies.
