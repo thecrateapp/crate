@@ -11,8 +11,8 @@ func TestArchitectureCheck(t *testing.T) {
 		want Status
 	}{
 		{Host{OS: "linux", Arch: "amd64"}, OK},
-		{Host{OS: "darwin", Arch: "arm64"}, Warn},
-		{Host{OS: "linux", Arch: "arm64"}, Warn},
+		{Host{OS: "darwin", Arch: "arm64"}, OK},
+		{Host{OS: "linux", Arch: "arm64"}, OK},
 		{Host{OS: "linux", Arch: "386"}, Fail},
 	}
 	for _, tc := range cases {

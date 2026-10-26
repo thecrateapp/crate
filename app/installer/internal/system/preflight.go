@@ -33,26 +33,11 @@ const (
 )
 
 func ArchitectureCheck(host Host) Check {
-	switch {
-	case host.Arch == "amd64":
-		return Check{Title: "Architecture", Status: OK, Detail: "amd64"}
-	case host.Arch == "arm64" && host.OS == "darwin":
-		return Check{
-			Title:  "Architecture",
-			Status: Warn,
-			Detail: "Apple Silicon runs Crate's amd64 images through Rosetta emulation",
-			Fix:    "Enable \"Use Rosetta for x86_64/amd64 emulation\" in Docker Desktop settings. Native arm64 images are on the way.",
-		}
-	case host.Arch == "arm64":
-		return Check{
-			Title:  "Architecture",
-			Status: Warn,
-			Detail: "Crate publishes amd64 images only for now; arm64 needs QEMU emulation and will be slow",
-			Fix:    "Install binfmt support (docker run --privileged --rm tonistiigi/binfmt --install amd64). Native arm64 images are on the way.",
-		}
-	default:
-		return Check{Title: "Architecture", Status: Fail, Detail: host.Arch + " is not supported"}
+	switch host.Arch {
+	case "amd64", "arm64":
+		return Check{Title: "Architecture", Status: OK, Detail: host.Arch}
 	}
+	return Check{Title: "Architecture", Status: Fail, Detail: host.Arch + " is not supported", Fix: "Crate publishes images for amd64 and arm64."}
 }
 
 func MemoryCheck(host Host) Check {

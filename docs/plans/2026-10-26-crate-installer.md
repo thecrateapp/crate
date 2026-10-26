@@ -90,8 +90,16 @@ para que un agente (Claude, Codex…) instale Crate conversando con el usuario.
   extremo a extremo con un cliente MCP en memoria (sin fugas de secretos en ninguna respuesta),
   por stdio real, y la página con Chrome y validaciones reales de Last.fm y Telegram.
   `CRATE_INSTALLER_ONLY=1` en el bootstrap y guía "Install with an AI agent" en la documentación.
-- **Fase 4 (en curso).** Retirado el wizard web de Setup (página, redirección, rutas `/api/setup` y
+- **Fase 4 hecha.** Retirado el wizard web de Setup (página, redirección, rutas `/api/setup` y
   esquemas; el benchmark de escritorio sonda `/api/status`). `.env.example` sin variables muertas
   (`TIDARR_PASSWORD`, `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED`) y README con las variables por
   perfil, sin `PROTONVPN_*` ni requisitos falsos; tests en `internal/manifest` impiden que
   `.env.example` o el README documenten variables que nada lee.
+- Imágenes multi-arch: `build-image.yml` (reutilizable) construye api, workers, media-worker y
+  readplane en runners nativos amd64 y arm64 (`ubuntu-24.04-arm`; el repo es público), empuja por
+  digest y fusiona la lista de manifiestos, cuyo digest sigue alimentando el manifiesto de
+  release. Los frontends compilan el bundle una vez (`$BUILDPLATFORM`) y publican nginx para las
+  dos arquitecturas. `crate-cli` se compila por arquitectura y el worker core lo instala también
+  en aarch64. `PANNS=on` instala PyTorch y PANNs en arm64 en release; `auto` mantiene ligeros los
+  builds locales en ARM. Verificado: imagen arm64 con torch 2.14.1, panns_inference y el modelo
+  CNN14; `actionlint` sin avisos. Pendiente: la primera ejecución real del workflow en CI.

@@ -24,6 +24,8 @@ them.
 
 ## Prerequisites
 
+- Linux or macOS on amd64 or arm64 (Apple Silicon, Raspberry Pi 4/5 and ARM servers run
+  native images).
 - Docker Engine and Docker Compose v2.
 - A host with persistent storage for music, PostgreSQL and downloads.
 - A music directory writable by the user that runs Docker.
