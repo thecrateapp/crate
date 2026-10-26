@@ -24,10 +24,17 @@ const views: Record<string, () => Promise<View>> = {
   allowlist: () =>
     import("./allowlist-view").then((module) => module.initAllowlist),
   inside: () => import("./inside-view").then((module) => module.initInside),
+  "inside-mix": () =>
+    import("./inside-mix-view").then((module) => module.initInsideMix),
+  "inside-agent": () =>
+    import("./inside-agent-view").then((module) => module.initInsideAgent),
   redis: () => import("./redis-view").then((module) => module.initRedis),
   steps: () => import("./steps-view").then((module) => module.initSteps),
   governor: () =>
     import("./governor-view").then((module) => module.initGovernor),
+  approval: () =>
+    import("./approval-view").then((module) => module.initApproval),
+  agent: () => import("./agent-view").then((module) => module.initAgent),
 };
 
 export function initViz(root: ParentNode = document): Cleanup {
