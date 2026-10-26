@@ -63,6 +63,12 @@ func (s Stack) Up(ctx context.Context, w io.Writer) error {
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
+// Restart restarts the services of a compose profile.
+func (s Stack) Restart(ctx context.Context, w io.Writer, profile string, services ...string) error {
+	name, args := s.Command(append([]string{"--profile", profile, "restart"}, services...)...)
+	return s.Run.Stream(ctx, w, s.Dir, name, args...)
+}
+
 // Remove stops and deletes the services of a compose profile.
 func (s Stack) Remove(ctx context.Context, w io.Writer, profile string, services ...string) error {
 	name, args := s.Command(append([]string{"--profile", profile, "rm", "-s", "-f"}, services...)...)
