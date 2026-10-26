@@ -385,3 +385,108 @@ def test_connect_lastfm_conflict_returns_409_without_raw_db_error(
     assert resp.json() == {
         "detail": "This Last.fm account is already linked to another Crate user"
     }
+
+
+def _scrobble_with(monkeypatch, *, status_code=200, payload=None, exc=None):
+    from crate.scrobble import lastfm_scrobble
+
+    class Response:
+        def __init__(self):
+            self.status_code = status_code
+            self.content = b"{}" if payload is not None else b""
+
+        def json(self):
+            return payload
+
+    def fake_post(url, *, data, timeout):
+        if exc is not None:
+            raise exc
+        return Response()
+
+    monkeypatch.setattr("crate.scrobble.requests.post", fake_post)
+    return lastfm_scrobble(
+        api_key="api-key",
+        api_secret="api-secret",
+        session_key="session-key",
+        artist="Viva Belgrado",
+        track="Vals de los Ciegos",
+        timestamp=1782000000,
+    )
+
+
+def _scrobbles(accepted: str, ignored: str, code: str = "0") -> dict:
+    return {
+        "scrobbles": {
+            "@attr": {"accepted": accepted, "ignored": ignored},
+            "scrobble": {"ignoredMessage": {"code": code, "#text": ""}},
+        }
+    }
+
+
+def test_lastfm_scrobble_reports_an_accepted_scrobble(monkeypatch):
+    result = _scrobble_with(monkeypatch, payload=_scrobbles("1", "0"))
+
+    assert result.outcome == "accepted"
+
+
+def test_lastfm_scrobble_does_not_read_a_zero_string_as_accepted(monkeypatch):
+    result = _scrobble_with(monkeypatch, payload=_scrobbles("0", "1", code="3"))
+
+    assert result.outcome == "ignored"
+    assert result.detail == "lastfm ignored 3"
+
+
+@pytest.mark.parametrize(
+    ("payload", "status_code", "outcome"),
+    [
+        ({"error": 9, "message": "Invalid session key"}, 403, "failed"),
+        ({"error": 11, "message": "Service Offline"}, 200, "retryable"),
+        ({"error": 16, "message": "Temporarily unavailable"}, 200, "retryable"),
+        ({"error": 29, "message": "Rate limit exceeded"}, 429, "retryable"),
+        (None, 503, "retryable"),
+        (None, 400, "failed"),
+    ],
+)
+def test_lastfm_scrobble_classifies_provider_errors(
+    monkeypatch, payload, status_code, outcome
+):
+    result = _scrobble_with(monkeypatch, status_code=status_code, payload=payload)
+
+    assert result.outcome == outcome
+
+
+def test_lastfm_scrobble_treats_a_timeout_as_retryable(monkeypatch):
+    import requests
+
+    result = _scrobble_with(monkeypatch, exc=requests.Timeout("slow"))
+
+    assert result.outcome == "retryable"
+
+
+@pytest.mark.parametrize(
+    ("played", "duration", "completed", "eligible"),
+    [
+        (120, 240, False, True),
+        (119, 240, False, False),
+        (240, 600, False, True),
+        (239, 600, False, False),
+        (224.9, 46.7, False, True),
+        (30, 30, True, False),
+        (10, None, True, True),
+        (200, None, False, False),
+        (240, None, False, True),
+    ],
+)
+def test_scrobble_eligibility_follows_the_lastfm_rule(
+    played, duration, completed, eligible
+):
+    from crate.db.repositories.user_library_playback_writes import scrobble_eligible
+
+    assert (
+        scrobble_eligible(
+            played_seconds=played,
+            track_duration_seconds=duration,
+            was_completed=completed,
+        )
+        is eligible
+    )

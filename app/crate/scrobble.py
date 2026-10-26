@@ -1,6 +1,6 @@
 """Direct scrobbling to Last.fm and ListenBrainz.
 
-Called from record_play_event after a track is completed.
+Called from record_play_event after a play that Last.fm would count.
 Each service requires user-level credentials stored in user_external_identities.
 """
 
@@ -19,6 +19,58 @@ from crate.db.jobs.scrobble_dispatch import (
 )
 
 log = logging.getLogger(__name__)
+
+ACCEPTED = "accepted"
+IGNORED = "ignored"
+RETRYABLE = "retryable"
+FAILED = "failed"
+NOT_CONFIGURED = "not_configured"
+
+# Last.fm error codes worth retrying: service offline, temporarily unavailable
+# and rate limit exceeded. Every other code needs a user or operator fix.
+_LASTFM_RETRYABLE_ERRORS = {11, 16, 29}
+_LASTFM_INVALID_SESSION = 9
+_TERMINAL_OUTCOMES = frozenset({ACCEPTED, IGNORED, NOT_CONFIGURED})
+
+
+@dataclass(frozen=True)
+class ScrobbleResult:
+    outcome: str
+    detail: str = ""
+
+    def as_json(self) -> dict:
+        return {"outcome": self.outcome, "detail": self.detail}
+
+
+def _int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _lastfm_scrobble_result(status_code: int, data: object) -> ScrobbleResult:
+    if isinstance(data, dict) and "error" in data:
+        code = _int(data.get("error"))
+        if code in _LASTFM_RETRYABLE_ERRORS:
+            return ScrobbleResult(RETRYABLE, f"lastfm error {code}")
+        return ScrobbleResult(FAILED, f"lastfm error {code}")
+    if status_code == 429 or status_code >= 500:
+        return ScrobbleResult(RETRYABLE, f"http {status_code}")
+    if status_code != 200 or not isinstance(data, dict):
+        return ScrobbleResult(FAILED, f"http {status_code}")
+    scrobbles = data.get("scrobbles") or {}
+    attr = scrobbles.get("@attr") or {}
+    if _int(attr.get("accepted")) > 0:
+        return ScrobbleResult(ACCEPTED)
+    if _int(attr.get("ignored")) > 0:
+        entry = scrobbles.get("scrobble")
+        if isinstance(entry, list):
+            entry = entry[0] if entry else {}
+        ignored = (entry or {}).get("ignoredMessage") or {}
+        return ScrobbleResult(IGNORED, f"lastfm ignored {_int(ignored.get('code'))}")
+    return ScrobbleResult(RETRYABLE, "lastfm response without a scrobble count")
+
 
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 LISTENBRAINZ_API_URL = "https://api.listenbrainz.org/1/submit-listens"
@@ -101,10 +153,10 @@ def lastfm_scrobble(
     track: str,
     album: str = "",
     timestamp: int | None = None,
-) -> bool:
+) -> ScrobbleResult:
     """Scrobble a track to Last.fm using a user's session key."""
     if not all([api_key, api_secret, session_key, artist, track]):
-        return False
+        return ScrobbleResult(FAILED, "missing scrobble fields")
 
     ts = timestamp or int(time.time())
     params = {
@@ -127,19 +179,17 @@ def lastfm_scrobble(
 
     try:
         resp = requests.post(LASTFM_API_URL, data=params, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("scrobbles", {}).get("@attr", {}).get("accepted"):
-                log.debug("Last.fm scrobble OK: %s - %s", artist, track)
-                return True
-            log.warning("Last.fm scrobble rejected: %s", data)
-        else:
-            log.warning(
-                "Last.fm scrobble failed (%d): %s", resp.status_code, resp.text[:200]
-            )
-    except Exception:
-        log.warning("Last.fm scrobble error", exc_info=True)
-    return False
+    except requests.RequestException as exc:
+        log.warning("Last.fm scrobble transport error: %s", type(exc).__name__)
+        return ScrobbleResult(RETRYABLE, f"transport {type(exc).__name__}")
+    try:
+        data = resp.json() if resp.content else None
+    except ValueError:
+        data = None
+    result = _lastfm_scrobble_result(resp.status_code, data)
+    if result.outcome != ACCEPTED:
+        log.warning("Last.fm scrobble %s: %s", result.outcome, result.detail)
+    return result
 
 
 def lastfm_now_playing(
@@ -283,10 +333,10 @@ def listenbrainz_scrobble(
     track: str,
     album: str = "",
     timestamp: int | None = None,
-) -> bool:
+) -> ScrobbleResult:
     """Submit a listen to ListenBrainz."""
     if not all([token, artist, track]):
-        return False
+        return ScrobbleResult(FAILED, "missing scrobble fields")
 
     ts = timestamp or int(time.time())
     payload = {
@@ -352,12 +402,42 @@ def listenbrainz_now_playing(
             headers={"Authorization": f"Token {token}"},
             timeout=10,
         )
-        return resp.status_code == 200
-    except Exception:
-        return False
+    except requests.RequestException as exc:
+        log.warning("ListenBrainz submit transport error: %s", type(exc).__name__)
+        return ScrobbleResult(RETRYABLE, f"transport {type(exc).__name__}")
+    if resp.status_code == 200:
+        return ScrobbleResult(ACCEPTED)
+    if resp.status_code == 429 or resp.status_code >= 500:
+        result = ScrobbleResult(RETRYABLE, f"http {resp.status_code}")
+    else:
+        result = ScrobbleResult(FAILED, f"http {resp.status_code}")
+    log.warning("ListenBrainz submit %s: %s", result.outcome, result.detail)
+    return result
 
 
 # ── Dispatcher ──────────────────────────────────────────────────
+
+
+def _mark_lastfm_session_rejected(user_id: int) -> None:
+    from crate.db.repositories.auth_identities import upsert_user_external_identity
+
+    upsert_user_external_identity(
+        user_id,
+        "lastfm",
+        status="error",
+        last_error="Last.fm rejected the stored session; reconnect to resume scrobbling",
+    )
+
+
+def _identity_metadata(identity: dict) -> dict | None:
+    raw_meta = identity.get("metadata_json")
+    if not isinstance(raw_meta, str):
+        return raw_meta or {}
+    try:
+        metadata = json.loads(raw_meta)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return metadata if isinstance(metadata, dict) else None
 
 
 def scrobble_play_event(
@@ -367,58 +447,72 @@ def scrobble_play_event(
     track: str,
     album: str = "",
     timestamp: int | None = None,
-):
-    """Scrobble to all configured services for the given user. Best-effort, never raises."""
+    done: frozenset[str] = frozenset(),
+) -> dict[str, ScrobbleResult]:
+    """Submit one play to every linked provider not in ``done``.
+
+    Provider failures are returned, not raised, so the caller can retry only
+    the providers that did not reach a terminal outcome.
+    """
     import os
     from crate.db.queries.user import get_user_scrobble_identities
 
-    try:
-        identities = get_user_scrobble_identities(user_id)
+    results: dict[str, ScrobbleResult] = {}
+    for identity in get_user_scrobble_identities(user_id):
+        provider = identity["provider"]
+        if provider in done:
+            continue
+        metadata = _identity_metadata(identity)
+        if metadata is None:
+            log.warning(
+                "Corrupted metadata_json for user %s provider %s", user_id, provider
+            )
+            results[provider] = ScrobbleResult(FAILED, "corrupted credentials")
+            continue
 
-        for identity in identities:
-            provider = identity["provider"]
-            raw_meta = identity.get("metadata_json")
-            if isinstance(raw_meta, str):
-                try:
-                    metadata = json.loads(raw_meta)
-                except (json.JSONDecodeError, ValueError):
-                    log.warning(
-                        "Corrupted metadata_json for user %s provider %s",
-                        user_id,
-                        provider,
-                    )
-                    continue
+        if provider == "lastfm":
+            api_key = os.environ.get("LASTFM_APIKEY", "")
+            api_secret = os.environ.get("LASTFM_API_SECRET", "")
+            session_key = metadata.get("session_key", "")
+            if not (api_key and api_secret):
+                results[provider] = ScrobbleResult(
+                    NOT_CONFIGURED, "Last.fm API credentials are not configured"
+                )
+            elif not session_key:
+                results[provider] = ScrobbleResult(FAILED, "missing session key")
             else:
-                metadata = raw_meta or {}
+                result = lastfm_scrobble(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    session_key=session_key,
+                    artist=artist,
+                    track=track,
+                    album=album,
+                    timestamp=timestamp,
+                )
+                if result.detail == f"lastfm error {_LASTFM_INVALID_SESSION}":
+                    _mark_lastfm_session_rejected(user_id)
+                results[provider] = result
 
-            if provider == "lastfm":
-                api_key = os.environ.get("LASTFM_APIKEY", "")
-                api_secret = os.environ.get("LASTFM_API_SECRET", "")
-                session_key = metadata.get("session_key", "")
-                if api_key and api_secret and session_key:
-                    lastfm_scrobble(
-                        api_key=api_key,
-                        api_secret=api_secret,
-                        session_key=session_key,
-                        artist=artist,
-                        track=track,
-                        album=album,
-                        timestamp=timestamp,
-                    )
+        elif provider == "listenbrainz":
+            lb_token = metadata.get("token", "")
+            results[provider] = (
+                listenbrainz_scrobble(
+                    token=lb_token,
+                    artist=artist,
+                    track=track,
+                    album=album,
+                    timestamp=timestamp,
+                )
+                if lb_token
+                else ScrobbleResult(FAILED, "missing token")
+            )
 
-            elif provider == "listenbrainz":
-                lb_token = metadata.get("token", "")
-                if lb_token:
-                    listenbrainz_scrobble(
-                        token=lb_token,
-                        artist=artist,
-                        track=track,
-                        album=album,
-                        timestamp=timestamp,
-                    )
+    return results
 
-    except Exception:
-        log.debug("scrobble_play_event failed for user %s", user_id, exc_info=True)
+
+class ScrobbleRetryError(RuntimeError):
+    """A provider may accept the scrobble later; Dramatiq retries the dispatch."""
 
 
 def _claim_scrobble_dispatch(event_id: int) -> tuple[str, dict | None]:
@@ -426,13 +520,33 @@ def _claim_scrobble_dispatch(event_id: int) -> tuple[str, dict | None]:
 
 
 def _finish_scrobble_dispatch(
-    event_id: int, status: str, *, error: str | None = None
+    event_id: int,
+    status: str,
+    *,
+    error: str | None = None,
+    provider_results: dict | None = None,
 ) -> None:
-    finish_scrobble_dispatch(event_id, status, error=error)
+    finish_scrobble_dispatch(
+        event_id, status, error=error, provider_results=provider_results
+    )
+
+
+def _results_summary(results: dict[str, dict]) -> str:
+    return "; ".join(
+        f"{provider}: {result['outcome']}"
+        + (f" ({result['detail']})" if result.get("detail") else "")
+        for provider, result in sorted(results.items())
+        if result.get("outcome") != ACCEPTED
+    )
 
 
 def dispatch_scrobble_play_event(event_id: int) -> str:
-    """Dispatch one completed play event at most once per database claim."""
+    """Dispatch one play event, retrying only providers without a final answer.
+
+    The dispatch is ``completed`` only when a provider accepted the scrobble.
+    Providers that accepted or ignored it are never sent the event again, so a
+    retry for another provider cannot duplicate it.
+    """
     status, event = _claim_scrobble_dispatch(event_id)
     if event is None:
         return status
@@ -441,19 +555,49 @@ def dispatch_scrobble_play_event(event_id: int) -> str:
         _finish_scrobble_dispatch(event_id, "skipped")
         return "skipped"
 
+    previous: dict[str, dict] = dict(event.get("provider_results") or {})
+    done = frozenset(
+        provider
+        for provider, result in previous.items()
+        if result.get("outcome") in _TERMINAL_OUTCOMES
+    )
     started_at = event.get("started_at")
     timestamp = int(started_at.timestamp()) if started_at is not None else None
     try:
-        scrobble_play_event(
+        results = scrobble_play_event(
             int(event["user_id"]),
             artist=str(event.get("artist") or ""),
             track=str(event.get("title") or ""),
             album=str(event.get("album") or ""),
             timestamp=timestamp,
+            done=done,
         )
     except Exception as exc:
         _finish_scrobble_dispatch(event_id, "failed", error=str(exc)[:1000])
         raise
 
-    _finish_scrobble_dispatch(event_id, "completed")
-    return "completed"
+    merged = {
+        **previous,
+        **{provider: result.as_json() for provider, result in results.items()},
+    }
+    outcomes = {result.get("outcome") for result in merged.values()}
+    summary = _results_summary(merged) or None
+    if RETRYABLE in outcomes:
+        _finish_scrobble_dispatch(
+            event_id, "failed", error=summary, provider_results=merged
+        )
+        raise ScrobbleRetryError(summary or "retryable scrobble failure")
+    if FAILED in outcomes:
+        _finish_scrobble_dispatch(
+            event_id, "failed", error=summary, provider_results=merged
+        )
+        return "failed"
+    if ACCEPTED in outcomes:
+        _finish_scrobble_dispatch(
+            event_id, "completed", error=summary, provider_results=merged
+        )
+        return "completed"
+    _finish_scrobble_dispatch(
+        event_id, "skipped", error=summary, provider_results=merged
+    )
+    return "skipped"
