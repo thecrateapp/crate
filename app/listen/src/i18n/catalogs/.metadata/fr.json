@@ -1947,18 +1947,6 @@
     "sourceHash": "sha256:26e451ee1f748cffbe437bd547fdf19fbb376a58dd7759fb221d5647907f89c2",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
-  "home.greeting.afternoon": {
-    "sourceHash": "sha256:3a89f1dee9c9f09ed62b057fa7492e53a4efb53f4dc9441ee2012e44549877c6",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "home.greeting.evening": {
-    "sourceHash": "sha256:78faeedce0c21794f4b175d42f8b11e6ccf321672b6a5149723a6c0fef4443ec",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
-  "home.greeting.morning": {
-    "sourceHash": "sha256:b011b0d83c4ad203594d5880eeeec8fd9cf531ddacf7e6d4c8fded417f50f192",
-    "reviewedAt": "2026-07-07T15:39:22.141Z"
-  },
   "home.hero.featuredArtist": {
     "sourceHash": "sha256:2d66e581be9ad0616936cbacd67e98584ce9e09fddc04e4e942295fee85c4ca1",
     "reviewedAt": "2026-10-07T13:21:25.887Z"

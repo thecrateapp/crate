@@ -16,15 +16,10 @@ import {
 import type { StatsDashboard } from "@/components/stats/stats-model";
 import { useApi } from "@/hooks/use-api";
 import {
-  getHomeDateString,
-  getHomeGreeting,
-} from "@/components/home/HomeSections";
-import {
   HomeShowPrepSection,
   HomeUpcomingSection,
 } from "@/components/home/HomeUpcomingSections";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
-import { HomeGreeting } from "@/components/home/HomeGreeting";
 
 import type { HomePageController } from "@/pages/use-home-page-controller";
 import type { HomePageViewModel } from "@/pages/home-page-model";
@@ -41,13 +36,6 @@ interface HomeSectionProps {
 
 function HomeHero({ page }: HomeSectionProps) {
   const { heroes, currentDiscovery } = page.view;
-  const homeIntro = (
-    <HomeGreeting
-      greeting={getHomeGreeting(page.t)}
-      date={getHomeDateString(page.i18nLanguage)}
-    />
-  );
-
   return (
     <HomeTasteHero
       heroes={heroes}
@@ -56,7 +44,6 @@ function HomeHero({ page }: HomeSectionProps) {
       onOpenArtist={page.openArtist}
       onPlay={(artist) => void page.playHeroArtist(artist)}
       onToggleFollow={(artist) => void page.toggleHeroFollow(artist)}
-      desktopIntro={page.isDesktop ? homeIntro : undefined}
     />
   );
 }

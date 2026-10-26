@@ -461,12 +461,6 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        desktopIntro={
-          <div>
-            <h1>Good morning</h1>
-            <p>Saturday, August 1</p>
-          </div>
-        }
       />,
     );
 
@@ -478,11 +472,6 @@ describe("HomeTasteHero", () => {
       "aspect-[1480/600]",
       "min-h-[clamp(480px,38dvh,600px)]",
     );
-    expect(
-      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
-        name: "Good morning",
-      }),
-    ).toBeInTheDocument();
     for (const layer of screen.getAllByTestId("desktop-hero-copy-layer")) {
       expect(layer).toHaveClass("top-[39%]");
       expect(layer).not.toHaveClass("bottom-0");
