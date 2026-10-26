@@ -1,8 +1,7 @@
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
-import { api } from "@/lib/api";
 import { Toaster } from "sonner";
 import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { TooltipProvider } from "@crate/ui/shadcn/tooltip";
@@ -113,9 +112,6 @@ const Upcoming = lazy(() =>
 const Bandcamp = lazy(() =>
   import("@/pages/Bandcamp").then((m) => ({ default: m.Bandcamp })),
 );
-const Setup = lazy(() =>
-  import("@/pages/Setup").then((m) => ({ default: m.Setup })),
-);
 const Analysis = lazy(() =>
   import("@/pages/Analysis").then((m) => ({ default: m.Analysis })),
 );
@@ -141,19 +137,6 @@ const GlobalCatalog = lazy(() =>
     default: m.GlobalCatalog,
   })),
 );
-
-function SetupGuard() {
-  useEffect(() => {
-    api<{ needs_setup: boolean }>("/api/setup/status")
-      .then((d) => {
-        if (d.needs_setup && !window.location.pathname.startsWith("/setup")) {
-          window.location.href = "/setup";
-        }
-      })
-      .catch(() => {});
-  }, []);
-  return null;
-}
 
 function ProfileRedirect() {
   const { user, loading, hasCapability } = useAuth();
@@ -239,10 +222,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <TooltipProvider>
-          <SetupGuard />
           <Suspense fallback={<LoadingState variant="route" />}>
             <Routes>
-              <Route path="setup" element={<Setup />} />
               <Route path="login" element={<Login />} />
               <Route
                 element={

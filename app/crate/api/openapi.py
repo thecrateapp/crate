@@ -29,10 +29,6 @@ _PUBLIC_AUTH_PATHS = {
 _PUBLIC_PLAYLIST_PATHS = {
     "/api/playlists/filter-options",
 }
-_PUBLIC_SETUP_PATHS = {
-    "/api/setup/status",
-    "/api/setup/admin",
-}
 _PUBLIC_SCANNER_PATHS = {
     "/api/status",
 }
@@ -410,8 +406,6 @@ def _should_attach_auth(path: str, operation: dict) -> bool:
     if path.startswith("/api/auth") and path not in _PUBLIC_AUTH_PATHS:
         return True
     if path.startswith("/api/playlists") and path not in _PUBLIC_PLAYLIST_PATHS:
-        return True
-    if path.startswith("/api/setup") and path not in _PUBLIC_SETUP_PATHS:
         return True
     if path.startswith("/api/cache") and path != "/api/cache/invalidate":
         return True

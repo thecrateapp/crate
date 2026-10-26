@@ -474,7 +474,6 @@ def create_app() -> FastAPI:
     install_trace_id_log_record_factory()
     app.add_middleware(TraceMiddleware)
 
-    from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
     from crate.api.access_tokens import router as access_tokens_router
     from crate.api.media_access import router as media_access_router
@@ -545,7 +544,6 @@ def create_app() -> FastAPI:
     app.include_router(federation_well_known)
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
-    app.include_router(setup_router)
     from crate.api.mcp_oauth import router as mcp_oauth_router
 
     app.include_router(mcp_oauth_router)

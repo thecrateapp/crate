@@ -66,7 +66,7 @@ To compare the same Tauri HTTP client against Crate's API over HTTPS, set
 performs a database count but no writes:
 
 ```bash
-CRATE_R01_API_URL=https://api.lespedants.org/api/setup/status \
+CRATE_R01_API_URL=https://api.lespedants.org/api/status \
   cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml \
   --example http_pool_bench
 ```

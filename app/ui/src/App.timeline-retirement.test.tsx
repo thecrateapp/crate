@@ -47,7 +47,7 @@ import App from "./App";
 beforeEach(() => {
   state.signedIn = true;
   state.libraryView = true;
-  apiMock.mockReset().mockResolvedValue({ needs_setup: false });
+  apiMock.mockReset();
   window.history.replaceState(null, "", "/timeline?year=2020#albums");
 });
 afterEach(cleanup);

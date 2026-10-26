@@ -366,26 +366,10 @@ def test_openapi_types_task_routes_and_marks_them_authenticated(test_app):
     ].endswith("/TaskRetryResponse")
 
 
-def test_openapi_types_setup_routes_and_only_secures_protected_endpoints(test_app):
-    data = test_app.get("/openapi.json").json()
-    status_operation = data["paths"]["/api/setup/status"]["get"]
-    admin_operation = data["paths"]["/api/setup/admin"]["post"]
-    scan_operation = data["paths"]["/api/setup/scan"]["post"]
-
-    assert "security" not in status_operation
-    assert status_operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]["$ref"].endswith("/SetupStatusResponse")
-
-    assert "security" not in admin_operation
-    assert admin_operation["responses"]["200"]["content"]["application/json"]["schema"][
-        "$ref"
-    ].endswith("/SetupAdminResponse")
-
-    assert scan_operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
-    assert scan_operation["responses"]["200"]["content"]["application/json"]["schema"][
-        "$ref"
-    ].endswith("/TaskEnqueueResponse")
+def test_openapi_has_no_setup_wizard_routes(test_app):
+    """The web setup wizard is retired; `crate install` sets Crate up."""
+    paths = test_app.get("/openapi.json").json()["paths"]
+    assert not [path for path in paths if path.startswith("/api/setup")]
 
 
 def test_openapi_types_scanner_and_operations_routes(test_app):

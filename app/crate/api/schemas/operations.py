@@ -19,43 +19,6 @@ from crate.api.schemas.common import (
 from crate.api.schemas.management import AnalysisStatusResponse
 
 
-class SetupAdminRequest(BaseModel):
-    email: str
-    password: str
-    name: str = ""
-
-
-class SetupKeysRequest(BaseModel):
-    lastfm_apikey: str = ""
-    ticketmaster_api_key: str = ""
-    spotify_id: str = ""
-    spotify_secret: str = ""
-    fanart_api_key: str = ""
-    setlistfm_api_key: str = ""
-
-
-class SetupStatusResponse(BaseModel):
-    needs_setup: bool
-
-
-class SetupAdminResponse(BaseModel):
-    id: int
-    email: str
-
-
-class SetupKeysResponse(BaseModel):
-    saved: int
-
-
-class SetupCheckResponse(BaseModel):
-    has_lastfm: bool
-    has_ticketmaster: bool
-    has_spotify: bool
-    has_fanart: bool
-    has_setlistfm: bool
-    library_stats: Any
-
-
 class ScanRequest(BaseModel):
     only: str | None = None
 

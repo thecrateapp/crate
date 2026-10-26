@@ -279,10 +279,6 @@ from crate.api.schemas.operations import (
     ScanIssueResponse,
     ScannerStatusResponse,
     ScanStartResponse,
-    SetupAdminResponse,
-    SetupCheckResponse,
-    SetupKeysResponse,
-    SetupStatusResponse,
 )
 from crate.api.schemas.curation import (
     CreateSystemPlaylistRequest,
@@ -781,10 +777,6 @@ __all__ = [
     "SubsonicUser",
     "SubsonicUserResponse",
     "SyncStatusResponse",
-    "SetupAdminResponse",
-    "SetupCheckResponse",
-    "SetupKeysResponse",
-    "SetupStatusResponse",
     "TaskEnqueueResponse",
     "TaskCancelResponse",
     "TaskCleanupResponse",

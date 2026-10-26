@@ -275,7 +275,7 @@ jobs:
       - name: Measure pooled HTTP reuse against API (diagnostic)
         if: github.event_name == 'workflow_dispatch' && inputs.measure_r01_api
         env:
-          CRATE_R01_API_URL: https://api.lespedants.org/api/setup/status
+          CRATE_R01_API_URL: https://api.lespedants.org/api/status
         run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
 
       - name: Clear stale desktop bundles
