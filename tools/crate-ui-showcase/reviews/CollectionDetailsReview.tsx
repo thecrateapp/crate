@@ -627,7 +627,6 @@ function Scene() {
         closeLabel="Close"
         pending={pending}
         submitDisabled={!state.name.trim()}
-        maxWidthClassName="sm:max-w-3xl"
         onCancel={() => setDialog(null)}
       >
         <form

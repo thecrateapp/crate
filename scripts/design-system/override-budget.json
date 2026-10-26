@@ -9,8 +9,7 @@
   },
   "AppModal": {
     "background": 1,
-    "border": 1,
-    "height": 6,
+    "height": 2,
     "radius": 1
   },
   "AppPopover": {
@@ -165,7 +164,7 @@
     "radius": 5
   },
   "ModalBody": {
-    "height": 6,
+    "height": 1,
     "padding": 13
   },
   "ModalHeader": {

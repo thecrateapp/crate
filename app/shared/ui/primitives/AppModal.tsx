@@ -20,16 +20,7 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
-export type AppModalSize = "sm" | "md" | "lg" | "xl";
-
-const MODAL_SIZE_CLASS_NAMES: Record<AppModalSize, string> = {
-  sm: "sm:max-w-md",
-  md: "sm:max-w-lg",
-  lg: "sm:max-w-2xl",
-  xl: "sm:max-w-4xl",
-};
-
-const DEFAULT_MAX_WIDTH_CLASS_NAME = MODAL_SIZE_CLASS_NAMES.lg;
+export type AppModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 export interface AppModalProps {
   open: boolean;
@@ -47,7 +38,6 @@ export interface AppModalProps {
   closeDisabled?: boolean;
   backdropLabel?: string;
   headerClassName?: string;
-  maxWidthClassName?: string;
   panelClassName?: string;
   overlayClassName?: string;
   closeOnOverlay?: boolean;
@@ -78,7 +68,6 @@ export function AppModal({
   closeDisabled = false,
   backdropLabel = "Close dialog backdrop",
   headerClassName,
-  maxWidthClassName,
   panelClassName,
   overlayClassName,
   closeOnOverlay = true,
@@ -95,9 +84,6 @@ export function AppModal({
   const labelledBy = ariaLabelledBy ?? (hasTitle ? titleId : undefined);
   const describedBy =
     ariaDescribedBy ?? (hasTitle && hasDescription ? descriptionId : undefined);
-  const resolvedMaxWidthClassName =
-    maxWidthClassName ??
-    (size ? MODAL_SIZE_CLASS_NAMES[size] : DEFAULT_MAX_WIDTH_CLASS_NAME);
   useModalFocus({
     active: open,
     panelRef,
@@ -224,10 +210,10 @@ export function AppModal({
           ref={panelRef}
           data-app-modal-panel="true"
           data-modal-depth={depth}
-          data-overlay-size={maxWidthClassName ? undefined : (size ?? "lg")}
+          data-overlay-size={size ?? "lg"}
           tabIndex={-1}
           className={cn(
-            "crate-overlay-panel relative z-10 w-full overflow-hidden overscroll-contain",
+            "crate-overlay-panel relative z-10 flex min-h-0 w-full flex-col overflow-hidden overscroll-contain",
             isDragClosing
               ? undefined
               : isEntering && !isDragging
@@ -236,7 +222,6 @@ export function AppModal({
             mobileSafeArea
               ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
               : "max-h-[92vh]",
-            resolvedMaxWidthClassName,
             panelClassName,
           )}
           style={{
@@ -329,7 +314,7 @@ export function ModalBody({
     <div
       {...props}
       className={cn(
-        "crate-overlay-body overflow-y-auto overscroll-contain",
+        "crate-overlay-body min-h-0 flex-1 overflow-y-auto overscroll-contain",
         className,
       )}
     >

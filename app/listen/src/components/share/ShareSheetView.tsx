@@ -62,7 +62,6 @@ export function ShareSheetView(props: ShareSheetViewProps) {
       mobileSafeArea
       closeOnEscape={!busy}
       closeOnOverlay={!busy}
-      panelClassName="flex min-h-0 flex-col overflow-hidden"
     >
       <ModalHeader className="p-5">
         <div className="flex min-w-0 items-start gap-3">
@@ -85,7 +84,7 @@ export function ShareSheetView(props: ShareSheetViewProps) {
           />
         </div>
       </ModalHeader>
-      <ModalBody className="min-h-0 overflow-y-auto p-5">
+      <ModalBody className="overflow-y-auto p-5">
         {props.choosingStoryStyle ? (
           <div className="grid gap-2">
             <div className="flex items-center gap-2">

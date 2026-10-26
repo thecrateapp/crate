@@ -58,9 +58,8 @@ export function ArtistSetlistView({
       closeLabel={t("common.close")}
       size="md"
       mobileSafeArea
-      panelClassName="flex min-h-0 flex-col sm:max-h-[92vh]"
     >
-      <ModalBody className="min-h-0 flex-1 p-4">
+      <ModalBody className="p-4">
         <HairlineList label={t("artist.setlist.title")} ruled={false}>
           {setlist.map((track, index) => (
             <HairlineRow

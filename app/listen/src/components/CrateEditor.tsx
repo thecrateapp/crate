@@ -89,7 +89,6 @@ export function CrateEditor({ crateId, onBack, onDeleted }: CrateEditorProps) {
         title={t("library.crates.title")}
         closeLabel={t("common.close")}
         headerClassName="bg-transparent"
-        panelClassName="flex flex-col border-border-quiet"
       >
         <section className="flex min-h-0 flex-col">
           <ModalBody className="p-5">

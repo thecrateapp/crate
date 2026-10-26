@@ -486,12 +486,12 @@ function TrackAudioInfo({
         title={<span className="wrap-anywhere">{title} · Audio profile</span>}
         description="Measured audio features, Smart Mix readiness and similarity references for this track."
         closeLabel="Close audio profile"
-        maxWidthClassName="sm:max-w-6xl"
-        panelClassName="flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col"
+        size="3xl"
+        panelClassName="max-h-[calc(100dvh-2rem)] min-w-0"
         headerClassName="shrink-0"
       >
         <ModalBody
-          className="min-h-0 min-w-0 px-5 py-5"
+          className="min-w-0 px-5 py-5"
           data-slot="audio-profile-scroll"
         >
           <AudioProfileCard

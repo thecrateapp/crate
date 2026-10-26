@@ -241,7 +241,6 @@ export function PlaylistCreateModal({
       open={open}
       title={modalTitle}
       description={modalSubtitle}
-      maxWidthClassName="sm:max-w-3xl"
       formId={formId}
       submitLabel={submitLabel}
       cancelLabel={t("common.cancel")}

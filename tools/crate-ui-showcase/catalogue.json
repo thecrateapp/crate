@@ -1072,9 +1072,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/AppModal.tsx": "6075351b96eda7c888677b81425422e2043eb1ce7e1dc2d6eb6af5dd17559f7c",
+        "app/shared/ui/primitives/AppModal.tsx": "4dbee270e9e64a72a4832dd56e913f778410d50d2031f0fae19f7caf4384a3a4",
         "tools/crate-ui-showcase/stories/AppModal.stories.tsx": "d9d6908f2734b735bc53f00774b46a2c27bc62b6c2dce3d5b215a77d29b742ac",
-        "tools/crate-ui-showcase/docs/AppModal.mdx": "7c4ca9b560b150b675c366712e6d54ba293cc7c1762f233d1dfbff78739fa956"
+        "tools/crate-ui-showcase/docs/AppModal.mdx": "fb5cfd2e3410b005f1ffce9a949100ccef85f06a3a8fb0695e03a8c920c43ea4"
       },
       "category": "Overlays"
     },

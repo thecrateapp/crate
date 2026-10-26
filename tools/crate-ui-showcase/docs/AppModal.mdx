@@ -18,6 +18,14 @@ the panel minus the panel border; children use the available width minus body pa
 preserves the V2 artist biography at both desktop and mobile widths without a caller override.
 The biography sample composes the actual ArtistBioProfile with the same AppModal as Listen.
 
+The panel is a flex column capped at 92vh, and ModalBody is its flexible, scrollable region
+(`min-h-0 flex-1`), so header and footer stay visible while long content scrolls. Callers never
+add `flex`, `flex-col`, `min-h-0` or `overflow-hidden` to the panel or body.
+
+Width comes only from `size`, which maps to the shared `crate-overlay-panel[data-overlay-size]`
+recipe: sm 420px, md 560px, lg 760px (default), xl 896px, 2xl 1024px and 3xl 1280px. The recipe is
+unlayered, so width utilities on the panel have no effect; there is no width escape hatch.
+
 ModalFooter owns its action row: 20px inline and 16px block padding (matching the header), right
 alignment, wrapping and an 8px gap between actions. Callers pass only the actions; they never add
 layout or padding classes to the footer.

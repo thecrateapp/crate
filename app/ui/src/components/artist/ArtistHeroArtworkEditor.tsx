@@ -794,7 +794,7 @@ export function ArtistHeroArtworkEditor({
       <AppModal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
-        maxWidthClassName="sm:max-w-6xl"
+        size="3xl"
         panelClassName="sm:rounded-md"
       >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">

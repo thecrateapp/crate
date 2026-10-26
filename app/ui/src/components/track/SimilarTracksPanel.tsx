@@ -73,11 +73,11 @@ export function SimilarTracksPanel({
       description={artist}
       closeLabel="Close similar tracks"
       size="md"
-      panelClassName="flex min-h-0 max-h-[calc(100dvh-2rem)] flex-col"
+      panelClassName="max-h-[calc(100dvh-2rem)]"
       headerClassName="shrink-0"
       mobileSafeArea
     >
-      <ModalBody className="min-h-0 p-5">
+      <ModalBody className="p-5">
         {loading ? (
           <LoadingState label="Loading similar tracks" />
         ) : error ? (

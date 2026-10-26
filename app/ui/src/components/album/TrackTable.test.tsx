@@ -233,8 +233,8 @@ it("opens a wide scrollable track profile and preserves Escape, close and trigge
     name: "Concubine · Audio profile",
   });
   const panel = dialog.querySelector("[data-app-modal-panel]");
-  expect(panel).toHaveClass("sm:max-w-6xl", "flex", "flex-col");
-  expect(panel).not.toHaveAttribute("data-overlay-size");
+  expect(panel).toHaveClass("flex", "flex-col");
+  expect(panel).toHaveAttribute("data-overlay-size", "3xl");
   expect(
     dialog.querySelector('[data-slot="audio-profile-scroll"]'),
   ).toHaveClass("overflow-y-auto", "min-h-0");

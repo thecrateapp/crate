@@ -13,7 +13,6 @@ export function CollectionEditorDialog({
   title,
   description,
   size = "lg",
-  maxWidthClassName,
   formId,
   submitLabel,
   cancelLabel,
@@ -28,7 +27,6 @@ export function CollectionEditorDialog({
   title: ReactNode;
   description?: ReactNode;
   size?: AppModalSize;
-  maxWidthClassName?: string;
   formId: string;
   submitLabel: string;
   cancelLabel: string;
@@ -48,15 +46,13 @@ export function CollectionEditorDialog({
       title={title}
       description={description}
       size={size}
-      maxWidthClassName={maxWidthClassName}
       onClose={close}
       closeLabel={closeLabel}
       closeDisabled={pending}
       closeOnEscape={!pending && !closeBlocked}
       closeOnOverlay={!pending && !closeBlocked}
-      panelClassName="flex min-h-0 flex-col"
     >
-      <ModalBody className="min-h-0 flex-1 space-y-5 p-5">{children}</ModalBody>
+      <ModalBody className="space-y-5 p-5">{children}</ModalBody>
       <ModalFooter>
         <Button variant="ghost" disabled={pending} onClick={close}>
           {cancelLabel}
