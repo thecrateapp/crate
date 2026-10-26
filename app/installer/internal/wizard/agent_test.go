@@ -145,3 +145,28 @@ func TestConfigureKnowsTheAgentByItsOldNameAndWhenItIsPending(t *testing.T) {
 		}
 	}
 }
+
+func TestUnreachableDockerSaysTheAgentAnswersWereNotSaved(t *testing.T) {
+	cases := []struct {
+		answers map[string]string
+		warns   bool
+	}{
+		{map[string]string{"CRATE_AGENT_MODE": "agent", "AGENT_TELEGRAM_TOKEN": testBot}, true},
+		{map[string]string{"CRATE_AGENT_MODE": "agent"}, false},
+	}
+	for _, tc := range cases {
+		dir := t.TempDir()
+		w, out, _ := newTestWizard(t, Options{Version: "test", InstallDir: dir})
+		w.detectDocker = func(context.Context, system.Runner, system.Host) (system.Docker, system.DockerState) {
+			return system.Docker{}, system.DockerUnreachable
+		}
+		w.cfg.Integrations = tc.answers
+		if err := w.restart(context.Background(), dir); err != nil {
+			t.Fatal(err)
+		}
+		warned := strings.Contains(out.String(), "were not saved; run `crate configure agent` again")
+		if warned != tc.warns {
+			t.Errorf("%v: warned %v\n%s", tc.answers, warned, out.String())
+		}
+	}
+}

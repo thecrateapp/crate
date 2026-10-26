@@ -129,12 +129,18 @@ func (w *wizard) restart(ctx context.Context, dir string) error {
 	docker, state := w.detectDocker(ctx, w.run, w.host)
 	if state != system.DockerReady {
 		ui.Warning(w.out, "Docker is not reachable; the changes apply the next time Crate starts.")
+		w.agentAnswersDropped()
 		return nil
 	}
-	now, err := w.confirm("Apply the changes now?", "Crate restarts only the services that use these settings, usually in under a minute.", true)
+	description := "Crate restarts only the services that use these settings, usually in under a minute."
+	if len(w.agentAnswers()) > 0 {
+		description += " Crate Agent is set up now too; the bot token and keys you entered are kept only until then."
+	}
+	now, err := w.confirm("Apply the changes now?", description, true)
 	if err != nil || !now {
 		if err == nil {
 			ui.Success(w.out, "Apply them later with `docker compose up -d` in "+dir)
+			w.agentAnswersDropped()
 		}
 		return w.cancelled(err)
 	}
@@ -155,4 +161,12 @@ func (w *wizard) restart(ctx context.Context, dir string) error {
 		ui.Success(w.out, "Connect Tidal in Admin > Settings > Downloads and enter the code at tidal.com/activate")
 	}
 	return nil
+}
+
+// agentAnswersDropped tells the user that the agent answers only the setup
+// sees were not kept, since they are never written to .env.
+func (w *wizard) agentAnswersDropped() {
+	if len(w.agentAnswers()) > 0 {
+		ui.Warning(w.out, "Crate Agent was not set up. The bot token, allowed users and API key you entered were not saved; run `"+agent.SetupCommand+"` again to enter them.")
+	}
 }
