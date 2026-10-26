@@ -25,11 +25,13 @@ type Generated struct {
 }
 
 type IntegrationEnv struct {
-	Name        string `yaml:"name"`
-	Label       string `yaml:"label"`
-	Secret      bool   `yaml:"secret"`
-	Default     string `yaml:"default"`
-	Placeholder string `yaml:"placeholder"`
+	Name          string `yaml:"name"`
+	Label         string `yaml:"label"`
+	Secret        bool   `yaml:"secret"`
+	Default       string `yaml:"default"`
+	Placeholder   string `yaml:"placeholder"`
+	InstallerOnly bool   `yaml:"installer_only"`
+	Transient     bool   `yaml:"transient"`
 }
 
 type KeyGuide struct {
@@ -155,8 +157,8 @@ func (m *Manifest) Variables() []string {
 	return names
 }
 
-// InstallerOnly reports variables the installer keeps for itself that no
-// container reads.
+// InstallerOnly reports variables no container reads: the ones the
+// installer keeps for itself and the transient ones.
 func (m *Manifest) InstallerOnly() map[string]bool {
 	only := map[string]bool{}
 	for _, s := range m.Core {
@@ -164,7 +166,27 @@ func (m *Manifest) InstallerOnly() map[string]bool {
 			only[s.Env] = true
 		}
 	}
+	for _, in := range m.Integrations {
+		for _, e := range in.Env {
+			if e.InstallerOnly || e.Transient {
+				only[e.Name] = true
+			}
+		}
+	}
 	return only
+}
+
+// Transient reports integration variables that are never written to .env.
+func (m *Manifest) Transient() map[string]bool {
+	transient := map[string]bool{}
+	for _, in := range m.Integrations {
+		for _, e := range in.Env {
+			if e.Transient {
+				transient[e.Name] = true
+			}
+		}
+	}
+	return transient
 }
 
 // Secret reports whether a variable holds a credential that must never be shown.

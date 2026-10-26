@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/thecrateapp/crate/app/installer/internal/assets"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
@@ -24,6 +25,24 @@ func ReadExisting(installDir string) (*envfile.Values, error) {
 	return values, err
 }
 
+// ComposeFiles are the compose files of an installation: COMPOSE_FILE, or
+// the stack alone.
+func ComposeFiles(values *envfile.Values) []string {
+	var files []string
+	if values != nil {
+		value, _ := values.Get("COMPOSE_FILE")
+		for _, file := range strings.Split(value, ":") {
+			if file = strings.TrimSpace(file); file != "" {
+				files = append(files, file)
+			}
+		}
+	}
+	if len(files) == 0 {
+		return []string{"docker-compose.yaml"}
+	}
+	return files
+}
+
 // Action is one change Apply makes, shown before anything is written.
 type Action struct {
 	Description string
@@ -38,6 +57,7 @@ func Plan(cfg Config) []Action {
 		{"Write the Crate compose stack", filepath.Join(cfg.InstallDir, "docker-compose.yaml")},
 		{"Write Crate's configuration", filepath.Join(cfg.InstallDir, "config.yaml")},
 		{"Write the read-plane routes for Traefik", filepath.Join(cfg.InstallDir, "deploy", "traefik", assets.FederationRoutes)},
+		{"Write the Crate Agent setup", filepath.Join(cfg.InstallDir, "scripts", assets.AgentSetup)},
 		{"Write Traefik's configuration", filepath.Join(traefik, "traefik.yml")},
 		{"Write the settings and secrets (owner-only)", EnvPath(cfg.InstallDir)},
 	}
@@ -51,7 +71,6 @@ func Apply(m *manifest.Manifest, cfg Config, existing *envfile.Values) error {
 		cfg.MusicDir,
 		cfg.DataDir,
 		cfg.DownloadsDir,
-		filepath.Join(cfg.InstallDir, "deploy", "traefik"),
 		filepath.Join(traefik, "conf"),
 		filepath.Join(traefik, "logs"),
 	}
@@ -60,15 +79,14 @@ func Apply(m *manifest.Manifest, cfg Config, existing *envfile.Values) error {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
-	copies := map[string]string{
-		assets.Compose:          filepath.Join(cfg.InstallDir, "docker-compose.yaml"),
-		assets.CrateConfig:      filepath.Join(cfg.InstallDir, "config.yaml"),
-		assets.FederationRoutes: filepath.Join(cfg.InstallDir, "deploy", "traefik", assets.FederationRoutes),
-	}
-	for name, path := range copies {
+	for name, relative := range assets.Deployed {
 		data, err := assets.Read(name)
 		if err != nil {
 			return err
+		}
+		path := filepath.Join(cfg.InstallDir, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
 		}
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)

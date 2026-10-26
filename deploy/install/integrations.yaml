@@ -8,6 +8,10 @@
 #   generated     secrets created once and kept when the install is reconfigured
 #   tuning        knobs with safe compose defaults; never asked
 #   integrations  optional features the user can enable, with their variables
+#
+# installer_only variables stay in .env for the installer and the compose CLI;
+# no container reads them. transient variables are handed to a setup step and
+# never written to .env.
 
 version: 1
 
@@ -45,6 +49,9 @@ core:
   # Read by the docker compose CLI itself, not interpolated in the file.
   - env: COMPOSE_PROFILES
     label: Optional services
+    installer_only: true
+  - env: COMPOSE_FILE
+    label: Compose files
     installer_only: true
   - env: CF_DNS_API_TOKEN
     label: Cloudflare DNS API token
@@ -108,14 +115,20 @@ tuning:
   - ANALYSIS_SQLALCHEMY_MAX_OVERFLOW
   - ANALYSIS_SQLALCHEMY_POOL_SIZE
   - ANALYSIS_WORKER_PROCESSES
+  - CRATE_AGENT_IMAGE
+  - CRATE_AGENT_INSTANCE_ID
+  - CRATE_AGENT_MCP_HOST
+  - CRATE_AGENT_MCP_URL
   - CRATE_ANALYSIS_WORKER_IMAGE
   - CRATE_API_IMAGE
   - CRATE_CREDENTIAL_PREVIOUS_KEYS
+  - CRATE_DOCKER_SOCKET
   - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES
   - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES
   - CRATE_FEDERATION_IMPORT_LEASE_SECONDS
   - CRATE_FEDERATION_IMPORT_MAX_BYTES
   - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES
+  - CRATE_INFRA_RELAY_GID
   - CRATE_LISTEN_IMAGE
   - CRATE_MAINTENANCE_WINDOW_ENABLED
   - CRATE_MAINTENANCE_WINDOW_END
@@ -129,10 +142,13 @@ tuning:
   - CRATE_MEDIA_WORKER_IMAGE
   - CRATE_MEDIA_WORKER_MAX_ACTIVE
   - CRATE_METRICS_REDIS_TTL_SECONDS
+  - CRATE_OPERATOR_PRINCIPAL_IDS
+  - CRATE_OPERATOR_ROOT
   - CRATE_PLAYBACK_WORKER_IMAGE
   - CRATE_PROJECTOR_BATCH_LIMIT
   - CRATE_PROJECTOR_INTERVAL_SECONDS
   - CRATE_READPLANE_IMAGE
+  - CRATE_RELEASE_SHA
   - CRATE_RESOURCE_DEFER_SECONDS
   - CRATE_RESOURCE_GOVERNOR_ENABLED
   - CRATE_RESOURCE_MAX_ACTIVE_STREAMS
@@ -325,25 +341,6 @@ integrations:
         - Forward the listening port on your router so other users can reach you; searches work without it, downloads get faster with it.
     validate: slskd
 
-  - id: telegram
-    group: notifications
-    title: Telegram
-    tagline: alerts on your phone
-    summary: Alerts about imports, failures and new releases, and quick actions from your phone.
-    env:
-      - name: TELEGRAM_BOT_TOKEN
-        label: Bot token
-        secret: true
-      - name: TELEGRAM_CHAT_ID
-        label: Chat ID
-    get_key:
-      url: https://t.me/BotFather
-      steps:
-        - Open @BotFather in Telegram and send /newbot.
-        - Pick a name and a username ending in bot; BotFather replies with the token.
-        - Crate finds your chat ID when you send your new bot a message.
-    validate: telegram
-
   - id: tidal
     group: acquisition
     title: Tidal
@@ -414,6 +411,46 @@ integrations:
       url: https://cratemusic.app/docs
       steps:
         - Agents connect with tokens you create in Admin > Agents.
+
+  - id: agent
+    group: ai
+    title: Crate Agent
+    tagline: ask about your Crate on Telegram
+    summary: A Telegram bot that answers questions about your library, jobs and health. It only reads; Crate Operator, which `crate configure agent` sets up, can also make changes you approve.
+    env:
+      - name: CRATE_AGENT_MODE
+        label: Mode
+        installer_only: true
+      - name: CRATE_AGENT_PROVIDER
+        label: Model provider
+      - name: CRATE_AGENT_MODEL
+        label: Model
+      - name: CRATE_AGENT_BASE_URL
+        label: Model base URL
+      - name: AGENT_TELEGRAM_TOKEN
+        label: Telegram bot token
+        secret: true
+        transient: true
+      - name: AGENT_ALLOWED_USERS
+        label: Telegram user IDs allowed to use the bot
+        transient: true
+      - name: AGENT_MODEL_API_KEY
+        label: Model API key
+        secret: true
+        transient: true
+      - name: AGENT_APPROVER_EMAIL
+        label: Email of the admin who approves changes
+        transient: true
+      - name: AGENT_APPROVER_TELEGRAM_ID
+        label: Telegram user ID of that admin
+        transient: true
+    get_key:
+      url: https://t.me/BotFather
+      steps:
+        - Open @BotFather in Telegram, send /newbot and pick a username ending in bot.
+        - Use a new bot that no other program reads; BotFather replies with its token.
+        - Everyone who may use the bot sends it a message, so Crate can find their account.
+    validate: agent
 
   - id: google-login
     group: accounts

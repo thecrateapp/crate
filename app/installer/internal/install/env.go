@@ -47,8 +47,11 @@ func BuildEnv(m *manifest.Manifest, cfg Config, existing *envfile.Values) (*envf
 			values.Set(key, value)
 		}
 	}
+	transient := m.Transient()
 	for key, value := range cfg.Integrations {
-		values.Set(key, value)
+		if !transient[key] {
+			values.Set(key, value)
+		}
 	}
 	if cfg.Profiles != nil {
 		values.Set("COMPOSE_PROFILES", strings.Join(cfg.Profiles, ","))

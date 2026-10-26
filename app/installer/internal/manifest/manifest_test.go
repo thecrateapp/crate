@@ -25,13 +25,15 @@ func TestManifestAndHomeComposeDeclareTheSameVariables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	compose, err := assets.Read(assets.Compose)
-	if err != nil {
-		t.Fatal(err)
-	}
 	used := map[string]bool{}
-	for _, match := range composeVariable.FindAllStringSubmatch(string(compose), -1) {
-		used[match[1]] = true
+	for _, name := range []string{assets.Compose, assets.OperatorOverlay} {
+		compose, err := assets.Read(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range composeVariable.FindAllStringSubmatch(string(compose), -1) {
+			used[match[1]] = true
+		}
 	}
 	declared := map[string]bool{}
 	for _, name := range m.Variables() {
@@ -39,13 +41,13 @@ func TestManifestAndHomeComposeDeclareTheSameVariables(t *testing.T) {
 	}
 	for name := range used {
 		if !declared[name] {
-			t.Errorf("docker-compose.home.yaml reads %s; declare it in deploy/install/integrations.yaml", name)
+			t.Errorf("the home compose or the operator overlay reads %s; declare it in deploy/install/integrations.yaml", name)
 		}
 	}
 	installerOnly := m.InstallerOnly()
 	for name := range declared {
 		if !used[name] && !installerOnly[name] {
-			t.Errorf("%s is declared in the manifest but docker-compose.home.yaml never reads it", name)
+			t.Errorf("%s is declared in the manifest but neither the home compose nor the operator overlay reads it", name)
 		}
 	}
 }
@@ -76,5 +78,38 @@ integrations:
 				t.Fatalf("expected an error for %s", strings.TrimSpace(name))
 			}
 		})
+	}
+}
+
+func TestTransientVariablesAreInstallerOnly(t *testing.T) {
+	m, err := Parse([]byte(`version: 1
+integrations:
+  - id: agent
+    env:
+      - name: CRATE_AGENT_MODE
+        installer_only: true
+      - name: CRATE_AGENT_MODEL
+      - name: AGENT_TELEGRAM_TOKEN
+        secret: true
+        transient: true`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	only, transient := m.InstallerOnly(), m.Transient()
+	cases := []struct {
+		name                string
+		installerOnly, temp bool
+	}{
+		{"CRATE_AGENT_MODE", true, false},
+		{"CRATE_AGENT_MODEL", false, false},
+		{"AGENT_TELEGRAM_TOKEN", true, true},
+	}
+	for _, tc := range cases {
+		if only[tc.name] != tc.installerOnly || transient[tc.name] != tc.temp {
+			t.Errorf("%s: installer only %v, transient %v", tc.name, only[tc.name], transient[tc.name])
+		}
+	}
+	if !m.Secret("AGENT_TELEGRAM_TOKEN") {
+		t.Error("a transient secret is still a secret")
 	}
 }
