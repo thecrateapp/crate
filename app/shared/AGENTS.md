@@ -270,9 +270,11 @@ media names/details retain their existing roles and case. Keep two-line clamping
 access, pointer targets, original localized accessible names and desktop/sheet navigation.
 
 MonoLabel inside an enabled native/ARIA link changes to high accent on hover/focus-visible;
-standalone and disabled captions keep their tone. ContextMenu owns the same foreground-only
-feedback for its MonoLabel options, including disclosure/submenu highlight/open states; no hover
-fill. Resting normal/danger/disabled colors and media-name case remain their existing roles.
+standalone and disabled captions keep their tone. ContextMenu MonoLabel options, including
+disclosure/submenu highlight/open states, use the shared `crate-overlay-menu-item` feedback: high
+accent foreground over the neutral `--hover-bg` fill, with no border change. The same recipe covers
+DropdownMenu, Select and AppPopover items in both apps (`overlay-recipes.test.ts`). Resting
+normal/danger/disabled colors and media-name case remain their existing roles.
 
 Enabled native EntityRow primary action buttons apply the same foreground-only MonoLabel
 hover/focus-visible feedback as links. This is the unfilled callback-action role; disabled
