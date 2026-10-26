@@ -58,30 +58,139 @@ export function pickNodes(
   });
 }
 
-const PATH_KEYS = ["5A", "6A", "7A", "8A", "9A", "10A", "11A", "12A"];
-
-export interface PathReadout {
-  head: string;
-  bpm: number;
-  key: string;
+export interface PathStop {
+  position: number;
+  artist: string;
+  title: string;
+  cover: string;
 }
 
-export function pathReadouts(steps: number, random: Random): PathReadout[] {
-  const startBpm = 84 + Math.floor(random() * 20);
-  const endBpm = startBpm + 24 + Math.floor(random() * 20);
-  const keyStart = Math.floor(random() * 3);
-  return Array.from({ length: steps }, (_, i) => ({
-    head:
+export const PATH_ROUTE = {
+  from: "rap",
+  to: "punk rock",
+  tracks: 34,
+  stops: [
+    {
+      position: 1,
+      artist: "JPEGMAFIA",
+      title: "either on or off the drugs",
+      cover: "/paths/jpegmafia.webp",
+    },
+    {
+      position: 4,
+      artist: "Wu-Tang Clan",
+      title: "Bring Da Ruckus",
+      cover: "/paths/wu-tang-clan.webp",
+    },
+    {
+      position: 8,
+      artist: "The Clash",
+      title: "Should I Stay or Should I Go",
+      cover: "/paths/the-clash.webp",
+    },
+    {
+      position: 16,
+      artist: "Bad Brains",
+      title: "The Regulator",
+      cover: "/paths/bad-brains.webp",
+    },
+    {
+      position: 26,
+      artist: "Descendents",
+      title: "Catalina",
+      cover: "/paths/descendents.webp",
+    },
+    {
+      position: 34,
+      artist: "Eskorbuto",
+      title: "Historia triste",
+      cover: "/paths/eskorbuto.webp",
+    },
+  ] satisfies PathStop[],
+};
+
+export function pathLabels(route: typeof PATH_ROUTE): string[] {
+  const last = route.stops.length - 1;
+  return route.stops.map((stop, i) => {
+    const head =
       i === 0
-        ? "START"
-        : i === steps - 1
-          ? "END"
-          : String(i + 1).padStart(2, "0"),
-    bpm: Math.round(startBpm + ((endBpm - startBpm) * i) / (steps - 1)),
-    key: PATH_KEYS[
-      Math.min(PATH_KEYS.length - 1, keyStart + Math.round(i * 0.8))
-    ],
-  }));
+        ? route.from.toUpperCase()
+        : i === last
+          ? route.to.toUpperCase()
+          : `${String(stop.position).padStart(2, "0")} / ${route.tracks}`;
+    return `${head}\n${stop.artist}\n${stop.title}`;
+  });
+}
+
+export function labelAbove(ys: number[], i: number): boolean {
+  const before = ys[i - 1] ?? ys[i + 1] ?? ys[i];
+  const after = ys[i + 1] ?? ys[i - 1] ?? ys[i];
+  return ys[i] <= (before + after) / 2;
+}
+
+export interface LabelBox {
+  width: number;
+  height: number;
+  alignEnd?: boolean;
+}
+
+const LABEL_GAP = 14;
+const LABEL_INSET = 20;
+
+export function placeLabels(
+  points: { x: number; y: number }[],
+  boxes: LabelBox[],
+  previous: (number | null)[] = [],
+  bounds = Infinity,
+): (number | null)[] {
+  const ys = points.map((p) => p.y);
+  const last = points.length - 1;
+  const order = [0, last, ...points.keys()].filter(
+    (i, n, all) => i >= 0 && all.indexOf(i) === n,
+  );
+  const placed: { left: number; top: number; right: number; bottom: number }[] =
+    [];
+  const offsets: (number | null)[] = points.map(() => null);
+  for (const i of order) {
+    const point = points[i];
+    const { width, height, alignEnd } = boxes[i];
+    const above = -(height + LABEL_GAP);
+    const below = LABEL_GAP;
+    const far = height + LABEL_GAP;
+    const options = labelAbove(ys, i)
+      ? [above, below, above - far, below + far]
+      : [below, above, below + far, above - far];
+    const left = alignEnd
+      ? point.x + LABEL_INSET - width
+      : point.x - LABEL_INSET;
+    const rect = (offset: number) => ({
+      left,
+      right: left + width,
+      top: point.y + offset,
+      bottom: point.y + offset + height,
+    });
+    const free = (offset: number) => {
+      const r = rect(offset);
+      return placed.every(
+        (o) =>
+          r.right <= o.left ||
+          r.left >= o.right ||
+          r.bottom <= o.top ||
+          r.top >= o.bottom,
+      );
+    };
+    const endpoint = i === 0 || i === last;
+    const fits = endpoint || (left >= 0 && left + width <= bounds);
+    const kept = previous[i] ?? NaN;
+    const offset = !fits
+      ? null
+      : options.includes(kept) && free(kept)
+        ? kept
+        : options.find(free) ?? (endpoint ? options[0] : null);
+    if (offset !== null) placed.push(rect(offset));
+    offsets[i] = offset;
+  }
+  return offsets;
 }
 
 const RADIO_KEYS = ["8A", "9A", "8B", "7A", "8A", "9A", "7B"];

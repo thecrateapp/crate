@@ -1,6 +1,7 @@
 ---
 import { t } from "../../i18n";
 import type { Step } from "../../lib/chapters";
+import { PATH_ROUTE } from "../../scripts/listen/scene";
 import DeepDive from "./DeepDive.astro";
 
 interface Props {
@@ -13,7 +14,8 @@ const { steps, locale = "en" } = Astro.props;
 
 <DeepDive name="paths" steps={steps}>
   <p class="mono-panel paths-caption" data-fade>
-    <b>{t("paths.title", locale)}</b> · {t("paths.steps", locale, { steps: "6" })} · <span class="range"></span>
+    <b>{t("paths.title", locale)}</b> · {PATH_ROUTE.from} → {PATH_ROUTE.to} ·
+    {t("paths.tracks", locale, { tracks: String(PATH_ROUTE.tracks) })}
   </p>
   <p class="mono-panel paths-saved" data-fade>{t("paths.saved", locale)}</p>
 </DeepDive>
@@ -54,14 +56,35 @@ const { steps, locale = "en" } = Astro.props;
     position: absolute;
     left: 0;
     top: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     white-space: pre;
     font-size: 10px;
     line-height: 1.6;
     letter-spacing: 0.08em;
     color: var(--fg-2);
+    text-shadow:
+      0 0 4px var(--bg),
+      0 0 10px var(--bg);
     opacity: 0;
     transition: opacity 0.4s var(--ease-out);
     pointer-events: none;
+  }
+
+  :global([data-dive="paths"] .node-label.is-end) {
+    flex-direction: row-reverse;
+    translate: calc(-100% + 40px) 0;
+    text-align: right;
+  }
+
+  :global([data-dive="paths"] .node-cover) {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 3px;
+    object-fit: cover;
+    box-shadow: 0 0 0 1px rgba(241, 245, 249, 0.12);
   }
 
   :global([data-dive="paths"] .node-label.is-on) {
@@ -81,6 +104,11 @@ const { steps, locale = "en" } = Astro.props;
     }
     :global([data-dive="paths"] .node-label) {
       font-size: 9px;
+      gap: 8px;
+    }
+    :global([data-dive="paths"] .node-cover) {
+      width: 40px;
+      height: 40px;
     }
   }
 </style>

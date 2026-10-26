@@ -3,9 +3,17 @@ import type { Field } from "../field/renderer";
 import { mulberry32 } from "../field/sources";
 import { scrambleText } from "../motion/scramble";
 import { svgElement, type DiveContext, type DiveScene } from "./dive";
-import { pathReadouts, pickNodes, segment, type Candidate } from "./scene";
+import {
+  PATH_ROUTE,
+  pathLabels,
+  pickNodes,
+  placeLabels,
+  type LabelBox,
+  segment,
+  type Candidate,
+} from "./scene";
 
-const STEPS = 6;
+const STEPS = PATH_ROUTE.stops.length;
 
 export function createPathsScene(
   field: Field,
@@ -21,26 +29,50 @@ export function createPathsScene(
       r: i === 0 || i === STEPS - 1 ? 4.5 : 3,
     }),
   );
-  const readouts = pathReadouts(STEPS, mulberry32(21));
-  const labels = readouts.map((readout) => {
+  const labels = pathLabels(PATH_ROUTE).map((text, i) => {
     const label = document.createElement("div");
-    label.className = "node-label";
+    label.className = i === STEPS - 1 ? "node-label is-end" : "node-label";
     label.setAttribute("aria-hidden", "true");
-    label.dataset.text = `${readout.head}\n${readout.bpm} BPM · ${readout.key}`;
+    const cover = document.createElement("img");
+    cover.className = "node-cover";
+    cover.src = PATH_ROUTE.stops[i].cover;
+    cover.alt = "";
+    cover.loading = "lazy";
+    cover.decoding = "async";
+    const copy = document.createElement("span");
+    copy.className = "node-text";
+    copy.dataset.text = text;
+    label.append(cover, copy);
     visual.appendChild(label);
     return label;
   });
+  const copies = labels.map(
+    (label) => label.querySelector<HTMLElement>(".node-text")!,
+  );
   const caption = root.querySelector<HTMLElement>(".paths-caption");
   const saved = root.querySelector<HTMLElement>(".paths-saved");
-  if (caption) {
-    const range = caption.querySelector(".range");
-    if (range)
-      range.textContent = `${readouts[0].bpm} → ${readouts[STEPS - 1].bpm} BPM`;
-  }
 
   const scrambles: (() => void)[] = [];
   let nodes: number[] = [];
+  let boxes: LabelBox[] = [];
+  let offsets: (number | null)[] = [];
+  let bounds = Infinity;
   let planned = false;
+
+  function measure(): LabelBox[] {
+    return labels.map((label, i) => {
+      const copy = copies[i];
+      const current = copy.textContent;
+      copy.textContent = copy.dataset.text ?? "";
+      const box = {
+        width: label.offsetWidth,
+        height: label.offsetHeight,
+        alignEnd: i === STEPS - 1,
+      };
+      copy.textContent = current;
+      return box;
+    });
+  }
 
   function plan() {
     const random = mulberry32(5);
@@ -61,6 +93,8 @@ export function createPathsScene(
       if (point.w > 0) candidates.push({ index, x: point.x, y: point.y });
     }
     nodes = pickNodes(candidates, anchors);
+    boxes = measure();
+    bounds = width;
     planned = true;
   }
 
@@ -71,15 +105,16 @@ export function createPathsScene(
 
   function setLabel(i: number, on: boolean) {
     const label = labels[i];
+    const copy = copies[i];
     if (on === label.classList.contains("is-on")) return;
     label.classList.toggle("is-on", on);
     scrambles[i]?.();
     if (on)
-      scrambles[i] = scrambleText(label, label.dataset.text ?? "", {
+      scrambles[i] = scrambleText(copy, copy.dataset.text ?? "", {
         durationMs: 380,
         reducedMotion: reduced,
       });
-    else label.textContent = "";
+    else copy.textContent = "";
   }
 
   function frame(phase: number, time: number) {
@@ -116,6 +151,7 @@ export function createPathsScene(
     polyline.style.opacity = draw > 0 ? "1" : "0";
 
     const endpoints = segment(phase, 0.15, 0.4);
+    offsets = placeLabels(screen, boxes, offsets, bounds);
     screen.forEach((p, i) => {
       const isEndpoint = i === 0 || i === STEPS - 1;
       const on = isEndpoint
@@ -125,10 +161,12 @@ export function createPathsScene(
       circles[i].setAttribute("cx", String(p.x));
       circles[i].setAttribute("cy", String(p.y));
       circles[i].style.opacity = String(amount);
-      labels[i].style.transform = `translate3d(${p.x - 20}px, ${
-        p.y + (i % 2 === 0 ? -46 : 14)
-      }px, 0)`;
-      setLabel(i, on);
+      const offset = offsets[i];
+      if (offset !== null)
+        labels[i].style.transform = `translate3d(${p.x - 20}px, ${
+          p.y + offset
+        }px, 0)`;
+      setLabel(i, on && offset !== null);
     });
 
     if (caption) caption.style.opacity = String(endpoints);

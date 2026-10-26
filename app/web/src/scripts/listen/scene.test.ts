@@ -4,8 +4,11 @@ import {
   closestIndex,
   densestIndex,
   nearest,
-  pathReadouts,
+  labelAbove,
+  PATH_ROUTE,
+  pathLabels,
   pickNodes,
+  placeLabels,
   radioPicks,
   segment,
 } from "./scene";
@@ -50,21 +53,102 @@ describe("pickNodes", () => {
   });
 });
 
-describe("pathReadouts", () => {
-  it("labels six nodes from START to END with rising BPM and Camelot keys", () => {
-    const readouts = pathReadouts(6, mulberry32(3));
-    expect(readouts.map((r) => r.head)).toEqual([
-      "START",
-      "02",
-      "03",
-      "04",
-      "05",
-      "END",
+describe("pathLabels", () => {
+  it("heads the endpoints with genres and the stops with their place in the path", () => {
+    const labels = pathLabels(PATH_ROUTE);
+    expect(labels).toHaveLength(6);
+    expect(labels[0]).toBe("RAP\nJPEGMAFIA\neither on or off the drugs");
+    expect(labels[2]).toBe("08 / 34\nThe Clash\nShould I Stay or Should I Go");
+    expect(labels[5]).toBe("PUNK ROCK\nEskorbuto\nHistoria triste");
+  });
+
+  it("keeps the stops in path order inside the saved track count", () => {
+    const positions = PATH_ROUTE.stops.map((stop) => stop.position);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(positions[0]).toBe(1);
+    expect(positions.at(-1)).toBe(PATH_ROUTE.tracks);
+  });
+});
+
+describe("labelAbove", () => {
+  it("puts each label on the outside of the bend", () => {
+    const ys = [100, 220, 215, 130, 10, 5];
+    expect(ys.map((_, i) => labelAbove(ys, i))).toEqual([
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
     ]);
-    const bpms = readouts.map((r) => r.bpm);
-    expect([...bpms].sort((a, b) => a - b)).toEqual(bpms);
-    expect(bpms[5] - bpms[0]).toBeGreaterThanOrEqual(24);
-    readouts.forEach((r) => expect(r.key).toMatch(/^\d{1,2}A$/));
+  });
+});
+
+describe("placeLabels", () => {
+  const box = { width: 190, height: 48 };
+
+  it("uses the outside of the bend when labels are far apart", () => {
+    const points = [
+      { x: 0, y: 100 },
+      { x: 400, y: 300 },
+      { x: 800, y: 100 },
+    ];
+    expect(placeLabels(points, [box, box, box])).toEqual([-62, 14, -62]);
+  });
+
+  it("moves a label to a free slot when neighbours would overlap", () => {
+    const points = [
+      { x: 0, y: 100 },
+      { x: 80, y: 215 },
+      { x: 160, y: 222 },
+      { x: 260, y: 130 },
+    ];
+    const offsets = placeLabels(points, [box, box, box, box]);
+    expect(offsets).not.toContain(null);
+    const rects = points.map((p, i) => ({
+      left: p.x - 20,
+      right: p.x - 20 + box.width,
+      top: p.y + (offsets[i] ?? 0),
+      bottom: p.y + (offsets[i] ?? 0) + box.height,
+    }));
+    rects.forEach((a, i) =>
+      rects.slice(i + 1).forEach((b) => {
+        const overlap =
+          a.left < b.right &&
+          b.left < a.right &&
+          a.top < b.bottom &&
+          b.top < a.bottom;
+        expect(overlap).toBe(false);
+      }),
+    );
+  });
+
+  it("places the endpoints first and hides middle stops with no free slot", () => {
+    const points = Array.from({ length: 6 }, () => ({ x: 100, y: 100 }));
+    const offsets = placeLabels(
+      points,
+      points.map(() => box),
+    );
+    expect(offsets[0]).not.toBeNull();
+    expect(offsets[5]).not.toBeNull();
+    expect(offsets.filter((offset) => offset === null)).toHaveLength(2);
+  });
+
+  it("hides a middle stop that would run past the bounds", () => {
+    const points = [
+      { x: 0, y: 100 },
+      { x: 300, y: 400 },
+      { x: 360, y: 100 },
+    ];
+    expect(placeLabels(points, [box, box, box], [], 390)[1]).toBeNull();
+  });
+
+  it("keeps the previous slot while it stays free", () => {
+    const points = [
+      { x: 0, y: 100 },
+      { x: 400, y: 300 },
+    ];
+    expect(placeLabels(points, [box, box], [-62, -62])).toEqual([-62, -62]);
   });
 });
 

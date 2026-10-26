@@ -11,7 +11,7 @@ describe("t", () => {
   });
 
   it("interpolates named values", () => {
-    expect(t("paths.steps", "en", { steps: "12" })).toBe("12 steps");
+    expect(t("paths.tracks", "en", { tracks: "12" })).toBe("12 tracks");
   });
 
   it("exposes English as the only shipped locale", () => {
