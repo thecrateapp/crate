@@ -9,12 +9,12 @@ x-logging: &default-logging
     max-file: "5"
 
 services:
-  # Dedicated read-only operator. Enable explicitly; personal Hermes is a different project.
-  crate-hermes-agent:
-    profiles: [hermes]
+  # Crate Agent: read-only Telegram operator (Hermes Agent engine). Enable explicitly.
+  crate-agent:
+    profiles: [agent]
     logging: *default-logging
-    image: ${CRATE_HERMES_IMAGE:-nousresearch/hermes-agent:v0.22.2@sha256:36099926da316742423544e055d4734777105ffe6341873af5459b957d0c2919}
-    container_name: crate-hermes-agent
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-agent
     restart: unless-stopped
     mem_limit: 1g
     cpus: 0.50
@@ -25,17 +25,23 @@ services:
       HERMES_UID: ${PUID:-1000}
       HERMES_GID: ${PGID:-1000}
       HERMES_HOME: /opt/data
-      HERMES_TIMEZONE: ${TZ:-Europe/Madrid}
+      HERMES_TIMEZONE: ${TZ:-UTC}
+      TZ: ${TZ:-UTC}
       HERMES_MANAGED_DIR: /etc/hermes
-      CRATE_MCP_URL: ${CRATE_HERMES_MCP_URL:-http://crate-api:8585/mcp}
-      CRATE_MCP_HOST: ${CRATE_HERMES_MCP_HOST:-api.${DOMAIN}}
+      CRATE_MCP_URL: ${CRATE_AGENT_MCP_URL:-http://crate-api:8585/mcp}
+      CRATE_MCP_HOST: ${CRATE_AGENT_MCP_HOST:-api.${DOMAIN}}
+      CRATE_AGENT_PROVIDER: ${CRATE_AGENT_PROVIDER:-}
+      CRATE_AGENT_MODEL: ${CRATE_AGENT_MODEL:-}
+      CRATE_AGENT_BASE_URL: ${CRATE_AGENT_BASE_URL:-}
+      CRATE_RELEASE_SHA: ${CRATE_RELEASE_SHA:-}
     volumes:
-      - ${DATA_DIR}/hermes-agent/home:/opt/data
-      - ${DATA_DIR}/hermes-agent/secrets:/run/crate-hermes-secrets:ro
-      - ${DATA_DIR}/hermes-agent/secrets/managed.env:/etc/hermes/.env:ro
-      - ${DATA_DIR}/hermes-agent/context:/opt/crate-context:ro
-      - ${DATA_DIR}/hermes-agent/runtime/current:/opt/crate-hermes:ro
-      - ${DATA_DIR}/hermes-agent/runtime/current/config.json:/etc/hermes/config.yaml:ro
+      - ${DATA_DIR}/crate-agent/home:/opt/data
+      - ${DATA_DIR}/crate-agent/secrets:/run/crate-hermes-secrets:ro
+      - ${DATA_DIR}/crate-agent/context:/opt/crate-context:ro
+    # The runtime renders the managed policy here on every start; console edits
+    # under the home cannot override it.
+    tmpfs:
+      - /etc/hermes:uid=${PUID:-1000},gid=${PGID:-1000},mode=0700
     command: ["python3", "/opt/crate-hermes/runtime.py"]
     healthcheck:
       test: ["CMD", "python3", "/opt/crate-hermes/runtime.py", "--health"]

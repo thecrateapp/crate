@@ -689,3 +689,96 @@ describe("ConnectAgentDialog", () => {
     expect(screen.getByLabelText("Name")).toHaveValue("Retry this proposal");
   });
 });
+
+describe("Crate Agent presets", () => {
+  const crateAgentScopes = [
+    "library.health.read",
+    "ops.status.read",
+    "ops.jobs.read",
+    "ops.logs.read",
+    "ops.audit.read",
+    "ops.schedules.read",
+    "ops.runtime.read",
+  ];
+  const agentCatalog: AgentCatalog = {
+    ...catalog,
+    presets: [
+      ...catalog.presets,
+      {
+        id: "crate_agent",
+        label: "Crate Agent (read only)",
+        description:
+          "Exactly what Crate Agent uses: health, status, jobs, logs, audit, schedules and runtime policy. Cannot change anything.",
+        scopes: crateAgentScopes,
+      },
+      {
+        id: "crate_operator",
+        label: "Crate Operator",
+        description:
+          "Exactly what Crate Operator tools need, including reviewed changes. Requires actions to be enabled and human approval.",
+        scopes: [
+          ...crateAgentScopes,
+          "library.repair.run",
+          "curation.shows.read",
+          "curation.shows.write",
+          "editorial.read",
+          "editorial.publish",
+        ],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
+
+  it("creates a connection with exactly the Crate Agent grants", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      token: "crate_mcp_visible-once",
+      credential_id: "credential-1",
+      expires_at: "2030-01-01T00:00:00Z",
+    });
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={agentCatalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Crate Agent");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(
+      screen.getByRole("radio", { name: "Crate Agent (read only)" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/agent-integrations",
+        "POST",
+        expect.objectContaining({ grants: crateAgentScopes }),
+      ),
+    );
+  });
+
+  it("keeps the existing default and disables Crate Operator without every permission", () => {
+    render(
+      <PermissionPicker
+        catalog={agentCatalog}
+        value={readOnlyPreset.scopes}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: "Read only" })).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "Crate Agent (read only)" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("radio", { name: "Crate Operator" }),
+    ).toBeDisabled();
+  });
+});

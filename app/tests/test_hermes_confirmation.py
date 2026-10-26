@@ -262,7 +262,7 @@ def test_presenter_delivers_full_page_then_receipt_and_outcome(monkeypatch):
         monkeypatch.setattr(module.asyncio, "sleep", no_wait)
         await presenter.present(app, provider)
         assert sent[0]["text"] == "literal <b>é</b>" and sent[0]["parse_mode"] is None
-        assert sent[0]["reply_markup"][0][0]["label"] == "Siguiente"
+        assert sent[0]["reply_markup"][0][0]["label"] == "Next"
         assert "job-1" in sent[1]["text"]
         assert provider.event.await_args_list[1].args[0]["kind"] == "delivered"
 
@@ -372,6 +372,7 @@ def test_profile_validates_current_approval_and_retains_bounded_reconnect_adapte
     monkeypatch.setenv("XDG_STATE_HOME", "/root/.local/state")
     monkeypatch.setenv("CRATE_MCP_URL", "http://crate-api:8585/mcp")
     monkeypatch.setenv("CRATE_MCP_HOST", "api.test.invalid")
+    monkeypatch.setenv("HERMES_MANAGED_DIR", str(tmp_path / "managed"))
     runtime.configure_operator(tmp_path, ROOT / "deploy/hermes", domain_available=False)
     assert os.environ["HOME"] == str(tmp_path)
     assert os.environ["XDG_STATE_HOME"] == str(tmp_path / "xdg-state")
@@ -384,7 +385,7 @@ def test_profile_validates_current_approval_and_retains_bounded_reconnect_adapte
     assert json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]["crate"][
         "args"
     ] == ["/opt/crate-hermes/domain_mcp.py"]
-    assert "exclusivamente lectura" not in (tmp_path / "SOUL.md").read_text()
+    assert "strictly read-only" not in (tmp_path / "SOUL.md").read_text()
     runtime.configure_operator(tmp_path, ROOT / "deploy/hermes", domain_available=True)
     assert "crate" in json.loads((tmp_path / "config.yaml").read_text())["mcp_servers"]
 

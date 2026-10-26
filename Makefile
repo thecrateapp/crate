@@ -772,6 +772,90 @@ _create-dirs:
 	@echo "$(GREEN)Directories created$(NC)"
 
 # ===========================================================================
+# CRATE AGENT / CRATE OPERATOR (Telegram agents on the host that runs the stack)
+# ===========================================================================
+
+# AGENT_PROFILE=agent runs Crate Agent, read only (profile agent).
+# AGENT_PROFILE=operator runs Crate Operator: adds deploy/operator/compose.operator.yaml
+# (profile crate-operator), which also recreates crate-api and the workers it overrides.
+# AGENT_COMPOSE_FILES is a COMPOSE_FILE-style list; the official server uses
+# AGENT_COMPOSE_FILES=docker-compose.yaml:docker-compose.project.yaml.
+# AGENT_INIT_FLAGS passes --non-interactive, --replace, --no-start or --no-network.
+AGENT_PROFILE          ?= agent
+AGENT_COMPOSE_FILES    ?= docker-compose.yaml
+AGENT_OPERATOR_OVERLAY ?= deploy/operator/compose.operator.yaml
+AGENT_INIT_FLAGS       ?=
+AGENT_SETUP            := python3 scripts/agent_setup.py
+AGENT_ARGS             := --profile $(AGENT_PROFILE) --compose-files "$(AGENT_COMPOSE_FILES)" --overlay "$(AGENT_OPERATOR_OVERLAY)"
+
+ifeq ($(AGENT_PROFILE),operator)
+AGENT_DC       := COMPOSE_FILE="$(AGENT_COMPOSE_FILES):$(AGENT_OPERATOR_OVERLAY)" $(DC) --profile crate-operator
+AGENT_SERVICES := crate-operator crate-infra-relay crate-operator-supervisor crate-provenance crate-provenance-docker
+AGENT_NAME     := Crate Operator
+AGENT_OTHER    := crate-agent
+else
+AGENT_DC       := COMPOSE_FILE="$(AGENT_COMPOSE_FILES)" $(DC) --profile agent
+AGENT_SERVICES := crate-agent
+AGENT_NAME     := Crate Agent
+AGENT_OTHER    := crate-operator
+endif
+
+.PHONY: _agent-profile
+_agent-profile:
+	@case "$(AGENT_PROFILE)" in agent|operator) ;; \
+		*) echo "$(RED)AGENT_PROFILE must be agent or operator$(NC)"; exit 1 ;; esac
+
+.PHONY: agent-init
+agent-init: _agent-profile ## Guided setup: Telegram, MCP credential, model, approver and alerts (operator), login and smoke test (AGENT_PROFILE=agent|operator)
+	@$(AGENT_SETUP) init $(AGENT_ARGS) $(AGENT_INIT_FLAGS)
+
+.PHONY: agent-up
+agent-up: _agent-profile ## Start Crate Agent or Crate Operator after checking prerequisites (AGENT_PROFILE=agent|operator)
+	@if [ -n "$$(docker ps -q -f name=^$(AGENT_OTHER)$$)" ]; then \
+		echo "$(RED)$(AGENT_OTHER) is running. Never run Crate Agent and Crate Operator together; stop it first$(NC)"; \
+		exit 1; \
+	fi
+	@$(AGENT_SETUP) check $(AGENT_ARGS) || { echo "$(RED)Fix the items above (make agent-init sets them up)$(NC)"; exit 1; }
+ifeq ($(AGENT_PROFILE),operator)
+	@echo "$(YELLOW)Crate Operator recreates crate-api and the workers with the operator overlay$(NC)"
+	@$(AGENT_DC) up -d $$($(AGENT_SETUP) scale-args $(AGENT_ARGS))
+else
+	@$(AGENT_DC) up -d --no-deps $(AGENT_SERVICES)
+endif
+	@echo "$(GREEN)$(AGENT_NAME) is starting. Follow it with make agent-logs$(NC)"
+
+.PHONY: agent-down
+agent-down: _agent-profile ## Stop and remove the agent containers (AGENT_PROFILE=agent|operator)
+	@$(AGENT_DC) rm -sf $(AGENT_SERVICES)
+ifeq ($(AGENT_PROFILE),operator)
+	@echo "$(YELLOW)crate-api and the workers keep the operator overlay until the stack is recreated without it$(NC)"
+endif
+	@echo "$(GREEN)$(AGENT_NAME) stopped$(NC)"
+
+.PHONY: agent-logs
+agent-logs: _agent-profile ## Tail agent logs (AGENT_PROFILE=agent|operator)
+	@$(AGENT_DC) logs -f --tail=200 $(AGENT_SERVICES)
+
+.PHONY: agent-status
+agent-status: _agent-profile ## Show agent containers, health and prerequisite checks (AGENT_PROFILE=agent|operator)
+	@-$(AGENT_DC) ps -a $(AGENT_SERVICES)
+	@echo ""
+	@$(AGENT_SETUP) check $(AGENT_ARGS) || true
+
+.PHONY: agent-model
+agent-model: _agent-profile ## Switch the model and recreate only the agent: PROVIDER=... MODEL=... [BASE_URL=...]
+	@if [ -z "$(PROVIDER)" ]; then echo "$(RED)Usage: make agent-model PROVIDER=<provider> MODEL=<model> [BASE_URL=<url>]$(NC)"; exit 1; fi
+	@$(AGENT_SETUP) model $(AGENT_ARGS) --provider "$(PROVIDER)" --model "$(MODEL)" --base-url "$(BASE_URL)"
+
+.PHONY: agent-auth
+agent-auth: _agent-profile ## Log the agent in to an OAuth model provider (openai-codex, nous)
+	@$(AGENT_SETUP) auth $(AGENT_ARGS)
+
+.PHONY: agent-smoke
+agent-smoke: _agent-profile ## Check MCP discovery and one real model reply from the running agent
+	@$(AGENT_SETUP) smoke $(AGENT_ARGS)
+
+# ===========================================================================
 # DEPLOY (production)
 # ===========================================================================
 

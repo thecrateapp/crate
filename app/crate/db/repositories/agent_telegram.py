@@ -49,10 +49,14 @@ def bind_human(actor, principal_id, telegram_user_id, *, session=None):
             },
             session=current,
         )
-        current.execute(
-            text("SELECT id FROM agent_principals WHERE id=:id FOR UPDATE"),
-            {"id": principal_id},
-        )
+        if (
+            current.execute(
+                text("SELECT id FROM agent_principals WHERE id=:id FOR UPDATE"),
+                {"id": principal_id},
+            ).first()
+            is None
+        ):
+            raise DiagnosticError("NOT_FOUND", "Integration was not found")
         current.execute(
             text(
                 "UPDATE agent_telegram_bindings SET revoked_at=NOW() WHERE instance_id=:instance AND principal_id=:principal AND revoked_at IS NULL"
@@ -72,11 +76,95 @@ def bind_human(actor, principal_id, telegram_user_id, *, session=None):
                 "telegram": telegram_user_id,
             },
         )
+        _audit(
+            current,
+            actor,
+            "agent.telegram.bound",
+            principal_id,
+            {"binding_id": binding_id, "telegram_user_id": telegram_user_id},
+        )
         return {
             "binding_id": binding_id,
             "instance_id": _instance(),
             "telegram_user_id": telegram_user_id,
         }
+
+
+def list_bindings(*, principal_id=None, session=None) -> dict:
+    """Active approver bindings of this instance; empty when it has no identity."""
+    instance = os.environ.get("CRATE_AGENT_INSTANCE_ID", "")
+    if not instance or len(instance) > 128:
+        return {"instance_id": None, "items": []}
+    principal = requests._uuid(principal_id) if principal_id else None
+
+    def _read(current):
+        return [
+            dict(row)
+            for row in current.execute(
+                text("""
+                SELECT b.id::text AS binding_id, b.principal_id::text AS principal_id,
+                       p.name AS principal_name, b.user_id, u.username,
+                       b.telegram_user_id, b.created_at
+                FROM agent_telegram_bindings b
+                JOIN agent_principals p ON p.id = b.principal_id
+                LEFT JOIN users u ON u.id = b.user_id
+                WHERE b.instance_id = :instance AND b.revoked_at IS NULL
+                  AND (CAST(:principal AS uuid) IS NULL OR b.principal_id = CAST(:principal AS uuid))
+                ORDER BY b.created_at DESC, b.id
+                LIMIT 100
+            """),
+                {"instance": instance, "principal": principal},
+            ).mappings()
+        ]
+
+    if session is not None:
+        return {"instance_id": instance, "items": _read(session)}
+    with read_scope() as current:
+        return {"instance_id": instance, "items": _read(current)}
+
+
+def revoke_binding(actor, binding_id, *, session=None) -> dict:
+    """Remove an approver; its pending native confirmations can no longer approve."""
+    binding_id = requests._uuid(binding_id)
+    with optional_scope(session) as current:
+        require_agent_human_capabilities(
+            actor, {"agents.integrations.manage"}, session=current
+        )
+        row = (
+            current.execute(
+                text(
+                    "UPDATE agent_telegram_bindings SET revoked_at=NOW() WHERE id=:id AND instance_id=:instance AND revoked_at IS NULL RETURNING principal_id::text, telegram_user_id"
+                ),
+                {"id": binding_id, "instance": _instance()},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise DiagnosticError("NOT_FOUND", "Approver binding was not found")
+        _audit(
+            current,
+            actor,
+            "agent.telegram.unbound",
+            row["principal_id"],
+            {"binding_id": binding_id, "telegram_user_id": row["telegram_user_id"]},
+        )
+        return {"revoked": True}
+
+
+def _audit(current, actor, action, principal_id, details):
+    current.execute(
+        text("""
+        INSERT INTO audit_log (timestamp,user_id,action,target_type,target_name,details_json)
+        VALUES (NOW(),:user,:action,'agent_principal',:principal,CAST(:details AS jsonb))
+    """),
+        {
+            "user": actor["id"],
+            "action": action,
+            "principal": principal_id,
+            "details": json.dumps({"principal_id": principal_id, **details}),
+        },
+    )
 
 
 def _binding(current, binding_id):
@@ -594,6 +682,8 @@ __all__ = [
     "approval_policy",
     "bind_human",
     "get_confirmation_status",
+    "list_bindings",
     "native_event",
     "request_confirmation",
+    "revoke_binding",
 ]

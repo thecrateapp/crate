@@ -614,6 +614,7 @@ from context_server import ContextStore
 root = Path(sys.argv[2])
 os.environ['CRATE_AGENT_INSTANCE_ID'] = 'mode-lab'
 operator_provenance.ROOT = root / 'public'
+operator_provenance.EVIDENCE = root / 'public'
 assert operator_provenance.current_identity()['release_sha'] == 'a' * 40
 store = ContextStore(root / 'active')
 assert store.summary()['availability'] == 'available'

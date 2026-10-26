@@ -1773,6 +1773,21 @@ def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     assert native["tags"] == ["agents"]
     assert native["security"] == [{"nativeTelegramHmac": []}]
     assert bind["security"] == [{"cookieAuth": []}]
+    bindings = data["paths"]["/api/admin/agent-telegram/bindings"]["get"]
+    unbind = data["paths"]["/api/admin/agent-telegram/bindings/{binding_id}"]["delete"]
+    for operation, model in (
+        (bind, "TelegramBindingResult"),
+        (bindings, "TelegramApproverBindings"),
+        (unbind, "TelegramBindingRevoked"),
+    ):
+        assert operation["tags"] == ["agents"]
+        assert operation["security"] == [{"cookieAuth": []}]
+        assert (
+            operation["responses"]["200"]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            == f"#/components/schemas/{model}"
+        )
     assert (
         data["components"]["securitySchemes"]["nativeTelegramHmac"]["name"]
         == "X-Crate-Signature"

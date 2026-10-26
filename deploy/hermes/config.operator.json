@@ -1,8 +1,4 @@
 {
-  "model": {
-    "default": "gpt-6-luna",
-    "provider": "openai-codex"
-  },
   "toolsets": [
     "crate",
     "crate_context",
