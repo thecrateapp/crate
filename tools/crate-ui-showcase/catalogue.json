@@ -85,9 +85,7 @@
       "storyId": "components-monolabel",
       "story": "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/MonoLabel.mdx",
-      "sources": [
-        "app/shared/ui/primitives/MonoLabel.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/MonoLabel.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/MonoLabel.tsx": "ce043985f3e2687183f9f511e8833e3f104ba8df4cf0eeb90d8cf88859176248",
@@ -105,9 +103,7 @@
       "storyId": "components-statusdot",
       "story": "tools/crate-ui-showcase/stories/StatusDot.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/StatusDot.mdx",
-      "sources": [
-        "app/shared/ui/primitives/StatusDot.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/StatusDot.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/StatusDot.tsx": "48c74a2a86d06524890fdad7aa92907da17763dee3b3a2dfe4911b5ad523f9cf",
@@ -125,9 +121,7 @@
       "storyId": "components-statnumber",
       "story": "tools/crate-ui-showcase/stories/StatNumber.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/StatNumber.mdx",
-      "sources": [
-        "app/shared/ui/primitives/StatNumber.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/StatNumber.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/StatNumber.tsx": "62d516e2398ac10bf46fac849456a7fb5f5d29b600d2c4bdb380653b00c3c6d2",
@@ -145,9 +139,7 @@
       "storyId": "components-hairlinerow",
       "story": "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/HairlineRow.mdx",
-      "sources": [
-        "app/shared/ui/primitives/HairlineList.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/HairlineList.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/HairlineList.tsx": "33baf1cff73ec18212bc6e3f118c9e74ae88eebcee815d5432453b3ce182b97d",
@@ -187,9 +179,7 @@
       "storyId": "components-filterchip",
       "story": "tools/crate-ui-showcase/stories/FilterChip.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/FilterChip.mdx",
-      "sources": [
-        "app/shared/ui/primitives/FilterChip.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/FilterChip.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/FilterChip.tsx": "eff73b75e83767f3db4738fba6898ba6cc0bf5ed5e507bed380a57d249cf8ffb",
@@ -207,9 +197,7 @@
       "storyId": "components-segmentedcontrol",
       "story": "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/SegmentedControl.mdx",
-      "sources": [
-        "app/shared/ui/primitives/SegmentedControl.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/SegmentedControl.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/SegmentedControl.tsx": "dff469b97db4ffbefed556bad121078adff5e7e33ed0e8923d521640916bd9af",
@@ -227,9 +215,7 @@
       "storyId": "components-genrepill",
       "story": "tools/crate-ui-showcase/stories/GenrePill.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/GenrePill.mdx",
-      "sources": [
-        "app/shared/ui/domain/genres/GenrePill.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/genres/GenrePill.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/genres/GenrePill.tsx": "d60755fc50378dea66d09012d980a797fbf1d3b8a6f8e621cd8caf678546d4e7",
@@ -269,9 +255,7 @@
       "storyId": "components-adminselect",
       "story": "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/AdminSelect.mdx",
-      "sources": [
-        "app/shared/ui/composites/AdminSelect.tsx"
-      ],
+      "sources": ["app/shared/ui/composites/AdminSelect.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/composites/AdminSelect.tsx": "8681d2582336753b2742bb92d606fb6c769320b5bf44abccb92ac5cd3a7f5e4f",
@@ -289,9 +273,7 @@
       "storyId": "components-cardskeleton",
       "story": "tools/crate-ui-showcase/stories/CardSkeleton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/CardSkeleton.mdx",
-      "sources": [
-        "app/shared/ui/composites/CardSkeleton.tsx"
-      ],
+      "sources": ["app/shared/ui/composites/CardSkeleton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/composites/CardSkeleton.tsx": "0f40fa6b1fac063326342171f323beb94f63dbef24745066bc061677f5c0ed28",
@@ -309,9 +291,7 @@
       "storyId": "components-confirmdialog",
       "story": "tools/crate-ui-showcase/stories/ConfirmDialog.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ConfirmDialog.mdx",
-      "sources": [
-        "app/shared/ui/composites/ConfirmDialog.tsx"
-      ],
+      "sources": ["app/shared/ui/composites/ConfirmDialog.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/composites/ConfirmDialog.tsx": "7b1791a0cce721073d65f2049204dfce1a8acd29b53869b0049ca1f67ad52dad",
@@ -329,9 +309,7 @@
       "storyId": "components-gridskeleton",
       "story": "tools/crate-ui-showcase/stories/GridSkeleton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/GridSkeleton.mdx",
-      "sources": [
-        "app/shared/ui/composites/GridSkeleton.tsx"
-      ],
+      "sources": ["app/shared/ui/composites/GridSkeleton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/composites/GridSkeleton.tsx": "2b5caf2baab70084a52791b4af0c0a76a5315b73880da5e8ef0bfe0222e29f42",
@@ -349,9 +327,7 @@
       "storyId": "components-tableskeleton",
       "story": "tools/crate-ui-showcase/stories/TableSkeleton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/TableSkeleton.mdx",
-      "sources": [
-        "app/shared/ui/composites/TableSkeleton.tsx"
-      ],
+      "sources": ["app/shared/ui/composites/TableSkeleton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/composites/TableSkeleton.tsx": "8167f6d50724984379b03f1acf20e8ef000073647a01aedd9bab3f1b81d53f44",
@@ -369,9 +345,7 @@
       "storyId": "components-artistbioprofile",
       "story": "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx",
-      "sources": [
-        "app/shared/ui/domain/ArtistBioProfile.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/ArtistBioProfile.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/ArtistBioProfile.tsx": "3f7589e63acd4d1ad9e67aaed1d211de0cf6c108ebf6390e8107294d631d19e5",
@@ -389,9 +363,7 @@
       "storyId": "components-artistbiotext",
       "story": "tools/crate-ui-showcase/stories/ArtistBioText.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ArtistBioText.mdx",
-      "sources": [
-        "app/shared/ui/domain/ArtistBioText.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/ArtistBioText.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/ArtistBioText.tsx": "9bb1a935c8ef9a7314f20bf40c85390a94a03b1821ec5c28c5ecda2d1e0d5ae0",
@@ -409,9 +381,7 @@
       "storyId": "components-artistheroframe",
       "story": "tools/crate-ui-showcase/stories/ArtistHeroFrame.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ArtistHeroFrame.mdx",
-      "sources": [
-        "app/shared/ui/domain/ArtistHeroFrame.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/ArtistHeroFrame.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/ArtistHeroFrame.tsx": "62ea5350816b48658f1455ebeb376640a97a6c38a909aeceac060bb351db4cc0",
@@ -429,9 +399,7 @@
       "storyId": "components-artistheropresentation",
       "story": "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx",
-      "sources": [
-        "app/shared/ui/domain/ArtistHeroPresentation.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/ArtistHeroPresentation.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/ArtistHeroPresentation.tsx": "30d5df750f72522fb35b85621db41bb7acb32bdd29d5322c861b6ed6c9115fa8",
@@ -449,9 +417,7 @@
       "storyId": "components-contextmenu",
       "story": "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ContextMenu.mdx",
-      "sources": [
-        "app/shared/ui/domain/actions/ContextMenu.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/actions/ContextMenu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/actions/ContextMenu.tsx": "b29de2c516acdd8ad6ee4a3f14d86b45df9ea564f1c6e4ce19caa9d0b1aef9f5",
@@ -469,9 +435,7 @@
       "storyId": "components-entitymenus",
       "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
-      "sources": [
-        "app/shared/ui/domain/actions/ItemActionMenu.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/actions/ItemActionMenu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/actions/ItemActionMenu.tsx": "d711bf068f5b27bd7d5e4fc029e89bc70c8d5b787709b8f0e387bd7ea421c9ec",
@@ -489,9 +453,7 @@
       "storyId": "components-entitymenus",
       "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
-      "sources": [
-        "app/shared/ui/domain/actions/MobileActionSheet.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/actions/MobileActionSheet.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/actions/MobileActionSheet.tsx": "37158444437ae7d218173e8637521a30a46bfff599b6ffa86776bd748bb1a024",
@@ -509,9 +471,7 @@
       "storyId": "components-oauthbuttons",
       "story": "tools/crate-ui-showcase/stories/OAuthButtons.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/OAuthButtons.mdx",
-      "sources": [
-        "app/shared/ui/domain/auth/OAuthButtons.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/auth/OAuthButtons.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/auth/OAuthButtons.tsx": "7f403f12a1376634c040b2bfc87651dcd93facd91664e1ed7c7c1c92b43d38c7",
@@ -529,9 +489,7 @@
       "storyId": "components-bandcamplogo",
       "story": "tools/crate-ui-showcase/stories/BandcampLogo.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/BandcampLogo.mdx",
-      "sources": [
-        "app/shared/ui/domain/brand/BandcampLogo.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/brand/BandcampLogo.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/brand/BandcampLogo.tsx": "41c859cd455ac6d5bb841d9024623e06cc35baacdaa85c8929300f590c5dc06d",
@@ -549,9 +507,7 @@
       "storyId": "components-crateloader",
       "story": "tools/crate-ui-showcase/stories/CrateLoader.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/CrateLoader.mdx",
-      "sources": [
-        "app/shared/ui/domain/brand/CrateLoader.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/brand/CrateLoader.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/brand/CrateLoader.tsx": "9cec84ba332cced0d409b0d414d8df151cab5aedb77d7999e0cbd94a88bff45b",
@@ -569,9 +525,7 @@
       "storyId": "components-cratelogo",
       "story": "tools/crate-ui-showcase/stories/CrateLogo.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/CrateLogo.mdx",
-      "sources": [
-        "app/shared/ui/domain/brand/CrateLogo.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/brand/CrateLogo.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/brand/CrateLogo.tsx": "d1df52b02027639e4e8bb14db0a6d0055e16d61c9e157df2e80eee970c69367d",
@@ -589,9 +543,7 @@
       "storyId": "components-entityavatar",
       "story": "tools/crate-ui-showcase/stories/EntityAvatar.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityAvatar.mdx",
-      "sources": [
-        "app/shared/ui/domain/entity/EntityAvatar.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/entity/EntityAvatar.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/entity/EntityAvatar.tsx": "e594ba287fc9634dfef8588c491c75b0e3d45cad581198ed907882ee3ba178e1",
@@ -609,9 +561,7 @@
       "storyId": "components-entitycard",
       "story": "tools/crate-ui-showcase/stories/EntityCard.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityCard.mdx",
-      "sources": [
-        "app/shared/ui/domain/entity/EntityCard.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/entity/EntityCard.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/entity/EntityCard.tsx": "06c2033d8b03616d77a09b7ca8a1ec3a1cffa0cd7ba29b25cd8bb203d2d17e36",
@@ -629,9 +579,7 @@
       "storyId": "components-entityprimaryaction",
       "story": "tools/crate-ui-showcase/stories/EntityPrimaryAction.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityPrimaryAction.mdx",
-      "sources": [
-        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/entity/EntityPrimaryAction.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/entity/EntityPrimaryAction.tsx": "9f8a8ed53201fa312c97839bb64e5cbf3f12b374c669a99b0b1b1d19c94273d4",
@@ -649,9 +597,7 @@
       "storyId": "components-entityrow",
       "story": "tools/crate-ui-showcase/stories/EntityRow.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityRow.mdx",
-      "sources": [
-        "app/shared/ui/domain/entity/EntityRow.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/entity/EntityRow.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/entity/EntityRow.tsx": "66ad258a7badbdddf5747d104f8670df3ddbae7c5ab8284673f42ded0d5ae36a",
@@ -669,9 +615,7 @@
       "storyId": "components-entitymenus",
       "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
-      "sources": [
-        "app/shared/ui/domain/entity/useEntityMenu.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/entity/useEntityMenu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/entity/useEntityMenu.tsx": "37b351b8fe5d716643cc7d6e6bfda63aa52173fcd228d920ed51455c57db99e2",
@@ -689,9 +633,7 @@
       "storyId": "components-filterbar",
       "story": "tools/crate-ui-showcase/stories/FilterBar.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/FilterBar.mdx",
-      "sources": [
-        "app/shared/ui/domain/filters/FilterBar.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/filters/FilterBar.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/filters/FilterBar.tsx": "d1e1187be06b63a79a486b9f7385af7748af463d85ca81d9fe93d3328affe191",
@@ -709,9 +651,7 @@
       "storyId": "components-heroactionbar",
       "story": "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/HeroActionBar.mdx",
-      "sources": [
-        "app/shared/ui/domain/hero/HeroActionBar.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/hero/HeroActionBar.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/hero/HeroActionBar.tsx": "853ba09860047914f3e934629b45624c2d8220050465f2cf3ed528e95aee34bd",
@@ -729,9 +669,7 @@
       "storyId": "components-pagehero",
       "story": "tools/crate-ui-showcase/stories/PageHero.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/PageHero.mdx",
-      "sources": [
-        "app/shared/ui/domain/hero/PageHero.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/hero/PageHero.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/hero/PageHero.tsx": "5e4596cd02a7138e1e6f8d17a14cbdf0d811a930db07f772b4d7b2f52ee36a3b",
@@ -749,9 +687,7 @@
       "storyId": "components-emptystate",
       "story": "tools/crate-ui-showcase/stories/EmptyState.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EmptyState.mdx",
-      "sources": [
-        "app/shared/ui/domain/lists/EmptyState.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/lists/EmptyState.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/lists/EmptyState.tsx": "f988e92499164aa02ab5a46f08c84b0934fc91aef4d36873d8acadd782c5097d",
@@ -769,9 +705,7 @@
       "storyId": "components-mediagrid",
       "story": "tools/crate-ui-showcase/stories/MediaGrid.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/MediaGrid.mdx",
-      "sources": [
-        "app/shared/ui/domain/lists/MediaGrid.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/lists/MediaGrid.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/lists/MediaGrid.tsx": "eccf83128ff9d39df54e876fbd03ca90903293894f4fd78fb1b95955e8fd5fc5",
@@ -789,9 +723,7 @@
       "storyId": "components-mediarail",
       "story": "tools/crate-ui-showcase/stories/MediaRail.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/MediaRail.mdx",
-      "sources": [
-        "app/shared/ui/domain/lists/MediaRail.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/lists/MediaRail.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/lists/MediaRail.tsx": "5112502d1eb28fb1e25482bc540548725e25de34df91c0518382c5a76705b191",
@@ -809,9 +741,7 @@
       "storyId": "components-sectionheader",
       "story": "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/SectionHeader.mdx",
-      "sources": [
-        "app/shared/ui/domain/lists/SectionHeader.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/lists/SectionHeader.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/lists/SectionHeader.tsx": "a823275b7ece209edaa1c12c8f0d6d03662ee8596e765f9b4418318d6fbde62a",
@@ -829,9 +759,7 @@
       "storyId": "components-mediacover",
       "story": "tools/crate-ui-showcase/stories/MediaCover.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/MediaCover.mdx",
-      "sources": [
-        "app/shared/ui/domain/media/MediaCover.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/media/MediaCover.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/media/MediaCover.tsx": "36a3fa15858255fc9d3f01395f3cbd29594490264004c8e63c3a81299b3f7bf0",
@@ -849,9 +777,7 @@
       "storyId": "components-playbutton",
       "story": "tools/crate-ui-showcase/stories/PlayButton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/PlayButton.mdx",
-      "sources": [
-        "app/shared/ui/domain/media/PlayButton.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/media/PlayButton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/media/PlayButton.tsx": "e805efb1c7ac0b2bcc5d8f6b7530ec267aea1e4dac611e74bc3e28a2ccb1ac40",
@@ -869,9 +795,7 @@
       "storyId": "components-backlink",
       "story": "tools/crate-ui-showcase/stories/BackLink.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/BackLink.mdx",
-      "sources": [
-        "app/shared/ui/domain/navigation/BackLink.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/navigation/BackLink.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/navigation/BackLink.tsx": "ff7f5fb182bc4648501693a31f81067f8bd897b10b8de96aed712ab3ce0c8be7",
@@ -889,9 +813,7 @@
       "storyId": "components-pageheader",
       "story": "tools/crate-ui-showcase/stories/PageHeader.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/PageHeader.mdx",
-      "sources": [
-        "app/shared/ui/domain/navigation/PageHeader.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/navigation/PageHeader.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/navigation/PageHeader.tsx": "d808bd201d58fc4f54f0961ef09b4605200e783d7c391807caa09b3ff4ab0c76",
@@ -909,9 +831,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/domain/navigation/SearchBar.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/navigation/SearchBar.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/navigation/SearchBar.tsx": "5ec43c77c0826ab0aba7c365437fcf4d5dcecdf814d5487081a1880886cd1707"
@@ -927,9 +847,7 @@
       "storyId": "components-eqbands",
       "story": "tools/crate-ui-showcase/stories/EqBands.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/EqBands.mdx",
-      "sources": [
-        "app/shared/ui/domain/player/EqBands.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/player/EqBands.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/player/EqBands.tsx": "5dd1dda576174ff47d123a9a8ed5df9ce2bb099690a50ce499a8937522d5e7d0",
@@ -947,9 +865,7 @@
       "storyId": "components-playlistartwork",
       "story": "tools/crate-ui-showcase/stories/PlaylistArtwork.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/PlaylistArtwork.mdx",
-      "sources": [
-        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/playlists/PlaylistArtwork.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/playlists/PlaylistArtwork.tsx": "ab21047751ccd8641ec25385fa72062b17cd24b7f4f4ba6529ccc5363cac1b7e",
@@ -967,9 +883,7 @@
       "storyId": "components-loadingstate",
       "story": "tools/crate-ui-showcase/stories/LoadingState.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/LoadingState.mdx",
-      "sources": [
-        "app/shared/ui/domain/states/LoadingState.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/states/LoadingState.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/states/LoadingState.tsx": "4901e202a0dc208ed99b2fcdcdf882578e796129c5d3c9ab7b6d03785caff54c",
@@ -987,9 +901,7 @@
       "storyId": "components-tracklist",
       "story": "tools/crate-ui-showcase/stories/TrackList.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/TrackList.mdx",
-      "sources": [
-        "app/shared/ui/domain/tracks/TrackList.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/tracks/TrackList.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/tracks/TrackList.tsx": "b42f47c80ffbc139a05a22971fcdb0ba38e431cfe14899626292e1388da3dda7",
@@ -1007,9 +919,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/domain/user/UserMenu.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/user/UserMenu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/user/UserMenu.tsx": "155f5da051a5ce5f97ff2db837c5f6292b1c9b155bb646b4f8485a11515a31e5"
@@ -1025,9 +935,7 @@
       "storyId": "components-actioniconbutton",
       "story": "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ActionIconButton.mdx",
-      "sources": [
-        "app/shared/ui/primitives/ActionIconButton.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/ActionIconButton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/ActionIconButton.tsx": "87b775ae04bf9fb5deea8e1c039adc51a3fc52e4ffd36750317548a48088dd6c",
@@ -1045,9 +953,7 @@
       "storyId": "components-apperrorboundary",
       "story": "tools/crate-ui-showcase/stories/AppErrorBoundary.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/AppErrorBoundary.mdx",
-      "sources": [
-        "app/shared/ui/primitives/AppErrorBoundary.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/AppErrorBoundary.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/AppErrorBoundary.tsx": "634d14c0bf2d571b86721b456417c42646311d2e06dffc40df47f9dcd133b096",
@@ -1065,9 +971,7 @@
       "storyId": "components-appmodal",
       "story": "tools/crate-ui-showcase/stories/AppModal.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/AppModal.mdx",
-      "sources": [
-        "app/shared/ui/primitives/AppModal.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/AppModal.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/AppModal.tsx": "6075351b96eda7c888677b81425422e2043eb1ce7e1dc2d6eb6af5dd17559f7c",
@@ -1085,9 +989,7 @@
       "storyId": "components-apppopover",
       "story": "tools/crate-ui-showcase/stories/AppPopover.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/AppPopover.mdx",
-      "sources": [
-        "app/shared/ui/primitives/AppPopover.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/AppPopover.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/AppPopover.tsx": "bfa0ca2e9f19093db1ab499f3c7203201e41611d4b8d418136f4c15079dae97f",
@@ -1105,9 +1007,7 @@
       "storyId": "components-avatar",
       "story": "tools/crate-ui-showcase/stories/Avatar.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Avatar.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Avatar.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Avatar.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Avatar.tsx": "1edb4c976ea474b00bf490cfc717bb532d98e60e72929c0a6d48ddb0d06905bc",
@@ -1125,9 +1025,7 @@
       "storyId": "components-checkbox",
       "story": "tools/crate-ui-showcase/stories/Checkbox.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Checkbox.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Checkbox.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Checkbox.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416",
@@ -1145,9 +1043,7 @@
       "storyId": "components-errorstate",
       "story": "tools/crate-ui-showcase/stories/ErrorState.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ErrorState.mdx",
-      "sources": [
-        "app/shared/ui/primitives/ErrorState.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/ErrorState.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/ErrorState.tsx": "91510d21eb0d4369010bae9d171d70292d6027017bb8fb07793fb7066f831b4a",
@@ -1165,9 +1061,7 @@
       "storyId": "components-followheartbutton",
       "story": "tools/crate-ui-showcase/stories/FollowHeartButton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/FollowHeartButton.mdx",
-      "sources": [
-        "app/shared/ui/primitives/FollowHeartButton.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/FollowHeartButton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/FollowHeartButton.tsx": "f71187ddb4ddf18871abf0234b4bd5acaa7b9c5d0f2d84fef9bbb38a168ac888",
@@ -1185,9 +1079,7 @@
       "storyId": "components-formfield",
       "story": "tools/crate-ui-showcase/stories/FormField.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/FormField.mdx",
-      "sources": [
-        "app/shared/ui/primitives/FormField.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/FormField.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/FormField.tsx": "51219738a5841395e79e9152fe3be4d419aa6c5b05f79baa78bccc463b1deced",
@@ -1205,9 +1097,7 @@
       "storyId": "components-iconbutton",
       "story": "tools/crate-ui-showcase/stories/IconButton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/IconButton.mdx",
-      "sources": [
-        "app/shared/ui/primitives/IconButton.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/IconButton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/IconButton.tsx": "0648e313d1be64b9ec4885554f72aba2799b2c39f7b60570d063dbc1cea0671b",
@@ -1225,9 +1115,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/primitives/ImageLightbox.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/ImageLightbox.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/ImageLightbox.tsx": "025fb97ea116368e428f04b2840aa8f575c1426cb82e17e601f04e185edf0284"
@@ -1243,9 +1131,7 @@
       "storyId": "components-instrumentpanel",
       "story": "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/InstrumentPanel.mdx",
-      "sources": [
-        "app/shared/ui/primitives/InstrumentPanel.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/InstrumentPanel.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/InstrumentPanel.tsx": "005183206ff20fdceea32d5399203fe2901ea96d1bc4148a24b701cfbf9e5e09",
@@ -1263,9 +1149,7 @@
       "storyId": "components-meter",
       "story": "tools/crate-ui-showcase/stories/Meter.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Meter.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Meter.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Meter.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Meter.tsx": "370101f0ea9726aa05de69d9c1fd2f0bf8ed93453e42ea39e77d9dcfbc64f69e",
@@ -1283,9 +1167,7 @@
       "storyId": "components-progresshairline",
       "story": "tools/crate-ui-showcase/stories/ProgressHairline.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/ProgressHairline.mdx",
-      "sources": [
-        "app/shared/ui/primitives/ProgressHairline.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/ProgressHairline.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/ProgressHairline.tsx": "1522d9187914b9338a119b59588dc731d0e9077b4cc3c3170c5b44c048947639",
@@ -1303,9 +1185,7 @@
       "storyId": "components-pullindicator",
       "story": "tools/crate-ui-showcase/stories/PullIndicator.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/PullIndicator.mdx",
-      "sources": [
-        "app/shared/ui/primitives/PullIndicator.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/PullIndicator.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/PullIndicator.tsx": "0194384bbf1b1048981be52fc979db1f4d7df8cfaab6bf8fa897c8be9157692d",
@@ -1323,9 +1203,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/primitives/QrCodeImage.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/QrCodeImage.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/QrCodeImage.tsx": "b03cc9ff44cac888772168dc32ce7988a95a70076304871f5aec917988b22b42"
@@ -1341,9 +1219,7 @@
       "storyId": "components-radiogroup",
       "story": "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/RadioGroup.mdx",
-      "sources": [
-        "app/shared/ui/primitives/RadioGroup.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/RadioGroup.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/RadioGroup.tsx": "25ea47560430742f51ab7aed77d51d4b135001f8dddd40aa26e26997916c4c4f",
@@ -1361,9 +1237,7 @@
       "storyId": "components-readout",
       "story": "tools/crate-ui-showcase/stories/Readout.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Readout.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Readout.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Readout.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Readout.tsx": "877a73be30722a3096f74460d86485949807626dddf57ce07b0b14c20ff60a9f",
@@ -1381,9 +1255,7 @@
       "storyId": "components-searchinput",
       "story": "tools/crate-ui-showcase/stories/SearchInput.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/SearchInput.mdx",
-      "sources": [
-        "app/shared/ui/primitives/SearchInput.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/SearchInput.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/SearchInput.tsx": "1364ee39f4e2e9ce2329a2a7aeb3e8d9d245a9d774e956e35572c34593217a66",
@@ -1401,9 +1273,7 @@
       "storyId": "components-skiplink",
       "story": "tools/crate-ui-showcase/stories/SkipLink.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/SkipLink.mdx",
-      "sources": [
-        "app/shared/ui/primitives/SkipLink.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/SkipLink.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/SkipLink.tsx": "1da215bcfa8015b04bab0968ef8dbd9876684a44e0c59224c1db4c3c4d6c7e5a",
@@ -1421,9 +1291,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/primitives/Spinner.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Spinner.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Spinner.tsx": "392a91bd66b079bbd63681ddb487e288abd613d13eaff68c3347e5d006443973"
@@ -1439,9 +1307,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/primitives/StarRating.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/StarRating.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/StarRating.tsx": "0e3857752a818b31338e83b734e8f332637503b0d83ff0439df205950ffd7984"
@@ -1457,9 +1323,7 @@
       "storyId": "components-switch",
       "story": "tools/crate-ui-showcase/stories/Switch.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Switch.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Switch.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Switch.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b",
@@ -1477,9 +1341,7 @@
       "storyId": "components-vtnavlink",
       "story": "tools/crate-ui-showcase/stories/VtNavLink.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/VtNavLink.mdx",
-      "sources": [
-        "app/shared/ui/primitives/VtNavLink.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/VtNavLink.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/VtNavLink.tsx": "f00774a4abefb0429396cedf6a44e691baf4484733fa2613485892310d6b0449",
@@ -1497,9 +1359,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/alert-dialog.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/alert-dialog.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/alert-dialog.tsx": "137c968dad89d882a02582b0a868c3d7b31ba19b9c9fe42978f82ac9a13d6ec6"
@@ -1515,9 +1375,7 @@
       "storyId": "components-button",
       "story": "tools/crate-ui-showcase/stories/Button.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Button.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/button.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/button.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/button.tsx": "88d84480c1d35e271d578359f35a9b856978aab3b14e2c52bd8303a53bdcd776",
@@ -1535,9 +1393,7 @@
       "storyId": "components-card",
       "story": "tools/crate-ui-showcase/stories/Card.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Card.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/card.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/card.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/card.tsx": "9d3427f06657fc9edcbb058cea1073eb60fb5b15637ba9ee1a37633131a87896",
@@ -1555,9 +1411,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/context-menu.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/context-menu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/context-menu.tsx": "dcd1c0f58dd99aa4116d2afdfb00e7de796e80a31abaf3e49783d3cb70893d65"
@@ -1573,9 +1427,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/dialog.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/dialog.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/dialog.tsx": "7612e9cc72606926a6cd13fccdc55b25b81f52f85bab8093ec3609351920bc74"
@@ -1591,9 +1443,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/dropdown-menu.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/dropdown-menu.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/dropdown-menu.tsx": "af0580f335f81f07039f41811d388bed80854fa786e26de53f42775287c201dd"
@@ -1609,9 +1459,7 @@
       "storyId": "components-input",
       "story": "tools/crate-ui-showcase/stories/Input.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Input.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/input.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/input.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda",
@@ -1629,9 +1477,7 @@
       "storyId": "components-overlayclosebutton",
       "story": "tools/crate-ui-showcase/stories/OverlayCloseButton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/OverlayCloseButton.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/overlay-close-button.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/overlay-close-button.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/overlay-close-button.tsx": "70b2c93d2d3c6c9006e0909fbc6b4a59e7335c06dadd8b0688779ee5439588dc",
@@ -1649,9 +1495,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/popover.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/popover.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/popover.tsx": "4773a27453e4129c3203f5ae2b1beb47ee4594b28c75443371b660bc92900ee8"
@@ -1667,9 +1511,7 @@
       "storyId": "components-progress",
       "story": "tools/crate-ui-showcase/stories/Progress.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Progress.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/progress.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/progress.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/progress.tsx": "e86c589123477c5849f6baeeb110e42830fd5a1c0bbf55c103a5ef873222bed8",
@@ -1687,9 +1529,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/scroll-area.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/scroll-area.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/scroll-area.tsx": "dcb32083e8000c31f1dde685f7b62c41f4eb2a7a5918749774593f5eeaced676"
@@ -1705,9 +1545,7 @@
       "storyId": "components-select",
       "story": "tools/crate-ui-showcase/stories/Select.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Select.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/select.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/select.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/select.tsx": "ceed0ae676420f8b4000f71b7b43c9a43799339dd0cc4e3d8ebe4559bc0b58f0",
@@ -1725,9 +1563,7 @@
       "storyId": "components-separator",
       "story": "tools/crate-ui-showcase/stories/Separator.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Separator.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/separator.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/separator.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/separator.tsx": "1a3f00e6a66e2ff70aec58fcb8c8a5e274bb8d733b57c712d82a29fd15b68c72",
@@ -1745,9 +1581,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/sheet.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/sheet.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/sheet.tsx": "0ee9560fbcfdf8a8ea38efe17c75f955e40d99cc920a7ea463de16c52fe31f3b"
@@ -1763,9 +1597,7 @@
       "storyId": "components-skeleton",
       "story": "tools/crate-ui-showcase/stories/Skeleton.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Skeleton.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/skeleton.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/skeleton.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/skeleton.tsx": "eedfaf6612ffc9f63bc07d060648d4307787374df7cd202bde5b31e9716a2cd5",
@@ -1783,9 +1615,7 @@
       "storyId": null,
       "story": null,
       "docs": null,
-      "sources": [
-        "app/shared/ui/shadcn/table.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/table.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/table.tsx": "9ee0c610820b269fa9add6b825089a2ec37cfefdb314fc63839407b8293f55d2"
@@ -1801,9 +1631,7 @@
       "storyId": "components-tabs",
       "story": "tools/crate-ui-showcase/stories/Tabs.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Tabs.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/tabs.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/tabs.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/tabs.tsx": "1e3ffa9f591b72805e6551682b4a9869f946c1dd354652a4e763ff8b8e067f5f",
@@ -1821,9 +1649,7 @@
       "storyId": "components-textarea",
       "story": "tools/crate-ui-showcase/stories/Textarea.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Textarea.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/textarea.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/textarea.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909",
@@ -1841,9 +1667,7 @@
       "storyId": "components-tooltip",
       "story": "tools/crate-ui-showcase/stories/Tooltip.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Tooltip.mdx",
-      "sources": [
-        "app/shared/ui/shadcn/tooltip.tsx"
-      ],
+      "sources": ["app/shared/ui/shadcn/tooltip.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/shadcn/tooltip.tsx": "4942a269741cc123d1b7f833a8132c4c8779c1bc44a9e2dc4a1dd8aaacc7fbd4",
@@ -1862,9 +1686,7 @@
       "storyId": "components-slider",
       "story": "tools/crate-ui-showcase/stories/Slider.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/Slider.mdx",
-      "sources": [
-        "app/shared/ui/primitives/Slider.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/Slider.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/primitives/Slider.tsx": "4a9191416f323f49132012745499cca868e8ca6ee80fe93a908956b4dfecc88c",
@@ -1874,9 +1696,7 @@
     },
     {
       "id": "action-group",
-      "sources": [
-        "app/shared/ui/primitives/ActionGroup.tsx"
-      ],
+      "sources": ["app/shared/ui/primitives/ActionGroup.tsx"],
       "fingerprints": {
         "app/shared/ui/primitives/ActionGroup.tsx": "748ddda142a5e1ea1a1d775946a670bc37c371e9e37efc3783274e353870a3dd",
         "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "329c10c619dc296a64b5a77812d6b89eda7405273acedefd9cfeed263498eb9c",
@@ -1901,14 +1721,30 @@
       "storyId": "components-upcomingdatestamp",
       "story": "tools/crate-ui-showcase/stories/UpcomingDateStamp.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/UpcomingDateStamp.mdx",
-      "sources": [
-        "app/shared/ui/domain/shows/UpcomingDateStamp.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/shows/UpcomingDateStamp.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/shows/UpcomingDateStamp.tsx": "8b981dcbce6fe5ae815a4afa05b3c830b2e7e0f01da0621b7f29d4321b504448",
         "tools/crate-ui-showcase/stories/UpcomingDateStamp.stories.tsx": "db77964eb2fa42a628f79893283adbdfc181ca8d3aebf4953b6010dc19effd54",
         "tools/crate-ui-showcase/docs/UpcomingDateStamp.mdx": "2ca59a255e274cdf903257c7533dbee8c1cd3adfea05ae40736f8730915a9c9d"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-shows-setlistfrequency",
+      "name": "SetlistFrequency",
+      "purpose": "Probable-setlist song frequency: 1px rail, fixed-slot percentage, plays and optional last-played date.",
+      "coverage": "documented",
+      "adoption": "Used by Admin artist Probable Setlist and the Listen probable setlist modal",
+      "storyId": "components-setlistfrequency",
+      "story": "tools/crate-ui-showcase/stories/SetlistFrequency.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SetlistFrequency.mdx",
+      "sources": ["app/shared/ui/domain/shows/SetlistFrequency.tsx"],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/shows/SetlistFrequency.tsx": "5d8e0649c840b4c7525e64833f6c620d8a963461e46369f0607ca95f9906b39c",
+        "tools/crate-ui-showcase/stories/SetlistFrequency.stories.tsx": "0b4d62f635144180685df6205c4b8ca5a8be1de30704e952cefba2340b6311e1",
+        "tools/crate-ui-showcase/docs/SetlistFrequency.mdx": "fb96b7ba84fae3396ccae17b78e6a81260e38a6fe77c1c35aec7b098d5f7737c"
       },
       "category": "Data Display"
     },
@@ -1921,9 +1757,7 @@
       "storyId": "components-upcomingeventrow",
       "story": "tools/crate-ui-showcase/stories/UpcomingEventRow.stories.tsx",
       "docs": "tools/crate-ui-showcase/docs/UpcomingEventRow.mdx",
-      "sources": [
-        "app/shared/ui/domain/shows/UpcomingEventRow.tsx"
-      ],
+      "sources": ["app/shared/ui/domain/shows/UpcomingEventRow.tsx"],
       "knownIssues": [],
       "fingerprints": {
         "app/shared/ui/domain/shows/UpcomingEventRow.tsx": "2c144b53a3e493a36cae7611c0d62e5c25189a79ba2b4603eec12b577c636c48",

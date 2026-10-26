@@ -62,6 +62,27 @@ describe("artist mobile modals", () => {
     );
   });
 
+  it("tells how fresh the probable setlist is", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-26T10:00:00Z"));
+    renderWithProviders(
+      <ArtistSetlistModal
+        artistName="Pixies"
+        artistId={7}
+        open
+        onClose={() => {}}
+        onPlay={() => {}}
+        generatedAt="2026-10-23T10:00:00Z"
+        setlist={[{ title: "Hey", frequency: 0.8, play_count: 12 }]}
+      />,
+    );
+    vi.useRealTimers();
+
+    expect(
+      screen.getByText("Pixies · 1 song · Updated 3 days ago"),
+    ).toBeInTheDocument();
+  });
+
   it("keeps setlist export authority in the app adapter and closes after play", async () => {
     apiMock.mockResolvedValue({});
     const calls: string[] = [];

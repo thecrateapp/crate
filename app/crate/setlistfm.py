@@ -374,6 +374,16 @@ def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
     return _normalize_cached_songs(cached)
 
 
+def get_cached_probable_setlist_generated_at(artist_name: str) -> str | None:
+    cached = get_cache(
+        _probable_cache_key(artist_name), max_age_seconds=_PROBABLE_TTL_SECONDS
+    )
+    if not isinstance(cached, Mapping):
+        return None
+    generated_at = cached.get("generated_at")
+    return generated_at if isinstance(generated_at, str) and generated_at else None
+
+
 def get_cached_probable_setlist_context(
     artist_name: str,
 ) -> ProbableSetlistContext | None:

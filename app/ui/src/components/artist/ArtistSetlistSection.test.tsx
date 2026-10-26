@@ -98,6 +98,31 @@ describe("ArtistSetlistSection", () => {
     expect(screen.getByText("7%")).toHaveClass("text-right");
   });
 
+  it("tells how fresh the probable setlist is", () => {
+    render(
+      <MemoryRouter>
+        <ArtistSetlistSection
+          artistName="Pixies"
+          setlistData={{
+            probable_setlist: [
+              { title: "Hey", frequency: 0.8, play_count: 12 },
+            ],
+            total_shows: 12,
+            generated_at: "2026-10-23T10:00:00Z",
+          }}
+          allTrackTitles={[]}
+          onTrackTitlesLoaded={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const time = document.querySelector(
+      'time[datetime="2026-10-23T10:00:00Z"]',
+    );
+    expect(time).not.toBeNull();
+    expect(time?.parentElement).toHaveTextContent("Updated");
+  });
+
   it("offers refresh in the empty state when the user can edit metadata", async () => {
     const onRefresh = vi.fn();
     render(

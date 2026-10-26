@@ -9,6 +9,7 @@ interface ArtistSetlistModalProps {
   artistName: string;
   artistId?: number;
   setlist: SetlistTrack[];
+  generatedAt?: string | null;
   open: boolean;
   onClose: () => void;
   onPlay: () => void;
@@ -18,6 +19,7 @@ export function ArtistSetlistModal({
   artistName,
   artistId,
   setlist,
+  generatedAt,
   open,
   onClose,
   onPlay,
@@ -49,6 +51,7 @@ export function ArtistSetlistModal({
     <ArtistSetlistView
       artistName={artistName}
       setlist={setlist}
+      generatedAt={generatedAt}
       open={open}
       saving={saving}
       canExport={!!artistId}

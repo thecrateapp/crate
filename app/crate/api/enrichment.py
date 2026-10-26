@@ -110,6 +110,19 @@ def _with_probable_setlist(name: str, result: dict) -> dict:
     return enriched
 
 
+def _with_setlist_generated_at(name: str, result: dict) -> dict:
+    setlist = (result or {}).get("setlist")
+    if not isinstance(setlist, dict):
+        return result
+    return {
+        **result,
+        "setlist": {
+            **setlist,
+            "generated_at": setlistfm.get_cached_probable_setlist_generated_at(name),
+        },
+    }
+
+
 def get_artist_enrichment(request: Request, name: str):
     """Get consolidated enrichment data. Returns cached if available, otherwise fetches inline.
     For background enrichment, use POST /api/artists/{artist_id}/enrich which queues a worker task."""
@@ -122,7 +135,7 @@ def get_artist_enrichment(request: Request, name: str):
         enriched_cached = _enrich_enrichment_artist_refs(cached)
         enriched_cached = _with_probable_setlist(name, enriched_cached)
         set_cache(cache_key, enriched_cached)
-        return enriched_cached
+        return _with_setlist_generated_at(name, enriched_cached)
 
     # Try DB persisted data as fallback (survives cache expiry)
     db_artist = get_library_artist(name)
@@ -131,7 +144,7 @@ def get_artist_enrichment(request: Request, name: str):
         if result:
             result = _with_probable_setlist(name, result)
             set_cache(cache_key, result)
-            return result
+            return _with_setlist_generated_at(name, result)
 
     # Fetch inline (first visit)
     result = _enrich_enrichment_artist_refs(_fetch_enrichment(name))
@@ -139,7 +152,7 @@ def get_artist_enrichment(request: Request, name: str):
         # Only cache if we got meaningful data (at least lastfm or spotify)
         if "lastfm" in result or "spotify" in result:
             set_cache(cache_key, result)
-    return result or {}
+    return _with_setlist_generated_at(name, result or {})
 
 
 def get_artist_page_enrichment(name: str) -> dict:
@@ -149,16 +162,19 @@ def get_artist_page_enrichment(name: str) -> dict:
     if cached and isinstance(cached, dict):
         setlist_payload = cached.get("setlist")
         if isinstance(setlist_payload, dict) and _has_probable_setlist(cached):
-            return {"setlist": setlist_payload}
+            return _with_setlist_generated_at(name, {"setlist": setlist_payload})
 
     setlist = setlistfm.get_cached_probable_setlist(name)
     if setlist:
-        return {
-            "setlist": {
-                "probable_setlist": setlist,
-                "total_shows": len(setlist),
-            }
-        }
+        return _with_setlist_generated_at(
+            name,
+            {
+                "setlist": {
+                    "probable_setlist": setlist,
+                    "total_shows": len(setlist),
+                }
+            },
+        )
     setlistfm.queue_probable_setlist_refresh(name)
     return {}
 

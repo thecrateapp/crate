@@ -843,6 +843,10 @@
     "sourceHash": "sha256:e2b50272e2147f2f237f60d3501b9a817c35b83a63307674a95f1879a65a7fcf",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "artist.setlist.frequencyLabel": {
+    "sourceHash": "sha256:55df7e768d122158ec10315ea344f7554cb20aa0cf5c192d7ac3a3b92978b233",
+    "reviewedAt": "2026-10-26T09:16:01.484Z"
+  },
   "artist.setlist.play": {
     "sourceHash": "sha256:cd75d1639237501e265322ca72d96476292734c1256b2b2f2ef2f725249c65f4",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -862,6 +866,10 @@
   "artist.setlist.toasts.exportFailed": {
     "sourceHash": "sha256:fd15475c76874b51b74519890ff5cf6032a9c298892c3bd8e191f71b916708b8",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
+  },
+  "artist.setlist.updated": {
+    "sourceHash": "sha256:ca907642a751d6f7d1b4932fd840902d2b8ca45fadf67073271779e89c78de6c",
+    "reviewedAt": "2026-10-26T09:21:53.004Z"
   },
   "artist.toasts.followFailed": {
     "sourceHash": "sha256:35d41ea43e3cc31cf7757f1f938179cc1ce415b2085fbb5cba7357f070953e64",
@@ -7306,6 +7314,10 @@
   "stats.explorer.error": {
     "sourceHash": "sha256:20472862e7747e35b539074a2096e21aabb8ce2e845235f2a41ec4377249c00c",
     "reviewedAt": "2026-10-21T00:54:09.276Z"
+  },
+  "stats.explorer.fewListeners": {
+    "sourceHash": "sha256:8602cc281077dc173bd6386d904a91b72869cffc4ac4648e44622da3a64ab97b",
+    "reviewedAt": "2026-10-26T09:16:01.484Z"
   },
   "stats.explorer.hint": {
     "sourceHash": "sha256:c953c082c25d49238fd7de31bbeffdc0c6b6bddfdabb56c803d0b292285342f4",

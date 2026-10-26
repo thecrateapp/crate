@@ -30,12 +30,7 @@ export interface ArtistAlbum {
   release_type?: string | null;
   release_secondary_types?: string[];
   release_category?:
-    | "album"
-    | "ep_single"
-    | "compilation"
-    | "live"
-    | "other"
-    | null;
+    "album" | "ep_single" | "compilation" | "live" | "other" | null;
   source_url?: string | null;
 }
 
@@ -132,6 +127,7 @@ export interface ArtistPageEnrichment {
       last_played?: string;
     }[];
     total_shows: number;
+    generated_at?: string | null;
   };
 }
 

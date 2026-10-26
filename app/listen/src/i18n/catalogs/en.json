@@ -1052,6 +1052,8 @@
   "artist.setlist.songCount": "{count, plural, one {# song} other {# songs}}",
   "artist.setlist.play": "Play Setlist",
   "artist.setlist.export": "Export",
+  "artist.setlist.frequencyLabel": "{title} frequency",
+  "artist.setlist.updated": "Updated {time}",
   "artist.setlist.toasts.exported": "Setlist exported as playlist",
   "artist.setlist.toasts.exportFailed": "Failed to export setlist",
   "common.saving": "Saving...",

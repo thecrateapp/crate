@@ -1030,6 +1030,8 @@
   "artist.setlist.songCount": "{count, plural, one {# brano} other {# brani}}",
   "artist.setlist.play": "Riproduci scaletta",
   "artist.setlist.export": "Esporta",
+  "artist.setlist.frequencyLabel": "Frequenza di {title}",
+  "artist.setlist.updated": "Aggiornato {time}",
   "artist.setlist.toasts.exported": "Scaletta esportata come playlist",
   "artist.setlist.toasts.exportFailed": "Impossibile esportare la scaletta",
   "common.saving": "Salvataggio...",

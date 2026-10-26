@@ -1,0 +1,29 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SetlistFrequency.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">SetlistFrequency</DocHeading>
+<EntryDetails
+  id="domain-shows-setlistfrequency"
+  review="Diego review · probable setlist alignment, 2026-10-26"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Shows how often a song appeared in an artist's recent concerts: a 1px ProgressHairline rail,
+  the rounded percentage and a caller-supplied plays caption.
+- Every part has a fixed slot, so rows align whatever the percentage length: rail 3rem, percentage
+  6ch right-aligned, then plays. With `showLastPlayed`, plays take 12ch and a 13ch date slot is
+  reserved even when the date is missing; the date column hides below `sm`.
+- Frequency is clamped to 0–1; a missing or invalid value reads 0%, never a broken bar.
+- Copy belongs to the caller: Listen translates the rail label and plays caption, Admin uses
+  English. The component owns no spacing outside its grid; callers place it.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.AlignedRows} />
+
+<Canvas of={Stories.WithLastPlayed} />

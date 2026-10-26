@@ -1030,6 +1030,8 @@
   "artist.setlist.songCount": "{count, plural, one {# abesti} other {# abesti}}",
   "artist.setlist.play": "Erreproduzitu setlista",
   "artist.setlist.export": "Esportatu",
+  "artist.setlist.frequencyLabel": "{title} maiztasuna",
+  "artist.setlist.updated": "Eguneratua {time}",
   "artist.setlist.toasts.exported": "Setlista playlist gisa esportatu da",
   "artist.setlist.toasts.exportFailed": "Ezin izan da setlista esportatu",
   "common.saving": "Gordetzen...",

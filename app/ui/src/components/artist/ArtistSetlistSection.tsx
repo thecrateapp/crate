@@ -5,9 +5,9 @@ import { albumPagePath, artistActionApiPath } from "@/lib/library-routes";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { ArtistDetailSection } from "./ArtistDetailSection";
-import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { RelativeTime } from "@/components/admin/RelativeTime";
 import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
-import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { SetlistFrequency } from "@crate/ui/domain/shows/SetlistFrequency";
 import { RefreshCw } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -22,6 +22,7 @@ interface SetlistData {
   probable_setlist?: SetlistSong[];
   total_shows?: number;
   last_show?: { date: string; venue: string; city: string };
+  generated_at?: string | null;
 }
 
 interface LibraryTrackTitle {
@@ -119,6 +120,12 @@ export function ArtistSetlistSection({
             {lastShow
               ? ` · Last show: ${lastShow.date} at ${lastShow.venue}, ${lastShow.city}`
               : ""}
+            {setlistData?.generated_at ? (
+              <>
+                {" · Updated "}
+                <RelativeTime value={setlistData.generated_at} />
+              </>
+            ) : null}
           </>
         ) : (
           "Predicted from recent Setlist.fm concerts"
@@ -158,19 +165,13 @@ export function ArtistSetlistSection({
                 truncate={false}
                 asChild
                 trailing={
-                  <span className="grid grid-cols-[3rem_6ch_12ch] items-center gap-3 sm:grid-cols-[3rem_6ch_12ch_13ch]">
-                    <ProgressHairline
-                      label={`${song.title} frequency`}
-                      value={frequency}
-                    />
-                    <MonoLabel as="span" className="text-right">
-                      {Math.round(frequency * 100)}%
-                    </MonoLabel>
-                    <MonoLabel as="span">{song.play_count} plays</MonoLabel>
-                    <MonoLabel as="span" className="hidden sm:block">
-                      {song.last_played ?? ""}
-                    </MonoLabel>
-                  </span>
+                  <SetlistFrequency
+                    frequency={frequency}
+                    label={`${song.title} frequency`}
+                    plays={`${song.play_count} plays`}
+                    showLastPlayed
+                    lastPlayed={song.last_played}
+                  />
                 }
               >
                 <button

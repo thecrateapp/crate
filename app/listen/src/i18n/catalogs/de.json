@@ -1030,6 +1030,8 @@
   "artist.setlist.songCount": "{count, plural, one {# Song} other {# Songs}}",
   "artist.setlist.play": "Setlist abspielen",
   "artist.setlist.export": "Exportieren",
+  "artist.setlist.frequencyLabel": "Häufigkeit von {title}",
+  "artist.setlist.updated": "Aktualisiert {time}",
   "artist.setlist.toasts.exported": "Setlist als Playlist exportiert",
   "artist.setlist.toasts.exportFailed": "Setlist konnte nicht exportiert werden",
   "common.saving": "Wird gespeichert...",

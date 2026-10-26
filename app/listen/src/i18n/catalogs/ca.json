@@ -1030,6 +1030,8 @@
   "artist.setlist.songCount": "{count, plural, one {# cançó} other {# cançons}}",
   "artist.setlist.play": "Reproduir setlist",
   "artist.setlist.export": "Exporta",
+  "artist.setlist.frequencyLabel": "Freqüència de {title}",
+  "artist.setlist.updated": "Actualitzat {time}",
   "artist.setlist.toasts.exported": "Setlist exportada com a playlist",
   "artist.setlist.toasts.exportFailed": "No s'ha pogut exportar la setlist",
   "common.saving": "Desant...",

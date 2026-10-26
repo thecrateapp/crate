@@ -278,3 +278,48 @@ def test_show_setlist_worker_queues_outdated_billed_artists(monkeypatch):
     result = ENRICHMENT_TASK_HANDLERS["refresh_show_probable_setlists"]("task", {}, {})
 
     assert result == {"artist_count": 2, "queued": 1}
+
+
+def test_cached_setlist_generated_at_reads_the_versioned_cache_entry(monkeypatch):
+    from crate import setlistfm
+
+    monkeypatch.setattr(
+        setlistfm,
+        "get_cache",
+        lambda key, max_age_seconds=None: {
+            "songs": [{"title": "Hey"}],
+            "generated_at": "2026-10-20T10:00:00+00:00",
+        },
+    )
+    assert (
+        setlistfm.get_cached_probable_setlist_generated_at("Pixies")
+        == "2026-10-20T10:00:00+00:00"
+    )
+
+    monkeypatch.setattr(
+        setlistfm, "get_cache", lambda key, max_age_seconds=None: [{"title": "Hey"}]
+    )
+    assert setlistfm.get_cached_probable_setlist_generated_at("Pixies") is None
+
+
+def test_artist_page_enrichment_reports_when_the_setlist_was_generated(monkeypatch):
+    from crate.api import enrichment as api_enrichment
+
+    monkeypatch.setattr(
+        api_enrichment, "get_cache", lambda key, max_age_seconds=None: None
+    )
+    monkeypatch.setattr(
+        api_enrichment.setlistfm,
+        "get_cached_probable_setlist",
+        lambda name: [{"title": "Hey", "frequency": 0.8, "play_count": 4}],
+    )
+    monkeypatch.setattr(
+        api_enrichment.setlistfm,
+        "get_cached_probable_setlist_generated_at",
+        lambda name: "2026-10-20T10:00:00+00:00",
+    )
+
+    payload = api_enrichment.get_artist_page_enrichment("Pixies")
+
+    assert payload["setlist"]["generated_at"] == "2026-10-20T10:00:00+00:00"
+    assert payload["setlist"]["total_shows"] == 1
