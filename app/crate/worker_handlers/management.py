@@ -2363,17 +2363,6 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             },
         )
 
-        try:
-            from crate.telegram import send_message
-
-            send_message(
-                f"\U0001f3b6 Smart Playlist <b>{name}</b> regenerated\n"
-                f"{track_count} tracks \u00b7 {total_duration // 60}m\n"
-                f"Triggered by: {triggered_by}"
-            )
-        except Exception:
-            pass
-
         return {"track_count": track_count, "duration_sec": total_duration}
 
     except Exception as e:

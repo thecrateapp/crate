@@ -32,11 +32,9 @@ def actor_boundary(command_world, monkeypatch):
     monkeypatch.setattr(actors, "_check_memory", Mock())
     monkeypatch.setattr(actors, "_acquire_db_heavy_lock", Mock(return_value=True))
     monkeypatch.setattr(actors, "_release_db_heavy_lock", Mock())
-    failed, completed, published = Mock(), Mock(), Mock()
-    monkeypatch.setattr("crate.telegram.notify_task_failed", failed)
-    monkeypatch.setattr("crate.telegram.notify_task_completed", completed)
+    published = Mock()
     monkeypatch.setattr("crate.db.events._publish_to_redis", published)
-    return actors, command_world, failed, completed, published
+    return actors, command_world, published
 
 
 def _persisted_result(job_id):
@@ -44,7 +42,7 @@ def _persisted_result(job_id):
 
 
 def test_actor_preserves_revoked_agent_job_as_failed(actor_boundary):
-    actors, world, failed, completed, published = actor_boundary
+    actors, world, published = actor_boundary
     principal = world["principal"]
     accepted = agent_requests.accept_health_check(principal, UID, "revoke-before-run")
     job_id = accepted["job_id"]
@@ -65,8 +63,6 @@ def test_actor_preserves_revoked_agent_job_as_failed(actor_boundary):
         )
         == 0
     )
-    failed.assert_called_once()
-    completed.assert_not_called()
     events = [
         args.args[2] for args in published.call_args_list if args.args[1] == "task_done"
     ]
@@ -77,7 +73,7 @@ def test_actor_preserves_revoked_agent_job_as_failed(actor_boundary):
 def test_actor_preserves_exact_repair_outcome_after_real_worker_execution(
     actor_boundary, change_photo
 ):
-    actors, world, failed, completed, published = actor_boundary
+    actors, world, published = actor_boundary
     principal = world["principal"]
     check = agent_requests.accept_health_check(principal, UID, "check-before-repair")
     actors._execute_task("health_check", check["job_id"])
@@ -91,8 +87,6 @@ def test_actor_preserves_exact_repair_outcome_after_real_worker_execution(
     job_id = accepted["job_id"]
     if change_photo:
         (world["folder"] / "artist.jpg").write_bytes(b"changed after preview")
-    failed.reset_mock()
-    completed.reset_mock()
     published.reset_mock()
 
     actors._execute_task("repair", job_id)
@@ -109,12 +103,8 @@ def test_actor_preserves_exact_repair_outcome_after_real_worker_execution(
     ) == (0 if change_photo else 1)
     if change_photo:
         assert task["result"]["execution"]["error_code"] == "PLAN_STALE"
-        failed.assert_called_once()
-        completed.assert_not_called()
     else:
         assert task["result"]["verification"]["status"] == "verified"
-        completed.assert_called_once()
-        failed.assert_not_called()
     events = [
         args.args[2] for args in published.call_args_list if args.args[1] == "task_done"
     ]

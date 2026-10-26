@@ -75,9 +75,6 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
-    )
-    monkeypatch.setattr(
         "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
     )
     monkeypatch.setattr(actors, "_check_memory", lambda: None)
@@ -148,9 +145,6 @@ def test_actor_treats_conflict_result_as_failed(monkeypatch):
     monkeypatch.setattr("crate.worker._is_cancelled", lambda _task_id: False)
     monkeypatch.setattr("crate.metrics.record", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
-    )
-    monkeypatch.setattr(
         "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
     )
     monkeypatch.setattr(actors, "_try_fan_in_parent", lambda *args, **kwargs: None)
@@ -217,9 +211,6 @@ def test_actor_task_done_event_includes_handler_result(monkeypatch):
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "crate.telegram.notify_task_completed", lambda *args, **kwargs: None
-    )
-    monkeypatch.setattr(
         "crate.db.events._publish_to_redis",
         lambda *args, **kwargs: published.append(args),
     )
@@ -271,9 +262,6 @@ def test_actor_reports_handler_exception_before_dramatiq_retry(monkeypatch):
     monkeypatch.setattr("crate.config.load_config", lambda: {"library_path": "/tmp"})
     monkeypatch.setattr("crate.worker._is_cancelled", lambda _task_id: False)
     monkeypatch.setattr("crate.metrics.record", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
-    )
     monkeypatch.setattr(
         "crate.db.events._publish_to_redis", lambda *args, **kwargs: None
     )

@@ -50,9 +50,13 @@ PIPELINE_TASK_TYPES = {
 
 
 def read_observation_evidence(
-    *, track_uids=None, pipeline: str | None = None, session: Session | None = None
+    *,
+    track_uids=None,
+    pipeline: str | None = None,
+    alerts: bool = False,
+    session: Session | None = None,
 ) -> dict:
-    """One read transaction, fixed keys, at most 50 exact tracks and 21 task rows."""
+    """One read transaction, fixed keys, at most 50 exact tracks and 21 rows per sample."""
     if pipeline is not None and pipeline not in PIPELINES:
         raise ValueError("Unknown pipeline")
     if track_uids is not None and (
@@ -76,7 +80,7 @@ def read_observation_evidence(
                     octet_length(payload_json::text) > 32768 AS oversized,
                     CASE WHEN octet_length(payload_json::text) <= 32768 THEN payload_json END AS payload
                 FROM (SELECT key,updated_at,(SELECT jsonb_object_agg(k,v) FROM jsonb_each(payload_json) AS fields(k,v) WHERE k=ANY(:fields)) AS payload_json FROM ops_runtime_state) projected WHERE key IN (
-                    'worker_live','analysis_status','imports_pending',
+                    'worker_live','analysis_status','imports_pending','health',
                     'smart_mix:coverage','smart_mix:backfill_campaign')
             ), snapshots AS (
                 SELECT scope AS source, built_at AS observed_at, invalidated_at,
@@ -108,17 +112,36 @@ def read_observation_evidence(
                     created_at, updated_at, started_at, heartbeat_at
                 FROM tasks WHERE type=ANY(:types) AND created_at >= NOW()-INTERVAL '24 hours'
                 ORDER BY created_at DESC,id DESC LIMIT 21
+            ), failed AS (
+                SELECT id, LEFT(type,128) AS type, updated_at,
+                    LEFT(COALESCE(result_json->'execution'->>'error_code',
+                                  result_json->>'error_code'),80) AS error_code
+                FROM tasks WHERE :alerts AND status='failed'
+                    AND cancellation_requested_at IS NULL
+                    AND updated_at >= NOW()-INTERVAL '24 hours'
+                ORDER BY updated_at DESC,id DESC LIMIT 21
+            ), releases AS (
+                SELECT id::text AS id, LEFT(artist_name,128) AS artist,
+                    LEFT(album_title,128) AS album, LEFT(year,8) AS year,
+                    release_date, LEFT(release_type,32) AS release_type,
+                    LEFT(status,32) AS status, detected_at
+                FROM new_releases WHERE :alerts
+                    AND detected_at >= NOW()-INTERVAL '7 days'
+                ORDER BY detected_at DESC,id DESC LIMIT 21
             )
             SELECT (SELECT jsonb_agg(to_jsonb(r)) FROM runtime r) AS runtime,
                 (SELECT jsonb_agg(to_jsonb(s)) FROM snapshots s) AS snapshots,
                 (SELECT jsonb_agg(to_jsonb(p)) FROM profiles p) AS profiles,
                 (SELECT jsonb_agg(to_jsonb(j)) FROM jobs j) AS jobs,
+                (SELECT jsonb_agg(to_jsonb(f)) FROM failed f) AS failed_tasks,
+                (SELECT jsonb_agg(to_jsonb(n)) FROM releases n) AS new_releases,
                 (SELECT LEFT(version_num,128) FROM alembic_version LIMIT 1) AS database_schema_version,
                 NOW() AS queried_at
         """),
                 {
                     "uids": uids,
                     "types": task_types,
+                    "alerts": bool(alerts),
                     "fields": [
                         "engine",
                         "running_count",
@@ -153,6 +176,8 @@ def read_observation_evidence(
                         "batches",
                         "claimed",
                         "sequence",
+                        "score",
+                        "breaches",
                     ],
                 },
             )

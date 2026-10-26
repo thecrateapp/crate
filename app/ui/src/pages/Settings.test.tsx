@@ -80,12 +80,6 @@ const settingsData = {
     llm_refinement_enabled: true,
     llm_refinement_cache_ttl_hours: 168,
   },
-  telegram: {
-    enabled: false,
-    bot_token: "",
-    chat_id: "",
-    has_token: false,
-  },
   about: {
     version: "dev",
     git_commit: "abcdef123",
@@ -114,6 +108,20 @@ describe("Settings", () => {
       loading: false,
       refetch: refetchMock,
     });
+  });
+
+  it("no longer offers the legacy Telegram bot settings", () => {
+    render(<Settings />);
+
+    expect(
+      screen.queryByRole("button", { name: /notifications/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/telegram/i)).not.toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/settings/telegram"),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("shows one AI refinement state after setup", async () => {

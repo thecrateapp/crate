@@ -148,3 +148,26 @@ def test_alerting_reports_shared_filesystem_only_once(monkeypatch):
         breach for breach in status.breaches if "disk emergency" in breach.name
     ]
     assert len(disk_breaches) == 1
+
+
+def test_health_snapshot_is_bounded_for_the_operator_supervisor():
+    from crate.alerting import HealthStatus, ThresholdBreach
+
+    status = HealthStatus(
+        score=30,
+        breaches=[
+            ThresholdBreach("x" * 200, 91.234, 90, "critical") for _ in range(12)
+        ],
+        metrics={"disks": {"music": {"path": "/music"}}},
+    )
+
+    snapshot = status.snapshot()
+
+    assert set(snapshot) == {"score", "breaches"}
+    assert snapshot["score"] == 30 and len(snapshot["breaches"]) == 10
+    assert snapshot["breaches"][0] == {
+        "name": "x" * 80,
+        "value": 91.2,
+        "threshold": 90.0,
+        "severity": "critical",
+    }

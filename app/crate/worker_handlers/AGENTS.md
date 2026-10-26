@@ -9,15 +9,15 @@ Long-form background: `docs/technical/03-worker-tasks-and-background-services.md
 
 ## Runtime map (production, `docker-compose.yaml`)
 
-| Container                   | Command                                                    | Queues / loops                                                                                                             | `/music` |
-| --------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `crate-worker`              | `worker --queues default,fast --no-daemons --no-projector` | default + fast, service loop (scheduler, watcher, zombie cleanup, stale-pending redispatch, media-worker bridge), Telegram | rw       |
-| `crate-fast-worker`         | `worker --queues fast --no-service-loop ...`               | fast only (extends `crate-worker`)                                                                                         | rw       |
-| `crate-maintenance-worker`  | `worker --queues maintenance --no-service-loop ...`        | maintenance                                                                                                                | rw       |
-| `crate-analysis-worker`     | `worker --queues heavy --no-service-loop --no-projector`   | heavy + analysis/bliss daemons                                                                                             | **ro**   |
-| `crate-playback-worker`     | `worker --queues playback ...`                             | playback (ffmpeg transcodes into `/cache`)                                                                                 | **ro**   |
-| `crate-projector`           | `projector`                                                | outbox relay + domain-event projection + snapshot warming                                                                  | ro       |
-| `crate-media-worker` (Rust) | HTTP on :8687                                              | album/track ZIP packages, Redis progress/cancel                                                                            | ro       |
+| Container                   | Command                                                    | Queues / loops                                                                                                                    | `/music` |
+| --------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `crate-worker`              | `worker --queues default,fast --no-daemons --no-projector` | default + fast, service loop (scheduler, watcher, zombie cleanup, stale-pending redispatch, media-worker bridge, health snapshot) | rw       |
+| `crate-fast-worker`         | `worker --queues fast --no-service-loop ...`               | fast only (extends `crate-worker`)                                                                                                | rw       |
+| `crate-maintenance-worker`  | `worker --queues maintenance --no-service-loop ...`        | maintenance                                                                                                                       | rw       |
+| `crate-analysis-worker`     | `worker --queues heavy --no-service-loop --no-projector`   | heavy + analysis/bliss daemons                                                                                                    | **ro**   |
+| `crate-playback-worker`     | `worker --queues playback ...`                             | playback (ffmpeg transcodes into `/cache`)                                                                                        | **ro**   |
+| `crate-projector`           | `projector`                                                | outbox relay + domain-event projection + snapshot warming                                                                         | ro       |
+| `crate-media-worker` (Rust) | HTTP on :8687                                              | album/track ZIP packages, Redis progress/cancel                                                                                   | ro       |
 
 `run_worker()` in `worker.py` starts optional threads per CLI flag, then execs
 `python -m dramatiq crate.actors --processes N --threads 1 --queues ...`. `orchestrator.py`
@@ -128,5 +128,6 @@ Handler tests call `_handle_<name>(task_id, params, config)` directly and monkey
 Cover: happy path result dict, skip/failed result shapes, cancellation, and a second run
 (idempotency). Full suite in Docker: `docker compose -f docker-compose.dev.yaml exec worker pytest tests/ -v`.
 
-- `task_registry.py` icons are emojis meant for Telegram notifications only; the admin UI renders
-  its own status icons. Never surface them in UI text.
+- `task_registry.py` icons are emojis; the admin UI renders its own status icons. Never surface
+  them in UI text. Telegram control is Hermes; workers never send chat messages. Push alerts come
+  from the operator supervisor reading MCP observations.

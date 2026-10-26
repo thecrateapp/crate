@@ -843,12 +843,6 @@ def _execute_task(task_type: str, task_id: str):
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
             try:
-                from crate.telegram import notify_task_failed
-
-                notify_task_failed(task_type, task_id, error[:300])
-            except Exception:
-                log.debug("Telegram notification failed", exc_info=True)
-            try:
                 from crate.db.events import _publish_to_redis
 
                 _publish_to_redis(
@@ -877,12 +871,6 @@ def _execute_task(task_type: str, task_id: str):
                 )
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
-            try:
-                from crate.telegram import notify_task_completed
-
-                notify_task_completed(task_type, task_id, result)
-            except Exception:
-                log.debug("Telegram notification failed", exc_info=True)
             try:
                 from crate.db.events import _publish_to_redis
 
@@ -930,12 +918,6 @@ def _execute_task(task_type: str, task_id: str):
                 _try_fan_in_parent(task, task_type, task_id)
         except Exception:
             log.error("Could not mark task %s as failed", task_id)
-        try:
-            from crate.telegram import notify_task_failed
-
-            notify_task_failed(task_type, task_id, str(e)[:300])
-        except Exception:
-            log.debug("Telegram notification failed", exc_info=True)
         try:
             from crate.db.events import _publish_to_redis
 

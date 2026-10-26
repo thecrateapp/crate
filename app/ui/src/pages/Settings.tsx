@@ -49,7 +49,6 @@ import {
   X,
   Plus,
   Download,
-  Bell,
   ScrollText,
   HardDrive,
   ExternalLink,
@@ -95,12 +94,6 @@ interface SettingsData {
     min_bitrate: number;
     username: string;
     shares_music: boolean;
-  };
-  telegram?: {
-    enabled: boolean;
-    bot_token: string;
-    chat_id: string;
-    has_token: boolean;
   };
   about: {
     version: string;
@@ -379,7 +372,6 @@ type SettingsSection =
   | "downloads"
   | "schedules"
   | "enrichment"
-  | "notifications"
   | "storage"
   | "audit";
 
@@ -412,12 +404,6 @@ const NAV_ITEMS: {
     label: "Enrichment",
     description: "Sources, thresholds and file types",
     icon: Zap,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    description: "Telegram bot and alerts",
-    icon: Bell,
   },
   {
     id: "storage",
@@ -494,16 +480,6 @@ export function Settings() {
               </CrateChip>
               <CrateChip icon={Zap}>
                 {activeSchedules} active schedules
-              </CrateChip>
-              <CrateChip
-                icon={Bot}
-                className={
-                  settings.telegram?.enabled
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
-                    : undefined
-                }
-              >
-                Telegram {settings.telegram?.enabled ? "enabled" : "idle"}
               </CrateChip>
             </div>
           </div>
@@ -601,12 +577,6 @@ export function Settings() {
           )}
           {section === "enrichment" && (
             <EnrichmentSection settings={settings} refetch={refetch} />
-          )}
-          {section === "notifications" && (
-            <NotificationsSection
-              telegram={settings.telegram}
-              refetch={refetch}
-            />
           )}
           {section === "storage" && (
             <StorageSection dbStats={settings.db_stats} />
@@ -1643,123 +1613,6 @@ function EnrichmentSection({
         </PanelCard>
       </Section>
     </>
-  );
-}
-
-// ── Notifications ──────────────────────────────────────────────
-
-function NotificationsSection({
-  telegram,
-  refetch,
-}: {
-  telegram?: SettingsData["telegram"];
-  refetch: () => void;
-}) {
-  const [enabled, setEnabled] = useState(telegram?.enabled ?? false);
-  const [token, setToken] = useState("");
-  const [chatId, setChatId] = useState(telegram?.chat_id ?? "");
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-
-  useEffect(() => {
-    setEnabled(telegram?.enabled ?? false);
-    setChatId(telegram?.chat_id ?? "");
-  }, [telegram]);
-
-  async function save() {
-    setSaving(true);
-    try {
-      const body: Record<string, unknown> = { enabled, chat_id: chatId };
-      if (token) body.bot_token = token;
-      await api("/api/settings/telegram", "PUT", body);
-      toast.success("Telegram settings saved");
-      setToken("");
-      refetch();
-    } catch {
-      toast.error("Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function test() {
-    setTesting(true);
-    try {
-      await api("/api/settings/telegram/test", "POST");
-      toast.success("Test message sent");
-    } catch {
-      toast.error("Test failed");
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  return (
-    <Section
-      title="Telegram Bot"
-      description="Outbound operational notifications and test delivery."
-    >
-      <PanelCard
-        icon={Bell}
-        title="Telegram Notifications"
-        description="Send task and system messages through a bot linked to your chat."
-      >
-        <FieldRow label="Enabled">
-          <Toggle checked={enabled} onChange={setEnabled} />
-          <Badge
-            variant={enabled ? "default" : "secondary"}
-            className="text-[10px]"
-          >
-            {enabled ? "Active" : "Disabled"}
-          </Badge>
-        </FieldRow>
-        <FieldRow label="Bot Token">
-          <Input
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder={
-              telegram?.has_token ? "Token configured" : "Paste from @BotFather"
-            }
-            className="max-w-sm"
-          />
-        </FieldRow>
-        <FieldRow label="Chat ID">
-          <Input
-            value={chatId}
-            onChange={(e) => setChatId(e.target.value)}
-            placeholder="Auto-filled on /start"
-            className="max-w-sm"
-          />
-        </FieldRow>
-        <div className="flex flex-wrap items-center gap-2 md:pl-[212px] pt-1">
-          <Button onClick={save} disabled={saving} size="sm">
-            {saving ? (
-              <Loader2 size={12} className="animate-spin mr-1.5" />
-            ) : (
-              <Save size={12} className="mr-1.5" />
-            )}
-            Save
-          </Button>
-          <Button
-            onClick={test}
-            disabled={testing || !telegram?.has_token}
-            variant="outline"
-            size="sm"
-          >
-            {testing ? (
-              <Loader2 size={12} className="animate-spin mr-1.5" />
-            ) : (
-              <Wifi size={12} className="mr-1.5" />
-            )}
-            Send Test
-          </Button>
-        </div>
-        <p className="text-[10px] text-white/30 md:pl-[212px]">
-          Create a bot via @BotFather, paste the token, then send /start to it.
-        </p>
-      </PanelCard>
-    </Section>
   );
 }
 

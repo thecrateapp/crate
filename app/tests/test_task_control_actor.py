@@ -36,8 +36,6 @@ def actor_world(pg_db, monkeypatch):
         lambda *_: SimpleNamespace(allowed=True),
     )
     monkeypatch.setattr("crate.metrics.record", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr("crate.telegram.notify_task_completed", lambda *_: None)
-    monkeypatch.setattr("crate.telegram.notify_task_failed", lambda *_: None)
     monkeypatch.setattr(
         "crate.observability.sentry.capture_task_exception",
         lambda *_args, **_kwargs: None,

@@ -77,7 +77,6 @@ def run_worker(config: dict):
     start_service_loop = bool(config.get("worker_service_loop", True))
     start_analysis_daemons = bool(config.get("worker_analysis_daemons", True))
     start_projector = bool(config.get("worker_projector", True))
-    start_telegram = bool(config.get("worker_telegram", True))
 
     init_db()
     init_musicbrainz()
@@ -144,18 +143,6 @@ def run_worker(config: dict):
         log.info("Projector daemon started")
     else:
         log.info("Projector daemon disabled for queues: %s", ",".join(queues))
-
-    # Start Telegram bot
-    if start_telegram:
-        from crate.telegram import telegram_bot_loop
-
-        telegram_thread = threading.Thread(
-            target=telegram_bot_loop,
-            args=(config,),
-            daemon=True,
-            name="telegram-bot",
-        )
-        telegram_thread.start()
 
     # Start Dramatiq workers via CLI (this manages its own process pool)
     dramatiq_cmd = [
@@ -271,6 +258,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_cleanup = 0
     last_status_update = 0
     last_analysis_status_update = 0
+    last_health_update = 0
     last_metrics_flush = 0
     last_shadow_backfill = 0
     last_media_worker_bridge = 0
@@ -469,6 +457,16 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                 )
             except Exception:
                 log.debug("Analysis status refresh failed", exc_info=True)
+
+        if now - last_health_update > 120:
+            last_health_update = now
+            try:
+                from crate.alerting import evaluate_health
+                from crate.db.ops_runtime import set_ops_runtime_state
+
+                set_ops_runtime_state("health", evaluate_health().snapshot())
+            except Exception:
+                log.debug("Health snapshot refresh failed", exc_info=True)
 
         # Metrics flush every 5 minutes
         if now - last_metrics_flush > 300:

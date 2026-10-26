@@ -450,3 +450,49 @@ def test_summary_invalid_runtime_counters_remain_unknown_preserving_other_source
     assert worker["observed_at"] == stored["runtime"][0]["observed_at"]
     assert result["data"]["sources"]["analysis_status"]["data"]["analysis_done"] == 17
     assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
+
+
+def test_summary_exposes_health_and_alert_samples(stored):
+    stored["runtime"].append(
+        record(
+            "health",
+            {
+                "score": 60,
+                "breaches": [
+                    {"name": "RAM usage", "severity": "warning", "value": 97.5},
+                ],
+                "metrics": {"secret": "omit"},
+            },
+        )
+    )
+    stored["failed_tasks"] = [
+        {"id": str(i), "type": "enrich_artist", "error_code": "UPSTREAM"}
+        for i in range(21)
+    ]
+    stored["new_releases"] = [{"id": "1", "artist": "A", "album": "B"}]
+    sources = observations.get_observability_summary()["data"]["sources"]
+    assert sources["health"]["availability"] == "available"
+    assert sources["health"]["data"] == {
+        "score": 60,
+        "breaches": [{"name": "RAM usage", "severity": "warning", "value": 97.5}],
+    }
+    failed = sources["failed_tasks"]
+    assert failed["returned_count"] == 20 and failed["truncated"]
+    assert len(failed["data"]["rows"]) == 20
+    assert sources["new_releases"]["data"]["rows"][0]["album"] == "B"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"score": 101, "breaches": []},
+        {"score": "60", "breaches": []},
+        {"score": 60, "breaches": [{"name": "x", "severity": "bad"}]},
+        {"score": 60},
+    ],
+)
+def test_summary_invalid_health_is_unavailable_not_healthy(stored, payload):
+    stored["runtime"].append(record("health", payload))
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+    assert health["availability"] == "unavailable" and health["data"] is None
+    assert "invalid producer" in health["reason"]

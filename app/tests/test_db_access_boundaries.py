@@ -12,7 +12,6 @@ REFACTORED_MODULES = [
     Path("health_check.py"),
     Path("popularity.py"),
     Path("repair.py"),
-    Path("telegram.py"),
     Path("genre_taxonomy_inference.py"),
     Path("api/genres.py"),
     Path("api/radio.py"),
