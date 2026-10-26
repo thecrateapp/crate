@@ -56,8 +56,12 @@ func (m Mode) Name() string {
 	return profiles[m].Name
 }
 
-// SetupCommand is what home installs run to change the agent.
-const SetupCommand = "crate configure agent"
+const (
+	// SetupCommand is what home installs run to change the agent.
+	SetupCommand = "crate configure agent"
+	// SignInCommand signs a running agent in to its model provider.
+	SignInCommand = "crate configure agent --sign-in"
+)
 
 // OperatorOverlay is the compose file Crate Operator adds, relative to the
 // install folder.

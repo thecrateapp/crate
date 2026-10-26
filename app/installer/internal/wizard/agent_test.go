@@ -32,7 +32,7 @@ func TestUnattendedInstallSetsUpCrateAgent(t *testing.T) {
 		output []string
 	}{
 		{"ready", `{"mcp": "12 tools", "model_credentials": "configured"}`, []string{"Crate Agent is running and answered", "Message your bot on Telegram"}},
-		{"sign-in pending", `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`, []string{"Sign-in pending: run `crate configure agent`", "Sign in to ChatGPT"}},
+		{"sign-in pending", `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`, []string{"Sign-in pending: run `crate configure agent --sign-in`", "Sign in to ChatGPT"}},
 		{"cannot reach crate", `{"mcp": "unreachable or rejected; check the credential and MCP flags"}`, []string{"Crate Agent cannot use Crate yet", "crate doctor"}},
 	}
 	for _, tc := range cases {
@@ -168,5 +168,61 @@ func TestUnreachableDockerSaysTheAgentAnswersWereNotSaved(t *testing.T) {
 		if warned != tc.warns {
 			t.Errorf("%v: warned %v\n%s", tc.answers, warned, out.String())
 		}
+	}
+}
+
+func TestSignInOnlySignsTheRunningAgentIn(t *testing.T) {
+	pending := `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`
+	signedIn := `{"mcp": "12 tools", "model_credentials": "configured"}`
+	cases := []struct {
+		name     string
+		settings []string
+		check    string
+		ids      []string
+		signs    bool
+		fails    string
+		says     string
+	}{
+		{"pending", []string{"COMPOSE_PROFILES", "agent", "CRATE_AGENT_MODE", "agent"}, pending, []string{"agent"}, true, "", "The sign-in is still pending"},
+		{"already signed in", []string{"COMPOSE_PROFILES", "agent", "CRATE_AGENT_MODE", "agent"}, signedIn, nil, false, "", "already signed in"},
+		{"not running", []string{"CRATE_AGENT_MODE", "agent"}, pending, nil, false, "Crate Agent is not running", ""},
+		{"api key provider", []string{"COMPOSE_PROFILES", "agent", "CRATE_AGENT_PROVIDER", "anthropic"}, pending, nil, false, "uses an API key", ""},
+		{"another integration", []string{"COMPOSE_PROFILES", "agent"}, pending, []string{"lastfm"}, false, "works only with the agent", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			w, out, runner := newTestWizard(t, Options{Version: "test", InstallDir: dir, SignIn: true})
+			if err := install.Apply(w.manifest, install.Defaults(dir), nil); err != nil {
+				t.Fatal(err)
+			}
+			values, _ := install.ReadExisting(dir)
+			for i := 0; i+1 < len(tc.settings); i += 2 {
+				values.Set(tc.settings[i], tc.settings[i+1])
+			}
+			envfile.Write(install.EnvPath(dir), envfile.Render(values, "", nil))
+			runner.outputs = map[string]string{"runtime.py --check": tc.check}
+
+			err := w.configure(context.Background(), tc.ids)
+
+			if tc.fails != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.fails) {
+					t.Fatalf("got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			signed := slices.ContainsFunc(runner.streamed, func(line string) bool {
+				return strings.Contains(line, "exec -it -u") && strings.HasSuffix(line, "hermes auth add openai-codex --type oauth")
+			})
+			if signed != tc.signs || !strings.Contains(out.String(), tc.says) {
+				t.Fatalf("signed %v\n%s", signed, out.String())
+			}
+			if strings.Contains(out.String(), "What do you want to set up") {
+				t.Fatal("the sign-in must not walk the integration form")
+			}
+		})
 	}
 }

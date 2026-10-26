@@ -176,7 +176,7 @@ func TestDoctorChecksCrateAgent(t *testing.T) {
 		{"turned off", map[string]string{"COMPOSE_PROFILES": "agent"}, "", "", Fail, "runs although the settings turned it off", ""},
 		{"operator without overlay", map[string]string{"CRATE_AGENT_MODE": "operator", "COMPOSE_PROFILES": "crate-operator"}, "", "", Fail, "runs without its compose overlay", ""},
 		{"operator", map[string]string{"CRATE_AGENT_MODE": "operator", "COMPOSE_PROFILES": "crate-operator", "COMPOSE_FILE": overlay}, "", `{"mcp": "69 tools", "model_credentials": "configured"}`, OK, "reaches Crate (69 tools)", ""},
-		{"sign-in pending", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, unhealthy, `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`, Warn, "Sign-in pending: run `crate configure agent` in a terminal", Warn},
+		{"sign-in pending", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, unhealthy, `{"mcp": "12 tools", "model_credentials": "provider openai-codex has no login"}`, Warn, "Sign-in pending: run `crate configure agent --sign-in` in a terminal", Warn},
 		{"rejected credential", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, unhealthy, `{"mcp": "unreachable or rejected; check the credential and MCP flags"}`, Fail, "unreachable or rejected; check the credential and MCP flags", Fail},
 		{"not running", map[string]string{"CRATE_AGENT_MODE": "agent", "COMPOSE_PROFILES": "agent"}, "", "", Fail, "crate-agent is not running", ""},
 	}

@@ -28,6 +28,7 @@ type Options struct {
 	DryRun     bool // show the plan, write nothing
 	SkipStart  bool // write the files, do not start containers
 	Accessible bool // plain prompts for screen readers
+	SignIn     bool // only sign the running agent in to its model provider
 }
 
 // ErrCancelled is returned when the user leaves the wizard.

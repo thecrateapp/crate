@@ -58,6 +58,14 @@ func (w *wizard) configure(ctx context.Context, ids []string) error {
 	}
 	w.cfg = install.FromEnvFile(install.Defaults(dir), w.existing)
 	ui.Banner(w.out, w.opts.Version)
+	if w.opts.SignIn {
+		for _, id := range ids {
+			if in, ok := w.integration(id); !ok || in.ID != "agent" {
+				return errors.New("--sign-in works only with the agent: `" + agent.SignInCommand + "`")
+			}
+		}
+		return w.signInOnly(ctx, dir)
+	}
 	if len(ids) == 0 {
 		if ids, err = w.chooseIntegrations(false); err != nil {
 			return w.cancelled(err)

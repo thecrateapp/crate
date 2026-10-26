@@ -222,7 +222,7 @@ func checkAgent(ctx context.Context, r *report, values *envfile.Values, setup ag
 		r.add("Crate Agent", wanted.Name(), Fail, status.MCP, fix)
 	case status.SignInPending:
 		provider, _ := agent.FindProvider(get(values, "CRATE_AGENT_PROVIDER"))
-		r.add("Crate Agent", wanted.Name(), Warn, "Sign-in pending: run `"+agent.SetupCommand+"` in a terminal", provider.SignIn+" so it can answer.")
+		r.add("Crate Agent", wanted.Name(), Warn, "Sign-in pending: run `"+agent.SignInCommand+"` in a terminal", provider.SignIn+" so it can answer.")
 		for i, item := range r.items {
 			if item.Section == "Services" && item.Name == container && item.Status == Fail && item.Detail == "unhealthy" {
 				r.items[i].Status, r.items[i].Detail = Warn, "waiting for the sign-in"

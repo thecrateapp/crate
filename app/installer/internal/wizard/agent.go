@@ -17,6 +17,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
+	"github.com/thecrateapp/crate/app/installer/internal/system"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
@@ -443,7 +444,7 @@ func (w *wizard) setUpAgent(ctx context.Context, s stack.Stack, api string) {
 		w.signIn(ctx, setup, values, to, provider)
 		if status, err = setup.Check(ctx, values, to); err == nil && status.SignInPending {
 			w.agent.signIn = provider.SignIn
-			ui.Warning(w.out, "Sign-in pending: run `"+agent.SetupCommand+"` in a terminal")
+			ui.Warning(w.out, "Sign-in pending: run `"+agent.SignInCommand+"` in a terminal")
 			return
 		}
 	}
@@ -476,11 +477,54 @@ func (w *wizard) agentNextSteps() []string {
 		return nil
 	}
 	if w.agent.signIn != "" {
-		return []string{"Sign-in pending: run `" + agent.SetupCommand + "` in a terminal (" + w.agent.signIn + ")"}
+		return []string{"Sign-in pending: run `" + agent.SignInCommand + "` in a terminal (" + w.agent.signIn + ")"}
 	}
 	bot := "your bot"
 	if w.agent.bot != "" {
 		bot = "@" + w.agent.bot
 	}
 	return []string{fmt.Sprintf("Message %s on Telegram from an allowed account and ask how Crate is doing", bot)}
+}
+
+// signInOnly signs the running agent in to its model provider, without the
+// rest of the agent form.
+func (w *wizard) signInOnly(ctx context.Context, dir string) error {
+	mode := agent.Active(w.existing)
+	if mode == agent.Off {
+		return errors.New("Crate Agent is not running; set it up with `" + agent.SetupCommand + "`")
+	}
+	providerID, _ := w.existing.Get("CRATE_AGENT_PROVIDER")
+	provider, _ := agent.FindProvider(providerID)
+	if provider.SignIn == "" {
+		return errors.New(provider.Title + " uses an API key, so there is nothing to sign in to; change it with `" + agent.SetupCommand + "`")
+	}
+	w.host = system.DetectHost(ctx, w.run)
+	docker, state := w.detectDocker(ctx, w.run, w.host)
+	if state != system.DockerReady {
+		return errors.New("Docker is not reachable; start it and run `" + agent.SignInCommand + "` again")
+	}
+	w.docker = docker
+	s, err := w.stack(dir)
+	if err != nil {
+		return err
+	}
+	setup := agent.Setup{Stack: s, Docker: docker.Docker}
+	status, err := setup.Check(ctx, w.existing, mode)
+	if err != nil {
+		return fmt.Errorf("%s does not answer: %w; `crate doctor` shows why", mode.Name(), err)
+	}
+	if !status.SignInPending {
+		ui.Success(w.out, mode.Name()+" is already signed in to "+provider.Title)
+		return nil
+	}
+	ui.Heading(w.out, provider.SignIn)
+	if err := setup.SignIn(ctx, w.existing, mode, provider.ID, os.Stdin, os.Stdout); err != nil {
+		return fmt.Errorf("the sign-in did not finish: %w", err)
+	}
+	if status, err = setup.Check(ctx, w.existing, mode); err != nil || status.SignInPending {
+		ui.Warning(w.out, "The sign-in is still pending; run `"+agent.SignInCommand+"` to try again")
+		return nil
+	}
+	ui.Success(w.out, "Signed in. "+mode.Name()+" can answer now")
+	return nil
 }

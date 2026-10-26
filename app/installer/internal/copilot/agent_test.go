@@ -39,11 +39,11 @@ func TestASignInPendingIsToldToTheUser(t *testing.T) {
 		t.Fatal("a new agent must be set up")
 	}
 	state := step(context.Background(), io.Discard)
-	if state != "Sign-in pending: run `crate configure agent` in a terminal (Sign in to ChatGPT)" {
+	if state != "Sign-in pending: run `crate configure agent --sign-in` in a terminal (Sign in to ChatGPT)" {
 		t.Fatalf("state %q", state)
 	}
 	steps := strings.Join(s.nextSteps(StatusOut{Applied: true, Start: &jobState{Phase: PhaseReady, Agent: state}}, system.DockerReady), " ")
-	if !strings.Contains(steps, "Sign-in pending: run `crate configure agent`") {
+	if !strings.Contains(steps, "Sign-in pending: run `crate configure agent --sign-in`") {
 		t.Fatalf("next steps: %s", steps)
 	}
 }

@@ -125,6 +125,7 @@ func runConfigure(args []string, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	flags.StringVar(&opts.InstallDir, "dir", defaultInstallDir(), "install folder (CRATE_INSTALL_DIR)")
 	flags.BoolVar(&opts.Accessible, "accessible", envFlag("ACCESSIBLE"), "plain prompts that work with screen readers")
+	flags.BoolVar(&opts.SignIn, "sign-in", false, "with agent: only sign Crate Agent in to its model provider (ChatGPT, Nous)")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: crate configure [integration...] [flags]\n\nWithout an integration it lists them all.")
 		flags.PrintDefaults()

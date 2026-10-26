@@ -105,7 +105,7 @@ func (s *Session) agentStep(st stack.Stack, docker system.Docker, values *envfil
 		case status.SignInPending:
 			providerID, _ := values.Get("CRATE_AGENT_PROVIDER")
 			provider, _ := agent.FindProvider(providerID)
-			return "Sign-in pending: run `" + agent.SetupCommand + "` in a terminal (" + provider.SignIn + ")"
+			return "Sign-in pending: run `" + agent.SignInCommand + "` in a terminal (" + provider.SignIn + ")"
 		}
 		return AgentRunning
 	}

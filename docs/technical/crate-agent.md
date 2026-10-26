@@ -175,6 +175,7 @@ is no `make` and nothing to run by hand:
 ```bash
 crate install              # offers Crate Agent among the integrations
 crate configure agent      # Crate Agent or Crate Operator, switch between them, or turn off
+crate configure agent --sign-in   # sign in to ChatGPT or Nous when the sign-in is pending
 crate doctor               # whether the assistant runs, reaches Crate and has its model
 ```
 
@@ -206,9 +207,9 @@ Once Crate answers, the installer:
 
 `openai-codex` and `nous` without a key need a sign-in. The installer runs it in your
 terminal ("Sign in to ChatGPT"). When it cannot (an unattended install, the install
-copilot, or you skipped it), it says "Sign-in pending: run `crate configure agent`", and
-`crate doctor` warns until you do. Run that command in a terminal and keep every answer;
-it offers the sign-in again.
+copilot, or you skipped it), it says "Sign-in pending: run
+`crate configure agent --sign-in`", and `crate doctor` warns until you do. That command
+runs only the sign-in, in a terminal, without asking the other questions again.
 
 Switching between Crate Agent and Crate Operator keeps the bot, the allowlist and the
 model keys, and revokes the credential of the mode you leave. Turning the assistant off
