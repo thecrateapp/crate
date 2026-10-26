@@ -29,6 +29,7 @@ def operator_world(operation_world, human_actor, tmp_path, monkeypatch):
     monkeypatch.setenv("CRATE_OPERATOR_PRINCIPAL_IDS", world["principal"].id)
     monkeypatch.setenv("CRATE_AGENT_INSTANCE_ID", "test-instance")
     monkeypatch.setattr(provenance, "ROOT", tmp_path)
+    monkeypatch.setattr(provenance, "EVIDENCE", tmp_path)
     evidence(tmp_path)
     change(
         "UPDATE agent_principals SET require_approval=TRUE WHERE id=:id",
@@ -311,6 +312,7 @@ def test_directed_photo_plan_retains_native_approval_and_effect_gate(
     _, old = observed_plan(command_world)
     monkeypatch.setenv("CRATE_MCP_ACTIONS_ENABLED", "true")
     monkeypatch.setattr(provenance, "ROOT", tmp_path)
+    monkeypatch.setattr(provenance, "EVIDENCE", tmp_path)
     monkeypatch.setenv("CRATE_AGENT_INSTANCE_ID", "test-instance")
     monkeypatch.setenv("CRATE_OPERATOR_PRINCIPAL_IDS", command_world["principal"].id)
     evidence(tmp_path)

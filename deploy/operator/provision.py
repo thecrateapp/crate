@@ -40,6 +40,7 @@ def provision(source):
         "context/releases",
         "assets",
         "home",
+        "provenance",
         "supervisor-state",
         "secrets",
         "secrets/domain",
@@ -68,7 +69,7 @@ def provision(source):
     (HOST / ".deploy-backups").mkdir()
     shutil.copyfile(
         source / "deploy/operator/compose.operator.yaml",
-        HOST / ".deploy/hermes.compose.yaml",
+        HOST / ".deploy/crate-operator.compose.yaml",
     )
     # Explicit absent .env keeps the host executor disabled until the actual
     # administrator config/library mounts and image approvals have been reviewed.

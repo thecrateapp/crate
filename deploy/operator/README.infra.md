@@ -2,7 +2,7 @@
 
 This is a separate host process and authority from Crate's API, database, operator
 supervisor and domain approval provider. It is disabled until explicitly provisioned.
-Nothing here installs a service, modifies the default read-only Hermes profile,
+Nothing here installs a service, modifies the default read-only Crate Agent profile,
 contacts Telegram, approves releases or starts production jobs automatically.
 
 ## Host provisioning
@@ -23,7 +23,7 @@ at the configured `server_path`. The checked-in unit uses `/opt/crate-host`; it 
 not directly compatible with a user-writable `/home/crate` checkout. All executable
 host scripts and live deployment configuration must be root-controlled. The fixed
 closure in `infra_deploy.py` validates the actual `deploy/hermes/activate_context.py`,
-`deploy-remote.sh`, both live Compose files, `.env`, optional active Hermes overlay,
+`deploy-remote.sh`, both live Compose files, `.env`, optional active operator overlay,
 active/candidate release files, optional federation config, staging/backup directories,
 per-operation backup descendants and the configured context marker destination.
 Present consumed files and their ancestors must be root-owned, non-writable by group
@@ -116,10 +116,11 @@ its `rollback` and remain indeterminate. These are local host commands, never th
 laptop SSH orchestrator `make deploy`. Rollback preserves the existing script's
 image/config contract; it does not promise reversal of database migrations. No
 cleanup/prune or production state-rollback is exposed. Public HTTP checks are off;
-local host verification and stronger image/health checks are required. With `CRATE_OPERATOR_ROOT` configured, the exact approved `hermes-context.tar.gz`
+local host verification and stronger image/health checks are required. With `CRATE_OPERATOR_ROOT` configured, the exact approved `agent-context.tar.gz`
 is also validated/hashed before effects, staged under the sealed closure and activated
-after verify. The separate root publisher observes actual images and publishes fresh
-bounded evidence. Rollback markers close domain mutations. See the canonical
+after verify. The `crate-provenance` container (operator profile, no host unit) observes
+actual images through a list/inspect-only Docker filter and publishes fresh bounded
+evidence. Rollback markers close domain mutations. See the canonical
 `docs/technical/hermes-operator-release.md` for provisioning and explicit limits.
 
 Each deployed container must match its expected image ID; each exact image reference
@@ -194,7 +195,7 @@ construction/availability. It reads only:
   `{"instance_id":"...","allowed_users":[123]}`.
 
 It uses the same `pending`, `delivered`, `callback`, `outcome_delivered` shapes and
-Spanish `Siguiente`, `Aprobar`, `Rechazar` buttons as the domain provider. Full exact
+`Next`, `Approve`, `Reject` buttons as the domain provider. Full exact
 JSON is ASCII-escaped losslessly and split into bounded pages. The final approval
 requires every page receipt and exact final message ID/private human. HMAC-SHA256
 signs `POST\n/v1/native/events\n<unix timestamp>\n<32-hex nonce>\n<exact JSON bytes>`.
@@ -255,7 +256,8 @@ The host `.env` opt-in `CRATE_OPERATOR_ROOT` selects the exact root-managed cont
 destination. Its parser and trust closure use the same strict LF/quote/control rules
 as the existing DATA_DIR fallback. Consumed candidate context archives are hashed,
 validated and included in expected staging transitions. API/worker mounts expose only
-the bounded public directory; Hermes has neither host root nor Docker socket.
+the bounded public directory and the publisher's evidence directory; the gateway has
+neither host root nor Docker socket.
 
 The limited relay and independent gateway/supervisor profiles are executable in
 `compose.operator.yaml`, with no API/DB startup dependencies. The actual pinned

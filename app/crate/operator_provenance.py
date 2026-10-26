@@ -1,4 +1,9 @@
-"""Read only bounded host evidence; operator identity comes from server configuration."""
+"""Read only bounded release evidence; operator identity comes from server configuration.
+
+ROOT holds the deployment and context markers written by make deploy. EVIDENCE holds
+what the crate-provenance container observed; without a deployment marker (a new
+instance running published images) it also carries the publisher's own markers.
+"""
 
 import json
 import os
@@ -10,6 +15,7 @@ from pathlib import Path
 from crate.agent_diagnostics import DiagnosticError
 
 ROOT = Path("/run/crate-provenance")
+EVIDENCE = Path("/run/crate-provenance-evidence")
 SHA = re.compile(r"[a-f0-9]{40}")
 HASH = re.compile(r"[a-f0-9]{64}")
 
@@ -20,12 +26,21 @@ def is_operator(principal_id):
     ).split(",")
 
 
-def _read(name):
-    with (ROOT / name).open("rb") as stream:
+def _read(name, root=None):
+    with ((EVIDENCE if root is None else root) / name).open("rb") as stream:
         raw = stream.read(65537)
     if len(raw) > 65536:
         raise ValueError("Oversized provenance")
     return json.loads(raw)
+
+
+def _markers():
+    """Deployment markers are read directly, so an in-progress deploy closes at once."""
+    try:
+        marker = _read("deployment.json", ROOT)
+    except FileNotFoundError:
+        return _read("deployment.json"), _read("context.json")
+    return marker, _read("context.json", ROOT)
 
 
 def _valid_identity(identity):
@@ -59,8 +74,7 @@ def current_identity():
     """Fresh observation of stable identity, never request time as freshness proof."""
     try:
         target, observation = _read("target.json"), _read("observation.json")
-        marker = _read("deployment.json")
-        active = _read("context.json")
+        marker, active = _markers()
         identity = observation["identity"]
         observed = observation["observed_at"]
         if (

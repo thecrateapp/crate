@@ -198,12 +198,20 @@ prepare_payload() {
     if [[ -d "$ROOT_DIR/deploy/hermes" ]]; then
       cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
     fi
+    if [[ -f "$ROOT_DIR/deploy/operator/compose.operator.yaml" ]]; then
+      mkdir -p "$TMP_DIR/deploy/operator"
+      cp "$ROOT_DIR/deploy/operator/compose.operator.yaml" "$TMP_DIR/deploy/operator/"
+    fi
   else
     git -C "$ROOT_DIR" archive "$DEPLOY_REF" docker-compose.yaml docker-compose.project.yaml \
       deploy/traefik/federation-readplane.yml \
       | tar -x -C "$TMP_DIR"
     if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:deploy/hermes" 2>/dev/null; then
       git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
+    fi
+    if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:deploy/operator/compose.operator.yaml" 2>/dev/null; then
+      git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/operator/compose.operator.yaml \
+        | tar -x -C "$TMP_DIR"
     fi
   fi
 
@@ -212,9 +220,9 @@ prepare_payload() {
   fetch_release_manifest
   python3 "$ROOT_DIR/scripts/hermes_context.py" \
     --repo "$ROOT_DIR" --revision "$DEPLOY_IMAGE_SHA" \
-    --destination "$TMP_DIR/hermes-context" \
+    --destination "$TMP_DIR/agent-context" \
     --deployment-manifest "$TMP_DIR/release-manifest.json"
-  tar -czf "$TMP_DIR/hermes-context.tar.gz" -C "$TMP_DIR/hermes-context" .
+  tar -czf "$TMP_DIR/agent-context.tar.gz" -C "$TMP_DIR/agent-context" .
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_TAG "$DEPLOY_IMAGE_TAG"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
   set_env_value "$TMP_DIR/.env" CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
@@ -318,7 +326,12 @@ sync_config() {
   if [[ -f "$TMP_DIR/deploy/hermes/activate_context.py" ]]; then
     scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
-  scp "$TMP_DIR/hermes-context.tar.gz" "$REMOTE:$SERVER_PATH/.deploy/hermes-context.candidate.tar.gz"
+  if [[ -f "$TMP_DIR/deploy/operator/compose.operator.yaml" ]]; then
+    ssh_remote "mkdir -p '$SERVER_PATH/deploy/operator'"
+    scp "$TMP_DIR/deploy/operator/compose.operator.yaml" \
+      "$REMOTE:$SERVER_PATH/deploy/operator/compose.operator.yaml"
+  fi
+  scp "$TMP_DIR/agent-context.tar.gz" "$REMOTE:$SERVER_PATH/.deploy/agent-context.candidate.tar.gz"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
 
   scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
@@ -364,8 +377,8 @@ run_preflight() {
   log "Deploy preflight completed successfully"
 }
 
-activate_hermes_context() {
-  remote_deploy hermes-context
+activate_agent_context() {
+  remote_deploy agent-context
 }
 
 run_deploy() {
@@ -388,7 +401,7 @@ run_deploy() {
   remote_deploy up
   ROLLBACK_ENABLED=0
   remote_deploy verify
-  activate_hermes_context
+  activate_agent_context
   remote_deploy cleanup
 
   trap - EXIT

@@ -43,6 +43,7 @@ def configure(world, human, tmp_path, monkeypatch):
     monkeypatch.setenv("CRATE_AGENT_INSTANCE_ID", "test-instance")
     monkeypatch.setenv("CRATE_OPERATOR_PRINCIPAL_IDS", world["principal"].id)
     monkeypatch.setattr(provenance, "ROOT", root)
+    monkeypatch.setattr(provenance, "EVIDENCE", root)
     monkeypatch.setattr("crate.worker_handlers.is_cancelled", check_task_authority)
     evidence(root)
     change(

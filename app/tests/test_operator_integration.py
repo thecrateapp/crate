@@ -198,7 +198,7 @@ def test_overlay_health_and_authority_are_explicit_and_independent():
         (ROOT / "deploy/operator/compose.operator.yaml").read_text()
     )["services"]
     for service in (
-        "crate-hermes-operator",
+        "crate-operator",
         "crate-operator-supervisor",
         "crate-infra-relay",
     ):
@@ -221,10 +221,12 @@ def test_overlay_health_and_authority_are_explicit_and_independent():
         "crate-media-worker",
         "crate-ui",
         "crate-listen",
-        "crate-site",
-        "crate-docs",
     ):
         assert overlay[service]["healthcheck"]["test"]
+    assert not {"crate-site", "crate-docs"} & set(overlay)
+    project = yaml.safe_load((ROOT / "docker-compose.project.yaml").read_text())
+    for service in ("crate-site", "crate-docs"):
+        assert project["services"][service]["healthcheck"]["test"]
     assert (
         overlay["crate-fast-worker"]["environment"]["CRATE_READINESS_QUEUES"] == "fast"
     )

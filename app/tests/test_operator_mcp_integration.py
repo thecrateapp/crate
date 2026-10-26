@@ -94,7 +94,7 @@ def test_shipped_internal_authority_uses_fixed_host_with_actual_transport(
             / "deploy/operator/config.operator.example.json"
         ).read_text()
     )
-    monkeypatch.setenv("DOMAIN", "lespedants.org")
+    monkeypatch.setenv("DOMAIN", "example.com")
     monkeypatch.delenv("CRATE_MCP_ALLOWED_HOSTS", raising=False)
     host = config["mcp_host"]
     if custom:

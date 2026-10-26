@@ -32,7 +32,7 @@ lab = shared_fixtures.lab
     "relative",
     [
         ".env",
-        ".deploy/hermes.compose.yaml",
+        ".deploy/crate-operator.compose.yaml",
         "deploy/hermes/activate_context.py",
         ".deploy/release.env.candidate",
     ],
@@ -90,7 +90,7 @@ def test_external_change_between_stages_stops_without_unreviewed_rollback(lab):
     _, manifest = release(lab)
     server = Path(lab.config["server_path"])
     (server / ".deploy").mkdir()
-    overlay = server / ".deploy/hermes.compose.yaml"
+    overlay = server / ".deploy/crate-operator.compose.yaml"
     overlay.write_text("original")
     plan = prepare(
         lab, operation="deploy", target="crate", version=manifest["release_sha"]
@@ -167,11 +167,11 @@ def test_environment_prediction_matches_existing_real_shell_setter(lab, raw):
     "relative",
     [
         "deploy/hermes/activate_context.py",
-        ".deploy/hermes.compose.yaml",
+        ".deploy/crate-operator.compose.yaml",
         ".deploy/release.env.candidate",
         ".deploy/release-manifest.json",
         ".deploy-backups",
-        "data/hermes-agent/context/deployment.json",
+        "data/crate-agent/context/deployment.json",
     ],
 )
 @pytest.mark.parametrize("bad_kind", ["owner", "writable", "symlink"])
@@ -246,7 +246,7 @@ def test_real_compose_resolution_uses_host_directory_env_and_active_overlay(lab)
     root, manifest = release(lab)
     server = Path(lab.config["server_path"])
     (server / ".deploy").mkdir()
-    overlay = server / ".deploy/hermes.compose.yaml"
+    overlay = server / ".deploy/crate-operator.compose.yaml"
     overlay.write_text(
         json.dumps(
             {
@@ -306,7 +306,7 @@ def test_optional_overlay_appearing_after_approval_is_drift(lab):
         lab, operation="deploy", target="crate", version=manifest["release_sha"]
     )
     confirm(lab, plan)
-    overlay = Path(lab.config["server_path"]) / ".deploy/hermes.compose.yaml"
+    overlay = Path(lab.config["server_path"]) / ".deploy/crate-operator.compose.yaml"
     overlay.parent.mkdir()
     overlay.write_text("services: {}\n")
     lab.bridge.tick()
@@ -430,7 +430,7 @@ def test_context_destination_matches_actual_shell_normal_values(tmp_path, raw):
 
     (tmp_path / ".env").write_bytes(raw)
     selected = _shell_data_dir(tmp_path).decode("utf-8")
-    expected = Path(selected + "/hermes-agent/context")
+    expected = Path(selected + "/crate-agent/context")
     if not expected.is_absolute():
         expected = tmp_path / expected
     assert _context_root(tmp_path) == expected
@@ -480,7 +480,7 @@ def test_startup_rejects_actual_shell_selected_untrusted_destination(raw):
         (root / "deploy/hermes/activate_context.py").write_text("import json\n")
         (root / ".env").write_bytes(raw)
         selected = _shell_data_dir(root).decode("utf-8")
-        target = root / selected / "hermes-agent/context/deployment.json"
+        target = root / selected / "crate-agent/context/deployment.json"
         target.parent.mkdir(parents=True)
         target.write_text("{}\n")
         assert all(path.stat().st_uid == 0 for path in target.parents)
@@ -517,11 +517,11 @@ def test_operator_deploy_seals_staged_bundle_and_activates_context_after_verify(
             }
         )
     )
-    with tarfile.open(root / "hermes-context.tar.gz", "w:gz") as archive:
+    with tarfile.open(root / "agent-context.tar.gz", "w:gz") as archive:
         archive.add(context / "context-manifest.json", arcname="context-manifest.json")
     approval = json.loads((root / "approved.json").read_text())
-    approval["hermes-context.tar.gz"] = hashlib.sha256(
-        (root / "hermes-context.tar.gz").read_bytes()
+    approval["agent-context.tar.gz"] = hashlib.sha256(
+        (root / "agent-context.tar.gz").read_bytes()
     ).hexdigest()
     (root / "approved.json").write_text(json.dumps(approval))
     plan = prepare(
@@ -529,11 +529,11 @@ def test_operator_deploy_seals_staged_bundle_and_activates_context_after_verify(
     )
     result = lab.executor.execute(plan["document"])
     assert (
-        result["host_inputs"][".deploy/hermes-context.candidate.tar.gz"]
-        == approval["hermes-context.tar.gz"]
+        result["host_inputs"][".deploy/agent-context.candidate.tar.gz"]
+        == approval["agent-context.tar.gz"]
     )
     stages = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
-    assert stages[-2:] == ["verify", "hermes-context"]
+    assert stages[-2:] == ["verify", "agent-context"]
 
 
 def test_operator_deploy_rejects_missing_context_before_effects(lab):
