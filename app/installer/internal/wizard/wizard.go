@@ -44,12 +44,16 @@ type wizard struct {
 
 	detectDocker   func(context.Context, system.Runner, system.Host) (system.Docker, system.DockerState)
 	startupTimeout time.Duration
+	agentTimeout   time.Duration
+	telegramWait   time.Duration
 
-	host     system.Host
-	docker   system.Docker
-	cfg      install.Config
-	existing *envfile.Values
-	tidal    bool // the user chose Tidal, which connects after start
+	host        system.Host
+	docker      system.Docker
+	cfg         install.Config
+	existing    *envfile.Values
+	tidal       bool // the user chose Tidal, which connects after start
+	configuring bool // `crate configure`, where Crate Operator is offered
+	agent       agentState
 }
 
 func Run(ctx context.Context, opts Options) error {
@@ -68,6 +72,8 @@ func Run(ctx context.Context, opts Options) error {
 		manifest:       m,
 		detectDocker:   system.DetectDocker,
 		startupTimeout: 10 * time.Minute,
+		agentTimeout:   2 * time.Minute,
+		telegramWait:   time.Minute,
 	}
 	return w.execute(ctx)
 }

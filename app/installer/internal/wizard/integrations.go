@@ -15,7 +15,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
 
-var groupOrder = []string{"enrichment", "shows", "acquisition", "notifications", "ai", "accounts"}
+var groupOrder = []string{"enrichment", "shows", "acquisition", "ai", "accounts"}
 
 func (w *wizard) draft() install.Draft {
 	return install.Draft{Config: &w.cfg, Existing: w.existing}
@@ -87,7 +87,11 @@ func (w *wizard) chooseIntegrations(suggest bool) ([]string, error) {
 func (w *wizard) setUpIntegrations(ctx context.Context, ids []string) error {
 	for _, in := range w.ordered() {
 		if w.enabled(in) && !slices.Contains(ids, in.ID) {
-			off, err := w.confirm("Turn "+in.Title+" off?", "Its keys are removed from .env. You can set it up again later.", true)
+			description := "Its keys are removed from .env. You can set it up again later."
+			if in.ID == "agent" {
+				description = "The bot stops and its access to Crate is revoked. Model keys stay for next time."
+			}
+			off, err := w.confirm("Turn "+in.Title+" off?", description, true)
 			if err != nil {
 				return err
 			}
@@ -174,6 +178,8 @@ func (w *wizard) integrationForm(ctx context.Context, in manifest.Integration) e
 		return w.aiForm(in)
 	case "mcp":
 		return w.mcpForm(in)
+	case "agent":
+		return w.agentForm(ctx, in)
 	case "google-login":
 		return w.fieldsForm(in, in.Env, "Redirect URI: "+w.cfg.PublicURLs().API+"/api/auth/oauth/google/callback")
 	case "apple-login":
@@ -363,6 +369,7 @@ func (w *wizard) mcpForm(in manifest.Integration) error {
 
 // reportIntegrations validates what --yes configured, without blocking.
 func (w *wizard) reportIntegrations(ctx context.Context) {
+	w.keepOperatorForConfigure()
 	if w.value("SLSKD_URL") == install.BundledSlskdURL {
 		if err := w.draft().UseBundledSlskd(); err != nil {
 			ui.Warning(w.out, "Could not prepare Crate's slskd: "+err.Error())

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
+	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
@@ -115,10 +117,16 @@ func (w *wizard) install(ctx context.Context) error {
 	}
 	if w.opts.SkipStart {
 		ui.Success(w.out, "Files are ready. Start Crate with `docker compose up -d` in "+w.cfg.InstallDir)
+		if agent.Wanted(w.existingAfterApply()) != agent.Off {
+			ui.Success(w.out, "Then set up Crate Agent with `"+agent.SetupCommand+"`")
+		}
 		return nil
 	}
 
-	s := stack.Stack{Run: w.run, Compose: w.docker.Compose, Dir: w.cfg.InstallDir}
+	s, err := w.stack(w.cfg.InstallDir)
+	if err != nil {
+		return err
+	}
 	ui.Heading(w.out, "Downloading Crate")
 	if err := s.Pull(ctx, w.out); err != nil {
 		return fmt.Errorf("download the images: %w", err)
@@ -138,8 +146,23 @@ func (w *wizard) install(ctx context.Context) error {
 		return errors.New("Crate did not finish starting")
 	}
 	ui.Success(w.out, "Crate is running")
+	w.setUpAgent(ctx, s, api)
 	w.done()
 	return nil
+}
+
+// stack is the installation's compose project with the files it runs.
+func (w *wizard) stack(dir string) (stack.Stack, error) {
+	values, err := install.ReadExisting(dir)
+	if err != nil {
+		return stack.Stack{}, err
+	}
+	return stack.Stack{Run: w.run, Compose: w.docker.Compose, Dir: dir, Files: install.ComposeFiles(values)}, nil
+}
+
+func (w *wizard) existingAfterApply() *envfile.Values {
+	values, _ := install.ReadExisting(w.cfg.InstallDir)
+	return values
 }
 
 func (w *wizard) done() {
@@ -175,6 +198,7 @@ func (w *wizard) done() {
 	if w.tidal {
 		steps = append(steps, "Connect Tidal in Admin > Settings > Downloads and enter the code at tidal.com/activate")
 	}
+	steps = append(steps, w.agentNextSteps()...)
 	var next [][2]string
 	for i, step := range steps {
 		next = append(next, [2]string{fmt.Sprint(i + 1), step})
