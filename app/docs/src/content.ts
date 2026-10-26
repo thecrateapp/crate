@@ -74,6 +74,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/00-quickstart.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/00a-install-with-ai.md": () =>
+    import("../../../docs/technical/00a-install-with-ai.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/00b-development-setup.md": () =>
     import("../../../docs/technical/00b-development-setup.md?raw").then(
       (module) => module.default,

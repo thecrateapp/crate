@@ -35,6 +35,15 @@ for linux/darwin × amd64/arm64.
   `internal/wizard/integrations.go`; the rest use the generic fields form.
 - `crate doctor --json` is a contract for scripts and the coming MCP server: keep the fields
   stable.
+- `crate mcp` (`internal/copilot`) is the AI install copilot. Its rules are the product:
+  - No tool output may contain a secret value. Secrets arrive only through the private portal
+    (127.0.0.1, unguessable one-time ids, 30-minute expiry); tools report accepted/rejected.
+    `crate_set_integration` must keep rejecting secret variables. The end-to-end test asserts
+    that no output leaks a value; keep it passing.
+  - stdout carries the protocol: nothing may print there. Streamed commands get no stdin
+    (`system.ExecRunner{}` without `Stdin`), or they would read the protocol.
+  - Long work (pull/up/health) runs as a background job polled with `crate_progress`.
+  - Wizard and copilot change installs through `install.Draft`; do not duplicate its rules.
 - UI copy is English, in Crate's tone: short, concrete, no emojis. Colours come from the V3
   tokens in `internal/ui/theme.go`; status rows use a dot plus a word.
 

@@ -1,8 +1,14 @@
 package install
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/thecrateapp/crate/app/installer/internal/system"
 )
 
 // Command is a privileged step the wizard shows before running it.
@@ -114,4 +120,30 @@ func PackageInstall(distro, pkg string) ([]Command, error) {
 		return []Command{{"Install " + pkg, []string{"sudo", "pacman", "-Sy", "--noconfirm", pkg}}}, nil
 	}
 	return nil, fmt.Errorf("install %s yourself on %s, or use the hosts mode", pkg, distro)
+}
+
+// DetectDNSHost reads what LocalNameCommands needs to know about this machine.
+func DetectDNSHost(ctx context.Context, run system.Runner, host system.Host) DNSHost {
+	dns := DNSHost{OS: host.OS, Distro: host.Distro}
+	if data, err := os.ReadFile("/etc/hosts"); err == nil {
+		dns.HostsFile = string(data)
+	}
+	_, err := exec.LookPath("dnsmasq")
+	dns.HasDNSMasq = err == nil
+	_, err = exec.LookPath("resolvectl")
+	dns.HasResolvectl = err == nil
+	if prefix, err := run.Output(ctx, "brew", "--prefix"); err == nil && prefix != "" {
+		dns.BrewPrefix = prefix
+		if _, err := os.Stat(filepath.Join(prefix, "sbin", "dnsmasq")); err == nil {
+			dns.HasDNSMasq = true
+		}
+	}
+	if data, err := os.ReadFile("/etc/resolv.conf"); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.TrimSpace(line) == "nameserver 127.0.0.1" {
+				dns.ResolvConfLocal = true
+			}
+		}
+	}
+	return dns
 }

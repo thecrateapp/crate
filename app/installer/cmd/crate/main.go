@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"github.com/thecrateapp/crate/app/installer/internal/copilot"
 	"github.com/thecrateapp/crate/app/installer/internal/doctor"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
 	"github.com/thecrateapp/crate/app/installer/internal/wizard"
@@ -24,6 +25,7 @@ Usage:
   crate install [flags]                  install Crate, or change an existing installation
   crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Telegram…)
   crate doctor [flags]                   check the installation, its services and its keys
+  crate mcp                              let an AI agent install Crate with you (MCP over stdio)
   crate version                          print the installer version
 
 Run "crate <command> --help" for its flags.
@@ -45,6 +47,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runConfigure(args[1:], stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
+	case "mcp":
+		return runMCP(stderr)
 	case "version", "--version":
 		fmt.Fprintln(stdout, version)
 		return 0
@@ -187,4 +191,16 @@ func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 		positional = append(positional, args[0])
 		args = args[1:]
 	}
+}
+
+// runMCP serves the install copilot. stdout carries the protocol, so
+// nothing else may print there.
+func runMCP(stderr io.Writer) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if err := copilot.Serve(ctx, version); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(stderr, "crate mcp:", err)
+		return 1
+	}
+	return 0
 }

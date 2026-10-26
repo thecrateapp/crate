@@ -54,6 +54,9 @@ against its provider, asks for the admin password, shows a review and waits
 until the API answers. Pass `--dry-run` to see the plan without writing anything, or
 `--accessible` for plain prompts that work with screen readers.
 
+To install with Claude Code, Codex or another AI agent instead, see
+[Install with an AI agent](00a-install-with-ai.md).
+
 For a non-interactive public installation (the `CRATE_*` variables are the
 same ones the previous script accepted):
 

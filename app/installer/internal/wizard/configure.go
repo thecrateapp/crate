@@ -32,7 +32,7 @@ func Configure(ctx context.Context, opts Options, ids []string) error {
 	w := &wizard{
 		opts:         opts,
 		out:          os.Stdout,
-		run:          system.ExecRunner{},
+		run:          system.ExecRunner{Stdin: os.Stdin},
 		validate:     validate.NewClient(),
 		manifest:     m,
 		detectDocker: system.DetectDocker,

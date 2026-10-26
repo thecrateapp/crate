@@ -10,7 +10,9 @@
 #   curl -fsSL https://cratemusic.app/install.sh | bash -s -- --dir /srv/crate
 #
 # CRATE_INSTALLER_VERSION pins a release tag; CRATE_BIN_DIR chooses where the
-# binary is kept (default ~/.local/bin); CRATE_RELEASE_BASE points at a mirror.
+# binary is kept (default ~/.local/bin); CRATE_RELEASE_BASE points at a mirror;
+# CRATE_INSTALLER_ONLY=1 keeps the binary without running it, for installing
+# with an AI agent through `crate mcp`.
 set -euo pipefail
 
 CRATE_REPO="${CRATE_REPO:-thecrateapp/crate}"
@@ -83,6 +85,12 @@ if mkdir -p "${CRATE_BIN_DIR}" 2>/dev/null && cp "${workdir}/crate" "${CRATE_BIN
     *":${CRATE_BIN_DIR}:"*) ;;
     *) printf 'The installer is kept at %s; add %s to your PATH to run `crate` later.\n' "${binary}" "${CRATE_BIN_DIR}" ;;
   esac
+fi
+
+if [[ "${CRATE_INSTALLER_ONLY:-0}" == "1" ]]; then
+  printf 'The Crate installer is ready at %s.\n' "${binary}"
+  printf 'Connect it to your AI agent with `crate mcp`, or run `crate install` yourself.\n'
+  exit 0
 fi
 
 # Piped into bash, stdin is this script: read the answers from the terminal.

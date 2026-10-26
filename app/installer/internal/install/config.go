@@ -36,7 +36,11 @@ func ParseAccessMode(value string) (AccessMode, error) {
 }
 
 type Ports struct {
-	HTTP, HTTPS, API, Admin, Listen int
+	HTTP   int `json:"http"`
+	HTTPS  int `json:"https"`
+	API    int `json:"api"`
+	Admin  int `json:"admin"`
+	Listen int `json:"listen"`
 }
 
 func DefaultPorts() Ports {

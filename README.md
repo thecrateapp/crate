@@ -212,7 +212,9 @@ library, access mode and admin password, shows a review, starts Crate and waits
 until it answers. Run `crate install` again at any time to change the
 installation; it keeps your secrets and manual edits. `crate configure` sets up
 integrations such as Last.fm, Soulseek or Telegram, checking each key with its
-provider, and `crate doctor` checks the whole installation.
+provider, and `crate doctor` checks the whole installation. `crate mcp` lets an
+AI agent such as Claude Code or Codex install Crate with you; your API keys go
+into a private local page, never into the chat.
 
 After installation:
 

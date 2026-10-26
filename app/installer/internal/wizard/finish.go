@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,23 +22,7 @@ var accessLabels = map[install.AccessMode]string{
 }
 
 func (w *wizard) dnsHost(ctx context.Context) install.DNSHost {
-	host := install.DNSHost{OS: w.host.OS, Distro: w.host.Distro}
-	if data, err := os.ReadFile("/etc/hosts"); err == nil {
-		host.HostsFile = string(data)
-	}
-	_, err := exec.LookPath("dnsmasq")
-	host.HasDNSMasq = err == nil
-	_, err = exec.LookPath("resolvectl")
-	host.HasResolvectl = err == nil
-	if prefix, err := w.run.Output(ctx, "brew", "--prefix"); err == nil {
-		host.BrewPrefix = prefix
-		_, err := os.Stat(filepath.Join(prefix, "sbin", "dnsmasq"))
-		host.HasDNSMasq = host.HasDNSMasq || err == nil
-	}
-	if data, err := os.ReadFile("/etc/resolv.conf"); err == nil {
-		host.ResolvConfLocal = containsLine(string(data), "nameserver 127.0.0.1")
-	}
-	return host
+	return install.DetectDNSHost(ctx, w.run, w.host)
 }
 
 func (w *wizard) review(ctx context.Context) error {
@@ -208,13 +189,4 @@ func (w *wizard) done() {
 		{"Everything else", "crate install --dir " + w.cfg.InstallDir},
 	})
 	fmt.Fprintln(w.out)
-}
-
-func containsLine(text, line string) bool {
-	for _, candidate := range strings.Split(text, "\n") {
-		if strings.TrimSpace(candidate) == line {
-			return true
-		}
-	}
-	return false
 }

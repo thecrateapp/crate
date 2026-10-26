@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -18,9 +17,14 @@ type Runner interface {
 	Stream(ctx context.Context, w io.Writer, dir, name string, args ...string) error
 }
 
-type ExecRunner struct{}
+// ExecRunner runs real commands. Stdin is handed to streamed commands so
+// sudo can ask for a password; leave it nil when stdin carries something
+// else, such as the MCP protocol.
+type ExecRunner struct {
+	Stdin io.Reader
+}
 
-func (ExecRunner) Output(ctx context.Context, name string, args ...string) (string, error) {
+func (r ExecRunner) Output(ctx context.Context, name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = &stdout
@@ -31,12 +35,11 @@ func (ExecRunner) Output(ctx context.Context, name string, args ...string) (stri
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-func (ExecRunner) Stream(ctx context.Context, w io.Writer, dir, name string, args ...string) error {
+func (r ExecRunner) Stream(ctx context.Context, w io.Writer, dir, name string, args ...string) error {
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
-	// sudo asks for the password on the terminal.
-	cmd.Stdin = os.Stdin
+	cmd.Stdin = r.Stdin
 	cmd.Stdout = w
 	cmd.Stderr = io.MultiWriter(w, &stderr)
 	if err := cmd.Run(); err != nil {

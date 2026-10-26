@@ -82,3 +82,11 @@ para que un agente (Claude, Codex…) instale Crate conversando con el usuario.
 - **Cambio sobre el plan:** sin perfil `cast`. Un receptor de Cast propio solo sirve registrado
   en Google y con las apps compiladas con su app ID; en una instalación doméstica las apps usan el
   receptor por defecto.
+- **Fase 3 hecha.** `crate mcp` (SDK oficial de MCP para Go) con 12 herramientas: estado y
+  siguientes pasos, catálogo, básicos, acceso, integraciones, secretos, comprobación, aplicar,
+  arrancar en segundo plano con progreso, credenciales y diagnóstico. Los secretos nunca pasan
+  por el agente: una página privada en 127.0.0.1 con id de un solo uso guía al usuario, recibe
+  las claves y las valida; la contraseña del admin se muestra en otra página privada. Probado de
+  extremo a extremo con un cliente MCP en memoria (sin fugas de secretos en ninguna respuesta),
+  por stdio real, y la página con Chrome y validaciones reales de Last.fm y Telegram.
+  `CRATE_INSTALLER_ONLY=1` en el bootstrap y guía "Install with an AI agent" en la documentación.

@@ -9,6 +9,15 @@
     "order": 10
   },
   {
+    "sourcePath": "docs/technical/00a-install-with-ai.md",
+    "route": "/start/install-with-ai",
+    "section": "start",
+    "title": "Install with an AI agent",
+    "summary": "Let Claude Code, Codex or another MCP client install Crate with you through `crate mcp`.",
+    "keywords": ["installer", "mcp", "agent", "claude", "codex"],
+    "order": 15
+  },
+  {
     "sourcePath": "docs/technical/00b-development-setup.md",
     "route": "/start/development-setup",
     "section": "start",

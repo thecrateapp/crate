@@ -12,70 +12,29 @@ import (
 
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
-	"github.com/thecrateapp/crate/app/installer/internal/secrets"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
 
 var groupOrder = []string{"enrichment", "shows", "acquisition", "notifications", "ai", "accounts"}
 
-const bundledSlskdURL = "http://slskd:5030"
-
-// value returns what .env will hold for env: this run's answer, else the
-// existing installation's value.
-func (w *wizard) value(env string) string {
-	if value, ok := w.cfg.Integrations[env]; ok {
-		return value
-	}
-	if w.existing != nil {
-		value, _ := w.existing.Get(env)
-		return value
-	}
-	return ""
+func (w *wizard) draft() install.Draft {
+	return install.Draft{Config: &w.cfg, Existing: w.existing}
 }
 
-func (w *wizard) set(env, value string) {
-	if w.cfg.Integrations == nil {
-		w.cfg.Integrations = map[string]string{}
-	}
-	w.cfg.Integrations[env] = strings.TrimSpace(value)
-}
+func (w *wizard) value(env string) string { return w.draft().Value(env) }
+
+func (w *wizard) set(env, value string) { w.draft().Set(env, value) }
 
 func (w *wizard) values(in manifest.Integration) validate.Values {
-	values := validate.Values{}
-	for _, env := range in.Env {
-		values[env.Name] = w.value(env.Name)
-	}
-	return values
+	return w.draft().Values(in)
 }
 
-func (w *wizard) clear(in manifest.Integration) {
-	for _, env := range in.Env {
-		w.set(env.Name, "")
-	}
-	if in.ID == "soulseek" {
-		w.setProfile("soulseek", false)
-	}
-}
+func (w *wizard) clear(in manifest.Integration) { w.draft().Clear(in) }
 
-func (w *wizard) setProfile(profile string, on bool) {
-	if w.cfg.Profiles == nil {
-		w.cfg.Profiles = []string{}
-		for _, existing := range strings.Split(w.value("COMPOSE_PROFILES"), ",") {
-			if existing = strings.TrimSpace(existing); existing != "" {
-				w.cfg.Profiles = append(w.cfg.Profiles, existing)
-			}
-		}
-	}
-	w.cfg.Profiles = slices.DeleteFunc(w.cfg.Profiles, func(p string) bool { return p == profile })
-	if on {
-		w.cfg.Profiles = append(w.cfg.Profiles, profile)
-	}
-}
+func (w *wizard) setProfile(profile string, on bool) { w.draft().SetProfile(profile, on) }
 
-func (w *wizard) enabled(in manifest.Integration) bool {
-	return install.IntegrationEnabled(in, w.value)
-}
+func (w *wizard) enabled(in manifest.Integration) bool { return w.draft().Enabled(in) }
 
 // ordered lists the integrations by group, keeping manifest order inside one.
 func (w *wizard) ordered() []manifest.Integration {
@@ -270,7 +229,7 @@ func (w *wizard) tidalForm(in manifest.Integration) error {
 
 func (w *wizard) soulseekForm(in manifest.Integration) error {
 	mode := "bundled"
-	if url := w.value("SLSKD_URL"); url != "" && url != bundledSlskdURL {
+	if url := w.value("SLSKD_URL"); url != "" && url != install.BundledSlskdURL {
 		mode = "external"
 	}
 	err := w.form(huh.NewGroup(
@@ -296,9 +255,7 @@ func (w *wizard) soulseekForm(in manifest.Integration) error {
 		return envs
 	}
 	if mode == "external" {
-		w.setProfile("soulseek", false)
-		w.set("SLSKD_SLSK_USERNAME", "")
-		w.set("SLSKD_SLSK_PASSWORD", "")
+		w.draft().UseExternalSlskd()
 		return w.fieldsForm(in, byName("SLSKD_URL", "SLSKD_API_KEY"))
 	}
 	if err := w.fieldsForm(in, byName("SLSKD_SLSK_USERNAME", "SLSKD_SLSK_PASSWORD", "SLSKD_LISTEN_PORT")); err != nil {
@@ -308,16 +265,7 @@ func (w *wizard) soulseekForm(in manifest.Integration) error {
 		ui.Warning(w.out, "slskd needs a Soulseek username and password to sign in.")
 		return w.soulseekForm(in)
 	}
-	w.set("SLSKD_URL", bundledSlskdURL)
-	if w.value("SLSKD_API_KEY") == "" || w.value("SLSKD_URL") != bundledSlskdURL {
-		key, err := secrets.Generate("hex32")
-		if err != nil {
-			return err
-		}
-		w.set("SLSKD_API_KEY", key)
-	}
-	w.setProfile("soulseek", true)
-	return nil
+	return w.draft().UseBundledSlskd()
 }
 
 type aiProvider struct {
@@ -412,15 +360,7 @@ func (w *wizard) mcpForm(in manifest.Integration) error {
 	if err != nil {
 		return err
 	}
-	w.set("CRATE_MCP_ENABLED", "true")
-	w.set("CRATE_MCP_ACTIONS_ENABLED", fmt.Sprint(actions))
-	if public {
-		w.set("CRATE_MCP_OAUTH_ENABLED", "true")
-		w.set("CRATE_MCP_OAUTH_ISSUER", w.cfg.PublicURLs().API)
-	} else {
-		w.set("CRATE_MCP_OAUTH_ENABLED", "false")
-		w.set("CRATE_MCP_OAUTH_ISSUER", "")
-	}
+	w.draft().EnableMCP(actions)
 	return nil
 }
 
@@ -478,11 +418,9 @@ func (w *wizard) telegramForm(ctx context.Context, in manifest.Integration) erro
 
 // reportIntegrations validates what --yes configured, without blocking.
 func (w *wizard) reportIntegrations(ctx context.Context) {
-	if url := w.value("SLSKD_URL"); url == bundledSlskdURL {
-		w.setProfile("soulseek", true)
-		if w.value("SLSKD_API_KEY") == "" {
-			key, _ := secrets.Generate("hex32")
-			w.set("SLSKD_API_KEY", key)
+	if w.value("SLSKD_URL") == install.BundledSlskdURL {
+		if err := w.draft().UseBundledSlskd(); err != nil {
+			ui.Warning(w.out, "Could not prepare Crate's slskd: "+err.Error())
 		}
 	}
 	any := false
