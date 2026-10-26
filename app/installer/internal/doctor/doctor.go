@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
@@ -94,11 +95,13 @@ func Run(ctx context.Context, dir string, deps Deps) (Report, error) {
 
 	docker, state := deps.DetectDocker(ctx, deps.Run, host)
 	r.items = append(r.items, fromCheck("Docker", system.DockerCheck(state, docker, host)))
+	s := stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir, Files: install.ComposeFiles(values)}
 	if state == system.DockerReady {
-		checkServices(ctx, r, stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir})
+		checkServices(ctx, r, s)
 	}
 	checkAPI(ctx, r, deps.HTTP, cfg.LocalURLs().API)
 	checkIntegrations(ctx, r, m, values, deps.Validate)
+	checkAgent(ctx, r, values, agent.Setup{Stack: s, Docker: docker.Docker}, state == system.DockerReady)
 	return r.finish(), nil
 }
 
@@ -188,6 +191,51 @@ func checkIntegrations(ctx context.Context, r *report, m *manifest.Manifest, val
 	if len(notSet) > 0 {
 		r.add("Integrations", "Not set up", Skip, strings.Join(notSet, ", "), "Add them with `crate configure`.")
 	}
+}
+
+// checkAgent reports whether Crate Agent or Crate Operator runs as the
+// settings ask and, when it runs, whether it reaches Crate and its model.
+func checkAgent(ctx context.Context, r *report, values *envfile.Values, setup agent.Setup, docker bool) {
+	wanted, active := agent.Wanted(values), agent.Active(values)
+	fix := "Run `" + agent.SetupCommand + "`."
+	switch {
+	case wanted == agent.Off && active == agent.Off:
+		return
+	case wanted != active && wanted == agent.Off:
+		r.add("Crate Agent", active.Name(), Fail, "runs although the settings turned it off", fix)
+		return
+	case wanted != active:
+		r.add("Crate Agent", wanted.Name(), Fail, "set up in the settings but not running", fix)
+		return
+	case wanted == agent.Operator && !slices.Contains(install.ComposeFiles(values), agent.OperatorOverlay):
+		r.add("Crate Agent", wanted.Name(), Fail, "runs without its compose overlay", fix)
+		return
+	case !docker:
+		return
+	}
+	status, err := setup.Check(ctx, values, wanted)
+	container := wanted.Profile().Container
+	switch {
+	case err != nil:
+		r.add("Crate Agent", wanted.Name(), Fail, err.Error(), fix+" Logs: `docker compose logs "+container+"`.")
+	case !status.Ready:
+		r.add("Crate Agent", wanted.Name(), Fail, status.MCP, fix)
+	case status.SignInPending:
+		provider, _ := agent.FindProvider(get(values, "CRATE_AGENT_PROVIDER"))
+		r.add("Crate Agent", wanted.Name(), Warn, "Sign-in pending: run `"+agent.SetupCommand+"` in a terminal", provider.SignIn+" so it can answer.")
+		for i, item := range r.items {
+			if item.Section == "Services" && item.Name == container && item.Status == Fail && item.Detail == "unhealthy" {
+				r.items[i].Status, r.items[i].Detail = Warn, "waiting for the sign-in"
+			}
+		}
+	default:
+		r.add("Crate Agent", wanted.Name(), OK, "reaches Crate ("+status.MCP+")", "")
+	}
+}
+
+func get(values *envfile.Values, key string) string {
+	value, _ := values.Get(key)
+	return value
 }
 
 func Print(w io.Writer, report Report) {
