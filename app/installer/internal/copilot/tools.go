@@ -109,7 +109,7 @@ func (s *Session) status(ctx context.Context) StatusOut {
 		state := IntegrationState{ID: in.ID, Title: in.Title, Enabled: d.Enabled(in)}
 		if state.Enabled {
 			for _, env := range secretFields(in, s) {
-				if d.Value(env.Name) == "" {
+				if d.Value(env.Name) == "" && !optionalSecret(env, s) {
 					state.SecretsMissing = append(state.SecretsMissing, env.Label)
 				}
 			}
@@ -144,6 +144,9 @@ func (s *Session) nextSteps(out StatusOut, docker system.DockerState) []string {
 	if len(missing) > 0 {
 		steps = append(steps, "Call crate_request_secrets with "+strings.Join(missing, ", ")+" and send the user the link.")
 	}
+	if s.agentNeedsUsers() {
+		steps = append(steps, "Ask everyone who may use the Crate Agent bot to send it a private message on Telegram, then call crate_set_integration with id agent and telegram_find_users true.")
+	}
 	if !out.Installed && out.Start == nil {
 		topics := map[string]string{
 			"basics":       "where the music is, where Crate keeps its data and the timezone (crate_set_basics)",
@@ -159,6 +162,14 @@ func (s *Session) nextSteps(out StatusOut, docker system.DockerState) []string {
 	switch {
 	case out.Start != nil && out.Start.Phase == PhaseReady:
 		steps = append(steps, "Crate is running. Call crate_credentials and give the user the link, then crate_doctor.")
+		switch agentState := out.Start.Agent; {
+		case strings.HasPrefix(agentState, "Sign-in pending"):
+			steps = append(steps, "Tell the user, word for word: "+agentState+".")
+		case agentState == AgentRunning:
+			steps = append(steps, "Crate Agent runs: tell the user to message their bot on Telegram from an allowed account.")
+		case agentState != "":
+			steps = append(steps, "Crate Agent: "+agentState+".")
+		}
 	case out.Start != nil && out.Start.Phase == PhaseFailed:
 		steps = append(steps, "Starting failed: "+out.Start.Error+". Call crate_doctor to see why.")
 	case out.Start != nil:
@@ -217,6 +228,7 @@ var integrationOptions = map[string]string{
 	"ai":       `Set OLLAMA_URL (default http://host.docker.internal:11434) and LLM_PROVIDER, for example gemini/gemini-2.5-flash, openai/gpt-4o-mini, anthropic/claude-sonnet-5-5 or ollama/llama3.1:8b. Ask for provider keys through crate_request_secrets.`,
 	"mcp":      `crate_set_integration option "mcp_actions": true lets agents change things, false keeps them read-only. OAuth is configured automatically with public HTTPS.`,
 	"tidal":    `Nothing to set now. After Crate starts, the user connects Tidal in Admin > Settings > Downloads with a code at tidal.com/activate.`,
+	"agent":    `Crate Agent is a Telegram bot that answers questions about this Crate and changes nothing. Set CRATE_AGENT_PROVIDER: openai-codex (default; the user signs in with a ChatGPT account after Crate starts), openai-api, anthropic, openrouter, gemini or deepseek (API key), nous (API key or sign-in) or custom (an OpenAI-compatible endpoint: set CRATE_AGENT_BASE_URL). CRATE_AGENT_MODEL is required except for openai-codex. The user creates a new bot with @BotFather; ask for its token and the model key through crate_request_secrets. Then ask everyone who may use the bot to message it and call crate_set_integration with telegram_find_users true. Crate Operator, which can make changes, is set up later by the user with crate configure agent in a terminal.`,
 }
 
 func (s *Session) toolIntegrations(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, CatalogOut, error) {
@@ -334,11 +346,13 @@ func (s *Session) toolSetAccess(ctx context.Context, _ *mcp.CallToolRequest, in 
 }
 
 type IntegrationInput struct {
-	ID         string            `json:"id" jsonschema:"integration id from crate_integrations"`
-	Enabled    bool              `json:"enabled" jsonschema:"false turns the integration off and clears its settings"`
-	Values     map[string]string `json:"values,omitempty" jsonschema:"non-secret variables only, such as SLSKD_URL or LLM_PROVIDER; secrets go through crate_request_secrets"`
-	Soulseek   string            `json:"soulseek,omitempty" jsonschema:"bundled or external"`
-	MCPActions bool              `json:"mcp_actions,omitempty" jsonschema:"let agents change things, not only read"`
+	ID                string            `json:"id" jsonschema:"integration id from crate_integrations"`
+	Enabled           bool              `json:"enabled" jsonschema:"false turns the integration off and clears its settings"`
+	Values            map[string]string `json:"values,omitempty" jsonschema:"non-secret variables only, such as SLSKD_URL or LLM_PROVIDER; secrets go through crate_request_secrets"`
+	Soulseek          string            `json:"soulseek,omitempty" jsonschema:"bundled or external"`
+	MCPActions        bool              `json:"mcp_actions,omitempty" jsonschema:"let agents change things, not only read"`
+	AgentMode         string            `json:"agent_mode,omitempty" jsonschema:"agent: Crate Agent, read only (the only mode the installer sets up)"`
+	TelegramFindUsers bool              `json:"telegram_find_users,omitempty" jsonschema:"fill AGENT_ALLOWED_USERS with everyone who sent the Crate Agent bot a private message"`
 }
 
 func (s *Session) toolSetIntegration(ctx context.Context, _ *mcp.CallToolRequest, in IntegrationInput) (*mcp.CallToolResult, IntegrationState, error) {
@@ -388,19 +402,23 @@ func (s *Session) toolSetIntegration(ctx context.Context, _ *mcp.CallToolRequest
 		}
 	case "mcp":
 		d.EnableMCP(in.MCPActions)
+	case "agent":
+		if err := s.setAgent(ctx, in); err != nil {
+			return nil, IntegrationState{}, err
+		}
 	}
 	if !d.Enabled(integration) && in.ID != "tidal" {
 		return nil, s.integrationState(in.ID), nil
 	}
-	if len(secretFields(integration, s)) == 0 || allSet(d, secretFields(integration, s)) {
+	if allSet(d, secretFields(integration, s), s) {
 		s.check(ctx, integration)
 	}
 	return nil, s.integrationState(in.ID), nil
 }
 
-func allSet(d install.Draft, envs []manifest.IntegrationEnv) bool {
+func allSet(d install.Draft, envs []manifest.IntegrationEnv, s *Session) bool {
 	for _, env := range envs {
-		if d.Value(env.Name) == "" {
+		if d.Value(env.Name) == "" && !optionalSecret(env, s) {
 			return false
 		}
 	}
@@ -499,7 +517,7 @@ func (s *Session) toolApply(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 		return nil, ApplyOut{}, err
 	}
 	s.existing, s.applied = existing, true
-	s.cfg.Integrations, s.cfg.Profiles = nil, nil
+	s.cfg.Integrations, s.cfg.Profiles = s.transient(), nil
 	out := ApplyOut{AdminPasswordSource: s.status(ctx).Settings.AdminPassword}
 	for _, action := range install.Plan(s.cfg) {
 		out.Written = append(out.Written, action.Path)
@@ -534,7 +552,12 @@ func (s *Session) toolStart(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 		check := system.DockerCheck(state, docker, s.host)
 		return nil, jobState{}, errors.New("Docker is not ready: " + check.Detail + ". " + check.Fix)
 	}
-	s.job = startJob(stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir}, s.deps.HTTP, s.cfg.LocalURLs().API, startTimeout)
+	values, err := install.ReadExisting(s.dir)
+	if err != nil {
+		return nil, jobState{}, err
+	}
+	st := stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir, Files: install.ComposeFiles(values)}
+	s.job = startJob(st, s.deps.HTTP, s.cfg.LocalURLs().API, startTimeout, s.agentStep(st, docker, values))
 	return nil, s.job.state(), nil
 }
 

@@ -2,6 +2,7 @@ package copilot
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ const (
 	PhasePulling  = "downloading images"
 	PhaseStarting = "starting containers"
 	PhaseWaiting  = "waiting for the API"
+	PhaseAgent    = "setting up Crate Agent"
 	PhaseReady    = "ready"
 	PhaseFailed   = "failed"
 )
@@ -26,6 +28,7 @@ type job struct {
 	mu       sync.Mutex
 	phase    string
 	err      string
+	agent    string
 	lines    []string
 	partial  string
 	started  time.Time
@@ -61,6 +64,7 @@ func (j *job) set(phase, err string) {
 type jobState struct {
 	Phase    string   `json:"phase"`
 	Error    string   `json:"error,omitempty"`
+	Agent    string   `json:"agent,omitempty"`
 	Elapsed  string   `json:"elapsed"`
 	LastLogs []string `json:"last_logs,omitempty"`
 }
@@ -72,7 +76,7 @@ func (j *job) state() jobState {
 	if end.IsZero() {
 		end = time.Now()
 	}
-	return jobState{Phase: j.phase, Error: j.err, Elapsed: end.Sub(j.started).Round(time.Second).String(), LastLogs: append([]string(nil), j.lines...)}
+	return jobState{Phase: j.phase, Error: j.err, Agent: j.agent, Elapsed: end.Sub(j.started).Round(time.Second).String(), LastLogs: append([]string(nil), j.lines...)}
 }
 
 func (j *job) running() bool {
@@ -81,7 +85,7 @@ func (j *job) running() bool {
 	return j.phase != PhaseReady && j.phase != PhaseFailed
 }
 
-func startJob(s stack.Stack, client *http.Client, apiURL string, timeout time.Duration) *job {
+func startJob(s stack.Stack, client *http.Client, apiURL string, timeout time.Duration, agentStep func(context.Context, io.Writer) string) *job {
 	j := &job{phase: PhasePulling, started: time.Now()}
 	go func() {
 		ctx := context.Background()
@@ -98,6 +102,13 @@ func startJob(s stack.Stack, client *http.Client, apiURL string, timeout time.Du
 		if err := stack.WaitForAPI(ctx, client, apiURL, timeout, 2*time.Second); err != nil {
 			j.set(PhaseFailed, err.Error()+"; run crate_doctor or look at `docker compose logs crate-api`")
 			return
+		}
+		if agentStep != nil {
+			j.set(PhaseAgent, "")
+			state := agentStep(ctx, j)
+			j.mu.Lock()
+			j.agent = state
+			j.mu.Unlock()
 		}
 		j.set(PhaseReady, "")
 	}()
