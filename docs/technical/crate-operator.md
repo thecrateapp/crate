@@ -34,9 +34,9 @@ fallback alerts directly to its own allowlisted Telegram destination.
 
 This is a locally tested integrated candidate, not deployed acceptance.
 [Operator candidate and rollout](hermes-operator-release.md) describes the opt-in
-Compose, native transport, root provisioning, health and provenance contracts. The existing read-only Hermes pilot remains the default. Nothing here
-changes the legacy bot or assumes a setting stops its poller. Never run a
-second Telegram poller with the same bot token.
+Compose, native transport, root provisioning, health and provenance contracts. Crate Agent, the read-only profile, remains the default. Telegram is
+served only by Crate Agent or Crate Operator (Hermes Agent engine); the legacy built-in bot was removed. Never run a second
+Telegram poller with the same bot token.
 
 ## Service and configuration
 
@@ -105,14 +105,15 @@ failures, but polling time never becomes a producer timestamp. Freshness uses
 the stricter configured/source age limit. Missing, expired, future, invalidated,
 malformed and out-of-order evidence cannot prove recovery.
 
-| Kind           | Evidence and behavior                                                                                                                                                                                                                                                                  |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `availability` | Missing/stale source opens after the configured count; sustained absence escalates to critical.                                                                                                                                                                                        |
-| `high`         | Exact nonnegative scalar at/above `threshold`; clears at/below `clear_threshold`; optional critical threshold. Useful for persisted queue/backlog counts.                                                                                                                              |
-| `low`          | Exact nonnegative scalar at/below threshold; clears at/above recovery threshold. Supports storage capacity when a valid persisted source exists.                                                                                                                                       |
-| `drift`        | Exact source string differs from an explicit reviewed `expected` version. Missing provenance remains unknown.                                                                                                                                                                          |
-| `progress`     | A cumulative scalar remains unchanged across producer samples while a separate required `active_field` count is positive. Idle count zero clears; a counter reset is unknown, not progress.                                                                                            |
-| `stuck`        | A timestamp remains behind the source measurement time, or a bounded task sample contains running/delegated/completing tasks with old heartbeats. A previously stuck sampled task must reappear with recovery/terminal evidence; disappearing from the 24-hour sample cannot clear it. |
+| Kind           | Evidence and behavior                                                                                                                                                                                                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `availability` | Missing/stale source opens after the configured count; sustained absence escalates to critical.                                                                                                                                                                                               |
+| `high`         | Exact nonnegative scalar at/above `threshold`; clears at/below `clear_threshold`; optional critical threshold. Useful for persisted queue/backlog counts.                                                                                                                                     |
+| `low`          | Exact nonnegative scalar at/below threshold; clears at/above recovery threshold. Supports storage capacity when a valid persisted source exists.                                                                                                                                              |
+| `drift`        | Exact source string differs from an explicit reviewed `expected` version. Missing provenance remains unknown.                                                                                                                                                                                 |
+| `progress`     | A cumulative scalar remains unchanged across producer samples while a separate required `active_field` count is positive. Idle count zero clears; a counter reset is unknown, not progress.                                                                                                   |
+| `stuck`        | A timestamp remains behind the source measurement time, or a bounded task sample contains running/delegated/completing tasks with old heartbeats. A previously stuck sampled task must reappear with recovery/terminal evidence; disappearing from the 24-hour sample cannot clear it.        |
+| `digest`       | A bounded row sample (`field`) announces rows whose `id` was not seen before. The first valid sample is a baseline. Rows are reduced to `row_fields`, grouped by `group_field`, and each group sends at most one message per `cooldown_seconds`; later rows are counted into the next digest. |
 
 Task samples contain at most 20 rows. Empty samples never mean zero backlog.
 A stuck task that ages out of the sample remains unresolved until affirmative
@@ -137,6 +138,25 @@ keeps missing release evidence visible. Do not configure expected versions from
 image tags or fabricate storage zeroes; controlled provenance/source wiring is
 still required. Generic low/drift rule support is not proof that those sources
 exist. See [MCP observations](./11-crate-mcp.md) for exact source coverage.
+
+The supervisor is the only push channel to the Crate Operator chat; the legacy built-in
+Telegram bot was removed. The example config ships three alert rules over
+`get_observability_summary`:
+
+- `instance/health-score` (`low`): the health score persisted by the worker
+  service loop every 120 seconds. Opens at `<= 70`, critical at `<= 40`, clears at
+  `>= 80`, and includes the breach list as `detail`. `cooldown_seconds: 1800`
+  defers a reopen until 30 minutes after the previous message; a reopen that
+  resolves inside the cooldown sends nothing.
+- `tasks/failed-tasks` (`digest`): newest 20 failed tasks updated in 24 hours,
+  excluding cancellations, grouped by task type with a 30-minute cooldown. Rows
+  carry `id`, `type`, `error_code` and `updated_at`, never error text. Counts are
+  marked as a lower bound when a truncated sample contained only new rows.
+- `library/new-releases` (`digest`): releases detected for library artists in the
+  last 7 days, one message per hour at most.
+
+Per-task completion messages and playback notifications are intentionally not
+recreated.
 
 ## Incidents, read API and job watches
 

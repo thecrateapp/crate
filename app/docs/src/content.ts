@@ -87,33 +87,33 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/03-worker-tasks-and-background-services.md": () =>
-    import("../../../docs/technical/03-worker-tasks-and-background-services.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/03-worker-tasks-and-background-services.md?raw"
+    ).then((module) => module.default),
   "docs/technical/04-library-storage-sync-and-imports.md": () =>
-    import("../../../docs/technical/04-library-storage-sync-and-imports.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/04-library-storage-sync-and-imports.md?raw"
+    ).then((module) => module.default),
   "docs/technical/05-enrichment-acquisition-and-integrations.md": () =>
-    import("../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw"
+    ).then((module) => module.default),
   "docs/technical/06-audio-analysis-similarity-and-discovery.md": () =>
-    import("../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw"
+    ).then((module) => module.default),
   "docs/technical/07-auth-users-social-and-sessions.md": () =>
-    import("../../../docs/technical/07-auth-users-social-and-sessions.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/07-auth-users-social-and-sessions.md?raw"
+    ).then((module) => module.default),
   "docs/technical/08-frontends-admin-and-listen.md": () =>
     import("../../../docs/technical/08-frontends-admin-and-listen.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/09-playback-realtime-and-subsonic.md": () =>
-    import("../../../docs/technical/09-playback-realtime-and-subsonic.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/09-playback-realtime-and-subsonic.md?raw"
+    ).then((module) => module.default),
   "docs/technical/opensubsonic.md": () =>
     import("../../../docs/technical/opensubsonic.md?raw").then(
       (module) => module.default,
@@ -147,9 +147,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/10-development-deployment-and-operations.md": () =>
-    import("../../../docs/technical/10-development-deployment-and-operations.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/10-development-deployment-and-operations.md?raw"
+    ).then((module) => module.default),
   "docs/technical/artist-hero-theming-rollout.md": () =>
     import("../../../docs/technical/artist-hero-theming-rollout.md?raw").then(
       (module) => module.default,
@@ -187,9 +187,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-production-acceptance.md": () =>
-    import("../../../docs/technical/federation-production-acceptance.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-production-acceptance.md?raw"
+    ).then((module) => module.default),
   "docs/technical/federation-protocol.md": () =>
     import("../../../docs/technical/federation-protocol.md?raw").then(
       (module) => module.default,
@@ -199,17 +199,17 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-streaming-benchmark.md": () =>
-    import("../../../docs/technical/federation-streaming-benchmark.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-streaming-benchmark.md?raw"
+    ).then((module) => module.default),
   "docs/technical/federation-threat-model.md": () =>
     import("../../../docs/technical/federation-threat-model.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/federation-upgrade-and-rollback.md": () =>
-    import("../../../docs/technical/federation-upgrade-and-rollback.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-upgrade-and-rollback.md?raw"
+    ).then((module) => module.default),
   "docs/technical/hermes-plan-confirmation.md": () =>
     import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
       (module) => module.default,
@@ -226,14 +226,18 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/operations.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/crate-agent.md": () =>
+    import("../../../docs/technical/crate-agent.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/local-media-delivery-slos.md": () =>
     import("../../../docs/technical/local-media-delivery-slos.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/listen-design-system-visual-qa.md": () =>
-    import("../../../docs/technical/listen-design-system-visual-qa.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/listen-design-system-visual-qa.md?raw"
+    ).then((module) => module.default),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,

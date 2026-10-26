@@ -1,6 +1,6 @@
 ---
 title: Smart Mix - funcionamiento y operación
-summary: Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Hermes.
+summary: Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Crate Agent.
 section: operations
 audience: [operator, developer]
 status: canonical
@@ -208,7 +208,7 @@ rutinaria. Un POST de planificación puede escribir caché aunque no modifique l
 ## HTTP, permisos y consumidores
 
 Estas rutas describen la aplicación. No son herramientas disponibles automáticamente para
-Hermes; un Bearer MCP no es una sesión Admin ni un PAT de VirtualDJ.
+Crate Agent; un Bearer MCP no es una sesión Admin ni un PAT de VirtualDJ.
 
 | Ruta                                                                     | Uso y efecto relevante                                                                                       |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -248,7 +248,7 @@ El plan conserva un gate físico de R1 aplazado el 18 de octubre: captura extern
 para clipping/underrun. Los logs QoE y las suites automáticas no lo sustituyen. Esta revisión
 documental no cierra ese gate ni los de plataformas futuras.
 
-## Diagnóstico mediante Hermes de solo lectura
+## Diagnóstico mediante Crate Agent (solo lectura)
 
 1. Obtener `get_release_context` y distinguir SHA de release, `source_sha` de imagen,
    `analyzerVersion`, `profileRevision` y versión de planner. Leer esta referencia y las
@@ -266,17 +266,17 @@ documental no cierra ese gate ni los de plataformas futuras.
    `get_analysis_status` sigue cubriendo solo `analysis` y `bliss`; no sustituye esta lectura.
 4. Cuando falte esa evidencia o el grant, declarar el dato no disponible y proponer al operador la
    comprobación Admin apropiada. El GET de estado Admin puede encolar trabajo: no usarlo
-   como sustituto transparente de una observación MCP. Hermes no cambia flags, pausa,
+   como sustituto transparente de una observación MCP. Crate Agent no cambia flags, pausa,
    reanaliza ni inicia campañas en esta fase.
 
-| Síntoma                              | Evidencia y siguiente comprobación                                                                                                                                    |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Síntoma                              | Evidencia y siguiente comprobación                                                                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cobertura cero o parada              | Fecha/versión del snapshot, campaña y tareas por cola; distinguir snapshot ausente de cero real. Consultar `get_smart_mix_status`; si falta evidencia o grant, solicitar al operador la comprobación Admin |
-| Mucho `missing_profiles`             | Separar ausencia real, generación antigua, fuente cambiada y calidad `unavailable`; comprobar filtros por pista y `current_quality`                                   |
-| Campaña running sin avance           | Presión/ventana de recursos, heavy worker, claims y tareas hijos; consultar errores/agotados antes de reiniciar                                                       |
-| Task terminado pero sin perfil nuevo | Leer `outcome`, fuente/revisión y claim: `superseded`/`unchanged` no equivalen a publicación por ese task                                                             |
-| Crossfade sin beatmatch              | Capability, preferencia, calidad/beat de cue, confianza/estabilidad, compás, ventana y `fallbackReason`                                                               |
-| Mezcla antigua tras reanálisis       | Verificar `profileRevision`, reglas y plan instalado por el cliente; no confundir plan nuevo con adopción en el reproductor                                           |
+| Mucho `missing_profiles`             | Separar ausencia real, generación antigua, fuente cambiada y calidad `unavailable`; comprobar filtros por pista y `current_quality`                                                                        |
+| Campaña running sin avance           | Presión/ventana de recursos, heavy worker, claims y tareas hijos; consultar errores/agotados antes de reiniciar                                                                                            |
+| Task terminado pero sin perfil nuevo | Leer `outcome`, fuente/revisión y claim: `superseded`/`unchanged` no equivalen a publicación por ese task                                                                                                  |
+| Crossfade sin beatmatch              | Capability, preferencia, calidad/beat de cue, confianza/estabilidad, compás, ventana y `fallbackReason`                                                                                                    |
+| Mezcla antigua tras reanálisis       | Verificar `profileRevision`, reglas y plan instalado por el cliente; no confundir plan nuevo con adopción en el reproductor                                                                                |
 
 La lectura almacenada tiene cobertura parcial. No expone probes funcionales del host en vivo,
 aceptación física por plataforma, adopción del plan en cada reproductor ni una nueva validación
@@ -294,7 +294,7 @@ cubren las identidades, publicación concurrente, estados, control de campaña y
 planificación. Tests de readplane, Listen y Rust completan sus superficies; no sustituyen
 una prueba física o la comprobación de un binario distribuido.
 
-Hermes debe poder explicar Smart Mix frente a Bliss; diferenciar calidad, vigencia y error;
+Crate Agent debe poder explicar Smart Mix frente a Bliss; diferenciar calidad, vigencia y error;
 seguir un backfill sin equiparar enqueue/finalización/cobertura; explicar elegibilidad de
 beats locales y fallbacks; y señalar los límites por plataforma y de evidencia MCP. Cada
 respuesta debe citar ruta y SHA del contexto. La respuesta correcta a la cobertura real

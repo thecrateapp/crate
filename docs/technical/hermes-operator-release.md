@@ -1,12 +1,12 @@
 ---
-title: Hermes operator candidate and rollout
+title: Crate Operator candidate and rollout
 summary: Complete opt-in operator architecture, authority and coverage matrix, root provisioning, disposable acceptance and rollback.
 section: operations
 audience: [operator, developer]
 keywords: [hermes, operator, provenance, approval, recovery, rollout]
 status: canonical
 order: 127
-verified: 2026-10-21
+verified: 2026-10-26
 sources:
   - deploy/operator/compose.operator.yaml
   - deploy/operator/provision.py
@@ -15,10 +15,8 @@ sources:
   - deploy/operator/infra_executor.py
   - deploy/operator/README.infra.md
   - deploy/operator/crate-infra.service
-  - deploy/operator/crate-provenance.service
   - deploy/operator/config.operator.example.json
   - deploy/operator/watchdog.example.json
-  - deploy/operator/compose.legacy-telegram-off.yaml
   - deploy/hermes/runtime.py
   - deploy/hermes/domain_mcp.py
   - deploy/hermes/plugins/crate_confirmation/__init__.py
@@ -29,6 +27,8 @@ sources:
   - app/crate/projector.py
   - app/crate/projector_daemon.py
   - scripts/operator_candidate.py
+  - scripts/agent_setup.py
+  - scripts/deploy-remote.sh
   - scripts/operator_gateway_smoke.py
   - scripts/operator_gateway_probe.py
   - app/tests/test_operator_confirmation_status.py
@@ -38,26 +38,30 @@ sources:
   - app/tests/test_operator_packaging.py
 ---
 
-# Hermes operator candidate and rollout
+# Crate Operator candidate and rollout
 
-The integrated candidate completes the opt-in operator path in source. The existing
-`hermes` profile remains a read-only pilot. No production permission, installation,
-deployment, Telegram bot ownership or personal Hermes state changes as part of
+The integrated candidate completes the opt-in Crate Operator path in source; it runs
+Nous Research's Hermes Agent under the hood. Crate Agent (`agent` profile) remains
+the read-only default. A new instance can start Crate Operator with only
+`docker-compose.yaml` and `make agent-init AGENT_PROFILE=operator` (see
+[Crate Agent and Crate Operator over Telegram](crate-agent.md)); everything below adds the provenance, bridge and
+supervisor authority. No production permission, installation,
+deployment, Telegram bot ownership or personal assistant state changes as part of
 building or testing this candidate. Final whole-branch review and a separately
 approved consolidated rollout remain required.
 
 ## Coverage and authority
 
-| Component                  | Implemented authority and evidence                                                                                                           | Operational limit                                                                                          |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Discovery and observations | Bounded inventory, status, pipeline and dedicated Smart Mix coverage/campaign observations                                                   | Persisted observations retain timestamps and gaps; source context does not prove health                    |
-| Domain operations          | Existing plans, current grants/roles, exact native human review, idempotent admission, worker checkpoints, cancellation and durable outcomes | Tidal single-album or up-to-50-album batch plans share one exact Telegram approval; Soulseek transfer and publication remain separate; partial effects need reconciliation |
-| Independent supervisor     | Durable incidents/outbox, bounded watches, deterministic rules, signed fixed delivery                                                        | Separate single-writer state; source gaps and transport ambiguity remain explicit                          |
-| Native domain review       | Every exact page, private numeric human, current role/binding, version and one-use receipts                                                  | At most 20 delivery attempts per page/outcome; expiry requires a new reviewed plan                         |
-| Native incident decisions  | `/crate_ack` and `/crate_silence`, own HMAC and current local operator map                                                                   | Reason and TTL required; silence suppresses notifications without erasing monitoring/history               |
-| Infrastructure             | Independent root Unix bridge, fixed relay, exact plans, own native key/human map, restart/backup/deploy/disposable restore                   | No model shell, Docker socket, paths or commands; production restore is denied                             |
-| Release provenance         | Fresh root host image inspection, expected immutable per-image entries, active context hash and deployment marker                            | Unverified, stale, deploying and rollback evidence closes mutations; reads remain available                |
-| Offline acceptance         | Real PostgreSQL, MCP SDK transports, actual pinned gateway, fake loopback Bot API, native recovery and reconnect                             | Synthetic host restart and Bot API; no real Telegram, provider inference or physical production acceptance |
+| Component                  | Implemented authority and evidence                                                                                                                                             | Operational limit                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discovery and observations | Bounded inventory, status, pipeline and dedicated Smart Mix coverage/campaign observations                                                                                     | Persisted observations retain timestamps and gaps; source context does not prove health                                                                                    |
+| Domain operations          | Existing plans, current grants/roles, exact native human review, idempotent admission, worker checkpoints, cancellation and durable outcomes                                   | Tidal single-album or up-to-50-album batch plans share one exact Telegram approval; Soulseek transfer and publication remain separate; partial effects need reconciliation |
+| Independent supervisor     | Durable incidents/outbox, bounded watches, deterministic rules, signed fixed delivery                                                                                          | Separate single-writer state; source gaps and transport ambiguity remain explicit                                                                                          |
+| Native domain review       | Every exact page, private numeric human, current role/binding, version and one-use receipts                                                                                    | At most 20 delivery attempts per page/outcome; expiry requires a new reviewed plan                                                                                         |
+| Native incident decisions  | `/crate_ack` and `/crate_silence`, own HMAC and current local operator map                                                                                                     | Reason and TTL required; silence suppresses notifications without erasing monitoring/history                                                                               |
+| Infrastructure             | Independent root Unix bridge, fixed relay, exact plans, own native key/human map, restart/backup/deploy/disposable restore                                                     | No model shell, Docker socket, paths or commands; production restore is denied                                                                                             |
+| Release provenance         | `crate-provenance` container: actual running images through a list/inspect-only Docker filter, official GHCR digests or exact release entries, context hash, deployment marker | Unverified, stale, deploying and rollback evidence closes mutations; reads remain available; local builds stay read-only                                                   |
+| Offline acceptance         | Real PostgreSQL, MCP SDK transports, actual pinned gateway, fake loopback Bot API, native recovery and reconnect                                                               | Synthetic host restart and Bot API; no real Telegram, provider inference or physical production acceptance                                                                 |
 
 The server identifies operator principals from administrator-controlled
 `CRATE_OPERATOR_PRINCIPAL_IDS`, a comma-separated list of exact principal UUIDs.
@@ -86,13 +90,13 @@ never an automatic replay.
 
 ## Independent startup and completion flow
 
-`crate-hermes-operator`, `crate-infra-relay` and `crate-operator-supervisor` have no
+`crate-operator`, `crate-infra-relay` and `crate-operator-supervisor` have no
 API/DB startup dependency. Operator runtime selects its mode before reading domain
 context. Its fixed stdio catalog can initialize offline; each mutation rechecks
 live discovery, current approval policy and server authority. Failed API/context
 reads do not remove independent native providers. When the API returns, the same
 adapter and gateway can use current domain reads and mutation preparation without
-a restart. No cached grant authorizes an effect. The original pilot startup policy
+a restart. No cached grant authorizes an effect. The Crate Agent startup policy
 is unchanged. Standard MCP `_meta` is discarded before domain dispatch; it supplies
 no authority. Expected API/policy unavailability returns a normal MCP availability
 report with an unverified outcome, preserving the healthy local connection. It is
@@ -164,7 +168,7 @@ One consolidated rollout must provision:
    coordinated switch; do not start two fleets against the library.
 2. Root-owned assets under `/opt/crate-operator/assets`, context under
    `/opt/crate-operator/context`, and the reviewed overlay installed at
-   `/opt/crate-host/.deploy/hermes.compose.yaml`. Only the dedicated gateway home and
+   `/opt/crate-host/.deploy/crate-operator.compose.yaml`. Only the dedicated gateway home and
    supervisor state are owned by their runtime UID. `HOME`, `XDG_STATE_HOME` and
    working directory are inside the dedicated gateway home. Explicit child MCP
    environment carries the internal URL and required Crate Host header. Public
@@ -177,57 +181,124 @@ One consolidated rollout must provision:
    read/watch bearer and incident HMAC, and delivery HMAC. Never reuse secrets.
    Native identity files use the same fixed instance and reviewed numeric users.
    Model adapters have no native signing keys in arguments/environment/results.
+   `make agent-init AGENT_PROFILE=operator` with `CRATE_OPERATOR_ROOT` pointing at this
+   root provisions everything in this item and item 4 except the infra tokens and keys
+   (the approval-required credential, the supervisor credential, the binding, every
+   domain/supervisor/delivery key, both identity files and the supervisor config); see
+   [Crate Agent and Crate Operator over Telegram](crate-agent.md). Run it as root so the
+   files are owned by `PUID`, and review the result like any other root-provisioned input.
 4. Supervisor config from `config.operator.example.json`; set its fixed `mcp_host`
-   to the API’s exact allowed public authority (`api.lespedants.org` in the example),
-   even while `mcp_url` uses the private `http://crate-api:8585/mcp` route. Match any
+   to the API’s exact allowed public authority (`api.${DOMAIN}` unless
+   `CRATE_MCP_ALLOWED_HOSTS` names another; `api.example.com` in the example), even while `mcp_url` uses the private `http://crate-api:8585/mcp` route. Match any
    custom `CRATE_MCP_ALLOWED_HOSTS` without wildcard expansion. Dedicated gateway
    `secrets/delivery/{secret,destination}` for the fixed private allowlisted
    `deliver_only` route; distinct supervisor state, infra state/backups and external
    watchdog state. No service gets the Docker socket except the separately
-   root-authorized host executor, which uses the local CLI. Only the relay mounts
-   `/run/crate-infra`; Hermes receives only its fixed private HTTP route.
+   root-authorized host executor, which uses the local CLI, and the
+   `crate-provenance-docker` filter, which forwards only container listing and image
+   inspection ([Release provenance publisher](#release-provenance-publisher)). Only the
+   relay mounts `/run/crate-infra`; the gateway receives only its fixed private HTTP
+   route.
 5. Root `/etc/crate-infra/policy.json`, separate 0600 host secrets, pinned compatible
    pgvector PG15 image, allowlisted services/humans, and host-approved release assets.
-   Provenance inspects all manifest services including fast worker, so its policy
-   service allowlist must cover that entire fleet even if humans can only restart.
-   Install the reviewed `crate-infra.service` and `crate-provenance.service` only at
-   the final authorized activation. Bridge execution needs `enabled:true` and
+   Install the reviewed `crate-infra.service` only at the final authorized activation;
+   release provenance needs no host unit. `${CRATE_OPERATOR_ROOT}/provenance` must be
+   owned by `PUID` like the gateway home and supervisor state. Bridge execution needs `enabled:true` and
    `--execute`. Provision meaningful current/candidate healthchecks before enabling
    restart/deploy authority.
 6. An external watchdog on another host using `watchdog.example.json`, its own
    state/token/destination, and private authenticated connectivity. Its `.invalid`
    sample addresses are deliberately unusable until configured. Route its private
    gateway probe to the pinned webhook adapter’s `:8644/health`, and supervisor
-   status to `:8791/v1/status`; the sample adds no public ingress. If migrating the
-   legacy bot, explicitly review `compose.legacy-telegram-off.yaml` and incorporate
-   its exact worker command in the sealed overlay; never run duplicate pollers for
-   one token. The default worker command remains unchanged.
+   status to `:8791/v1/status`; the sample adds no public ingress. Telegram control is
+   Crate Operator: the legacy built-in bot was removed (migration 135 deletes its
+   stored settings and plaintext token), and the supervisor is the only push channel
+   to the Crate Operator chat. `--no-telegram` is accepted as a no-op for one release.
 
 The normal deployment entry point remains `scripts/deploy.sh` / `make deploy` for
 the existing managed checkout. It must not silently gain root write authority or
-move that checkout. The opt-in bridge reuses the reviewed local
+move that checkout. It ships `deploy/operator/compose.operator.yaml` with the compose
+files; while `crate-operator` runs, every remote stage adds that overlay (or the
+host-approved `.deploy/crate-operator.compose.yaml` when present) so API and workers
+keep the operator identity, and the final stage recreates the running operator,
+supervisor and relay on the release's `crate-agent` image. The opt-in bridge reuses the reviewed local
 `scripts/deploy-remote.sh` stages inside the separately provisioned root tree.
 Administrator release approval supplies exact hashes; a model cannot approve new
 assets. Future normal release automation must explicitly hand approved artifacts
 to this root boundary. Root maintenance must be serialized with infrastructure
 operations; validation does not make concurrent root edits atomic.
 
+## Release provenance publisher
+
+The publisher is a container service of the `crate-operator` profile, so a new
+instance gets working provenance from its first `make agent-up AGENT_PROFILE=operator`,
+with no systemd unit or host root process. It replaces the former root
+`crate-provenance.service`.
+
+| Service                   | Runs as                                                                                   | Access                                                                                                                                                |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `crate-provenance-docker` | HAProxy, pinned by digest; uid 0 only to open the socket, no capabilities, read-only root | Host Docker socket (`CRATE_DOCKER_SOCKET`, default `/var/run/docker.sock`); internal `crate-provenance` network; no published port                    |
+| `crate-provenance`        | `crate-agent` image as `PUID:PGID`, no capabilities, read-only root                       | `GET /containers/json` and `GET /images/sha256:<id>/json` through the filter; `context/` read-only; writes `provenance/`; outbound HTTPS to `ghcr.io` |
+
+The filter denies every other method and path with 403, including container inspect
+(which would expose environment secrets), logs, archive, exec, export and image export.
+The publisher finds its own container by hostname, takes its Compose project from the
+labels, and observes only running containers of that project every 30 seconds.
+
+Evidence (`provenance/target.json`, `observation.json`, mounted read-only at
+`/run/crate-provenance-evidence`) keeps the identity format: instance, release SHA,
+context manifest SHA256 and, per service, the digest reference, OCI source SHA and image
+ID. Deployment and context markers written by `scripts/deploy-remote.sh` stay in
+`context/public` (mounted at `/run/crate-provenance`) and are read directly on every
+boundary; when they exist they take precedence, so `deploying` and `rollback` close
+mutations without waiting for an observation.
+
+- **Release mode** (a deployment marker exists): the marker must be verified, the active
+  context must describe the same manifest, and every manifest service, including
+  `crate-fast-worker`, must run that entry's exact digest reference and `source_sha`.
+  The publisher's own image must match the manifest's `agent` entry when present.
+- **Image mode** (no deployment marker, the new-instance case): `crate-api` and the
+  four executing workers must run; every running fleet image and the publisher's own
+  `crate-agent` image need a `RepoDigests` entry in their expected
+  `ghcr.io/thecrateapp/<repository>` and an OCI revision label, and the registry must
+  confirm that digest exists in that repository (anonymous `HEAD` on the manifest,
+  positive results cached per digest). The release SHA is the publisher image's
+  revision, and the context hash is that of the release context baked into it, which
+  must name the same revision. The publisher also writes its own verified
+  `deployment.json`/`context.json` to the evidence directory; they are ignored as soon
+  as a deployment marker appears.
+
+The registry proof is what keeps local builds closed: Docker's containerd image store
+records a local manifest digest for locally built images, which does not exist in the
+official repository. Observation drift (a recreated service, a new pull) changes the
+identity and invalidates pending plans; freshness stays 90 seconds over a 30-second
+cycle, as before. Residual limits: an executing process does not inspect its own image,
+so a container recreated between two observations is caught at the next one (at most
+30 seconds); the publisher depends on `ghcr.io` for digests it has not proven yet; and
+the host's own root can forge any of this, as it could the former root unit.
+
 ## Version transition, health and rollback
 
 The approved operator release contains `release-manifest.json`, exact `release.env`,
-both Compose files and `hermes-context.tar.gz`, with hashes in `approved.json`.
+both Compose files and `agent-context.tar.gz`, with hashes in `approved.json`.
 The context archive must describe that exact release and the expected per-image
 manifest entries; it is validated before effects. The host plan seals all consumed
 helpers, `.env`, overlay, existing/candidate files and expected staging transitions.
 Context destinations use the exact LF/quote parser semantics of the shell; CR/NUL,
 unsafe ancestors and relative operator roots fail closed. Legacy deployments retain
-`DATA_DIR/hermes-agent/context` when no operator root is configured.
+`DATA_DIR/crate-agent/context` when no operator root is configured.
+The gateway, supervisor, relay and provenance publisher run from the release's
+`crate-agent` image (`CRATE_AGENT_IMAGE`, an optional manifest entry outside the
+provenance-bound fleet); root-provisioned assets remain the source for the host bridge
+unit.
+Instances running locally built images never obtain verified provenance, so their
+mutations stay closed and Crate Operator behaves as read-only.
 
 Deploy stages mark `deploying`, verify real health/images, then activate the approved
 context. The public gate stays closed until the active link and its exact hash have
-changed; the operator always consumes the reviewed archive, even for a cached SHA. The root publisher observes every actual image against that entry's digest
+changed; the operator always consumes the reviewed archive, even for a cached SHA. The publisher observes every actual image against that entry's digest
 and `source_sha`; incremental releases may legitimately reuse older image sources.
-It writes only bounded public identity files for API/workers, without environment,
+It writes only bounded identity files for API/workers, without environment,
 private labels, home or credentials. Failed publication writes unverified evidence.
 Rollback markers immediately close domain mutations; cached previous context may
 be reactivated only after explicit verification of the selected previous release.
