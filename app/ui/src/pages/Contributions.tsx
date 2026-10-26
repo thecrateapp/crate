@@ -229,7 +229,8 @@ export function Contributions() {
                         <MediaCover
                           src={coverUrl}
                           alt={item.album_name}
-                          className="size-14 shrink-0 rounded-lg border border-border-quiet bg-muted"
+                          size={56}
+                          className="rounded-lg border border-border-quiet bg-muted"
                         />
                         <div className="min-w-0">
                           {albumPath ? (

@@ -68,7 +68,7 @@ export function OfflineDownloadsView({
                         src={offlineItemArtworkPath(item)}
                         renderImage={renderImage}
                         alt=""
-                        className="size-12 shrink-0"
+                        size={48}
                         fallback={<HardDrive size={CRATE_ICON_SIZE.md} />}
                       />
                     }

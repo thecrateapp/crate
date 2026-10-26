@@ -171,7 +171,7 @@ export function OfflineLibraryView({
                               src={track.albumCover}
                               renderImage={renderImage}
                               alt={track.title}
-                              className="size-12"
+                              size={48}
                             />
                           }
                           activeGlyph={activeGlyph}

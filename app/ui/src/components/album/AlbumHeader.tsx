@@ -269,7 +269,7 @@ export function AlbumHeader({
                 key={coverUrl}
                 src={coverUrl}
                 alt={resolvedDisplayName}
-                className="size-full"
+                size="fill"
               />
             </ImageLightbox>
             {canEditArtwork ? (

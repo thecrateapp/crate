@@ -128,7 +128,8 @@ function OpportunityCard({
             artistName: artist.artist,
           })}
           alt={artist.artist}
-          className="size-14 shrink-0 border border-border-quiet"
+          size={56}
+          className="border border-border-quiet"
         />
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -242,7 +243,8 @@ function ReleaseRadarRow({ release }: { release: Release }) {
       <MediaCover
         src={release.cover_url}
         alt=""
-        className="size-12 shrink-0 border border-border-quiet"
+        size={48}
+        className="border border-border-quiet"
       />
       <div className="min-w-0 flex-1">
         {albumHref ? (

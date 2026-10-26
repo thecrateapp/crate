@@ -53,7 +53,7 @@ export function StatsHighlights({
           <MediaCover
             src={cover}
             alt=""
-            className="size-20 shrink-0"
+            size={80}
             renderImage={({ src, alt, className, onError }) => (
               <CrateImage
                 src={src}

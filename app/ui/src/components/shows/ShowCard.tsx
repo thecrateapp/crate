@@ -423,7 +423,7 @@ function ExpandedShowCardBody({
         <MediaCover
           src={show.coverUrl || show.artistPhotoUrl || show.backgroundUrl}
           alt={name}
-          className="size-16 shrink-0"
+          size={64}
         />
         <div className="min-w-0">
           <h3 className="break-words font-display text-2xl font-bold leading-tight text-text-primary">

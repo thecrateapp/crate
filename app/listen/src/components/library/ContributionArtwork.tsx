@@ -27,7 +27,7 @@ export function ContributionArtwork({
     <MediaCover
       src={src}
       alt=""
-      className={layout === "grid" ? "size-full" : "size-14 shrink-0"}
+      size={layout === "grid" ? "fill" : 56}
       fallback={
         contribution.source === "bandcamp" ? (
           <BandcampLogo size={CRATE_ICON_SIZE.lg} />

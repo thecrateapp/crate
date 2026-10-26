@@ -190,7 +190,7 @@ export function buildDiggingChapters(
                   {cover ? (
                     media.renderImage(cover)
                   ) : (
-                    <MediaCover alt="" className="size-12" />
+                    <MediaCover alt="" size={48} />
                   )}
                   <span className="min-w-0">
                     <strong className="block truncate">{track.title}</strong>

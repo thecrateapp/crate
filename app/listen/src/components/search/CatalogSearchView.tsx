@@ -136,7 +136,7 @@ export function CatalogSearchView<T>({
                             alt=""
                             shape={item.kind === "artist" ? "circle" : "square"}
                             fallbackIcon={icons[item.kind]}
-                            className="size-12 shrink-0"
+                            size={48}
                             renderImage={renderImage}
                           />
                         }

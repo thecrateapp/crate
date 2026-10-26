@@ -203,7 +203,7 @@ export function ShareSheetHost() {
           src={payload.imageUrl}
           alt=""
           fallbackIcon={Send}
-          className="size-16 shrink-0"
+          size={64}
           renderImage={(image) => (
             <ArtworkSurface
               source={image.src}

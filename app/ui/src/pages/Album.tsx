@@ -416,10 +416,7 @@ export function MergeAlbumDialog({
                       onClick={() => onMerge(album)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <MediaCover
-                        alt={album.name}
-                        className="size-12 shrink-0"
-                      />
+                      <MediaCover alt={album.name} size={48} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">
                           {album.name}

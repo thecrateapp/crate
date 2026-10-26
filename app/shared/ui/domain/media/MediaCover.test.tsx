@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Disc, User } from "@crate/ui/icons";
 import { MediaCover } from "./MediaCover";
 
@@ -171,4 +171,25 @@ it("injects a managed image renderer with its shared fallback and forwards frame
     "canonical.jpg",
   );
   expect(view.getByTestId("managed-image")).toHaveTextContent("CN");
+});
+
+it.each([
+  [48, "size-12"],
+  [56, "size-14"],
+  [88, "size-22"],
+  ["fill", "size-full"],
+] as const)("maps size %s to a fixed frame", (size, className) => {
+  render(<MediaCover alt="Doolittle" size={size} />);
+  const cover = screen.getByRole("img", { name: "Doolittle" });
+  expect(cover).toHaveClass(className);
+  expect(cover).toHaveAttribute("data-size", String(size));
+  if (size === "fill") expect(cover).not.toHaveClass("shrink-0");
+  else expect(cover).toHaveClass("shrink-0");
+});
+
+it("leaves sizing to the parent when no size is given", () => {
+  render(<MediaCover alt="Doolittle" />);
+  const cover = screen.getByRole("img", { name: "Doolittle" });
+  expect(cover).not.toHaveAttribute("data-size");
+  expect(cover.className).not.toMatch(/\bsize-/);
 });

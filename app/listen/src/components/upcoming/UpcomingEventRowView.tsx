@@ -31,7 +31,8 @@ export function UpcomingEventArtwork({
       renderImage={renderImage}
       fallbackIcon={kind === "show" ? Calendar : Disc3}
       iconSize={CRATE_ICON_SIZE.xl}
-      className="size-[88px] shrink-0 rounded-none"
+      size={88}
+      className="rounded-none"
     />
   );
 }

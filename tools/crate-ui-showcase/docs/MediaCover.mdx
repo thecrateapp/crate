@@ -41,3 +41,10 @@ Compact artist identity beside a name uses EntityAvatar instead:24px in album by
 in the player, preserving V2. Circular standalone artist media still keep the48px minimum.
 The focused browser fixture mounts the actual Listen renderer and checks decoded, visible48px
 artwork in both densities. It does not certify production credentials or every native runtime.
+
+<DocHeading as="h2">Sizes</DocHeading>
+
+`size` sets a fixed, non-shrinking frame: `48` (list rows, the minimum), `56` (contribution and radar
+rows), `64`, `80`, `88` (event rows), `96`, or `"fill"` to take the parent box. Callers no longer
+pass `size-*`/`shrink-0` classes; without `size` the parent owns the geometry, as before.
+Responsive covers that change size at a breakpoint keep their own classes.

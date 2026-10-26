@@ -46,7 +46,7 @@ export function InsightAlbumList({
           >
             <div className="flex min-w-0 items-start gap-3 text-text-primary group-hover:text-accent-action-hi">
               <MediaCover
-                className="size-12 shrink-0"
+                size={48}
                 src={
                   album.has_cover
                     ? albumCoverApiUrl({ albumId: album.id }, { size: 96 })
@@ -122,7 +122,7 @@ function ArtistChanges({
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-3 text-text-primary group-hover:text-accent-action-hi">
                   <MediaCover
-                    className="size-11 shrink-0"
+                    size={48}
                     shape="circle"
                     src={
                       artist.has_photo

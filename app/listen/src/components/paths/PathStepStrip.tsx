@@ -125,7 +125,7 @@ export function PathStepStrip({
                 src={step.coverUrl}
                 alt=""
                 fallbackIcon={Music2}
-                className="size-12"
+                size={48}
                 renderImage={renderImage}
               />
               <MonoLabel

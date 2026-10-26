@@ -254,7 +254,8 @@ export function PathCoverStage({
             src={step.coverUrl}
             alt=""
             fallbackIcon={Music2}
-            className="path-cover-art size-full"
+            size="fill"
+            className="path-cover-art"
             renderImage={renderImage}
           />
         ) : null}

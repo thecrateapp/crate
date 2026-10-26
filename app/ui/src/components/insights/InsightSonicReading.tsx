@@ -37,7 +37,7 @@ const albumPath = (track: SonicTrack) =>
 export function SonicTrackCover({ track }: { track: SonicTrack }) {
   return (
     <MediaCover
-      className="size-12 shrink-0"
+      size={48}
       src={
         track.has_cover
           ? albumCoverApiUrl({ albumId: track.album_id }, { size: 96 })

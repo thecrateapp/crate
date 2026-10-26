@@ -60,7 +60,7 @@ function SortableTrackItem({
             src={trackCoverPath(track)}
             renderImage={renderImage}
             fallbackIcon={Music2}
-            className="size-12 shrink-0"
+            size={48}
           />
         }
         meta={

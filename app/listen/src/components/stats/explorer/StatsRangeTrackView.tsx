@@ -58,7 +58,7 @@ export function StatsRangeTrackView({
                 src={cover}
                 alt=""
                 renderImage={renderImage}
-                className="size-12"
+                size={48}
               />
             }
           />

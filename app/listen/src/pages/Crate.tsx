@@ -605,7 +605,7 @@ function CrateAlbumPreviewRow({
         <MediaCover
           src={albumCover}
           alt=""
-          className="size-12 shrink-0"
+          size={48}
           fallbackIcon={Disc3}
           renderImage={(image) => (
             <CrateImage

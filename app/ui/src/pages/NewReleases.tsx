@@ -281,7 +281,8 @@ function ReleaseTimelineRow({
             alt=""
             fallbackIcon={Disc3}
             iconSize={CRATE_ICON_SIZE.xl}
-            className="size-[88px] shrink-0 rounded-none"
+            size={88}
+            className="rounded-none"
           />
         }
         href={albumHref}
@@ -356,7 +357,8 @@ function ReleaseGridCard({
           alt=""
           fallbackIcon={Disc3}
           iconSize={CRATE_ICON_SIZE.xl}
-          className="h-full w-full rounded-none"
+          size="fill"
+          className="rounded-none"
         />
 
         <div className="absolute left-3 top-3">

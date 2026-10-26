@@ -424,7 +424,7 @@ function ArtistStatsConsole({
                           src={identity?.coverUrl}
                           alt=""
                           fallback={row.album.slice(0, 2)}
-                          className="size-12 shrink-0"
+                          size={48}
                         />
                         <span className="min-w-0 break-words">
                           <span className="font-display text-sm">
@@ -517,7 +517,7 @@ function ArtistStatsConsole({
                               src={identity?.coverUrl}
                               alt=""
                               fallback={row.label.slice(0, 2)}
-                              className="size-12 shrink-0"
+                              size={48}
                             />
                             <span className="min-w-0 break-words">
                               <span className="font-display text-sm">

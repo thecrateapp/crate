@@ -836,9 +836,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/media/MediaCover.tsx": "36a3fa15858255fc9d3f01395f3cbd29594490264004c8e63c3a81299b3f7bf0",
+        "app/shared/ui/domain/media/MediaCover.tsx": "7c0e60fcbb0f0a3826f0ccbbf245a1e7712093c323c9d989c9739e73c78c9492",
         "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "06775dc68a8e18501c05252c2ad3bb6d2ecbf13f3e3aa276c0ff84226ce23da6",
-        "tools/crate-ui-showcase/docs/MediaCover.mdx": "34fd7862a9febb0c7a68f5c5873f67fe0d6684e70f767c93fff0ea016cd741b8"
+        "tools/crate-ui-showcase/docs/MediaCover.mdx": "a0eb5d9c86dd9cff172ea855997e11543bfeb8e8cb7d7333f44713d14655e9d4"
       },
       "category": "Media"
     },

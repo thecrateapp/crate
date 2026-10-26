@@ -12,8 +12,22 @@ export interface MediaCoverImageProps {
   fallback: ReactNode;
 }
 
-export interface MediaCoverProps
-  extends Omit<ComponentPropsWithRef<"div">, "children"> {
+export type MediaCoverSize = 48 | 56 | 64 | 80 | 88 | 96 | "fill";
+
+const SIZE_CLASS: Record<MediaCoverSize, string> = {
+  48: "size-12 shrink-0",
+  56: "size-14 shrink-0",
+  64: "size-16 shrink-0",
+  80: "size-20 shrink-0",
+  88: "size-22 shrink-0",
+  96: "size-24 shrink-0",
+  fill: "size-full",
+};
+
+export interface MediaCoverProps extends Omit<
+  ComponentPropsWithRef<"div">,
+  "children"
+> {
   src?: string | null;
   fallbackUrl?: string | null;
   alt?: string;
@@ -21,6 +35,7 @@ export interface MediaCoverProps
   fallback?: ReactNode;
   iconSize?: number;
   shape?: MediaImageShape;
+  size?: MediaCoverSize;
   renderImage?: (image: MediaCoverImageProps) => ReactNode;
 }
 
@@ -32,6 +47,7 @@ export function MediaCover({
   fallback,
   iconSize = 18,
   shape = "square",
+  size,
   className,
   renderImage,
   ...props
@@ -65,6 +81,7 @@ export function MediaCover({
   const baseClasses = cn(
     "crate-media-cover overflow-hidden",
     shapeClass(shape),
+    size !== undefined && SIZE_CLASS[size],
     className,
   );
   const handleError = () => {
@@ -77,6 +94,7 @@ export function MediaCover({
       {...props}
       data-slot="media-cover"
       data-shape={shape}
+      data-size={size}
       data-min-size="48"
       data-state={imageSrc ? "image" : "fallback"}
       className={cn(

@@ -53,7 +53,7 @@ export function StatsReplayCard({
               key={item ? `${item.track_id ?? item.title}-${index}` : index}
               src={item && coverUrl ? coverUrl(item) : null}
               alt=""
-              className="size-full"
+              size="fill"
               renderImage={renderImage}
             />
           );

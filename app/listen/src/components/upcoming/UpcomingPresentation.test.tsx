@@ -89,7 +89,7 @@ describe("Upcoming event presentation", () => {
         date
           .closest('[data-slot="upcoming-event-row"]')
           ?.querySelector('[data-slot="media-cover"]'),
-      ).toHaveClass("size-[88px]");
+      ).toHaveAttribute("data-size", "88");
     }
     expect(screen.queryByText("Pre-release")).not.toBeInTheDocument();
     expect(

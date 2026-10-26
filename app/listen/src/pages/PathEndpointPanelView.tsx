@@ -52,7 +52,7 @@ export function PathEndpointPanelView({
                   alt=""
                   shape={selected.type === "artist" ? "circle" : "square"}
                   fallbackIcon={Music2}
-                  className="size-24 shrink-0"
+                  size={96}
                   renderImage={renderImage}
                 />
                 <div className="min-w-0 flex-1">

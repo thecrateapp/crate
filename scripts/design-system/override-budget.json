@@ -161,7 +161,7 @@
   "MediaCover": {
     "background": 1,
     "border": 3,
-    "height": 35,
+    "height": 3,
     "radius": 5
   },
   "ModalBody": {

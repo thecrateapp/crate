@@ -148,7 +148,7 @@ function UserProfileCrateRow({ crate }: { crate: PublicCrate }) {
         <MediaCover
           alt=""
           src={coverUrl}
-          className="size-14"
+          size={56}
           fallbackIcon={CrateBox}
           renderImage={(image) => <CrateImage {...image} />}
         />
