@@ -17,7 +17,7 @@ describe("docs app", () => {
     render(<App />);
     expect(
       await screen.findByRole("heading", {
-        name: "Hermes operator candidate and rollout",
+        name: "Crate Operator candidate and rollout",
         level: 1,
       }),
     ).toBeTruthy();
@@ -30,6 +30,26 @@ describe("docs app", () => {
       screen.getByRole("heading", {
         name: "Version transition, health and rollback",
       }),
+    ).toBeTruthy();
+  });
+
+  it("publishes the Crate Agent and Crate Operator Telegram guide", async () => {
+    window.history.pushState(null, "", "/operations/crate-agent");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Crate Agent and Crate Operator over Telegram",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Create the Telegram bot" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Approvals in Telegram" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Troubleshooting" }),
     ).toBeTruthy();
   });
 

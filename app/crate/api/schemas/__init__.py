@@ -314,7 +314,6 @@ from crate.api.schemas.settings import (
     SettingsUpdateResponse,
     ShowsSettingsResponse,
     SoulseekSettingsResponse,
-    TelegramSettingsResponse,
     WorkerSettingsResponse,
 )
 from crate.api.schemas.tasks import (
@@ -784,7 +783,6 @@ __all__ = [
     "TaskConflictResponse",
     "TaskResponse",
     "TaskRetryResponse",
-    "TelegramSettingsResponse",
     "TidalAlbumResponse",
     "TidalArtistRefResponse",
     "TidalArtistResponse",

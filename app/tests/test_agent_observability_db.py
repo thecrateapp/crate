@@ -104,3 +104,44 @@ def test_persisted_observation_query_is_read_only_batched_and_bounded(pg_db):
     assert result["database_schema_version"] and result["queried_at"]
     # The no-session branch also owns a rollback-only scope.
     assert read_observation_evidence()["profiles"] is None
+
+
+def test_alert_samples_exclude_cancellations_and_old_rows_and_need_opt_in(pg_db):
+    del pg_db
+    with transaction_scope() as session:
+        session.execute(
+            text("""INSERT INTO tasks(id,type,status,created_at,updated_at,result_json,error)
+            SELECT 'failed-'||i,'enrich_artist','failed',NOW(),NOW()-make_interval(secs=>i),
+                CAST('{"error_code":"UPSTREAM"}' AS jsonb),'raw secret error text'
+            FROM generate_series(1,22) i""")
+        )
+        session.execute(
+            text("""INSERT INTO tasks(id,type,status,created_at,updated_at,cancellation_requested_at)
+            VALUES ('failed-cancelled','enrich_artist','failed',NOW(),NOW(),NOW()),
+                   ('failed-old','enrich_artist','failed',NOW(),NOW()-INTERVAL '25 hours',NULL),
+                   ('cancelled','enrich_artist','cancelled',NOW(),NOW(),NULL)""")
+        )
+        session.execute(
+            text("""INSERT INTO new_releases(artist_name,album_title,year,status,detected_at)
+            VALUES ('Artist','Fresh','2026','detected',NOW()),
+                   ('Artist','Stale','2020','detected',NOW()-INTERVAL '8 days')""")
+        )
+        session.execute(
+            text("""INSERT INTO ops_runtime_state (key,payload_json,updated_at)
+            VALUES ('health',CAST(:health AS jsonb),NOW())
+            ON CONFLICT(key) DO UPDATE SET payload_json=EXCLUDED.payload_json,updated_at=EXCLUDED.updated_at"""),
+            {"health": json.dumps({"score": 70, "breaches": [], "metrics": {"x": 1}})},
+        )
+    plain = read_observation_evidence()
+    assert plain["failed_tasks"] is None and plain["new_releases"] is None
+    result = read_observation_evidence(alerts=True)
+    failed = result["failed_tasks"]
+    assert len(failed) == 21
+    assert {row["id"] for row in failed}.isdisjoint(
+        {"failed-cancelled", "failed-old", "cancelled"}
+    )
+    assert failed[0]["id"] == "failed-1" and failed[0]["error_code"] == "UPSTREAM"
+    assert "raw secret error text" not in json.dumps(failed)
+    assert [row["album"] for row in result["new_releases"]] == ["Fresh"]
+    health = next(r for r in result["runtime"] if r["source"] == "health")
+    assert health["payload"] == {"score": 70, "breaches": []}

@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ConnectAgentDialog } from "@/components/agents/connections/ConnectAgentDialog";
 import { ConnectionSheet } from "@/components/agents/connections/ConnectionSheet";
 import { OAuthApps } from "@/components/agents/connections/OAuthApps";
+import { TelegramApprovers } from "@/components/agents/connections/TelegramApprovers";
 import { useCursorList } from "@/components/agents/connections/use-cursor-list";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -140,6 +141,7 @@ export function AgentConnections() {
   const [selected, setSelected] = useState<AgentIntegration | null>(null);
   // Remounting the OAuth apps panel reloads its list from the first page.
   const [oauthGeneration, setOauthGeneration] = useState(0);
+  const [approverGeneration, setApproverGeneration] = useState(0);
 
   if (!canManage) {
     return (
@@ -172,6 +174,7 @@ export function AgentConnections() {
     connections.reload();
     catalog.refetch();
     setOauthGeneration((value) => value + 1);
+    setApproverGeneration((value) => value + 1);
   }
 
   function connectionChanged(fresh: AgentIntegration) {
@@ -269,6 +272,15 @@ export function AgentConnections() {
           ) : null}
         </div>
       </OpsPanel>
+
+      {!listLoading ? (
+        <TelegramApprovers
+          key={approverGeneration}
+          connections={connections.items.filter(
+            (item) => item.kind === "service",
+          )}
+        />
+      ) : null}
 
       {catalog.data ? (
         <OAuthApps key={oauthGeneration} catalog={catalog.data} />

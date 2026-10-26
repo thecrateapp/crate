@@ -175,10 +175,10 @@
     },
     {
       "id": "smart-mix-unavailable",
-      "question_es": "¿Tiene Hermes cobertura dedicada de Smart Mix y sabe que terminó el backfill?",
+      "question_es": "¿Tiene Crate Agent cobertura dedicada de Smart Mix y sabe que terminó el backfill?",
       "source_path": "docs/technical/smart-mix-operations.md",
       "search_queries": [
-        "Hermes"
+        "Crate Agent"
       ],
       "required_evidence": [
         "get_smart_mix_status",

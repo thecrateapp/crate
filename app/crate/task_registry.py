@@ -1,7 +1,7 @@
 """Canonical task type catalog: labels, categories and manual actions.
 
-Single source of truth for task names. Used by API responses, the admin
-task catalog endpoint and the Telegram bot.
+Single source of truth for task names. Used by API responses and the admin
+task catalog endpoint.
 """
 
 from __future__ import annotations
@@ -462,5 +462,5 @@ def task_category(task_type: str) -> str:
 
 
 def task_icon(task_type: str) -> str:
-    """Emoji icon for a task type (Telegram only)."""
+    """Emoji icon for a task type."""
     return TASK_TYPE_ICONS.get(task_type, "\u2699\ufe0f")

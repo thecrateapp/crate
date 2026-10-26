@@ -1,6 +1,6 @@
 ---
 title: Native Telegram plan confirmation
-summary: Exact human button review, deterministic job admission and the opt-in Hermes write profile.
+summary: Exact human button review, deterministic job admission and the opt-in Crate Operator write profile.
 section: operations
 audience: [operator, developer]
 status: canonical
@@ -24,8 +24,8 @@ sources:
 
 # Native Telegram plan confirmation
 
-The default `config.json` remains the twelve-tool read-only pilot. The explicit
-`CRATE_HERMES_PROFILE=operator` profile adds reviewed prepare/apply tools and a
+The default `config.json` remains the twelve-tool read-only Crate Agent. The explicit
+`CRATE_AGENT_PROFILE=operator` profile (Crate Operator) adds reviewed prepare/apply tools and a
 presentation request. It never supplies a human decision tool to the model.
 Native Telegram buttons provide independent approval without a second Admin review.
 The Admin plan detail/approve/reject pages remain available as a fallback.
@@ -44,8 +44,8 @@ decision; disabling/demoting the account or removing its required capabilities d
    the operation. This call only creates presentation bookkeeping.
 3. The native presenter sends the entire exact plan as plain JSON pages, including
    every target, change, cost/impact, precondition, version/hash, policy and expiry.
-   `Siguiente` presents the next page. The backend permits `Aprobar` only after all
-   pages have durable delivery receipts. `Rechazar` is available on every page.
+   `Next` presents the next page. The backend permits `Approve` only after all
+   pages have durable delivery receipts. `Reject` is available on every page.
    Invisible formatting characters are escaped losslessly; titles cannot inject
    Telegram markup. Long strings can span pages, but no target is truncated.
 4. The human presses the button from the bound private Telegram account. The same
@@ -115,7 +115,7 @@ instance/principal/credential identity, grants and tool annotations per mutation
 Its fixed stdio catalog remains discoverable when API/context is unavailable;
 independent native recovery starts first and current domain calls recover without
 a gateway restart. The separate supervisor credential is mounted only to its own
-service, not exported to the model. The read-only pilot startup is unchanged.
+service, not exported to the model. The read-only Crate Agent startup is unchanged.
 
 Only the controlled Crate MCP server uses `trust: full`. The pinned Hermes v0.22.2
 client otherwise adds a generic per-tool consent prompt for `trust: untrusted`.

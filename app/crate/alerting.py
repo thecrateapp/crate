@@ -1,7 +1,7 @@
-"""Health evaluation and alerting engine.
+"""Health evaluation engine.
 
-Computes a degradation score (0–100) from metrics and checks
-thresholds. Integrates with Telegram for proactive alerts.
+Computes a degradation score (0–100) from metrics and checks thresholds.
+The worker service loop persists the result; the operator supervisor alerts on it.
 """
 
 from __future__ import annotations
@@ -28,29 +28,19 @@ class HealthStatus:
     breaches: list[ThresholdBreach] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
 
-    def summary_text(self) -> str:
-        lines = []
-        m = self.metrics
-        lines.append(
-            f"\U0001f4ca API: p95 {m.get('api_p95', 0):.0f}ms, {m.get('api_error_rate', 0):.1f}% errors"
-        )
-        lines.append(f"\u2699\ufe0f Queue: {m.get('queue_depth', 0):.0f} pending")
-        lines.append(
-            f"\U0001f4be Disk: {m.get('disk_free_gb', 0):.0f} GB free ({m.get('disk_usage_pct', 0):.0f}%)"
-        )
-        if m.get("disk_days_until_full") is not None:
-            lines.append(
-                f"\u23f3 Disk projection: {m['disk_days_until_full']:.1f} days remaining"
-            )
-        lines.append(f"\U0001f9e0 RAM: {m.get('ram_usage_pct', 0):.0f}%")
-        if self.breaches:
-            lines.append("")
-            lines.append("\u26a0\ufe0f Breaches:")
-            for b in self.breaches:
-                lines.append(
-                    f"  \u2022 {b.name}: {b.value:.1f} (threshold: {b.threshold})"
-                )
-        return "\n".join(lines)
+    def snapshot(self) -> dict:
+        return {
+            "score": int(self.score),
+            "breaches": [
+                {
+                    "name": breach.name[:80],
+                    "value": round(float(breach.value), 1),
+                    "threshold": round(float(breach.threshold), 1),
+                    "severity": breach.severity,
+                }
+                for breach in self.breaches[:10]
+            ],
+        }
 
 
 def _get_threshold(key: str, default: float) -> float:
@@ -200,30 +190,3 @@ def evaluate_health() -> HealthStatus:
     status.breaches = breaches
 
     return status
-
-
-def check_and_alert():
-    """Evaluate health and send Telegram alerts if thresholds are breached.
-
-    Called from the Telegram bot loop every 5 minutes.
-    """
-    from crate.telegram import send_alert
-
-    status = evaluate_health()
-
-    if status.score < 50:
-        send_alert(
-            "critical",
-            f"\U0001f534 Service CRITICAL ({status.score}/100)\n\n{status.summary_text()}",
-        )
-    elif status.score < 80:
-        send_alert(
-            "degraded",
-            f"\u26a0\ufe0f Service degraded ({status.score}/100)\n\n{status.summary_text()}",
-        )
-
-    for breach in status.breaches:
-        send_alert(
-            f"metric:{breach.name}",
-            f"\u26a0\ufe0f <b>{breach.name}</b>: {breach.value:.1f} (threshold: {breach.threshold})",
-        )

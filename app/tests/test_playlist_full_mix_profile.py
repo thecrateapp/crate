@@ -172,7 +172,6 @@ def test_admin_preview_and_generation_share_full_profile_selection(pg_db, monkey
 
     monkeypatch.setattr(management, "emit_progress", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(management, "emit_task_event", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr("crate.telegram.send_message", lambda *_args, **_kwargs: None)
     result = management._handle_generate_system_playlist(
         "test-full-mix", {"playlist_id": playlist_id}, {}
     )

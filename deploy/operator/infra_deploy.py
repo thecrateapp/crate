@@ -16,11 +16,11 @@ REQUIRED = (
     ".env",
 )
 OPTIONAL = (
-    ".deploy/hermes.compose.yaml",
+    ".deploy/crate-operator.compose.yaml",
     ".deploy/release-manifest.json",
     ".deploy/release.env.candidate",
     ".deploy/release-manifest.json.candidate",
-    ".deploy/hermes-context.candidate.tar.gz",
+    ".deploy/agent-context.candidate.tar.gz",
     "deploy/traefik/federation-readplane.yml",
     "app/config.yaml",
 )
@@ -96,7 +96,7 @@ def _context_root(root):
         if not Path(managed).is_absolute():
             raise ValueError("Operator root must be absolute")
         return Path(managed) / "context"
-    directory = Path(value + "/hermes-agent")
+    directory = Path(value + "/crate-agent")
     if not directory.is_absolute():
         directory = root / directory
     return directory / "context"
@@ -143,12 +143,7 @@ def validate_host(root, *, backup_id=None):
         _check_optional(context)
         _check_optional(context / "deployment.json")
         _check_optional(context / "public")
-        for name in (
-            "deployment.json",
-            "context.json",
-            "target.json",
-            "observation.json",
-        ):
+        for name in ("deployment.json", "context.json"):
             _check_optional(context / "public" / name)
         _check_optional(context / "releases")
         active = context / "active"
@@ -220,9 +215,9 @@ def staged_inputs(original, assets):
         expected[name] = assets[name]
     for name in ("release.env", "release-manifest.json"):
         expected[".deploy/" + name + ".candidate"] = assets[name]
-    if "hermes-context.tar.gz" in assets:
-        expected[".deploy/hermes-context.candidate.tar.gz"] = assets[
-            "hermes-context.tar.gz"
+    if "agent-context.tar.gz" in assets:
+        expected[".deploy/agent-context.candidate.tar.gz"] = assets[
+            "agent-context.tar.gz"
         ]
     return expected
 

@@ -22,8 +22,6 @@ from crate.api.schemas.settings import (
     SettingsResponse,
     SettingsUpdateResponse,
     SoulseekSettingsUpdateRequest,
-    TelegramSettingsUpdateRequest,
-    TelegramTestResponse,
     WorkerSettingsRequest,
 )
 from crate.db.audit import get_db_table_stats
@@ -121,20 +119,8 @@ def get_settings(request: Request):
             ),
             "shares_music": get_setting("slskd_shares_music", "true") == "true",
         },
-        "telegram": {
-            "enabled": get_setting("telegram_enabled", "false") == "true",
-            "bot_token": _mask_token(get_setting("telegram_bot_token", "")),
-            "chat_id": get_setting("telegram_chat_id", ""),
-            "has_token": bool(get_setting("telegram_bot_token", "")),
-        },
         "about": _get_about_info(),
     }
-
-
-def _mask_token(token: str) -> str:
-    if not token or len(token) < 10:
-        return ""
-    return token[:6] + "..." + token[-4:]
 
 
 def _get_shows_settings() -> dict:
@@ -358,44 +344,6 @@ def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
         set_setting(
             "paths_llm_refinement_enabled",
             "true" if body.llm_refinement_enabled else "false",
-        )
-    return {"ok": True}
-
-
-@router.put(
-    "/telegram",
-    response_model=SettingsUpdateResponse,
-    responses=_SETTINGS_RESPONSES,
-    summary="Update Telegram integration settings",
-)
-def update_telegram(request: Request, body: TelegramSettingsUpdateRequest):
-    _require_settings_manager(request)
-    if body.bot_token is not None:
-        token = (body.bot_token or "").strip()
-        if token and "..." not in token:
-            set_setting("telegram_bot_token", token)
-    if body.enabled is not None:
-        set_setting("telegram_enabled", "true" if body.enabled else "false")
-    if body.chat_id is not None:
-        set_setting("telegram_chat_id", str(body.chat_id).strip())
-    return {"ok": True}
-
-
-@router.post(
-    "/telegram/test",
-    response_model=TelegramTestResponse,
-    responses=_SETTINGS_RESPONSES,
-    summary="Send a Telegram test message",
-)
-def test_telegram(request: Request):
-    _require_settings_manager(request)
-    from crate.telegram import send_message
-
-    ok = send_message("\u2705 Crate bot test — connection working!")
-    if not ok:
-        raise HTTPException(
-            status_code=400,
-            detail="Failed to send message. Check bot token and chat ID.",
         )
     return {"ok": True}
 

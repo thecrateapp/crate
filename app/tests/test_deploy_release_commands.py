@@ -15,18 +15,18 @@ ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize(
     ("base_services", "overlay_included"),
     [
-        ("crate-hermes-agent\ncrate-api\n", False),
+        ("crate-agent\ncrate-api\n", False),
         ("crate-api\n", True),
     ],
 )
-def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
+def test_remote_deploy_selects_legacy_operator_overlay_only_when_needed(
     tmp_path: Path, base_services: str, overlay_included: bool
 ) -> None:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     compose_setup = script[
         script.index("COMPOSE=(docker compose") : script.index("PROJECT_SERVICES=(")
     ]
-    overlay = tmp_path / ".deploy/hermes.compose.yaml"
+    overlay = tmp_path / ".deploy/crate-operator.compose.yaml"
     overlay.parent.mkdir()
     overlay.write_text("services: {}\n")
 
@@ -35,6 +35,7 @@ def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
     docker = fake_bin / "docker"
     docker.write_text(
         "#!/usr/bin/env bash\n"
+        '[[ "$1" == ps ]] && exit 0\n'
         'printf \'%s\' "$*" > "$FAKE_DOCKER_ARGS"\n'
         "printf '%s\\n' \"$FAKE_COMPOSE_SERVICES\"\n"
     )
@@ -61,10 +62,206 @@ def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
         env=env,
     )
 
-    assert (".deploy/hermes.compose.yaml" in result.stdout) is overlay_included
+    assert (".deploy/crate-operator.compose.yaml" in result.stdout) is overlay_included
     docker_args = args_file.read_text()
-    assert "--profile hermes" in docker_args
+    assert "--profile agent" in docker_args
     assert "config --services" in docker_args
+
+
+def _compose_setup() -> str:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    return script[
+        script.index("COMPOSE=(docker compose") : script.index("PROJECT_SERVICES=(")
+    ]
+
+
+def _shell_function(name: str) -> str:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    start = script.index(f"{name}() {{")
+    return script[start : script.index("\n}\n", start) + 3]
+
+
+def _fake_docker(tmp_path: Path) -> tuple[dict, Path]:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf \'%s\\n\' "$*" >> "$FAKE_DOCKER_LOG"\n'
+        'if [[ "$1" == ps ]]; then\n'
+        "  for name in $FAKE_RUNNING; do\n"
+        '    [[ "$*" == *"name=^${name}\\$"* ]] && echo "id-${name}"\n'
+        "  done\n"
+        "  exit 0\n"
+        "fi\n"
+        'if [[ "$*" == *" ps -q --status running "* ]]; then\n'
+        "  for name in $FAKE_RUNNING; do\n"
+        '    [[ "${@: -1}" == "$name" ]] && echo "id-${name}"\n'
+        "  done\n"
+        "  exit 0\n"
+        "fi\n"
+        'if [[ "$*" == *"config --services"* ]]; then echo crate-agent; fi\n'
+    )
+    docker.chmod(0o755)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "FAKE_DOCKER_LOG": str(log),
+    }
+    return env, log
+
+
+@pytest.mark.parametrize(
+    ("running", "overlay_file", "expected"),
+    [
+        ("crate-api", True, None),
+        ("crate-operator", True, "deploy/operator/compose.operator.yaml"),
+    ],
+)
+def test_remote_deploy_keeps_the_operator_overlay_while_it_runs(
+    tmp_path: Path, running: str, overlay_file: bool, expected: str | None
+) -> None:
+    if overlay_file:
+        overlay = tmp_path / "deploy/operator/compose.operator.yaml"
+        overlay.parent.mkdir(parents=True)
+        overlay.write_text("services: {}\n")
+    env, _log = _fake_docker(tmp_path)
+    env["FAKE_RUNNING"] = running
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            _compose_setup()
+            + "printf '%s\\n' \"${COMPOSE[@]}\"\nprintf 'overlay=%s\\n' \"$OPERATOR_OVERLAY\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    lines = result.stdout.splitlines()
+    if expected is None:
+        assert "overlay=" in lines
+        assert not any("compose.operator.yaml" in line for line in lines[:-1])
+    else:
+        assert lines.count(expected) == 1
+        assert f"overlay={expected}" in lines
+
+
+def test_remote_deploy_refuses_a_running_operator_without_its_overlay(
+    tmp_path: Path,
+) -> None:
+    env, _log = _fake_docker(tmp_path)
+    env["FAKE_RUNNING"] = "crate-operator"
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", _compose_setup()],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 1
+    assert "compose.operator.yaml is missing" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("running", "agent_image", "recreated"),
+    [
+        ("crate-agent", "img", [["--profile", "agent", "crate-agent"]]),
+        (
+            "crate-operator crate-operator-supervisor",
+            "img",
+            [
+                [
+                    "--profile",
+                    "crate-operator",
+                    "crate-operator",
+                    "crate-operator-supervisor",
+                ]
+            ],
+        ),
+        (
+            "crate-operator crate-operator-supervisor crate-infra-relay",
+            "img",
+            [
+                [
+                    "--profile",
+                    "crate-operator",
+                    "crate-operator",
+                    "crate-operator-supervisor",
+                    "crate-infra-relay",
+                ]
+            ],
+        ),
+        (
+            "crate-operator crate-provenance crate-provenance-docker",
+            "img",
+            [
+                [
+                    "--profile",
+                    "crate-operator",
+                    "crate-operator",
+                    "crate-provenance",
+                    "crate-provenance-docker",
+                ]
+            ],
+        ),
+        ("crate-operator", "", []),
+        ("crate-api", "img", []),
+    ],
+)
+def test_deploy_recreates_running_agent_or_operator_on_the_release_image(
+    tmp_path: Path, running: str, agent_image: str, recreated: list
+) -> None:
+    (tmp_path / ".env").write_text(f"CRATE_AGENT_IMAGE={agent_image}\n")
+    env, log = _fake_docker(tmp_path)
+    env["FAKE_RUNNING"] = running
+    operator = "crate-operator" in running.split()
+    script = (
+        "COMPOSE=(docker compose -f docker-compose.yaml)\n"
+        f"OPERATOR_OVERLAY={'deploy/operator/compose.operator.yaml' if operator else ''}\n"
+        + "\n".join(
+            _shell_function(name)
+            for name in (
+                "log",
+                "dc",
+                "env_file_value",
+                "env_value",
+                "refresh_running_agent",
+            )
+        )
+        + "\nrefresh_running_agent\n"
+    )
+    subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    ups = [
+        line.split()
+        for line in log.read_text().splitlines()
+        if " up -d --no-build --no-deps " in line
+    ]
+    assert [
+        [up[up.index("--profile")], up[up.index("--profile") + 1]]
+        + up[up.index("--no-deps") + 1 :]
+        for up in ups
+    ] == recreated
+
+
+def test_deploy_ships_the_operator_overlay_with_the_compose_files() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    assert "deploy/operator/compose.operator.yaml" in deploy
+    sync = deploy[deploy.index("sync_config() {") :]
+    assert sync.index("compose.operator.yaml") < sync.index("deploy-remote.sh")
 
 
 def _make_dry_run(target: str, *variables: str) -> str:

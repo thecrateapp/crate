@@ -1,0 +1,11 @@
+# The Hermes image builds with the repository root as context. Allowlist only
+# the runtime assets, the operator package and the exported release context.
+*
+!deploy/hermes/
+!deploy/operator/
+!scripts/release_manifest.py
+!build/hermes-context/
+
+**/__pycache__/
+**/*.pyc
+deploy/hermes/Dockerfile*

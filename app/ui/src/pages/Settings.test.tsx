@@ -87,12 +87,6 @@ const settingsData = {
     llm_refinement_enabled: true,
     llm_refinement_cache_ttl_hours: 168,
   },
-  telegram: {
-    enabled: false,
-    bot_token: "",
-    chat_id: "",
-    has_token: false,
-  },
   about: {
     version: "dev",
     git_commit: "abcdef123",
@@ -288,6 +282,20 @@ describe("Settings", () => {
     time.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       new Date(timestamp).toLocaleString(),
+    );
+  });
+
+  it("no longer offers the legacy Telegram bot settings", () => {
+    render(<Settings />);
+
+    expect(
+      screen.queryByRole("button", { name: /notifications/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/telegram/i)).not.toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/settings/telegram"),
+      expect.anything(),
+      expect.anything(),
     );
   });
 
@@ -543,7 +551,6 @@ describe("Settings", () => {
     ["downloads", "spinbutton", "Max active streams"],
     ["enrichment", "spinbutton", "Re-enrich age"],
     ["enrichment", "spinbutton", "Track popularity"],
-    ["notifications", "textbox", "Chat ID"],
   ])(
     "names the %s field %s %s through its visible caption",
     async (section, role, name) => {

@@ -237,7 +237,7 @@ env = {
     **os.environ,
     "HERMES_HOME": str(LAB_HOME),
     "XDG_STATE_HOME": str(LAB_HOME / "xdg-state"),
-    "CRATE_HERMES_PROFILE": "operator",
+    "CRATE_AGENT_PROFILE": "operator",
     "CRATE_MCP_URL": "http://127.0.0.1:8585/mcp",
     "CRATE_MCP_HOST": "localhost",
     "PYTHONPATH": "/workspace",

@@ -1,5 +1,6 @@
 """Closed native transport inputs; none of these are model decision tools."""
 
+from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -10,6 +11,31 @@ class TelegramBindingInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     principal_id: UUID
     telegram_user_id: Annotated[int, Field(strict=True, gt=0)]
+
+
+class TelegramBindingResult(BaseModel):
+    binding_id: str
+    instance_id: str
+    telegram_user_id: int
+
+
+class TelegramApproverBinding(BaseModel):
+    binding_id: str
+    principal_id: str
+    principal_name: str | None = None
+    user_id: int | None = None
+    username: str | None = None
+    telegram_user_id: int
+    created_at: datetime
+
+
+class TelegramApproverBindings(BaseModel):
+    instance_id: str | None
+    items: list[TelegramApproverBinding]
+
+
+class TelegramBindingRevoked(BaseModel):
+    revoked: bool
 
 
 class NativePoll(BaseModel):

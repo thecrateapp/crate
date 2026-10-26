@@ -189,6 +189,22 @@
     "order": 120
   },
   {
+    "sourcePath": "docs/technical/crate-agent.md",
+    "route": "/operations/crate-agent",
+    "section": "operations",
+    "title": "Crate Agent and Crate Operator over Telegram",
+    "summary": "Set up, run and troubleshoot the read-only Crate Agent and the approval-gated Crate Operator on Telegram.",
+    "keywords": [
+      "crate agent",
+      "crate operator",
+      "telegram",
+      "model",
+      "approval",
+      "supervisor"
+    ],
+    "order": 122
+  },
+  {
     "sourcePath": "docs/technical/crate-operator.md",
     "route": "/operations/independent-operator",
     "section": "operations",
@@ -202,7 +218,7 @@
     "route": "/operations/native-plan-confirmation",
     "section": "operations",
     "title": "Native Telegram plan confirmation",
-    "summary": "Exact human button review, deterministic job admission and the opt-in Hermes write profile.",
+    "summary": "Exact human button review, deterministic job admission and the opt-in Crate Operator write profile.",
     "keywords": ["Hermes", "Telegram", "approval", "plans", "operator"],
     "order": 126
   },
@@ -475,7 +491,7 @@
     "route": "/operations/smart-mix",
     "section": "operations",
     "title": "Smart Mix - funcionamiento y operación",
-    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Hermes.",
+    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Crate Agent.",
     "keywords": [
       "smart mix",
       "backfill",
@@ -490,7 +506,7 @@
     "sourcePath": "docs/technical/hermes-operator-release.md",
     "route": "/operations/hermes-operator-release",
     "section": "operations",
-    "title": "Hermes operator candidate and rollout",
+    "title": "Crate Operator candidate and rollout",
     "summary": "Complete opt-in operator architecture, authority and coverage matrix, root provisioning, disposable acceptance and rollback.",
     "order": 127,
     "keywords": [

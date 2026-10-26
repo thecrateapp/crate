@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,cast-receiver,docs,site or all)"
+        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,cast-receiver,docs,site,agent or all)"
         default: "all"
 
 env:
@@ -36,6 +36,7 @@ jobs:
       cast_receiver: ${{ steps.filter.outputs.cast_receiver }}
       site: ${{ steps.filter.outputs.site }}
       docs: ${{ steps.filter.outputs.docs }}
+      agent: ${{ steps.filter.outputs.agent }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -418,6 +419,57 @@ jobs:
             VITE_SENTRY_RELEASE=crate-${{ github.sha }}
             VITE_SENTRY_TRACES_SAMPLE_RATE=${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
 
+  build-agent:
+    needs: changes
+    if: needs.changes.outputs.agent == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      # The image carries the release context of this exact commit, so Crate
+      # Agent needs no host-side context activation on a new instance.
+      - name: Export the release context
+        run: |
+          set -Eeuo pipefail
+          printf '{"release_sha": "%s"}\n' "$GITHUB_SHA" > /tmp/agent-deployment.json
+          python scripts/hermes_context.py \
+            --repo . \
+            --revision "$GITHUB_SHA" \
+            --deployment-manifest /tmp/agent-deployment.json \
+            --destination build/hermes-context
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-agent
+          tags: |
+            type=sha,prefix=,format=long
+
+      - uses: docker/build-push-action@v7
+        id: build
+        with:
+          context: .
+          file: ./deploy/hermes/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,scope=agent,mode=max
+
   promote-release:
     needs:
       - changes
@@ -432,6 +484,7 @@ jobs:
       - build-cast-receiver
       - build-site
       - build-docs
+      - build-agent
     if: always() && needs.changes.result == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -453,6 +506,7 @@ jobs:
       CHANGED_CAST_RECEIVER: ${{ needs.changes.outputs.cast_receiver }}
       CHANGED_SITE: ${{ needs.changes.outputs.site }}
       CHANGED_DOCS: ${{ needs.changes.outputs.docs }}
+      CHANGED_AGENT: ${{ needs.changes.outputs.agent }}
       RESULT_API: ${{ needs['build-api'].result }}
       RESULT_READPLANE: ${{ needs['build-readplane'].result }}
       RESULT_WORKER: ${{ needs['build-worker'].result }}
@@ -464,6 +518,7 @@ jobs:
       RESULT_CAST_RECEIVER: ${{ needs['build-cast-receiver'].result }}
       RESULT_SITE: ${{ needs['build-site'].result }}
       RESULT_DOCS: ${{ needs['build-docs'].result }}
+      RESULT_AGENT: ${{ needs['build-agent'].result }}
       DIGEST_API: ${{ needs['build-api'].outputs.digest }}
       DIGEST_READPLANE: ${{ needs['build-readplane'].outputs.digest }}
       DIGEST_WORKER: ${{ needs['build-worker'].outputs.digest }}
@@ -475,6 +530,7 @@ jobs:
       DIGEST_CAST_RECEIVER: ${{ needs['build-cast-receiver'].outputs.digest }}
       DIGEST_SITE: ${{ needs['build-site'].outputs.digest }}
       DIGEST_DOCS: ${{ needs['build-docs'].outputs.digest }}
+      DIGEST_AGENT: ${{ needs['build-agent'].outputs.digest }}
     steps:
       - uses: actions/checkout@v6
 
@@ -509,6 +565,7 @@ jobs:
           check_result cast-receiver "$CHANGED_CAST_RECEIVER" "$RESULT_CAST_RECEIVER"
           check_result site "$CHANGED_SITE" "$RESULT_SITE"
           check_result docs "$CHANGED_DOCS" "$RESULT_DOCS"
+          check_result agent "$CHANGED_AGENT" "$RESULT_AGENT"
 
       - name: Assemble complete release manifest
         env:
@@ -540,6 +597,7 @@ jobs:
           [[ "$CHANGED_CAST_RECEIVER" == "true" ]] && digest_args+=(--digest "cast-receiver=$DIGEST_CAST_RECEIVER")
           [[ "$CHANGED_SITE" == "true" ]] && digest_args+=(--digest "site=$DIGEST_SITE")
           [[ "$CHANGED_DOCS" == "true" ]] && digest_args+=(--digest "docs=$DIGEST_DOCS")
+          [[ "$CHANGED_AGENT" == "true" ]] && digest_args+=(--digest "agent=$DIGEST_AGENT")
 
           python scripts/release_manifest.py assemble \
             --release-sha "$GITHUB_SHA" \
@@ -607,6 +665,7 @@ jobs:
           promote_latest "$CHANGED_CAST_RECEIVER" crate-cast-receiver "$DIGEST_CAST_RECEIVER"
           promote_latest "$CHANGED_SITE" crate-site "$DIGEST_SITE"
           promote_latest "$CHANGED_DOCS" crate-docs "$DIGEST_DOCS"
+          promote_latest "$CHANGED_AGENT" crate-agent "$DIGEST_AGENT"
 
       - name: Attest release manifest
         uses: actions/attest@v4

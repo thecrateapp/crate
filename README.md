@@ -128,7 +128,7 @@ Go readplane relays remote media without receiving private signing keys.
 - Three-tier cache: L1 in-memory, L2 Redis, L3 PostgreSQL
 - Snapshot-backed admin/listen surfaces warmed by domain events
 - Replayable cache invalidation and home snapshot refreshes for catalog/import changes
-- Telegram bot for status, task control, and playback notifications
+- Telegram control through Crate Agent and Crate Operator (AI assistants over Crate MCP); the operator supervisor pushes failed-task, health and new-release alerts
 
 ## Architecture
 

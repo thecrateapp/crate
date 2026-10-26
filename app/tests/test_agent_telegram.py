@@ -556,3 +556,149 @@ def test_sdk_policy_and_presentation_request_use_valid_output_and_real_store(
     asyncio.run(run())
     assert scalar("SELECT count(*) FROM agent_telegram_confirmations") == 1
     assert scalar("SELECT count(*) FROM agent_plan_approvals") == 0
+
+
+def _admin_client(world):
+    from crate.api.agent_telegram import router
+
+    app = FastAPI()
+    app.include_router(router)
+    client = TestClient(app)
+    client.headers.update(
+        {"Origin": ORIGIN, "Cookie": "crate_session=" + human_token(world["human"])}
+    )
+    return client
+
+
+def test_admin_lists_binds_and_removes_the_approver_with_audit(native_world):
+    client = _admin_client(native_world)
+    principal = native_world["principal"].id
+    listed = client.get("/api/admin/agent-telegram/bindings").json()
+    assert listed["instance_id"] == "test-instance"
+    assert [item["telegram_user_id"] for item in listed["items"]] == [123]
+    item = listed["items"][0]
+    assert item["principal_id"] == principal
+    assert item["user_id"] == native_world["human"]["id"]
+    assert item["principal_name"]
+    bound = client.post(
+        "/api/admin/agent-telegram/bind",
+        json={"principal_id": principal, "telegram_user_id": 456},
+    ).json()
+    listed = client.get(
+        "/api/admin/agent-telegram/bindings", params={"principal_id": principal}
+    ).json()
+    assert [item["binding_id"] for item in listed["items"]] == [bound["binding_id"]]
+    removed = client.delete(f"/api/admin/agent-telegram/bindings/{bound['binding_id']}")
+    assert removed.status_code == 200
+    assert removed.json() == {"revoked": True}
+    assert client.get("/api/admin/agent-telegram/bindings").json()["items"] == []
+    again = client.delete(f"/api/admin/agent-telegram/bindings/{bound['binding_id']}")
+    assert again.status_code == 404
+    from crate.db.tx import read_scope
+    from sqlalchemy import text
+
+    with read_scope() as session:
+        actions = (
+            session.execute(
+                text(
+                    "SELECT action FROM audit_log WHERE action LIKE 'agent.telegram.%' ORDER BY id"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert actions == [
+        "agent.telegram.bound",
+        "agent.telegram.bound",
+        "agent.telegram.unbound",
+    ]
+
+
+def test_removed_approver_can_no_longer_approve(native_world):
+    confirmation, message = show_all(native_world)
+    store.revoke_binding(native_world["human"], native_world["binding"]["binding_id"])
+    with pytest.raises(DiagnosticError):
+        button(confirmation["confirmation_id"], message, "approve")
+    assert scalar("SELECT count(*) FROM agent_plan_approvals") == 0
+
+
+def test_binding_management_needs_permissions_and_an_instance(
+    native_world, monkeypatch
+):
+    client = _admin_client(native_world)
+    set_user_roles(native_world["human"]["id"], ["user"])
+    assert client.get("/api/admin/agent-telegram/bindings").status_code == 403
+    assert (
+        client.delete(
+            f"/api/admin/agent-telegram/bindings/{native_world['binding']['binding_id']}"
+        ).status_code
+        == 403
+    )
+    set_user_roles(native_world["human"]["id"], ["admin"])
+    unknown = client.post(
+        "/api/admin/agent-telegram/bind",
+        json={"principal_id": str(uuid4()), "telegram_user_id": 456},
+    )
+    assert unknown.status_code == 404
+    monkeypatch.delenv("CRATE_AGENT_INSTANCE_ID")
+    assert client.get("/api/admin/agent-telegram/bindings").json() == {
+        "instance_id": None,
+        "items": [],
+    }
+
+
+def test_cli_binds_and_shows_the_approver_by_email(native_world, capsys):
+    from crate import agent_credentials_cli as cli
+
+    principal = native_world["principal"].id
+    assert (
+        cli.main(
+            [
+                "bind-approver",
+                "--principal-id",
+                principal,
+                "--telegram-user-id",
+                "789",
+                "--user-email",
+                native_world["human"]["email"],
+            ]
+        )
+        == 0
+    )
+    bound = json.loads(capsys.readouterr().out)
+    assert bound["telegram_user_id"] == 789
+    assert cli.main(["show-approver", "--principal-id", principal]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["binding_id"] == bound["binding_id"]
+    assert shown["user_id"] == native_world["human"]["id"]
+    assert (
+        cli.main(
+            [
+                "bind-approver",
+                "--principal-id",
+                principal,
+                "--telegram-user-id",
+                "789",
+                "--user-email",
+                "nobody@example.test",
+            ]
+        )
+        == 2
+    )
+    assert "No Crate user" in capsys.readouterr().err
+    set_user_roles(native_world["human"]["id"], ["user"])
+    assert (
+        cli.main(
+            [
+                "bind-approver",
+                "--principal-id",
+                principal,
+                "--telegram-user-id",
+                "789",
+                "--user-email",
+                native_world["human"]["email"],
+            ]
+        )
+        == 2
+    )
+    assert "no longer permits" in capsys.readouterr().err
