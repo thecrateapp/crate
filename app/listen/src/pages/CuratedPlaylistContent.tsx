@@ -95,9 +95,9 @@ export function CuratedPlaylistContent({
         />
 
         {data.tracks.length === 0 ? (
-          <EmptyState message={t("playlist.empty.noTracks")} />
+          <EmptyState title={t("playlist.empty.noTracks")} />
         ) : filteredTracks.length === 0 ? (
-          <EmptyState message={t("playlist.empty.noFilter")} />
+          <EmptyState title={t("playlist.empty.noFilter")} />
         ) : (
           <TrackList
             items={filteredTracks}

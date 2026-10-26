@@ -268,7 +268,7 @@ function RecentTrackCard({
           ) : null}
         </div>
       ) : (
-        <EmptyState message="No recent output recorded yet." className="py-6" />
+        <EmptyState message="No recent output recorded yet." />
       )}
     </OpsSurface>
   );

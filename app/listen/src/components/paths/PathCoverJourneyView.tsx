@@ -109,7 +109,7 @@ export function PathCoverJourneyView({
             />
           </>
         ) : (
-          <EmptyState message={t("paths.journey.empty")} />
+          <EmptyState title={t("paths.journey.empty")} />
         )}
       </CardContent>
     </Card>

@@ -1146,7 +1146,7 @@ export function Album() {
               MusicBrainz matches
             </MonoLabel>
             {matches.length === 0 ? (
-              <EmptyState message="No matches found on MusicBrainz" />
+              <EmptyState title="No matches found on MusicBrainz" />
             ) : (
               matches.map((m) => (
                 <MatchCard

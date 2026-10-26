@@ -73,7 +73,7 @@ export function LibraryLikedView<T>({
         }
       />
       {list.items.length === 0 ? (
-        <EmptyState variant="inline" message={t("playlist.empty.noFilter")} />
+        <EmptyState variant="inline" title={t("playlist.empty.noFilter")} />
       ) : (
         <TrackList {...list} />
       )}

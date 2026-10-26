@@ -86,7 +86,7 @@ export function SimilarTracksPanel({
             onRetry={() => setAttempt((value) => value + 1)}
           />
         ) : tracks.length === 0 ? (
-          <EmptyState message="No similar tracks found" />
+          <EmptyState title="No similar tracks found" />
         ) : (
           <HairlineList label="Similar tracks" ruled={false}>
             {tracks.map((track, index) => {

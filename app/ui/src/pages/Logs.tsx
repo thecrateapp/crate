@@ -506,10 +506,7 @@ export function Logs() {
             ))}
           </div>
         ) : (
-          <EmptyState
-            message="No worker heartbeat data available yet."
-            className="py-8"
-          />
+          <EmptyState message="No worker heartbeat data available yet." />
         )}
       </OpsPanel>
 
@@ -540,7 +537,7 @@ export function Logs() {
           {visibleLogs.length === 0 ? (
             <EmptyState
               message="No log lines match the current filters."
-              className="px-4 py-12"
+              className="px-4"
             />
           ) : (
             <div className="max-h-[70vh] overflow-y-auto">

@@ -257,3 +257,7 @@ receiving new glyphs, to `@solar-icons/react` 2.3.3 with per-icon imports. Publi
 Icons draw at 1em and take their size through font-size, so caller `size-*` classes still win.
 Six glyphs differ from the previous release: Share, ArchiveDown (Bold), VolumeCross,
 HamburgerMenu, Ticket and MagicStick (now Solar Magic Wand).
+
+Empty states (2026-10-26): `crate-empty-state` centres its content (items and text) with 24px inline
+padding inside any container, and keeps its 32px block padding and 160px minimum. The recipe is
+unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.

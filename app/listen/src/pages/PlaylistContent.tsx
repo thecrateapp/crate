@@ -110,9 +110,9 @@ export function PlaylistContent({
           filteredCount={page.filteredTracks.length}
         />
         {data.tracks.length === 0 ? (
-          <EmptyState message={page.t("playlist.empty.noTracks")} />
+          <EmptyState title={page.t("playlist.empty.noTracks")} />
         ) : page.filteredTracks.length === 0 ? (
-          <EmptyState message={page.t("playlist.empty.noFilter")} />
+          <EmptyState title={page.t("playlist.empty.noFilter")} />
         ) : (
           <PlaylistTrackList
             filteredTracks={page.filteredTracks}

@@ -96,10 +96,7 @@ export function MetricChart({
       />
       <div className="h-48" aria-label={`${stream.title} chronological plot`}>
         {!samples.length ? (
-          <EmptyState
-            message="No samples"
-            className="h-48 items-center text-center"
-          />
+          <EmptyState title="No samples" className="h-48" />
         ) : (
           <ResponsiveLine
             data={series}

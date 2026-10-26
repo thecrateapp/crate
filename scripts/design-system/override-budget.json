@@ -84,9 +84,9 @@
     "padding": 1
   },
   "EmptyState": {
-    "height": 2,
+    "height": 1,
     "margin": 1,
-    "padding": 11
+    "padding": 2
   },
   "EntityPrimaryAction": {
     "height": 1,

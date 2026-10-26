@@ -16,7 +16,7 @@ export function ArtistReadState({
   if (loading)
     return <LoadingState variant="route" label={t("artist.loading")} />;
   if (status === 404 || !error)
-    return <EmptyState message={t("artist.notFound")} />;
+    return <EmptyState title={t("artist.notFound")} />;
   return (
     <ErrorState
       title={t("artist.unavailable")}

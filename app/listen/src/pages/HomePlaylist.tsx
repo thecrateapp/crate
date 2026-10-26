@@ -292,9 +292,9 @@ export function HomePlaylist() {
         />
 
         {data.tracks.length === 0 ? (
-          <EmptyState variant="inline" message={t("playlist.empty.noTracks")} />
+          <EmptyState variant="inline" title={t("playlist.empty.noTracks")} />
         ) : filteredTracks.length === 0 ? (
-          <EmptyState variant="inline" message={t("playlist.empty.noFilter")} />
+          <EmptyState variant="inline" title={t("playlist.empty.noFilter")} />
         ) : (
           <div className="space-y-1">
             {trackRows.map((row, index) => (

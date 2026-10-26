@@ -172,7 +172,7 @@ export function ArtistTopTracks() {
           !loading && !error ? (
             <EmptyState
               variant="inline"
-              message={t("actions.artist.toasts.noTopTracks")}
+              title={t("actions.artist.toasts.noTopTracks")}
             />
           ) : null
         }

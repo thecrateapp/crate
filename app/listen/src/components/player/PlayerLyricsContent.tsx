@@ -58,7 +58,7 @@ export function PlayerLyricsContent({
           {lyrics.plain}
         </pre>
       ) : (
-        <EmptyState title={t("player.lyrics.empty")} className="py-8" />
+        <EmptyState title={t("player.lyrics.empty")} />
       )}
     </PlayerLyricsSurface>
   );

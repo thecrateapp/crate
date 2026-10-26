@@ -1702,10 +1702,7 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <EmptyState
-                message="No active tasks match the current filters."
-                className="py-10"
-              />
+              <EmptyState message="No active tasks match the current filters." />
             )}
           </TabsContent>
 
@@ -1728,10 +1725,7 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <EmptyState
-                message="No tasks need attention right now."
-                className="py-10"
-              />
+              <EmptyState message="No tasks need attention right now." />
             )}
           </TabsContent>
 
@@ -1754,10 +1748,7 @@ export function Tasks() {
                 ))}
               </div>
             ) : (
-              <EmptyState
-                message="No historical tasks match the current filters."
-                className="py-10"
-              />
+              <EmptyState message="No historical tasks match the current filters." />
             )}
           </TabsContent>
         </Tabs>

@@ -159,8 +159,7 @@ function ItemGrid({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length)
-    return <EmptyState variant="dashed" message={empty} className="py-6" />;
+  if (!items.length) return <EmptyState variant="dashed" message={empty} />;
   return (
     <MediaGrid density="wide">
       {items.map((item) => (
@@ -187,8 +186,7 @@ function ItemList({
   onImport: (item: BandcampItem) => void;
   empty: string;
 }) {
-  if (!items.length)
-    return <EmptyState variant="dashed" message={empty} className="py-6" />;
+  if (!items.length) return <EmptyState variant="dashed" message={empty} />;
   return (
     <div className="space-y-3">
       {items.map((item) => (

@@ -581,10 +581,7 @@ export function Stack() {
                 ))}
               </div>
             ) : (
-              <EmptyState
-                message="No services match the current filters."
-                className="py-8"
-              />
+              <EmptyState message="No services match the current filters." />
             )}
           </OpsPanel>
         </>

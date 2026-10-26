@@ -146,7 +146,10 @@ export function PlaylistComposerTrackListView({
               </SortableContext>
             </DndContext>
           ) : (
-            <EmptyState message={t("playlistComposer.emptyTracks")} />
+            <EmptyState
+              title={t("playlistComposer.emptyTracksTitle")}
+              message={t("playlistComposer.emptyTracks")}
+            />
           )}
         </div>
       </div>

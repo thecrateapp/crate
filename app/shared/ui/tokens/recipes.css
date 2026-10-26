@@ -4173,6 +4173,11 @@ label
   gap: 8px;
   padding-block: 32px;
 }
+.crate-empty-state {
+  align-items: center;
+  padding-inline: 24px;
+  text-align: center;
+}
 .crate-error-page {
   min-block-size: 320px;
   padding-block: 48px;

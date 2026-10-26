@@ -65,7 +65,7 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "ae227ee09af662d574acfc0d022b8bf6ae462187da8f2d6b72370820d9449c73",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "9ffb6e044c41b3da5da0c99c52bfc0e1e37c5c15a0138e35e4ad9d8d5bd4b713",
+        "app/shared/ui/tokens/recipes.css": "aea2e6619896564853a6f66d1c9d68720851f15d44ebbcde6a73e103ccc801b0",
         "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
@@ -74,7 +74,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "3131334f88e1f879f7817b1cddfe1a4ca46a8d08d30c75ff7fbb91cabd403735",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "b5f2da89c4541932edaaad25a35517fe581be82df50c53baaf0969c842d4deff"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "28c2405d77339fbd15af9608501b39e831cc0da838503d293cdf813080180f7d"
       },
       "category": "Foundations"
     },
@@ -758,7 +758,7 @@
       "fingerprints": {
         "app/shared/ui/domain/lists/EmptyState.tsx": "f988e92499164aa02ab5a46f08c84b0934fc91aef4d36873d8acadd782c5097d",
         "tools/crate-ui-showcase/stories/EmptyState.stories.tsx": "54c2634a1b609313c9bae83514d774a480168cf2e753cf2ea0411e16c7372e82",
-        "tools/crate-ui-showcase/docs/EmptyState.mdx": "a9a226bcdcc6090d6689be0cf9fce6b698303433fb53a98b378a1752a9387b31"
+        "tools/crate-ui-showcase/docs/EmptyState.mdx": "94693118a8cd0354fe8ab1ed9a641223091b1a74267e7e4dba5618e201acba63"
       },
       "category": "Feedback"
     },

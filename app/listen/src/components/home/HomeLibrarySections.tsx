@@ -68,7 +68,7 @@ export function JustLandedSection({
       ) : (
         <EmptyState
           variant="dashed"
-          className="px-4 py-6"
+          className="px-4"
           message={t("home.library.justLanded.empty")}
         />
       )}

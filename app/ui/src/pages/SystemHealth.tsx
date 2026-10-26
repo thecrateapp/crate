@@ -516,10 +516,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               })}
             </div>
           ) : (
-            <EmptyState
-              message="No route latency samples yet"
-              className="min-h-[132px] items-center text-center"
-            />
+            <EmptyState title="No route latency samples yet" />
           )}
         </OpsSurface>
       </div>
