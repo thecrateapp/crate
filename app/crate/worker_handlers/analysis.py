@@ -183,6 +183,7 @@ def _handle_refresh_user_listening_stats(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.db.domain_events import append_domain_event
+    from crate.db.repositories.tasks import release_task_dedup_key
     from crate.db.repositories.user_library_aggregate_runner import (
         refresh_user_listening_aggregates,
     )
@@ -190,6 +191,10 @@ def _handle_refresh_user_listening_stats(
     user_id = int(params.get("user_id") or 0)
     if user_id <= 0:
         return {"ok": False, "error": "Missing user_id"}
+
+    # Plays committed from here on queue a follow-up instead of being
+    # deduplicated against a refresh that has already read the dirty days.
+    release_task_dedup_key(task_id)
 
     p = TaskProgress(phase="stats", phase_count=1, total=1, item=f"user:{user_id}")
     emit_progress(task_id, p, force=True)
@@ -1426,9 +1431,22 @@ def _handle_refresh_smart_mix_coverage(
 # Populate finalizers now that handler functions are defined
 register_parent_finalizer("compute_popularity", _popularity_finalize)
 
+
+def _handle_refresh_dirty_listening_stats(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    from crate.db.repositories.user_library_aggregate_runner import (
+        schedule_dirty_listening_refreshes,
+    )
+
+    user_ids = schedule_dirty_listening_refreshes()
+    return {"ok": True, "users": len(user_ids)}
+
+
 ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "compute_analytics": _handle_compute_analytics,
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
+    "refresh_dirty_listening_stats": _handle_refresh_dirty_listening_stats,
     "rebuild_instance_listening_days": _handle_rebuild_instance_listening_days,
     "backfill_instance_listening_rollups": _handle_backfill_instance_listening_rollups,
     "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,

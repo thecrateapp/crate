@@ -574,6 +574,16 @@ def refresh_user_listening_projections(session, user_id: int) -> dict:
     }
 
 
+def users_with_dirty_listening_days(session) -> list[int]:
+    return list(
+        session.execute(
+            text(
+                "SELECT DISTINCT user_id FROM user_listening_dirty_days ORDER BY user_id"
+            )
+        ).scalars()
+    )
+
+
 def user_listening_projections_pending(session, user_id: int) -> bool:
     return bool(
         session.execute(
@@ -598,6 +608,7 @@ def user_listening_projections_pending(session, user_id: int) -> bool:
 
 
 __all__ = [
+    "users_with_dirty_listening_days",
     "SESSION_GAP_MINUTES",
     "local_today",
     "mark_listening_day_dirty",

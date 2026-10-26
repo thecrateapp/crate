@@ -159,7 +159,7 @@ class TestUserListeningAggregates:
 
         with (
             patch(
-                "crate.db.repositories.user_library_playback_writes.create_task_dedup"
+                "crate.db.repositories.user_library_playback_writes.schedule_user_listening_refresh"
             ) as mock_enqueue,
             patch(
                 "crate.db.repositories.user_library_playback_writes.get_cache",
@@ -218,9 +218,7 @@ class TestUserListeningAggregates:
             )
 
         assert first_id == second_id
-        mock_enqueue.assert_called_once_with(
-            "refresh_user_listening_stats", {"user_id": 1}
-        )
+        mock_enqueue.assert_called_once_with(1)
         mock_scrobble.assert_called_once()
 
         with read_scope() as session:

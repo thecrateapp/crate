@@ -7,7 +7,9 @@ from sqlalchemy import text
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.jobs.user_listening_projections import mark_listening_day_dirty
 from crate.db.repositories.user_listening_today import add_listening_today
-from crate.db.repositories.tasks import create_task_dedup
+from crate.db.repositories.user_library_aggregate_runner import (
+    schedule_user_listening_refresh,
+)
 from crate.db.repositories.user_library_shared import (
     emit_user_domain_event,
     resolve_track_reference,
@@ -23,7 +25,7 @@ def _schedule_stats_refresh(user_id: int) -> None:
     debounce_key = f"stats_refresh_debounce:{user_id}"
     if get_cache(debounce_key, max_age_seconds=_STATS_REFRESH_DEBOUNCE_SECONDS):
         return
-    create_task_dedup("refresh_user_listening_stats", {"user_id": user_id})
+    schedule_user_listening_refresh(user_id)
     set_cache(debounce_key, True, ttl=_STATS_REFRESH_DEBOUNCE_SECONDS)
 
 
