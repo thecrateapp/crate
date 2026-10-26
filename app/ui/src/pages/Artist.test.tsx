@@ -297,7 +297,7 @@ describe("MergeArtistDialog", () => {
       />,
     );
 
-    await userEvent.type(screen.getByRole("textbox"), "target");
+    await userEvent.type(screen.getByRole("searchbox"), "target");
 
     const result = await screen.findByText("Target Artist");
     const resultButton = result.closest("button");

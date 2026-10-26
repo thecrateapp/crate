@@ -446,6 +446,60 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/primitives/SearchInput:SearchInput",
     1,
   ],
+  // Shared search fields: the search and clear glyphs belong to SearchInput.
+  [
+    "app/ui/src/components/SmartMixTracks.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/components/artist/ArtistGenreSelector.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Album.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    2,
+  ],
+  [
+    "app/ui/src/pages/Artist.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Discover.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Download.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Genres.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  ["app/ui/src/pages/Logs.tsx:@crate/ui/primitives/SearchInput:SearchInput", 1],
+  [
+    "app/ui/src/pages/NewReleases.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Playlists.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Stack.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Tasks.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Upcoming.tsx:@crate/ui/primitives/SearchInput:SearchInput",
+    1,
+  ],
   [
     "app/ui/src/pages/PlaylistEditor.tsx:@/components/playlists/PlaylistEditorTrackList:PlaylistEditorTrackList",
     1,
@@ -960,7 +1014,6 @@ const approvedUx = new Map([
   ["SmartMixCoverage:mix-resume-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-pause-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-cancel-loading", ["@crate/ui/icons", "Loader2"]],
-  ["SmartMixTracks:mix-track-search", ["@crate/ui/icons", "Search"]],
   ["SmartMixTracks:mix-reanalyze-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-load-more-loading", ["@crate/ui/icons", "Loader2"]],
   ["SystemHealth:system-health-loading", ["lucide-react", "Loader2"]],
@@ -984,11 +1037,8 @@ const approvedUx = new Map([
   // by the inventory name heuristic. Only its six individually named calls are accepted;
   // the wrapper's actual ActionButton and each child glyph are still audited below.
   ["Insights:insights-refresh", ["@crate/ui/icons", "RefreshCw"]],
-  ["Artist:artist-merge-search", ["@crate/ui/icons", "Search"]],
   ["Artist:artist-merge-search-loading", ["@crate/ui/icons", "Loader2"]],
-  ["Album:album-move-search", ["@crate/ui/icons", "Search"]],
   ["Album:album-move-search-loading", ["@crate/ui/icons", "Loader2"]],
-  ["Album:album-merge-search", ["@crate/ui/icons", "Search"]],
   ["Album:album-merge-search-loading", ["@crate/ui/icons", "Loader2"]],
   ["Album:album-split-loading", ["@crate/ui/icons", "Loader2"]],
   ["Album:album-edit-tags", ["@crate/ui/icons", "Tag"]],
@@ -1072,7 +1122,6 @@ const approvedUx = new Map([
     "ArtistGenreSelector:artist-genres-disclosure",
     ["@crate/ui/icons", "ChevronDown"],
   ],
-  ["ArtistGenreSelector:artist-genres-search", ["@crate/ui/icons", "Search"]],
   [
     "ArtistBioResearchDialog:bio-research-loading",
     ["@crate/ui/icons", "Loader2"],
@@ -1090,7 +1139,6 @@ const approvedUx = new Map([
   ["ArtistArtworkGallery:artwork-ai-generate", ["@crate/ui/icons", "Bot"]],
   ["ArtistArtworkGallery:artwork-ai-loading", ["@crate/ui/icons", "Loader2"]],
   ["TrackTable:track-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
-  ["TrackTable:track-move-search", ["@crate/ui/icons", "Search"]],
   ["TrackTable:track-move-search-loading", ["@crate/ui/icons", "Loader2"]],
   ["TrackTable:track-audio-profile", ["@crate/ui/icons", "BarChart3"]],
   ["TrackTable:track-download", ["@crate/ui/icons", "Download"]],
@@ -1175,8 +1223,6 @@ const approvedUx = new Map([
     ["@crate/ui/icons", "Trash2"],
   ],
   ["Playlists:playlists-remove-rule", ["lucide-react", "Trash2"]],
-
-  ["Playlists:playlists-search", ["lucide-react", "Search"]],
   ["Playlists:playlists-loading", ["lucide-react", "Loader2"]],
   ["Playlists:playlists-static-close", ["lucide-react", "X"]],
   ["Playlists:playlists-static-saving", ["lucide-react", "Loader2"]],
@@ -1185,7 +1231,6 @@ const approvedUx = new Map([
   ["Upcoming:upcoming-view-list", ["@crate/ui/icons", "ListOrdered"]],
   ["Upcoming:upcoming-view-calendar", ["@crate/ui/icons", "Calendar"]],
   ["Upcoming:upcoming-sync", ["lucide-react", "Loader2"]],
-  ["Upcoming:upcoming-search", ["lucide-react", "Search"]],
   ["Upcoming:upcoming-loading", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-download-loading", ["lucide-react", "Loader2"]],
   ["Upcoming:upcoming-dismiss", ["@crate/ui/icons", "X"]],
@@ -1231,13 +1276,11 @@ const approvedUx = new Map([
   ["Users:users-next", ["lucide-react", "ChevronRight"]],
   ["GlobalCatalog:catalog-incremental-loading", ["lucide-react", "Loader2"]],
   ["GlobalCatalog:catalog-full-loading", ["lucide-react", "Loader2"]],
-  ["NewReleases:releases-search", ["lucide-react", "Search"]],
   ["NewReleases:releases-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-check-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-download-loading", ["lucide-react", "Loader2"]],
   ["NewReleases:releases-timeline-dismiss", ["lucide-react", "X"]],
   ["NewReleases:releases-grid-dismiss", ["lucide-react", "X"]],
-  ["Discover:discovery-search", ["lucide-react", "Search"]],
   ["Discover:discovery-loading", ["lucide-react", "Loader2"]],
   ["Discover:discovery-recompute-loading", ["lucide-react", "Loader2"]],
   ["Discover:discovery-check-loading", ["lucide-react", "Loader2"]],
@@ -1271,8 +1314,6 @@ const approvedUx = new Map([
   ["Logs:logs-loading", ["lucide-react", "Loader2"]],
   ["Logs:live-pause", ["lucide-react", "Pause"]],
   ["Logs:live-resume", ["lucide-react", "Play"]],
-  ["Logs:logs-search", ["lucide-react", "Search"]],
-  ["Stack:stack-search", ["@crate/ui/icons", "Search"]],
   ["Shell:history-back", ["lucide-react", "ChevronLeft"]],
   ["Shell:history-forward", ["lucide-react", "ChevronRight"]],
   ["Shell:mobile-navigation", ["lucide-react", "Menu"]],

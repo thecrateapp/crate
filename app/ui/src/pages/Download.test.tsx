@@ -263,7 +263,7 @@ it("offers recovery when loading an album tracklist fails", async () => {
     </MemoryRouter>,
   );
   await user.type(
-    screen.getByRole("textbox", { name: "Search music" }),
+    screen.getByRole("searchbox", { name: "Search music" }),
     "Caspian",
   );
   await user.click(screen.getByRole("button", { name: "Search" }));
@@ -343,7 +343,7 @@ it("clears and disconnects Soulseek results when a new search is below its minim
       <DownloadPage />
     </MemoryRouter>,
   );
-  const search = screen.getByRole("textbox", { name: "Search music" });
+  const search = screen.getByRole("searchbox", { name: "Search music" });
   await user.type(search, "Caspian");
   await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() =>
@@ -392,7 +392,7 @@ it("keeps Tidal artist browsing and release actions accessible without hover", a
   );
 
   await user.type(
-    screen.getByRole("textbox", { name: "Search music" }),
+    screen.getByRole("searchbox", { name: "Search music" }),
     "Caspian",
   );
   await user.click(screen.getByRole("button", { name: "Search" }));
@@ -461,7 +461,7 @@ it("keeps an unavailable artist discography distinct from zero albums", async ()
     </MemoryRouter>,
   );
   await user.type(
-    screen.getByRole("textbox", { name: "Search music" }),
+    screen.getByRole("searchbox", { name: "Search music" }),
     "Caspian",
   );
   await user.click(screen.getByRole("button", { name: "Search" }));
@@ -519,10 +519,9 @@ it("explains which sources the acquisition controls affect", async () => {
 
   expect(screen.getByRole("heading", { name: "Acquisition" })).toBeVisible();
   expect(screen.getByRole("region", { name: "Music search" })).toBeVisible();
-  expect(screen.getByRole("textbox", { name: "Search music" })).toHaveAttribute(
-    "placeholder",
-    "Artist, album, or track",
-  );
+  expect(
+    screen.getByRole("searchbox", { name: "Search music" }),
+  ).toHaveAttribute("placeholder", "Artist, album, or track");
   expect(
     screen.getByText(/Used for Tidal downloads and wishlist items/),
   ).toBeVisible();
@@ -542,14 +541,13 @@ it("keeps the acquisition search field, icon, and action aligned", () => {
   );
 
   const form = screen.getByRole("form", { name: "Acquisition search" });
-  const input = within(form).getByRole("textbox", { name: "Search music" });
+  const input = within(form).getByRole("searchbox", { name: "Search music" });
   const button = within(form).getByRole("button", { name: "Search" });
-  const icon = form.querySelector('[data-slot="acquisition-search-icon"]');
 
   expect(form).toHaveClass("items-stretch");
-  expect(input).toHaveClass("h-10", "pointer-coarse:h-11");
-  expect(button).toHaveClass("h-10", "pointer-coarse:h-11");
-  expect(icon).toHaveClass("absolute", "inset-y-0", "flex", "items-center");
+  expect(input.closest('[data-slot="search-input"]')).not.toBeNull();
+  expect(input).toHaveClass("crate-form-control");
+  expect(button).toHaveClass("h-10", "pointer-coarse:min-h-11");
 });
 
 it("submits the music search from the search form", async () => {
@@ -561,7 +559,7 @@ it("submits the music search from the search form", async () => {
   );
 
   await user.type(
-    screen.getByRole("textbox", { name: "Search music" }),
+    screen.getByRole("searchbox", { name: "Search music" }),
     "Caspian",
   );
   await user.click(screen.getByRole("button", { name: "Search" }));

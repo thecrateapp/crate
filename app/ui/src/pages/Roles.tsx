@@ -80,7 +80,7 @@ export function Roles() {
       {loading ? (
         <LoadingState label="Loading role presets and capabilities" />
       ) : loadError ? (
-        <Card className="border-border-quiet bg-card">
+        <Card>
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
               <MonoLabel as="h2" tone="accent">
@@ -90,11 +90,7 @@ export function Roles() {
                 The role and capability catalog could not be loaded.
               </p>
             </div>
-            <Button
-              className="min-h-11"
-              variant="outline"
-              onClick={() => void loadRoles()}
-            >
+            <Button variant="outline" onClick={() => void loadRoles()}>
               Retry
             </Button>
           </CardContent>
@@ -151,7 +147,7 @@ export function Roles() {
             )}
           </section>
 
-          <Card className="border-border-quiet bg-card">
+          <Card>
             <CardHeader>
               <CardTitle className="font-display">Capability matrix</CardTitle>
               <CardDescription>

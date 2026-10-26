@@ -248,13 +248,7 @@ function RecentTrackCard({
                 </InfoBadge>
               ) : null}
               {"has_mood" in track ? (
-                <InfoBadge
-                  className={
-                    track.has_mood
-                      ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                      : "border-border-quiet bg-surface-card text-text-subtle"
-                  }
-                >
+                <InfoBadge tone={track.has_mood ? "accent" : "neutral"}>
                   {track.has_mood ? "Mood extracted" : "Mood missing"}
                 </InfoBadge>
               ) : null}
@@ -607,11 +601,7 @@ export function Analysis() {
               <div className="flex flex-wrap items-center gap-2">
                 <InfoBadge>{metrics.fingerprintPercent}% coverage</InfoBadge>
                 <InfoBadge
-                  className={
-                    status.chromaprint_available
-                      ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                      : "border-border-quiet bg-surface-card text-text-subtle"
-                  }
+                  tone={status.chromaprint_available ? "accent" : "neutral"}
                 >
                   {status.chromaprint_available
                     ? "Chromaprint active"
@@ -680,7 +670,7 @@ export function Analysis() {
               }
               disabled={activeAction !== null}
               aria-busy={activeAction === "lyrics" || undefined}
-              className="min-h-11 gap-2"
+              className="gap-2"
             >
               {activeAction === "lyrics" ? (
                 <Loader2
@@ -705,7 +695,7 @@ export function Analysis() {
               }
               disabled={activeAction !== null}
               aria-busy={activeAction === "portable" || undefined}
-              className="min-h-11 gap-2"
+              className="gap-2"
             >
               {activeAction === "portable" ? (
                 <Loader2
@@ -729,7 +719,7 @@ export function Analysis() {
               }
               disabled={activeAction !== null}
               aria-busy={activeAction === "rehydrate" || undefined}
-              className="min-h-11 gap-2"
+              className="gap-2"
             >
               {activeAction === "rehydrate" ? (
                 <Loader2
@@ -754,7 +744,7 @@ export function Analysis() {
               }
               disabled={activeAction !== null}
               aria-busy={activeAction === "richExport" || undefined}
-              className="min-h-11 gap-2"
+              className="gap-2"
             >
               {activeAction === "richExport" ? (
                 <Loader2

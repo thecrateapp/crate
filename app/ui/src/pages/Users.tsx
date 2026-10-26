@@ -571,26 +571,14 @@ function UserPresence({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      <InfoBadge
-        className={
-          user.online_now
-            ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-            : "border-border-quiet bg-raised-surface text-text-muted"
-        }
-      >
+      <InfoBadge tone={user.online_now ? "accent" : "neutral"}>
         {user.online_now
           ? "Active now"
           : user.last_seen_at
             ? `Last seen ${formatRelativeTimestamp(user.last_seen_at)}`
             : "Offline"}
       </InfoBadge>
-      <InfoBadge
-        className={
-          user.listening_now
-            ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-            : "border-border-quiet bg-raised-surface text-text-muted"
-        }
-      >
+      <InfoBadge tone={user.listening_now ? "accent" : "neutral"}>
         {user.listening_now ? "Listening now" : "Not playing"}
       </InfoBadge>
       <InfoBadge>
@@ -849,7 +837,7 @@ export function Users() {
           title="Users"
           description="Account access, presence and listening activity."
         />
-        <Card className="border-border-quiet bg-card">
+        <Card>
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
               <MonoLabel as="h2" tone="accent">
@@ -860,7 +848,7 @@ export function Users() {
                 settings have not changed.
               </p>
             </div>
-            <Button className="min-h-11" variant="outline" onClick={retryUsers}>
+            <Button variant="outline" onClick={retryUsers}>
               Retry
             </Button>
           </CardContent>
@@ -903,28 +891,16 @@ export function Users() {
         }
       >
         <InfoBadge>{counts.total} total users</InfoBadge>
-        <InfoBadge
-          className={
-            counts.online > 0
-              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-              : undefined
-          }
-        >
+        <InfoBadge tone={counts.online > 0 ? "accent" : undefined}>
           {counts.online} active now
         </InfoBadge>
-        <InfoBadge
-          className={
-            counts.listening > 0
-              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-              : undefined
-          }
-        >
+        <InfoBadge tone={counts.listening > 0 ? "accent" : undefined}>
           {counts.listening} listening
         </InfoBadge>
         <InfoBadge>{counts.devices} active devices</InfoBadge>
       </OpsPageHero>
 
-      <Card className="border-border-quiet bg-card">
+      <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-md">
@@ -1037,7 +1013,7 @@ export function Users() {
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="crate-form-field">
-                        <h2 className="break-words font-display text-base font-semibold text-text-main">
+                        <h2 className="break-words font-display text-base font-semibold text-text-primary">
                           {user.name || user.email}
                         </h2>
                         <span className="break-all text-xs text-text-muted">
@@ -1084,7 +1060,7 @@ export function Users() {
                       Presence
                     </MonoLabel>
                     <div className="mt-1.5 space-y-1.5 lg:mt-0">
-                      <span className="flex items-center gap-2 text-text-main">
+                      <span className="flex items-center gap-2 text-text-primary">
                         <span
                           aria-hidden="true"
                           className={`h-1 w-1 shrink-0 rounded-full ${user.listening_now || user.online_now ? "bg-accent-action-hi" : "bg-text-subtle"}`}
@@ -1109,7 +1085,6 @@ export function Users() {
                     className="col-span-2 flex flex-wrap justify-end gap-2 lg:col-span-1"
                   >
                     <Button
-                      className="min-h-11"
                       variant="outline"
                       size="sm"
                       onClick={() => openUserDetail(user)}
@@ -1118,7 +1093,6 @@ export function Users() {
                     </Button>
                     {canDeleteUsers ? (
                       <Button
-                        className="min-h-11"
                         variant="ghost"
                         size="sm"
                         onClick={() => setDeleteTarget(user)}
@@ -1146,7 +1120,6 @@ export function Users() {
           {filteredUsers.length > 0 && pageCount > 1 ? (
             <div className="flex items-center justify-between gap-3 border-t border-border-quiet pt-4">
               <Button
-                className="min-h-11"
                 size="sm"
                 variant="outline"
                 aria-label="Previous page"
@@ -1165,7 +1138,6 @@ export function Users() {
                 Page {page} of {pageCount}
               </span>
               <Button
-                className="min-h-11"
                 size="sm"
                 variant="outline"
                 aria-label="Next page"
@@ -1509,7 +1481,7 @@ function UserDetailDialog({
           ) : detail ? (
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
-                <Card className="border-border-quiet bg-card">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <UserAvatar user={detail} size="md" />
@@ -1563,7 +1535,6 @@ function UserDetailDialog({
                               disabled={roleSaving}
                             />
                             <Button
-                              className="min-h-11"
                               size="sm"
                               variant="outline"
                               disabled={
@@ -1635,7 +1606,6 @@ function UserDetailDialog({
                                 }))}
                               />
                               <Button
-                                className="min-h-11"
                                 size="sm"
                                 variant="outline"
                                 disabled={
@@ -1704,7 +1674,7 @@ function UserDetailDialog({
                   </CardContent>
                 </Card>
 
-                <Card className="border-border-quiet bg-card">
+                <Card>
                   <CardHeader>
                     <CardTitle className="font-display text-base text-text-primary">
                       Presence
@@ -1746,7 +1716,7 @@ function UserDetailDialog({
                   </CardContent>
                 </Card>
 
-                <Card className="border-border-quiet bg-card">
+                <Card>
                   <CardHeader>
                     <CardTitle className="font-display text-base text-text-primary">
                       Access & session footprint
@@ -1810,7 +1780,6 @@ function UserDetailDialog({
                       {canManagePasswords ? (
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
-                            className="min-h-11"
                             size="sm"
                             variant="outline"
                             onClick={() => setPasswordDialogOpen(true)}
@@ -1847,7 +1816,7 @@ function UserDetailDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {source.online + source.connected > 0 ? (
-                                    <InfoBadge className="border-accent-action/25 bg-accent-action/10 text-accent-action-hi">
+                                    <InfoBadge tone="accent">
                                       {source.online + source.connected} active
                                     </InfoBadge>
                                   ) : null}
@@ -1884,7 +1853,6 @@ function UserDetailDialog({
                     {canManageSessions ? (
                       <div>
                         <Button
-                          className="min-h-11"
                           size="sm"
                           variant="outline"
                           aria-label="Revoke all sessions"
@@ -1906,7 +1874,7 @@ function UserDetailDialog({
                 </Card>
               </div>
 
-              <Card className="border-border-quiet bg-card">
+              <Card>
                 <CardHeader>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -2004,7 +1972,6 @@ function UserDetailDialog({
                           {canManageSessions ? (
                             <div className="flex shrink-0 gap-2">
                               <Button
-                                className="min-h-11"
                                 size="sm"
                                 variant="outline"
                                 disabled={
@@ -2139,8 +2106,8 @@ function SetPasswordDialog({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="min-h-11 h-auto px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
+                size="xs"
+                className="text-text-secondary hover:text-text-primary"
                 onClick={() => setNewPassword(generatePassword())}
               >
                 Generate
@@ -2166,7 +2133,6 @@ function SetPasswordDialog({
           </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button
-              className="min-h-11"
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -2174,7 +2140,6 @@ function SetPasswordDialog({
               Cancel
             </Button>
             <Button
-              className="min-h-11"
               aria-label={
                 user?.has_password ? "Reset password" : "Set password"
               }
@@ -2315,19 +2280,13 @@ function AddUserDialog({
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button
-              className="min-h-11"
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button
-              className="min-h-11"
-              aria-label="Create"
-              type="submit"
-              disabled={submitting}
-            >
+            <Button aria-label="Create" type="submit" disabled={submitting}>
               {submitting ? (
                 <Loader2
                   data-admin-ux="users-create-loading"
@@ -2464,7 +2423,6 @@ function InviteUserDialog({
                     : ""}
                 </span>
                 <Button
-                  className="min-h-11"
                   type="button"
                   size="sm"
                   variant="outline"
@@ -2478,7 +2436,6 @@ function InviteUserDialog({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
-              className="min-h-11"
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -2486,7 +2443,6 @@ function InviteUserDialog({
               Close
             </Button>
             <Button
-              className="min-h-11"
               aria-label="Create invite"
               type="submit"
               disabled={submitting || !email.trim()}

@@ -191,7 +191,7 @@ describe("Playlist read and mutation recovery", () => {
       "System playlists could not be refreshed. Showing the last successful results.";
     expect(await screen.findByText(message)).toBeVisible();
     await userEvent.type(
-      screen.getByRole("textbox", { name: "Search playlists" }),
+      screen.getByRole("searchbox", { name: "Search playlists" }),
       "absent",
     );
     expect(screen.getByText(message)).toBeVisible();

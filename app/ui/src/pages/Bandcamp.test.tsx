@@ -109,7 +109,7 @@ describe("Bandcamp text presentation and real contracts", () => {
       for (const button of screen.getAllByRole("button", { name }))
         if (button.closest('[data-slot="admin-page-header"]'))
           expect(button).toHaveAttribute("data-size", "icon-lg");
-        else expect(button).toHaveClass("min-h-11");
+        else expect(button).not.toHaveClass("min-h-11");
     expect(screen.getByText("12", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("92%", { exact: true })).toBeInTheDocument();
     expect(screen.getByText("7 total", { exact: true })).toBeInTheDocument();

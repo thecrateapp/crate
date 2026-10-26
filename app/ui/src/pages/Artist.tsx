@@ -59,8 +59,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { Input } from "@crate/ui/shadcn/input";
-import { Loader2, Search } from "@crate/ui/icons";
+import { Loader2 } from "@crate/ui/icons";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface ArtistRepairPlanSummary {
   total: number;
@@ -145,24 +145,17 @@ export function MergeArtistDialog({
             <label htmlFor="merge-artist-target" data-slot="form-field-label">
               <MonoLabel as="span">Target artist</MonoLabel>
             </label>
-            <div className="relative">
-              <Search
-                data-admin-ux="artist-merge-search"
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                id="merge-artist-target"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9"
-                placeholder="Search canonical artist"
-                autoFocus
-              />
-            </div>
+            <SearchInput
+              id="merge-artist-target"
+              label="Target artist"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search canonical artist"
+              autoFocus
+            />
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet">
             {searchError ? (
               <ErrorState message={searchError} onRetry={retrySearch} />
             ) : searching ? (

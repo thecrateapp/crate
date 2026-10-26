@@ -163,11 +163,7 @@ export function Dashboard() {
                 <p className="mt-1 text-sm text-text-muted">{item.detail}</p>
               </div>
               {canSystem ? (
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="min-h-11 shrink-0 self-start"
-                >
+                <Button asChild variant="ghost" className="shrink-0 self-start">
                   <Link to="/system">Inspect system</Link>
                 </Button>
               ) : null}
@@ -284,12 +280,12 @@ export function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-2">
             {canSystem ? (
-              <Button asChild variant="ghost" className="min-h-11">
+              <Button asChild variant="ghost">
                 <Link to="/system">System details</Link>
               </Button>
             ) : null}
             {canStack ? (
-              <Button asChild variant="ghost" className="min-h-11">
+              <Button asChild variant="ghost">
                 <Link to="/stack">Services</Link>
               </Button>
             ) : null}
@@ -429,12 +425,12 @@ export function Dashboard() {
           )}
           <div className="flex flex-wrap gap-2">
             {canTasks ? (
-              <Button asChild variant="ghost" className="min-h-11">
+              <Button asChild variant="ghost">
                 <Link to="/tasks">All tasks</Link>
               </Button>
             ) : null}
             {canAnalysis ? (
-              <Button asChild variant="ghost" className="min-h-11">
+              <Button asChild variant="ghost">
                 <Link to="/analysis">Analysis details</Link>
               </Button>
             ) : null}
@@ -462,7 +458,6 @@ export function Dashboard() {
           {canSync ? (
             <Button
               variant="outline"
-              className="min-h-11"
               disabled={maintenanceBusy}
               aria-busy={maintenanceBusy}
               onClick={() => void triggerLibrarySync()}
@@ -475,7 +470,6 @@ export function Dashboard() {
               <MonoLabel>Database maintenance</MonoLabel>
               <Button
                 variant="outline"
-                className="min-h-11"
                 disabled={maintenanceBusy}
                 onClick={() => setShowRebuildConfirm(true)}
               >
@@ -483,7 +477,6 @@ export function Dashboard() {
               </Button>
               <Button
                 variant="outline"
-                className="min-h-11"
                 disabled={maintenanceBusy}
                 onClick={() => setShowWipeConfirm(true)}
               >

@@ -1014,7 +1014,7 @@ export function PlaylistEditor() {
             name={playlist.name}
             coverDataUrl={playlist.cover_data_url}
             tracks={playlist.artwork_tracks}
-            className="size-28 shrink-0 rounded-md border border-border-quiet bg-canvas-surface object-cover md:size-56"
+            className="size-28 shrink-0 rounded-md border border-border-quiet object-cover md:size-56"
             crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
           />
         }

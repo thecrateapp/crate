@@ -8,7 +8,6 @@ import {
   ChartNoAxesCombined as HeaderChartNoAxesCombined,
   Radar as HeaderRadar,
   Loader2,
-  Search,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -24,7 +23,6 @@ import {
 import { Button } from "@crate/ui/shadcn/button";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { Input } from "@crate/ui/shadcn/input";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +35,7 @@ import {
   albumPagePath,
 } from "@/lib/library-routes";
 import { cn, formatCompact } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface MissingAlbum {
   title: string;
@@ -129,7 +128,7 @@ function OpportunityCard({
             artistName: artist.artist,
           })}
           alt={artist.artist}
-          className="size-14 shrink-0 border border-border-quiet bg-canvas-surface"
+          className="size-14 shrink-0 border border-border-quiet"
         />
 
         <div className="min-w-0 flex-1 space-y-2">
@@ -197,7 +196,7 @@ function OpportunityCard({
           <Button
             size="sm"
             variant="outline"
-            className="min-h-11 gap-2"
+            className="gap-2"
             onClick={() => navigate(href)}
           >
             Open artist
@@ -206,7 +205,7 @@ function OpportunityCard({
         {canAcquire ? (
           <Button
             size="sm"
-            className="min-h-11 gap-2"
+            className="gap-2"
             onClick={() =>
               navigate(`/download?q=${encodeURIComponent(artist.artist)}`)
             }
@@ -243,7 +242,7 @@ function ReleaseRadarRow({ release }: { release: Release }) {
       <MediaCover
         src={release.cover_url}
         alt=""
-        className="size-12 shrink-0 border border-border-quiet bg-canvas-surface"
+        className="size-12 shrink-0 border border-border-quiet"
       />
       <div className="min-w-0 flex-1">
         {albumHref ? (
@@ -560,21 +559,13 @@ function DiscoverView({
           <label htmlFor="discovery-search">
             <MonoLabel as="span">Search discovery</MonoLabel>
           </label>
-          <div className="relative">
-            <Search
-              data-admin-ux="discovery-search"
-              aria-hidden="true"
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-            />
-            <Input
-              id="discovery-search"
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Search artists, releases or missing albums..."
-              className="min-h-11 pl-9"
-            />
-          </div>
+          <SearchInput
+            id="discovery-search"
+            label="Search discovery"
+            value={search}
+            onValueChange={onSearchChange}
+            placeholder="Search artists, releases or missing albums..."
+          />
         </div>
       </OpsPanel>
 
@@ -601,7 +592,7 @@ function DiscoverView({
           </div>
         ) : feeds.completeness.hasData ||
           (!feeds.completeness.loading && !feeds.completeness.error) ? (
-          <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-12 text-center text-sm text-text-subtle">
+          <div className="rounded-md border border-dashed border-border-quiet px-4 py-12 text-center text-sm text-text-subtle">
             No acquisition opportunities match the current filter.
           </div>
         ) : null}
@@ -616,7 +607,7 @@ function DiscoverView({
               <Button
                 size="sm"
                 variant="outline"
-                className="min-h-11 gap-2"
+                className="gap-2"
                 onClick={() => navigate("/new-releases")}
               >
                 Open Release Radar
@@ -639,7 +630,7 @@ function DiscoverView({
             </div>
           ) : feeds.releases.hasData ||
             (!feeds.releases.loading && !feeds.releases.error) ? (
-            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
+            <div className="rounded-md border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-subtle">
               No detected releases available right now.
             </div>
           ) : null}
@@ -669,7 +660,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
+            <div className="rounded-md border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-subtle">
               Genre expansion data is not available yet.
             </div>
           ) : null}
@@ -698,7 +689,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
+            <div className="rounded-md border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-subtle">
               No momentum data available yet.
             </div>
           ) : null}
@@ -725,7 +716,7 @@ function DiscoverView({
             </div>
           ) : feeds.insights.hasData ||
             (!feeds.insights.loading && !feeds.insights.error) ? (
-            <div className="rounded-md border border-dashed border-border-quiet bg-canvas-surface px-4 py-10 text-center text-sm text-text-subtle">
+            <div className="rounded-md border border-dashed border-border-quiet px-4 py-10 text-center text-sm text-text-subtle">
               No album momentum data available yet.
             </div>
           ) : null}

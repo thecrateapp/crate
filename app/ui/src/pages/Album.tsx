@@ -46,7 +46,6 @@ import { LoadingState, EmptyState } from "@crate/ui/domain/states";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   Loader2,
-  Search,
   Tag,
   ArrowRight,
   Link as MergeIcon,
@@ -58,6 +57,7 @@ import {
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface AlbumData {
   id?: number;
@@ -265,24 +265,17 @@ export function MoveAlbumToArtistDialog({
             <label htmlFor="move-album-target" data-slot="form-field-label">
               <MonoLabel as="span">Target artist</MonoLabel>
             </label>
-            <div className="relative">
-              <Search
-                data-admin-ux="album-move-search"
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                id="move-album-target"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9"
-                placeholder="Search artists"
-                autoFocus
-              />
-            </div>
+            <SearchInput
+              id="move-album-target"
+              label="Target artist"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search artists"
+              autoFocus
+            />
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet">
             {searchError ? (
               <ErrorState message={searchError} onRetry={retrySearch} />
             ) : searching ? (
@@ -386,24 +379,17 @@ export function MergeAlbumDialog({
             <label htmlFor="merge-album-target" data-slot="form-field-label">
               <MonoLabel as="span">Target album</MonoLabel>
             </label>
-            <div className="relative">
-              <Search
-                data-admin-ux="album-merge-search"
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                id="merge-album-target"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9"
-                placeholder="Search albums by title or artist"
-                autoFocus
-              />
-            </div>
+            <SearchInput
+              id="merge-album-target"
+              label="Target album"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search albums by title or artist"
+              autoFocus
+            />
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
+          <div className="max-h-[320px] overflow-y-auto rounded-md border border-border-quiet">
             {searchError ? (
               <ErrorState message={searchError} onRetry={retrySearch} />
             ) : searching ? (
@@ -550,7 +536,7 @@ export function SplitAlbumDialog({
             />
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto rounded-md border border-border-quiet bg-canvas-surface">
+          <div className="max-h-[360px] overflow-y-auto rounded-md border border-border-quiet">
             {tracks.map((track, index) => {
               const trackId = track.id;
               const title = track.tags.title || track.filename;

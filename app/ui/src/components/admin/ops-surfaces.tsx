@@ -148,6 +148,7 @@ export function OpsPanel({
   titleTone = "accent",
   description,
   action,
+  ruled,
   children,
   className,
 }: {
@@ -155,6 +156,7 @@ export function OpsPanel({
   titleTone?: ComponentProps<typeof MonoLabel>["tone"];
   description?: string;
   action?: ReactNode;
+  ruled?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -165,6 +167,7 @@ export function OpsPanel({
       label={{ children: title, tone: titleTone }}
       description={description}
       actions={action}
+      ruled={ruled}
       className={className}
     >
       {children}
@@ -269,7 +272,6 @@ export function OpsRefreshNotice({
       <Button
         variant="outline"
         size="sm"
-        className="min-h-11"
         onClick={onRetry}
         disabled={retrying}
         aria-busy={retrying || undefined}

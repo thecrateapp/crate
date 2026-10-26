@@ -6,7 +6,6 @@ import {
   CRATE_ICON_SIZE,
   Download as DownloadActionIcon,
   Heart as HeartIcon,
-  Search,
   Loader2,
   Trash2,
   ArrowUp,
@@ -31,7 +30,6 @@ import {
 import { useSearchParams } from "react-router";
 
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import { Badge } from "@crate/ui/shadcn/badge";
 import {
   Tabs,
@@ -49,6 +47,7 @@ import { api, apiSseUrl } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { toast } from "sonner";
 import { EntityAvatar } from "@crate/ui/domain/entity";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 // encPath available if needed for navigation
 
 interface TidalAlbum {
@@ -735,13 +734,7 @@ export function DownloadPage() {
         title="Acquisition"
         description="Find music, bring it into the library, and follow every import."
       >
-        <InfoBadge
-          className={
-            tidalAuthenticated
-              ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-              : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-          }
-        >
+        <InfoBadge tone={tidalAuthenticated ? "accent" : "warning"}>
           {tidalAuthenticated == null
             ? "Tidal status unavailable"
             : `Tidal ${tidalAuthenticated ? "connected" : "disconnected"}`}
@@ -800,26 +793,17 @@ export function DownloadPage() {
               void doSearch();
             }}
           >
-            <div className="relative h-10 min-w-0 pointer-coarse:h-11">
-              <span
-                data-slot="acquisition-search-icon"
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-text-subtle"
-              >
-                <Search size={18} />
-              </span>
-              <Input
-                aria-label="Search music"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Artist, album, or track"
-                className="h-10 rounded-md border-border-quiet bg-canvas-surface pl-11 text-base pointer-coarse:h-11"
-              />
-            </div>
+            <SearchInput
+              label="Search music"
+              containerClassName="min-w-0"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Artist, album, or track"
+            />
             <Button
               type="submit"
               disabled={searching || query.trim().length < 2}
-              className="h-10 min-w-32 pointer-coarse:h-11"
+              className="min-w-32"
             >
               {searching ? (
                 <Loader2 size={14} className="mr-2 animate-spin" />
@@ -912,13 +896,12 @@ export function DownloadPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 border-t border-border-quiet pt-3">
                     <Button
-                      className="min-h-11"
                       onClick={() => void searchArtistSuggestion(suggestion)}
                     >
                       Search artist
                     </Button>
                     {suggestion.artist_url ? (
-                      <Button className="min-h-11" variant="outline" asChild>
+                      <Button variant="outline" asChild>
                         <a
                           href={suggestion.artist_url}
                           target="_blank"
@@ -929,7 +912,6 @@ export function DownloadPage() {
                       </Button>
                     ) : null}
                     <Button
-                      className="min-h-11"
                       variant="outline"
                       onClick={() =>
                         void updateArtistSuggestionStatus(
@@ -1059,7 +1041,7 @@ export function DownloadPage() {
                               }
                             }}
                           >
-                            <div className="relative mx-auto mb-3 aspect-square w-full overflow-hidden rounded-md bg-canvas-surface">
+                            <div className="relative mx-auto mb-3 aspect-square w-full overflow-hidden rounded-md">
                               <span className="absolute inset-0 grid place-items-center font-mono text-xl text-text-subtle">
                                 {artist.name.slice(0, 1).toUpperCase()}
                               </span>
@@ -1305,7 +1287,7 @@ export function DownloadPage() {
                 className={`grid min-h-56 content-center justify-items-center gap-3 rounded-md border border-dashed px-5 py-8 text-center transition-colors ${
                   uploadDragActive
                     ? "border-accent-action bg-accent-action/[0.08]"
-                    : "border-border-quiet bg-canvas-surface hover:border-accent-action/50"
+                    : "border-border-quiet hover:border-accent-action/50"
                 }`}
               >
                 <label
@@ -1330,7 +1312,7 @@ export function DownloadPage() {
                 </p>
               </div>
               {uploadFiles.length > 0 ? (
-                <div className="grid gap-3 rounded-md border border-border-quiet bg-canvas-surface p-3 sm:p-4">
+                <div className="grid gap-3 rounded-md border border-border-quiet p-3 sm:p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <MonoLabel as="span" tone="accent">
                       {uploadFiles.length} file
@@ -1340,7 +1322,6 @@ export function DownloadPage() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="min-h-11"
                       onClick={() => setUploadFiles([])}
                     >
                       Clear selection
@@ -1382,7 +1363,7 @@ export function DownloadPage() {
               <Button
                 onClick={submitUpload}
                 disabled={uploading || uploadFiles.length === 0}
-                className="min-h-11 w-full"
+                className="w-full"
               >
                 {uploading ? (
                   <Loader2 size={14} className="mr-2 animate-spin" />
@@ -1423,7 +1404,6 @@ export function DownloadPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="min-h-11"
                     onClick={async () => {
                       await api(
                         "/api/acquisition/queue/clear-completed",
@@ -1438,7 +1418,6 @@ export function DownloadPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="min-h-11"
                     onClick={async () => {
                       await api("/api/acquisition/queue/clear-errored", "POST");
                       refetchQueue();
@@ -1450,7 +1429,6 @@ export function DownloadPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="min-h-11"
                     onClick={async () => {
                       await api(
                         "/api/acquisition/queue/cleanup-incomplete",
@@ -1560,7 +1538,7 @@ export function DownloadPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="min-h-11 flex-shrink-0"
+                          className="flex-shrink-0"
                           onClick={async () => {
                             // Parse artist from directory path (e.g. "music/D/Dredg - 2002 - El Cielo/track.flac")
                             const path = (
@@ -1628,7 +1606,6 @@ export function DownloadPage() {
               </div>
               {wishlist.length > 0 ? (
                 <Button
-                  className="min-h-11"
                   onClick={() => void promoteAllWishlist()}
                   disabled={queueBusy.size > 0}
                   aria-busy={queueBusy.size > 0}
@@ -1842,7 +1819,7 @@ function TidalArtistBrowser({
         as="div"
         className="flex flex-wrap items-center gap-3 p-3 sm:p-4"
       >
-        <Button variant="outline" className="min-h-11" onClick={onBack}>
+        <Button variant="outline" onClick={onBack}>
           <ArrowLeft size={14} aria-hidden="true" />
           Back to results
         </Button>
@@ -1872,7 +1849,7 @@ function TidalArtistBrowser({
         </div>
         {availableCount > 0 ? (
           <Button
-            className="min-h-11 w-full sm:ml-auto sm:w-auto"
+            className="w-full sm:ml-auto sm:w-auto"
             onClick={() => {
               for (const album of albums) {
                 if (album.status === "available") {
@@ -2013,7 +1990,7 @@ function TidalAlbumCard({
           isLocal && hasUpgrade ? "border-state-warning/40" : ""
         }`}
       >
-        <div className="relative aspect-square w-full bg-canvas-surface">
+        <div className="relative aspect-square w-full">
           {album.cover ? (
             <img
               src={album.cover}
@@ -2067,7 +2044,7 @@ function TidalAlbumCard({
           </div>
           <div className="grid grid-cols-2 gap-2 border-t border-border-quiet pt-3">
             <Button
-              className="col-span-2 min-h-11 w-full"
+              className="col-span-2 w-full"
               onClick={onDownloadAlbum}
               disabled={isDownloading || (isLocal && !hasUpgrade)}
             >
@@ -2081,14 +2058,14 @@ function TidalAlbumCard({
             </Button>
             <Button
               variant="outline"
-              className="min-h-11 w-full px-2 text-xs"
+              className="w-full px-2 text-xs"
               onClick={openTracklist}
             >
               View tracks
             </Button>
             <Button
               variant="outline"
-              className="min-h-11 w-full px-2 text-xs"
+              className="w-full px-2 text-xs"
               onClick={onWishlist}
             >
               Wishlist
@@ -2171,16 +2148,11 @@ function TidalAlbumCard({
                   onDownloadAlbum();
                   setOpen(false);
                 }}
-                className="min-h-11"
                 disabled={isDownloading || (isLocal && !hasUpgrade)}
               >
                 {isDownloading ? "Download queued" : "Download full album"}
               </Button>
-              <Button
-                variant="outline"
-                className="min-h-11"
-                onClick={onWishlist}
-              >
+              <Button variant="outline" onClick={onWishlist}>
                 Add to wishlist
               </Button>
             </div>
@@ -2215,7 +2187,7 @@ function SlskResultCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-canvas-surface">
+              <div className="flex h-full w-full items-center justify-center">
                 <span className="font-display text-2xl font-semibold text-text-subtle">
                   {r.album.slice(0, 1).toUpperCase()}
                 </span>
@@ -2279,7 +2251,7 @@ function SlskResultCard({
                   className="w-12 h-12 rounded object-cover"
                 />
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded bg-canvas-surface font-display text-xl font-semibold text-text-subtle">
+                <div className="flex h-12 w-12 items-center justify-center rounded font-display text-xl font-semibold text-text-subtle">
                   {r.album.slice(0, 1).toUpperCase()}
                 </div>
               )}

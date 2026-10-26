@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search } from "@crate/ui/icons";
+import { Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
@@ -11,7 +11,6 @@ import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import {
   Table,
   TableBody,
@@ -22,6 +21,7 @@ import {
 } from "@crate/ui/shadcn/table";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 export type SmartMixTrackFilter =
   | "all"
@@ -241,20 +241,13 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
             label: `${item.label}${countsByFilter[item.key] != null ? ` · ${countsByFilter[item.key]?.toLocaleString()}` : ""}`,
           }))}
         />
-        <div className="relative lg:w-72">
-          <Search
-            data-admin-ux="mix-track-search"
-            size={14}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
-          />
-          <Input
-            aria-label="Search tracks"
-            placeholder="Search title, artist or album"
-            className="pl-8"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-          />
-        </div>
+        <SearchInput
+          label="Search tracks"
+          placeholder="Search title, artist or album"
+          containerClassName="lg:w-72"
+          value={searchInput}
+          onValueChange={setSearchInput}
+        />
       </div>
 
       {error ? (

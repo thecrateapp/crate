@@ -317,7 +317,7 @@ export function Trash() {
           description="Quarantined tracks will appear here after manual removals or repair actions."
         />
       ) : (
-        <Card className="border-border-quiet bg-card">
+        <Card>
           <div className="divide-y divide-border-quiet">
             {items.map((item) => {
               const busy = busyPath === item.quarantine_path;
@@ -347,7 +347,6 @@ export function Trash() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="min-h-11"
                       disabled={busyPath !== null || bulkDeleting}
                       aria-busy={busy}
                       onClick={() => void restore(item)}
@@ -366,7 +365,6 @@ export function Trash() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="min-h-11"
                       disabled={busyPath !== null || bulkDeleting}
                       onClick={() => setDeleteTarget(item)}
                     >

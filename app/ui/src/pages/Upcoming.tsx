@@ -27,7 +27,6 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Search,
   X,
 } from "lucide-react";
 import {
@@ -47,7 +46,6 @@ import { AdminSelect } from "@/components/ui/AdminSelect";
 import { ListPagination } from "@/components/admin/ListPagination";
 
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import {
   Popover,
   PopoverContent,
@@ -71,6 +69,7 @@ import {
 import { toast } from "sonner";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 function groupByMonth(list: UpcomingItem[]): [string, UpcomingItem[]][] {
   const groups = new Map<string, UpcomingItem[]>();
@@ -625,25 +624,16 @@ export function Upcoming() {
               className="crate-form-field min-w-0"
             >
               <MonoLabel as="span">Artist</MonoLabel>
-              <div className="relative">
-                <Search
-                  data-admin-ux="upcoming-search"
-                  aria-hidden="true"
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-                />
-                <Input
-                  id="upcoming-artist"
-                  type="text"
-                  placeholder="Filter by artist..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
-                  }}
-                  className="h-11 border-border-quiet bg-surface-canvas pl-9 text-text-primary"
-                />
-              </div>
+              <SearchInput
+                id="upcoming-artist"
+                label="Artist"
+                placeholder="Filter by artist..."
+                value={search}
+                onValueChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+              />
             </label>
           </div>
 

@@ -158,7 +158,7 @@ describe("SmartMixTracks", () => {
   it("only searches from three characters on", async () => {
     const user = userEvent.setup();
     render(<SmartMixTracks counts={counts} />);
-    const input = screen.getByRole("textbox", { name: "Search tracks" });
+    const input = screen.getByRole("searchbox", { name: "Search tracks" });
 
     await user.type(input, "fa");
     await new Promise((resolve) => setTimeout(resolve, 400));

@@ -871,11 +871,7 @@ export function Health() {
         {filter ? (
           <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-text-muted">
             <p>Showing {CHECK_LABELS[filter] || filter.replace(/_/g, " ")}.</p>
-            <Button
-              variant="ghost"
-              className="min-h-11"
-              onClick={() => setFilter(null)}
-            >
+            <Button variant="ghost" onClick={() => setFilter(null)}>
               Clear filter
             </Button>
           </div>
@@ -987,7 +983,7 @@ export function Health() {
                   </div>
                   <Button
                     variant="ghost"
-                    className="min-h-11 shrink-0 gap-4 aria-expanded:text-accent-action-hi aria-expanded:hover:text-accent-action-hi"
+                    className="shrink-0 gap-4 aria-expanded:text-accent-action-hi aria-expanded:hover:text-accent-action-hi"
                     onClick={() => toggleGroup(check)}
                     aria-label={`Review issues: ${label}`}
                     aria-expanded={isExpanded}
@@ -1094,7 +1090,6 @@ export function Health() {
                                 variant={
                                   hasArtistReview ? "outline" : "default"
                                 }
-                                className="min-h-11"
                                 aria-label={`Queue repair for ${label}`}
                                 onClick={() =>
                                   canRunBulkFix
@@ -1125,7 +1120,6 @@ export function Health() {
                                     ? "outline"
                                     : "default"
                                 }
-                                className="min-h-11"
                                 onClick={() => void runDuplicateCleanup()}
                                 disabled={operationBusy}
                               >
@@ -1134,7 +1128,7 @@ export function Health() {
                             ) : null}
                             <Button
                               variant="ghost"
-                              className="min-h-11 text-caption text-text-muted"
+                              className="text-caption text-text-muted"
                               onClick={() => handleDismissType(check)}
                               aria-label={`Dismiss all ${label} issues`}
                             >
@@ -1173,7 +1167,7 @@ export function Health() {
           {latestRepairTask ? (
             <>
               <p>{latestRepairSummary(latestRepairTask)}</p>
-              <Button variant="ghost" className="min-h-11" asChild>
+              <Button variant="ghost" asChild>
                 <Link to={`/tasks?task=${latestRepairTask.id}`}>
                   View task log
                 </Link>
@@ -1312,7 +1306,7 @@ function IssueRow({
               e.stopPropagation();
               onResolve();
             }}
-            className="min-h-11 text-caption text-text-muted"
+            className="text-caption text-text-muted"
             aria-label="Mark as resolved"
           >
             Resolve
@@ -1323,7 +1317,7 @@ function IssueRow({
               e.stopPropagation();
               onDismiss();
             }}
-            className="min-h-11 text-caption text-text-muted"
+            className="text-caption text-text-muted"
             aria-label="Dismiss: it stays hidden unless its details change"
           >
             Dismiss
@@ -1408,7 +1402,7 @@ function ArtistGroupHeader({
       </Link>
       {children}
       {canRepair && group.artistId ? (
-        <Button className="min-h-11" asChild>
+        <Button asChild>
           <Link to={`${href}?repair=1`}>Review and repair</Link>
         </Button>
       ) : null}

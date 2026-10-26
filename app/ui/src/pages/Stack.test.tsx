@@ -411,20 +411,19 @@ describe("Stack typographic controls", () => {
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "All" }));
     await user.type(
-      screen.getByRole("textbox", { name: "Search stack services" }),
+      screen.getByRole("searchbox", { name: "Search stack services" }),
       "8686",
     );
     expect(screen.getByText("tidarr", { exact: true })).toBeVisible();
     expect(created).toHaveBeenCalledOnce();
-    act(
-      () =>
-        stream.onmessage?.({
-          data: JSON.stringify({
-            ...snapshot,
-            stack: { ...snapshot.stack, containers: [] },
-          }),
-          origin: window.location.origin,
-        } as MessageEvent),
+    act(() =>
+      stream.onmessage?.({
+        data: JSON.stringify({
+          ...snapshot,
+          stack: { ...snapshot.stack, containers: [] },
+        }),
+        origin: window.location.origin,
+      } as MessageEvent),
     );
     expect(
       screen.getByText("No services match the current filters."),

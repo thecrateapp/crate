@@ -24,7 +24,6 @@ import {
   Pencil,
   Power,
   PowerOff,
-  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -62,6 +61,7 @@ import { Textarea } from "@crate/ui/shadcn/textarea";
 import { api } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { timeAgo } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface SystemPlaylist {
   id: number;
@@ -434,24 +434,16 @@ export function Playlists() {
             >
               Search playlists
             </label>
-            <div className="relative">
-              <Search
-                data-admin-ux="playlists-search"
-                aria-hidden="true"
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                id="playlists-search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search playlists by name, description or category"
-                className="pl-9"
-              />
-            </div>
+            <SearchInput
+              id="playlists-search"
+              label="Search playlists"
+              value={query}
+              onValueChange={(value) => {
+                setQuery(value);
+                setPage(1);
+              }}
+              placeholder="Search playlists by name, description or category"
+            />
           </div>
           <div className="crate-form-field">
             <MonoLabel as="span">Category</MonoLabel>
@@ -659,7 +651,7 @@ export function Playlists() {
                       name={playlist.name}
                       coverDataUrl={playlist.cover_data_url}
                       tracks={playlist.artwork_tracks}
-                      className="size-28 shrink-0 self-stretch rounded-sm border border-border-quiet bg-canvas-surface object-cover md:size-44"
+                      className="size-28 shrink-0 self-stretch rounded-sm border border-border-quiet object-cover md:size-44"
                     />
 
                     <div
@@ -858,12 +850,7 @@ function CreateStaticPlaylistPanel({
             </div>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="min-h-11"
-            onClick={onCancel}
-          >
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             <X
               data-admin-ux="playlists-static-close"
               aria-hidden="true"
@@ -919,14 +906,10 @@ function CreateStaticPlaylistPanel({
             and editorial metadata stay in the same workflow.
           </p>
           <div className="flex items-center gap-2">
-            <Button className="min-h-11" variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
-            <Button
-              className="min-h-11"
-              onClick={submit}
-              disabled={saving || !name.trim()}
-            >
+            <Button onClick={submit} disabled={saving || !name.trim()}>
               {saving ? (
                 <Loader2
                   data-admin-ux="playlists-static-saving"
@@ -1084,12 +1067,7 @@ function CreateSmartPlaylistPanel({
             </div>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="min-h-11"
-            onClick={onCancel}
-          >
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             <X
               data-admin-ux="playlists-smart-close"
               aria-hidden="true"
@@ -1139,7 +1117,7 @@ function CreateSmartPlaylistPanel({
           </FormField>
         </div>
 
-        <div className="rounded-md border border-border-quiet bg-canvas-surface p-4">
+        <div className="rounded-md border border-border-quiet p-4">
           <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h3 className="text-sm font-semibold font-display">
@@ -1228,7 +1206,7 @@ function CreateSmartPlaylistPanel({
               return (
                 <div
                   key={index}
-                  className="@container rounded-md border border-border-quiet bg-canvas-surface p-3"
+                  className="@container rounded-md border border-border-quiet p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <InfoBadge>Rule {index + 1}</InfoBadge>
@@ -1360,7 +1338,6 @@ function CreateSmartPlaylistPanel({
             <Button
               variant="outline"
               size="sm"
-              className="min-h-11"
               onClick={addRule}
               disabled={rules.length >= 12 || saving}
             >
@@ -1375,11 +1352,10 @@ function CreateSmartPlaylistPanel({
             continue in the editor for cover, status and later refinements.
           </p>
           <div className="flex items-center gap-2">
-            <Button className="min-h-11" variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
             <Button
-              className="min-h-11"
               onClick={submit}
               disabled={
                 saving || !name.trim() || (needsOptions && !filterOptions)

@@ -102,7 +102,10 @@ describe("Show Management visual contract", () => {
     expect(mergeRowAction.querySelector("svg")).toBeNull();
 
     for (const icon of container.querySelectorAll("svg")) {
-      if (!icon.hasAttribute("data-admin-ux")) {
+      if (
+        !icon.hasAttribute("data-admin-ux") &&
+        !icon.closest('[data-slot="search-input"]')
+      ) {
         expect(icon.closest("button, a, [role=combobox]")).toBeInTheDocument();
       }
     }

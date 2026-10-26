@@ -95,12 +95,13 @@ describe("New Releases text presentation with real data hook and handlers", () =
       Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
         (el) =>
           !el.closest('[role="combobox"]') &&
+          !el.closest('[data-slot="search-input"]') &&
           !el.closest('[data-testid="media-cover-fallback"]'),
       ),
     ).toHaveLength(0);
     expect(
       screen
-        .getByRole("textbox", { name: "Search releases" })
+        .getByRole("searchbox", { name: "Search releases" })
         .closest(".crate-form-field"),
     ).not.toBeNull();
     expect(
@@ -143,7 +144,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
         expect(button).toHaveAttribute("data-size", "icon-lg");
       else if (button.getAttribute("data-slot") === "chip")
         expect(button).toHaveClass("[@media(pointer:coarse)]:min-h-11");
-      else expect(button).toHaveClass("min-h-11");
+      else expect(button).not.toHaveClass("min-h-11");
     expect(mockApi).toHaveBeenCalledTimes(1);
     expect(SampleStream.instances).toHaveLength(1);
     expect(SampleStream.instances[0]!.url).toBe(
@@ -228,6 +229,7 @@ describe("New Releases text presentation with real data hook and handlers", () =
       Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
         (el) =>
           !el.closest('[role="combobox"]') &&
+          !el.closest('[data-slot="search-input"]') &&
           !el.closest('[data-testid="media-cover-fallback"]'),
       ),
     ).toHaveLength(0);
@@ -419,7 +421,9 @@ describe("New Releases text presentation with real data hook and handlers", () =
     await screen.findByText("No releases match the current radar", {});
     expect(
       Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
-        (el) => !el.closest('[role="combobox"]'),
+        (el) =>
+          !el.closest('[role="combobox"]') &&
+          !el.closest('[data-slot="search-input"]'),
       ),
     ).toHaveLength(0);
   });

@@ -518,7 +518,7 @@ function MatchRow({
           <Button
             variant="ghost"
             size="sm"
-            className="min-h-11 gap-2"
+            className="gap-2"
             onClick={() =>
               window.open(match.item_url || "", "_blank", "noopener,noreferrer")
             }
@@ -528,7 +528,7 @@ function MatchRow({
         ) : null}
         <Button
           size="sm"
-          className="min-h-11 gap-2"
+          className="gap-2"
           aria-busy={busyAction === `confirm:${match.id}`}
           disabled={busyAction !== null}
           onClick={onConfirm}
@@ -545,7 +545,7 @@ function MatchRow({
         <Button
           variant="outline"
           size="sm"
-          className="min-h-11 gap-2"
+          className="gap-2"
           aria-busy={busyAction === `reject:${match.id}`}
           disabled={busyAction !== null}
           onClick={onReject}

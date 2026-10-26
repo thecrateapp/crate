@@ -579,7 +579,7 @@ export function Browse() {
         </div>
 
         {/* Results count */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-quiet pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <span aria-live="polite">
               {loading

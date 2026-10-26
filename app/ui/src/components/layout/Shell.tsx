@@ -136,11 +136,7 @@ export function Shell() {
           className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface px-4 py-3 md:hidden"
         >
           <SheetTrigger asChild>
-            <Button
-              variant="ghost"
-              className="min-h-11 min-w-11 p-0"
-              aria-label="Open navigation"
-            >
+            <Button variant="ghost" size="icon" aria-label="Open navigation">
               <Menu
                 size={20}
                 data-admin-ux="mobile-navigation"

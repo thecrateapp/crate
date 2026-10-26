@@ -156,7 +156,7 @@ describe("System Playlists reviewed rendering and contracts", () => {
     expect(
       container.querySelectorAll(".playlist-artwork-placeholder svg"),
     ).toHaveLength(0);
-    const search = screen.getByRole("textbox", { name: "Search playlists" });
+    const search = screen.getByRole("searchbox", { name: "Search playlists" });
     expect(search.closest(".crate-form-field")).toBeInTheDocument();
   });
   it("opens the correct editor from the row toolbar by keyboard without triggering its parent", async () => {
@@ -176,13 +176,15 @@ describe("System Playlists reviewed rendering and contracts", () => {
     mount();
     await screen.findByRole("heading", { name: "Costa de noche" });
     await user.type(
-      screen.getByRole("textbox", { name: "Search playlists" }),
+      screen.getByRole("searchbox", { name: "Search playlists" }),
       "Archivo",
     );
     expect(
       screen.queryByRole("heading", { name: "Costa de noche" }),
     ).not.toBeInTheDocument();
-    await user.clear(screen.getByRole("textbox", { name: "Search playlists" }));
+    await user.clear(
+      screen.getByRole("searchbox", { name: "Search playlists" }),
+    );
     await user.click(screen.getByRole("button", { name: /Inactive1/ }));
     expect(
       screen.getByRole("heading", { name: "Archivo pausado" }),

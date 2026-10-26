@@ -31,7 +31,7 @@ function BeforeAfter({
 }) {
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
-      <div className="min-w-0 rounded-md border border-border-quiet bg-canvas-surface p-3">
+      <div className="min-w-0 rounded-md border border-border-quiet p-3">
         <MonoLabel as="dt">Current</MonoLabel>
         <dd className="mt-1 text-sm text-text-secondary">{current}</dd>
       </div>
@@ -218,7 +218,7 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
         {changes.map(({ view, key }) => (
           <li
             key={key}
-            className="min-w-0 space-y-3 rounded-md border border-border-quiet bg-canvas-surface p-4"
+            className="min-w-0 space-y-3 rounded-md border border-border-quiet p-4"
           >
             <div className="space-y-1">
               {view.numbered ? (

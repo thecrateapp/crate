@@ -202,6 +202,9 @@ jobs:
       - name: Check design-system drift budget
         run: npm run design-system:drift -- --check
 
+      - name: Check shared component override budget
+        run: npm run design-system:overrides -- --check
+
       - name: Check generated appearance tokens
         run: npm run design-system:tokens:check
 

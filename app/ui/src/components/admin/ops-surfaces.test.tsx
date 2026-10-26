@@ -140,6 +140,24 @@ it("supports accent section headings for operational surfaces", () => {
   );
 });
 
+it("drops the panel rule when it would sit under another rule", () => {
+  render(
+    <>
+      <OpsPanel title="Ruled">Content</OpsPanel>
+      <OpsPanel title="Under tabs" ruled={false}>
+        Content
+      </OpsPanel>
+    </>,
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Ruled" }).closest("section"),
+  ).toHaveClass("border-t");
+  expect(
+    screen.getByRole("heading", { name: "Under tabs" }).closest("section"),
+  ).not.toHaveClass("border-t");
+});
+
 describe("Admin operational surfaces without decorative glyphs", () => {
   it("gives nested status cards one opaque surface while keeping semantic tones", () => {
     render(

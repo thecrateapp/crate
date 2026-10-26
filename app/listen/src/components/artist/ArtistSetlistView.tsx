@@ -42,12 +42,12 @@ export function ArtistSetlistView({
       title={t("artist.setlist.title")}
       description={`${artistName} · ${t("artist.setlist.songCount", { count: setlist.length })}`}
       closeLabel={t("common.close")}
-      size="sm"
+      size="md"
       mobileSafeArea
       panelClassName="flex min-h-0 flex-col sm:max-h-[92vh]"
     >
       <ModalBody className="min-h-0 flex-1 p-4">
-        <HairlineList label={t("artist.setlist.title")}>
+        <HairlineList label={t("artist.setlist.title")} ruled={false}>
           {setlist.map((track, index) => (
             <HairlineRow
               key={[index, track.title, track.last_played].join(":")}
@@ -58,14 +58,14 @@ export function ArtistSetlistView({
               <span className="mt-2 flex flex-wrap items-center gap-2">
                 <span
                   aria-hidden="true"
-                  className="relative h-1 w-16 overflow-hidden rounded-full bg-accent-action/15"
+                  className="relative h-px w-16 overflow-hidden bg-accent-action/15"
                 >
                   <span
-                    className="absolute inset-y-0 left-0 rounded-full bg-accent-action/70"
+                    className="absolute inset-y-0 left-0 bg-accent-action/70"
                     style={{ width: `${Math.round(track.frequency * 100)}%` }}
                   />
                 </span>
-                <MonoLabel as="span">
+                <MonoLabel as="span" className="w-[6ch] text-right">
                   {Math.round(track.frequency * 100)}%
                 </MonoLabel>
                 {track.play_count > 0 ? (

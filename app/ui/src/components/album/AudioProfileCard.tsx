@@ -24,7 +24,7 @@ const CHART_THEME = {
   grid: { line: { stroke: "var(--color-border-quiet)" } },
   tooltip: {
     container: {
-      background: "var(--color-popover-surface)",
+      background: "var(--surface-popover)",
       color: "var(--color-text-primary)",
       fontSize: 12,
     },

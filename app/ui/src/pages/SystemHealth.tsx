@@ -688,13 +688,7 @@ export function SystemHealth() {
         <InfoBadge>{runningTasks} running tasks</InfoBadge>
         <InfoBadge>{queueDepth ?? "—"} queued depth</InfoBadge>
         {summary && errorRate !== "—" ? (
-          <InfoBadge
-            className={
-              Number(errorRate) > 1
-                ? "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-                : undefined
-            }
-          >
+          <InfoBadge tone={Number(errorRate) > 1 ? "warning" : undefined}>
             {errorRate}% error rate
           </InfoBadge>
         ) : null}
@@ -713,11 +707,7 @@ export function SystemHealth() {
         ) : null}
         {system?.resource_pressure ? (
           <InfoBadge
-            className={
-              system.resource_pressure.allowed
-                ? "border-accent-action/25 bg-accent-action/10 text-accent-action-hi"
-                : "border-state-warning/25 bg-state-warning/10 text-state-warning-text"
-            }
+            tone={system.resource_pressure.allowed ? "accent" : "warning"}
           >
             {system.resource_pressure.allowed ? "Batch open" : "Batch deferred"}
           </InfoBadge>

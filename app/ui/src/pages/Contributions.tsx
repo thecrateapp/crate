@@ -142,10 +142,7 @@ export function Contributions() {
         ) : null}
       </OpsPageHero>
 
-      <Card
-        aria-busy={loading}
-        className="overflow-hidden border-border-quiet bg-card"
-      >
+      <Card aria-busy={loading} className="overflow-hidden">
         {loading && items.length === 0 ? (
           <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2

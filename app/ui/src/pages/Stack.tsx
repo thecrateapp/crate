@@ -11,7 +11,6 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
-  Search,
   Square,
 } from "@crate/ui/icons";
 import {
@@ -33,12 +32,12 @@ import {
 } from "@/components/admin/ops-surfaces";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { Input } from "@crate/ui/shadcn/input";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface Container {
   id: string;
@@ -540,21 +539,13 @@ export function Stack() {
             }
           >
             <div className="mb-4 flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  data-admin-ux="stack-search"
-                  aria-hidden="true"
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-                />
-                <Input
-                  aria-label="Search stack services"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search services, images or ports..."
-                  className="pl-9"
-                />
-              </div>
+              <SearchInput
+                label="Search stack services"
+                containerClassName="min-w-0 flex-1"
+                value={search}
+                onValueChange={setSearch}
+                placeholder="Search services, images or ports..."
+              />
               <SegmentedControl
                 as="radio"
                 label="Service state"

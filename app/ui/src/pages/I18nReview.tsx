@@ -715,7 +715,7 @@ function OverviewSection({
   onDraftMissing: (locale: string, sourceVersion: string) => Promise<void>;
 }) {
   return (
-    <Card className="gap-0 overflow-hidden border-border-quiet bg-card p-0">
+    <Card className="gap-0 overflow-hidden p-0">
       <div className="border-b border-border-quiet px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -780,7 +780,7 @@ function OverviewSection({
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-11 w-full md:w-auto"
+                className="w-full md:w-auto"
                 aria-label={`Draft missing/stale with AI for ${health.locale}`}
                 disabled={
                   !aiConfigured ||
@@ -1015,7 +1015,6 @@ function EditorSection({
               <Button
                 variant="outline"
                 size="sm"
-                className="min-h-11"
                 onClick={() => void onExportBundle()}
                 disabled={exportBusy}
               >
@@ -1032,7 +1031,6 @@ function EditorSection({
               <Button
                 variant="ghost"
                 size="sm"
-                className="min-h-11"
                 onClick={() => void onReviewAction("reject")}
                 disabled={
                   !!actionBusy ||
@@ -1052,7 +1050,6 @@ function EditorSection({
               </Button>
               <Button
                 size="sm"
-                className="min-h-11"
                 onClick={() => void onReviewAction("publish")}
                 disabled={
                   !!actionBusy ||
@@ -1133,7 +1130,6 @@ function EditorSection({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="min-h-11"
                         aria-label={`Save ${key}`}
                         onClick={() => void onSaveMessage(key)}
                         disabled={savingKey !== null || actionBusy !== null}
@@ -1152,7 +1148,6 @@ function EditorSection({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="min-h-11"
                           aria-label={`Save ${key} to workspace JSON`}
                           onClick={() => void onSaveWorkspaceMessage(key)}
                           disabled={workspaceSavingKey === key}

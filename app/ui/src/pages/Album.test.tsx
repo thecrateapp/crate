@@ -189,7 +189,7 @@ describe("MoveAlbumToArtistDialog", () => {
       />,
     );
 
-    await userEvent.type(screen.getByRole("textbox"), "target");
+    await userEvent.type(screen.getByRole("searchbox"), "target");
 
     const result = await screen.findByText("Target Artist");
     expect(result.closest("button")).toHaveClass("hover:text-accent-action-hi");
@@ -225,8 +225,8 @@ describe("MergeAlbumDialog", () => {
       />,
     );
 
-    await userEvent.clear(screen.getByRole("textbox"));
-    await userEvent.type(screen.getByRole("textbox"), "target");
+    await userEvent.clear(screen.getByRole("searchbox"));
+    await userEvent.type(screen.getByRole("searchbox"), "target");
 
     await screen.findByText("Target Album");
     await userEvent.click(screen.getByText("Target Album"));
@@ -361,7 +361,7 @@ it.each(["move", "merge"])(
       ),
     );
     if (kind === "move")
-      await userEvent.type(screen.getByRole("textbox"), "Target");
+      await userEvent.type(screen.getByRole("searchbox"), "Target");
     await screen.findByRole("button", { name: "Retry" });
     expect(
       screen.queryByText(/No matching (artists|albums) found/),

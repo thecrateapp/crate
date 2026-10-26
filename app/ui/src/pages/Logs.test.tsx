@@ -43,7 +43,7 @@ describe("Logs typographic controls", () => {
     const user = userEvent.setup();
     renderWithAdminProviders(<Logs />);
     await user.type(
-      await screen.findByRole("textbox", { name: "Search worker logs" }),
+      await screen.findByRole("searchbox", { name: "Search worker logs" }),
       "needle-at-the-end",
     );
     await user.click(screen.getByText("Inspect metadata"));
@@ -81,7 +81,7 @@ describe("Logs typographic controls", () => {
       screen.getByRole("button", { name: "Pause live" }).querySelector("svg"),
     ).toHaveAttribute("aria-hidden", "true");
     expect(
-      screen.getByRole("textbox", { name: "Search worker logs" }),
+      screen.getByRole("searchbox", { name: "Search worker logs" }),
     ).toBeVisible();
     expect(screen.getByRole("link", { name: "Task scan-sam" })).toHaveAttribute(
       "href",
@@ -123,7 +123,7 @@ describe("Logs typographic controls", () => {
     expect(screen.queryByText("Sample sync waiting")).not.toBeInTheDocument();
     await user.click(screen.getByRole("radio", { name: "All levels" }));
     await user.type(
-      screen.getByRole("textbox", { name: "Search worker logs" }),
+      screen.getByRole("searchbox", { name: "Search worker logs" }),
       "Costa Norte",
     );
     expect(screen.getByText("Sample analysis needs attention")).toBeVisible();
@@ -145,7 +145,7 @@ describe("Logs typographic controls", () => {
     await user.click(screen.getByRole("button", { name: "Resume live" }));
     expect(streams).toHaveLength(2);
     await user.clear(
-      screen.getByRole("textbox", { name: "Search worker logs" }),
+      screen.getByRole("searchbox", { name: "Search worker logs" }),
     );
     act(() =>
       streams[1]!.onmessage?.({

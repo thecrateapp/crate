@@ -121,7 +121,6 @@ describe("Playlists smart rule composer", () => {
       "md:size-44",
       "shrink-0",
       "border-border-quiet",
-      "bg-canvas-surface",
     );
     expect(artwork?.className).not.toContain("border-white");
     expect(content?.firstElementChild).toBe(artwork);

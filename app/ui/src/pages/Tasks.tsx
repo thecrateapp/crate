@@ -25,7 +25,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Search,
   X,
 } from "@crate/ui/icons";
 import { toast } from "sonner";
@@ -56,7 +55,6 @@ import { Button } from "@crate/ui/shadcn/button";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
-import { Input } from "@crate/ui/shadcn/input";
 import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { TooltipHint } from "@crate/ui/shadcn/tooltip";
@@ -70,6 +68,7 @@ import {
 } from "@/lib/task-insights";
 import { cn, timeAgo } from "@/lib/utils";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface TaskProgress {
   phase?: string;
@@ -1633,20 +1632,13 @@ export function Tasks() {
           </TabsList>
 
           <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(180px,0.8fr)_minmax(200px,1fr)]">
-            <div className="relative min-w-0 md:col-span-2 lg:col-span-1">
-              <Search
-                size={14}
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                aria-label="Search tasks"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search labels, ids or params..."
-                className="pl-9"
-              />
-            </div>
+            <SearchInput
+              label="Search tasks"
+              containerClassName="min-w-0 md:col-span-2 lg:col-span-1"
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search labels, ids or params..."
+            />
             <AdminSelect
               ariaLabel="Task family"
               value={filterFamily}

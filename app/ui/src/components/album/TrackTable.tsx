@@ -5,13 +5,7 @@ import {
   formatTrackQuality,
 } from "@crate/ui/lib/track-meta";
 import { useState } from "react";
-import {
-  BarChart3,
-  Download,
-  AlignLeft,
-  Loader2,
-  Search,
-} from "@crate/ui/icons";
+import { BarChart3, Download, AlignLeft, Loader2 } from "@crate/ui/icons";
 
 import { SimilarTracksPanel } from "@/components/track/SimilarTracksPanel";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
@@ -28,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { Input } from "@crate/ui/shadcn/input";
 
 import {
   Table,
@@ -123,6 +116,7 @@ import { AudioProfileCard } from "./AudioProfileCard";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface TrackTableProps {
   tracks: Track[];
@@ -392,24 +386,17 @@ function MoveTrackDialog({
             <label htmlFor="move-track-target" data-slot="form-field-label">
               Target album
             </label>
-            <div className="relative">
-              <Search
-                data-admin-ux="track-move-search"
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                id="move-track-target"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="pl-9"
-                placeholder="Search albums by title or artist"
-                autoFocus
-              />
-            </div>
+            <SearchInput
+              id="move-track-target"
+              label="Target album"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search albums by title or artist"
+              autoFocus
+            />
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border-quiet bg-canvas-surface">
+          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border-quiet">
             {searchError ? (
               <ErrorState message={searchError} onRetry={retrySearch} />
             ) : searching ? (

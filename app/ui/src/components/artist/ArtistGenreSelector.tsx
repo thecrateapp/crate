@@ -3,17 +3,17 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useMemo, useState } from "react";
-import { ChevronDown, Search } from "@crate/ui/icons";
+import { ChevronDown } from "@crate/ui/icons";
 
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@crate/ui/shadcn/popover";
-import { Input } from "@crate/ui/shadcn/input";
 import { cn } from "@crate/ui/lib/cn";
 
 import { useApi } from "@/hooks/use-api";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface TaxonomyNode {
   slug: string;
@@ -117,20 +117,13 @@ export function ArtistGenreSelector({
         className="w-[min(420px,calc(100vw-2rem))] overflow-hidden p-2"
       >
         <div className="border-b border-border-quiet px-1 pb-2">
-          <div className="relative">
-            <Search
-              data-admin-ux="artist-genres-search"
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-            />
-            <Input
-              autoFocus
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search taxonomy genres..."
-              className="pl-9"
-            />
-          </div>
+          <SearchInput
+            autoFocus
+            label="Search taxonomy genres"
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search taxonomy genres..."
+          />
         </div>
         <div className="max-h-64 overflow-y-auto p-1">
           {loading ? (

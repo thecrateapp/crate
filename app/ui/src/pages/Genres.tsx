@@ -22,8 +22,6 @@ import {
   SlidersHorizontal,
   Tag,
 } from "@crate/ui/icons";
-
-import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   DropdownMenu,
@@ -45,8 +43,9 @@ import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ApiError, api } from "@/lib/api";
 import { waitForTask } from "@/lib/tasks";
 import { formatNumber } from "@/lib/utils";
-import { Search, LayoutGrid, Network, Trash2 } from "lucide-react";
+import { LayoutGrid, Network, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface Genre {
   id: number;
@@ -972,19 +971,14 @@ function GenreList() {
       >
         <div className="flex flex-col gap-4">
           <div className="min-w-0">
-            <div className="relative w-full min-w-0">
-              <Search
-                size={16}
-                aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filter genres..."
-                className="pl-9"
-              />
-            </div>
+            <SearchInput
+              label="Filter genres"
+              clearLabel="Clear filter"
+              containerClassName="min-w-0"
+              value={filter}
+              onValueChange={setFilter}
+              placeholder="Filter genres..."
+            />
           </div>
 
           {wheelUnavailable ? (

@@ -348,7 +348,7 @@ export function GlobalCatalog() {
         </TabsContent>
 
         <TabsContent value="runs" className="mt-0">
-          <OpsPanel title="Reconciliation runs">
+          <OpsPanel title="Reconciliation runs" ruled={false}>
             <CatalogReadState
               data={runs}
               loading={runsLoading}
@@ -371,7 +371,7 @@ export function GlobalCatalog() {
         </TabsContent>
 
         <TabsContent value="duplicates" className="mt-0">
-          <OpsPanel title="Duplicate candidates">
+          <OpsPanel title="Duplicate candidates" ruled={false}>
             <CatalogReadState
               data={duplicates}
               loading={duplicatesLoading}

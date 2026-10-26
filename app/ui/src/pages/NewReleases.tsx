@@ -20,7 +20,6 @@ import {
   LayoutGrid as HeaderLayoutGrid,
   Radar as HeaderRadar,
   Loader2,
-  Search,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -38,13 +37,13 @@ import { Button } from "@crate/ui/shadcn/button";
 import { ListPagination } from "@/components/admin/ListPagination";
 
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { Input } from "@crate/ui/shadcn/input";
 import { api, apiSseUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import { useApi } from "@/hooks/use-api";
 import { timeAgo } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface Release {
   id: number;
@@ -407,7 +406,7 @@ function ReleaseGridCard({
           {release.status === "detected" && release.tidal_url && onDownload ? (
             <Button
               size="sm"
-              className="min-h-11 flex-1 gap-2"
+              className="flex-1 gap-2"
               onClick={() => onDownload(release.id)}
             >
               Download
@@ -717,28 +716,19 @@ export function NewReleases() {
             <label htmlFor="releases-search">
               <MonoLabel as="span">Search releases</MonoLabel>
             </label>
-            <div className="relative">
-              <Search
-                aria-hidden="true"
-                data-admin-ux="releases-search"
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-              />
-              <Input
-                id="releases-search"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search artist or album..."
-                className="min-h-11 pl-9"
-              />
-            </div>
+            <SearchInput
+              id="releases-search"
+              label="Search releases"
+              value={search}
+              onValueChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
+              placeholder="Search artist or album..."
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <FilterChip
-              className="min-h-11"
               active={statusFilter === "all"}
               onClick={() => {
                 setStatusFilter("all");
@@ -748,7 +738,6 @@ export function NewReleases() {
               All
             </FilterChip>
             <FilterChip
-              className="min-h-11"
               active={statusFilter === "detected"}
               onClick={() => {
                 setStatusFilter("detected");
@@ -758,7 +747,6 @@ export function NewReleases() {
               Needs action
             </FilterChip>
             <FilterChip
-              className="min-h-11"
               active={statusFilter === "downloading"}
               onClick={() => {
                 setStatusFilter("downloading");
@@ -768,7 +756,6 @@ export function NewReleases() {
               Downloading
             </FilterChip>
             <FilterChip
-              className="min-h-11"
               active={statusFilter === "downloaded"}
               onClick={() => {
                 setStatusFilter("downloaded");

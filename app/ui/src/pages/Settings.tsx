@@ -442,7 +442,7 @@ export function Settings() {
           title="Settings"
           description="Runtime, library, enrichment and notification controls."
         />
-        <Card className="border-border-quiet bg-card">
+        <Card>
           <CardContent className="flex flex-col items-start gap-4 py-8">
             <div>
               <MonoLabel as="h2" tone="accent">
@@ -453,11 +453,7 @@ export function Settings() {
                 changed.
               </p>
             </div>
-            <Button
-              className="min-h-11"
-              variant="outline"
-              onClick={() => void refetch()}
-            >
+            <Button variant="outline" onClick={() => void refetch()}>
               Retry
             </Button>
           </CardContent>

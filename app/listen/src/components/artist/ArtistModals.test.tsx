@@ -52,6 +52,9 @@ describe("artist mobile modals", () => {
         .closest('[data-slot="hairline-row"]'),
     ).toBeInTheDocument();
     expect(screen.getByText("80%")).toHaveClass("font-mono", "uppercase");
+    expect(
+      screen.getByRole("list", { name: "Probable Setlist" }),
+    ).not.toHaveClass("border-t");
     expect(panel).not.toHaveClass("listen-glass-panel");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(

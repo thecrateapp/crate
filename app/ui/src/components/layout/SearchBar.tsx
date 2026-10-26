@@ -97,7 +97,7 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover bg-canvas-surface ${
+        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover ${
           item.type === "artist" ? "rounded-md" : "rounded"
         }`}
         onError={(event) => {
@@ -405,7 +405,7 @@ export function SearchBar({
                 onFocus={handleFocus}
                 onKeyDown={handleKeyDown}
                 placeholder="Search library…"
-                className="h-12 w-full rounded-md border border-border-quiet bg-canvas-surface pl-11 pr-12 text-[15px] text-text-primary transition-[background-color,border-color,box-shadow] placeholder:text-text-subtle focus:border-accent-action/25 focus:bg-canvas-surface"
+                className="h-12 w-full rounded-md border border-border-quiet pl-11 pr-12 text-[15px] text-text-primary transition-[background-color,border-color,box-shadow] placeholder:text-text-subtle focus:border-accent-action/25"
               />
             </div>
           </div>

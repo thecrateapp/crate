@@ -8,7 +8,6 @@ import {
   Loader2,
   Pause,
   Play,
-  Search,
 } from "lucide-react";
 import { StatusDot } from "@crate/ui/primitives/StatusDot";
 import { SeverityMeter } from "@/components/admin/status-indicators";
@@ -26,12 +25,11 @@ import {
   type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-
-import { Input } from "@crate/ui/shadcn/input";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface LogEntry {
   id: number;
@@ -435,21 +433,13 @@ export function Logs() {
         description="Shape the stream by severity, worker, category or free-text search without losing the live console feel."
       >
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search
-              data-admin-ux="logs-search"
-              aria-hidden="true"
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-subtle"
-            />
-            <Input
-              aria-label="Search worker logs"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search messages, workers, task ids or metadata..."
-              className="min-h-11 pl-9"
-            />
-          </div>
+          <SearchInput
+            label="Search worker logs"
+            containerClassName="flex-1 min-w-[240px]"
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search messages, workers, task ids or metadata..."
+          />
           <div className="crate-form-field max-w-full">
             <MonoLabel as="span" className="block">
               Log level

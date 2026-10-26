@@ -60,6 +60,44 @@ describe("ArtistSetlistSection", () => {
     expect(screen.getByText("Una historia con las manos")).toBeInTheDocument();
   });
 
+  it("keeps frequency, plays and date in fixed slots whatever their length", () => {
+    render(
+      <MemoryRouter>
+        <ArtistSetlistSection
+          artistName="Pixies"
+          setlistData={{
+            probable_setlist: [
+              {
+                title: "Where Is My Mind?",
+                frequency: 1,
+                play_count: 12,
+                last_played: "2026-10-12",
+              },
+              { title: "Caribou", frequency: 0.07, play_count: 1 },
+            ],
+            total_shows: 12,
+          }}
+          allTrackTitles={[]}
+          onTrackTitlesLoaded={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const slots = ["Where Is My Mind? frequency", "Caribou frequency"].map(
+      (name) => screen.getByRole("progressbar", { name }).parentElement!,
+    );
+    for (const row of slots) {
+      expect(row).toHaveClass(
+        "grid",
+        "grid-cols-[3rem_6ch_12ch]",
+        "sm:grid-cols-[3rem_6ch_12ch_13ch]",
+      );
+      expect(row.children).toHaveLength(4);
+    }
+    expect(screen.getByText("100%")).toHaveClass("text-right");
+    expect(screen.getByText("7%")).toHaveClass("text-right");
+  });
+
   it("offers refresh in the empty state when the user can edit metadata", async () => {
     const onRefresh = vi.fn();
     render(

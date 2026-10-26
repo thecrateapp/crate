@@ -71,17 +71,19 @@ describe("Discovery text presentation with real hooks", () => {
     expect(screen.getByRole("heading", { name: "Discovery" })).toHaveClass(
       "font-display",
     );
-    const search = screen.getByRole("textbox", { name: "Search discovery" });
+    const search = screen.getByRole("searchbox", { name: "Search discovery" });
     expect(search).toHaveAttribute(
       "placeholder",
       "Search artists, releases or missing albums...",
     );
     expect(search.closest(".crate-form-field")).not.toBeNull();
-    expect(document.querySelectorAll("svg:not([data-admin-ux])")).toHaveLength(
-      0,
-    );
     expect(
-      document.querySelectorAll('[data-admin-ux="discovery-search"]'),
+      Array.from(document.querySelectorAll("svg:not([data-admin-ux])")).filter(
+        (el) => !el.closest('[data-slot="search-input"]'),
+      ),
+    ).toHaveLength(0);
+    expect(
+      search.closest('[data-slot="search-input"]')?.querySelectorAll("svg"),
     ).toHaveLength(1);
     expect(screen.getByText("40% discography coverage")).toBeInTheDocument();
     expect(screen.getByText("+1 more")).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe("Discovery text presentation with real hooks", () => {
       for (const button of screen.getAllByRole("button", { name }))
         if (button.closest('[data-slot="admin-page-header"]'))
           expect(button).toHaveAttribute("data-size", "icon-lg");
-        else expect(button).toHaveClass("min-h-11");
+        else expect(button).not.toHaveClass("min-h-11");
     expect(mockApi.mock.calls.map(([path]) => path).sort()).toEqual([
       "/api/acquisition/new-releases?status=detected",
       "/api/discover/completeness",
@@ -118,7 +120,7 @@ describe("Discovery text presentation with real hooks", () => {
   it("filters by missing title without refetching and keeps genre/global summary semantics", async () => {
     await ready();
     await userEvent.type(
-      screen.getByRole("textbox", { name: "Search discovery" }),
+      screen.getByRole("searchbox", { name: "Search discovery" }),
       "  MAR DE  ",
     );
     expect(screen.getAllByRole("link", { name: "Costa Norte" })).toHaveLength(

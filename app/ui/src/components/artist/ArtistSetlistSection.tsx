@@ -158,24 +158,18 @@ export function ArtistSetlistSection({
                 truncate={false}
                 asChild
                 trailing={
-                  <span className="inline-flex max-w-full flex-wrap items-center justify-end gap-3">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="w-12">
-                        <ProgressHairline
-                          label={`${song.title} frequency`}
-                          value={frequency}
-                        />
-                      </span>
-                      <MonoLabel as="span">
-                        {Math.round(frequency * 100)}%
-                      </MonoLabel>
-                    </span>
+                  <span className="grid grid-cols-[3rem_6ch_12ch] items-center gap-3 sm:grid-cols-[3rem_6ch_12ch_13ch]">
+                    <ProgressHairline
+                      label={`${song.title} frequency`}
+                      value={frequency}
+                    />
+                    <MonoLabel as="span" className="text-right">
+                      {Math.round(frequency * 100)}%
+                    </MonoLabel>
                     <MonoLabel as="span">{song.play_count} plays</MonoLabel>
-                    {song.last_played ? (
-                      <MonoLabel as="span" className="hidden sm:inline">
-                        {song.last_played}
-                      </MonoLabel>
-                    ) : null}
+                    <MonoLabel as="span" className="hidden sm:block">
+                      {song.last_played ?? ""}
+                    </MonoLabel>
                   </span>
                 }
               >

@@ -802,7 +802,7 @@ function ObservationRail({
             aria-pressed={row.id === selectedId}
             onFocus={() => onSelect(row.id)}
             onClick={() => onSelect(row.id)}
-            className="h-auto min-h-11 min-w-0 max-w-48 justify-start whitespace-normal px-2 py-1 text-left text-xs"
+            className="h-auto min-w-0 max-w-48 justify-start whitespace-normal px-2 py-1 text-left text-xs"
           >
             <span
               aria-hidden="true"

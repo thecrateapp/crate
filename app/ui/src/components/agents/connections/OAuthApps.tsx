@@ -225,7 +225,7 @@ function OAuthAppRow({
 }) {
   const nameId = useId();
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-border-quiet bg-canvas-surface p-4 md:flex-row md:items-center md:justify-between">
+    <li className="flex flex-col gap-3 rounded-md border border-border-quiet p-4 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <p id={nameId} className="font-medium [overflow-wrap:anywhere]">
