@@ -1,0 +1,490 @@
+---
+import type { SmartMixDetail } from "../../content/listen/en";
+import StatusBadge from "../StatusBadge.astro";
+import MixViz from "../viz/MixViz.astro";
+
+interface Props {
+  content: SmartMixDetail;
+  locale?: string;
+}
+
+const { content, locale = "en" } = Astro.props;
+const { techniques, decide, numbers, platforms, controls } = content;
+const number = (index: number) => String(index + 1).padStart(2, "0");
+---
+
+<div class="smx">
+  <section class="block" aria-labelledby="smx-techniques">
+    <header class="head" data-reveal>
+      <p class="eyebrow" data-enter>{techniques.eyebrow}</p>
+      <h3 id="smx-techniques" data-enter style="--d:80ms">{techniques.title}</h3>
+    </header>
+    <ol class="cards" data-reveal>
+      {
+        techniques.items.map((item, index) => (
+          <li style={`--i:${index}`}>
+            <p class="viz-label">
+              <b>{number(index)}</b> {item.meta}
+            </p>
+            <h4>{item.name}</h4>
+            <p class="body">{item.body}</p>
+            <ul class="facts">
+              {item.facts.map((fact) => (
+                <li>{fact}</li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <div class="viz-band gap">
+    <MixViz stages={content.stages} />
+  </div>
+
+  <section class="block" aria-labelledby="smx-decide">
+    <header class="head" data-reveal>
+      <p class="eyebrow" data-enter>{decide.eyebrow}</p>
+      <h3 id="smx-decide" data-enter style="--d:80ms">{decide.title}</h3>
+    </header>
+    <ol class="cards flow" data-reveal>
+      {
+        decide.items.map((item, index) => (
+          <li style={`--i:${index}`}>
+            <p class="viz-label">
+              <b>{number(index)}</b> {item.meta}
+            </p>
+            <h4>{item.name}</h4>
+            <p class="body">{item.body}</p>
+            <ul class="facts">
+              {item.facts.map((fact) => (
+                <li>{fact}</li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="block" aria-labelledby="smx-numbers">
+    <header class="head" data-reveal>
+      <p class="eyebrow" data-enter>{numbers.eyebrow}</p>
+      <h3 id="smx-numbers" data-enter style="--d:80ms">{numbers.title}</h3>
+    </header>
+    <div class="numbers" data-reveal>
+      <dl>
+        {
+          numbers.figures.map((figure, index) => (
+            <div class="figure" style={`--i:${index}`}>
+              <dt>{figure.label}</dt>
+              <dd>
+                {figure.value}
+                {figure.unit && <span class="unit">{figure.unit}</span>}
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="note">{numbers.note}</p>
+    </div>
+  </section>
+
+  <div class="split">
+    <section class="block" aria-labelledby="smx-platforms" data-reveal>
+      <header class="head stack">
+        <p class="eyebrow" data-enter>{platforms.eyebrow}</p>
+        <h3 id="smx-platforms" data-enter style="--d:80ms">{platforms.title}</h3>
+      </header>
+      <ul class="rows" data-platforms>
+        {
+          platforms.items.map((item, index) => (
+            <li style={`--i:${index}`} data-platform={item.name}>
+              <h4>
+                {item.name} <StatusBadge kind={item.status} locale={locale} />
+              </h4>
+              <p>{item.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="note">{platforms.note}</p>
+    </section>
+
+    <section class="block" aria-labelledby="smx-controls" data-reveal>
+      <header class="head stack">
+        <p class="eyebrow" data-enter>{controls.eyebrow}</p>
+        <h3 id="smx-controls" data-enter style="--d:80ms">{controls.title}</h3>
+      </header>
+      <ul class="rows panel">
+        {
+          controls.items.map((item, index) => (
+            <li style={`--i:${index}`} class="control">
+              <div>
+                <h4>{item.name}</h4>
+                <p>{item.body}</p>
+              </div>
+              <span class="value">
+                {item.control === "switch" ? (
+                  <span class="switch" aria-hidden="true">
+                    <i />
+                  </span>
+                ) : (
+                  <span class="range" aria-hidden="true">
+                    <i style="--v:0.5" />
+                  </span>
+                )}
+                <b>{item.value}</b>
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="note">{controls.note}</p>
+    </section>
+  </div>
+</div>
+
+<style>
+  .smx {
+    display: grid;
+  }
+
+  .block + .block,
+  .viz-band + .block,
+  .block + .split {
+    margin-top: 12vh;
+  }
+
+  .head {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 14px clamp(24px, 5vw, 80px);
+    align-items: end;
+    margin-bottom: 5vh;
+  }
+
+  .head.stack {
+    grid-template-columns: 1fr;
+    margin-bottom: 3vh;
+  }
+
+  h3 {
+    margin: 0;
+    max-width: 24ch;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.7rem, 2.9vw, 2.8rem);
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  h4 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 clamp(20px, 3vw, 48px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cards > li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding: 24px 0 8px;
+    border-top: 1px solid var(--line);
+  }
+
+  .cards > li:last-child {
+    border-top-color: rgba(103, 232, 249, 0.5);
+  }
+
+  .flow > li:last-child {
+    border-top-color: var(--line);
+  }
+
+  .flow > li:not(:last-child)::after {
+    content: "→";
+    position: absolute;
+    top: -0.75em;
+    right: calc(-1 * clamp(20px, 3vw, 48px) / 2 - 0.5em);
+    padding: 0 0.25em;
+    background: var(--bg);
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--cyan-hi);
+  }
+
+  :global(:where(html.js)) .cards > li,
+  :global(:where(html.js)) .rows > li,
+  :global(:where(html.js)) .figure {
+    opacity: 0;
+  }
+
+  .is-in > li,
+  .is-in .rows > li,
+  .is-in .figure {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 80ms);
+  }
+
+  .body,
+  .rows p {
+    margin: 0;
+    max-width: 52ch;
+    font-size: clamp(0.95rem, 1.05vw, 1.04rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .facts li {
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--cyan-hi);
+  }
+
+  .numbers dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 clamp(24px, 4vw, 56px);
+    margin: 0;
+  }
+
+  .figure {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 26px 0 34px;
+    border-top: 1px solid var(--line);
+  }
+
+  .figure dt {
+    max-width: 28ch;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+    line-height: 1.5;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .figure dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(3rem, 6.5vw, 6.5rem);
+    letter-spacing: -0.045em;
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .unit {
+    margin-left: 0.12em;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 0.3em;
+    letter-spacing: 0.04em;
+    color: var(--cyan-hi);
+  }
+
+  .note {
+    margin: 2vh 0 0;
+    max-width: 92ch;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    line-height: 1.7;
+    color: var(--fg-3);
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px clamp(28px, 5vw, 88px);
+  }
+
+  .split .block {
+    margin-top: 0;
+  }
+
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows > li {
+    display: grid;
+    gap: 8px;
+    padding: 18px 0 20px;
+    border-top: 1px solid var(--line);
+  }
+
+  .rows h4 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 4px 22px;
+  }
+
+  .panel > li:first-child {
+    border-top: 0;
+  }
+
+  .control {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 20px;
+  }
+
+  .control h4 {
+    font-size: clamp(1.05rem, 1.3vw, 1.2rem);
+  }
+
+  .control p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .value {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+
+  .value b {
+    min-width: 3ch;
+    font-weight: 400;
+    text-align: right;
+  }
+
+  .switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(6, 182, 212, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.6);
+  }
+
+  .switch i {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--fg);
+  }
+
+  .range {
+    position: relative;
+    width: 96px;
+    height: 2px;
+    background: var(--line);
+  }
+
+  .range i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--v) * 100%);
+    background: var(--cyan-hi);
+  }
+
+  .range i::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -7px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--fg);
+    transform: translateY(-50%);
+  }
+
+  @media (max-width: 1000px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+    .flow > li:not(:last-child)::after {
+      content: none;
+    }
+    .numbers dl {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .split {
+      grid-template-columns: 1fr;
+    }
+    .split .block + .block {
+      margin-top: 4vh;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .head {
+      grid-template-columns: 1fr;
+    }
+    .block + .block,
+    .viz-band + .block,
+    .block + .split {
+      margin-top: 8vh;
+    }
+    .figure dd {
+      font-size: clamp(2.6rem, 13vw, 3.6rem);
+    }
+    .panel {
+      padding: 4px 16px;
+    }
+    .range {
+      width: 64px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in > li,
+    .is-in .rows > li,
+    .is-in .figure {
+      animation: fade-in 0.3s linear both;
+    }
+  }
+</style>

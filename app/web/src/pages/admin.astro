@@ -3,6 +3,7 @@ import Chapter from "../components/Chapter.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
+import McpAgents from "../components/admin/McpAgents.astro";
 import AlbumSidecar from "../components/viz/AlbumSidecar.astro";
 import EnrichmentOrbit from "../components/viz/EnrichmentOrbit.astro";
 import GenreWheel from "../components/viz/GenreWheel.astro";
@@ -18,7 +19,7 @@ import { chapterId } from "../lib/chapters";
 const chapters = admin.chapters.map((chapter, index) => ({
   ...chapter,
   index: index + 1,
-  id: chapterId(index + 1, chapter.title),
+  id: chapter.id ?? chapterId(index + 1, chapter.title),
 }));
 const bands: Record<string, unknown> = {
   Health: HealthScan,
@@ -45,7 +46,7 @@ const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
         const split = splits[chapter.title];
         const Visual = split?.visual as typeof TrackReadout | undefined;
         return (
-          <Chapter index={chapter.index} title={chapter.title} status={chapter.status}>
+          <Chapter index={chapter.index} title={chapter.title} id={chapter.id} status={chapter.status}>
             <Fragment slot="lede">
               {chapter.lede.map((paragraph) => (
                 <p>{paragraph}</p>
@@ -64,6 +65,7 @@ const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
             ) : (
               chapter.features && <FeatureList items={chapter.features} />
             )}
+            {chapter.id === "mcp" && <McpAgents />}
           </Chapter>
         );
       })

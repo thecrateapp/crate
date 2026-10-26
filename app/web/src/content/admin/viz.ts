@@ -566,13 +566,16 @@ export const GOVERNOR = {
 };
 
 export const GOVERNED_TASKS = [
-  "backfill_track_audio_fingerprints",
+  "agent_maintenance",
   "backfill_artwork_variants",
-  "cleanup_artwork_variants",
+  "backfill_smart_mix_profiles",
+  "backfill_track_audio_fingerprints",
   "batch_covers",
   "batch_retag",
+  "cleanup_artwork_variants",
   "compute_analytics",
   "compute_popularity",
+  "compute_smart_mix_profile",
   "enrich_mbids",
   "export_rich_metadata",
   "fetch_artwork_all",
@@ -584,7 +587,9 @@ export const GOVERNED_TASKS = [
   "library_sync",
   "materialize_artwork_variants",
   "migrate_storage_v2",
+  "prepare_library_repairs",
   "process_new_content",
+  "quality_check",
   "rebuild_library",
   "rehydrate_portable_metadata",
   "repair",
@@ -592,10 +597,11 @@ export const GOVERNED_TASKS = [
   "resolve_duplicates",
   "scan",
   "scan_missing_covers",
+  "show_extract",
   "verify_storage_v2",
+  "warmup_stream_variants",
   "wipe_library",
   "write_portable_metadata",
-  "warmup_stream_variants",
 ];
 
 export const QUEUE_ORDER = [

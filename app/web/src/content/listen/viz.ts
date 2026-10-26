@@ -130,12 +130,29 @@ export const STATS = {
 };
 
 export const MIX = {
-  bpm: 124,
-  fadeBars: 4,
-  windowSeconds: 24,
-  fadeStart: 7.74,
-  a: { label: "A · outgoing", key: "8A", lufs: -9.1, cue: "outro cue 3:41.2" },
-  b: { label: "B · incoming", key: "9A", lufs: -10.4, cue: "intro cue 0:00.4" },
+  beats: 12,
+  prerollMs: 2_500,
+  lockWindowMs: 10,
+  tempoRestoreMs: 4_000,
+  tempoRatio: { min: 0.94, max: 1.06 },
+  bus: { sampleRate: 48_000, blockFrames: 480 },
+  bass: { shelfHz: 150, cutDb: -24, swapFraction: 0.125 },
+  planner: {
+    maxTempoChange: 0.04,
+    minBeatmatchBeats: 8,
+    maxLoudnessDb: 6,
+    truePeakDbtp: -1,
+    minTransitionMs: 1_000,
+    maxTransitionMs: 12_000,
+  },
+  a: { label: "A · outgoing", bpm: 124, key: "8A", lufs: -10.4 },
+  b: {
+    label: "B · incoming",
+    bpm: 120,
+    key: "9A",
+    lufs: -9.1,
+    looseOffsetMs: 210,
+  },
 };
 
 export const FEDERATION = {

@@ -1,16 +1,17 @@
 ---
-import { chapterId } from "../lib/chapters";
+import { chapterId, type ChapterStatus } from "../lib/chapters";
 import StatusBadge from "./StatusBadge.astro";
 
 interface Props {
   index: number;
   title: string;
-  status?: "coming-soon";
+  id?: string;
+  status?: ChapterStatus;
   locale?: string;
 }
 
 const { index, title, status, locale = "en" } = Astro.props;
-const id = chapterId(index, title);
+const id = Astro.props.id ?? chapterId(index, title);
 const number = String(index).padStart(2, "0");
 ---
 
@@ -19,7 +20,7 @@ const number = String(index).padStart(2, "0");
     <div class="chapter-title">
       <p class="eyebrow" data-enter><b>{number}</b> / {title}</p>
       <h2 class="display" id={`${id}-title`} data-split style="--d:60ms;--step:50ms">{title}</h2>
-      {status === "coming-soon" && <div data-enter style="--d:240ms"><StatusBadge locale={locale} /></div>}
+      {status && <div data-enter style="--d:240ms"><StatusBadge kind={status} locale={locale} /></div>}
     </div>
     <div class="chapter-lede" data-enter style="--d:180ms">
       <slot name="lede" />

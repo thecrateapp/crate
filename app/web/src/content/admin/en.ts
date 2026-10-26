@@ -8,7 +8,7 @@ export const admin: AdminPage = {
   meta: {
     title: "Admin — Crate",
     description:
-      "Library health checks, staged imports, acquisition, enrichment, a signed genre taxonomy, analysis coverage and live operations for your Crate server.",
+      "Library health checks, staged imports, acquisition, enrichment, a signed genre taxonomy, analysis coverage, live operations, and opt-in AI agents over MCP and in Telegram for your Crate server.",
   },
   eyebrow: "Admin",
   title: "Keep the library in shape.",
@@ -169,14 +169,25 @@ export const admin: AdminPage = {
           body: "System metrics, a view of the running stack and the service logs.",
         },
         {
-          title: "Telegram bot",
-          body: "Alerts when tasks finish or fail and when new releases appear. Commands for status, tasks, logs and search.",
+          title: "Crate Agent and Crate Operator",
+          body: "Look after the server from Telegram. Crate Agent diagnoses it with live evidence. Crate Operator also plans changes that run only after you approve them, and posts alerts for failed tasks, health and new releases.",
+          status: "opt-in",
+          link: { href: "#telegram-agent", label: "In Telegram" },
         },
         {
           title: "Language models",
-          body: "Features marked like this one use a language model you choose: Ollama on your own hardware, or OpenAI, Anthropic or Gemini, through LiteLLM. Crate works fully without them.",
+          body: "Features marked like this one use a language model the operator sets up in Admin: Gemini, DeepSeek, or Ollama on your own hardware. Crate works fully without them.",
           status: "optional-llm",
         },
+      ],
+    },
+    {
+      title: "AI agents, via MCP",
+      id: "mcp",
+      status: "opt-in",
+      lede: [
+        "Your library can talk to your AI agent.",
+        "Over MCP, an agent such as Claude diagnoses the collection and prepares its maintenance. Nothing changes until a person approves it.",
       ],
     },
   ],

@@ -5,11 +5,11 @@ import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
 import PathsDive from "../components/listen/PathsDive.astro";
 import RadioDive from "../components/listen/RadioDive.astro";
+import SmartMix from "../components/listen/SmartMix.astro";
 import Devices from "../components/viz/Devices.astro";
 import EqViz from "../components/viz/EqViz.astro";
 import Federation from "../components/viz/Federation.astro";
 import Heatmap from "../components/viz/Heatmap.astro";
-import MixViz from "../components/viz/MixViz.astro";
 import MoodMap from "../components/viz/MoodMap.astro";
 import Setlist from "../components/viz/Setlist.astro";
 import VizSplit from "../components/viz/VizSplit.astro";
@@ -20,9 +20,9 @@ import { chapterId } from "../lib/chapters";
 const chapters = listen.chapters.map((chapter, index) => ({
   ...chapter,
   index: index + 1,
-  id: chapterId(index + 1, chapter.title),
+  id: chapter.id ?? chapterId(index + 1, chapter.title),
 }));
-const custom = new Set(["Play", "Discover", "Yours", "Together", "Everywhere", "Live"]);
+const custom = new Set(["Play", "Smart Mix", "Discover", "Yours", "Together", "Everywhere", "Live"]);
 ---
 
 <Base title={listen.meta.title} description={listen.meta.description}>
@@ -33,7 +33,7 @@ const custom = new Set(["Play", "Discover", "Yours", "Together", "Everywhere", "
 
     {
       chapters.map((chapter) => (
-        <Chapter index={chapter.index} title={chapter.title} status={chapter.status}>
+        <Chapter index={chapter.index} id={chapter.id} title={chapter.title} status={chapter.status}>
           <Fragment slot="lede">
             {chapter.lede.map((paragraph) => (
               <p>{paragraph}</p>
@@ -42,16 +42,15 @@ const custom = new Set(["Play", "Discover", "Yours", "Together", "Everywhere", "
 
           {chapter.title === "Play" && chapter.features && (
             <>
-              <div class="viz-band">
-                <MixViz />
-              </div>
-              <FeatureList items={chapter.features.slice(0, 2)} />
+              <FeatureList items={chapter.features.slice(0, 1)} />
               <div class="viz-band gap">
                 <EqViz />
               </div>
-              <FeatureList items={chapter.features.slice(2)} />
+              <FeatureList items={chapter.features.slice(1)} />
             </>
           )}
+
+          {chapter.smartMix && <SmartMix content={chapter.smartMix} />}
 
           {chapter.title === "Discover" && chapter.features && (
             <VizSplit side="right">

@@ -53,14 +53,20 @@ describe("access tokens copied from the API", () => {
   it.skipIf(!auth || !auth.includes("_VDJ_ACCESS_TOKEN_ROUTES"))(
     "uses the same allowlist",
     () => {
-      const block = auth!.slice(
-        auth!.indexOf("_VDJ_ACCESS_TOKEN_ROUTES"),
-        auth!.indexOf("def _is_vdj_access_token_request"),
+      const start = auth!.indexOf("_VDJ_ACCESS_TOKEN_ROUTES");
+      const block = auth!.slice(start, auth!.indexOf("\n)\n", start));
+      const routes = [...block.matchAll(/\{([^}]+)\},\s*rf?"([^"]+)"/g)].map(
+        ([, methods, pattern]) => ({
+          methods: [...methods!.matchAll(/"(\w+)"/g)].map(([, m]) => m).sort(),
+          pattern: pattern!.replace("{_ENTITY_SEGMENT}", "[^/]+"),
+        }),
       );
-      const patterns = [...block.matchAll(/rf?"([^"]+)"/g)].map(([, pattern]) =>
-        pattern!.replace("{_ENTITY_SEGMENT}", "[^/]+"),
-      );
-      expect(ALLOWLIST.map((route) => route.pattern)).toEqual(patterns);
+      expect(
+        ALLOWLIST.map((route) => ({
+          methods: [...route.methods].sort(),
+          pattern: route.pattern,
+        })),
+      ).toEqual(routes);
     },
   );
 

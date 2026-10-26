@@ -1,0 +1,468 @@
+---
+import { BUTTON_LABELS, CHAT, CHAT_BEATS, CHAT_DONE, CHAT_LABEL } from "../../content/admin/telegram-agent";
+
+const decision = CHAT.findIndex((entry) => entry.kind === "decision");
+const pressedAt = (index: number, button: string) => (button === "next" ? index + 1 : button === "approve" ? decision : undefined);
+const from = (kind: string) => (kind === "user" ? "user" : kind === "decision" ? "service" : "bot");
+---
+
+<figure class="chat" data-viz="agent" aria-label={CHAT_LABEL}>
+  <div class="chat-scroll">
+    <div class="chat-pin" data-reveal>
+      <header class="viz-bar" data-enter>
+        <p class="viz-label"><b>Crate Operator</b> example chat</p>
+        <p class="viz-label chat-status" data-chat-status>{CHAT_DONE}</p>
+      </header>
+
+      <div class="chat-stage">
+        <div class="phone" data-enter style="--d:80ms">
+          <div class="phone-head">
+            <span class="avatar" aria-hidden="true">C</span>
+            <p><b>Crate Operator</b><span>bot · your Crate</span></p>
+          </div>
+          <div class="log-window">
+            <ol class="log">
+              {
+                CHAT.map((entry, index) => (
+                  <li class:list={["msg", entry.kind]} data-entry={index} data-beat={entry.beat} data-from={from(entry.kind)}>
+                    {entry.kind === "user" && <p class="bubble">{entry.text}</p>}
+                    {entry.kind === "bot" && <p class="bubble">{entry.text}</p>}
+                    {entry.kind === "tools" && (
+                      <p class="calls">
+                        <span class="viz-label">via MCP</span>
+                        {entry.tools.map((tool) => (
+                          <code>{tool}</code>
+                        ))}
+                      </p>
+                    )}
+                    {entry.kind === "page" && (
+                      <div class="bubble plan">
+                        <p class="viz-label">
+                          <b>Plan</b> page {entry.page} of {entry.pages}
+                        </p>
+                        <pre>{entry.lines.join("\n")}</pre>
+                        <p class="keys">
+                          {entry.buttons.map((button) => (
+                            <span class:list={["key", button, { "is-pressed": button !== "reject" }]} data-pressed-at={pressedAt(index, button)}>
+                              {BUTTON_LABELS[button]}
+                            </span>
+                          ))}
+                        </p>
+                      </div>
+                    )}
+                    {entry.kind === "decision" && <p class="service">{entry.text}</p>}
+                    {entry.kind === "alert" && (
+                      <p class="bubble">
+                        <span class="viz-label">{entry.from}</span>
+                        {entry.text}
+                      </p>
+                    )}
+                  </li>
+                ))
+              }
+            </ol>
+            <p class="typing" aria-hidden="true"><i></i><i></i><i></i></p>
+          </div>
+        </div>
+
+        <ol class="beats">
+          {
+            CHAT_BEATS.map((beat, index) => (
+              <li data-beat-step={index} data-status={beat.status} data-state="done">
+                <p class="viz-label">
+                  <b>{String(index + 1).padStart(2, "0")}</b> {beat.title}
+                </p>
+                <p class="body">{beat.body}</p>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .chat {
+    margin: 0;
+  }
+
+  .chat-pin {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  :global(:where(html.js)) .chat-scroll {
+    height: 300vh;
+  }
+
+  :global(:where(html.js)) .chat-pin {
+    position: sticky;
+    top: max(9vh, 76px);
+  }
+
+  .chat-status {
+    color: var(--cyan-hi);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .chat-status:global(.is-waiting) {
+    color: var(--amber);
+  }
+
+  .chat-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 32px clamp(28px, 5vw, 88px);
+    align-items: center;
+    margin-top: 24px;
+  }
+
+  .phone {
+    width: 100%;
+    max-width: 480px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: #0d0e14;
+    overflow: hidden;
+  }
+
+  .phone-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan-hi), var(--cyan));
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 15px;
+    color: var(--bg);
+  }
+
+  .phone-head p {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .phone-head p span {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+  }
+
+  .log-window {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 18px 16px 16px;
+  }
+
+  :global(:where(html.js)) .log-window {
+    height: clamp(340px, calc(100svh - 290px), 560px);
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, #000 56px);
+  }
+
+  .log {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chat:global(.is-live) .msg[data-state="hidden"] {
+    display: none;
+  }
+
+  .chat:global(.is-live) .msg[data-state="shown"] {
+    animation: bubble-in 0.5s var(--spring-snappy) both;
+  }
+
+  .msg {
+    display: flex;
+    transform-origin: left bottom;
+  }
+
+  .msg[data-from="user"] {
+    justify-content: flex-end;
+    transform-origin: right bottom;
+  }
+
+  .msg[data-from="service"] {
+    justify-content: center;
+    transform-origin: center;
+  }
+
+  .bubble {
+    max-width: 86%;
+    margin: 0;
+    padding: 9px 13px;
+    border-radius: 16px 16px 16px 5px;
+    background: rgba(241, 245, 249, 0.06);
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--fg);
+  }
+
+  .user .bubble {
+    border-radius: 16px 16px 5px 16px;
+    background: rgba(6, 182, 212, 0.18);
+  }
+
+  .calls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding-left: 4px;
+  }
+
+  .calls .viz-label {
+    margin-right: 4px;
+    font-size: 9.5px;
+  }
+
+  .calls code {
+    padding: 2px 8px;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--cyan-hi);
+  }
+
+  .plan {
+    display: grid;
+    gap: 8px;
+    width: 86%;
+    padding-bottom: 10px;
+  }
+
+  .plan .viz-label {
+    font-size: 10px;
+  }
+
+  .plan pre {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--fg-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .keys {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 6px;
+    margin: 2px 0 0;
+  }
+
+  .key {
+    padding: 7px 8px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: rgba(241, 245, 249, 0.04);
+    font-size: 12.5px;
+    text-align: center;
+    color: var(--fg);
+    transition:
+      background-color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      color 0.3s var(--ease-snap);
+  }
+
+  .key.reject {
+    color: var(--fg-2);
+  }
+
+  .key.next.is-pressed {
+    border-color: transparent;
+    color: var(--fg-3);
+  }
+
+  .key.approve {
+    border-color: rgba(103, 232, 249, 0.35);
+    color: var(--cyan-hi);
+  }
+
+  .key.approve.is-pressed {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    color: var(--bg);
+    animation: press 0.45s var(--spring-snappy);
+  }
+
+  .service {
+    margin: 4px 0;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(241, 245, 249, 0.06);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--fg-2);
+  }
+
+  .alert .bubble {
+    display: grid;
+    gap: 4px;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    background: rgba(251, 191, 36, 0.06);
+  }
+
+  .alert .viz-label {
+    font-size: 10px;
+    color: var(--amber);
+  }
+
+  .typing {
+    display: none;
+    gap: 4px;
+    align-self: flex-start;
+    margin: 10px 0 0;
+    padding: 12px 14px;
+    border-radius: 16px 16px 16px 5px;
+    background: rgba(241, 245, 249, 0.06);
+  }
+
+  .chat:global(.is-typing) .typing {
+    display: flex;
+  }
+
+  .typing i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fg-3);
+    animation: dot 1.1s var(--ease-in-out) infinite;
+  }
+
+  .typing i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .typing i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  .beats {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .beats li {
+    display: grid;
+    gap: 8px;
+    padding: 16px 0 18px;
+    border-top: 1px solid var(--line);
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .beats li[data-state="pending"] {
+    opacity: 0.32;
+  }
+
+  .beats li[data-state="active"] .viz-label {
+    color: var(--fg);
+  }
+
+  .beats .body {
+    margin: 0;
+    max-width: 44ch;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg-2);
+  }
+
+  @keyframes bubble-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.96);
+    }
+  }
+
+  @keyframes press {
+    40% {
+      transform: scale(0.94);
+    }
+  }
+
+  @keyframes dot {
+    50% {
+      opacity: 0.3;
+      transform: translateY(-2px);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .chat-stage {
+      grid-template-columns: 1fr;
+    }
+    .phone {
+      max-width: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    :global(:where(html.js)) .chat-pin {
+      top: 64px;
+    }
+    :global(:where(html.js)) .log-window {
+      height: clamp(320px, calc(100svh - 330px), 520px);
+    }
+    .chat-stage {
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .chat:global(.is-live) .beats li {
+      display: none;
+    }
+    .chat:global(.is-live) .beats li[data-state="active"] {
+      display: grid;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .chat-scroll {
+      height: auto;
+    }
+    :global(:where(html.js)) .chat-pin {
+      position: static;
+    }
+    :global(:where(html.js)) .log-window {
+      height: auto;
+      mask-image: none;
+    }
+    .key,
+    .beats li {
+      transition: none;
+    }
+    .key.approve.is-pressed,
+    .typing i {
+      animation: none;
+    }
+  }
+</style>

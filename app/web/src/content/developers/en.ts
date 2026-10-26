@@ -57,6 +57,11 @@ export const developers: DevelopersPage = {
           title: "Capabilities",
           body: "GET /api/capabilities tells a client what this server supports, and what the current token may do, before it asks.",
         },
+        {
+          title: "MCP",
+          body: "Opt-in, off until an operator enables it: /mcp on the Crate API serves MCP clients such as Claude Code, over OAuth 2 with PKCE or service tokens. Agents prepare plans and a person approves each change, in Admin or, with Crate Operator, in Telegram. Approval starts on when you connect an agent from Admin.",
+          link: { href: "/admin#mcp", label: "AI agents, via MCP" },
+        },
       ],
     },
     {
@@ -70,7 +75,7 @@ export const developers: DevelopersPage = {
         },
         {
           title: "Scopes",
-          body: "Each token carries the scopes it needs: vdj.catalog.read, vdj.media.read, vdj.smart_mix.read and vdj.play_events.write.",
+          body: "Each token carries the scopes it needs: vdj.catalog.read, vdj.media.read, vdj.smart_mix.read, vdj.play_events.write, vdj.automation and vdj.automation.execute.",
         },
         {
           title: "Allowlist",
@@ -115,7 +120,7 @@ export const developers: DevelopersPage = {
       features: [
         {
           title: "Run a server",
-          body: "One line on Linux x86_64 with Docker. 4 cores and 8 GB RAM recommended.",
+          body: "One line on Linux or macOS, x86_64 or arm64, with Docker. 8 GB RAM recommended.",
         },
         {
           title: "Develop",

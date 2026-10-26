@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  readJavaConstants,
   readPyConstants,
   readPyDict,
   readPyTuples,
@@ -70,6 +71,26 @@ describe("readPyTuples", () => {
     expect(readPyTuples(source, "_EQ_")).toEqual({
       _EQ_ROCK: [4, 3, -1],
       _EQ_POP: [-1, 2],
+    });
+  });
+});
+
+describe("readJavaConstants", () => {
+  it("reads numeric static finals with underscores, suffixes and signs", () => {
+    const source = `
+    static final long PREROLL_MS = 2_500L;
+    private static final float CUT_DB = -24.0f;
+    static final double SHELF_HZ = 150.0; // low shelf
+    static final int SAMPLE_RATE = 48_000;
+    static final String TAG = "mix";
+    // static final int GONE = 1;
+    `;
+
+    expect(readJavaConstants(source)).toEqual({
+      PREROLL_MS: 2500,
+      CUT_DB: -24,
+      SHELF_HZ: 150,
+      SAMPLE_RATE: 48000,
     });
   });
 });

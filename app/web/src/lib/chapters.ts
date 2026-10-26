@@ -6,7 +6,14 @@ export function chapterId(index: number, title: string): string {
   return `${String(index).padStart(2, "0")}-${slug}`;
 }
 
-export type Status = "coming-soon" | "optional-llm";
+export type Status =
+  | "in-development"
+  | "optional-llm"
+  | "opt-in"
+  | "available"
+  | "planned";
+
+export type ChapterStatus = "in-development" | "opt-in";
 
 export interface Feature {
   title: string;
@@ -17,8 +24,9 @@ export interface Feature {
 
 export interface ChapterContent {
   title: string;
+  id?: string;
   lede: string[];
-  status?: "coming-soon";
+  status?: ChapterStatus;
   features?: Feature[];
 }
 

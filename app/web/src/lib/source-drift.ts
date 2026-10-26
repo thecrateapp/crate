@@ -87,3 +87,13 @@ export function readPyTuples(
     ]),
   );
 }
+
+export function readJavaConstants(source: string): Record<string, number> {
+  return Object.fromEntries(
+    [
+      ...stripLineComments(source, "//").matchAll(
+        /static\s+final\s+(?:int|long|float|double)\s+(\w+)\s*=\s*(-?[\d_.]+)[fFdDlL]?\s*;/g,
+      ),
+    ].map(([, name, value]) => [name, Number(value!.replace(/_/g, ""))]),
+  );
+}
