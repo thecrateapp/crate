@@ -5,8 +5,14 @@ section: start
 audience: [operator]
 status: canonical
 order: 10
-verified: 2026-07-21
-sources: [install.sh, docker-compose.home.yaml]
+verified: 2026-10-26
+sources:
+  [
+    install.sh,
+    app/installer/internal/wizard/wizard.go,
+    deploy/install/integrations.yaml,
+    docker-compose.home.yaml,
+  ]
 ---
 
 # Home quickstart
@@ -24,9 +30,13 @@ them.
 - For public HTTPS, a domain managed by Cloudflare and a DNS API token. For a
   local-only instance, use the `ports`, `hosts` or `dnsmasq` access modes.
 
-The installer writes a mode-specific `docker-compose.yaml`, `config.yaml`,
-Traefik federation proxy configuration and a mode-specific `.env`. Keep that
-directory private: `.env` contains database, JWT, Redis and readplane secrets.
+`install.sh` downloads the `crate` installer for your system from GitHub
+Releases, checks its SHA-256 checksum, keeps it in `~/.local/bin` and runs
+`crate install`, a step-by-step wizard. The installer embeds the
+`docker-compose.yaml`, `config.yaml` and Traefik files of its release, writes
+them with a mode-specific `.env` (owner-only) and starts Crate. Keep that
+directory private: `.env` contains the database, JWT, Redis, readplane,
+credential and federation secrets.
 
 ## Install
 
@@ -36,7 +46,13 @@ For an interactive installation:
 curl -fsSL https://cratemusic.app/install.sh | bash
 ```
 
-For a non-interactive public installation:
+The wizard checks Docker, memory, disk and ports, asks for the music folder,
+the access mode and the admin password, shows a review and waits until the API
+answers. Pass `--dry-run` to see the plan without writing anything, or
+`--accessible` for plain prompts that work with screen readers.
+
+For a non-interactive public installation (the `CRATE_*` variables are the
+same ones the previous script accepted):
 
 ```bash
 curl -fsSL https://cratemusic.app/install.sh \
@@ -57,10 +73,14 @@ curl -fsSL https://cratemusic.app/install.sh \
   | CRATE_ASSUME_YES=1 CRATE_ACCESS_MODE=ports bash
 ```
 
-The installer generates `JWT_SECRET`, `REDIS_PASSWORD` and
-`CRATE_READPLANE_SERVICE_TOKEN` when they are not supplied. Do not rotate or
-delete them casually: the token authenticates API/readplane traffic and Redis
-also carries the task broker and durable streams.
+The installer generates `JWT_SECRET`, the PostgreSQL password,
+`REDIS_PASSWORD`, `CRATE_READPLANE_SERVICE_TOKEN`, `CRATE_CREDENTIAL_KEY` and
+the two federation secrets when they are missing, and never regenerates an
+existing one. Do not rotate or delete them casually: the readplane token
+authenticates API/readplane traffic, Redis also carries the task broker and
+durable streams, and `CRATE_CREDENTIAL_KEY` encrypts stored AI credentials.
+`deploy/install/integrations.yaml` declares every variable the installer
+writes.
 
 ## Access modes and endpoints
 
@@ -76,7 +96,8 @@ origin. The home Compose profile derives it as `https://listen.<domain>` for
 domain-based installs; override it with the actual reachable Listen URL for a
 local or port-based installation.
 
-The Admin app creates the first administrator and starts a library scan. Use
+The admin account is `admin@cratemusic.app`, with the password chosen in the
+wizard or generated and shown at the end. Admin starts the library scan. Use
 Listen for playback and user-facing library features. Files received by uploads
 or owned-purchase import are staged and published by workers; the API never
 writes the music filesystem directly.
@@ -101,14 +122,17 @@ The installer downloads a Compose-based installation; it is not a repository
 checkout. Therefore `git pull && docker compose up -d --build` is not a valid
 update command for this profile.
 
-Re-run the installer with the same install directory and desired image/ref. It
-refreshes the compose/config files and keeps an existing `.env` unless
-`CRATE_FORCE_ENV=1` is explicitly set:
+Run the installer again on the same directory. It prefills the answers from
+the existing `.env`, rewrites the compose and config files of its release,
+keeps every secret and any line you added by hand, and adds settings that are
+new in this release:
 
 ```bash
-curl -fsSL https://cratemusic.app/install.sh \
-  | CRATE_INSTALL_DIR=/opt/crate CRATE_REF=main bash
+crate install --dir /opt/crate
 ```
+
+To use a specific release of the installer, set `CRATE_INSTALLER_VERSION` to
+its tag when running `install.sh`.
 
 Before an update, copy the existing `.env` and take a PostgreSQL backup. After
 the update, repeat the verification commands above. If a database migration has

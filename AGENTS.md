@@ -18,6 +18,7 @@ the rules you need when editing it; read the one closest to the files you touch.
 | Desktop app (Tauri)                  | `app/listen-desktop/AGENTS.md`        |
 | Go read plane                        | `app/readplane/AGENTS.md`             |
 | Rust media worker                    | `app/media-worker/AGENTS.md`          |
+| `crate` installer (Go)               | `app/installer/AGENTS.md`             |
 | Cast receiver                        | `app/cast-receiver/AGENTS.md`         |
 | Documentation site                   | `app/docs/AGENTS.md`                  |
 

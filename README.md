@@ -206,9 +206,11 @@ Fastest path on a Linux/macOS machine with Docker:
 curl -fsSL https://cratemusic.app/install.sh | bash
 ```
 
-The installer asks for the install directory, music library path, access mode,
-and initial admin password. It writes a small self-hosted stack to your machine,
-pulls pre-built GHCR images, and starts Crate with Docker Compose.
+The script downloads `crate`, a step-by-step installer, checks its checksum and
+runs it. The wizard checks Docker, memory, disk and ports, then asks for the music
+library, access mode and admin password, shows a review, starts Crate and waits
+until it answers. Run `crate install` again at any time to change the
+installation; it keeps your secrets and manual edits.
 
 After installation:
 
@@ -245,8 +247,9 @@ curl -fsSL https://cratemusic.app/install.sh \
   | CRATE_ACCESS_MODE=dnsmasq CRATE_DOMAIN=crate.local bash
 ```
 
-Set `CRATE_SKIP_START=1` if you only want the installer to write
-`docker-compose.yaml`, `.env`, and `config.yaml`.
+Set `CRATE_SKIP_START=1` (or pass `--skip-start`) if you only want the installer
+to write `docker-compose.yaml`, `.env`, and `config.yaml`, and `--dry-run` to see
+the plan without writing anything.
 
 ### Local development
 

@@ -1,0 +1,92 @@
+name: Installer
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+    paths:
+      - "app/installer/**"
+      - "deploy/install/**"
+      - "docker-compose.home.yaml"
+      - "app/config.yaml"
+      - "deploy/traefik/federation-readplane.yml"
+      - "install.sh"
+      - ".github/workflows/build-installer.yml"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "app/installer/**"
+      - "deploy/install/**"
+      - "docker-compose.home.yaml"
+      - "app/config.yaml"
+      - "deploy/traefik/federation-readplane.yml"
+      - "install.sh"
+      - ".github/workflows/build-installer.yml"
+
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: app/installer
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: app/installer/go.mod
+          cache-dependency-path: app/installer/go.sum
+
+      - name: Embedded files match the repository
+        run: |
+          go generate ./...
+          git diff --exit-code -- internal/assets/files
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Bootstrap script syntax
+        working-directory: .
+        run: bash -n install.sh
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: app/installer/go.mod
+          cache-dependency-path: app/installer/go.sum
+
+      - name: Build
+        working-directory: app/installer
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p ../../installer-artifacts
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.version=${VERSION}" \
+              -o "../../installer-artifacts/crate-${os}-${arch}" ./cmd/crate
+          done
+          cd ../../installer-artifacts
+          sha256sum crate-* > crate-checksums.txt
+
+      - name: Attach the installer to the GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: installer-artifacts/*
