@@ -30,6 +30,8 @@ func (fakeRunner) Stream(_ context.Context, w io.Writer, _ string, _ string, arg
 	return nil
 }
 
+func (fakeRunner) Run(context.Context, system.Command) error { return nil }
+
 const fanartKey = "fanart-secret-value-1234"
 
 type harness struct {

@@ -30,6 +30,8 @@ func (r composeRunner) Output(_ context.Context, name string, args ...string) (s
 
 func (composeRunner) Stream(context.Context, io.Writer, string, string, ...string) error { return nil }
 
+func (composeRunner) Run(context.Context, system.Command) error { return nil }
+
 func installAt(t *testing.T, apiURL string, extra map[string]string) string {
 	t.Helper()
 	m, err := manifest.Load()

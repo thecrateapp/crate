@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,24 +19,53 @@ type Stack struct {
 	Run     system.Runner
 	Compose []string // e.g. ["docker", "compose"] or ["sudo", "docker", "compose"]
 	Dir     string
+	Files   []string // relative to Dir; empty means docker-compose.yaml
 }
 
-func (s Stack) command(args ...string) (string, []string) {
-	full := append(append([]string(nil), s.Compose[1:]...),
-		"--project-directory", s.Dir,
-		"-f", filepath.Join(s.Dir, "docker-compose.yaml"),
-		"--env-file", filepath.Join(s.Dir, ".env"),
-	)
+// InfraBridge is the host socket the optional infrastructure relay of
+// Crate Operator needs.
+var InfraBridge = "/run/crate-infra/bridge.sock"
+
+// Command is the compose invocation for args in this installation.
+func (s Stack) Command(args ...string) (string, []string) {
+	full := append(append([]string(nil), s.Compose[1:]...), "--project-directory", s.Dir)
+	files := s.Files
+	if len(files) == 0 {
+		files = []string{"docker-compose.yaml"}
+	}
+	for _, file := range files {
+		full = append(full, "-f", filepath.Join(s.Dir, file))
+	}
+	full = append(full, "--env-file", filepath.Join(s.Dir, ".env"))
 	return s.Compose[0], append(full, args...)
 }
 
+func (s Stack) operator() bool {
+	for _, file := range s.Files {
+		if filepath.Base(file) == "compose.operator.yaml" {
+			return true
+		}
+	}
+	return false
+}
+
 func (s Stack) Pull(ctx context.Context, w io.Writer) error {
-	name, args := s.command("pull")
+	name, args := s.Command("pull")
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
 func (s Stack) Up(ctx context.Context, w io.Writer) error {
-	name, args := s.command("up", "-d", "--remove-orphans")
+	up := []string{"up", "-d", "--remove-orphans"}
+	if _, err := os.Stat(InfraBridge); s.operator() && err != nil {
+		up = append(up, "--scale", "crate-infra-relay=0")
+	}
+	name, args := s.Command(up...)
+	return s.Run.Stream(ctx, w, s.Dir, name, args...)
+}
+
+// Remove stops and deletes the services of a compose profile.
+func (s Stack) Remove(ctx context.Context, w io.Writer, profile string, services ...string) error {
+	name, args := s.Command(append([]string{"--profile", profile, "rm", "-s", "-f"}, services...)...)
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
@@ -74,7 +104,7 @@ type Service struct {
 
 // Services lists the project's containers, running or not.
 func (s Stack) Services(ctx context.Context) ([]Service, error) {
-	name, args := s.command("ps", "--all", "--format", "json")
+	name, args := s.Command("ps", "--all", "--format", "json")
 	out, err := s.Run.Output(ctx, name, args...)
 	if err != nil {
 		return nil, err

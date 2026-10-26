@@ -25,6 +25,11 @@ func (f *fakeRunner) Stream(_ context.Context, _ io.Writer, _ string, name strin
 	return nil
 }
 
+func (f *fakeRunner) Run(_ context.Context, c system.Command) error {
+	f.streamed = append(f.streamed, c.Name+" "+strings.Join(c.Args, " "))
+	return nil
+}
+
 // offlineValidation fails fast instead of calling real providers.
 func offlineValidation() validate.Client {
 	client := validate.NewClient()

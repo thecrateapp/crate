@@ -34,6 +34,19 @@ func (v *Values) Set(key, value string) {
 	v.values[key] = value
 }
 
+func (v *Values) Delete(key string) {
+	if _, ok := v.values[key]; !ok {
+		return
+	}
+	delete(v.values, key)
+	for i, existing := range v.keys {
+		if existing == key {
+			v.keys = append(v.keys[:i], v.keys[i+1:]...)
+			break
+		}
+	}
+}
+
 func (v *Values) Keys() []string {
 	return append([]string(nil), v.keys...)
 }
