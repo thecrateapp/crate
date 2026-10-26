@@ -347,7 +347,7 @@ export function ModalFooter({
     <div
       {...props}
       className={cn(
-        "crate-overlay-footer sticky bottom-0 z-10 bg-surface-popover",
+        "crate-overlay-footer sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 bg-surface-popover px-5 py-4",
         className,
       )}
     >

@@ -856,7 +856,7 @@ export function ArtistHeroArtworkEditor({
           </p>
         </ModalBody>
 
-        <ModalFooter className="flex justify-end px-5 py-4">
+        <ModalFooter>
           <Button variant="outline" onClick={() => setPreviewOpen(false)}>
             Back to editor
           </Button>

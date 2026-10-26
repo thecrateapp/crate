@@ -169,7 +169,7 @@ export function ImageCropUpload({
             />
           </FormField>
         </ModalBody>
-        <ModalFooter className="flex justify-end gap-2">
+        <ModalFooter>
           <Button variant="outline" onClick={cancel} disabled={uploading}>
             Cancel
           </Button>

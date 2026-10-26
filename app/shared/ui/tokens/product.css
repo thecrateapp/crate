@@ -18,7 +18,8 @@
     color-mix(in srgb, var(--accent-action) 92%, var(--state-info)) 250deg,
     color-mix(in srgb, var(--state-info) 72%, var(--accent-action)) 360deg
   );
-  --playback-aura: radial-gradient(
+  --playback-aura:
+    radial-gradient(
       ellipse 58% 46% at 46% 57%,
       var(--accent-action-glow-strong) 0%,
       var(--accent-action-glow-medium) 24%,
@@ -37,9 +38,10 @@
       color-mix(in srgb, var(--state-info) 9%, transparent) 38%,
       transparent 68%
     );
-  --play-button-shadow: 0 0 5px var(--accent-action-glow),
-    0 0 9px var(--accent-action-glow-soft);
-  --playback-core-shadow: inset 0 0 0 1px var(--border-quiet),
+  --play-button-shadow:
+    0 0 5px var(--accent-action-glow), 0 0 9px var(--accent-action-glow-soft);
+  --playback-core-shadow:
+    inset 0 0 0 1px var(--border-quiet),
     inset 0 -10px 24px var(--surface-glass-shadow);
   --play-button-icon-shadow: 0 0 4px
     color-mix(in srgb, var(--text-primary) 35%, transparent);
@@ -69,54 +71,9 @@
   );
   --genre-tone-muted: var(--text-muted);
   --genre-tone-success: var(--state-success);
-  --visualizer-ribbon-stop-0: color-mix(
-    in srgb,
-    var(--accent-action) 0%,
-    transparent
-  );
   --visualizer-ribbon-stop-1: color-mix(
     in srgb,
     var(--accent-action) 55%,
-    transparent
-  );
-  --visualizer-ribbon-stop-2: color-mix(
-    in srgb,
-    var(--accent-action) 78%,
-    transparent
-  );
-  --visualizer-ribbon-stop-3: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--accent-action) 72%, var(--text-primary)) 94%,
-    transparent
-  );
-  --visualizer-ribbon-stop-4: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--accent-action) 56%, var(--text-primary)) 76%,
-    transparent
-  );
-  --visualizer-ribbon-stop-5: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 45%,
-    transparent
-  );
-  --visualizer-ribbon-stop-6: color-mix(
-    in srgb,
-    color-mix(in srgb, var(--accent-action) 34%, var(--text-primary)) 0%,
-    transparent
-  );
-  --visualizer-ribbon-trace: color-mix(
-    in srgb,
-    var(--accent-action) 66%,
-    transparent
-  );
-  --visualizer-ribbon-trace-shadow: color-mix(
-    in srgb,
-    var(--accent-action) 70%,
-    transparent
-  );
-  --visualizer-ribbon-shadow: color-mix(
-    in srgb,
-    var(--accent-action) 32%,
     transparent
   );
   --visualizer-sphere-color-2: color-mix(
@@ -134,7 +91,8 @@
     var(--accent-action) 95%,
     transparent
   );
-  --home-upcoming-empty-surface: radial-gradient(
+  --home-upcoming-empty-surface:
+    radial-gradient(
       circle at top left,
       color-mix(in srgb, var(--accent-action) 16%, transparent),
       transparent 42%

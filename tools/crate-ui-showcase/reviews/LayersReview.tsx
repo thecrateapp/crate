@@ -124,7 +124,7 @@ export function ModalExample() {
             </ModalBody>
           </AppModal>
         </ModalBody>
-        <ModalFooter className="flex justify-end gap-3 px-5 py-4">
+        <ModalFooter>
           <Button
             variant="ghost"
             disabled={busy}

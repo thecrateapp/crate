@@ -11,7 +11,7 @@ Gain values use compact 12px regular monospace. Frequency captions use uppercase
 
 <Canvas of={Stories.Manual} />
 
-Each band is a vertical slider from −12 to +12 dB. Arrow keys move 0.5 dB, Page Up/Down move 3 dB and Home/End reach the limits. Continuous input is separate from persistence: release, blur or 150ms of keyboard inactivity commits once. Touch gestures stay with the active band rather than starting a containing player swipe; other panel areas retain normal scrolling. A caller may omit edit callbacks for a read-only curve. Listen lets an enabled automatic curve become Custom on the first band edit, retaining its other gains. Disabled EQ dims the instrument and prevents changes.
+Each band is a vertical slider from −12 to +12 dB. Arrow keys move 0.5 dB, Page Up/Down move 3 dB and Home/End reach the limits. Continuous input is separate from persistence: release, blur or 150ms of keyboard inactivity commits once. Unmounting the bands also commits a pending edit, so closing the panel mid-gesture never loses the last value. Touch gestures stay with the active band rather than starting a containing player swipe; other panel areas retain normal scrolling. A caller may omit edit callbacks for a read-only curve. Listen lets an enabled automatic curve become Custom on the first band edit, retaining its other gains. Disabled EQ dims the instrument and prevents changes.
 
 <Canvas of={Stories.ReadOnly} />
 <Canvas of={Stories.Disabled} />

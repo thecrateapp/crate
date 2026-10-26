@@ -57,7 +57,7 @@ export function CollectionEditorDialog({
       panelClassName="flex min-h-0 flex-col"
     >
       <ModalBody className="min-h-0 flex-1 space-y-5 p-5">{children}</ModalBody>
-      <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
+      <ModalFooter>
         <Button variant="ghost" disabled={pending} onClick={close}>
           {cancelLabel}
         </Button>

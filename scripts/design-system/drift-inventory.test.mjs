@@ -184,6 +184,13 @@ test("exposes ownership metadata for every raw color exception", () => {
 
   assert.deepEqual(inventory.rawColorAllowlist, [
     {
+      path: "app/listen/src/components/paths/path-cover-textures.ts",
+      owner: "listen-paths",
+      reason:
+        "The cover glow is the measured average colour of the artwork pixels: content, not identity.",
+      reviewBy: "2026-12-31",
+    },
+    {
       path: "app/shared/ui/domain/auth/OAuthButtons.tsx",
       owner: "shared-ui",
       reason: "Provider brand colors must match Google's official OAuth mark.",

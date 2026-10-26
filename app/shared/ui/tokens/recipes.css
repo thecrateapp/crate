@@ -2635,7 +2635,7 @@ button.genre-pill:hover,
 }
 
 .stats-heatmap-hours > [data-night] {
-  border-top-color: var(--surface-quiet);
+  border-top-color: var(--border-quiet);
 }
 
 /* Entrance: a diagonal wave on the first real payload only; it waits for the
@@ -4025,7 +4025,9 @@ label
     width 450ms var(--ease-spring-snappy),
     height 450ms var(--ease-spring-snappy);
 }
-:root[data-crate-motion="reduced"] .crate-tabs-list > .crate-tabs-indicator {
+[data-crate-motion="reduced"]
+  .crate-tabs-list[data-indicator-ready]
+  > .crate-tabs-indicator {
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {

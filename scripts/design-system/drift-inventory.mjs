@@ -16,6 +16,16 @@ const RAW_COLOR_PATTERN = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/gi;
 const FOUNDATION_TOKEN_PATH_PATTERN = /^app\/shared\/ui\/tokens\//;
 const RAW_COLOR_ALLOWLIST = new Map([
   [
+    "app/listen/src/components/paths/path-cover-textures.ts",
+    {
+      pattern: /return \x60rgb\(\$\{/g,
+      owner: "listen-paths",
+      reason:
+        "The cover glow is the measured average colour of the artwork pixels: content, not identity.",
+      reviewBy: "2026-12-31",
+    },
+  ],
+  [
     "app/shared/ui/domain/auth/OAuthButtons.tsx",
     {
       pattern: /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
