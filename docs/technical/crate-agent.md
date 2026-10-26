@@ -9,6 +9,12 @@ verified: 2026-10-26
 sources:
   - Makefile
   - scripts/agent_setup.py
+  - docker-compose.home.yaml
+  - deploy/install/integrations.yaml
+  - app/installer/internal/agent/setup.go
+  - app/installer/internal/wizard/agent.go
+  - app/installer/internal/copilot/agent.go
+  - app/installer/internal/doctor/doctor.go
   - .env.example
   - docker-compose.yaml
   - deploy/operator/compose.operator.yaml
@@ -113,9 +119,11 @@ mounts.
 
 Both profiles need:
 
-- A running stack started from a checkout of the repository (the setup script is
-  `scripts/agent_setup.py`, run by `make` with the host `python3`). `crate-api` must be
-  running and migrated, because the MCP credential is created inside it.
+- A running stack: a home install made with `crate install`, which needs no checkout and
+  no Python on the host ([Home installs](#home-installs)), or a checkout of the
+  repository, where `make` runs `scripts/agent_setup.py` with the host `python3`.
+  `crate-api` must be running and migrated, because the MCP credential is created inside
+  it.
 - In `.env`: `DATA_DIR`, `PUID`/`PGID`, and `DOMAIN` or `CRATE_AGENT_MCP_HOST` (the API
   host clients use, for example `api.example.com`).
 - `CRATE_MCP_ENABLED=true`, and the MCP host listed in `CRATE_MCP_ALLOWED_HOSTS`.
@@ -158,6 +166,61 @@ Use a new bot for Crate. A Telegram token can have only one process polling it; 
 programs (an old bot, a personal assistant, the other Crate profile) share a token, both
 get `409 Conflict` errors and messages go missing. Do not reuse the token of the removed
 built-in bot; revoke it in BotFather with `/revoke` if it is still valid.
+
+## Home installs
+
+On an installation made with `crate install`, the installer sets the assistants up; there
+is no `make` and nothing to run by hand:
+
+```bash
+crate install              # offers Crate Agent among the integrations
+crate configure agent      # Crate Agent or Crate Operator, switch between them, or turn off
+crate doctor               # whether the assistant runs, reaches Crate and has its model
+```
+
+`crate install` (and `crate mcp`, the install copilot) offers only Crate Agent. Crate
+Operator recreates Crate's services with its overlay, so it is offered only by
+`crate configure agent` once Crate runs. `crate configure telegram` opens the same form.
+
+The form asks for the bot token, then asks everyone who may use the bot to send it a
+message and offers those accounts as the allowlist (or takes numeric IDs). It asks for the
+model provider, the model, the base URL where the provider takes one, and the API key
+where it needs one. Crate Operator also asks for the admin who approves changes. On a
+re-run every answer can be kept as it is.
+
+Once Crate answers, the installer:
+
+1. Writes the answers to the setup script in a throwaway `crate-api` container
+   (`docker compose run --rm crate-api`) with the install folder and the data folder
+   mounted at their host paths. The bot token, allowlist and model key travel only in
+   that container's environment; they never reach `.env` or a command line. The script
+   is `scripts/agent_setup.py --in-container`: it creates the MCP credential with the
+   credential CLI in that container and writes the secrets as root, owned by `PUID:PGID`,
+   keeping the owner of `.env`.
+2. Adds the `agent` or `crate-operator` profile to `COMPOSE_PROFILES`. For Crate Operator
+   it also sets `COMPOSE_FILE=docker-compose.yaml:deploy/operator/compose.operator.yaml`,
+   so a plain `docker compose up -d` in the install folder keeps the overlay. Without
+   `/run/crate-infra/bridge.sock` the infrastructure relay stays stopped.
+3. Starts the stack, waits until the assistant reaches Crate MCP, and asks the model for
+   one word.
+
+`openai-codex` and `nous` without a key need a sign-in. The installer runs it in your
+terminal ("Sign in to ChatGPT"). When it cannot (an unattended install, the install
+copilot, or you skipped it), it says "Sign-in pending: run `crate configure agent`", and
+`crate doctor` warns until you do. Run that command in a terminal and keep every answer;
+it offers the sign-in again.
+
+Switching between Crate Agent and Crate Operator keeps the bot, the allowlist and the
+model keys, and revokes the credential of the mode you leave. Turning the assistant off
+stops its services, removes its profile (and the operator overlay), revokes its MCP
+credentials and deletes `telegram-token`, `allowed-users` and `mcp-token`. Model keys in
+`secrets/model-keys/`, the sign-in and the conversation memory under `home/` stay, so
+turning it on again does not ask for them; delete those folders to remove them as well.
+
+For an unattended install, set the answers in the environment of
+`crate install --yes`: `CRATE_AGENT_MODE=agent`, `AGENT_TELEGRAM_TOKEN`,
+`AGENT_ALLOWED_USERS`, `CRATE_AGENT_PROVIDER`, `CRATE_AGENT_MODEL` and, where needed,
+`AGENT_MODEL_API_KEY`.
 
 ## Quick start: Crate Agent
 

@@ -13,12 +13,15 @@ for linux/darwin × amd64/arm64.
 ## Rules
 
 - `deploy/install/integrations.yaml` is the single source of truth for every variable the
-  installer writes. Every variable `docker-compose.home.yaml` reads must be declared there, and
-  every declared variable must be read by the compose file (or be marked `installer_only`);
-  `internal/manifest` tests enforce both directions.
-- The binary embeds the compose file, `app/config.yaml`, the Traefik read-plane routes and the
-  manifest. After changing any of them run `go generate ./...` here; CI fails when the embedded
-  copies are stale.
+  installer writes. Every variable `docker-compose.home.yaml` or the operator overlay reads must
+  be declared there, and every declared variable must be read by one of them (or be marked
+  `installer_only`); `internal/manifest` tests enforce both directions. `transient` variables
+  (the Crate Agent bot token, allowlist, model key and approver) are handed to a setup step
+  and never written to `.env`; `install.BuildEnv` skips them.
+- The binary embeds the compose file, `app/config.yaml`, the Traefik read-plane routes, the
+  manifest, `scripts/agent_setup.py`, the agent runtime it imports and the operator overlay
+  (`internal/assets`). After changing any of them run `go generate ./...` here; CI fails when
+  the embedded copies are stale.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - Never print a secret. `.env` is written with mode 0600. Validation calls go straight to the
@@ -31,8 +34,15 @@ for linux/darwin × amd64/arm64.
 - Integrations live in the manifest: id, group, title, a tagline under 40 characters for the
   list, summary, variables and how to get the key. A provider check belongs in
   `internal/validate` and must tell a rejected key from an unreachable provider. Integrations
-  with their own questions (Soulseek, AI, MCP, Telegram, Tidal) have a form in
+  with their own questions (Soulseek, AI, MCP, Crate Agent, Tidal) have a form in
   `internal/wizard/integrations.go`; the rest use the generic fields form.
+- Crate Agent (`internal/agent`): the setup is `scripts/agent_setup.py --in-container`, run in
+  a throwaway `crate-api` container once Crate answers; never require Python on the host. Its
+  answers go in the child environment (`docker -e NAME`), never in arguments. `crate install`
+  and `crate mcp` offer only Crate Agent; Crate Operator, switching and turning off belong to
+  `crate configure agent`. Once the operator overlay is on, every compose call includes it
+  (`stack.Stack.Files` from `COMPOSE_FILE`). Product text says Crate Agent and Crate
+  Operator, never the name of the engine underneath.
 - `crate doctor --json` is a contract for scripts and the coming MCP server: keep the fields
   stable.
 - `crate mcp` (`internal/copilot`) is the AI install copilot. Its rules are the product:

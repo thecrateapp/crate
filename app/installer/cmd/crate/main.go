@@ -23,7 +23,7 @@ const usage = `crate sets up and configures a Crate home server.
 
 Usage:
   crate install [flags]                  install Crate, or change an existing installation
-  crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Telegram…)
+  crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Crate Agent…)
   crate doctor [flags]                   check the installation, its services and its keys
   crate mcp                              let an AI agent install Crate with you (MCP over stdio)
   crate version                          print the installer version
