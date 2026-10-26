@@ -78,3 +78,20 @@ func envValues(pairs ...string) *envfile.Values {
 	}
 	return values
 }
+
+func TestTheCopilotLeavesCrateOperatorAlone(t *testing.T) {
+	m, _ := manifest.Load()
+	s := NewSession(m, Deps{})
+	s.existing = envValues("CRATE_AGENT_MODE", "operator", "COMPOSE_PROFILES", "crate-operator")
+	s.answered = map[string]bool{}
+	s.dir = t.TempDir()
+	for _, enabled := range []bool{true, false} {
+		_, _, err := s.toolSetIntegration(context.Background(), nil, IntegrationInput{ID: "agent", Enabled: enabled})
+		if err == nil || !strings.Contains(err.Error(), "crate configure agent") {
+			t.Errorf("enabled %v: got %v", enabled, err)
+		}
+	}
+	if mode := s.draft().Value("CRATE_AGENT_MODE"); mode != "operator" {
+		t.Fatalf("mode %q", mode)
+	}
+}

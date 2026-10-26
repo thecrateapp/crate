@@ -24,9 +24,6 @@ var agentTimeout = 2 * time.Minute
 
 // setAgent turns Crate Agent on. Callers hold s.mu.
 func (s *Session) setAgent(ctx context.Context, in IntegrationInput) error {
-	if agent.Wanted(s.existing) == agent.Operator {
-		return errors.New("Crate Operator runs here; the user changes it with `" + agent.SetupCommand + "` in a terminal")
-	}
 	if mode, ok := agent.ParseMode(in.AgentMode); !ok || mode == agent.Operator {
 		return errors.New(`agent_mode must be "agent"; Crate Operator is set up later by the user with ` + "`" + agent.SetupCommand + "` in a terminal")
 	}

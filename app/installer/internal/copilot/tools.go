@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/thecrateapp/crate/app/installer/internal/agent"
 	"github.com/thecrateapp/crate/app/installer/internal/doctor"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
@@ -364,6 +365,9 @@ func (s *Session) toolSetIntegration(ctx context.Context, _ *mcp.CallToolRequest
 	integration, ok := s.manifest.Integration(in.ID)
 	if !ok {
 		return nil, IntegrationState{}, fmt.Errorf("unknown integration %q; call crate_integrations", in.ID)
+	}
+	if in.ID == "agent" && agent.Wanted(s.existing) == agent.Operator {
+		return nil, IntegrationState{}, errors.New("Crate Operator runs here; the user changes it with `" + agent.SetupCommand + "` in a terminal")
 	}
 	d := s.draft()
 	s.changed()
