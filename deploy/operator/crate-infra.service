@@ -1,0 +1,29 @@
+[Unit]
+Description=Crate private infrastructure bridge (explicit opt-in)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=crate-infra-relay
+WorkingDirectory=/opt/crate-operator/assets
+ExecStart=/usr/bin/python3 -m deploy.operator.infra_server --config /etc/crate-infra/policy.json --execute
+Restart=on-failure
+RestartSec=10
+UMask=0077
+RuntimeDirectory=crate-infra
+RuntimeDirectoryMode=0750
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/crate-infra /var/lib/crate-infra /opt/crate-host /opt/crate-operator/context
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+TasksMax=64
+TimeoutStopSec=30
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

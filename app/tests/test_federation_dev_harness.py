@@ -16,7 +16,7 @@ def test_federation_dev_harness_serves_node_a_admin():
     admin = services["node-a-admin"]
 
     assert admin["container_name"] == "fed-a-admin"
-    assert admin["build"] == {"context": "./app", "dockerfile": "ui/Dockerfile"}
+    assert admin["build"] == {"context": ".", "dockerfile": "app/ui/Dockerfile"}
     assert "15173:80" in admin["ports"]
     assert "fed-net" in admin["networks"]
     assert admin["depends_on"]["node-a-api"]["condition"] == "service_started"

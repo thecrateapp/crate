@@ -375,10 +375,13 @@ jobs:
           tags: |
             type=sha,prefix=,format=long
 
+      # NOTE: the context is the repo root so the image installs from the
+      # root package-lock.json; app/ui/Dockerfile.dockerignore limits
+      # it to the files this image needs.
       - uses: docker/build-push-action@v7
         id: build
         with:
-          context: ./app
+          context: .
           file: ./app/ui/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -420,10 +423,13 @@ jobs:
           tags: |
             type=sha,prefix=,format=long
 
+      # NOTE: the context is the repo root so the image installs from the
+      # root package-lock.json; app/listen/Dockerfile.dockerignore limits
+      # it to the files this image needs.
       - uses: docker/build-push-action@v7
         id: build
         with:
-          context: ./app
+          context: .
           file: ./app/listen/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -468,10 +474,13 @@ jobs:
           tags: |
             type=sha,prefix=,format=long
 
+      # NOTE: the context is the repo root so the image installs from the
+      # root package-lock.json; app/cast-receiver/Dockerfile.dockerignore limits
+      # it to the files this image needs.
       - uses: docker/build-push-action@v7
         id: build
         with:
-          context: ./app
+          context: .
           file: ./app/cast-receiver/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

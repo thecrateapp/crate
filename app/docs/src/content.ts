@@ -1,4 +1,6 @@
 import manifest from "../../../docs/manifest.json";
+import mcpContractUrl from "../../../docs/technical/crate-mcp-v1.json?url";
+import mcpLoadEvidenceUrl from "../../../docs/technical/crate-mcp-phase7-load.json?url";
 
 import { slugify } from "@/lib/utils";
 
@@ -38,6 +40,22 @@ interface ManifestDoc {
 type MarkdownLoader = () => Promise<string>;
 
 const loaders: Record<string, MarkdownLoader> = {
+  "docs/technical/ai-agents.md": () =>
+    import("../../../docs/technical/ai-agents.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/smart-mix-operations.md": () =>
+    import("../../../docs/technical/smart-mix-operations.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/smart-mix-design.md": () =>
+    import("../../../docs/technical/smart-mix-design.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/smart-mix-implementation-plan.md": () =>
+    import("../../../docs/technical/smart-mix-implementation-plan.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/README.md": () =>
     import("../../../docs/README.md?raw").then((module) => module.default),
   "docs/api.md": () =>
@@ -98,6 +116,22 @@ const loaders: Record<string, MarkdownLoader> = {
     ).then((module) => module.default),
   "docs/technical/opensubsonic.md": () =>
     import("../../../docs/technical/opensubsonic.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/11-crate-mcp.md": () =>
+    import("../../../docs/technical/11-crate-mcp.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-mcp.md": () =>
+    import("../../../docs/technical/crate-mcp.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-mcp-distribution.md": () =>
+    import("../../../docs/technical/crate-mcp-distribution.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-mcp-acquisition.md": () =>
+    import("../../../docs/technical/crate-mcp-acquisition.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/tauri-desktop-support.md": () =>
@@ -176,6 +210,18 @@ const loaders: Record<string, MarkdownLoader> = {
     import(
       "../../../docs/technical/federation-upgrade-and-rollback.md?raw"
     ).then((module) => module.default),
+  "docs/technical/hermes-plan-confirmation.md": () =>
+    import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/hermes-operator-release.md": () =>
+    import("../../../docs/technical/hermes-operator-release.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-operator.md": () =>
+    import("../../../docs/technical/crate-operator.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/operations.md": () =>
     import("../../../docs/technical/operations.md?raw").then(
       (module) => module.default,
@@ -196,6 +242,11 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/storage-retention.md?raw").then(
       (module) => module.default,
     ),
+};
+
+const documentAssets: Record<string, string> = {
+  "docs/technical/crate-mcp-v1.json": mcpContractUrl,
+  "docs/technical/crate-mcp-phase7-load.json": mcpLoadEvidenceUrl,
 };
 
 export interface DocEntry extends ManifestDoc {
@@ -435,9 +486,12 @@ export function resolveDocHref(sourcePath: string, href: string): string {
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href)) return href;
 
   const [target, fragment] = href.split("#", 2);
-  if (!target?.endsWith(".md")) return href;
+  if (!target) return href;
 
   const targetPath = resolveSourcePath(sourcePath, target);
+  const asset = documentAssets[targetPath];
+  if (asset) return `${asset}${fragment ? `#${fragment}` : ""}`;
+  if (!target.endsWith(".md")) return href;
   const targetDoc = docs.find((doc) => doc.sourcePath === targetPath);
   if (!targetDoc) return href;
   return `${targetDoc.route}${fragment ? `#${fragment}` : ""}`;

@@ -1,5 +1,8 @@
 library_path: /music
 
+# Server-owned destinations/sources for MCP metadata portability; see docs/technical/crate-mcp.md.
+agent_metadata_presets: {}
+
 exclude_dirs:
   - music
 

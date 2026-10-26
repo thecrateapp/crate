@@ -177,6 +177,7 @@ export function ArtistMetadataEditor({
                   Biography
                 </span>
                 <AIButton
+                  actionId="artists.bio.research"
                   type="button"
                   onClick={() => setResearchOpen(true)}
                   disabled={saving}

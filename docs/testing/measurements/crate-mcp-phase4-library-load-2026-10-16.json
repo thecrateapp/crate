@@ -1,0 +1,156 @@
+{
+  "analysis_cursor_stale_after_generation_change": true,
+  "analysis_pagination": {
+    "items": 400,
+    "largest_page_bytes": 40738,
+    "pages": 20,
+    "queries_per_page": {
+      "maximum": 6,
+      "p50": 4.0,
+      "p95": 4,
+      "samples": 20
+    }
+  },
+  "durable_preparation_jobs": 2,
+  "errors": [],
+  "fixture": {
+    "albums": 4800,
+    "artists": 900,
+    "pipeline_rows": 96000,
+    "tracks": 48000
+  },
+  "http_compiler_filesystem_dsp_calls": 0,
+  "http_library_aggregate_queries": 0,
+  "latency_is_an_assertion": false,
+  "latency_unit": "milliseconds",
+  "measurement_context": {
+    "architecture": "arm64",
+    "assertions": "Bounded queries and payloads, exact metadata URL, complete version-bound pagination, durable concurrent preparation, no HTTP library aggregates/compiler/filesystem/DSP; no latency SLO",
+    "git_head": "f2f2d2f5beaf69cad39a23fc966d7412c205953c",
+    "measured_at_utc": "2026-10-16T11:27:28.615983+00:00",
+    "os": "Darwin",
+    "phase4_changes_uncommitted": true,
+    "python": "3.13.11",
+    "scope": "Synthetic local integration benchmark, not production DSP/provider/proxy throughput"
+  },
+  "preparations": [
+    {
+      "is_error": false,
+      "job_id": "d6c427d7141b",
+      "latency_ms": 76.37062505818903,
+      "principal_id": "25dbec98-56fd-49b1-bd97-ec47ea591a63",
+      "replay": {
+        "is_error": false,
+        "latency_ms": 13.748707948252559,
+        "sql_queries": 7,
+        "structured_content_bytes": 396,
+        "tool_result_json_bytes": 580
+      },
+      "sql_queries": 17,
+      "structured_content_bytes": 397,
+      "tool_result_json_bytes": 581
+    },
+    {
+      "is_error": false,
+      "job_id": "87255a51ec3d",
+      "latency_ms": 98.85391697753221,
+      "principal_id": "ae338324-be17-4242-ab47-3c3658b170bb",
+      "replay": {
+        "is_error": false,
+        "latency_ms": 7.458791020326316,
+        "sql_queries": 7,
+        "structured_content_bytes": 396,
+        "tool_result_json_bytes": 580
+      },
+      "sql_queries": 17,
+      "structured_content_bytes": 397,
+      "tool_result_json_bytes": 581
+    }
+  ],
+  "prepared_plan_document_bytes": 39000,
+  "quality_snapshot_items": 48000,
+  "reads": {
+    "get_analysis_status": {
+      "latency_ms": {
+        "maximum": 133.905,
+        "p50": 39.058,
+        "p95": 133.905,
+        "samples": 12
+      },
+      "sql_queries": {
+        "maximum": 4,
+        "p50": 4.0,
+        "p95": 4,
+        "samples": 12
+      },
+      "structured_content_bytes": {
+        "maximum": 40730,
+        "p50": 40730.0,
+        "p95": 40730,
+        "samples": 12
+      },
+      "tool_result_json_bytes": {
+        "maximum": 40050,
+        "p50": 40050.0,
+        "p95": 40050,
+        "samples": 12
+      }
+    },
+    "get_library_quality": {
+      "latency_ms": {
+        "maximum": 30.143,
+        "p50": 11.217,
+        "p95": 30.143,
+        "samples": 12
+      },
+      "sql_queries": {
+        "maximum": 4,
+        "p50": 4.0,
+        "p95": 4,
+        "samples": 12
+      },
+      "structured_content_bytes": {
+        "maximum": 31133,
+        "p50": 31133.0,
+        "p95": 31133,
+        "samples": 12
+      },
+      "tool_result_json_bytes": {
+        "maximum": 28863,
+        "p50": 28863.0,
+        "p95": 28863,
+        "samples": 12
+      }
+    },
+    "get_plan": {
+      "latency_ms": {
+        "maximum": 69.451,
+        "p50": 9.976,
+        "p95": 69.451,
+        "samples": 12
+      },
+      "sql_queries": {
+        "maximum": 9,
+        "p50": 7.0,
+        "p95": 9,
+        "samples": 12
+      },
+      "structured_content_bytes": {
+        "maximum": 40041,
+        "p50": 40041.0,
+        "p95": 40041,
+        "samples": 12
+      },
+      "tool_result_json_bytes": {
+        "maximum": 40166,
+        "p50": 40166.0,
+        "p95": 40166,
+        "samples": 12
+      }
+    }
+  },
+  "reproduce": "cd app && ../.venv/bin/python -m pytest tests/test_mcp_library_performance.py -q",
+  "samples_per_read": 12,
+  "sql_statement_count": 316,
+  "transport": "official MCP SDK over loopback TCP; PostgreSQL and Redis real"
+}

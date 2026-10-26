@@ -11,10 +11,18 @@ sources:
     app/crate/audio_analysis.py,
     app/crate/bliss.py,
     app/crate/analysis_daemon.py,
+    app/crate/smart_mix,
+    app/crate/db/jobs/analysis_storage.py,
+    app/crate/db/jobs/smart_mix_backfill.py,
   ]
 ---
 
 # Audio Analysis, Similarity, and Discovery Intelligence
+
+> For Smart Mix's implemented behavior and diagnosis, use the
+> [operational reference](smart-mix-operations.md). The [unified design](smart-mix-design.md)
+> and [continuation plan](smart-mix-implementation-plan.md) describe further development
+> and its acceptance gates.
 
 ## Why this subsystem matters
 
@@ -28,9 +36,9 @@ This layer powers:
 - quality and analysis views
 - mood/energy exploration
 
-## Two parallel analysis tracks
+## General audio features and Bliss
 
-Crate actually runs two independent analysis subsystems, each with its own
+Two independent analysis streams provide general discovery features, each with its own
 pipeline, output, and consumer:
 
 1. **Per-track audio features** — BPM, key, loudness, dynamic range,
@@ -219,3 +227,17 @@ That local-first posture is one of the project's core product ideas.
 - [Enrichment, Acquisition, and External Integrations](/technical/enrichment-acquisition-and-integrations)
 - [Frontend Architecture: Admin and Listen](/technical/frontends-admin-and-listen)
 - [Playback, Realtime, Visualizer, and Subsonic](/technical/playback-realtime-and-subsonic)
+
+## Smart Mix profiles and transition intelligence
+
+Smart Mix section verified against source on 2026-10-21.
+
+Smart Mix adds a separately published per-track profile used by compatibility ranking and
+transition planning. General audio features and Bliss vectors do not prove profile coverage.
+The profile carries analyzer/schema/source revisions, quality, cue-local tempo/beat evidence
+and loudness measurement provenance. Rust results are preferred when available; a Python
+fallback can produce partial profiles. Quality and current-version coverage are different
+axes, and a partial profile with explicit cue beats can be eligible for beatmatch.
+Use [Smart Mix operation](smart-mix-operations.md) for the version table, publication rules,
+coverage semantics and fallbacks. Source owners are `crate/smart_mix/`,
+`crate/db/jobs/analysis_storage.py` and `crate/db/jobs/smart_mix_backfill.py` under `app/`.

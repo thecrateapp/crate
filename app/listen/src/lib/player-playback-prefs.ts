@@ -18,6 +18,15 @@ const SMART_PLAYLIST_SUGGESTIONS_CADENCE_KEY =
   "listen-player-smart-playlist-suggestions-cadence";
 const PLAYBACK_DELIVERY_POLICY_KEY = "listen-player-delivery-policy";
 const MOBILE_ENHANCED_AUDIO_KEY = "listen-player-mobile-enhanced-audio";
+const NATIVE_SMART_MIX_KEY = "listen-player-native-smart-mix";
+const NATIVE_SMART_MIX_SECONDS_KEY = "listen-player-native-smart-mix-seconds";
+const NATIVE_BEATMATCH_KEY = "listen-player-native-beatmatch";
+const NATIVE_BASS_HANDOFF_KEY = "listen-player-native-bass-handoff";
+const LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY =
+  "crate-native-smart-mix-rollout-enabled";
+const DEFAULT_NATIVE_SMART_MIX_SECONDS = 6;
+const MAX_TRANSITION_SECONDS = 12;
+export const NATIVE_PLAYER_DISABLED_KEY = "crate-native-player-disabled";
 
 export type PlaybackDeliveryPolicy = ConcretePlaybackDeliveryPolicy;
 export type PlaybackDeliveryPreference = PlaybackDeliveryPolicy | "auto";
@@ -163,7 +172,129 @@ export function setMobileEnhancedAudioPreference(enabled: boolean) {
   }
 }
 
+let nativeMixRuntimeAvailable: () => boolean = () => false;
+
+export function registerNativeMixRuntime(isAvailable: () => boolean): void {
+  nativeMixRuntimeAvailable = isAvailable;
+}
+
+export function isNativeMixRuntime(): boolean {
+  if (!nativeMixRuntimeAvailable()) return false;
+  try {
+    return localStorage.getItem(NATIVE_PLAYER_DISABLED_KEY) !== "true";
+  } catch {
+    return true;
+  }
+}
+
+export function getNativeSmartMixEnabledPreference(): boolean {
+  try {
+    const raw = localStorage.getItem(NATIVE_SMART_MIX_KEY);
+    if (raw === "true" || raw === "false") {
+      localStorage.removeItem(LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY);
+      return raw === "true";
+    }
+    if (localStorage.getItem(LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY) === "true") {
+      localStorage.setItem(NATIVE_SMART_MIX_KEY, "true");
+      localStorage.removeItem(LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY);
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export function setNativeSmartMixEnabledPreference(enabled: boolean) {
+  try {
+    localStorage.setItem(NATIVE_SMART_MIX_KEY, enabled ? "true" : "false");
+    localStorage.removeItem(LEGACY_NATIVE_SMART_MIX_ROLLOUT_KEY);
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
+        detail: { nativeSmartMixEnabled: enabled },
+      }),
+    );
+  } catch {
+    // ignore localStorage failures in private mode or restricted environments
+  }
+}
+
+function getOptInPreference(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setOptInPreference(key: string, enabled: boolean, detail: object) {
+  try {
+    localStorage.setItem(key, enabled ? "true" : "false");
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, { detail }),
+    );
+  } catch {
+    // ignore localStorage failures in private mode or restricted environments
+  }
+}
+
+export function getNativeBeatmatchPreference(): boolean {
+  return getOptInPreference(NATIVE_BEATMATCH_KEY);
+}
+
+export function setNativeBeatmatchPreference(enabled: boolean) {
+  setOptInPreference(NATIVE_BEATMATCH_KEY, enabled, {
+    nativeBeatmatch: enabled,
+  });
+}
+
+export function getNativeBassHandoffPreference(): boolean {
+  return getOptInPreference(NATIVE_BASS_HANDOFF_KEY);
+}
+
+export function setNativeBassHandoffPreference(enabled: boolean) {
+  setOptInPreference(NATIVE_BASS_HANDOFF_KEY, enabled, {
+    nativeBassHandoff: enabled,
+  });
+}
+
+export function getNativeSmartMixSecondsPreference(): number {
+  try {
+    const raw = localStorage.getItem(NATIVE_SMART_MIX_SECONDS_KEY);
+    if (raw == null) return DEFAULT_NATIVE_SMART_MIX_SECONDS;
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return DEFAULT_NATIVE_SMART_MIX_SECONDS;
+    }
+    return Math.min(parsed, MAX_TRANSITION_SECONDS);
+  } catch {
+    return DEFAULT_NATIVE_SMART_MIX_SECONDS;
+  }
+}
+
+export function setNativeSmartMixSecondsPreference(seconds: number) {
+  const value = Math.max(0, Math.min(seconds, MAX_TRANSITION_SECONDS));
+  try {
+    localStorage.setItem(NATIVE_SMART_MIX_SECONDS_KEY, String(value));
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
+        detail: { nativeSmartMixSeconds: value },
+      }),
+    );
+  } catch {
+    // ignore localStorage failures in private mode or restricted environments
+  }
+}
+
+export function getNativeCrossfadeMs(): number {
+  return Math.max(0, getCrossfadeDurationPreference() * 1000);
+}
+
 export function getCrossfadeDurationPreference(): number {
+  if (isNativeMixRuntime()) {
+    return getNativeSmartMixEnabledPreference()
+      ? getNativeSmartMixSecondsPreference()
+      : 0;
+  }
   try {
     if (isMobilePlaybackRuntime()) {
       localStorage.removeItem(CROSSFADE_DURATION_KEY);

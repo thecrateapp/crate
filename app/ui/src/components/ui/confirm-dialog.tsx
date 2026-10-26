@@ -30,7 +30,10 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-card border-border">
+      {/* No surface override: the base modal surface is the one Dialog, Sheet
+          and AppModal use. `bg-card` is more transparent (78% on glass), so
+          over a Sheet the content behind would show through. */}
+      <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

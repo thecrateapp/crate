@@ -1,6 +1,16 @@
+import pytest
+
+from tests.ai_consumer_fakes import pin_actions
+
+
 from datetime import datetime, timezone
 from uuid import UUID
 from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def pinned_ai(monkeypatch):
+    pin_actions(monkeypatch)
 
 
 def test_i18n_manifest_returns_fallback(test_app):
@@ -167,7 +177,15 @@ def test_translation_request_queues_task_when_ai_enabled(test_app):
     assert created == [
         (
             "draft_i18n_translation",
-            {"app": "listen", "locale": "pl", "source_version": "sha256:test"},
+            {
+                "app": "listen",
+                "locale": "pl",
+                "source_version": "sha256:test",
+                "ai_acceptance": {
+                    "action_id": "i18n.listen.draft",
+                    "fingerprint": "accepted:i18n.listen.draft",
+                },
+            },
         )
     ]
     update_status.assert_called_once_with(
@@ -217,6 +235,7 @@ def test_translation_request_does_not_requeue_active_ai_draft(test_app):
 def test_listen_i18n_ai_ignores_default_ollama_without_explicit_enable(monkeypatch):
     from crate.api import i18n
 
+    pin_actions(monkeypatch, model="llama3.1:8b", provider="ollama", status="legacy")
     monkeypatch.delenv("CRATE_ENABLE_LISTEN_I18N_AI_DRAFTS", raising=False)
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.setattr(

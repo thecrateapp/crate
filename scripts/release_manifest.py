@@ -40,6 +40,10 @@ BACKEND_PATTERNS = (
     "app/.dockerignore",
 )
 
+# The ui, listen and cast-receiver images install from the root workspace
+# manifest and lockfile (npm ci), so a change there rebuilds them.
+WORKSPACE_LOCK_PATTERNS = ("package.json", "package-lock.json")
+
 IMAGE_SPECS: dict[str, ImageSpec] = {
     "api": ImageSpec(
         repository="crate-api",
@@ -90,13 +94,13 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         repository="crate-ui",
         environment="CRATE_UI_IMAGE",
         services=("crate-ui",),
-        patterns=("app/ui/**", "app/shared/**"),
+        patterns=("app/ui/**", "app/shared/**", *WORKSPACE_LOCK_PATTERNS),
     ),
     "listen": ImageSpec(
         repository="crate-listen",
         environment="CRATE_LISTEN_IMAGE",
         services=("crate-listen",),
-        patterns=("app/listen/**", "app/shared/**"),
+        patterns=("app/listen/**", "app/shared/**", *WORKSPACE_LOCK_PATTERNS),
     ),
     "cast-receiver": ImageSpec(
         repository="crate-cast-receiver",
@@ -106,7 +110,7 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
             "app/cast-receiver/**",
             "app/shared/cast/**",
             "app/shared/fonts/**",
-            "app/.dockerignore",
+            *WORKSPACE_LOCK_PATTERNS,
         ),
     ),
     "site": ImageSpec(

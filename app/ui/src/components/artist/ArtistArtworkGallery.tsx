@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { waitForTask } from "@/lib/tasks";
 
@@ -90,6 +91,7 @@ export function ArtistArtworkGallery({
   onChanged: () => void;
   onHeroChanged?: (composition: HeroComposition) => void;
 }) {
+  const heroAI = useActionLLMStatus("artwork.hero.analyze");
   const uploadRef = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<ArtistArtworkAsset[]>([]);
   const [candidates, setCandidates] = useState<ArtworkCandidate[]>([]);
@@ -500,7 +502,12 @@ export function ArtistArtworkGallery({
                         size="sm"
                         variant="outline"
                         aria-label={`Analyze ${candidate.label}`}
-                        disabled={busy !== null}
+                        title={
+                          heroAI?.available
+                            ? `Analyze with ${heroAI.model_id}`
+                            : "Image analysis action unavailable"
+                        }
+                        disabled={busy !== null || !heroAI?.available}
                         onClick={() => void analyze(candidate)}
                       >
                         {busy === `analyze:${candidate.id}` ? (

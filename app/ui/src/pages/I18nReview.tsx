@@ -1,3 +1,4 @@
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -157,6 +158,7 @@ function uniqueSorted(values: Iterable<string>) {
 }
 
 export function I18nReview() {
+  const draftAI = useActionLLMStatus("i18n.listen.draft");
   const [requests, setRequests] = useState<TranslationRequest[]>([]);
   const [bundles, setBundles] = useState<TranslationBundleSummary[]>([]);
   const [selectedBundle, setSelectedBundle] =
@@ -495,6 +497,11 @@ export function I18nReview() {
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               Manage Listen language bundles, review draft quality, and publish
               remote translations.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {draftAI?.available
+                ? `AI drafts: ${draftAI.model_id}.`
+                : "AI draft action unavailable; requests remain available for manual translation review."}
             </p>
           </div>
           <Button

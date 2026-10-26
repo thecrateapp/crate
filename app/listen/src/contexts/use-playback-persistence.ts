@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from "react";
 import type { MutableRefObject } from "react";
 
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import { saveQueue } from "@/contexts/player-utils";
 
 const CHECKPOINT_INTERVAL_MS = 5000;
@@ -22,6 +22,8 @@ interface UsePlaybackPersistenceOptions {
    * the user started from.
    */
   unshuffledQueueRef: MutableRefObject<Track[] | null>;
+  playSource: PlaySource | null;
+  playSourceRef: MutableRefObject<PlaySource | null>;
 }
 
 /**
@@ -50,6 +52,8 @@ export function usePlaybackPersistence({
   isPlayingRef,
   shuffleRef,
   unshuffledQueueRef,
+  playSource,
+  playSourceRef,
 }: UsePlaybackPersistenceOptions): void {
   const persistNow = useEffectEvent((playing: boolean) => {
     saveQueue(queueRef.current, currentIndexRef.current, {
@@ -57,13 +61,14 @@ export function usePlaybackPersistence({
       wasPlaying: playing,
       shuffle: shuffleRef.current,
       unshuffledQueue: unshuffledQueueRef.current,
+      playSource: playSourceRef.current,
     });
   });
 
   // Structural: immediate writes on queue / cursor / play-pause / shuffle changes.
   useEffect(() => {
     persistNow(isPlaying);
-  }, [queue, currentIndex, isPlaying, shuffle]);
+  }, [queue, currentIndex, isPlaying, shuffle, playSource]);
 
   // Periodic checkpoint so a crash mid-playback doesn't erase resume
   // position. No-op when the queue is empty.

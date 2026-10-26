@@ -40,18 +40,23 @@ from crate.db.admin_tasks_surface import (
     TASKS_SURFACE_STREAM_CHANNEL,
     get_cached_tasks_surface,
 )
-from crate.db.cache_settings import get_setting, set_setting
 from crate.db.cache_store import get_cache
 from crate.db.queries.tasks import get_task, list_tasks
 from crate.db.repositories.tasks import (
     create_task,
     delete_old_finished_tasks,
     delete_tasks_by_status,
-    update_task,
 )
 from crate.docker_ctl import restart_container
 from crate.media_worker_progress import cancel_media_worker_job
-from crate.scheduler import enqueue_scheduled_task, get_schedules, set_schedules
+from crate.db.repositories.runtime_policy import (
+    read_runtime_policy_state,
+    read_schedules_state,
+    update_admission_slots,
+    update_schedules,
+)
+from crate.runtime_policy_contract import PolicyRevisionConflict
+from crate.scheduler import DEFAULT_SCHEDULES, guarded_run_schedule
 from crate.task_registry import (
     TASK_ACTIONS,
     TASK_CATEGORIES,
@@ -374,23 +379,36 @@ def api_worker_status(request: Request):
     summary="Update worker slot limits",
 )
 def api_set_worker_slots(request: Request, body: WorkerSlotsRequest):
-    """Set max/min worker slots. Workers read this on next poll."""
+    """Limit concurrent task admission without resizing worker processes."""
     _require_task_operator(request)
-    slots = body.slots
-    min_slots = body.min_slots
-    if slots is not None:
-        if not isinstance(slots, int) or slots < 1 or slots > 10:
-            return JSONResponse({"error": "Slots must be 1-10"}, status_code=400)
-        set_setting("max_workers", str(slots))
-    if min_slots is not None:
-        if not isinstance(min_slots, int) or min_slots < 1 or min_slots > 10:
-            return JSONResponse({"error": "min_slots must be 1-10"}, status_code=400)
-        set_setting("min_workers", str(min_slots))
+    if body.min_slots not in {None, 1}:
+        raise HTTPException(
+            422,
+            "Dramatiq has no minimum process autoscaling control; use slot admission limits",
+        )
+    try:
+        state = (
+            update_admission_slots(body.slots, expected_revision=body.expected_revision)
+            if body.slots is not None
+            else read_runtime_policy_state()
+        )
+        if (
+            body.slots is None
+            and body.expected_revision is not None
+            and body.expected_revision != state["configured_revision"]
+        ):
+            raise PolicyRevisionConflict("Runtime revision changed")
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
     return {
-        "max_slots": int(
-            get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS
-        ),
-        "min_slots": int(get_setting("min_workers", "2") or 2),
+        "max_slots": state["policy"]["max_running"],
+        "min_slots": 1,
+        "configured_revision": state["configured_revision"],
+        "effective_revision": state["effective_revision"],
+        "slot_semantics": "admission_limits",
+        "process_resize": False,
     }
 
 
@@ -417,15 +435,35 @@ def api_restart_worker(request: Request):
 )
 def api_cancel_all_tasks(request: Request):
     """Cancel all running and pending tasks."""
+    from crate.agent_diagnostics import DiagnosticError
+    from crate.db.repositories.task_control import request_cancellation
+
     _require_task_operator(request)
     running = list_tasks(status="running")
     pending = list_tasks(status="pending")
     cancelled = 0
+    outcomes = []
     for t in running + pending:
-        update_task(t["id"], status="cancelled")
-        cancel_media_worker_job(t["id"])
-        cancelled += 1
-    return {"cancelled": cancelled}
+        try:
+            outcome = request_cancellation(t["id"])
+        except DiagnosticError as error:
+            outcomes.append(
+                {
+                    "task_id": t["id"],
+                    "request_state": "rejected",
+                    "error_code": error.code,
+                }
+            )
+            continue
+        outcomes.append(outcome)
+        if outcome["request_state"] in {"cancelled", "cancellation_requested"}:
+            cancel_media_worker_job(t["id"])
+            cancelled += 1
+    return {
+        "cancelled": cancelled,
+        "skipped": len(outcomes) - cancelled,
+        "items": outcomes,
+    }
 
 
 @router.get(
@@ -437,17 +475,17 @@ def api_cancel_all_tasks(request: Request):
 def api_get_schedules(request: Request):
     """Get configured task schedules."""
     _require_auth(request)
-    schedules = get_schedules()
-    # Add last run times
+    state = read_schedules_state()
     result = {}
-    for task_type, interval in schedules.items():
-        last_key = f"schedule:last_run:{task_type}"
-        last_run = get_setting(last_key)
+    for task_type, interval in state["schedules"].items():
         result[task_type] = {
             "label": task_label(task_type),
             "interval_seconds": interval,
             "interval_human": _format_interval(interval),
-            "last_run": last_run,
+            "last_run": state["last_enqueued_at"].get(task_type),
+            "last_enqueued_at": state["last_enqueued_at"].get(task_type),
+            "last_succeeded_at": state["last_succeeded_at"].get(task_type),
+            "revision": state["revision"],
             "enabled": interval > 0,
         }
     return result
@@ -462,12 +500,17 @@ def api_get_schedules(request: Request):
 def api_set_schedules(request: Request, body: WorkerSchedulesUpdateRequest):
     """Update task schedules. Body: {task_type: interval_seconds, ...}. Set to 0 to disable."""
     _require_task_operator(request)
-    current = get_schedules()
-    for k, v in body.root.items():
-        if isinstance(v, (int, float)) and v >= 0:
-            current[k] = int(v)
-    set_schedules(current)
-    return {"schedules": current}
+    state = read_schedules_state()
+    try:
+        updated = update_schedules(
+            body.schedules,
+            expected_revision=body.expected_revision or state["revision"],
+        )
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    return {"schedules": updated["schedules"], "revision": updated["revision"]}
 
 
 @router.post(
@@ -479,15 +522,16 @@ def api_set_schedules(request: Request, body: WorkerSchedulesUpdateRequest):
     summary="Run a scheduled task now",
 )
 def api_run_schedule_now(request: Request, task_type: str):
-    _require_task_operator(request)
-    if task_type not in get_schedules():
+    actor = _require_task_operator(request)
+    if task_type not in DEFAULT_SCHEDULES:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    task_id = enqueue_scheduled_task(task_type)
-    return {
-        "task_type": task_type,
-        "task_id": task_id,
-        "status": "queued" if task_id else "already_queued",
-    }
+    try:
+        result = guarded_run_schedule(
+            task_type, origin="admin", actor_user_id=actor.get("id")
+        )
+    except PolicyRevisionConflict as error:
+        raise HTTPException(409, str(error)) from None
+    return {"task_type": task_type, **result}
 
 
 @router.get(
@@ -586,6 +630,13 @@ def api_retry_task(request: Request, body: TaskRetryRequest):
     if not task:
         return JSONResponse({"error": "Task not found"}, status_code=404)
 
+    if task["type"] in {"ai_catalog_refresh", "ai_profile_test"}:
+        raise HTTPException(
+            409,
+            "AI operations require a new dedicated human request",
+            headers={"X-Crate-Error": "AI_DEDICATED_REQUEST_REQUIRED"},
+        )
+
     params = task.get("params") or {}
     if isinstance(params, str):
         try:
@@ -593,7 +644,13 @@ def api_retry_task(request: Request, body: TaskRetryRequest):
         except (_json.JSONDecodeError, TypeError):
             params = {}
 
-    new_id = create_task(task["type"], params)
+    new_id = create_task(
+        task["type"],
+        params,
+        origin="admin",
+        actor_user_id=getattr(request.state, "user", {}).get("id"),
+        retry_of=task_id,
+    )
     return {"task_id": new_id, "original_id": task_id}
 
 
@@ -604,7 +661,7 @@ def api_retry_task(request: Request, body: TaskRetryRequest):
     summary="Cancel a pending or running task",
 )
 def api_cancel_task(request: Request, task_id: str):
-    _require_task_operator(request)
+    actor = _require_task_operator(request)
     task = get_task(task_id)
     if not task:
         return JSONResponse({"error": "Task not found"}, status_code=404)
@@ -615,6 +672,19 @@ def api_cancel_task(request: Request, task_id: str):
             status_code=400,
         )
 
-    update_task(task_id, status="cancelled")
+    from crate.agent_diagnostics import DiagnosticError
+    from crate.db.repositories.task_control import request_cancellation
+
+    try:
+        result = request_cancellation(
+            task_id, actor_user_id=actor.get("id") if actor else None
+        )
+    except DiagnosticError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
     cancel_media_worker_job(task_id)
-    return {"status": "cancelled", "id": task_id}
+    return {
+        "status": result["status"],
+        "id": task_id,
+        "cancellation_requested": result["cancellation_requested"],
+        "request_state": result["request_state"],
+    }

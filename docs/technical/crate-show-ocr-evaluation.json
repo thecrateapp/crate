@@ -1,0 +1,129 @@
+{
+  "engine": "tesseract 5.5.0",
+  "languages": ["eng", "spa"],
+  "fixtures": "Original synthetic CC0; no real private flyers",
+  "network": "none during evaluation",
+  "threads": 1,
+  "results": [
+    {
+      "fixture": "flyer",
+      "psm": 3,
+      "elapsed_seconds": 0.132,
+      "rss_kib": 53536,
+      "text": "EXTERNAL BAND\n2027-03-02 21:00\nSALA NORTE | MADRID | ES",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "flyer",
+      "psm": 6,
+      "elapsed_seconds": 0.126,
+      "rss_kib": 53436,
+      "text": "EXTERNAL BAND\n2027-03-02 21:00\nSALA NORTE | MADRID | ES",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "flyer",
+      "psm": 11,
+      "elapsed_seconds": 0.132,
+      "rss_kib": 53480,
+      "text": "EXTERNAL BAND\n\n2027-03-02 21:00\n\nSALA NORTE | MADRID | ES",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "tour",
+      "psm": 3,
+      "elapsed_seconds": 0.159,
+      "rss_kib": 53764,
+      "text": "EXTERNAL BAND TOUR\n\n2027-03-02 | MADRID | SALA NORTE\n2027-03-04 | BILBAO | SALA SUR\n2027-03-06 | PORTO | SALA AZUL",
+      "full_year_dates": 3
+    },
+    {
+      "fixture": "tour",
+      "psm": 6,
+      "elapsed_seconds": 0.158,
+      "rss_kib": 53064,
+      "text": "EXTERNAL BAND TOUR\n\n2027-03-02 | MADRID | SALA NORTE\n2027-03-04 | BILBAO | SALA SUR\n2027-03-06 | PORTO | SALA AZUL",
+      "full_year_dates": 3
+    },
+    {
+      "fixture": "tour",
+      "psm": 11,
+      "elapsed_seconds": 0.158,
+      "rss_kib": 54124,
+      "text": "EXTERNAL BAND TOUR\n\n2027-03-02 | MADRID | SALA NORTE\n\n2027-03-04 | BILBAO | SALA SUR\n\n2027-03-06 | PORTO | SALA AZUL",
+      "full_year_dates": 3
+    },
+    {
+      "fixture": "screenshot",
+      "psm": 3,
+      "elapsed_seconds": 0.141,
+      "rss_kib": 53744,
+      "text": "Event details\n\nExternal Band\n2027-03-02\n\nDoors 19:30 / Show 21:00\nSala Norte, Madrid",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "screenshot",
+      "psm": 6,
+      "elapsed_seconds": 0.142,
+      "rss_kib": 53336,
+      "text": "Event details\n\nExternal Band\n2027-03-02\n\nDoors 19:30 / Show 21:00\nSala Norte, Madrid",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "screenshot",
+      "psm": 11,
+      "elapsed_seconds": 0.146,
+      "rss_kib": 54024,
+      "text": "Event details\n\nExternal Band\n\n2027-03-02\n\nDoors 19:30 / Show 21:00\n\nSala Norte, Madrid",
+      "full_year_dates": 1
+    },
+    {
+      "fixture": "artistic",
+      "psm": 3,
+      "elapsed_seconds": 0.113,
+      "rss_kib": 52796,
+      "text": "",
+      "full_year_dates": 0
+    },
+    {
+      "fixture": "artistic",
+      "psm": 6,
+      "elapsed_seconds": 0.172,
+      "rss_kib": 52848,
+      "text": "EXTERNAL BAND\n02 MAR | 04 MAR | 06 MAR\n| MADRID BILBAO porto",
+      "full_year_dates": 0
+    },
+    {
+      "fixture": "artistic",
+      "psm": 11,
+      "elapsed_seconds": 0.155,
+      "rss_kib": 52936,
+      "text": "RNAL BAN\n\n6 MA\n\n02 AR |\n\nqa MAR! \u00a9\n\nORID Bue",
+      "full_year_dates": 0
+    },
+    {
+      "fixture": "illegible",
+      "psm": 3,
+      "elapsed_seconds": 0.113,
+      "rss_kib": 52124,
+      "text": "",
+      "full_year_dates": 0
+    },
+    {
+      "fixture": "illegible",
+      "psm": 6,
+      "elapsed_seconds": 0.112,
+      "rss_kib": 51712,
+      "text": "",
+      "full_year_dates": 0
+    },
+    {
+      "fixture": "illegible",
+      "psm": 11,
+      "elapsed_seconds": 0.111,
+      "rss_kib": 51880,
+      "text": "",
+      "full_year_dates": 0
+    }
+  ]
+}

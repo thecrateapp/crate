@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -8,6 +9,61 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize(
+    ("base_services", "overlay_included"),
+    [
+        ("crate-hermes-agent\ncrate-api\n", False),
+        ("crate-api\n", True),
+    ],
+)
+def test_remote_deploy_selects_legacy_hermes_overlay_only_when_needed(
+    tmp_path: Path, base_services: str, overlay_included: bool
+) -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    compose_setup = script[
+        script.index("COMPOSE=(docker compose") : script.index("PROJECT_SERVICES=(")
+    ]
+    overlay = tmp_path / ".deploy/hermes.compose.yaml"
+    overlay.parent.mkdir()
+    overlay.write_text("services: {}\n")
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf \'%s\' "$*" > "$FAKE_DOCKER_ARGS"\n'
+        "printf '%s\\n' \"$FAKE_COMPOSE_SERVICES\"\n"
+    )
+    docker.chmod(0o755)
+    args_file = tmp_path / "docker-args"
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "FAKE_COMPOSE_SERVICES": base_services,
+        "FAKE_DOCKER_ARGS": str(args_file),
+    }
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            compose_setup + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert (".deploy/hermes.compose.yaml" in result.stdout) is overlay_included
+    docker_args = args_file.read_text()
+    assert "--profile hermes" in docker_args
+    assert "config --services" in docker_args
 
 
 def _make_dry_run(target: str, *variables: str) -> str:

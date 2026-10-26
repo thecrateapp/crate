@@ -41,8 +41,29 @@ def create_media_access_tickets(
 ) -> MediaAccessTicketsResponse:
     user = _require_auth(request)
     user_id = user.get("id")
-    session_id = user.get("session_id")
-    if not isinstance(user_id, int) or not isinstance(session_id, str):
+    is_access_token = user.get("auth_type") == "access_token"
+    session_id = user.get("session_id") if not is_access_token else None
+    access_token_id = user.get("access_token_id") if is_access_token else None
+    if not isinstance(user_id, int):
+        raise HTTPException(
+            status_code=401, detail="A valid media identity is required"
+        )
+    if is_access_token:
+        if not isinstance(access_token_id, int):
+            raise HTTPException(
+                status_code=401, detail="A valid access token is required"
+            )
+        if "vdj.media.read" not in set(user.get("scopes") or []):
+            raise HTTPException(
+                status_code=403,
+                detail="Access token is missing required scope: vdj.media.read",
+            )
+        if any(target.audience != "stream" for target in payload.targets):
+            raise HTTPException(
+                status_code=403,
+                detail="VirtualDJ access tokens can only issue stream tickets",
+            )
+    elif not isinstance(session_id, str):
         raise HTTPException(
             status_code=401,
             detail="A persisted user session is required",
@@ -61,6 +82,7 @@ def create_media_access_tickets(
             issue_media_access_ticket(
                 user_id=user_id,
                 session_id=session_id,
+                access_token_id=access_token_id,
                 audience=audience,
                 path=path,
             )

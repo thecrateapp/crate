@@ -1,0 +1,81 @@
+{
+  "instance": "crate-lab",
+  "state_directory": "/var/lib/crate-operator",
+  "listen_host": "0.0.0.0",
+  "listen_port": 8791,
+  "poll_seconds": 45,
+  "mcp_url": "http://crate-api:8585/mcp",
+  "mcp_host": "api.lespedants.org",
+  "mcp_token_file": "/run/secrets/operator_mcp_read",
+  "api_token_file": "/run/secrets/operator_api",
+  "webhook_url": "http://crate-hermes-operator:8644/webhooks/crate-operator",
+  "webhook_secret_file": "/run/secrets/operator_webhook",
+  "webhook_route": "crate-operator",
+  "rules": [
+    {
+      "id": "worker-evidence",
+      "subsystem": "import",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "import", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "enrichment",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "enrichment", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "analysis",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "analysis", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "bliss",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "bliss", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "playback",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "playback", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "projector",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "projector", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "federation",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "federation", "sources", "worker"]
+    },
+    {
+      "id": "worker-evidence",
+      "subsystem": "acquisition",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "acquisition", "sources", "worker"]
+    },
+    {
+      "id": "pending",
+      "subsystem": "import",
+      "tool": "get_observability_summary",
+      "source_path": ["data", "subsystems", "import", "sources", "pending"],
+      "field": ["count"],
+      "kind": "high",
+      "threshold": 100,
+      "clear_threshold": 50,
+      "critical": 500
+    },
+    {
+      "id": "release-evidence",
+      "subsystem": "version",
+      "tool": "get_instance_inventory",
+      "source_path": ["data", "sources", "release_manifest"]
+    }
+  ]
+}

@@ -4,7 +4,6 @@ from importlib import import_module
 from pathlib import Path
 
 from alembic.script import ScriptDirectory
-
 from crate.db.schema_sections.curation_crates import create_crates_schema
 
 
@@ -95,7 +94,66 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("106").down_revision == "105"
     assert scripts.get_revision("107").down_revision == "106"
     assert scripts.get_revision("108").down_revision == "107"
-    assert scripts.get_heads() == ["108"]
+    assert scripts.get_revision("109").down_revision == "108"
+    assert scripts.get_revision("110").down_revision == "109"
+    assert scripts.get_revision("111").down_revision == "110"
+    assert scripts.get_revision("112").down_revision == "111"
+    assert scripts.get_revision("113").down_revision == "112"
+    assert scripts.get_revision("114").down_revision == "113"
+    assert scripts.get_revision("115").down_revision == "114"
+    assert scripts.get_revision("116").down_revision == "115"
+    assert scripts.get_revision("117").down_revision == "116"
+    assert scripts.get_revision("118").down_revision == "117"
+    assert scripts.get_revision("119").down_revision == "118"
+    assert scripts.get_revision("120").down_revision == "119"
+    assert scripts.get_revision("121").down_revision == "120"
+    assert scripts.get_revision("122").down_revision == "121"
+    assert scripts.get_revision("123").down_revision == "122"
+    assert scripts.get_revision("124").down_revision == "123"
+    assert scripts.get_revision("125").down_revision == "124"
+    assert scripts.get_revision("126").down_revision == "125"
+    assert scripts.get_revision("127").down_revision == "126"
+    assert scripts.get_revision("128").down_revision == "127"
+    assert scripts.get_revision("129").down_revision == "128"
+    assert scripts.get_revision("130").down_revision == "129"
+    assert scripts.get_revision("131").down_revision == "130"
+    assert scripts.get_revision("134").down_revision == "133"
+    assert scripts.get_heads() == ["134"]
+
+
+def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> None:
+    migrations_path = (
+        Path(__file__).resolve().parents[1] / "crate" / "db" / "migrations"
+    )
+    scripts = ScriptDirectory(str(migrations_path))
+    expected = {
+        "109": "109_smart_mix_profiles",
+        "110": "110_user_access_tokens",
+        "111": "111_smart_mix_measurement_provenance",
+        "112": "112_smart_mix_target_generation",
+        "113": "113_vdj_mood_indexes",
+        "114": "114_smart_mix_source_stale",
+        "115": "115_playback_continuation_tokens",
+        "116": "116_playback_continuation_descriptor",
+        "117": "117_smart_mix_local_tempo",
+        "118": "118_smart_mix_cue_beats",
+        "119": "119_agent_access",
+        "120": "120_agent_diagnostic_reads",
+        "121": "121_agent_commands",
+        "122": "122_mcp_oauth",
+        "123": "123_agent_admin",
+        "124": "124_agent_library_operations",
+        "125": "125_agent_instance_operations",
+        "126": "126_editorial_playlists",
+        "127": "127_canonical_shows",
+        "128": "128_shared_show_plans",
+        "129": "129_private_show_extraction",
+        "130": "130_ai_configuration",
+        "131": "131_ai_default_model",
+    }
+
+    for revision, stem in expected.items():
+        assert Path(scripts.get_revision(revision).path).stem == stem
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

@@ -95,7 +95,9 @@ def test_scheduler_uses_stable_jitter_for_global_catalog_tasks(monkeypatch):
 def test_scheduler_reuses_the_full_catalog_chain_dedup_key(monkeypatch):
     from crate import resource_governor, scheduler
 
-    queued: list[tuple[str, str]] = []
+    from crate.db.repositories import runtime_policy
+
+    queued: list[str] = []
     monkeypatch.setattr(
         scheduler,
         "get_schedules",
@@ -103,21 +105,19 @@ def test_scheduler_reuses_the_full_catalog_chain_dedup_key(monkeypatch):
     )
     monkeypatch.setattr(scheduler, "should_run", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(
-        scheduler,
-        "create_task_dedup",
-        lambda task_type, *, dedup_key: (
-            queued.append((task_type, dedup_key)) or "task-global"
+        runtime_policy,
+        "enqueue_schedule",
+        lambda task_type, **kwargs: (
+            queued.append(task_type) or {"task_id": "task-global", "status": "queued"}
         ),
     )
-    monkeypatch.setattr(scheduler, "mark_run", lambda _task_type: None)
+    monkeypatch.setattr(scheduler, "_has_conflicting_full_sync", lambda: False)
     monkeypatch.setattr(
         resource_governor,
         "should_defer_task",
-        lambda _task_type: SimpleNamespace(allowed=True),
+        lambda _task_type, _params: SimpleNamespace(allowed=True),
     )
 
     scheduler.check_and_create_scheduled_tasks()
 
-    assert queued == [
-        ("global_catalog_reconcile_full", "global-catalog:full"),
-    ]
+    assert queued == ["global_catalog_reconcile_full"]

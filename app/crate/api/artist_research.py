@@ -43,7 +43,9 @@ class ArtistBioResearchRequest(BaseModel):
 def _queue_research(
     request: Request, artist: Mapping[str, object], body: ArtistBioResearchRequest
 ):
-    require_permission(request, "library.metadata.write")
+    actor = require_permission(request, "library.metadata.write")
+    from crate.ai.consumers import accept_action
+
     identity = str(artist.get("entity_uid") or artist.get("id") or artist.get("name"))
     language = " ".join(body.language.split()) or "English"
     dedup_key = f"artist-bio-research:{identity}:{language.casefold()}"
@@ -52,6 +54,8 @@ def _queue_research(
         "artist_entity_uid": artist.get("entity_uid"),
         "artist_name": artist.get("name"),
         "language": language,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": accept_action("artists.bio.research"),
     }
     task_id = create_task_dedup("research_artist_bio", params, dedup_key=dedup_key)
     if task_id is None:
@@ -102,9 +106,11 @@ def research_artist_bio_by_id(
 )
 def artist_bio_research_status(request: Request):
     require_permission(request, "library.metadata.write")
+    from crate.ai.runtime import action_availability
+
     providers = configured_web_search_providers()
     return {
-        "available": True,
+        "available": action_availability("artists.bio.research")["available"],
         "sources": ["MusicBrainz", "Wikipedia", "Last.fm", "official URLs"],
         "web_search_provider": web_search_provider_label() if providers else None,
         "web_search_providers": providers,

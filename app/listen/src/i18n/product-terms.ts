@@ -6,6 +6,7 @@ export const PRODUCT_TERMS = {
   discoveryRadio: "Discovery Radio",
   replay: "Replay",
   crateDigging: "Crate Digging",
+  smartMix: "Smart Mix",
 } as const;
 
 export const EXACT_PRODUCT_TERM_KEYS = [
@@ -20,6 +21,7 @@ export const EXACT_PRODUCT_TERM_KEYS = [
   ["stats.digging.band.title", PRODUCT_TERMS.crateDigging],
   ["stats.scope.yourDna", PRODUCT_TERMS.crateDna],
   ["stats.signal.playReplay", PRODUCT_TERMS.replay],
+  ["settings.playback.smartMix", PRODUCT_TERMS.smartMix],
 ] as const;
 
 export const CONTAINED_PRODUCT_TERM_KEYS = [

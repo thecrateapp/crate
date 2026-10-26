@@ -1,4 +1,14 @@
+import pytest
+
+from tests.ai_consumer_fakes import pin_actions
+
+
 from sqlalchemy import text
+
+
+@pytest.fixture(autouse=True)
+def pinned_ai(monkeypatch):
+    pin_actions(monkeypatch)
 
 
 def test_i18n_translation_prompt_preserves_keys():
@@ -105,13 +115,29 @@ def test_draft_i18n_translation_handler_stores_needs_review_bundle(pg_db, monkey
     )
     task_id = create_task(
         "draft_i18n_translation",
-        {"app": "listen", "locale": "es", "source_version": "sha256:test"},
+        {
+            "app": "listen",
+            "locale": "es",
+            "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
+        },
         dispatch=False,
     )
 
     result = _handle_draft_i18n_translation(
         task_id,
-        {"app": "listen", "locale": "es", "source_version": "sha256:test"},
+        {
+            "app": "listen",
+            "locale": "es",
+            "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
+        },
         {},
     )
 
@@ -187,13 +213,29 @@ def test_draft_i18n_translation_handler_marks_manual_required_on_llm_failure(
     )
     task_id = create_task(
         "draft_i18n_translation",
-        {"app": "listen", "locale": "es", "source_version": "sha256:test"},
+        {
+            "app": "listen",
+            "locale": "es",
+            "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
+        },
         dispatch=False,
     )
 
     result = _handle_draft_i18n_translation(
         task_id,
-        {"app": "listen", "locale": "es", "source_version": "sha256:test"},
+        {
+            "app": "listen",
+            "locale": "es",
+            "source_version": "sha256:test",
+            "ai_acceptance": {
+                "action_id": "i18n.listen.draft",
+                "fingerprint": "accepted:i18n.listen.draft",
+            },
+        },
         {},
     )
 

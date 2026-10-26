@@ -182,7 +182,7 @@ def test_build_genre_taxonomy_rebuild_proposal_is_review_only(monkeypatch):
     monkeypatch.setattr(
         proposals,
         "build_genre_taxonomy_node_proposal",
-        lambda slug: {
+        lambda slug, **kwargs: {
             "ok": True,
             "slug": slug,
             "description": "Instrumental rock without vocals.",

@@ -669,10 +669,10 @@ def research_artist_bio(
     *,
     language: str = "English",
     progress: Callable[[str], None] | None = None,
+    ai_call: dict | None = None,
 ) -> dict[str, object]:
     from datetime import datetime, timezone
 
-    from crate.llm import get_config
     from crate.llm.prompts.artist_bio_research import consolidate_artist_bio
 
     current_bio = normalize_artist_bio(str(artist.get("bio") or ""))
@@ -685,6 +685,7 @@ def research_artist_bio(
         artist_context=dict(artist),
         sources=sources,
         language=language,
+        ai_call=ai_call,
     )
     draft = "\n\n".join(response.paragraphs)
     preserve_current_bio = bool(current_bio) and response.bio_action == "preserve"
@@ -741,7 +742,7 @@ def research_artist_bio(
         "conflicts": response.conflicts,
         "warnings": warnings[:8],
         "sources": sources,
-        "model": get_config().get("model"),
+        "model": getattr(response, "_ai_model_id", None),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 

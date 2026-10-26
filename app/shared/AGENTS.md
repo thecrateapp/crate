@@ -40,6 +40,7 @@ web/artist-hero-contract.ts  Artist hero composition contract types (versioned)
 - `shared/web` factories stay framework-injected: `createUseApi` receives React hooks and an `api` function; `createApiClient` receives callbacks. Do not hardcode app behavior (redirects, token storage, Sentry init) here.
 - Use tokens, not raw values. `design-token-policy.test.ts` budgets arbitrary `rounded-[..]`, `z-[..]`, `shadow-[..]`, `text-[..px]`, `tracking-[..]` per file, and icon sizes must come from `CRATE_ICON_SIZE`.
 - Surfaces: `[data-surface="solid"]` (also the `:root` default, listen) and `[data-surface="glass"]` (admin sets it on `<html>`). Components must read `--color-card`, `--surface-*` etc. and work under both; never branch on app identity. `lib/appearance-resolver.ts` may set `data-surface` at runtime.
+- Surface color utilities (`bg-card`, `border-border`, `bg-secondary`, ...) generate CSS only in the admin build, which registers them in `app/ui/src/index.css`; Listen does not generate them yet, so in shared code use `var(--color-card)` or the `bg-*-surface` classes.
 - Peer deps only (react 19, react-router 7, radix-ui, sonner, cva, clsx, tailwind-merge, @solar-icons/react-perf). Do not add runtime dependencies without updating `package.json` peers and the `external` list in `tsup.config.ts`.
 - No emojis in UI text.
 

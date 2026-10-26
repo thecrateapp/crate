@@ -1,0 +1,11 @@
+{
+  "instance": "crate-lab",
+  "state_directory": "/var/lib/crate-watchdog",
+  "poll_seconds": 45,
+  "supervisor_status_url": "https://operator.example.invalid/v1/status",
+  "gateway_health_url": "https://gateway.example.invalid/health",
+  "api_token_file": "/run/secrets/watchdog_operator_api",
+  "telegram_token_file": "/run/secrets/watchdog_telegram",
+  "chat_id": "12345678",
+  "allowlist_file": "/run/secrets/watchdog_allowed_chats"
+}

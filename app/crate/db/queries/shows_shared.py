@@ -33,6 +33,8 @@ def _show_location_key(show: dict) -> str:
 
 
 def _can_merge_show_rows(first: dict, second: dict) -> bool:
+    if first.get("id") and second.get("id") and first["id"] != second["id"]:
+        return False
     if _show_location_key(first) != _show_location_key(second):
         return False
     first_time = _normalize_show_text(first.get("local_time"))
@@ -112,6 +114,11 @@ def dedupe_show_rows(shows: list[dict]) -> list[dict]:
     location_to_indexes: dict[str, list[int]] = {}
 
     for show in shows:
+        show = {
+            key: value
+            for key, value in show.items()
+            if key not in {"field_provenance", "identity_key"}
+        }
         location_key = _show_location_key(show)
         existing_index = next(
             (

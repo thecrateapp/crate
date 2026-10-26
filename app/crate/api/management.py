@@ -76,6 +76,8 @@ from crate.db.health import (
     resolve_issues_by_type,
 )
 from crate.db.ops_snapshot import get_cached_ops_snapshot
+from crate.db.queries.repair_plans import get_open_repair_issues
+from crate.repair_selection import RepairSelectionError
 from crate.db.queries.management import (
     get_last_analyzed_track,
     get_last_bliss_track,
@@ -99,15 +101,60 @@ from crate.db.repositories.tasks import (
     find_active_task_by_type_params,
 )
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK, repair_catalog_payload
+from crate.db.repositories.admin_repair_plans import (
+    accept_admin_repair_selection,
+    read_admin_repair_preparation,
+)
 from crate.utils import AUDIO_EXTENSIONS
 
 
 def _build_repair_preview(issues: list[dict], *, auto_only: bool = False) -> dict:
-    from crate.config import load_config
-    from crate.repair import LibraryRepair
+    from crate.repair_contracts import repair_contracts
 
-    repairer = LibraryRepair(load_config())
-    return repairer.preview({"issues": issues}, auto_only=auto_only)
+    contracts = {item["check_type"]: item for item in repair_contracts()}
+    items = [
+        {
+            "issue_id": issue["id"],
+            "check_type": _issue_check_type(issue),
+            "support": contracts.get(_issue_check_type(issue), {}).get(
+                "support", "manual"
+            ),
+            "executable": False,
+            "auto_fixable": False,
+            "message": "Prepare a worker plan to review exact effects",
+            "issue": issue,
+        }
+        for issue in issues
+    ]
+    return {
+        "items": items,
+        "total": len(items),
+        "executable": 0,
+        "manual_only": len(items),
+        "status": "diagnostic",
+    }
+
+
+def _queue_repair_preview(actor: dict, issues: list[dict], *, artist: str = "") -> dict:
+    if len(issues) > 20:
+        raise HTTPException(
+            status_code=422,
+            detail="Prepare at most 20 issues at a time; narrow the selection",
+        )
+    task_id = create_task(
+        "prepare_library_repairs",
+        {
+            "issue_ids": [issue["id"] for issue in issues],
+            "actor_user_id": actor["id"],
+            "artist": artist,
+        },
+    )
+    return {
+        "task_id": task_id,
+        "preparation_task_id": task_id,
+        "status": "pending",
+        "artist": artist,
+    }
 
 
 def _issue_check_type(issue: Mapping[str, Any]) -> str:
@@ -376,52 +423,20 @@ def run_repair(request: Request, body: RepairRequest):
 )
 def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     """Repair specific issues (individual or batch)."""
-    _require_repair_operator(request)
-    preview = _build_repair_preview(body.issues, auto_only=False)
-    if body.plan_version and preview.get("plan_version") != body.plan_version:
-        raise HTTPException(
-            status_code=409,
-            detail="Repair plan is stale; refresh the preview and try again",
+    actor = _require_repair_operator(request)
+    if body.dry_run:
+        issues = get_open_repair_issues([issue["id"] for issue in body.issues])
+        return _queue_repair_preview(actor, issues)
+    try:
+        task_id = accept_admin_repair_selection(
+            body.preparation_task_id or "",
+            actor["id"],
+            plan_version=body.plan_version or "",
+            plan_item_ids=body.plan_item_ids,
+            confirm_risky=body.confirm_risky,
         )
-    preview_items = preview.get("items") or []
-    preview_plan_item_ids = {
-        str(item.get("plan_item_id"))
-        for item in preview_items
-        if item.get("plan_item_id")
-    }
-    requested_plan_item_ids = {
-        str(plan_item_id)
-        for plan_item_id in body.plan_item_ids
-        if str(plan_item_id).strip()
-    }
-    if requested_plan_item_ids and not requested_plan_item_ids.issubset(
-        preview_plan_item_ids
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="Repair selection no longer matches the current plan",
-        )
-    risky_items = [item for item in preview_items if item.get("requires_confirmation")]
-    if risky_items and not body.confirm_risky:
-        raise HTTPException(
-            status_code=409,
-            detail="Repair execution requires explicit confirmation for risky fixes",
-        )
-    if len(preview_items) > 1 and any(
-        item.get("supports_batch") is False for item in preview_items
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="This repair selection includes fixes that must be run one by one",
-        )
-    task_id = create_task(
-        "repair",
-        {
-            "dry_run": body.dry_run,
-            "auto_only": False,
-            "issues": body.issues,
-        },
-    )
+    except (RepairSelectionError, ValueError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
     return {"task_id": task_id}
 
 
@@ -432,8 +447,28 @@ def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     summary="Preview repair actions for specific issues",
 )
 def preview_repair_issues(request: Request, body: RepairPreviewRequest):
-    _require_repair_operator(request)
-    return _build_repair_preview(body.issues, auto_only=body.auto_only)
+    actor = _require_repair_operator(request)
+    try:
+        issues = get_open_repair_issues(
+            body.issue_ids or [issue["id"] for issue in body.issues]
+        )
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
+    return _queue_repair_preview(actor, issues)
+
+
+@router.get(
+    "/repair-preparations/{task_id}",
+    response_model=RepairPreviewResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Read an owned worker-prepared repair plan",
+)
+def get_repair_preparation(request: Request, task_id: str):
+    actor = _require_repair_operator(request)
+    try:
+        return read_admin_repair_preparation(task_id, actor["id"])
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
 
 
 @router.post(
@@ -643,6 +678,22 @@ def preview_artist_repair_plan_by_id(request: Request, artist_id: int):
 
 
 @router.post(
+    "/artists/{artist_id}/repair-plan",
+    response_model=ArtistRepairPlanResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Prepare an exact artist repair plan in a worker",
+)
+def prepare_artist_repair_plan_by_id(request: Request, artist_id: int):
+    actor = _require_repair_operator(request)
+    artist_name = artist_name_from_id(artist_id)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return _queue_repair_preview(
+        actor, get_artist_issues(artist_name), artist=artist_name
+    )
+
+
+@router.post(
     "/artists/by-entity/{artist_entity_uid}/repair",
     response_model=ArtistRepairResponse,
     responses=_MANAGEMENT_RESPONSES,
@@ -666,6 +717,22 @@ def preview_artist_repair_plan_by_entity_uid(request: Request, artist_entity_uid
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return preview_artist_repair_plan(request, artist_name)
+
+
+@router.post(
+    "/artists/by-entity/{artist_entity_uid}/repair-plan",
+    response_model=ArtistRepairPlanResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Prepare an exact artist repair plan by entity UID in a worker",
+)
+def prepare_artist_repair_plan_by_entity_uid(request: Request, artist_entity_uid: str):
+    actor = _require_repair_operator(request)
+    artist_name = artist_name_from_entity_uid(artist_entity_uid)
+    if not artist_name:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    return _queue_repair_preview(
+        actor, get_artist_issues(artist_name), artist=artist_name
+    )
 
 
 @router.post(

@@ -26,4 +26,4 @@ def test_artist_blueprints_are_virtual_smart_rule_drafts():
     assert essentials["smart_rules"]["rules"] == [
         {"field": "artist", "op": "eq", "value": "Poison The Well"}
     ]
-    assert essentials["smart_rules"]["prefer_studio"] is True
+    assert essentials["smart_rules"]["deduplicate_variants"] is True

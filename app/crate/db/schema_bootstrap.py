@@ -8,6 +8,28 @@ from crate.db.schema_sections import (
     create_curation_schema,
     create_library_schema,
 )
+from crate.db.schema_sections.agent_access_v109 import create_agent_access_v109_schema
+from crate.db.schema_sections.agent_admin_v113 import create_agent_admin_v113_schema
+from crate.db.schema_sections.agent_commands_v111 import (
+    create_agent_commands_v111_schema,
+)
+from crate.db.schema_sections.agent_library_v114 import create_agent_library_v114_schema
+from crate.db.schema_sections.agent_operations_v115 import (
+    create_agent_operations_v115_schema,
+)
+from crate.db.schema_sections.ai_configuration_v120 import (
+    create_ai_configuration_v120_schema,
+)
+from crate.db.schema_sections.ai_configuration_v121 import (
+    create_ai_default_model_v121_schema,
+)
+from crate.db.schema_sections.editorial_v116 import create_editorial_v116_schema
+from crate.db.schema_sections.mcp_oauth_v112 import create_mcp_oauth_v112_schema
+from crate.db.schema_sections.show_extraction_v119 import (
+    create_show_extraction_v119_schema,
+)
+from crate.db.schema_sections.show_plans_v118 import create_show_plans_v118_schema
+from crate.db.schema_sections.shows_v117 import create_shows_v117_schema
 
 
 def create_schema(cur):
@@ -23,7 +45,13 @@ def create_schema(cur):
 
     create_core_schema(cur)
     create_auth_schema(cur)
+    create_agent_access_v109_schema(cur)
+    create_agent_commands_v111_schema(cur)
+    create_mcp_oauth_v112_schema(cur)
+    create_agent_admin_v113_schema(cur)
     create_library_schema(cur)
+    create_agent_library_v114_schema(cur)
+    create_agent_operations_v115_schema(cur)
     cur.execute(
         """
         DELETE FROM stream_variants sv
@@ -52,3 +80,37 @@ def create_schema(cur):
     create_acquisition_schema(cur)
     create_curation_schema(cur)
     create_activity_schema(cur)
+    create_editorial_v116_schema(cur)
+    create_shows_v117_schema(cur)
+    create_show_plans_v118_schema(cur)
+    create_show_extraction_v119_schema(cur)
+
+    # The shared vault was introduced by migration029; bootstrap now needs it
+    # before AI connection FKs. Keep the existing029 definition compatible.
+    cur.execute("""CREATE TABLE IF NOT EXISTS credential_secrets (
+        secret_ref TEXT PRIMARY KEY, scope TEXT NOT NULL, ciphertext TEXT NOT NULL,
+        expires_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL, revoked_at TIMESTAMPTZ)""")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_credential_secrets_scope ON credential_secrets(scope)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_credential_secrets_expires ON credential_secrets(expires_at) WHERE expires_at IS NOT NULL"
+    )
+    create_ai_configuration_v120_schema(cur)
+    create_ai_default_model_v121_schema(cur)
+    from crate.db.schema_sections.agent_acquisition_v132 import (
+        create_agent_acquisition_v132_schema,
+    )
+
+    create_agent_acquisition_v132_schema(cur)
+    from crate.db.schema_sections.agent_telegram_v133 import (
+        create_agent_telegram_v133_schema,
+    )
+
+    create_agent_telegram_v133_schema(cur)
+    from crate.db.schema_sections.operator_generations_v134 import (
+        create_operator_generations_v134_schema,
+    )
+
+    create_operator_generations_v134_schema(cur)

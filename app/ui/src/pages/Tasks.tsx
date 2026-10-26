@@ -81,6 +81,8 @@ interface Task {
   pool?: string | null;
   created_at: string;
   started_at: string | null;
+  cancellation_requested_at?: string | null;
+  cancellation_acknowledged_at?: string | null;
   updated_at: string;
 }
 
@@ -146,6 +148,11 @@ interface TasksSnapshotData {
       updated_at?: string | null;
     }>;
     worker_slots: { max: number; active: number };
+    admission_policy?: {
+      max_running: number;
+      configured_revision: number;
+      effective_revision: number | null;
+    };
     queue_breakdown: WorkerQueueBreakdown;
     db_heavy_gate: DbHeavyGate;
     systems: { postgres: boolean; watcher: boolean };
@@ -758,7 +765,7 @@ function WorkerControlPanel({
     try {
       await api("/api/worker/slots", "POST", { slots: next });
       await refreshTasks(true);
-      toast.success(`Worker slots set to ${next}`);
+      toast.success(`Task concurrency limit set to ${next}`);
     } catch {
       toast.error("Failed to update worker slots");
     }
@@ -779,12 +786,19 @@ function WorkerControlPanel({
 
   async function cancelAll() {
     try {
-      const response = await api<{ cancelled: number }>(
+      const response = await api<{ cancelled: number; skipped?: number }>(
         "/api/worker/cancel-all",
         "POST",
       );
       await refreshTasks(true);
-      toast.success(`Cancelled ${response.cancelled} tasks`);
+      const message = `Cancellation requested for ${response.cancelled} ${response.cancelled === 1 ? "task" : "tasks"}`;
+      if (response.skipped) {
+        toast.error(
+          `${message}. ${response.skipped} ${response.skipped === 1 ? "task" : "tasks"} could not be cancelled; review current states.`,
+        );
+      } else {
+        toast.success(message);
+      }
     } catch {
       toast.error("Failed to cancel tasks");
     }
@@ -825,7 +839,7 @@ function WorkerControlPanel({
           <CrateChip active>{engine}</CrateChip>
           <CrateChip>{running} running</CrateChip>
           <CrateChip>{pending} pending</CrateChip>
-          <CrateChip>{slotLimit} slots</CrateChip>
+          <CrateChip>{slotLimit} concurrent tasks</CrateChip>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -846,8 +860,8 @@ function WorkerControlPanel({
               size="sm"
               variant="ghost"
               className="h-8 px-2"
-              onClick={() => setSlots(Math.min(10, slotLimit + 1))}
-              disabled={slotLimit >= 10}
+              onClick={() => setSlots(Math.min(64, slotLimit + 1))}
+              disabled={slotLimit >= 64}
             >
               <Plus size={12} />
             </Button>
@@ -1200,6 +1214,11 @@ function ActiveTaskCard({
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/40">
                 <CrateChip className={status.pill}>{status.label}</CrateChip>
+                {task.cancellation_requested_at &&
+                !task.cancellation_acknowledged_at &&
+                !["completed", "failed", "cancelled"].includes(task.status) ? (
+                  <CrateChip>Cancellation requested</CrateChip>
+                ) : null}
                 {task.pool ? <CrateChip>{task.pool}</CrateChip> : null}
                 <span>
                   {liveStatus === "running" && task.started_at
@@ -1560,8 +1579,15 @@ export function Tasks() {
 
   async function handleCancel(id: string) {
     try {
-      await api(`/api/tasks/${id}/cancel`, "POST");
-      toast.success("Task cancelled");
+      const result = await api<{ status: string }>(
+        `/api/tasks/${id}/cancel`,
+        "POST",
+      );
+      toast.success(
+        result.status === "cancelled"
+          ? "Task cancelled"
+          : "Cancellation requested",
+      );
       await fetchSnapshot(true);
     } catch {
       toast.error("Failed to cancel task");
@@ -2028,7 +2054,9 @@ export function Tasks() {
           engine={live?.engine || "dramatiq"}
           running={live?.running_tasks.length ?? 0}
           pending={live?.pending_tasks.length ?? 0}
-          slotLimit={live?.worker_slots.max ?? 3}
+          slotLimit={
+            live?.admission_policy?.max_running ?? live?.worker_slots.max ?? 3
+          }
           queueBreakdown={
             live?.queue_breakdown ?? {
               running: {

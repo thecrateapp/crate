@@ -9,6 +9,10 @@ from crate.db.repositories.tasks_mutation_shared import (
     task_runtime_config,
     utc_now_iso,
 )
+from crate.db.repositories.task_control import (
+    record_task_provenance,
+    request_cancellation,
+)
 from crate.db.tx import optional_scope, register_after_commit, transaction_scope
 
 
@@ -22,6 +26,12 @@ def create_task(
     dedup_key: str | None = None,
     dispatch: bool = True,
     session=None,
+    origin="unknown",
+    actor_user_id=None,
+    agent_context=None,
+    required_grants=None,
+    retry_of=None,
+    schedule_name=None,
     dispatch_task_fn: Callable[[str, str], None],
     dumps_fn: Callable[..., str],
     register_tasks_surface_signal_fn: Callable[[object], None],
@@ -40,6 +50,21 @@ def create_task(
 
     with optional_scope(session) as s:
         register_tasks_surface_signal_fn(s)
+        parent = None
+        if parent_task_id:
+            parent = (
+                s.execute(
+                    text("SELECT * FROM tasks WHERE id=:id FOR UPDATE"),
+                    {"id": parent_task_id},
+                )
+                .mappings()
+                .first()
+            )
+            if parent:
+                origin = parent["origin"]
+                actor_user_id = parent["actor_user_id"]
+                agent_context = parent["origin_context"]
+                required_grants = parent["required_grants"]
         s.execute(
             text(
                 """
@@ -88,6 +113,22 @@ def create_task(
             },
         )
 
+        record_task_provenance(
+            task_id,
+            origin=origin,
+            actor_user_id=actor_user_id,
+            agent_context=agent_context,
+            required_grants=required_grants,
+            retry_of=retry_of,
+            schedule_name=schedule_name,
+            session=s,
+        )
+        if parent and (
+            parent["cancellation_requested_at"] is not None
+            or parent["status"] in {"completed", "failed", "cancelled", "completing"}
+        ):
+            request_cancellation(task_id, session=s)
+            dispatch = False
         if dispatch:
             register_after_commit(s, lambda: dispatch_task_fn(task_type, task_id))
 
@@ -100,6 +141,12 @@ def create_task_dedup(
     dedup_key: str = "",
     dispatch: bool = True,
     session=None,
+    origin="unknown",
+    actor_user_id=None,
+    agent_context=None,
+    required_grants=None,
+    retry_of=None,
+    schedule_name=None,
     *,
     priority: int | None = None,
     pool: str | None = None,
@@ -206,6 +253,16 @@ def create_task_dedup(
                 )
             return None
 
+        record_task_provenance(
+            task_id,
+            origin=origin,
+            actor_user_id=actor_user_id,
+            agent_context=agent_context,
+            required_grants=required_grants,
+            retry_of=retry_of,
+            schedule_name=schedule_name,
+            session=current,
+        )
         if dispatch:
             register_after_commit(current, lambda: dispatch_task_fn(task_type, task_id))
 

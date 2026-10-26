@@ -6,11 +6,14 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
+import {
+  toStartupEngineQueueSnapshot,
+  toStartupEngineTracks,
+} from "@/contexts/player-engine-adapter";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getStreamUrl } from "@/contexts/player-utils";
 import {
-  getCrossfadeDurationPreference,
+  getNativeCrossfadeMs,
   type PlaybackDeliveryPolicy,
 } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
@@ -53,10 +56,6 @@ function getKnownDuration(track: Track | undefined): number {
     : 0;
 }
 
-function nativeCrossfadeMs(): number {
-  return Math.max(0, getCrossfadeDurationPreference() * 1000);
-}
-
 function isJamPlaybackSource(source: PlaySource | undefined): boolean {
   return source?.type === "queue" && source.name.startsWith("Jam:");
 }
@@ -66,6 +65,7 @@ export interface UsePlayerStartActionsParams {
   currentIndexRef: MutableRefObject<number>;
   jamQueueLockedRef: MutableRefObject<boolean>;
   repeatRef: MutableRefObject<RepeatMode>;
+  shuffleRef: MutableRefObject<boolean>;
   bufferingIntentRef: MutableRefObject<boolean>;
   pendingRestoreTimeRef: MutableRefObject<number>;
   resumeAfterReloadRef: MutableRefObject<boolean>;
@@ -101,6 +101,7 @@ export function usePlayerStartActions({
   currentIndexRef,
   jamQueueLockedRef,
   repeatRef,
+  shuffleRef,
   bufferingIntentRef,
   pendingRestoreTimeRef,
   resumeAfterReloadRef,
@@ -177,23 +178,22 @@ export function usePlayerStartActions({
           );
         });
         void (async () => {
-          const engineTracks = await toStartupEngineTracks(
+          const revision = createQueueRevision();
+          const snapshot = await toStartupEngineQueueSnapshot({
+            revision,
             tracks,
-            normalizedIndex,
-            undefined,
-            { target: "android-native" },
-          );
-          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
-          return nativeEngine.loadQueue({
-            revision: createQueueRevision(),
-            tracks: engineTracks,
             currentIndex: normalizedIndex,
             positionMs: 0,
             autoplay: true,
             repeat: toEngineRepeatMode(repeatRef.current),
-            crossfadeMs: nativeCrossfadeMs(),
+            crossfadeMs: getNativeCrossfadeMs(),
             volume: lastNonZeroVolumeRef.current,
+            playSource: nextSource,
+            shuffle: shuffleRef.current,
+            target: "android-native",
           });
+          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
+          return nativeEngine.loadQueue(snapshot);
         })().catch((error) => {
           if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
           console.error("[native-player] failed to load queue:", error);
@@ -258,6 +258,7 @@ export function usePlayerStartActions({
       resetPlaybackIntelligence,
       resumeAfterReloadRef,
       setPlaySource,
+      shuffleRef,
       silenceGaplessEngine,
       startTrackerSession,
       stopNativeEngineIfAvailable,

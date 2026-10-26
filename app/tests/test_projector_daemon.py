@@ -1,18 +1,26 @@
-def test_projector_loop_runs_bounded_outbox_retention(monkeypatch):
+import pytest
+
+
+@pytest.mark.parametrize("relay_failed", [False, True])
+@pytest.mark.parametrize("projection_failed", [False, True])
+def test_projector_loop_runs_bounded_outbox_retention(
+    monkeypatch, relay_failed, projection_failed
+):
     from crate import domain_event_relay, projector, projector_daemon
-    from crate.db import domain_event_outbox
-    from crate.db import home_warming
+    from crate.db import domain_event_outbox, home_warming
 
     cleaned: list[tuple[int, int]] = []
+    readiness = []
+    monkeypatch.setattr("crate.role_readiness.progress", readiness.append)
     monkeypatch.setattr(
         domain_event_relay,
         "relay_domain_events",
-        lambda **_kwargs: {"claimed": 0, "delivered": 0, "failed": 0},
+        lambda **_kwargs: {"claimed": 0, "delivered": 0, "failed": int(relay_failed)},
     )
     monkeypatch.setattr(
         projector,
         "process_domain_events",
-        lambda **_kwargs: {"processed": 0},
+        lambda **_kwargs: {"processed": 0, "failed": int(projection_failed)},
     )
     monkeypatch.setattr(
         home_warming,
@@ -44,6 +52,7 @@ def test_projector_loop_runs_bounded_outbox_retention(monkeypatch):
     )
 
     assert cleaned == [(7, 1000)]
+    assert readiness == ([] if relay_failed or projection_failed else ["projector"])
 
 
 def test_projector_loop_reports_iteration_failures(monkeypatch):

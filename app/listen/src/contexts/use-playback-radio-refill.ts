@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { fetchRadioContinuation } from "@/lib/radio";
 import {
   getPlaySourceSignature,
@@ -39,6 +40,7 @@ export function usePlaybackRadioRefill({
     const currentTrack = queue[currentIndex];
     if (!isPlaying || !currentTrack) return;
     if (playSource?.type !== "radio" || !playSource.radio) return;
+    if (nativeOwnsBackgroundRefill()) return;
 
     const remainingUpcoming = queue.length - currentIndex - 1;
     if (remainingUpcoming > RADIO_REFILL_THRESHOLD) {
@@ -88,4 +90,12 @@ export function usePlaybackRadioRefill({
   }, [currentIndex, isPlaying, playSource, queue, refs]);
 
   return reset;
+}
+
+export function nativeOwnsBackgroundRefill(): boolean {
+  return (
+    typeof document !== "undefined" &&
+    document.visibilityState === "hidden" &&
+    shouldUseAndroidNativePlayer()
+  );
 }

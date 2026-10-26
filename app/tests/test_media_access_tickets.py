@@ -209,6 +209,88 @@ def test_ticket_endpoint_issues_requested_browser_media_paths(
     assert all(item.expires_at.tzinfo is not None for item in response.tickets)
 
 
+def test_ticket_endpoint_issues_vdj_stream_ticket_without_a_session(
+    fake_redis: _FakeRedis,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from crate.api import media_access as media_access_api
+
+    monkeypatch.setattr(
+        media_access_api,
+        "_require_auth",
+        lambda _request: {
+            "id": 7,
+            "auth_type": "access_token",
+            "access_token_id": 42,
+            "scopes": ["vdj.media.read"],
+        },
+    )
+
+    response = media_access_api.create_media_access_tickets(
+        MagicMock(),
+        media_access_api.MediaAccessTicketsRequest(
+            targets=[
+                media_access_api.MediaAccessTargetRequest(
+                    audience="stream",
+                    path="/api/vdj/tracks/by-entity/track-1/stream",
+                )
+            ]
+        ),
+    )
+
+    assert len(response.tickets) == 1
+    stored = json.loads(next(iter(fake_redis.values.values())))
+    assert stored["user_id"] == 7
+    assert stored["access_token_id"] == 42
+    assert "session_id" not in stored
+
+
+def test_auth_middleware_resolves_a_vdj_ticket_by_active_access_token(
+    fake_redis: _FakeRedis,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from crate.api import auth
+
+    monkeypatch.setattr(
+        "crate.db.repositories.access_tokens.resolve_access_token_by_id",
+        lambda token_id: {
+            "id": token_id,
+            "user_id": 7,
+            "email": "dj@example.test",
+            "role": "user",
+            "scopes": ["vdj.media.read"],
+        },
+    )
+    issued = media_access.issue_media_access_ticket(
+        user_id=7,
+        access_token_id=42,
+        audience="stream",
+        path="/api/vdj/tracks/by-entity/track-1/stream",
+    )
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "scheme": "https",
+            "server": ("api.example.test", 443),
+            "client": ("127.0.0.1", 1234),
+            "path": "/api/vdj/tracks/by-entity/track-1/stream",
+            "query_string": f"media_ticket={issued.ticket}".encode(),
+            "headers": [],
+        }
+    )
+
+    user = __import__("asyncio").run(
+        auth.AuthMiddleware(MagicMock()).resolve_user(request)
+    )
+
+    assert user is not None
+    assert user["id"] == 7
+    assert user["auth_type"] == "access_token"
+    assert user["access_token_id"] == 42
+    assert user["scopes"] == ["vdj.media.read"]
+
+
 def test_ticket_endpoint_issues_only_the_requested_exact_paths(
     fake_redis: _FakeRedis,
     monkeypatch: pytest.MonkeyPatch,

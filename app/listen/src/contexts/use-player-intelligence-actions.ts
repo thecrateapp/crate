@@ -38,6 +38,7 @@ interface UsePlayerIntelligenceActionsOptions {
 export interface PlayerIntelligenceActions {
   appendAndAdvance: (tracks: Track[]) => void;
   appendIntelligenceTracks: (tracks: Track[]) => void;
+  adoptNativeTracks: (tracks: Track[]) => void;
   insertSuggestionAfterCurrent: (candidates: Track[]) => void;
 }
 
@@ -110,6 +111,16 @@ export function usePlayerIntelligenceActions({
       registerEngineTrack,
       unshuffledQueueRef,
     ],
+  );
+
+  const adoptNativeTracks = useCallback(
+    (tracks: Track[]) => {
+      commitQueue([...queueRef.current, ...tracks]);
+      if (unshuffledQueueRef.current) {
+        unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...tracks];
+      }
+    },
+    [commitQueue, queueRef, unshuffledQueueRef],
   );
 
   const insertSuggestionAfterCurrent = useCallback(
@@ -225,6 +236,7 @@ export function usePlayerIntelligenceActions({
   return {
     appendAndAdvance,
     appendIntelligenceTracks,
+    adoptNativeTracks,
     insertSuggestionAfterCurrent,
   };
 }

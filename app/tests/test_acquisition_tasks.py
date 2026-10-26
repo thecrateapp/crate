@@ -80,3 +80,31 @@ def test_soulseek_dedup_key_is_stable_for_same_album_file_set_regardless_of_orde
     )
 
     assert left == right
+
+
+def test_soulseek_dedup_key_matches_direct_and_alternate_requests_for_same_files():
+    files = [
+        "audio/Lisabö - Gurak (2005)/01.flac",
+        "audio/Lisabö - Gurak (2005)/02.flac",
+    ]
+    direct = soulseek_download_dedup_key(
+        build_soulseek_download_params(
+            username="peer-a",
+            artist="audio",
+            album="Lisabö - Gurak (2005)",
+            files=files,
+            file_count=2,
+        )
+    )
+    alternate = soulseek_download_dedup_key(
+        build_soulseek_download_params(
+            username="peer-a",
+            artist="audio",
+            album="Lisabö - Gurak (2005)",
+            files=files,
+            file_count=2,
+            find_alternate=True,
+        )
+    )
+
+    assert direct == alternate

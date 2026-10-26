@@ -108,6 +108,9 @@ def test_partial_federated_search_is_not_cached_as_complete(monkeypatch):
 
     cache_writes: list[tuple] = []
     monkeypatch.setattr(browse_media, "_require_auth", lambda _request: {"id": 1})
+    monkeypatch.setattr(
+        browse_media, "_require_vdj_scope", lambda _request, _scope: {"id": 1}
+    )
     monkeypatch.setattr(browse_media, "get_cache", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         browse_media,

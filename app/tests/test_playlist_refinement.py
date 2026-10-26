@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from crate.playlist_refinement import (
-    apply_playlist_refinement_actions,
     build_playlist_refinement_proposal,
 )
 
@@ -56,34 +55,3 @@ def test_build_playlist_refinement_proposal_flags_safe_playlist_fixes():
     }
     assert action_positions == {2, 3, 4}
     assert proposal["score_version"] == "playlist_refinement_v1"
-
-
-def test_apply_playlist_refinement_actions_removes_selected_positions(monkeypatch):
-    calls: list[tuple[int, int, bool, int | None]] = []
-
-    def fake_remove_playlist_track(
-        playlist_id: int,
-        position: int,
-        *,
-        record_exclusion: bool = False,
-        excluded_by_user_id: int | None = None,
-    ) -> None:
-        calls.append((playlist_id, position, record_exclusion, excluded_by_user_id))
-
-    monkeypatch.setattr(
-        "crate.db.repositories.playlists_tracks.remove_playlist_track",
-        fake_remove_playlist_track,
-    )
-
-    applied_count = apply_playlist_refinement_actions(
-        playlist_id=77,
-        user_id=9,
-        selected_action_ids={"remove:4", "skip"},
-        actions=[
-            {"id": "remove:2", "type": "remove_track", "position": 2},
-            {"id": "remove:4", "type": "remove_track", "position": 4},
-        ],
-    )
-
-    assert applied_count == 1
-    assert calls == [(77, 4, True, 9)]

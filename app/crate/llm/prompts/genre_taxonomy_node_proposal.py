@@ -148,6 +148,7 @@ def generate_genre_taxonomy_node_proposal(
     artist_count: int | None = None,
     album_count: int | None = None,
     candidate_targets: list[dict] | None = None,
+    ai_call: dict | None = None,
 ) -> GenreTaxonomyNodeProposalResponse:
     from crate.llm import ask_structured
 
@@ -168,4 +169,7 @@ def generate_genre_taxonomy_node_proposal(
             candidate_targets=candidate_targets,
         ),
         system=GENRE_TAXONOMY_NODE_PROPOSAL_SYSTEM_PROMPT,
+        action_id="genres.taxonomy.propose",
+        private_response=True,
+        **(ai_call or {}),
     )

@@ -74,6 +74,13 @@ def persist_invalidation_events(scopes: tuple[str, ...]) -> None:
     if not scopes:
         return
     with transaction_scope() as session:
+        if any(
+            scope in {"library", "*"} or scope.startswith(("artist:", "album:"))
+            for scope in scopes
+        ):
+            from crate.db.analytics_quality_surface import mark_quality_report_stale
+
+            mark_quality_report_stale(session=session)
         for scope in scopes:
             enqueue_outbox_event(
                 "ui.invalidate",

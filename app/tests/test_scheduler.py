@@ -123,7 +123,7 @@ class TestGetSetSchedules:
             assert schedules["library_pipeline"] == 3600
             assert schedules["enrich_artists"] == 0
 
-    def test_get_schedules_merges_new_defaults_into_persisted_configuration(self):
+    def test_get_schedules_merges_defaults_without_persisting_them(self):
         import json
 
         custom = {"library_pipeline": 3600, "enrich_artists": 0}
@@ -138,17 +138,22 @@ class TestGetSetSchedules:
         assert schedules["library_pipeline"] == 3600
         assert schedules["enrich_artists"] == 0
         assert schedules["cleanup_stream_variants"] == 3600
-        persisted = json.loads(set_setting.call_args.args[1])
-        assert persisted == schedules
+        set_setting.assert_not_called()
 
     def test_set_schedules(self):
-        with patch("crate.scheduler.set_setting") as mock_set:
+        with (
+            patch(
+                "crate.db.repositories.runtime_policy.read_schedules_state",
+                return_value={"revision": "current"},
+            ),
+            patch("crate.db.repositories.runtime_policy.update_schedules") as update,
+        ):
             from crate.scheduler import set_schedules
 
-            set_schedules({"library_sync": 900})
-            mock_set.assert_called_once()
-            args = mock_set.call_args[0]
-            assert args[0] == "schedules"
+            set_schedules({"library_pipeline": 900})
+            update.assert_called_once_with(
+                {"library_pipeline": 900}, expected_revision="current"
+            )
 
 
 class TestMarkRun:
@@ -164,22 +169,24 @@ class TestMarkRun:
             datetime.fromisoformat(args[1])
 
 
-def test_enqueue_scheduled_task_marks_the_run_only_when_created():
+def test_enqueue_scheduled_task_preserves_guarded_result():
     from crate import scheduler
 
     with (
-        patch.object(scheduler, "create_task_dedup", return_value="t1") as create,
-        patch.object(scheduler, "mark_run") as mark,
+        patch.object(
+            scheduler,
+            "guarded_run_schedule",
+            return_value={"status": "queued", "task_id": "t1"},
+        ) as run,
     ):
         assert scheduler.enqueue_scheduled_task("repair_duplicate_tracks") == "t1"
-    create.assert_called_once_with(
-        "repair_duplicate_tracks", dedup_key="schedule:repair_duplicate_tracks"
-    )
-    mark.assert_called_once_with("repair_duplicate_tracks")
+    run.assert_called_once_with("repair_duplicate_tracks")
 
     with (
-        patch.object(scheduler, "create_task_dedup", return_value=None),
-        patch.object(scheduler, "mark_run") as mark,
+        patch.object(
+            scheduler,
+            "guarded_run_schedule",
+            return_value={"status": "deferred", "task_id": None},
+        ),
     ):
         assert scheduler.enqueue_scheduled_task("repair_duplicate_tracks") is None
-    mark.assert_not_called()

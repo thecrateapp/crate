@@ -83,6 +83,7 @@ def complete_processing_state(
             SET state = 'done',
                 claimed_by = NULL,
                 claimed_at = NULL,
+                claim_token = NULL,
                 last_error = NULL,
                 completed_at = :completed_at,
                 updated_at = :completed_at
@@ -106,6 +107,7 @@ def complete_processing_states(
             SET state = 'done',
                 claimed_by = NULL,
                 claimed_at = NULL,
+                claim_token = NULL,
                 last_error = NULL,
                 completed_at = :completed_at,
                 updated_at = :completed_at
@@ -223,6 +225,7 @@ def processing_pending_count_sql(state_column: str) -> str:
 
 
 def claim_batch_sql(state_column: str) -> str:
+    """Lock candidate tracks before touching their processing state."""
     if state_column == "bliss_state":
         extra_join = """
             LEFT JOIN track_processing_state aps
@@ -246,22 +249,40 @@ def claim_batch_sql(state_column: str) -> str:
               {extra_where}
             ORDER BY lt.updated_at DESC
             LIMIT :limit
-            FOR UPDATE OF ps SKIP LOCKED
-        ),
-        claimed AS (
+            FOR UPDATE OF lt SKIP LOCKED
+        )
+        SELECT track_id FROM batch
+    """
+
+
+def claim_locked_batch_sql(state_column: str) -> str:
+    """Recheck eligibility in a new statement while retaining track locks."""
+    extra_where = (
+        """AND NOT EXISTS (
+            SELECT 1 FROM track_processing_state aps
+            WHERE aps.track_id=ps.track_id AND aps.pipeline='analysis'
+              AND aps.state='analyzing'
+        )"""
+        if state_column == "bliss_state"
+        else ""
+    )
+    return f"""
+        WITH claimed AS (
             UPDATE track_processing_state ps
             SET state = 'analyzing',
                 claimed_by = :claimed_by,
                 claimed_at = :claimed_at,
+                claim_token = gen_random_uuid(),
                 attempts = ps.attempts + 1,
                 last_error = NULL,
                 updated_at = :claimed_at
-            FROM batch
-            WHERE ps.track_id = batch.track_id
+            WHERE ps.track_id = ANY(:track_ids)
               AND ps.pipeline = :pipeline
-            RETURNING ps.track_id
+              AND ps.state = 'pending'
+              {extra_where}
+            RETURNING ps.track_id, ps.generation, ps.claim_token
         )
-        SELECT lt.id, lt.path, lt.title, lt.artist, lt.album
+        SELECT lt.id, lt.path, lt.title, lt.artist, lt.album, claimed.generation, claimed.claim_token
         FROM claimed
         JOIN library_tracks lt ON lt.id = claimed.track_id
     """
@@ -269,6 +290,7 @@ def claim_batch_sql(state_column: str) -> str:
 
 __all__ = [
     "claim_batch_sql",
+    "claim_locked_batch_sql",
     "complete_processing_state",
     "ensure_processing_rows",
     "processing_pending_count_sql",

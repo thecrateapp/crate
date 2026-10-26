@@ -10,12 +10,14 @@ from crate.artist_lifecycle import (
     delete_artist,
     run_artist_merge,
 )
+from crate.artist_photo import PhotoObservationError, observe_artist_photo
 from crate.audio import audio_format_rank, read_tags
-from crate.db.repositories.library_quarantine import quarantine_album
+from crate.repair_selection import select_repair_items
 from crate.db.audit import log_audit
+from crate.db.jobs.artist_photo import apply_admin_artist_photo
 from crate.db.jobs.repair import (
-    count_valid_album_tracks,
     count_artist_tracks,
+    count_valid_album_tracks,
     find_artist_canonical,
     find_canonical_artist_by_folder,
     get_tracks_by_paths,
@@ -23,7 +25,6 @@ from crate.db.jobs.repair import (
     reassign_album_artist,
     rename_artist,
     update_album_path_and_name,
-    update_artist_has_photo,
     update_track_artist,
 )
 from crate.db.repositories.library import (
@@ -31,6 +32,7 @@ from crate.db.repositories.library import (
     delete_track,
     get_library_artist,
 )
+from crate.db.repositories.library_quarantine import quarantine_album
 from crate.repair_catalog import REPAIR_CATALOG, REPAIR_CATALOG_BY_CHECK
 from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 
@@ -161,7 +163,9 @@ class LibraryRepair:
                 event_payload = self._build_event_payload(check, result)
                 item.update(
                     {
-                        "executable": bool(issue.get("auto_fixable")),
+                        "executable": bool(
+                            result.get("executable", issue.get("auto_fixable"))
+                        ),
                         "action": result.get("action"),
                         "target": result.get("target"),
                         "message": event_payload.get("message"),
@@ -258,6 +262,7 @@ class LibraryRepair:
                 "requires_confirmation": item.get("requires_confirmation"),
                 "executable": item.get("executable"),
                 "details": item.get("details"),
+                "source": item.get("issue"),
             }
             for item in items
         ]
@@ -333,8 +338,20 @@ class LibraryRepair:
         progress_callback=None,
         event_callback=None,
         global_only: bool = False,
+        expected_plan_version: str | None = None,
+        plan_item_ids: list[str] | None = None,
+        confirm_risky: bool = False,
     ) -> dict:
         issues = report.get("issues", [])
+        if expected_plan_version is not None or plan_item_ids is not None:
+            preview = self.preview(report, auto_only=auto_only, global_only=global_only)
+            selected = select_repair_items(
+                preview,
+                plan_item_ids or [],
+                expected_version=expected_plan_version,
+                confirm_risky=confirm_risky or dry_run,
+            )
+            issues = [item["issue"] for item in selected]
         actions = []
         item_results: list[dict] = []
         resolved_ids: list[int] = []
@@ -435,7 +452,7 @@ class LibraryRepair:
                                 fs_changed = True
                             else:
                                 db_changed = True
-                        if result.get("applied") or (
+                        if (result.get("applied") and result.get("verified", True)) or (
                             result.get("resolved") and not dry_run
                         ):
                             issue_id = issue.get("id")
@@ -827,29 +844,73 @@ class LibraryRepair:
     ) -> dict | None:
         details = issue.get("details", {})
         artist_name = details.get("artist", "")
-        # has_photo is an INTEGER column; JSONB deserializes `true`/`false` to
-        # Python bool which Postgres refuses to coerce implicitly. Normalize.
-        fs_has_photo = 1 if details.get("fs_has_photo") else 0
-
         result = {
             "action": "fix_has_photo",
             "target": artist_name,
-            "details": {"new_value": fs_has_photo},
-            "applied": not dry_run,
+            "details": {},
+            "applied": False,
             "fs_write": False,
+            "verified": False,
+            "executable": False,
         }
-
-        if not dry_run:
-            update_artist_has_photo(artist_name, fs_has_photo)
-            log_audit(
-                "fix_has_photo",
-                "artist",
-                artist_name,
-                details={"new_value": fs_has_photo},
-                task_id=task_id,
+        artist_uid = details.get("artist_uid")
+        if not artist_uid:
+            result["details"] = {"status": "conflict", "reason": "recheck_required"}
+            return result
+        try:
+            observation = observe_artist_photo(
+                {"library_path": str(self.library_path)}, artist_uid
             )
-            result["message"] = f"Synced artist photo flag for {artist_name}"
-
+        except PhotoObservationError as exc:
+            result["details"] = {"status": "failed", "reason": exc.code}
+            return result
+        result["target"] = observation["name"]
+        result["details"] = {
+            "artist_uid": artist_uid,
+            "before": observation["db_has_photo"],
+            "new_value": int(observation["fs_has_photo"]),
+        }
+        if (
+            observation["name"] != artist_name
+            or (
+                "folder_name" in details
+                and observation["folder_name"] != details["folder_name"]
+            )
+            or observation["fs_has_photo"] != bool(details.get("fs_has_photo"))
+        ):
+            result["details"].update(status="conflict", reason="stale_photo_evidence")
+            return result
+        if observation["db_has_photo"] == observation["fs_has_photo"]:
+            result.update(resolved=not dry_run, verified=True)
+            result["details"]["status"] = "already_satisfied"
+            return result
+        if observation["db_has_photo"] != bool(details.get("db_has_photo")):
+            result["details"].update(status="conflict", reason="stale_photo_evidence")
+            return result
+        if dry_run:
+            result["details"]["status"] = "ready"
+            result["executable"] = True
+            return result
+        outcome = apply_admin_artist_photo(observation, task_id=task_id)
+        result["details"]["status"] = outcome
+        result["applied"] = outcome == "applied"
+        if outcome not in {"applied", "already_satisfied"}:
+            return result
+        try:
+            after = observe_artist_photo(
+                {"library_path": str(self.library_path)}, artist_uid
+            )
+            verified = (
+                after["filesystem_fingerprint"] == observation["filesystem_fingerprint"]
+                and after["db_has_photo"] == after["fs_has_photo"]
+            )
+            result["verified"] = verified
+            result["resolved"] = verified
+            result["details"]["verification"] = "verified" if verified else "conflict"
+        except PhotoObservationError as exc:
+            result["details"].update(
+                verification="unavailable", verification_reason=exc.code
+            )
         return result
 
     @staticmethod

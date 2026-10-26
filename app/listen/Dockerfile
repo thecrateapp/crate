@@ -1,35 +1,26 @@
 # syntax=docker/dockerfile:1.7
+# Build context: the repository root. app/listen/Dockerfile.dockerignore limits
+# it to the root manifest and lockfile, app/listen and the shared code Listen
+# imports, so the image installs exactly the workspace lockfile.
 FROM node:22-alpine AS build
 
-WORKDIR /app
+WORKDIR /repo
 
-# Copy shared workspace packages first.
-COPY shared/ui/ /app-shared/shared/ui/
-COPY shared/cast/ /app-shared/shared/cast/
+# Install the Listen workspace and the workspaces it depends on (@crate/ui and
+# @crate/cast-protocol) from the root lockfile. npm links them itself.
+COPY package.json package-lock.json ./
+COPY app/listen/package.json app/listen/
+COPY app/shared/ui/package.json app/shared/ui/
+COPY app/shared/cast/package.json app/shared/cast/
+RUN npm ci --workspace=app/listen --workspace=app/shared/ui --workspace=app/shared/cast
 
-# Install deps — local workspace packages are not on npm; install the rest,
-# then link the local packages into node_modules.
-COPY listen/package.json listen/package-lock.json* ./
-RUN sed -i \
-      -e '/"@crate\/ui"/d' \
-      -e '/"@crate\/cast-protocol"/d' \
-      package.json \
-    && npm install --ignore-scripts --legacy-peer-deps --package-lock=false
-RUN mkdir -p node_modules/@crate \
-    && ln -s /app-shared/shared/ui node_modules/@crate/ui \
-    && ln -s /app-shared/shared/cast node_modules/@crate/cast-protocol
+# Shared code (@crate/ui, @crate/cast-protocol, plus shared/web and
+# shared/fonts imported by relative path) and the Listen source, at their
+# repository paths.
+COPY app/shared/ app/shared/
+COPY app/listen/ app/listen/
 
-# Copy shared code (imported by listen via relative paths)
-COPY shared/ /app-shared/shared/
-
-# Copy listen source
-COPY listen/ .
-
-# Fix shared imports to work with Docker layout
-RUN ln -s /app-shared/shared ../shared
-
-# Symlink node_modules into shared/ui so its imports resolve React etc.
-RUN rm -rf /app-shared/shared/ui/node_modules && ln -s /app/node_modules /app-shared/shared/ui/node_modules
+WORKDIR /repo/app/listen
 
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENVIRONMENT=production
@@ -60,9 +51,9 @@ RUN --mount=type=secret,id=sentry_auth_token,required=false \
     if [ -s /run/secrets/sentry_auth_token ]; then \
       export SENTRY_AUTH_TOKEN="$(tr -d '\r\n' < /run/secrets/sentry_auth_token)"; \
     fi; \
-    npx vite build
+    npx --no-install vite build
 
 FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY --from=build /app/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /repo/app/listen/dist /usr/share/nginx/html
+COPY --from=build /repo/app/listen/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

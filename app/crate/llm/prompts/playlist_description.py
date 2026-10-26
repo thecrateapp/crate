@@ -76,6 +76,7 @@ def generate_playlist_description(
     category: str | None = None,
     smart_rules: dict[str, Any] | None = None,
     tracks: list[dict] | None = None,
+    ai_call: dict | None = None,
 ) -> PlaylistDescriptionResponse:
     from crate.llm import ask_structured
 
@@ -88,4 +89,7 @@ def generate_playlist_description(
             tracks=tracks,
         ),
         system=PLAYLIST_DESCRIPTION_SYSTEM_PROMPT,
+        action_id="playlists.description.generate",
+        private_response=True,
+        **(ai_call or {}),
     )

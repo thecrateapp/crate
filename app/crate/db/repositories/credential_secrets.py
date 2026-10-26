@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import text
 
-from crate.db.tx import optional_scope
+from crate.db.tx import optional_scope, read_scope
 
 
 def insert_credential_secret(
@@ -38,7 +39,7 @@ def insert_credential_secret(
 
 
 def get_credential_secret(secret_ref: str, *, session=None) -> dict[str, Any] | None:
-    with optional_scope(session) as current:
+    with nullcontext(session) if session is not None else read_scope() as current:
         row = (
             current.execute(
                 text("""
@@ -91,10 +92,48 @@ def delete_expired_credential_secrets(*, now: datetime, session=None) -> int:
         return int(getattr(result, "rowcount", 0) or 0)
 
 
+def rewrap_credential_secrets(
+    transform, *, limit=100, after_ref=None, session=None
+) -> dict:
+    """Locked keyset batch; transform receives ciphertext and the existing session."""
+    with optional_scope(session) as current:
+        with current.begin_nested():
+            rows = (
+                current.execute(
+                    text("""SELECT secret_ref,ciphertext FROM credential_secrets
+                WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>NOW())
+                  AND (:after IS NULL OR secret_ref>:after)
+                ORDER BY secret_ref LIMIT :limit FOR UPDATE"""),
+                    {"after": after_ref, "limit": min(max(limit, 1), 500)},
+                )
+                .mappings()
+                .all()
+            )
+            changed = 0
+            for row in rows:
+                replacement = transform(row["ciphertext"], current)
+                if replacement != row["ciphertext"]:
+                    current.execute(
+                        text(
+                            "UPDATE credential_secrets SET ciphertext=:ciphertext,updated_at=NOW() WHERE secret_ref=:ref"
+                        ),
+                        {"ciphertext": replacement, "ref": row["secret_ref"]},
+                    )
+                    changed += 1
+            return {
+                "scanned": len(rows),
+                "rewrapped": changed,
+                "next_cursor": rows[-1]["secret_ref"]
+                if len(rows) == min(max(limit, 1), 500)
+                else None,
+            }
+
+
 __all__ = [
     "delete_expired_credential_secrets",
     "get_credential_secret",
     "insert_credential_secret",
+    "rewrap_credential_secrets",
     "revoke_credential_scope",
     "revoke_credential_secret",
 ]

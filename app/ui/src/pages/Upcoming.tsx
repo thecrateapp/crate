@@ -1,5 +1,14 @@
-import { useState, useEffect, useMemo, type ReactNode } from "react";
-import { Link } from "react-router";
+import { AddShowButton } from "@/components/shows/AddShowButton";
+import { MergeShowsButton } from "@/components/shows/MergeShowsButton";
+import { MergeShowsSheet } from "@/components/shows/MergeShowsSheet";
+import {
+  useState,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  type ReactNode,
+} from "react";
+import { Link, useSearchParams } from "react-router";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
@@ -19,6 +28,7 @@ import {
   buildUpcomingCityOptions,
   buildUpcomingGenreOptions,
   filterUpcomingItems,
+  sameShowIds,
 } from "./upcoming-filters";
 import { toast } from "sonner";
 import {
@@ -36,6 +46,7 @@ import {
   ChevronRight,
   Check,
   Clock,
+  Merge,
   Search,
   Trash2,
 } from "lucide-react";
@@ -65,6 +76,8 @@ L.Icon.Default.mergeOptions({
 
 interface UpcomingItem {
   type: "release" | "show";
+  /** The canonical show ID, on show items only. */
+  show_id?: number;
   date: string;
   time?: string;
   artist: string;
@@ -103,7 +116,20 @@ interface UpcomingArtistRef {
 type ViewMode = "list" | "calendar";
 type TypeFilter = "all" | "releases" | "shows";
 
+const NOT_LISTED_TEXT = "That show isn't in the upcoming list.";
+
+/** The DOM id a linked show scrolls to. */
+function showAnchorId(showId: number): string {
+  return `upcoming-show-${showId}`;
+}
+
+/**
+ * The list key, also used to expand an item. A show is keyed by its ID, so
+ * exact twins (two saved shows with the same details) stay apart.
+ */
 function itemKey(item: UpcomingItem): string {
+  if (item.type === "show" && item.show_id != null)
+    return `show-${item.show_id}`;
   return `${item.type}-${item.artist}-${
     item.release_id ?? item.url ?? item.venue ?? item.title
   }-${item.date}`;
@@ -185,6 +211,15 @@ export function Upcoming() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  // `?show_id=` opens that show's detail, e.g. from «Open show» after a save.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedShowId = searchParams.get("show_id");
+  const [linkNotice, setLinkNotice] = useState("");
+  const [scrollTo, setScrollTo] = useState<number | null>(null);
+  // A new array per «Merge duplicates» in a show's detail, so the merge
+  // panel loads that show and its look-alikes.
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeIds, setMergeIds] = useState<readonly number[] | null>(null);
 
   async function fetchItems() {
     try {
@@ -227,6 +262,48 @@ export function Upcoming() {
       city: cityFilter,
     });
   }, [items, filter, search, genreFilter, cityFilter]);
+
+  const openLinkedShow = useEffectEvent((raw: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("show_id");
+    setSearchParams(next, { replace: true });
+    const showId = /^\d+$/.test(raw) ? Number(raw) : NaN;
+    const item = items.find(
+      (candidate) => candidate.type === "show" && candidate.show_id === showId,
+    );
+    if (!item) {
+      setLinkNotice(NOT_LISTED_TEXT);
+      return;
+    }
+    setLinkNotice("");
+    const type = filter === "releases" ? "shows" : filter;
+    setFilter(type);
+    if (
+      !filterUpcomingItems([item], {
+        type,
+        search,
+        genre: genreFilter,
+        city: cityFilter,
+      }).length
+    ) {
+      setSearch("");
+      setGenreFilter("");
+      setCityFilter("");
+    }
+    setView("list");
+    setExpandedId(itemKey(item));
+    setScrollTo(showId);
+  });
+  useEffect(() => {
+    if (!loading && linkedShowId) openLinkedShow(linkedShowId);
+  }, [loading, linkedShowId]);
+  useEffect(() => {
+    if (scrollTo === null) return;
+    document
+      .getElementById(showAnchorId(scrollTo))
+      ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    setScrollTo(null);
+  }, [scrollTo]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = filtered.filter(
@@ -290,6 +367,24 @@ export function Upcoming() {
   const showCount = items.filter((i) => i.type === "show").length;
   const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
   const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
+  const showActions = canCurateShows
+    ? (item: UpcomingItem) =>
+        item.show_id ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label="Merge duplicates of this show"
+            onClick={() => {
+              setMergeIds(sameShowIds(items, item));
+              setMergeOpen(true);
+            }}
+          >
+            <Merge size={14} className="mr-1" />
+            Merge duplicates
+          </Button>
+        ) : null
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -337,6 +432,8 @@ export function Upcoming() {
                 Calendar
               </CratePill>
             </div>
+            <AddShowButton onSaved={() => void fetchItems()} />
+            <MergeShowsButton onMerged={() => void fetchItems()} />
             {canCurateShows ? (
               <Button size="sm" onClick={syncShows} disabled={syncing}>
                 <RefreshCw
@@ -401,6 +498,22 @@ export function Upcoming() {
             )}
           </div>
 
+          {/* Always mounted, so a screen reader hears the notice arrive. */}
+          <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
+            <p role="status" className="text-sm text-white/70 empty:sr-only">
+              {linkNotice}
+            </p>
+            {linkNotice ? (
+              <ActionIconButton
+                onClick={() => setLinkNotice("")}
+                title="Dismiss"
+                aria-label="Dismiss"
+              >
+                <X size={14} />
+              </ActionIconButton>
+            ) : null}
+          </div>
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {(["all", "releases", "shows"] as const).map((f) => (
               <CratePill
@@ -460,6 +573,7 @@ export function Upcoming() {
                   onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
+                  showActions={showActions}
                 />
               ))}
             </section>
@@ -478,6 +592,7 @@ export function Upcoming() {
                   onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
+                  showActions={showActions}
                 />
               ))}
             </section>
@@ -501,6 +616,15 @@ export function Upcoming() {
           }}
         />
       )}
+
+      {canCurateShows ? (
+        <MergeShowsSheet
+          open={mergeOpen}
+          onOpenChange={setMergeOpen}
+          onMerged={() => void fetchItems()}
+          initialIds={mergeIds}
+        />
+      ) : null}
     </div>
   );
 }
@@ -514,6 +638,7 @@ function MonthGroup({
   onDismiss,
   expandedId,
   onToggleExpand,
+  showActions,
 }: {
   month: string;
   items: UpcomingItem[];
@@ -521,6 +646,7 @@ function MonthGroup({
   onDismiss?: (id: number) => void;
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
+  showActions?: (item: UpcomingItem) => ReactNode;
 }) {
   const label =
     month === "Unknown"
@@ -543,12 +669,16 @@ function MonthGroup({
           const key = itemKey(item);
           const isExpanded = expandedId === key;
           return (
-            <div key={key}>
+            <div
+              key={key}
+              id={item.show_id ? showAnchorId(item.show_id) : undefined}
+            >
               {item.type === "show" ? (
                 <ShowCard
                   show={item}
                   expanded={isExpanded}
                   onToggle={() => onToggleExpand(isExpanded ? null : key)}
+                  actions={isExpanded ? showActions?.(item) : undefined}
                 />
               ) : (
                 <EventCard

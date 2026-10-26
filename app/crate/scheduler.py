@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 
 from crate.db.cache_settings import get_setting, set_setting
 from crate.db.queries.tasks import list_tasks
-from crate.db.repositories.tasks import create_task_dedup
-from crate.task_dedup_keys import GLOBAL_CATALOG_FULL_DEDUP_KEY
 
 log = logging.getLogger(__name__)
 
@@ -50,31 +48,21 @@ GLOBAL_CATALOG_SCHEDULED_TASKS = {
 
 
 def get_schedules() -> dict[str, int]:
-    """Get configured schedules from settings, falling back to defaults."""
-    import json
+    """Read current schedules; defaults and legacy aliases are never persisted."""
+    from crate.db.queries.agent_runtime_policy import decode_schedules
 
-    raw = get_setting("schedules")
-    if raw:
-        try:
-            schedules = json.loads(raw)
-            # Migration: rename library_sync → library_pipeline
-            if "library_sync" in schedules and "library_pipeline" not in schedules:
-                schedules["library_pipeline"] = schedules.pop("library_sync")
-            merged = dict(DEFAULT_SCHEDULES)
-            merged.update(schedules)
-            if merged != schedules:
-                set_schedules(merged)
-            return merged
-        except Exception:
-            pass
-    return dict(DEFAULT_SCHEDULES)
+    return decode_schedules(get_setting("schedules"))
 
 
 def set_schedules(schedules: dict[str, int]):
     """Save schedule configuration."""
-    import json
+    from crate.db.repositories.runtime_policy import (
+        read_schedules_state,
+        update_schedules,
+    )
 
-    set_setting("schedules", json.dumps(schedules))
+    state = read_schedules_state()
+    return update_schedules(schedules, expected_revision=state["revision"])
 
 
 def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
@@ -92,7 +80,7 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
     if task_type == "global_catalog_reconcile_full" and _has_conflicting_full_sync():
         return False
 
-    # Check last completion time
+    # This is the last enqueue time, not evidence of successful execution.
     last_key = f"schedule:last_run:{task_type}"
     last_run = get_setting(last_key)
 
@@ -185,19 +173,64 @@ def mark_run(task_type: str):
     set_setting(last_key, datetime.now(timezone.utc).isoformat())
 
 
-def enqueue_scheduled_task(task_type: str) -> str | None:
-    """Create the task a schedule runs, deduplicated against a queued run."""
-    task_id = create_task_dedup(
+def guarded_run_schedule(
+    task_type: str,
+    *,
+    origin="scheduler",
+    actor_user_id=None,
+    agent_context=None,
+    required_grants=None,
+    expected_schedule_revision=None,
+    session=None,
+) -> dict:
+    """One bounded enqueue path; manual calls cannot force resource gates."""
+    from crate.db.repositories.runtime_policy import enqueue_schedule
+    from crate.resource_governor import record_decision, should_defer_task
+
+    if task_type not in DEFAULT_SCHEDULES:
+        raise ValueError("Unknown schedule")
+    if origin not in {"scheduler", "admin", "agent"}:
+        raise ValueError("Unsupported schedule origin")
+    if origin == "agent" and task_type != "compute_analytics":
+        return {
+            "status": "unavailable",
+            "task_id": None,
+            "reason": "The schedule has no bounded agent execution contract",
+        }
+    decision = should_defer_task(task_type, {})
+    if not decision.allowed:
+        record_decision(decision, task_type=task_type, source="scheduler")
+        return {
+            "status": "deferred",
+            "task_id": None,
+            "reason": decision.reason,
+            "retry_after": decision.defer_seconds,
+        }
+    if (
+        not _scheduled_task_enabled(task_type)
+        or task_type == "global_catalog_reconcile_full"
+        and _has_conflicting_full_sync()
+    ):
+        return {
+            "status": "unavailable",
+            "task_id": None,
+            "reason": "Schedule dependencies are not ready",
+        }
+    return enqueue_schedule(
         task_type,
-        dedup_key=(
-            GLOBAL_CATALOG_FULL_DEDUP_KEY
-            if task_type == "global_catalog_reconcile_full"
-            else f"schedule:{task_type}"
-        ),
+        origin=origin,
+        actor_user_id=actor_user_id,
+        agent_context=agent_context,
+        required_grants=required_grants,
+        decision=decision,
+        expected_schedule_revision=expected_schedule_revision,
+        session=session,
     )
-    if task_id:
-        mark_run(task_type)
-    return task_id
+
+
+def enqueue_scheduled_task(task_type: str, **kwargs) -> str | None:
+    """Compatibility wrapper around the same guarded schedule operation."""
+    return guarded_run_schedule(task_type, **kwargs)["task_id"]
 
 
 def check_and_create_scheduled_tasks():
@@ -208,23 +241,5 @@ def check_and_create_scheduled_tasks():
         if interval <= 0:
             continue
         if should_run(task_type, schedules):
-            try:
-                from crate.resource_governor import record_decision, should_defer_task
-
-                decision = should_defer_task(task_type)
-                if not decision.allowed:
-                    record_decision(decision, task_type=task_type, source="scheduler")
-                    log.info(
-                        "Deferring scheduled task %s due to resource pressure: %s",
-                        task_type,
-                        decision.reason,
-                    )
-                    continue
-            except Exception:
-                log.debug(
-                    "Resource governor check failed for scheduled %s",
-                    task_type,
-                    exc_info=True,
-                )
             log.info("Scheduling task: %s (interval=%ds)", task_type, interval)
             enqueue_scheduled_task(task_type)

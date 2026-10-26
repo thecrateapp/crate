@@ -40,6 +40,7 @@ import {
   Activity,
   ScrollText,
   ShieldCheck,
+  Bot,
   Trash2,
   HandHeart,
   type LucideIcon,
@@ -254,6 +255,18 @@ export function CommandPalette() {
       capabilities: ["users.view"],
     },
     {
+      label: "Agents",
+      path: "/agents",
+      icon: Bot,
+      capabilities: ["agents.plans.review", "agents.integrations.manage"],
+    },
+    {
+      label: "Agent approvals",
+      path: "/agents/approvals",
+      icon: ShieldCheck,
+      capabilities: ["agents.plans.review"],
+    },
+    {
       label: "Roles",
       path: "/roles",
       icon: ShieldCheck,
@@ -310,6 +323,12 @@ export function CommandPalette() {
       path: "/discover",
       icon: Compass,
       capabilities: ["library.view"],
+    },
+    {
+      label: "AI models",
+      path: "/ai",
+      icon: Sparkles,
+      capabilities: ["ai.config.read"],
     },
     {
       label: "Settings",

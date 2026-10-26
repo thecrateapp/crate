@@ -67,6 +67,7 @@ export function RangeRow({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
         className="settings-range w-full disabled:cursor-not-allowed"
       />
@@ -78,18 +79,20 @@ export function ToggleRow({
   label,
   description,
   checked,
+  disabled = false,
   onChange,
 }: {
   label: string;
   description?: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   const descriptionId = useId();
 
   return (
     <div className="flex items-start justify-between gap-4">
-      <div>
+      <div className={disabled ? "opacity-50" : undefined}>
         <div className="text-sm font-medium text-text-primary">{label}</div>
         {description ? (
           <p
@@ -104,6 +107,7 @@ export function ToggleRow({
         aria-label={label}
         aria-describedby={description ? descriptionId : undefined}
         checked={checked}
+        disabled={disabled}
         onCheckedChange={onChange}
       />
     </div>

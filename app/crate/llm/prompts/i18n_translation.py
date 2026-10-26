@@ -104,6 +104,7 @@ def generate_i18n_translation_draft(
     *,
     target_locale: str,
     source_messages: dict[str, str],
+    ai_call: dict | None = None,
 ) -> I18nTranslationDraft:
     from crate.llm import ask_structured
 
@@ -118,4 +119,7 @@ def generate_i18n_translation_draft(
         I18nTranslationDraft,
         prompt,
         system=I18N_TRANSLATION_SYSTEM_PROMPT,
+        action_id="i18n.listen.draft",
+        private_response=True,
+        **(ai_call or {}),
     )

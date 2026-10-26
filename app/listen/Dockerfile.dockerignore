@@ -1,18 +1,26 @@
-node_modules/
-dist/
-__pycache__/
-*.pyc
-.git/
-bin/
-crate/
-tests/
-scripts/
-config.yaml
-requirements.txt
-Dockerfile
-ui/node_modules/
-ui/dist/
-shared/ui/node_modules/
-shared/ui/dist/
-listen/android/
-listen/ios/
+# The Listen image builds with the repository root as context (CI and compose)
+# so it can install from the root package-lock.json. BuildKit uses this file
+# instead of a root .dockerignore. It is an allowlist: only the root manifest
+# and lockfile, app/listen and the shared code Listen imports are sent. data/,
+# media/, test-music/, .git/, .env and the other apps never leave the host.
+*
+!package.json
+!package-lock.json
+!app/listen/
+!app/shared/ui/
+!app/shared/cast/
+!app/shared/web/
+!app/shared/fonts/
+
+# Native shells are built by the Capacitor workflows, not this image.
+app/listen/android/
+app/listen/ios/
+
+# Installed and generated output, even inside the allowed folders.
+**/node_modules/
+**/dist/
+**/coverage/
+**/.vite/
+**/*.tsbuildinfo
+**/.env
+**/.env.*

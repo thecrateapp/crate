@@ -2,6 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/hooks/use-llm", () => ({
+  useActionLLMStatus: vi.fn(() => ({
+    available: true,
+    model_id: "hero-model",
+  })),
+}));
+import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ArtistArtworkGallery } from "./ArtistArtworkGallery";
 
 vi.mock("@/lib/tasks", () => ({
@@ -27,7 +34,13 @@ const asset = {
 };
 
 describe("ArtistArtworkGallery", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useActionLLMStatus).mockReturnValue({
+      available: true,
+      model_id: "hero-model",
+    } as ReturnType<typeof useActionLLMStatus>);
+  });
 
   it("shows curated assets and assigns one to any artwork slot", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
@@ -284,4 +297,50 @@ describe("ArtistArtworkGallery", () => {
       ).toBe(true),
     );
   });
+});
+
+it("disables only optional hero analysis when its own action is unavailable", async () => {
+  vi.mocked(useActionLLMStatus).mockReturnValue({
+    available: false,
+    model_id: null,
+  } as ReturnType<typeof useActionLLMStatus>);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string | URL | Request) =>
+      String(input).endsWith("/hero-candidates")
+        ? Response.json({
+            candidates: [
+              {
+                id: "candidate",
+                origin: "fanart-background",
+                label: "Candidate",
+                preview_url: "/candidate.jpg",
+                width: 2000,
+                height: 1000,
+                desktop: { score: 80, label: "good", reason: "wide" },
+                mobile: { score: 60, label: "fair", reason: "crop" },
+              },
+            ],
+          })
+        : Response.json({ assets: [] }),
+    ),
+  );
+  render(
+    <ArtistArtworkGallery
+      artistId={7}
+      artistName="Converge"
+      canEdit
+      onChanged={vi.fn()}
+    />,
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Find image candidates" }),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Analyze Candidate" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Add Candidate to gallery" }),
+  ).toBeEnabled();
+  expect(useActionLLMStatus).toHaveBeenCalledWith("artwork.hero.analyze");
 });

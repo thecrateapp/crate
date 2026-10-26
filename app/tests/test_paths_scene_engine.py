@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from collections import Counter
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def deterministic_scene_tests(monkeypatch):
+    from crate import music_paths
+
+    monkeypatch.setattr(
+        music_paths, "refine_music_path_with_llm", lambda **kwargs: kwargs["tracks"]
+    )
+
 
 def _track(
     track_id: int,
@@ -592,7 +603,7 @@ def test_scene_path_uses_unseen_artists_before_repeating_and_never_consecutively
 
 
 def test_music_path_planning_uses_scene_engine_before_acoustic_fallback(monkeypatch):
-    from crate.db import paths_service_planning
+    from crate import music_paths as paths_service_planning
 
     scene_tracks = [
         {
@@ -696,6 +707,7 @@ def test_compute_scene_path_returns_music_path_entries(monkeypatch):
 
 
 def test_compute_scene_path_applies_llm_refinement_before_entries(monkeypatch):
+    from crate import music_paths
     from crate.db import paths_scene
     from crate.db.queries import paths_scene_queries
 
@@ -737,7 +749,7 @@ def test_compute_scene_path_applies_llm_refinement_before_entries(monkeypatch):
     )
     monkeypatch.setattr(paths_scene, "load_artist_radio_graphs", lambda: ({}, {}, {}))
     monkeypatch.setattr(
-        paths_scene,
+        music_paths,
         "refine_music_path_with_llm",
         lambda **kwargs: [punk_track, better_track],
     )

@@ -12,7 +12,8 @@ export function ArtistTabsNav({
   onChange,
 }: ArtistTabsNavProps) {
   return (
-    <div className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10 px-4 md:px-8">
+    // Sticks below Shell's fixed header (--app-header-h), not under it.
+    <div className="border-b border-border sticky top-[var(--app-header-h,0px)] bg-background/95 backdrop-blur-sm z-10 px-4 md:px-8">
       <div className="mx-auto w-full max-w-[1480px]">
         <div
           className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-none"

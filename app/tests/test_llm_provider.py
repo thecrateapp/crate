@@ -70,9 +70,80 @@ def test_llm_status_requires_cloud_provider_key(monkeypatch):
     monkeypatch.setattr(
         admin_metrics, "_require_llm_status_viewer", lambda request: {"id": 1}
     )
-    with patch("crate.db.cache_settings.get_setting", side_effect=_settings_default):
-        result = admin_metrics.llm_status(cast(Any, object()))
+    monkeypatch.setattr(admin_metrics, "require_permission", lambda *a: {})
+    from crate.ai import configuration
 
-    assert result["available"] is False
-    assert result["provider"] == "gemini"
-    assert result["error"] == "GEMINI_API_KEY or AUDIOMUSE_GEMINI_API_KEY not set"
+    monkeypatch.setattr(
+        configuration,
+        "get_action_configuration",
+        lambda action: {
+            "mode": "legacy",
+            "provider": "gemini",
+            "model_id": "gemini-2.5-flash",
+            "config_fingerprint": "accepted",
+        },
+    )
+    result = admin_metrics.llm_status(cast(Any, object()))
+    assert all(not action["available"] for action in result["actions"].values())
+    assert (
+        result["actions"]["artists.bio.research"]["error_code"]
+        == "AI_CREDENTIAL_REQUIRED"
+    )
+
+
+def test_structured_public_action_routing_and_legacy_recursion_guard(monkeypatch):
+    import pytest
+    from pydantic import BaseModel
+    from crate.llm import provider
+    from crate.ai import runtime
+
+    class Answer(BaseModel):
+        ok: bool
+
+    calls = []
+
+    def execute(action, response_model, prompt, **kwargs):
+        calls.append((action, kwargs))
+        return response_model(ok=True)
+
+    monkeypatch.setattr(runtime, "execute_structured", execute)
+    assert provider.ask_structured(
+        Answer, "text", action_id="genres.eq.propose", job_id="job"
+    ).ok
+    assert provider.ask_image_structured(
+        Answer,
+        "image",
+        image=b"image",
+        media_type="image/png",
+        action_id="artwork.hero.analyze",
+    ).ok
+    assert calls[0][1]["job_id"] == "job"
+    assert calls[1][1]["image"] == b"image"
+    with pytest.raises(ValueError, match="recurse"):
+        provider.ask_structured(
+            Answer, "text", action_id="genres.eq.propose", _injected={}
+        )
+
+
+def test_legacy_sdk_native_timeout_is_pinned_or_explicitly_unavailable(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    from crate.llm.provider import legacy_native_timeout
+
+    assert legacy_native_timeout("gemini/model") == (60.0, None)
+    assert legacy_native_timeout("gemini/model", image=True) == (90.0, None)
+    assert legacy_native_timeout("ollama/model") == (300.0, None)
+    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(request_timeout=600))
+    assert legacy_native_timeout("anthropic/model") == (600.0, None)
+    monkeypatch.setitem(
+        sys.modules, "litellm", SimpleNamespace(request_timeout=float("inf"))
+    )
+    assert legacy_native_timeout("anthropic/model") == (
+        None,
+        "AI_LEGACY_LIMITS_UNKNOWN",
+    )
+    monkeypatch.setitem(sys.modules, "litellm", None)
+    assert legacy_native_timeout("anthropic/model") == (
+        None,
+        "AI_LEGACY_SDK_UNAVAILABLE",
+    )

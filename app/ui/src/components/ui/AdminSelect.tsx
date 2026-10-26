@@ -29,6 +29,7 @@ interface AdminSelectProps {
   triggerClassName?: string;
   menuClassName?: string;
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 const DEFAULT_TRIGGER_CLASS =
@@ -46,6 +47,7 @@ export function AdminSelect({
   triggerClassName,
   menuClassName,
   disabled = false,
+  ariaLabel,
 }: AdminSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -76,6 +78,7 @@ export function AdminSelect({
         <button
           type="button"
           disabled={disabled}
+          aria-label={ariaLabel}
           className={cn(
             DEFAULT_TRIGGER_CLASS,
             value ? "text-white" : "text-white/40",

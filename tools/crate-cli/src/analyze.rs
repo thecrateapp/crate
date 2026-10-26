@@ -3,7 +3,7 @@
 use rayon::prelude::*;
 use realfft::RealFftPlanner;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 #[cfg(feature = "ml")]
 use std::sync::Arc;
@@ -14,11 +14,27 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
+use crate::beat_tracking;
+use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
+use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
 const FFT_SIZE: usize = 2048;
 const HOP_SIZE: usize = 512;
+const MEASUREMENT_WINDOW_MS: u64 = 5_000;
+const DOWNBEAT_MIN_CONFIDENCE: f32 = 0.65;
+const FULL_SCAN_HEAD_SECONDS: u32 = 600;
+const FULL_SCAN_TAIL_SECONDS: u32 = 120;
+const LOCAL_TEMPO_BEATS: usize = 24;
+const LOCAL_TEMPO_MIN_BEATS: usize = 8;
+const LOCAL_TEMPO_OUTLIER_MS: f64 = 6.0;
+const LOCAL_OUTLIER_SIGMAS: f64 = 3.0;
+const LOCAL_DRIFT_LIMIT: f64 = 0.10;
+const LOCAL_JITTER_LIMIT: f32 = 0.20;
+const CUE_DOWNBEAT_BEATS: usize = 32;
+const LOCAL_MIX_WINDOW_MS: f64 = 12_000.0;
+const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -40,6 +56,8 @@ pub struct AnalysisResult {
     pub acousticness: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instrumentalness: Option<f32>,
+    #[serde(rename = "mixProfile", skip_serializing_if = "Option::is_none")]
+    pub mix_profile: Option<SmartMixProfileResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -52,7 +70,15 @@ pub struct BatchAnalysisResult {
     pub failed: usize,
 }
 
-fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
+fn decode_audio(path: &Path) -> Result<DecodedAudio, String> {
+    decode_audio_bounded(path, FULL_SCAN_HEAD_SECONDS, FULL_SCAN_TAIL_SECONDS)
+}
+
+pub fn decode_audio_bounded(
+    path: &Path,
+    head_seconds: u32,
+    tail_seconds: u32,
+) -> Result<DecodedAudio, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -85,7 +111,11 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("decoder: {}", e))?;
 
-    let mut all_samples: Vec<f32> = Vec::new();
+    let mut capture = MonoCapture::new(
+        head_seconds as usize * sample_rate as usize,
+        tail_seconds as usize * sample_rate as usize,
+    );
+    let mut meter = LoudnessMeter::new(channels, sample_rate);
 
     loop {
         let packet = match format.next_packet() {
@@ -112,6 +142,14 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
         let mut sample_buf = SampleBuffer::<f32>::new(num_frames as u64, spec);
         sample_buf.copy_interleaved_ref(decoded);
         let samples = sample_buf.samples();
+        if (spec.channels.count(), spec.rate) != (channels, sample_rate) {
+            meter = None;
+        }
+        if let Some(active_meter) = meter.as_mut() {
+            if active_meter.push_interleaved(samples).is_err() {
+                meter = None;
+            }
+        }
 
         // Mix to mono
         if channels > 1 {
@@ -120,37 +158,115 @@ fn decode_audio(path: &Path) -> Result<(Vec<f32>, u32), String> {
                 for ch in 0..channels {
                     sum += samples[frame * channels + ch];
                 }
-                all_samples.push(sum / channels as f32);
+                capture.push(sum / channels as f32);
             }
         } else {
-            all_samples.extend_from_slice(samples);
+            samples.iter().for_each(|sample| capture.push(*sample));
         }
     }
 
-    // Resample to target rate if needed (simple linear interpolation)
-    if sample_rate != TARGET_SAMPLE_RATE && !all_samples.is_empty() {
-        let ratio = TARGET_SAMPLE_RATE as f64 / sample_rate as f64;
-        let new_len = (all_samples.len() as f64 * ratio) as usize;
-        let mut resampled = Vec::with_capacity(new_len);
-        for i in 0..new_len {
-            let src_pos = i as f64 / ratio;
-            let idx = src_pos as usize;
-            let frac = (src_pos - idx as f64) as f32;
-            if idx + 1 < all_samples.len() {
-                resampled.push(all_samples[idx] * (1.0 - frac) + all_samples[idx + 1] * frac);
-            } else if idx < all_samples.len() {
-                resampled.push(all_samples[idx]);
-            }
+    let loudness = meter.map(LoudnessMeter::finish);
+
+    let total_frames = capture.total_frames;
+    let (head, tail) = capture.finish();
+    let target_rate = if head.is_empty() {
+        sample_rate
+    } else {
+        TARGET_SAMPLE_RATE
+    };
+    Ok(DecodedAudio {
+        head: resample_linear(&head, sample_rate, target_rate),
+        tail: tail.map(|(samples, start_frame)| {
+            (
+                resample_linear(&samples, sample_rate, target_rate),
+                start_frame as u64 * 1_000 / u64::from(sample_rate),
+            )
+        }),
+        sample_rate: target_rate,
+        duration_ms: total_frames as u64 * 1_000 / u64::from(sample_rate),
+        loudness,
+    })
+}
+
+pub struct DecodedAudio {
+    pub head: Vec<f32>,
+    pub tail: Option<(Vec<f32>, u64)>,
+    pub sample_rate: u32,
+    pub duration_ms: u64,
+    pub loudness: Option<LoudnessSummary>,
+}
+
+struct MonoCapture {
+    head: Vec<f32>,
+    tail: VecDeque<f32>,
+    head_frames: usize,
+    tail_frames: usize,
+    dropped_frames: usize,
+    total_frames: usize,
+}
+
+impl MonoCapture {
+    fn new(head_frames: usize, tail_frames: usize) -> Self {
+        Self {
+            head: Vec::new(),
+            tail: VecDeque::new(),
+            head_frames,
+            tail_frames,
+            dropped_frames: 0,
+            total_frames: 0,
         }
-        return Ok((resampled, TARGET_SAMPLE_RATE));
     }
 
-    Ok((all_samples, sample_rate))
+    fn push(&mut self, sample: f32) {
+        self.total_frames += 1;
+        if self.head.len() < self.head_frames {
+            self.head.push(sample);
+            return;
+        }
+        self.tail.push_back(sample);
+        if self.tail.len() > self.tail_frames {
+            self.tail.pop_front();
+            self.dropped_frames += 1;
+        }
+    }
+
+    fn finish(mut self) -> (Vec<f32>, Option<(Vec<f32>, usize)>) {
+        if self.dropped_frames == 0 {
+            self.head.extend(self.tail);
+            return (self.head, None);
+        }
+        let start_frame = self.head_frames + self.dropped_frames;
+        (
+            self.head,
+            Some((self.tail.into_iter().collect(), start_frame)),
+        )
+    }
+}
+
+fn resample_linear(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+    if from_rate == to_rate || samples.is_empty() {
+        return samples.to_vec();
+    }
+    let ratio = to_rate as f64 / from_rate as f64;
+    let new_len = (samples.len() as f64 * ratio) as usize;
+    let mut resampled = Vec::with_capacity(new_len);
+    for i in 0..new_len {
+        let src_pos = i as f64 / ratio;
+        let idx = src_pos as usize;
+        let frac = (src_pos - idx as f64) as f32;
+        if idx + 1 < samples.len() {
+            resampled.push(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac);
+        } else if idx < samples.len() {
+            resampled.push(samples[idx]);
+        }
+    }
+    resampled
 }
 
 /// Decode audio and return the original (pre-resample) mono samples + original sample rate.
 /// Used when we need to resample to 32kHz for PANNs (not 22050).
-fn decode_audio_original(path: &Path) -> Result<(Vec<f32>, u32), String> {
+#[cfg(feature = "ml")]
+fn decode_audio_original(path: &Path, max_seconds: usize) -> Result<(Vec<f32>, u32), String> {
     let file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
@@ -184,8 +300,9 @@ fn decode_audio_original(path: &Path) -> Result<(Vec<f32>, u32), String> {
         .map_err(|e| format!("decoder: {}", e))?;
 
     let mut all_samples: Vec<f32> = Vec::new();
+    let max_samples = max_seconds * sample_rate as usize;
 
-    loop {
+    while all_samples.len() < max_samples {
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(ref e))
@@ -311,14 +428,15 @@ fn compute_spectral_centroid_value(magnitudes: &[f32], sample_rate: f32, fft_siz
 }
 
 fn estimate_bpm(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    let onsets = compute_onset_envelope(samples);
+    estimate_bpm_from_onsets(&onsets, sample_rate)
+}
+
+fn compute_onset_envelope(samples: &[f32]) -> Vec<f32> {
     if samples.len() < FFT_SIZE * 4 {
-        return None;
+        return Vec::new();
     }
-
-    let sr = sample_rate as f32;
     let mut planner = RealFftPlanner::<f32>::new();
-
-    // Compute onset strength envelope (spectral flux)
     let mut onsets: Vec<f32> = Vec::new();
     let mut prev_spectrum: Vec<f32> = Vec::new();
 
@@ -339,14 +457,18 @@ fn estimate_bpm(samples: &[f32], sample_rate: u32) -> Option<f32> {
         prev_spectrum = spectrum;
         pos += HOP_SIZE;
     }
+    onsets
+}
 
+fn estimate_bpm_from_onsets(onsets: &[f32], sample_rate: u32) -> Option<f32> {
     if onsets.len() < 4 {
         return None;
     }
 
+    let sr = sample_rate as f32;
     // Autocorrelation of onset envelope
     let min_lag = (60.0 / 200.0 * sr / HOP_SIZE as f32) as usize; // 200 BPM
-    let max_lag = (60.0 / 60.0 * sr / HOP_SIZE as f32) as usize; // 60 BPM
+    let max_lag = (sr / HOP_SIZE as f32) as usize; // 60 BPM
     let max_lag = max_lag.min(onsets.len() / 2);
 
     if min_lag >= max_lag {
@@ -401,7 +523,7 @@ fn compute_chromagram(samples: &[f32], sample_rate: u32) -> [f32; 12] {
         // Map each frequency bin to a pitch class
         for (bin, &mag) in magnitudes.iter().enumerate() {
             let freq = bin as f32 * sr / FFT_SIZE as f32;
-            if freq < 20.0 || freq > 5000.0 {
+            if !(20.0..=5000.0).contains(&freq) {
                 continue;
             }
             // Convert frequency to MIDI note, then to pitch class
@@ -450,12 +572,13 @@ fn pearson_correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
     }
 }
 
-fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String) {
+fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String, f32) {
     let chroma = compute_chromagram(samples, sample_rate);
 
     let mut best_key = 0usize;
     let mut best_scale = "major";
     let mut best_corr = f32::MIN;
+    let mut second_corr = f32::MIN;
 
     for shift in 0..12 {
         let mut rotated = [0.0f32; 12];
@@ -467,18 +590,591 @@ fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String) {
         let minor_corr = pearson_correlation(&rotated, &KRUMHANSL_MINOR);
 
         if major_corr > best_corr {
+            second_corr = best_corr;
             best_corr = major_corr;
             best_key = shift;
             best_scale = "major";
+        } else if major_corr > second_corr {
+            second_corr = major_corr;
         }
         if minor_corr > best_corr {
+            second_corr = best_corr;
             best_corr = minor_corr;
             best_key = shift;
             best_scale = "minor";
+        } else if minor_corr > second_corr {
+            second_corr = minor_corr;
         }
     }
 
-    (NOTE_NAMES[best_key].to_string(), best_scale.to_string())
+    let confidence =
+        (((best_corr + 1.0) * 0.35) + (best_corr - second_corr).max(0.0)).clamp(0.0, 1.0);
+    (
+        NOTE_NAMES[best_key].to_string(),
+        best_scale.to_string(),
+        confidence,
+    )
+}
+
+fn percentile(values: &[f32], quantile: f32) -> f32 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut ordered = values.to_vec();
+    ordered.sort_by(|left, right| left.total_cmp(right));
+    let index = ((ordered.len() - 1) as f32 * quantile.clamp(0.0, 1.0)).round() as usize;
+    ordered[index]
+}
+
+fn median(values: &[f32]) -> f32 {
+    percentile(values, 0.5)
+}
+
+/// Tempo from a least-squares fit of beat index against refined beat time.
+///
+/// Frame-quantised intervals bias the mean interval by up to a hop over the
+/// whole track, which the planner then extrapolates from the downbeat anchor
+/// to a cue minutes later. Fitting the refined grid keeps that drift sub-ms.
+fn grid_bpm(beat_grid_ms: &[u64]) -> Option<f32> {
+    let beats: Vec<(f64, f64)> = beat_grid_ms
+        .iter()
+        .enumerate()
+        .map(|(index, time)| (index as f64, *time as f64))
+        .collect();
+    fit_beats(&beats).map(|fit| (60_000.0 / fit.period) as f32)
+}
+
+struct BeatFit {
+    period: f64,
+    mean_index: f64,
+    mean_time: f64,
+}
+
+impl BeatFit {
+    fn time_at(&self, index: f64) -> f64 {
+        self.mean_time + (index - self.mean_index) * self.period
+    }
+}
+
+fn fit_beats(beats: &[(f64, f64)]) -> Option<BeatFit> {
+    if beats.len() < 4 {
+        return None;
+    }
+    let count = beats.len() as f64;
+    let mean_index = beats.iter().map(|(index, _)| index).sum::<f64>() / count;
+    let mean_time = beats.iter().map(|(_, time)| time).sum::<f64>() / count;
+    let (covariance, variance) = beats.iter().fold(
+        (0.0_f64, 0.0_f64),
+        |(covariance, variance), (index, time)| {
+            let di = index - mean_index;
+            (covariance + di * (time - mean_time), variance + di * di)
+        },
+    );
+    let period = covariance / variance;
+    (period > 0.0).then_some(BeatFit {
+        period,
+        mean_index,
+        mean_time,
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LocalBeat {
+    bpm: f32,
+    beat_ms: Option<u64>,
+    stability: f32,
+}
+
+fn nearest_beat(beat_grid_ms: &[u64], cue_ms: u64) -> usize {
+    beat_grid_ms
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, position)| position.abs_diff(cue_ms))
+        .map_or(0, |(index, _)| index)
+}
+
+fn mix_window_beats(beat_grid_ms: &[u64]) -> usize {
+    let mut intervals: Vec<u64> = beat_grid_ms
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    intervals.sort_unstable();
+    let interval = intervals.get(intervals.len() / 2).copied().unwrap_or(0) as f64;
+    if interval <= 0.0 {
+        return LOCAL_TEMPO_BEATS;
+    }
+    LOCAL_TEMPO_BEATS.max((LOCAL_MIX_WINDOW_MS / interval).ceil() as usize)
+}
+
+fn window_start(len: usize, nearest: usize, count: usize) -> usize {
+    nearest.saturating_sub(count / 2).min(len - count)
+}
+
+/// Tempo, a fitted beat position and beat stability from the beats around a cue.
+///
+/// The planner phases the decks at the cues, so tempo and stability are measured
+/// over the longest mix the planner allows (12 s, never fewer than 24 beats) instead
+/// of across the whole track: a breakdown elsewhere must not hide a steady outro,
+/// and a messy outro must not pass because the rest of the track is steady. The
+/// window clamps at the track ends, so it runs forward from an intro cue and
+/// backward from an outro cue.
+///
+/// Tempo, the beat reference and tempo drift come from regressions over the refined
+/// beats, which average their per-beat attack noise: refined attacks on real
+/// recordings scatter by tens of milliseconds even when the pulse is steady. A
+/// drift of d across the window moves beats about d * beats * period / 8 off the
+/// fitted line, so the limit is far tighter than for a whole track: 2% drift, about
+/// 30 ms at 120 BPM over 24 beats, still reads as steady. Jitter comes from the
+/// tracker beats of the same window, which stay regular on steady music, after
+/// removing the half-frame alternation that frame quantization adds to any pulse.
+fn local_beat(
+    beat_grid_ms: &[u64],
+    beat_frames: &[usize],
+    sample_rate: u32,
+    cue_ms: Option<u64>,
+) -> Option<LocalBeat> {
+    let cue_ms = cue_ms?;
+    if beat_grid_ms.len() < 4 || beat_frames.len() != beat_grid_ms.len() {
+        return None;
+    }
+    let nearest = nearest_beat(beat_grid_ms, cue_ms);
+    let count = mix_window_beats(beat_grid_ms).min(beat_grid_ms.len());
+    let start = window_start(beat_grid_ms.len(), nearest, count);
+    let mut beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
+        .iter()
+        .enumerate()
+        .map(|(offset, time)| ((start + offset) as f64, *time as f64))
+        .collect();
+    let mut fit = fit_beats(&beats)?;
+    while beats.len() > LOCAL_TEMPO_MIN_BEATS {
+        let residuals: Vec<f64> = beats
+            .iter()
+            .map(|(index, time)| (time - fit.time_at(*index)).abs())
+            .collect();
+        let mut ordered = residuals.clone();
+        ordered.sort_by(|left, right| left.total_cmp(right));
+        let sigma = 1.4826 * ordered[ordered.len() / 2];
+        let limit = LOCAL_TEMPO_OUTLIER_MS.max(LOCAL_OUTLIER_SIGMAS * sigma);
+        let (worst, residual) = residuals
+            .iter()
+            .copied()
+            .enumerate()
+            .max_by(|left, right| left.1.total_cmp(&right.1))
+            .unwrap_or((0, 0.0));
+        if residual <= limit {
+            break;
+        }
+        beats.remove(worst);
+        fit = fit_beats(&beats)?;
+    }
+    let half = beats.len() / 2;
+    let drift = match (fit_beats(&beats[..half]), fit_beats(&beats[half..])) {
+        (Some(first), Some(second)) => (first.period - second.period).abs() / fit.period,
+        _ => 1.0,
+    };
+    let half_frame_ratio = (0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate)) / fit.period;
+    let jitter = (interval_jitter(&frame_intervals_ms(
+        &beat_frames[start..start + count],
+        sample_rate,
+    ))
+    .unwrap_or(1.0)
+        - half_frame_ratio as f32)
+        .max(0.0);
+    let stability =
+        (1.0 - (drift / LOCAL_DRIFT_LIMIT) as f32 - jitter / LOCAL_JITTER_LIMIT).clamp(0.0, 1.0);
+    let reference = fit.time_at(nearest as f64);
+    Some(LocalBeat {
+        bpm: (60_000.0 / fit.period) as f32,
+        beat_ms: (reference >= 0.0).then(|| reference.round() as u64),
+        stability,
+    })
+}
+
+/// The bar downbeat nearest a cue, phased only from the beats around that cue so a
+/// dropped beat or a section change elsewhere in the track cannot shift it.
+fn cue_downbeat_ms(
+    features: &beat_tracking::FrameFeatures,
+    beat_frames: &[usize],
+    beat_grid_ms: &[u64],
+    cue_ms: Option<u64>,
+) -> Option<u64> {
+    let cue_ms = cue_ms?;
+    if beat_frames.len() != beat_grid_ms.len() || beat_grid_ms.is_empty() {
+        return None;
+    }
+    let nearest = nearest_beat(beat_grid_ms, cue_ms);
+    let count = CUE_DOWNBEAT_BEATS.min(beat_frames.len());
+    let start = window_start(beat_frames.len(), nearest, count);
+    let phase = beat_tracking::window_downbeat_phase(features, &beat_frames[start..start + count])?;
+    let first = start + phase;
+    let bars = ((nearest as f64 - first as f64) / 4.0).round().max(0.0) as usize;
+    let mut index = first + bars * 4;
+    while index >= beat_grid_ms.len() && index >= 4 {
+        index -= 4;
+    }
+    beat_grid_ms.get(index).copied()
+}
+
+struct TempoFeatures {
+    frame_bpm: Option<f32>,
+    stability: f32,
+    strength_ratio: f32,
+    coverage: f32,
+}
+
+impl TempoFeatures {
+    const EMPTY: Self = Self {
+        frame_bpm: None,
+        stability: 0.0,
+        strength_ratio: 0.0,
+        coverage: 0.0,
+    };
+
+    fn confidence(&self, stability: f32) -> f32 {
+        (0.5 * stability + 0.35 * self.strength_ratio + 0.15 * self.coverage).clamp(0.0, 1.0)
+    }
+}
+
+fn frame_intervals_ms(beat_frames: &[usize], sample_rate: u32) -> Vec<f32> {
+    beat_frames
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]) as f32 * HOP_SIZE as f32 * 1_000.0 / sample_rate as f32)
+        .collect()
+}
+
+fn interval_jitter(intervals: &[f32]) -> Option<f32> {
+    let median_interval = median(intervals);
+    if intervals.is_empty() || median_interval <= 0.0 {
+        return None;
+    }
+    let residuals: Vec<f32> = intervals
+        .iter()
+        .map(|interval| (interval - median_interval).abs())
+        .collect();
+    Some(median(&residuals) / median_interval)
+}
+
+/// Steadiness of a run of beat intervals: penalises tempo drift between its first and
+/// last thirds and the median interval jitter.
+fn interval_stability(intervals: &[f32]) -> Option<f32> {
+    if intervals.len() < 3 {
+        return None;
+    }
+    let median_interval = median(intervals);
+    if median_interval <= 0.0 {
+        return None;
+    }
+    let third = (intervals.len() / 3).max(2).min(intervals.len());
+    let early_interval = median(&intervals[..third]);
+    let late_interval = median(&intervals[intervals.len() - third..]);
+    let drift_ratio = (late_interval - early_interval).abs() / median_interval;
+    let residuals: Vec<f32> = intervals
+        .iter()
+        .map(|interval| (interval - median_interval).abs())
+        .collect();
+    let jitter_ratio = median(&residuals) / median_interval;
+    Some((1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20).clamp(0.0, 1.0))
+}
+
+fn tempo_features(beat_frames: &[usize], onsets: &[f32], sample_rate: u32) -> TempoFeatures {
+    if beat_frames.len() < 4 {
+        return TempoFeatures::EMPTY;
+    }
+    let intervals = frame_intervals_ms(beat_frames, sample_rate);
+    let Some(stability) = interval_stability(&intervals) else {
+        return TempoFeatures::EMPTY;
+    };
+
+    let beat_strength = beat_frames
+        .iter()
+        .filter_map(|index| onsets.get(*index))
+        .sum::<f32>()
+        / beat_frames.len() as f32;
+    let reference = percentile(onsets, 0.95) + f32::EPSILON;
+    let strength_ratio = (beat_strength / reference).clamp(0.0, 1.0);
+    let coverage = (beat_frames.len() as f32 / 16.0).clamp(0.0, 1.0);
+    let mean_interval = intervals.iter().sum::<f32>() / intervals.len() as f32;
+    TempoFeatures {
+        frame_bpm: Some(60_000.0 / mean_interval),
+        stability,
+        strength_ratio,
+        coverage,
+    }
+}
+
+fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
+    let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
+    let hop_length = (frame_length / 2).max(128);
+    if samples.is_empty() {
+        return (Vec::new(), frame_length, hop_length);
+    }
+    if samples.len() < frame_length {
+        return (vec![compute_rms(samples)], frame_length, hop_length);
+    }
+    let values = (0..=samples.len() - frame_length)
+        .step_by(hop_length)
+        .map(|start| compute_rms(&samples[start..start + frame_length]))
+        .collect();
+    (values, frame_length, hop_length)
+}
+
+fn detect_mix_cues(
+    samples: &[f32],
+    sample_rate: u32,
+    beat_grid_ms: &[u64],
+) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
+    let (rms_values, frame_length, hop_length) = frame_rms(samples, sample_rate);
+    if rms_values.is_empty() {
+        return (None, None, None, None);
+    }
+    let dbfs: Vec<f32> = rms_values
+        .iter()
+        .map(|rms| compute_loudness_db(*rms))
+        .collect();
+    let peak = dbfs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let threshold = (-55.0_f32).max(peak - 35.0);
+    let active_frames: Vec<usize> = dbfs
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| (*value >= threshold).then_some(index))
+        .collect();
+    let (Some(first), Some(last)) = (active_frames.first(), active_frames.last()) else {
+        return (None, None, None, None);
+    };
+    let duration_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
+    let active_start_ms = *first as u64 * hop_length as u64 * 1_000 / u64::from(sample_rate);
+    let active_end_ms = duration_ms.min(
+        (*last as u64 * hop_length as u64 + frame_length as u64) * 1_000 / u64::from(sample_rate),
+    );
+    let intro = beat_grid_ms
+        .iter()
+        .find(|position| **position >= active_start_ms)
+        .copied()
+        .unwrap_or(active_start_ms);
+    let outro_target = intro.max(active_end_ms.saturating_sub(4_000));
+    let outro = beat_grid_ms
+        .iter()
+        .rev()
+        .find(|position| **position <= outro_target)
+        .copied()
+        .unwrap_or(outro_target);
+    (
+        Some(active_start_ms),
+        Some(intro),
+        Some(outro.max(intro)),
+        Some(active_end_ms),
+    )
+}
+
+fn spectral_density(samples: &[f32], sample_rate: u32) -> Option<f32> {
+    if samples.is_empty() {
+        return None;
+    }
+    let mut planner = RealFftPlanner::<f32>::new();
+    let mut total = 0.0;
+    let mut count = 0;
+    for frame in samples
+        .chunks(FFT_SIZE)
+        .filter(|frame| frame.len() >= FFT_SIZE)
+    {
+        let magnitudes = compute_magnitude_spectrum(frame, FFT_SIZE, &mut planner);
+        total += compute_spectral_centroid_value(&magnitudes, sample_rate as f32, FFT_SIZE);
+        count += 1;
+    }
+    if count == 0 {
+        return None;
+    }
+    let centroid = total / count as f32;
+    Some(((1.0 + centroid).ln() / (1.0 + sample_rate as f32 / 2.0).ln()).clamp(0.0, 1.0))
+}
+
+fn signal_features(samples: &[f32], sample_rate: u32) -> (Option<f32>, Option<f32>, Option<f32>) {
+    if samples.is_empty() {
+        return (None, None, None);
+    }
+    let loudness = compute_loudness_db(compute_rms(samples));
+    let energy = ((loudness + 60.0) / 60.0).clamp(0.0, 1.0);
+    (
+        Some(loudness),
+        Some(energy),
+        spectral_density(samples, sample_rate),
+    )
+}
+
+fn window_samples(
+    samples: &[f32],
+    sample_rate: u32,
+    anchor_ms: Option<u64>,
+    backwards: bool,
+) -> &[f32] {
+    let Some(anchor_ms) = anchor_ms else {
+        return &[];
+    };
+    let anchor = (anchor_ms * u64::from(sample_rate) / 1_000) as usize;
+    let window = sample_rate as usize * 5;
+    let (start, end) = if backwards {
+        let end = anchor.min(samples.len());
+        (end.saturating_sub(window), end)
+    } else {
+        let start = anchor.min(samples.len());
+        (start, (start + window).min(samples.len()))
+    };
+    &samples[start..end]
+}
+
+pub fn analyze_smart_mix_samples(samples: &[f32], sample_rate: u32) -> SmartMixProfileResult {
+    analyze_smart_mix_samples_with_loudness(samples, sample_rate, None)
+}
+
+pub fn analyze_smart_mix_samples_with_loudness(
+    samples: &[f32],
+    sample_rate: u32,
+    loudness: Option<&LoudnessSummary>,
+) -> SmartMixProfileResult {
+    analyze_smart_mix_segments(samples, None, sample_rate, None, loudness)
+}
+
+pub struct AudioTail<'a> {
+    pub samples: &'a [f32],
+    pub start_ms: u64,
+}
+
+pub fn analyze_smart_mix_segments(
+    samples: &[f32],
+    tail: Option<AudioTail<'_>>,
+    sample_rate: u32,
+    total_duration_ms: Option<u64>,
+    loudness: Option<&LoudnessSummary>,
+) -> SmartMixProfileResult {
+    let duration_ms = total_duration_ms.unwrap_or(if sample_rate == 0 {
+        0
+    } else {
+        samples.len() as u64 * 1_000 / u64::from(sample_rate)
+    });
+    if sample_rate == 0 || samples.len() < sample_rate as usize * 2 {
+        return SmartMixProfileResult::unavailable(duration_ms);
+    }
+
+    let features = beat_tracking::frame_features(samples, sample_rate);
+    let onsets = &features.onsets;
+    let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
+    let beat_grid_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
+    let tempo = tempo_features(&beat_frames, onsets, sample_rate);
+    let tempo_stability = tempo.stability;
+    let bpm = grid_bpm(&beat_grid_ms).or(tempo.frame_bpm);
+    let (key, scale, key_confidence) = detect_key(samples, sample_rate);
+    let camelot = to_camelot(&key, &scale).map(str::to_owned);
+    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
+        detect_mix_cues(samples, sample_rate, &beat_grid_ms);
+    let intro = signal_features(
+        window_samples(samples, sample_rate, intro_cue_ms, false),
+        sample_rate,
+    );
+    let outro = match &tail {
+        Some(tail) => {
+            let (_, _, tail_outro_ms, tail_end_ms) =
+                detect_mix_cues(tail.samples, sample_rate, &[]);
+            outro_cue_ms = tail_outro_ms.map(|position| position + tail.start_ms);
+            active_end_ms = tail_end_ms.map(|position| position + tail.start_ms);
+            signal_features(
+                window_samples(tail.samples, sample_rate, tail_end_ms, true),
+                sample_rate,
+            )
+        }
+        None => signal_features(
+            window_samples(samples, sample_rate, active_end_ms, true),
+            sample_rate,
+        ),
+    };
+    let intro_local = local_beat(&beat_grid_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let outro_local = if tail.is_none() {
+        local_beat(&beat_grid_ms, &beat_frames, sample_rate, outro_cue_ms)
+    } else {
+        None
+    };
+    let cue_stability = intro_local
+        .zip(outro_local)
+        .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
+    let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
+    let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
+    let intro_downbeat_ms = downbeat_detectable
+        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, intro_cue_ms))
+        .flatten();
+    let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
+        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, outro_cue_ms))
+        .flatten();
+    let downbeat_anchor_ms = downbeat_detectable
+        .then(|| {
+            beat_tracking::downbeat_phase(&features, &beat_frames)
+                .and_then(|phase| beat_grid_ms.get(phase).copied())
+        })
+        .flatten()
+        .or(intro_downbeat_ms);
+    let time_signature = downbeat_anchor_ms.map(|_| 4);
+    let global = signal_features(samples, sample_rate);
+    let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
+        summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
+    });
+    let outro_lufs = loudness.zip(active_end_ms).and_then(|(summary, end_ms)| {
+        summary.window_lufs(end_ms.saturating_sub(MEASUREMENT_WINDOW_MS), end_ms)
+    });
+    let steady_cues = intro_local.zip(outro_local).is_some_and(|(intro, outro)| {
+        intro.beat_ms.is_some()
+            && outro.beat_ms.is_some()
+            && intro.stability >= FULL_PROFILE_MIN_STABILITY
+            && outro.stability >= FULL_PROFILE_MIN_STABILITY
+    });
+    let quality =
+        if tail.is_none() && beat_grid_ms.len() >= 12 && bpm_confidence >= 0.75 && steady_cues {
+            "full"
+        } else {
+            "partial"
+        };
+
+    SmartMixProfileResult {
+        schema_version: 1,
+        analyzer: "crate-rust".to_string(),
+        analyzer_version: ANALYZER_VERSION.to_string(),
+        duration_ms,
+        quality: quality.to_string(),
+        bpm,
+        bpm_confidence: Some(bpm_confidence),
+        tempo_stability: Some(tempo_stability),
+        beat_anchor_ms: beat_grid_ms.first().copied(),
+        downbeat_anchor_ms,
+        time_signature,
+        beat_grid_ms,
+        key: Some(key),
+        scale: Some(scale),
+        camelot,
+        key_confidence: Some(key_confidence),
+        intro_cue_ms,
+        outro_cue_ms,
+        intro_bpm: intro_local.map(|local| local.bpm),
+        intro_beat_ms: intro_local.and_then(|local| local.beat_ms),
+        outro_bpm: outro_local.map(|local| local.bpm),
+        outro_beat_ms: outro_local.and_then(|local| local.beat_ms),
+        intro_tempo_stability: intro_local.map(|local| local.stability),
+        outro_tempo_stability: outro_local.map(|local| local.stability),
+        intro_downbeat_ms,
+        outro_downbeat_ms,
+        intro_lufs: intro_lufs.map(|value| value as f32),
+        outro_lufs: outro_lufs.map(|value| value as f32),
+        true_peak_dbfs: loudness
+            .and_then(|summary| summary.true_peak_dbfs)
+            .map(|value| value as f32),
+        integrated_lufs: loudness
+            .and_then(|summary| summary.integrated_lufs)
+            .map(|value| value as f32),
+        measurement_version: loudness.map(|_| MEASUREMENT_VERSION.to_string()),
+        active_start_ms,
+        active_end_ms,
+        intro_energy: intro.1,
+        outro_energy: outro.1,
+        intro_spectral_density: intro.2,
+        outro_spectral_density: outro.2,
+        global_energy: global.1,
+    }
 }
 
 /// Analyze a single track. If `panns` is provided, also compute ML features.
@@ -490,7 +1186,7 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
     }
 
     if let Some(model) = panns {
-        match decode_audio_original(path) {
+        match decode_audio_original(path, crate::ml::PANNS_DURATION) {
             Ok((orig_samples, orig_sr)) => {
                 let waveform_32k = crate::ml::resample_linear(
                     &orig_samples,
@@ -526,7 +1222,7 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
 }
 
 pub fn analyze_track(path: &Path) -> AnalysisResult {
-    let (samples, sample_rate) = match decode_audio(path) {
+    let decoded = match decode_audio(path) {
         Ok(r) => r,
         Err(e) => {
             return AnalysisResult {
@@ -543,10 +1239,19 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
                 valence: None,
                 acousticness: None,
                 instrumentalness: None,
+                mix_profile: None,
                 error: Some(e),
             }
         }
     };
+
+    let DecodedAudio {
+        head: samples,
+        tail,
+        sample_rate,
+        duration_ms,
+        loudness: measured_loudness,
+    } = decoded;
 
     if samples.is_empty() {
         return AnalysisResult {
@@ -563,6 +1268,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
             valence: None,
             acousticness: None,
             instrumentalness: None,
+            mix_profile: None,
             error: Some("empty audio".to_string()),
         };
     }
@@ -572,7 +1278,17 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let energy = compute_energy(rms);
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
-    let (key, scale) = detect_key(&samples, sample_rate);
+    let (key, scale, _) = detect_key(&samples, sample_rate);
+    let mix_profile = Some(analyze_smart_mix_segments(
+        &samples,
+        tail.as_ref().map(|(samples, start_ms)| AudioTail {
+            samples,
+            start_ms: *start_ms,
+        }),
+        sample_rate,
+        Some(duration_ms),
+        measured_loudness.as_ref(),
+    ));
 
     // Average spectral centroid
     let mut planner = RealFftPlanner::<f32>::new();
@@ -606,6 +1322,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         valence: None,
         acousticness: None,
         instrumentalness: None,
+        mix_profile,
         error: None,
     }
 }

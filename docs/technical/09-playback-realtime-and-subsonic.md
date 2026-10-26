@@ -12,6 +12,11 @@ sources:
 
 # Playback, Realtime, and Subsonic
 
+> For Smart Mix's implemented behavior and diagnosis, use the
+> [operational reference](smart-mix-operations.md). The [unified design](smart-mix-design.md)
+> and [continuation plan](smart-mix-implementation-plan.md) describe further development
+> and its acceptance gates.
+
 ## Listen playback architecture
 
 Playback is a defining subsystem of `app/listen`, not a peripheral utility.
@@ -222,3 +227,17 @@ under `/rest`.
 
 This lets Crate serve external clients while still keeping Listen's richer
 native API and playback model.
+
+## Smart Mix planning and execution
+
+Smart Mix section verified against source on 2026-10-21.
+
+The backend returns versioned transition plans; the consumer must still install and execute
+them. Album playback can remain gapless; adaptive crossfade and beatmatch have different
+eligibility. Cue-local tempo/beat evidence, confidence/stability, tempo limits and available
+windows govern degradation. Native Android requests plans without holding up initial audio,
+uses bounded deadlines/fallbacks and can continue planning outside the WebView. Current
+web/desktop heuristics and the future iOS native work are separate consumer paths.
+See [Smart Mix operation](smart-mix-operations.md) for current versions, flags, cache
+identity, fallback reasons and the difference between a planned result and physical audio
+validation. Existing design/continuation guides retain the unclosed physical gates.

@@ -10,6 +10,7 @@ _HTTP_METHODS = {"get", "post", "put", "delete", "patch", "options", "head"}
 _SECURED_TAGS = {"radio", "genres"}
 _SECURED_PATHS = {
     "/api/artists/{artist_id}/radio",
+    "/api/playback/continuation-token",
 }
 _PUBLIC_AUTH_PATHS = {
     "/api/auth/login",
@@ -201,6 +202,11 @@ _TAG_METADATA = [
         "description": "First-run setup and bootstrap helpers.",
     },
     {
+        "name": "agents",
+        "x-displayName": "Agent Integrations",
+        "description": "Human administration of service and delegated access, activity and exact plan decisions.",
+    },
+    {
         "name": "admin",
         "x-displayName": "System Playlists",
         "description": "Administrator-only curated/system playlist surfaces.",
@@ -256,6 +262,7 @@ _TAG_GROUPS = [
             "stack",
             "setup",
             "admin",
+            "agents",
         ],
     },
     {"name": "Compatibility", "tags": ["subsonic"]},
@@ -376,6 +383,7 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/missing-search",
         "/api/insights",
         "/api/shows",
+        "/api/show-imports",
         "/api/upcoming",
         "/api/network",
         "/api/batch",
@@ -448,6 +456,15 @@ def custom_openapi(app: FastAPI) -> dict:
 
     components = schema.setdefault("components", {})
     security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes.setdefault(
+        "nativeTelegramHmac",
+        {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Crate-Signature",
+            "description": "Native plugin HMAC over method, fixed path, timestamp, nonce and exact body; not a bearer credential.",
+        },
+    )
     security_schemes.setdefault(
         "bearerAuth",
         {

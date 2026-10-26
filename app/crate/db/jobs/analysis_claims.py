@@ -8,9 +8,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 
+from crate.db.jobs.analysis_generations import accepted_claim_ids, lock_processing_rows
 from crate.db.jobs.analysis_shared import (
     append_pipeline_event,
     claim_batch_sql,
+    claim_locked_batch_sql,
     ensure_processing_rows,
     mark_ops_snapshot_dirty,
     pipeline_name_for_state_column,
@@ -61,14 +63,39 @@ def claim_tracks(state_column: str, *, limit: int = 1) -> list[dict]:
         ).scalar()
         if not pending:
             return []
-        rows = (
+        track_ids = list(
             session.execute(
                 text(claim_batch_sql(col)),
                 {
                     "pipeline": pipeline,
+                    "limit": batch_size,
+                },
+            ).scalars()
+        )
+        if not track_ids:
+            return []
+        from crate.db.jobs.operator_generations import allowed_generation_ids
+
+        track_ids = sorted(
+            allowed_generation_ids(
+                session,
+                rows=lock_processing_rows(session, track_ids, [pipeline]),
+                pipeline=pipeline,
+            )
+        )
+        if not track_ids:
+            return []
+        # A candidate statement can retain an old processing-state snapshot
+        # after locking a newer track row. Recheck in a fresh statement before
+        # assigning tokens, with the track locks held until commit.
+        rows = (
+            session.execute(
+                text(claim_locked_batch_sql(col)),
+                {
+                    "pipeline": pipeline,
                     "claimed_at": claimed_at,
                     "claimed_by": claimed_by,
-                    "limit": batch_size,
+                    "track_ids": track_ids,
                 },
             )
             .mappings()
@@ -93,82 +120,65 @@ def claim_tracks(state_column: str, *, limit: int = 1) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def release_claims(track_ids: list[int], state_column: str) -> int:
+def release_claims(
+    track_ids: list[int], state_column: str, *, claims: dict[int, dict] | None = None
+) -> int:
     col = validate_state_column(state_column)
-    cleaned = [int(track_id) for track_id in track_ids if track_id]
+    cleaned = sorted({int(track_id) for track_id in track_ids if track_id})
     if not cleaned:
         return 0
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
-        # col is validated against ALLOWED_STATE_COLUMNS whitelist above.
-        result = session.execute(
-            text(
-                f"UPDATE library_tracks SET {col} = 'pending' WHERE id = ANY(:track_ids) AND {col} = 'analyzing'"
-            ),
-            {"track_ids": cleaned},
+        accepted = sorted(
+            accepted_claim_ids(
+                session, track_ids=cleaned, pipeline=pipeline, claims=claims
+            )
         )
+        if not accepted:
+            return 0
         session.execute(
             text(
-                """
-                UPDATE track_processing_state
-                SET state = 'pending',
-                    claimed_by = NULL,
-                    claimed_at = NULL,
-                    updated_at = NOW()
-                WHERE pipeline = :pipeline
-                  AND track_id = ANY(:track_ids)
-                  AND state = 'analyzing'
-                """
+                "UPDATE track_processing_state SET state='pending', claimed_by=NULL, claimed_at=NULL, claim_token=NULL, updated_at=NOW() WHERE pipeline=:pipeline AND track_id=ANY(:ids)"
             ),
-            {"pipeline": pipeline, "track_ids": cleaned},
+            {"pipeline": pipeline, "ids": accepted},
         )
-        changed = _rowcount(result)
-        if changed:
-            mark_ops_snapshot_dirty(session)
-        return changed
+        result = session.execute(
+            text(f"UPDATE library_tracks SET {col}='pending' WHERE id=ANY(:ids)"),
+            {"ids": accepted},
+        )
+        mark_ops_snapshot_dirty(session)
+        return _rowcount(result)
 
 
 def reset_stale_claims(state_column: str) -> int:
-    """On startup, reset processing rows stuck in analyzing from a previous crash.
-
-    The shadow ``track_processing_state`` row is the authoritative claim state.
-    Avoid scanning ``library_tracks`` here: on large libraries that legacy state
-    update can hit statement timeouts before the daemon even starts.
-    """
+    """Invalidate abandoned claim tokens before making their rows claimable again."""
     col = validate_state_column(state_column)
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
-        rows = (
+        ids = list(
             session.execute(
                 text(
-                    # col is validated against ALLOWED_STATE_COLUMNS whitelist above.
-                    f"""
-                WITH reset AS (
-                    UPDATE track_processing_state
-                    SET state = 'pending',
-                        claimed_by = NULL,
-                        claimed_at = NULL,
-                        updated_at = NOW()
-                    WHERE pipeline = :pipeline
-                      AND state = 'analyzing'
-                    RETURNING track_id
-                )
-                UPDATE library_tracks lt
-                SET {col} = 'pending'
-                FROM reset
-                WHERE lt.id = reset.track_id
-                RETURNING reset.track_id
-                """
+                    "SELECT track_id FROM track_processing_state WHERE pipeline=:pipeline AND state='analyzing'"
                 ),
                 {"pipeline": pipeline},
-            )
-            .mappings()
-            .all()
+            ).scalars()
         )
-        reset_count = len(rows)
-        if reset_count:
-            mark_ops_snapshot_dirty(session)
-        return reset_count
+        rows = lock_processing_rows(session, ids, [pipeline]) if ids else []
+        ids = [int(row["track_id"]) for row in rows if row["state"] == "analyzing"]
+        if not ids:
+            return 0
+        session.execute(
+            text(
+                "UPDATE track_processing_state SET state='pending',claimed_by=NULL,claimed_at=NULL,claim_token=NULL,updated_at=NOW() WHERE pipeline=:pipeline AND track_id=ANY(:ids)"
+            ),
+            {"pipeline": pipeline, "ids": ids},
+        )
+        session.execute(
+            text(f"UPDATE library_tracks SET {col}='pending' WHERE id=ANY(:ids)"),
+            {"ids": ids},
+        )
+        mark_ops_snapshot_dirty(session)
+        return len(ids)
 
 
 def get_pending_count(state_column: str) -> int:

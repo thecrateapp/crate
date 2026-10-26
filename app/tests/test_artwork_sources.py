@@ -4,14 +4,13 @@ from __future__ import annotations
 def test_revision_scoped_artist_hero_source_does_not_fall_back_to_legacy_file(
     monkeypatch, tmp_path
 ):
-    from PIL import Image
-
     from crate import artwork_sources
     from crate.artist_hero_publication import (
         ArtistHeroArtifactIdentity,
         publish_artist_hero_artifact,
     )
     from crate.artwork_variants import ArtworkAsset
+    from PIL import Image
 
     monkeypatch.setenv("CACHE_DIR", str(tmp_path))
     artist_dir = tmp_path / "Artist"
@@ -371,3 +370,45 @@ def test_source_resolver_rejects_oversized_embedded_or_provider_payloads(monkeyp
         )
         is None
     )
+
+
+def test_frozen_embedded_artwork_reads_exact_source_and_rejects_replacement(
+    tmp_path,
+):
+    import base64
+    import zlib
+    from io import BytesIO
+
+    import pytest
+    from crate import artwork_sources
+    from mutagen.flac import FLAC, Picture
+    from PIL import Image
+
+    from tests.test_agent_acquisition import SILENT_FLAC
+
+    path = tmp_path / "one.flac"
+    path.write_bytes(zlib.decompress(base64.b64decode(SILENT_FLAC)))
+    content = BytesIO()
+    Image.new("RGB", (12, 12), "blue").save(content, format="PNG")
+    picture = Picture()
+    picture.type = 3
+    picture.mime = "image/png"
+    picture.data = content.getvalue()
+    audio = FLAC(path)
+    audio.add_picture(picture)
+    audio.save()
+    reference = artwork_sources.freeze_album_artwork_source(tmp_path, {".flac"})
+    assert reference["embedded"] is True
+    assert (
+        artwork_sources.read_bound_artwork_source(reference).content
+        == content.getvalue()
+    )
+    # A new cover cannot retarget the queued embedded source.
+    Image.new("RGB", (10, 10), "red").save(tmp_path / "cover.jpg")
+    assert (
+        artwork_sources.read_bound_artwork_source(reference).content
+        == content.getvalue()
+    )
+    path.write_bytes(path.read_bytes() + b"changed")
+    with pytest.raises(ValueError, match="changed"):
+        artwork_sources.read_bound_artwork_source(reference)

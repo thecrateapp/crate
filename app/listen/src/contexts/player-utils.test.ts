@@ -116,6 +116,38 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.savedAt).toEqual(expect.any(String));
   });
 
+  it("restores the play source without the radio session", () => {
+    const source = {
+      type: "playlist",
+      name: "Smart Mix R1 test",
+      id: 1,
+      href: "/playlists/1",
+      radio: { sessionId: "radio-session" },
+    } as unknown as PlaySource;
+
+    saveQueue([TRACK_A, TRACK_B], 0, { playSource: source });
+
+    expect(getStoredQueue().playSource).toEqual({
+      type: "playlist",
+      name: "Smart Mix R1 test",
+      id: 1,
+      href: "/playlists/1",
+    });
+  });
+
+  it("ignores a stored play source with an unknown type", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        queue: [TRACK_A],
+        currentIndex: 0,
+        playSource: { type: "mystery", name: "?" },
+      }),
+    );
+
+    expect(getStoredQueue().playSource).toBeNull();
+  });
+
   it("persists canonical artwork URLs without expiring credentials", () => {
     saveQueue(
       [

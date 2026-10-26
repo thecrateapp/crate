@@ -1,5 +1,6 @@
 """Tests for crate.library_sync — filesystem-to-DB synchronization."""
 
+import os
 import tempfile
 import threading
 import time
@@ -11,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from crate.entity_ids import artist_entity_uid
+from crate.smart_mix.source import smart_mix_source_revision
 
 
 ALBUM_ENTITY_UID = "22222222-2222-5222-8222-222222222222"
@@ -38,6 +40,18 @@ def _create_test_library(base: Path):
     return base
 
 
+def _stored_album_mtimes(artist_dir: Path) -> dict[str, float]:
+    return {
+        str(album): max(
+            [album.stat().st_mtime]
+            + [path.stat().st_mtime for path in album.rglob("*")]
+        )
+        + 1
+        for album in artist_dir.iterdir()
+        if album.is_dir()
+    }
+
+
 def _fake_upsert_scanned_album(
     *, artist_payload: dict, album_payload: dict, track_payloads: list[dict]
 ):
@@ -54,6 +68,11 @@ def _fake_upsert_artist(payload: dict):
 
 
 class TestLibrarySyncFullSync:
+    @pytest.fixture(autouse=True)
+    def _no_indexed_album_paths(self):
+        with patch("crate.library_sync.get_all_album_paths", return_value=[]):
+            yield
+
     def test_full_sync_discovers_artists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = _create_test_library(Path(tmpdir))
@@ -68,6 +87,7 @@ class TestLibrarySyncFullSync:
                 patch("crate.library_sync.get_library_artist", return_value=None),
                 patch("crate.library_sync.get_library_albums", return_value=[]),
                 patch("crate.library_sync.get_library_artists", return_value=([], 0)),
+                patch("crate.library_sync.get_album_dir_mtimes", return_value={}),
                 patch(
                     "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
                 ),
@@ -144,6 +164,10 @@ class TestLibrarySyncFullSync:
                     return_value=([existing_artist], 1),
                 ),
                 patch(
+                    "crate.library_sync.get_album_dir_mtimes",
+                    return_value=_stored_album_mtimes(artist_dir),
+                ),
+                patch(
                     "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
                 ),
                 patch(
@@ -166,6 +190,79 @@ class TestLibrarySyncFullSync:
                 # Artist One was skipped, Artist Two was added
                 assert result["artists_added"] == 1
                 assert mock_upsert_scanned.call_count == 1
+
+    def test_full_sync_rescans_an_artist_whose_file_was_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = _create_test_library(Path(tmpdir))
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac", ".mp3"],
+            }
+            artist_dir = lib / "Artist One"
+            stored_mtimes = _stored_album_mtimes(artist_dir)
+            artist_mtime = artist_dir.stat().st_mtime
+            replaced = artist_dir / "Album A" / "01 - Track.flac"
+            replaced.write_bytes(b"\x01" * 2048)
+            stored_at = stored_mtimes[str(artist_dir / "Album A")]
+            os.utime(replaced, (stored_at + 10, stored_at + 10))
+            os.utime(artist_dir, (artist_mtime, artist_mtime))
+            existing_artist = {
+                "name": "Artist One",
+                "album_count": 2,
+                "track_count": 3,
+                "total_size": 2560,
+                "dir_mtime": artist_mtime + 1,
+                "formats": ["flac", "mp3"],
+                "primary_format": "flac",
+                "has_photo": 0,
+            }
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    side_effect=lambda name: (
+                        existing_artist if name == "Artist One" else None
+                    ),
+                ),
+                patch("crate.library_sync.get_library_albums", return_value=[]),
+                patch(
+                    "crate.library_sync.get_library_artists",
+                    return_value=([existing_artist], 1),
+                ),
+                patch(
+                    "crate.library_sync.get_album_dir_mtimes",
+                    return_value=stored_mtimes,
+                ),
+                patch(
+                    "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.delete_artist"),
+                patch("crate.library_sync.delete_album"),
+                patch("crate.library_sync.mutagen.File", return_value=None),
+                patch("crate.library_sync.read_tags", return_value={}),
+            ):
+                from crate.library_sync import LibrarySync
+
+                LibrarySync(config).full_sync()
+
+            payloads = [
+                track
+                for call in mock_upsert_scanned.call_args_list
+                for track in call.kwargs["track_payloads"]
+            ]
+            [rescanned] = [
+                track for track in payloads if track["path"] == str(replaced)
+            ]
+            assert rescanned["smart_mix_source_revision"] == (
+                smart_mix_source_revision(replaced)
+            )
 
 
 class TestSyncAlbum:
@@ -242,6 +339,9 @@ class TestSyncAlbum:
                 payload = mock_upsert_scanned.call_args.kwargs["track_payloads"][0]
                 assert payload["sample_rate"] == 44100
                 assert payload["bit_depth"] == 16
+                assert payload["smart_mix_source_revision"] == (
+                    smart_mix_source_revision(track_path)
+                )
 
     def test_sync_album_reads_tracks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -293,6 +393,14 @@ class TestSyncAlbum:
                 assert result["total_size"] == 3072
                 assert "flac" in result["formats"]
                 assert len(mock_upsert_scanned.call_args.kwargs["track_payloads"]) == 2
+                payloads = mock_upsert_scanned.call_args.kwargs["track_payloads"]
+                assert {
+                    payload["path"]: payload["smart_mix_source_revision"]
+                    for payload in payloads
+                } == {
+                    str(album_dir / name): smart_mix_source_revision(album_dir / name)
+                    for name in ("01.flac", "02.flac")
+                }
                 queued_asset = mock_queue.call_args.args[0]
                 assert queued_asset.kind == "album-cover"
                 assert queued_asset.entity_key == ALBUM_ENTITY_UID
@@ -1211,6 +1319,114 @@ class TestStaleArtistRemoval:
         mock_album_scan.assert_called_once()
 
 
+class TestInternalLibraryPaths:
+    def _sync(self, lib: Path):
+        from crate.library_sync import LibrarySync
+
+        return LibrarySync({"library_path": str(lib), "audio_extensions": [".flac"]})
+
+    def _trash_album(self, lib: Path) -> Path:
+        album_dir = lib / ".crate-trash" / "tracks" / "artist-uid" / "album-uid"
+        album_dir.mkdir(parents=True)
+        (album_dir / "01.flac").write_bytes(b"\x00" * 1024)
+        return album_dir
+
+    def test_sync_album_skips_album_inside_trash(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.upsert_scanned_album") as mock_upsert,
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+            ):
+                result = self._sync(lib).sync_album(album_dir, ".crate-trash")
+
+            assert result == {"skipped": "internal_path", "album_id": None}
+            mock_upsert.assert_not_called()
+            mock_upsert_artist.assert_not_called()
+
+    def test_prepare_album_sync_skips_album_inside_trash(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = self._trash_album(lib)
+
+            with patch("crate.library_sync.get_album_id_by_path") as mock_lookup:
+                result = self._sync(lib).prepare_album_sync(album_dir, ".crate-trash")
+
+            assert result == {"skipped": "internal_path", "album_id": None}
+            mock_lookup.assert_not_called()
+
+    def test_sync_artist_dirs_ignores_internal_dirs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.get_library_artist") as mock_lookup,
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+            ):
+                count = self._sync(lib).sync_artist_dirs(
+                    ".crate-trash", [lib / ".crate-trash"]
+                )
+
+            assert count == 0
+            mock_lookup.assert_not_called()
+            mock_upsert_artist.assert_not_called()
+
+    def test_remove_internal_rows_deletes_only_hidden_library_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            trash_album = str(lib / ".crate-trash" / "tracks")
+            albums = [
+                {"path": trash_album},
+                {"path": str(lib / "Artist" / "Album")},
+                {"path": "/elsewhere/.hidden/Album"},
+            ]
+            artists = [
+                {"name": ".crate-trash", "folder_name": ".crate-trash"},
+                {"name": "Artist", "folder_name": "Artist"},
+            ]
+
+            with (
+                patch("crate.library_sync.get_all_album_paths", return_value=albums),
+                patch(
+                    "crate.library_sync.get_library_artists",
+                    return_value=(artists, len(artists)),
+                ) as mock_artists,
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+                patch("crate.library_sync.delete_artist") as mock_delete_artist,
+            ):
+                removed = self._sync(lib).remove_internal_rows()
+
+            assert removed == 2
+            mock_delete_album.assert_called_once_with(trash_album)
+            mock_delete_artist.assert_called_once_with(".crate-trash")
+            assert mock_artists.call_args.kwargs["include_internal"] is True
+
+    def test_full_sync_reports_internal_rows_removed(self):
+        from crate.library_sync import LibrarySync
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            self._trash_album(lib)
+
+            with (
+                patch("crate.library_sync.get_album_dir_mtimes", return_value={}),
+                patch("crate.library_sync.get_library_artists", return_value=([], 0)),
+                patch("crate.library_sync.upsert_artist") as mock_upsert_artist,
+                patch.object(
+                    LibrarySync, "remove_internal_rows", return_value=2
+                ) as mock_cleanup,
+            ):
+                result = self._sync(lib).full_sync()
+
+            assert result["internal_removed"] == 2
+            assert result["artists_added"] == 0
+            mock_cleanup.assert_called_once_with()
+            mock_upsert_artist.assert_not_called()
+
+
 class TestParseInt:
     def test_normal_int(self):
         from crate.library_sync import _parse_int
@@ -1236,3 +1452,31 @@ class TestParseInt:
         from crate.library_sync import _parse_int
 
         assert _parse_int(None, 1) == 1
+
+
+def test_album_dir_mtimes_are_read_by_path_in_one_query(pg_db) -> None:
+    del pg_db
+    from sqlalchemy import text
+
+    from crate.db.jobs.sync import get_album_dir_mtimes
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text("INSERT INTO library_artists (name) VALUES ('Mtime Artist')")
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO library_albums (artist, name, path, dir_mtime)
+                VALUES
+                    ('Mtime Artist', 'Synced', '/music/mtime/synced', 1700000000.5),
+                    ('Mtime Artist', 'Unsynced', '/music/mtime/unsynced', NULL)
+                """
+            )
+        )
+
+    mtimes = get_album_dir_mtimes()
+
+    assert mtimes["/music/mtime/synced"] == 1700000000.5
+    assert mtimes["/music/mtime/unsynced"] is None
