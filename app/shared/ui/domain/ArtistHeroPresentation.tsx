@@ -32,7 +32,9 @@ export function ArtistHeroPresentation({
   const mobile = composition === "mobile";
   const copy = (
     <>
-      <MonoLabel className="text-accent-action">{kicker}</MonoLabel>
+      <MonoLabel className="relative top-2.5 text-accent-action">
+        {kicker}
+      </MonoLabel>
       <h1
         data-testid="hero-result-artist-name"
         className={cn(

@@ -46,7 +46,7 @@ export function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
   if (genres.length === 0) return null;
 
   return (
-    <div className="mt-4 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
+    <div className="mt-1.5 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
       {genres.slice(0, 2).map((genre) => (
         <GenrePill
           key={genre.name}

@@ -22,7 +22,7 @@ export function HeroActions({
     { name: hero.name },
   );
   return (
-    <div className="mt-6 flex items-center gap-2.5">
+    <div className="mt-[34px] flex items-center gap-2.5">
       <Button
         aria-label={playLabel}
         size="lg"

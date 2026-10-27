@@ -436,9 +436,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "30d5df750f72522fb35b85621db41bb7acb32bdd29d5322c861b6ed6c9115fa8",
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "bfbeb0831757e922fa0c87d88dcdbb01310ff893814b5ec525a18e932599166a",
         "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx": "9d3925e7cc7a6ea92ed2d26c469a3c935c5f9ce65047ed13bd56dcadb544b144",
-        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "cf00778e971aeeaa9b8f58383958b1ce97abf210d096eaaa3b99b5494bdc20e8"
+        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "87db821e2356d4965597a660100eac1331404881bf18f63be23d631304e012d9"
       },
       "category": "Data Display"
     },
