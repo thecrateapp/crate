@@ -6,10 +6,15 @@
     "login": "tsx login.ts",
     "capture": "tsx capture.ts",
     "render": "./render.sh",
-    "shots": "tsx shots.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "studio": "remotion studio remotion/index.ts --public-dir out"
+    "studio": "remotion studio remotion/index.ts --public-dir out",
+    "film:login": "tsx film/login.ts",
+    "film:animatic": "film/render-animatic.sh",
+    "film:capture": "tsx film/capture.ts",
+    "film:render": "film/render-film.sh",
+    "film:gallery": "film/render-gallery.sh",
+    "film:web": "tsx film/write-films.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

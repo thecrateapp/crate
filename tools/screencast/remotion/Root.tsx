@@ -3,12 +3,71 @@ import {
   staticFile,
   type CalculateMetadataFunction,
 } from "remotion";
+import admin from "../film/data/admin.beats.json";
+import listen from "../film/data/listen.beats.json";
+import type { BeatGrid } from "../film/grid";
+import { ADMIN, LISTEN } from "../film/storyboard";
+import { takesIn, type ShotEdit } from "../film/edit";
+import { ADMIN_EDIT } from "../film/edits/admin";
+import { LISTEN_EDIT } from "../film/edits/listen";
+import { GALLERY, galleryTakes } from "../film/gallery";
+import { Animatic } from "./Animatic";
+import { Gallery, type GalleryProps } from "./Gallery";
+import { Film, type FilmProps } from "./Film";
 import { Chapter, CHAPTERS, type ChapterProps, type Track } from "./Chapter";
 import type { Frame } from "./frames";
 import { syncTracks } from "./sync";
 
 const FPS = 30;
 const TAIL_SECONDS = 1;
+
+const FILMS: { board: FilmProps["board"]; grid: BeatGrid; edit: ShotEdit[] }[] =
+  [
+    { board: LISTEN, grid: listen as BeatGrid, edit: LISTEN_EDIT },
+    { board: ADMIN, grid: admin as BeatGrid, edit: ADMIN_EDIT },
+  ];
+
+const loadTakes: CalculateMetadataFunction<FilmProps> = async ({
+  props,
+  abortSignal,
+}) => {
+  const entries = await Promise.all(
+    takesIn(props.edit).map(async (key) => {
+      const response = await fetch(
+        staticFile(`takes/${props.board.id}/${key}/frames.json`),
+        { signal: abortSignal },
+      );
+      if (!response.ok)
+        throw new Error(
+          `Missing out/film/takes/${props.board.id}/${key}; capture it first.`,
+        );
+      return [key, (await response.json()) as Frame[]] as const;
+    }),
+  );
+  return { props: { ...props, takes: Object.fromEntries(entries) } };
+};
+
+const loadGalleryTakes: CalculateMetadataFunction<GalleryProps> = async ({
+  props,
+  abortSignal,
+}) => {
+  const entries = await Promise.all(
+    galleryTakes(props.gallery).map(async (key) => {
+      const response = await fetch(staticFile(`takes/${key}/frames.json`), {
+        signal: abortSignal,
+      });
+      if (!response.ok)
+        throw new Error(`Missing out/film/takes/${key}; capture it first.`);
+      return [key, (await response.json()) as Frame[]] as const;
+    }),
+  );
+  return { props: { ...props, takes: Object.fromEntries(entries) } };
+};
+
+const FORMATS = [
+  { id: "16x9", width: 1920, height: 1080 },
+  { id: "4x5", width: 1080, height: 1350 },
+];
 
 type Capture = Omit<Track, "knots">;
 
@@ -72,6 +131,55 @@ const empty: Track = {
 export function Root() {
   return (
     <>
+      <Composition
+        id="gallery"
+        component={Gallery}
+        width={1920}
+        height={1080}
+        fps={FPS}
+        durationInFrames={GALLERY.length}
+        defaultProps={{ gallery: GALLERY, takes: {} }}
+        calculateMetadata={loadGalleryTakes}
+      />
+      <Composition
+        id="gallery-4x5"
+        component={Gallery}
+        width={1080}
+        height={1350}
+        fps={FPS}
+        durationInFrames={GALLERY.length}
+        defaultProps={{ gallery: GALLERY, takes: {} }}
+        calculateMetadata={loadGalleryTakes}
+      />
+      {FILMS.flatMap(({ board, grid, edit }) =>
+        FORMATS.map((format) => (
+          <Composition
+            key={`${board.id}-film-${format.id}`}
+            id={`${board.id}-film-${format.id}`}
+            component={Film}
+            width={format.width}
+            height={format.height}
+            fps={FPS}
+            durationInFrames={Math.round(grid.duration * FPS)}
+            defaultProps={{ board, grid, edit, takes: {} }}
+            calculateMetadata={loadTakes}
+          />
+        )),
+      )}
+      {FILMS.flatMap(({ board, grid }) =>
+        FORMATS.map((format) => (
+          <Composition
+            key={`${board.id}-animatic-${format.id}`}
+            id={`${board.id}-animatic-${format.id}`}
+            component={Animatic}
+            width={format.width}
+            height={format.height}
+            fps={FPS}
+            durationInFrames={Math.round(grid.duration * FPS)}
+            defaultProps={{ board, grid }}
+          />
+        )),
+      )}
       {CHAPTERS.map((chapter) => (
         <Composition
           key={chapter}

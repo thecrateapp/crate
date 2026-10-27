@@ -7,12 +7,15 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "resolveJsonModule": true
   },
   "include": [
     "*.ts",
     "chapters/**/*.ts",
     "remotion/**/*.ts",
-    "remotion/**/*.tsx"
+    "remotion/**/*.tsx",
+    "film/**/*.ts",
+    "film/**/*.json"
   ]
 }
