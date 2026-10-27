@@ -3,6 +3,7 @@ import Chapter from "../components/Chapter.astro";
 import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
+import Gallery from "../components/Gallery.astro";
 import PageHeader from "../components/PageHeader.astro";
 import PathsDive from "../components/listen/PathsDive.astro";
 import RadioDive from "../components/listen/RadioDive.astro";
@@ -32,6 +33,8 @@ const custom = new Set(["Play", "Smart Mix", "Discover", "Yours", "Together", "E
       <ChapterToc items={chapters} />
     </PageHeader>
     <ChapterRail items={chapters} />
+
+    <Gallery app="listen" />
 
     {
       chapters.map((chapter) => (

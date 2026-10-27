@@ -3,6 +3,7 @@ import Chapter from "../components/Chapter.astro";
 import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
+import Gallery from "../components/Gallery.astro";
 import PageHeader from "../components/PageHeader.astro";
 import McpAgents from "../components/admin/McpAgents.astro";
 import AlbumSidecar from "../components/viz/AlbumSidecar.astro";
@@ -41,6 +42,8 @@ const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
       <ChapterToc items={chapters} />
     </PageHeader>
     <ChapterRail items={chapters} />
+
+    <Gallery app="admin" />
 
     {
       chapters.map((chapter) => {

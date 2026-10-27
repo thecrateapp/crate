@@ -221,6 +221,7 @@ export function initHero(): () => void {
       for (const [trigger, key, end] of [
         [".statement", "statement", "top 45%"],
         [".screencast", "screen", "top 30%"],
+        [".film, .get", "screen", "top 30%"],
       ] as const) {
         if (!document.querySelector(trigger)) continue;
         ScrollTrigger.create({

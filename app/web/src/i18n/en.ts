@@ -30,6 +30,13 @@ export const en = {
   "screencast.offline": "Offline",
   "screencast.play": "Play the walkthrough",
   "screencast.pause": "Pause the walkthrough",
+  "gallery.label.listen": "Listen screens",
+  "gallery.label.admin": "Admin screens",
+  "gallery.position": "{index} / {count}",
+  "gallery.previous": "Previous screen",
+  "gallery.next": "Next screen",
+  "gallery.pause": "Pause the screens",
+  "gallery.play": "Play the screens",
   "get.title": "Get Crate",
   "get.server": "Server",
   "get.requirements":
