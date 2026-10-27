@@ -1,0 +1,344 @@
+---
+import { films } from "../content/films";
+import { t } from "../i18n";
+
+interface Props {
+  film: "listen" | "admin";
+  locale?: string;
+}
+
+const { film, locale = "en" } = Astro.props;
+const { sources, chapters, track } = films[film];
+---
+
+<section
+  class="film"
+  data-film
+  aria-label={film === "listen" ? t("film.label.listen", locale) : t("film.label.admin", locale)}
+  data-play={t("film.play", locale)}
+  data-pause={t("film.pause", locale)}
+  data-replay={t("film.replay", locale)}
+  data-sound-on={t("film.soundOn", locale)}
+  data-sound-off={t("film.soundOff", locale)}
+>
+  <div class="stage" data-film-stage>
+    <div class="film-frame" data-film-frame>
+      <video data-film-video muted playsinline preload="none" disablepictureinpicture poster={sources["16x9"].poster}>
+        <source media="(max-width: 700px)" data-src={sources["4x5"].webm} type="video/webm" />
+        <source media="(max-width: 700px)" data-src={sources["4x5"].mp4} type="video/mp4" />
+        <source data-src={sources["16x9"].webm} type="video/webm" />
+        <source data-src={sources["16x9"].mp4} type="video/mp4" />
+      </video>
+      <picture class="poster" aria-hidden="true">
+        <source media="(max-width: 700px)" srcset={sources["4x5"].poster} />
+        <img src={sources["16x9"].poster} alt="" width="1920" height="1080" decoding="async" />
+      </picture>
+      <button type="button" class="toggle" data-film-toggle data-state="play" aria-label={t("film.play", locale)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="icon-play" d="M8 5v14l11-7z" />
+          <path class="icon-pause" d="M7 5h4v14H7zM13 5h4v14h-4z" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="bar">
+      <button type="button" class="sound" data-film-sound aria-pressed="false" aria-label={t("film.soundOn", locale)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z" />
+          <path class="waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />
+          <path class="mute" d="M16 9l5 6M21 9l-5 6" />
+        </svg>
+        <span>{t("film.sound", locale)}</span>
+      </button>
+      <ol class="chapters" aria-label={t("film.chapters", locale)}>
+        {
+          chapters.map((chapter, index) => (
+            <li>
+              <button type="button" data-film-chapter data-time={chapter.time}>
+                <b>{String(index + 1).padStart(2, "0")}</b> {chapter.label}
+              </button>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="credit">{t("film.soundtrack", locale)} · {track}</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { gsap } from "gsap";
+  import { ScrollTrigger } from "gsap/ScrollTrigger";
+  import { createFilm, type FilmController } from "../scripts/film/controller";
+  import { reducedMotion } from "../scripts/motion/env";
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  let ctx: gsap.Context | undefined;
+  let controllers: FilmController[] = [];
+
+  function teardown() {
+    ctx?.revert();
+    ctx = undefined;
+    controllers.forEach((controller) => controller.dispose());
+    controllers = [];
+  }
+
+  document.addEventListener("astro:page-load", () => {
+    teardown();
+    const roots = [...document.querySelectorAll<HTMLElement>("[data-film]")];
+    controllers = roots.map((root) =>
+      createFilm(root, {
+        play: root.dataset.play ?? "",
+        pause: root.dataset.pause ?? "",
+        replay: root.dataset.replay ?? "",
+        soundOn: root.dataset.soundOn ?? "",
+        soundOff: root.dataset.soundOff ?? "",
+      }),
+    );
+    if (reducedMotion()) return;
+    ctx = gsap.context(() => {
+      roots.forEach((root, index) => {
+        const frame = root.querySelector("[data-film-frame]");
+        gsap.fromTo(
+          frame,
+          { rotateX: 24, scale: 0.8, y: 60, opacity: 0.55 },
+          {
+            rotateX: 0,
+            scale: 1,
+            y: 0,
+            opacity: 1,
+            ease: "none",
+            scrollTrigger: {
+              trigger: root,
+              start: "top top",
+              end: "+=70%",
+              pin: root.querySelector("[data-film-stage]"),
+              scrub: 0.6,
+              onLeave: () => controllers[index].start(),
+              onUpdate: (self) => {
+                if (self.progress > 0.92) controllers[index].start();
+              },
+            },
+          },
+        );
+      });
+    });
+  });
+
+  document.addEventListener("astro:before-swap", teardown);
+</script>
+
+<style>
+  .film {
+    position: relative;
+    z-index: 5;
+  }
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(16px, 2.4vh, 28px);
+    padding: clamp(64px, 9vh, 110px) clamp(16px, 4vw, 64px) clamp(24px, 4vh, 48px);
+    perspective: 1800px;
+  }
+
+  /* No card: the film's own backdrop is the page colour, so its edges are feathered away and the
+     devices float straight on the site background. */
+  .film-frame {
+    position: relative;
+    width: min(100%, 1480px, calc((100vh - 220px) * 16 / 9));
+    margin: 0 auto;
+    aspect-ratio: 16 / 9;
+    transform-origin: 50% 100%;
+    will-change: transform;
+    --fade-x: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    --fade-y: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+    -webkit-mask-image: var(--fade-x), var(--fade-y);
+    -webkit-mask-composite: source-in;
+    mask-image: var(--fade-x), var(--fade-y);
+    mask-composite: intersect;
+  }
+
+  video,
+  .poster,
+  .poster img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .poster {
+    transition: opacity 400ms ease;
+  }
+
+  [data-state="playing"] .poster,
+  [data-state="ended"] .poster {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .toggle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 84px;
+    height: 84px;
+    margin: -42px 0 0 -42px;
+    border: 1px solid rgba(103, 232, 249, 0.5);
+    border-radius: 50%;
+    background: rgba(10, 10, 15, 0.6);
+    color: var(--fg);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: opacity 250ms ease;
+  }
+
+  .toggle svg {
+    width: 34px;
+    height: 34px;
+    fill: currentColor;
+  }
+
+  .toggle[data-state="play"] .icon-pause,
+  .toggle[data-state="pause"] .icon-play {
+    display: none;
+  }
+
+  [data-state="playing"] .toggle {
+    opacity: 0;
+  }
+
+  .film-frame:hover .toggle,
+  .toggle:focus-visible {
+    opacity: 1;
+  }
+
+  .toggle:focus-visible,
+  .sound:focus-visible,
+  .chapters button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 3px;
+  }
+
+  .bar {
+    width: min(100%, 1480px);
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+  }
+
+  .sound {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .sound svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+
+  .sound .waves {
+    fill: none;
+    display: none;
+  }
+
+  .sound .mute {
+    fill: none;
+  }
+
+  .sound[aria-pressed="true"] {
+    border-color: rgba(103, 232, 249, 0.5);
+    color: var(--cyan-hi);
+  }
+
+  .sound[aria-pressed="true"] .waves {
+    display: block;
+  }
+
+  .sound[aria-pressed="true"] .mute {
+    display: none;
+  }
+
+  .chapters {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+
+  .chapters button {
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 200ms ease;
+  }
+
+  .chapters b {
+    color: var(--cyan);
+    font-weight: 500;
+  }
+
+  .chapters button[data-active],
+  .chapters button:hover {
+    color: var(--fg);
+  }
+
+  .credit {
+    margin: 0 0 0 auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 700px) {
+    .film-frame {
+      width: min(100%, calc((100vh - 240px) * 4 / 5));
+      aspect-ratio: 4 / 5;
+    }
+
+    .credit {
+      margin-left: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .poster,
+    .toggle,
+    .chapters button {
+      transition: none;
+    }
+  }
+</style>
