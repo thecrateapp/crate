@@ -746,10 +746,10 @@ def test_supervisor_config_and_secrets_load_in_the_real_supervisor(
     adapted = tmp_path / "config.json"
     adapted.write_text(json.dumps(config))
     monkeypatch.syspath_prepend(str(ROOT))
-    sys.modules.pop("deploy.operator.server", None)
     from deploy.operator import server
 
     server.main(["--config", str(adapted), "--check"])
+    assert sys.modules.get("deploy.operator.server") is server
 
 
 def test_rerun_keeps_supervisor_secrets_binding_and_config_edits(tmp_path, monkeypatch):
