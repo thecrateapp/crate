@@ -50,7 +50,7 @@ test("renders the real empty offline mirror with a deterministic browser quota",
       value: async () => ({ quota, usage: 512 * 1024 * 1024 }),
     });
   }, quota);
-  await openListenPage("/settings");
+  await openListenPage("/settings?tab=offline");
   const section = page.getByRole("region", {
     name: "Offline mirror",
     exact: true,
@@ -95,7 +95,7 @@ for (const availability of ["absent", "rejected"] as const) {
               },
       });
     }, availability);
-    await openListenPage("/settings");
+    await openListenPage("/settings?tab=offline");
     const section = page.getByRole("region", {
       name: "Offline mirror",
       exact: true,
