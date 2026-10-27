@@ -53,6 +53,12 @@ export function UpcomingShowCollapsedView({
       expanded={false}
       actions={
         <div className="flex flex-col">
+          <ActionGroup label={t("actions.menu.more")}>
+            <UpcomingEventMenuAction
+              menu={actionMenu}
+              label={t("actions.menu.more")}
+            />
+          </ActionGroup>
           <ActionGroup label={t("radar.show.attend")}>
             <ActionButton
               label={
@@ -72,12 +78,6 @@ export function UpcomingShowCollapsedView({
                 <CalendarPlus size={CRATE_ICON_SIZE.md} />
               )}
             </ActionButton>
-          </ActionGroup>
-          <ActionGroup label={t("actions.menu.more")}>
-            <UpcomingEventMenuAction
-              menu={actionMenu}
-              label={t("actions.menu.more")}
-            />
           </ActionGroup>
         </div>
       }

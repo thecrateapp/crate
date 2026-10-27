@@ -5,7 +5,7 @@ import { UpcomingEventRow } from "./UpcomingEventRow";
 
 describe("UpcomingEventRow layout slots", () => {
   it.each([1, 2])(
-    "keeps date and actions in fixed sibling lanes with %i action(s)",
+    "keeps date and top-aligned actions in sibling lanes with %i action(s)",
     (actionCount) => {
       const { container } = render(
         <MemoryRouter>
@@ -36,7 +36,13 @@ describe("UpcomingEventRow layout slots", () => {
       expect(identity?.contains(dateSlot ?? null)).toBe(false);
       expect(dateSlot?.nextElementSibling).toBe(actionsSlot);
       expect(dateSlot).toHaveClass("w-14", "shrink-0");
-      expect(actionsSlot).toHaveClass("w-28", "shrink-0");
+      expect(actionsSlot).toHaveClass(
+        "min-w-11",
+        "shrink-0",
+        "self-stretch",
+        "items-start",
+      );
+      expect(actionsSlot).not.toHaveClass("w-28");
       expect(actionsSlot?.querySelectorAll("button")).toHaveLength(actionCount);
     },
   );

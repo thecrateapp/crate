@@ -65,7 +65,7 @@ export function UpcomingEventRow({
       <div
         data-slot="upcoming-event-actions-slot"
         className={cn(
-          "flex w-28 shrink-0 items-center justify-end",
+          "flex min-w-11 shrink-0 items-start justify-end self-stretch",
           actionsClassName,
         )}
       >

@@ -1950,9 +1950,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/shows/UpcomingEventRow.tsx": "2c144b53a3e493a36cae7611c0d62e5c25189a79ba2b4603eec12b577c636c48",
+        "app/shared/ui/domain/shows/UpcomingEventRow.tsx": "8a8eb3609cd08d23969b218bd3d88c7cfbb4ea585bbd765d27f6ca43e10911e7",
         "tools/crate-ui-showcase/stories/UpcomingEventRow.stories.tsx": "fdbcb5b35b91c513a1490ea4fca5640cbe0375954253f81f0355031a240a964c",
-        "tools/crate-ui-showcase/docs/UpcomingEventRow.mdx": "419c37c1f97582b058b7ce1873956d2f5c1beb04d9b5679d98a2623b4bd6ddc9"
+        "tools/crate-ui-showcase/docs/UpcomingEventRow.mdx": "64c55a300bdabc7e8bc339ba4ab4544a593a50135c05f66d4fa4b4b712c9bce9"
       },
       "category": "Data Display"
     }

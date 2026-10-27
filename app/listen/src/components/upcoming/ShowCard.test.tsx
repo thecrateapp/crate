@@ -187,6 +187,23 @@ describe("ShowCard row", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the more button above the attendance action", () => {
+    renderWithListenProviders(
+      <ShowCard item={item} expanded={false} onToggle={vi.fn()} />,
+    );
+    const slot = document.querySelector<HTMLElement>(
+      '[data-slot="upcoming-event-actions-slot"]',
+    )!;
+    const groups = within(slot).getAllByRole("group");
+    expect(groups).toHaveLength(2);
+    expect(
+      within(groups[0]!).getByRole("button", { name: "More actions" }),
+    ).toBeInTheDocument();
+    expect(
+      within(groups[1]!).queryByRole("button", { name: "More actions" }),
+    ).toBeNull();
+  });
+
   it("opens the show menu from the more button", () => {
     renderWithListenProviders(
       <ShowCard item={item} expanded={false} onToggle={vi.fn()} />,

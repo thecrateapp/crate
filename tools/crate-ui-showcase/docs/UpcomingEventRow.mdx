@@ -17,8 +17,11 @@ import { DocHeading } from "../components/DocHeading";
 - Identity uses a native button when `onToggle` is supplied, forwarding `expanded` as
   `aria-expanded`; otherwise a nonempty `href` uses a router Link with `openLabel`. With neither,
   identity is read-only. Toggle takes priority when both modes are supplied.
-- Date and actions are sibling lanes outside the identity action:56px for date,112px for actions.
-  An independent action never toggles or navigates identity. Empty lanes retain their widths.
+- Date and actions are sibling lanes outside the identity action: 56px for date, and an actions
+  lane of at least 44px that grows with its content (every consumer stacks its buttons
+  vertically). Actions sit at the top of the row even when there is only one. The old 112px lane
+  left about 80px for titles on a 392px phone; this gives them about 170px. An independent action
+  never toggles or navigates identity. Empty lanes retain their minimum widths.
 - App-supplied details own meaningful names, wrapping and localization. Artwork geometry is
   supplied by the caller; the examples use actual MediaCover at88px, as the upcoming consumers do.
   The component retains its inset focus ring and minimum height without caller repairs.
