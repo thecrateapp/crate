@@ -909,6 +909,7 @@
   box-shadow: 0 24px 56px
     color-mix(in srgb, var(--surface-canvas) 34%, transparent);
   backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .listen-player-artwork {

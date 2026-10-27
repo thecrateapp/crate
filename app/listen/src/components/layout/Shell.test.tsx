@@ -123,7 +123,7 @@ describe("Shell", () => {
     expect(screen.getByText("Radar")).toBeInTheDocument();
   });
 
-  it("renders one unified solid backdrop for the mobile dock when a track is loaded", () => {
+  it("renders one unified frosted backdrop for the mobile dock when a track is loaded", () => {
     const { container } = renderWithListenProviders(<Shell />, {
       playerActions: {
         currentTrack: {
@@ -138,7 +138,12 @@ describe("Shell", () => {
     const nav = screen.getByRole("navigation");
 
     expect(dockBackdrop).toBeInTheDocument();
+    expect(dockBackdrop).toHaveClass(
+      "listen-mobile-dock-glass",
+      "border-border-quiet",
+    );
     expect(dockBackdrop).not.toHaveClass("listen-glass-panel");
+    expect(dockBackdrop?.className).not.toMatch(/accent|glow|gradient/);
     expect(nav).toHaveClass("bg-transparent");
     const labels = nav.querySelectorAll(".listen-mobile-nav-item > span");
     expect(labels.length).toBeGreaterThan(0);

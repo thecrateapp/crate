@@ -70,7 +70,7 @@ export function MobileShellView({
       </main>
       <div
         aria-hidden="true"
-        className="listen-mobile-dock-surface border border-border-quiet bg-surface-chrome pointer-events-none fixed z-20 rounded-panel"
+        className="listen-mobile-dock-surface listen-mobile-dock-glass border border-border-quiet pointer-events-none fixed z-20 rounded-panel"
         style={{
           height: hasTrack
             ? "calc(var(--listen-mobile-player-height) + var(--listen-mobile-bottom-nav-content-height))"

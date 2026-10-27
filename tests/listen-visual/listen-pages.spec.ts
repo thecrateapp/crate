@@ -10,12 +10,21 @@ async function expectStablePage(page: Page, name: string) {
 test("renders the home shell with the restored player", async ({
   openListenPage,
   page,
-}) => {
+}, info) => {
   await openListenPage("/", { player: true });
   await expect(page.getByTestId("hero-result-artist-name")).toHaveText(
     "High Vis",
   );
   await expect(page.getByText("Mob DLA", { exact: true })).toBeVisible();
+  const dock =
+    info.project.name === "mobile"
+      ? page.locator(".listen-mobile-dock-surface")
+      : page.locator('[data-slot="player-chrome"]');
+  await expect(dock).toHaveCSS(
+    "backdrop-filter",
+    info.project.name === "mobile" ? "blur(18px) saturate(1.18)" : "blur(24px)",
+  );
+  await expect(dock).toHaveCSS("background-color", /\/ 0\.68\)$/);
   await expectStablePage(page, "home-player-default-dark");
 });
 

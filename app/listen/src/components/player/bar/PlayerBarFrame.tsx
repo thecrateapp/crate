@@ -1,7 +1,10 @@
 import type { ReactNode, TouchEventHandler } from "react";
 import { cn } from "@crate/ui/lib/cn";
 
-/** The live dock and review scene share the same geometry and solid chrome. */
+/**
+ * The live dock and review scene share the same geometry. The desktop dock is frosted chrome
+ * (`listen-player-shell`); on mobile the shell's glass dock slab sits behind it.
+ */
 export function PlayerBarFrame({
   children,
   isDesktop,
@@ -50,8 +53,10 @@ export function PlayerBarFrame({
         aria-hidden="true"
         data-slot="player-chrome"
         className={cn(
-          "pointer-events-none absolute inset-0 z-0 border border-border-subtle bg-surface-chrome",
-          isDesktop ? "rounded-panel" : "rounded-t-[2rem] rounded-b-none",
+          "pointer-events-none absolute inset-0 z-0",
+          isDesktop
+            ? "listen-player-shell rounded-panel"
+            : "rounded-t-[2rem] rounded-b-none border border-border-subtle",
         )}
       />
       <div

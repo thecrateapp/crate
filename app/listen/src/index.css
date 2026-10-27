@@ -230,50 +230,9 @@ textarea {
 }
 
 .listen-mobile-dock-glass {
-  --surface-glass-accent: color-mix(
-    in srgb,
-    var(--accent-action) 10%,
-    transparent
-  );
-  --surface-glass-top: color-mix(
-    in srgb,
-    var(--surface-elevated) 96%,
-    transparent
-  );
-  --surface-glass-bottom: color-mix(
-    in srgb,
-    var(--surface-canvas) 92%,
-    transparent
-  );
-  --border-quiet: color-mix(in srgb, var(--text-primary) 14%, transparent);
-  --surface-accent-shadow: color-mix(
-    in srgb,
-    var(--accent-action) 6%,
-    transparent
-  );
-  --border-quiet-subtle: color-mix(
-    in srgb,
-    var(--text-primary) 9%,
-    transparent
-  );
-  background: radial-gradient(
-      circle at 18% 0%,
-      var(--surface-glass-accent),
-      transparent 42%
-    ),
-    linear-gradient(
-      180deg,
-      var(--surface-glass-top),
-      var(--surface-glass-bottom)
-    );
-  box-shadow:
-    0 24px 72px
-      color-mix(in srgb, var(--surface-glass-shadow) 120%, transparent),
-    0 0 22px var(--surface-accent-shadow),
-    inset 0 1px 0 var(--border-quiet-subtle);
-  backdrop-filter: blur(38px) saturate(1.28) brightness(0.72) contrast(0.88);
-  -webkit-backdrop-filter: blur(38px) saturate(1.28) brightness(0.72)
-    contrast(0.88);
+  background: var(--surface-chrome);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .listen-mobile-eq-glass {

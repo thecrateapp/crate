@@ -728,7 +728,7 @@ it("updates the seek leaf without rerendering the bar controller on a clock puls
   expect(trackReads.mock.calls.length).toBe(reads);
 });
 
-it("uses the shared reviewable solid player frame", () => {
+it("uses the shared reviewable frosted player frame", () => {
   useIsDesktopMock.mockReturnValue(true);
   renderWithListenProviders(<PlayerBar />, {
     playerActions: { currentTrack: createMockTrack() },
@@ -740,8 +740,8 @@ it("uses the shared reviewable solid player frame", () => {
   const chrome = screen
     .getByTestId("player-bar-frame")
     .querySelector('[data-slot="player-chrome"]');
-  expect(chrome).toHaveClass("bg-surface-chrome");
-  expect(chrome?.className).not.toMatch(/blur|glass|shadow/);
+  expect(chrome).toHaveClass("listen-player-shell", "rounded-panel");
+  expect(chrome?.className).not.toMatch(/accent|glow|gradient|backdrop-blur/);
 });
 
 it("does not offer a blind like before the initial collection read succeeds", () => {
