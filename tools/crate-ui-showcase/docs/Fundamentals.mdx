@@ -172,7 +172,9 @@ The Stats explorer recipe (`stats-explorer-*`) is a hand-built Listen instrument
 strip with a draggable window, a detail chart whose scale column sizes to its longest localized
 label, and an "In this stretch" panel that moves below the chart in containers under 50rem. Its
 only motion is the one-time opening from today backwards (ease-out-expo); reduced motion renders
-the final state and nothing moves at rest. Its actual view is Listen's StatsExplorerView.
+the final state and nothing moves at rest. Its actual view is Listen's StatsExplorerView. Axis
+labels centre on their bucket, except the first and last bucket labels (`data-edge="start"`/`"end"`),
+which anchor inward so they never spill past the chart edge on narrow screens.
 
 Explorer edge handles reach outward only (44px in total on coarse pointers), so even a 16px
 window keeps its body draggable; the press position, not the hit element, chooses move or
