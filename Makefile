@@ -52,7 +52,7 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(MAKE) --no-print-directory _ensure-dev-certs
@@ -64,11 +64,11 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@mkdir -p .vite
 	@npm install --silent 2>/dev/null
 	@cd app/docs && npm install --silent 2>/dev/null; cd ../..
-	@cd app/site && npm install --silent 2>/dev/null; cd ../..
+	@cd app/web && npm install --silent 2>/dev/null; cd ../..
 	@(nohup npm run --workspace=app/ui dev -- --port 5173 --strictPort --host > .vite/admin.log 2>&1 < /dev/null & echo $$! > .vite/admin.pid)
 	@(nohup npm run --workspace=app/listen dev -- --port 5174 --strictPort --host > .vite/listen.log 2>&1 < /dev/null & echo $$! > .vite/listen.pid)
 	@(cd app/docs; nohup npm exec vite -- --port 5175 --strictPort --host > ../../.vite/docs.log 2>&1 < /dev/null & echo $$! > ../../.vite/docs.pid)
-	@(cd app/site; nohup npm exec vite -- --port 5176 --strictPort --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
+	@(cd app/web; nohup npm exec astro -- dev --port 5176 --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
 	@sleep 2
 	@echo ""
 	@echo "  $(GREEN)Admin:$(NC)  https://admin.dev.lespedants.org"
@@ -123,7 +123,7 @@ dev-docs: ## Start only the docs dev server (:5175)
 
 .PHONY: dev-site
 dev-site: ## Start only the site dev server (:5176)
-	@cd app/site && npx vite --port 5176 --host
+	@cd app/web && npx astro dev --port 5176 --host
 
 .PHONY: dev-down
 dev-down: ## Stop everything (backend + frontends)
@@ -147,7 +147,7 @@ dev-down: ## Stop everything (backend + frontends)
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@echo "$(GREEN)Everything stopped$(NC)"
 
 .PHONY: dev-logs
@@ -178,7 +178,7 @@ dev-rebuild: ## Rebuild and restart everything
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(DC_DEV) up -d --build --force-recreate
@@ -187,7 +187,7 @@ dev-rebuild: ## Rebuild and restart everything
 	@(nohup npm run --workspace=app/ui dev -- --port 5173 --strictPort --host > .vite/admin.log 2>&1 < /dev/null & echo $$! > .vite/admin.pid)
 	@(nohup npm run --workspace=app/listen dev -- --port 5174 --strictPort --host > .vite/listen.log 2>&1 < /dev/null & echo $$! > .vite/listen.pid)
 	@(nohup npm --prefix app/docs exec vite -- --port 5175 --strictPort --host > .vite/docs.log 2>&1 < /dev/null & echo $$! > .vite/docs.pid)
-	@(nohup npm --prefix app/site exec vite -- --port 5176 --strictPort --host > .vite/site.log 2>&1 < /dev/null & echo $$! > .vite/site.pid)
+	@(cd app/web; nohup npm exec astro -- dev --port 5176 --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
 	@sleep 2
 	@echo "$(GREEN)Everything rebuilt$(NC)"
 
@@ -213,7 +213,7 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 # ===========================================================================
