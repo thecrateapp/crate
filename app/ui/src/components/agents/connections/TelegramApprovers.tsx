@@ -70,7 +70,7 @@ function BindingRow({
       <Button
         type="button"
         size="sm"
-        variant="danger-soft"
+        variant="outline"
         aria-describedby={nameId}
         disabled={disabled}
         onClick={onRemove}
@@ -159,7 +159,7 @@ export function TelegramApprovers({
         ) : null}
         {bindings.error ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-sm text-state-warning-text">
               {apiErrorText(
                 bindings.error,
                 "The Telegram approvers could not be loaded.",
