@@ -9,7 +9,7 @@ Scope: `app/shared/ui/` (npm workspace `@crate/ui`) and `app/shared/web/` (plain
 | `app/listen`           | `@crate/ui` heavily (~360 files), `shared/web/{api,use-api,utils,library-routes,sentry,artist-hero-contract}` |
 | `app/ui` (admin)       | `@crate/ui` (~100 files), `shared/web/{api,use-api,utils,library-routes,sentry}`                              |
 | `app/listen-desktop`   | shared identity/preferences and Listen code it pulls in; tsconfig includes `../shared/web/**`                 |
-| `app/site`, `app/docs` | `shared/web/sentry` only                                                                                      |
+| `app/docs`             | `shared/web/sentry` only                                                                                      |
 | `app/cast-receiver`    | none of these (only `@crate/cast-protocol`)                                                                   |
 
 Find real usage with `git grep -n "@crate/ui/<path>" -- app/ui/src app/listen/src app/listen-desktop/src` and `git grep -n "shared/web/<file>" -- app`.

@@ -318,7 +318,7 @@ def test_build_includes_runbooks_native_clients_and_site_sources(repo, tmp_path)
     root, _ = repo
     included = (
         "scripts/deploy.sh",
-        "app/site/src/App.tsx",
+        "app/web/src/pages/install.astro",
         "app/docs/src/App.tsx",
         "app/listen/android/app/src/main/java/app/cratemusic/crate/NativeMix.java",
         "app/listen/ios/App/App/NativeClient.swift",

@@ -38,7 +38,8 @@ crate-ui                 (React 19 + Vite)       → admin web app
 crate-listen             (React 19 + Vite)       → listening app (web PWA + Capacitor iOS/Android)
 crate-listen-desktop     (Tauri 2)               → desktop shell around app/listen
 crate-cast-receiver      (Vite, CAF v3)          → Google Cast receiver
-crate-site / crate-docs  (React 19 + Vite)       → cratemusic.app and technical docs
+crate-site               (Astro)                 → cratemusic.app (app/web)
+crate-docs               (React 19 + Vite)       → technical docs
 crate-postgres           (PostgreSQL 15)         → data
 crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation replay, metrics, domain-event streams
 ```
@@ -113,7 +114,7 @@ npm run --workspace=app/listen dev           # Listen, :5174 (API_URL overrides 
 npm run --workspace=app/shared/ui build      # @crate/ui dist
 ```
 
-- `app/site` and `app/docs` are not npm workspaces: use `npm ci --prefix app/<name>`.
+- `app/web` and `app/docs` are not npm workspaces: use `npm ci --prefix app/<name>`.
 - Pre-commit hooks (`pre-commit install`) run Ruff, Prettier and ESLint.
 - Local test library: `test-music/` (not committed). Dev seed login `admin@cratemusic.app` /
   `admin` works only against the local stack; it is not valid in production.

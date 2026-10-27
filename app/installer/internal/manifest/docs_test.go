@@ -16,7 +16,7 @@ const repoRoot = "../../../.."
 // deploy tooling. Documentation is excluded on purpose.
 var sourceRoots = []string{
 	"app/crate", "app/readplane", "app/media-worker", "app/installer", "app/ui/src", "app/listen/src",
-	"app/shared", "app/cast-receiver", "app/listen-desktop", "app/site", "app/docs/src", "app/Dockerfile",
+	"app/shared", "app/cast-receiver", "app/listen-desktop", "app/web", "app/docs/src", "app/Dockerfile",
 	"app/config.yaml", "tools/crate-cli", "scripts", "deploy", ".github", "Makefile",
 	"docker-compose.yaml", "docker-compose.home.yaml", "docker-compose.dev.yaml",
 	"docker-compose.local-stack.yaml", "docker-compose.project.yaml", "docker-compose.test.yaml",
