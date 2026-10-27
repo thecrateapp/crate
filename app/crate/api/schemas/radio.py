@@ -75,6 +75,10 @@ class PersonalizedRadioStation(BaseModel):
     artist_name: str | None = None
     genre_slug: str | None = None
     genre_name: str | None = None
+    album_id: int | None = None
+    album_entity_uid: str | None = None
+    album_slug: str | None = None
+    album_name: str | None = None
     cover_url: str | None = None
 
 

@@ -21,6 +21,10 @@ export interface PersonalizedRadioStation {
   artist_name?: string | null;
   genre_slug?: string | null;
   genre_name?: string | null;
+  album_id?: number | null;
+  album_entity_uid?: string | null;
+  album_slug?: string | null;
+  album_name?: string | null;
   cover_url?: string | null;
 }
 

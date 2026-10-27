@@ -104,7 +104,10 @@ function albumRoute(station: RadioStationLike) {
 export function radioStationArtwork(station: RadioStationLike): string | null {
   const explicitCover = resolveMaybeApiAssetUrl(station.cover_url);
   if (explicitCover) return explicitCover;
-  if (station.type === "genre") return null;
+  if (station.type === "genre") {
+    if (station.album_id == null && !station.album_entity_uid) return null;
+    return albumCoverApiUrl(albumRoute(station), { size: 256 }) || null;
+  }
   if (station.type === "album") {
     return albumCoverApiUrl(albumRoute(station), { size: 256 }) || null;
   }
