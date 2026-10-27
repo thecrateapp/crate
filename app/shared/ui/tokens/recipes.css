@@ -2341,6 +2341,14 @@ button.genre-pill:hover,
   transform: translateX(-50%);
 }
 
+.stats-explorer-axis > [data-edge="start"] {
+  transform: none;
+}
+
+.stats-explorer-axis > [data-edge="end"] {
+  transform: translateX(-100%);
+}
+
 .stats-explorer-panel {
   display: grid;
   min-width: 0;

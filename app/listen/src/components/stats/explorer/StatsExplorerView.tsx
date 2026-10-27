@@ -670,6 +670,13 @@ function ExplorerChart({
               key={point.bucket}
               as="span"
               data-minor={minor || undefined}
+              data-edge={
+                offset === 0
+                  ? "start"
+                  : offset === count - 1
+                    ? "end"
+                    : undefined
+              }
               style={{ left: `${position(offset)}%` }}
             >
               {formatExplorerDay(point.bucket, i18n.language)}

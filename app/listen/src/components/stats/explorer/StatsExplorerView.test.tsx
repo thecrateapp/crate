@@ -311,6 +311,26 @@ describe("StatsExplorerView", () => {
     expect(onOpenBucket).toHaveBeenCalledWith(29);
   });
 
+  it("anchors the edge axis labels inside the chart", () => {
+    const tape = dailyTape(31);
+    const { container } = renderWithListenProviders(
+      <Harness
+        tape={tape}
+        mode={explorerMode("30d", tape)}
+        initial={{ from: 0, to: 31 }}
+      />,
+      { locale: "en" },
+    );
+    const labels = Array.from(
+      container.querySelectorAll(".stats-explorer-axis > span"),
+    );
+    expect(labels.length).toBeGreaterThan(2);
+    expect(labels[0]).toHaveAttribute("data-edge", "start");
+    expect(labels[labels.length - 1]).toHaveAttribute("data-edge", "end");
+    for (const label of labels.slice(1, -1))
+      expect(label).not.toHaveAttribute("data-edge");
+  });
+
   it("month labels link to the month view", () => {
     const tape = dailyTape();
     const onMonth = vi.fn();

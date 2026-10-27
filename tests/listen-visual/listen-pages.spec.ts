@@ -173,6 +173,19 @@ test("renders the Stats signal page", async ({ openListenPage, page }) => {
   await expect(
     page.getByRole("complementary", { name: "In this stretch", exact: true }),
   ).toContainText("30 days");
+  const overflow = await page
+    .locator(".stats-explorer-axis")
+    .evaluate((axis) => {
+      const bounds = axis.getBoundingClientRect();
+      return Array.from(axis.children)
+        .map((label) => label.getBoundingClientRect())
+        .filter((rect) => rect.width > 0)
+        .map((rect) =>
+          Math.max(bounds.left - rect.left, rect.right - bounds.right),
+        );
+    });
+  expect(overflow.length).toBeGreaterThan(0);
+  for (const pixels of overflow) expect(pixels).toBeLessThanOrEqual(0.5);
   await expectStablePage(page, "stats-default-dark");
 });
 
