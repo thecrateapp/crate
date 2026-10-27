@@ -40,7 +40,7 @@ for (const width of [1440, 768]) {
       "Go back",
       "Go forward",
       "Collapse sidebar",
-      "Logout",
+      "Admin account menu",
     ]) {
       const box = await page.getByRole("button", { name: label }).boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(44);

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/system-health-1ac.json";
 
 for (const width of [1440, 768, 390])
@@ -31,7 +31,7 @@ for (const width of [1440, 768, 390])
       );
       await expect(main.getByText("280 / 1000 GB", { exact: true })).toHaveCSS(
         "font-family",
-        /Bricolage Grotesque/,
+        /JetBrains Mono/,
       );
       const gaps = await main
         .locator(".crate-form-field")
@@ -58,6 +58,7 @@ for (const width of [1440, 768, 390])
       });
       await refresh.click();
       await expect.poll(() => queries.length).toBeGreaterThan(count);
+      await emulateCoarsePointer(page);
       const coarse = await page.evaluate(
         () => matchMedia("(pointer: coarse)").matches,
       );
@@ -70,8 +71,8 @@ for (const width of [1440, 768, 390])
         );
       }
       await expect(
-        main.getByRole("meter", { name: "Transcode Slots" }),
-      ).toHaveAttribute("aria-valuenow", "1");
+        main.getByRole("meter", { name: /Transcode slots/i }),
+      ).toHaveCount(0);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/bandcamp-1ah.json";
 for (const width of [1440, 768, 390]) {
   test.describe(`Bandcamp Admin ${width}`, () => {
@@ -10,6 +10,18 @@ for (const width of [1440, 768, 390]) {
     }) => {
       for (const [path, value] of Object.entries(fixture))
         adminApi.respondTo(new URL(path, "http://sample.test").pathname, value);
+      adminApi.respondTo("/api/tasks/bandcamp-browser-task", {
+        id: "bandcamp-browser-task",
+        type: "bandcamp_sync_collection",
+        status: "completed",
+        progress: null,
+        error: null,
+        result: { synced: 12 },
+        params: {},
+        created_at: "2026-10-10T20:00:00Z",
+        started_at: "2026-10-10T20:00:01Z",
+        updated_at: "2026-10-10T20:00:05Z",
+      });
       let release: (() => void) | undefined;
       await page.route("**/api/bandcamp/me/sync", async (route) => {
         expect(route.request().method()).toBe("POST");
@@ -21,7 +33,7 @@ for (const width of [1440, 768, 390]) {
       await openAdminPage("/bandcamp");
       const main = page.getByRole("main").last();
       await expect(main.getByRole("heading", { level: 1 })).toHaveText(
-        "Support layer for the collection",
+        "Bandcamp",
       );
       await expect(
         main.getByText("Diego de muestra", { exact: true }),
@@ -40,12 +52,13 @@ for (const width of [1440, 768, 390]) {
       ).toBeDisabled();
       await expect.poll(() => typeof release).toBe("function");
       release!();
-      await expect(button).toBeEnabled();
       await expect(
-        page.getByText("Bandcamp sync queued (bandcamp-browser-task)", {
-          exact: true,
-        }),
+        page.getByText("Bandcamp sync queued", { exact: true }),
       ).toBeVisible();
+      await expect(
+        page.getByText("Bandcamp sync completed", { exact: true }),
+      ).toBeVisible();
+      await expect(button).toBeEnabled();
       expect(
         await main
           .locator(".crate-form-field")
@@ -63,6 +76,7 @@ for (const width of [1440, 768, 390]) {
           .getByRole("heading", { level: 1 })
           .evaluate((element) => getComputedStyle(element).fontFamily),
       ).toContain("Bricolage");
+      await emulateCoarsePointer(page);
       for (const control of await main.getByRole("button").all())
         expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(
           44,

@@ -23,7 +23,9 @@ for (const width of [1440, 768, 390, 320]) {
         main.getByRole("button", { name: "Resume live" }).locator("svg"),
       ).toHaveCount(1);
       await main.getByRole("button", { name: "Resume live" }).click();
-      const search = main.getByRole("textbox", { name: "Search worker logs" });
+      const search = main.getByRole("searchbox", {
+        name: "Search worker logs",
+      });
       await search.fill("Costa Norte");
       await expect(
         main.getByText("Sample analysis needs attention", { exact: true }),

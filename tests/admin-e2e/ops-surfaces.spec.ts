@@ -7,8 +7,8 @@ for (const width of [1440, 768, 390]) {
       page,
     }) => {
       for (const [route, title, label, panel] of [
-        ["/tasks", "Tasks", "Today", "Worker control"],
-        ["/system", "System Health", "API p95", "Metric Streams"],
+        ["/tasks", "Tasks", null, "Worker runtime"],
+        ["/system", "System Health", "API max", "Metric Streams"],
       ] as const) {
         await openAdminPage(route);
         const heading = page.getByRole("heading", {
@@ -18,19 +18,21 @@ for (const width of [1440, 768, 390]) {
         });
         await expect(heading).toBeVisible();
         await expect(heading.locator("..").locator("svg")).toHaveCount(0);
-        const field = page.getByText(label, { exact: true }).locator("..");
-        await expect(field).toHaveClass(/crate-form-field/);
-        await expect(field.locator("svg")).toHaveCount(0);
-        const reading = await field.evaluate((node) => {
-          const labelNode = node.children[0]!.getBoundingClientRect();
-          const value = node.children[1]!.getBoundingClientRect();
-          return {
-            gap: value.top - labelNode.bottom,
-            value: node.children[1]!.textContent?.trim(),
-          };
-        });
-        expect(reading.gap).toBe(8);
-        expect(reading.value).toBeTruthy();
+        if (label) {
+          const field = page.getByText(label, { exact: true }).locator("..");
+          await expect(field).toHaveClass(/crate-form-field/);
+          await expect(field.locator("svg")).toHaveCount(0);
+          const reading = await field.evaluate((node) => {
+            const labelNode = node.children[0]!.getBoundingClientRect();
+            const value = node.children[1]!.getBoundingClientRect();
+            return {
+              gap: value.top - labelNode.bottom,
+              value: node.children[1]!.textContent?.trim(),
+            };
+          });
+          expect(reading.gap).toBe(8);
+          expect(reading.value).toBeTruthy();
+        }
         const panelHeading = page.getByRole("heading", {
           level: 2,
           name: panel,

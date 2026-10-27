@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import snapshot from "./fixtures/ops-snapshot.json";
 import analysis from "./fixtures/analysis-status.json";
 for (const width of [1440, 768, 390]) {
@@ -21,37 +21,39 @@ for (const width of [1440, 768, 390]) {
       ).toHaveCSS("font-family", /Bricolage Grotesque/);
       await expect(
         main.getByRole("heading", { name: "Pipeline coverage", exact: true }),
-      ).toHaveCSS("font-family", /Bricolage Grotesque/);
+      ).toHaveCSS("font-family", /JetBrains Mono/);
       await expect(
         main.getByRole("button", { name: "Refresh", exact: true }),
-      ).toHaveCSS("font-family", /^Poppins/);
+      ).toHaveCSS("font-family", /^Roboto/);
       const loaded = await page.evaluate(() =>
         Array.from(document.fonts)
           .filter((face) => face.status === "loaded")
           .map((face) => face.family),
       );
-      for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Poppins"])
+      for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Roboto"])
         expect(loaded).toContain(family);
       for (const field of await main.locator(".crate-form-field").all()) {
         await expect(field.locator(":scope > :first-child")).toHaveCSS(
           "font-family",
           /JetBrains Mono/,
         );
-        await expect(field.locator(":scope > :nth-child(2)")).toHaveCSS(
-          "font-family",
-          /Bricolage Grotesque/,
-        );
+        const reading = field.locator(":scope > :nth-child(2)");
+        await expect(reading).toHaveCSS("font-family", /JetBrains Mono/);
+        await expect(reading).toHaveCSS("font-variant-numeric", "tabular-nums");
       }
-      await expect(main.locator("svg")).toHaveCount(5);
+      await expect(main.locator("svg")).toHaveCount(6);
       await expect(main.locator('svg[data-admin-ux^="header-"]')).toHaveCount(
         5,
+      );
+      await expect(main.locator("svg:not([data-admin-ux])")).toHaveClass(
+        /solar-magnifier-outline/,
       );
       await expect(
         main.getByText("1,200 tracks", { exact: true }),
       ).toBeVisible();
       await expect(main.getByText("4 failed", { exact: true })).toHaveAttribute(
         "data-tone",
-        "warning",
+        "danger",
       );
       await expect(main.getByText("Marea", { exact: true })).toBeVisible();
       await expect(
@@ -115,6 +117,7 @@ for (const width of [1440, 768, 390]) {
         );
       expect(fields).toHaveLength(27);
       expect(new Set(fields)).toEqual(new Set([8]));
+      await emulateCoarsePointer(page);
       for (const action of await main.getByRole("button").all()) {
         const box = await action.boundingBox();
         expect(Math.min(box!.height, box!.width)).toBeGreaterThanOrEqual(44);

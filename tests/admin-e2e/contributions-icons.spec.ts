@@ -69,7 +69,13 @@ for (const width of [1440, 768, 390]) {
       await page.keyboard.press("Enter");
       await expect(refresh).toBeDisabled();
       await expect(refresh).toHaveAttribute("aria-busy", "true");
-      await expect(main.locator("svg[data-admin-ux]")).toHaveCount(2);
+      await expect(main.locator("svg[data-admin-ux]")).toHaveCount(1);
+      await expect(
+        main.locator('svg[data-admin-ux="contributions-refresh-loading"]'),
+      ).toHaveCount(1);
+      await expect(
+        main.getByRole("link", { name: "Luz de octubre", exact: true }),
+      ).toBeVisible();
       release();
       await expect(refresh).toBeEnabled();
       await expect(

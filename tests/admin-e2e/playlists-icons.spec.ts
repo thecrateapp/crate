@@ -41,12 +41,22 @@ for (const width of [1440, 768, 390])
             .first()
             .evaluate((e) => (e as HTMLImageElement).naturalWidth),
         ).toBeGreaterThan(0);
-        await main
-          .getByRole("button", {
-            name: "Deactivate Costa de noche",
-            exact: true,
-          })
-          .click();
+        const rowAction = async (inline: string, menu: string) => {
+          if (width >= 768) {
+            await main
+              .getByRole("button", { name: inline, exact: true })
+              .click();
+            return;
+          }
+          await main
+            .getByRole("button", {
+              name: "Actions for Costa de noche",
+              exact: true,
+            })
+            .click();
+          await page.getByRole("menuitem", { name: menu, exact: true }).click();
+        };
+        await rowAction("Deactivate Costa de noche", "Deactivate");
         await expect
           .poll(() =>
             adminApi.calls.find((c) => c.path.endsWith("/11/deactivate")),
@@ -56,9 +66,7 @@ for (const width of [1440, 768, 390])
             path: "/api/admin/system-playlists/11/deactivate",
             body: null,
           });
-        await main
-          .getByRole("button", { name: "Delete Costa de noche", exact: true })
-          .click();
+        await rowAction("Delete Costa de noche", "Delete playlist");
         await page
           .getByRole("alertdialog")
           .getByRole("button", { name: "Delete", exact: true })

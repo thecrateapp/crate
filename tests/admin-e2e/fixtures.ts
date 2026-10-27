@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { expect, test as base, type Route } from "@playwright/test";
+import { expect, test as base, type Page, type Route } from "@playwright/test";
 
 const fixtureDir = join(__dirname, "fixtures");
 
@@ -25,6 +25,7 @@ const JSON_FIXTURES: Record<string, string> = {
   "/api/manage/repair-catalog": "repair-catalog",
   "/api/genres": "genres",
   "/api/genres/sound-intelligence/health": "genre-sound-health",
+  "/api/genres/taxonomy/tree": "genre-taxonomy-tree",
   "/api/artist-slugs/quicksand/albums/crystallize": "album",
   "/api/admin/metrics/dashboard": "metrics-dashboard",
 };
@@ -141,6 +142,167 @@ export const test = base.extend<AdminFixtures>({
         await route.fulfill({ json: {} });
         return;
       }
+      const taskDetail = url.pathname.match(/^\/api\/tasks\/([^/]+)$/);
+      if (taskDetail) {
+        await route.fulfill({
+          json: {
+            id: decodeURIComponent(taskDetail[1]),
+            type: "e2e_task",
+            status: "completed",
+            progress: null,
+            error: null,
+            result: {},
+            params: {},
+            created_at: "2026-10-10T20:00:00Z",
+            started_at: "2026-10-10T20:00:01Z",
+            updated_at: "2026-10-10T20:00:02Z",
+          },
+        });
+        return;
+      }
+      if (url.pathname === "/api/admin/agent-plans/summary") {
+        await route.fulfill({ json: { awaiting_approval: 0 } });
+        return;
+      }
+      if (url.pathname === "/api/admin/governor") {
+        await route.fulfill({ json: { available: false, stale: false } });
+        return;
+      }
+      if (url.pathname === "/api/admin/smart-mix/status") {
+        await route.fulfill({
+          json: {
+            profileVersion: 2,
+            analyzerVersion: "smart-mix-v2",
+            totalTracks: 1200,
+            currentProfiles: 900,
+            staleProfiles: 0,
+            outdatedProfiles: 60,
+            sourceChangedProfiles: 0,
+            missingProfiles: 240,
+            coveragePercent: 75,
+            quality: { full: 820, partial: 70, legacy: 60, unavailable: 10 },
+            currentQuality: { full: 820, partial: 70, legacy: 10 },
+            processing: {
+              pending: 0,
+              active: 0,
+              failed: 0,
+              exhausted: 0,
+              completed: 960,
+            },
+            versions: [
+              { analyzerVersion: "smart-mix-v2", profiles: 900, current: true },
+              { analyzerVersion: "smart-mix-v1", profiles: 60, current: false },
+            ],
+            refreshedAt: "2026-10-24T12:00:00Z",
+            controlState: "idle",
+            campaign: null,
+            activeTask: null,
+          },
+        });
+        return;
+      }
+      if (url.pathname === "/api/admin/smart-mix/activity") {
+        await route.fulfill({
+          json: {
+            queued: 0,
+            running: [],
+            recent: [],
+            tracksPerMinute: 0,
+            rateWindowMinutes: 10,
+          },
+        });
+        return;
+      }
+      if (url.pathname === "/api/admin/smart-mix/tracks") {
+        await route.fulfill({
+          json: {
+            tracks: [
+              {
+                trackId: 901,
+                trackEntityUid: null,
+                title: "Litoral",
+                artist: "Arrecife",
+                album: "Bajamar",
+                status: "current",
+                analyzerVersion: "smart-mix-v2",
+                profileVersion: 2,
+                quality: "full",
+                bpm: 122,
+                introBpm: 122,
+                outroBpm: 122,
+                analyzedAt: "2026-10-24T11:40:00Z",
+                sourceStaleAt: null,
+                processingState: "completed",
+                processingAttempts: 1,
+                processingError: null,
+              },
+              {
+                trackId: 902,
+                trackEntityUid: null,
+                title: "Resaca",
+                artist: "Arrecife",
+                album: "Bajamar",
+                status: "missing",
+                analyzerVersion: null,
+                profileVersion: null,
+                quality: null,
+                bpm: null,
+                introBpm: null,
+                outroBpm: null,
+                analyzedAt: null,
+                sourceStaleAt: null,
+                processingState: null,
+                processingAttempts: null,
+                processingError: null,
+              },
+            ],
+            nextBefore: null,
+          },
+        });
+        return;
+      }
+      if (url.pathname === "/api/capabilities") {
+        await route.fulfill({
+          json: {
+            smart_mix: {
+              available: false,
+              planner_version: null,
+              android_native_crossfade: false,
+              android_beatmatch: false,
+              android_bass_handoff: false,
+            },
+            vdj: {
+              available: false,
+              min_plugin_version: "1.0.0",
+              max_plugin_version: "1.x",
+              contract_version: "2026-08",
+              profile_schema_version: 1,
+              planner_version: "smart-mix-v2",
+              online_source: false,
+              smart_mix_assistant: false,
+              automation: false,
+            },
+          },
+        });
+        return;
+      }
+      const aiAction = url.pathname.match(
+        /^\/api\/admin\/ai\/actions\/([^/]+)\/availability$/,
+      );
+      if (aiAction) {
+        await route.fulfill({
+          json: {
+            action_id: decodeURIComponent(aiAction[1]),
+            available: true,
+            status: "configured",
+            provider: "gemini",
+            model_id: "gemini/gemini-2.5-flash",
+            fingerprint: null,
+            error_code: null,
+          },
+        });
+        return;
+      }
       if (
         /^\/api\/albums\/(68|69|71)\/cover$/.test(url.pathname) ||
         url.pathname === "/api/artists/23/background"
@@ -169,5 +331,16 @@ export const test = base.extend<AdminFixtures>({
     });
   },
 });
+
+export async function emulateCoarsePointer(page: Page): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setTouchEmulationEnabled", {
+    enabled: true,
+    maxTouchPoints: 1,
+  });
+  await expect
+    .poll(() => page.evaluate(() => matchMedia("(pointer: coarse)").matches))
+    .toBe(true);
+}
 
 export { expect };

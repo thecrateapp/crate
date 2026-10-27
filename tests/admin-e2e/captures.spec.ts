@@ -7,29 +7,25 @@ const pages = [
     name: "dashboard",
     path: "/",
     heading: "Dashboard",
-    ready: ["Needs Attention"],
+    ready: ["No service interruption reported."],
   },
   {
     name: "tasks",
     path: "/tasks",
     heading: "Tasks",
-    ready: ["Artist Enrichment", "Converge - Love Is Not Enough"],
+    ready: ["Artist Enrichment", "Task desk"],
   },
   {
     name: "health",
     path: "/health",
     heading: "Library Health",
-    ready: ["5 open issues"],
+    ready: ["5 recorded issues"],
   },
   {
     name: "genres",
     path: "/genres",
     heading: "Genres",
-    ready: [
-      "Hardcore",
-      "Effective EQ sources",
-      "863 tracks resolved through the Smart EQ hierarchy.",
-    ],
+    ready: ["Rock", "Genre EQ coverage", "94 taxonomy nodes"],
   },
   {
     name: "album",
@@ -41,7 +37,10 @@ const pages = [
     name: "settings",
     path: "/settings",
     heading: "Settings",
-    ready: ["Library Runtime", "enrich_artists"],
+    ready: [
+      "Core library path, storage layout and current footprint.",
+      "enrich_artists",
+    ],
   },
   {
     name: "system",

@@ -95,6 +95,42 @@ for (const viewport of [
         ],
         configured: true,
       });
+      adminApi.respondTo("/api/shows/cached", {
+        events: [
+          {
+            id: "show-fixture",
+            artist_name: "Quicksand",
+            artist_id: 23,
+            artist_slug: "quicksand",
+            date: "2026-11-10",
+            venue: "Fixture venue",
+            city: "Madrid",
+            region: "",
+            country: "Spain",
+            country_code: "ES",
+            url: "https://example.test/tickets",
+            image_url: null,
+            lineup: ["Quicksand"],
+            lineup_artists: [
+              {
+                name: "Quicksand",
+                id: 23,
+                slug: "quicksand",
+                probable_setlist_status: "missing",
+                probable_setlist_song_count: 0,
+              },
+            ],
+            status: "onsale",
+          },
+        ],
+        setlist_coverage: {
+          artist_count: 1,
+          fresh: 0,
+          stale: 0,
+          missing: 1,
+          unknown: 0,
+        },
+      });
       adminApi.respondTo("/api/artists/23/track-titles", []);
       adminApi.respondTo("/api/artists/23/stats", {
         formats: [
@@ -190,6 +226,24 @@ for (const viewport of [
           },
         ],
         links: [],
+      });
+      adminApi.respondTo("/api/network/artist-card", {
+        name: "Quicksand",
+        in_library: true,
+        artist_id: 23,
+        artist_slug: "quicksand",
+        album_count: 0,
+        track_count: 20,
+        listeners: 6000,
+        genres: [dominantGenre],
+        linked_by: [],
+        next_show: {
+          date: "2026-11-10",
+          venue: "Fixture venue",
+          city: "Madrid",
+          country: "Spain",
+          url: "https://example.test/tickets",
+        },
       });
       adminApi.respondTo("/api/shows/artists-with-shows", { artists: [] });
       adminApi.respondTo("/api/artwork/artists/23/assets", { assets: [] });

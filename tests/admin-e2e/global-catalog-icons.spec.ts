@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/global-catalog-1ak.json";
 for (const width of [1440, 768, 390])
   test.describe(`Global Catalog Admin ${width}`, () => {
@@ -44,8 +44,11 @@ for (const width of [1440, 768, 390])
             );
           }),
         ).toBe(8);
+      await emulateCoarsePointer(page);
       for (const button of await main.getByRole("button").all())
-        expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        expect(
+          Number((await button.boundingBox())!.height.toFixed(2)),
+        ).toBeGreaterThanOrEqual(44);
       expect(
         await main
           .getByRole("heading", { level: 1 })
@@ -61,12 +64,10 @@ for (const width of [1440, 768, 390])
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
-      await main
-        .getByRole("button", { name: "Runs", exact: true })
-        .press("Enter");
+      await main.getByRole("tab", { name: "Runs", exact: true }).press("Enter");
       await expect(
-        main.getByRole("button", { name: "Runs", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+        main.getByRole("tab", { name: "Runs", exact: true }),
+      ).toHaveAttribute("aria-selected", "true");
       await expect(
         main.getByText("Sample peer unavailable", { exact: true }),
       ).toBeVisible();
@@ -105,18 +106,16 @@ for (const width of [1440, 768, 390])
       await expect.poll(() => typeof finishRuns).toBe("function");
       await expect(reconcile).toBeEnabled();
       await expect(full).toBeEnabled();
-      await expect(reconcile).toHaveAttribute("aria-busy", "false");
+      await expect(reconcile).not.toHaveAttribute("aria-busy", "true");
       finishStatus!();
       finishRuns!();
       await expect(
         page.getByText("Incremental reconciliation queued", { exact: true }),
       ).toBeVisible();
       await expect(
-        main.getByRole("button", { name: "Runs", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
-      await main
-        .getByRole("button", { name: "Duplicates", exact: true })
-        .click();
+        main.getByRole("tab", { name: "Runs", exact: true }),
+      ).toHaveAttribute("aria-selected", "true");
+      await main.getByRole("tab", { name: "Duplicates", exact: true }).click();
       await expect(
         main.getByText("sample-album:uncertain-match", { exact: true }),
       ).toBeVisible();

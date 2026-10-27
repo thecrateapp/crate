@@ -56,16 +56,21 @@ for (const width of [1440, 768, 390])
       await expect(operator).toHaveText("Equals");
       await expect(operator).toBeFocused();
       const genre = main.getByRole("combobox", {
-        name: "Select genre",
+        name: "Value",
         exact: true,
       });
       await expect(genre).toHaveText("Select genre");
       await genre.click();
       await page.getByRole("option", { name: "Ambient", exact: true }).click();
       await main.getByRole("button", { name: "Preview", exact: true }).click();
+      const preview = main.getByRole("region", {
+        name: "Preview",
+        exact: true,
+      });
       await expect(
-        main.getByText("3 matching tracks", { exact: true }),
+        preview.getByText("Matching tracks", { exact: true }),
       ).toBeVisible();
+      await expect(preview).toContainText(/(?:^|\D)3\s*Matching tracks/);
       expect(adminApi.calls.find((c) => c.path.endsWith("/preview"))).toEqual({
         method: "POST",
         path: `${prefix}/preview`,
@@ -118,9 +123,7 @@ for (const width of [1440, 768, 390])
         .getByRole("button", { name: "Remove rule 1", exact: true })
         .evaluate((button) => {
           const fields = Array.from(
-            button.parentElement!.parentElement!.querySelectorAll(
-              ".crate-form-field",
-            ),
+            button.closest("fieldset")!.querySelectorAll(".crate-form-field"),
           );
           return {
             width: fields[0]!.parentElement!.getBoundingClientRect().width,
@@ -142,7 +145,10 @@ for (const width of [1440, 768, 390])
         main.getByRole("button", { name: "Remove rule 1", exact: true }),
       ).toBeEnabled();
       await expect(
-        main.getByRole("button", { name: "Remove Marea", exact: true }),
+        main.getByRole("button", {
+          name: "Remove Marea, position 1",
+          exact: true,
+        }),
       ).toBeEnabled();
     });
   });

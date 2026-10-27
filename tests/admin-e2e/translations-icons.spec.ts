@@ -36,9 +36,11 @@ for (const width of [1440, 768, 390])
         main.locator('svg[data-admin-ux="header-refresh"]'),
       ).toHaveCount(1);
       await main.getByRole("tab", { name: "Bundles", exact: true }).click();
-      await main
-        .getByRole("combobox", { name: "Locale", exact: true })
-        .selectOption("es");
+      await main.getByRole("combobox", { name: "Locale", exact: true }).click();
+      await page.getByRole("option", { name: "es", exact: true }).click();
+      await expect(
+        main.getByRole("combobox", { name: "Locale", exact: true }),
+      ).toHaveText("es");
       await expect(
         main.getByRole("button", { name: "Review fr", exact: true }),
       ).toHaveCount(0);

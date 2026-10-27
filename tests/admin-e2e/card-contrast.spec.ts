@@ -67,7 +67,10 @@ async function captureSurface(
   await expect(surface).toHaveScreenshot(`${name}.png`);
 }
 
-async function expectQuietHairline(surface: Locator) {
+async function expectQuietHairline(
+  surface: Locator,
+  sides: readonly string[] = ["Top", "Right", "Bottom", "Left"],
+) {
   await expect(surface).toBeVisible();
   const appearance = await surface.evaluate((element) => {
     const canvas = document.createElement("canvas");
@@ -110,8 +113,10 @@ async function expectQuietHairline(surface: Locator) {
     appearance.quietColor[3],
     "The quiet border is not transparent",
   ).toBeGreaterThan(0);
-  expect(appearance.borders).toEqual(
-    ["Top", "Right", "Bottom", "Left"].map((side) => ({
+  expect(
+    appearance.borders.filter((border) => sides.includes(border.side)),
+  ).toEqual(
+    sides.map((side) => ({
       side,
       width: "1px",
       style: "solid",
@@ -124,34 +129,40 @@ test.beforeEach(async ({ page }) => {
   await prepareAdminCapture(page);
 });
 
-test("separates the four Audio Profile KPIs with quiet hairlines", async ({
+test("rules the album audio analysis readings with a quiet hairline", async ({
   adminApi,
   openAdminPage,
   page,
 }, info) => {
   adminApi.respondTo("/api/artists/23/analysis-data", analysisData);
   await openAdminPage(albumPath);
-  const profile = page
-    .getByRole("heading", { name: "Audio Profile", exact: true })
-    .locator("../..");
+  const profile = page.getByRole("region", {
+    name: "Audio analysis",
+    exact: true,
+  });
   await expect(
-    profile.getByText("3 tracks analyzed", { exact: true }),
+    profile.getByText("3 / 3 tracks with audio features", { exact: true }),
   ).toBeVisible();
-  const labels = ["Avg BPM", "Key", "Loudness", "Energy"];
-  const kpiGrid = profile
-    .getByText("Avg BPM", { exact: true })
-    .locator("../../..");
+  const labels = [
+    "Mean tempo",
+    "Most frequent key",
+    "Mean loudness",
+    "Mean dynamic range",
+  ];
+  const readings = profile
+    .getByRole("term")
+    .filter({ hasText: labels[0] })
+    .locator("xpath=ancestor::dl[1]");
   for (const label of labels) {
-    await expect(kpiGrid.getByText(label, { exact: true })).toBeVisible();
+    await expect(
+      readings.getByRole("term").filter({ hasText: label }),
+    ).toBeVisible();
   }
+  await expect(readings.getByRole("definition")).toHaveCount(labels.length);
 
-  await captureSurface(page, kpiGrid, info, "admin-audio-profile-kpis");
+  await captureSurface(page, readings, info, "admin-audio-profile-kpis");
 
-  for (const label of labels) {
-    await expectQuietHairline(
-      kpiGrid.getByText(label, { exact: true }).locator("../.."),
-    );
-  }
+  await expectQuietHairline(profile, ["Top"]);
 });
 
 test("separates the crop modal with a quiet hairline without uploading", async ({
@@ -160,16 +171,21 @@ test("separates the crop modal with a quiet hairline without uploading", async (
   page,
 }, info) => {
   await openAdminPage(albumPath);
-  await page.getByLabel("Upload image", { exact: true }).setInputFiles({
-    name: "crop-preview.svg",
-    mimeType: "image/svg+xml",
-    buffer: Buffer.from(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="#14343d"/><circle cx="400" cy="400" r="260" fill="#06b6d4"/></svg>',
-    ),
-  });
-  const title = page.getByText("Crop Image", { exact: true });
+  await page
+    .locator('input[type="file"][aria-label="Upload image"]')
+    .setInputFiles({
+      name: "crop-preview.svg",
+      mimeType: "image/svg+xml",
+      buffer: Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="#14343d"/><circle cx="400" cy="400" r="260" fill="#06b6d4"/></svg>',
+      ),
+    });
+  const title = page.getByRole("heading", { name: "Crop image", exact: true });
   await expect(title).toBeVisible();
-  const modal = title.locator("../..");
+  const modal = page
+    .getByRole("dialog", { name: "Crop image", exact: true })
+    .locator(":scope > div")
+    .filter({ has: title });
 
   try {
     const image = modal.locator("img");

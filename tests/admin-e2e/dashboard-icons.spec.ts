@@ -64,7 +64,14 @@ for (const width of [1440, 768, 390])
           name: "Reported progress: Artist enrichment",
         }),
       ).toHaveAttribute("aria-valuenow", "25");
-      await expect(main.locator("svg.lucide")).toHaveCount(1);
+      await expect(main.locator("svg")).toHaveCount(3);
+      await expect(main.locator("svg:not([data-admin-ux])")).toHaveCount(0);
+      await expect(main.locator('svg[data-admin-ux^="header-"]')).toHaveCount(
+        2,
+      );
+      await expect(
+        main.locator('svg[data-admin-ux="dashboard-running-task"]'),
+      ).toHaveCount(1);
       const gaps = await main
         .locator(".crate-form-field")
         .evaluateAll((nodes) =>

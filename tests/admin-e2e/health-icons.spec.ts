@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/health-1ad.json";
 for (const width of [1440, 768, 390])
   test.describe(`Library Health built ${width}`, () => {
@@ -51,9 +51,14 @@ for (const width of [1440, 768, 390])
       await expect(region).toHaveCSS("border-left-color", "rgb(6, 182, 212)");
       await expect(region).toHaveCSS("border-left-width", "1px");
       await expect(toggle).toHaveCSS("color", "rgb(103, 232, 249)");
-      await expect(
-        region.getByRole("link", { name: "Review and repair", exact: true }),
-      ).toHaveCSS("background-color", "rgb(6, 182, 212)");
+      const primary = region.getByRole("link", {
+        name: "Review and repair",
+        exact: true,
+      });
+      await expect(primary).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await expect(primary).toHaveCSS("border-top-color", "rgb(6, 182, 212)");
+      await expect(primary).toHaveCSS("border-top-width", "1px");
+      await expect(primary).toHaveCSS("color", "rgb(6, 182, 212)");
       await main
         .locator("summary")
         .filter({ hasText: /^Filter issues$/ })
@@ -69,6 +74,7 @@ for (const width of [1440, 768, 390])
             ),
           ),
       ).toEqual([8, 8]);
+      await emulateCoarsePointer(page);
       const coarse = await page.evaluate(
         () => matchMedia("(pointer: coarse)").matches,
       );

@@ -28,7 +28,10 @@ for (const width of [1440, 768, 390]) {
       await openAdminPage("/timeline?year=2020#albums");
       await expect(page).toHaveURL(/\/browse$/);
       await expect(
-        page.getByRole("main").getByText("No artists found", { exact: true }),
+        page.getByRole("main").getByRole("heading", {
+          name: "No artists in the library yet",
+          exact: true,
+        }),
       ).toBeVisible();
       await expect(page.locator('a[href="/timeline"]')).toHaveCount(0);
       await expect(
