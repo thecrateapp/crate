@@ -15,7 +15,7 @@ export function mountNav() {
   const nav = document.createElement("header");
   nav.className = "nav";
   nav.innerHTML = `
-    <a class="brand" href="index.html"><img src="../../site/public/icons/logo.svg" alt="" />Crate</a>
+    <a class="brand" href="index.html"><img src="../public/icons/logo.svg" alt="" />Crate</a>
     <nav class="links" aria-label="Primary">
       ${["Listen", "Admin", "Architecture", "Developers", "GitHub"]
         .map((label, index) => `<a href="#" style="--i:${index}">${label}</a>`)
