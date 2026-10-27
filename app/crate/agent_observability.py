@@ -208,11 +208,12 @@ def _health(records, failure):
     record = records.get("health")
     payload = (record or {}).get("payload")
     payload = payload if isinstance(payload, dict) else {}
-    score, breaches = payload.get("score"), payload.get("breaches")
+    score, raw_breaches = payload.get("score"), payload.get("breaches")
+    breaches = raw_breaches if isinstance(raw_breaches, list) else []
     valid = (
         type(score) is int
         and 0 <= score <= 100
-        and isinstance(breaches, list)
+        and isinstance(raw_breaches, list)
         and len(breaches) <= 10
         and all(
             isinstance(item, dict)
