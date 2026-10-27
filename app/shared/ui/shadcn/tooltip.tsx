@@ -29,10 +29,45 @@ function Tooltip({
   );
 }
 
+let keyboardInteraction = false;
+let trackingInteraction = false;
+
+function trackInteraction() {
+  if (trackingInteraction || typeof document === "undefined") return;
+  trackingInteraction = true;
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+        keyboardInteraction = true;
+      }
+    },
+    true,
+  );
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      keyboardInteraction = false;
+    },
+    true,
+  );
+}
+
 function TooltipTrigger({
+  onFocus,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+  React.useEffect(trackInteraction, []);
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (!keyboardInteraction) event.preventDefault();
+      }}
+      {...props}
+    />
+  );
 }
 
 function TooltipContent({

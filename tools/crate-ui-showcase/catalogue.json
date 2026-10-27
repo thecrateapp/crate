@@ -1850,9 +1850,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/tooltip.tsx": "4942a269741cc123d1b7f833a8132c4c8779c1bc44a9e2dc4a1dd8aaacc7fbd4",
+        "app/shared/ui/shadcn/tooltip.tsx": "a06e184bd7bf02a0c8bbbc8fe2c5830cb0230e5497c712aac3ab8ad92c00a372",
         "tools/crate-ui-showcase/stories/Tooltip.stories.tsx": "42dba3e82806dd355f96ccbffa8af8b47c2c55692201a217bbb64245398de2a3",
-        "tools/crate-ui-showcase/docs/Tooltip.mdx": "d6e3d6afcf9e3c4ccb8964ca95ee99d3d9bcb1e65b57f169e409a52c52a60c96"
+        "tools/crate-ui-showcase/docs/Tooltip.mdx": "0226a4b5bcbfb69effaf165312d73ede6f1009222d30e644e90764c648ef0374"
       },
       "category": "Overlays"
     },

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { Button } from "./button";
@@ -50,6 +50,20 @@ it("lets an existing Tooltip own nested compatibility hints", async () => {
   ).toBeVisible();
   expect(screen.getAllByRole("tooltip")).toHaveLength(1);
   expect(container.querySelector("[title]")).toBeNull();
+});
+
+it("stays closed when a dialog moves focus onto it after a click", async () => {
+  render(
+    <TooltipHint content="Genre source">
+      <button>hardcore</button>
+    </TooltipHint>,
+  );
+  const button = screen.getByRole("button", { name: "hardcore" });
+  fireEvent.pointerDown(document.body);
+  act(() => button.focus());
+  expect(button).toHaveFocus();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.queryByRole("tooltip")).toBeNull();
 });
 
 it("adds no wrapper or tab stop without content", () => {
