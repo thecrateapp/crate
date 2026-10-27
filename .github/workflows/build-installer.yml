@@ -68,9 +68,75 @@ jobs:
         working-directory: .
         run: bash -n install.sh
 
+  tag-images:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      OWNER: ${{ github.repository_owner }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read the release manifest of the tagged commit
+        env:
+          MANIFEST_REPOSITORY: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-release-manifest
+        run: |
+          set -Eeuo pipefail
+          release_sha="$(git rev-parse HEAD)"
+          manifest_image="${MANIFEST_REPOSITORY}:${release_sha}"
+          if ! docker pull -q "$manifest_image" >/dev/null 2>&1; then
+            echo "::error::No release manifest for ${release_sha} (${manifest_image}). Tag a commit whose \"Build & Push Docker Images\" run on main has finished, then re-run this job."
+            exit 1
+          fi
+          container="$(docker create "$manifest_image" true)"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container:/release-manifest.json" /tmp/release-manifest.json
+          python scripts/release_manifest.py validate \
+            --manifest /tmp/release-manifest.json \
+            --release-sha "$release_sha" \
+            --registry "$REGISTRY" \
+            --owner "$OWNER"
+
+      - name: Tag every release image with the version
+        run: |
+          set -Eeuo pipefail
+          refs="$(python scripts/release_manifest.py refs \
+            --manifest /tmp/release-manifest.json)"
+          if ! grep -q '/crate-agent@' <<<"$refs"; then
+            echo "::warning::The release manifest has no crate-agent image, so crate-agent:${RELEASE_TAG} will not exist."
+          fi
+          while IFS= read -r reference; do
+            repository="${reference%@*}"
+            digest="${reference#*@}"
+            target="${repository}:${RELEASE_TAG}"
+            current="$(docker buildx imagetools inspect "$target" \
+              --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"' || true)"
+            if [[ "$current" == "$digest" ]]; then
+              echo "${target} already points to ${digest}"
+              continue
+            fi
+            if [[ -n "$current" ]]; then
+              echo "::error::${target} already points to ${current}, not ${digest}. Release tags are never moved."
+              exit 1
+            fi
+            docker buildx imagetools create --tag "$target" "$reference"
+          done <<<"$refs"
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: test
+    needs: [test, tag-images]
     runs-on: ubuntu-latest
     permissions:
       contents: write
