@@ -41,11 +41,11 @@ def _run_tag_step(
         '  digest="$(grep -F "$4 " "$FAKE_TAGS" | cut -d" " -f2)"\n'
         '  [[ -n "$digest" ]] || exit 1\n'
         '  printf \'"%s"\\n\' "$digest"\n'
-        '  exit 0\n'
+        "  exit 0\n"
         "fi\n"
         'if [[ "$1 $2 $3" == "buildx imagetools create" ]]; then\n'
         '  printf \'%s %s\\n\' "$5" "$6" >> "$FAKE_CREATED"\n'
-        '  exit 0\n'
+        "  exit 0\n"
         "fi\n"
         "exit 2\n"
     )
