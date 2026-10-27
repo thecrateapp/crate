@@ -26,14 +26,14 @@ export const HERO_NEUTRAL_ACTION_CLASS =
   "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm whitespace-normal py-2 font-semibold text-text-primary shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
 
 export const HERO_SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-14 max-w-full shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-11 max-w-full shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-0 py-1 md:min-w-14 md:px-1.5 text-xs font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export const HERO_SECONDARY_ACTION_ACTIVE_CLASS =
   "text-accent-action drop-shadow-accent-action";
 
 const SECONDARY_GROUP_CLASS: Record<HeroSecondaryLayout, string> = {
   fixed:
-    "empty:hidden min-w-0 max-w-full grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
+    "empty:hidden min-w-0 max-w-full grid grid-cols-[repeat(5,auto)] justify-between items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
   fill: "empty:hidden min-w-0 max-w-full grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
 };
 
@@ -157,10 +157,7 @@ function HeroActionMenuControl({
         className={HERO_SECONDARY_ACTION_CLASS}
       >
         <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
-        <MonoLabel
-          as="span"
-          className="max-w-full whitespace-normal wrap-anywhere text-inherit"
-        >
+        <MonoLabel as="span" className="text-inherit">
           {moreLabel}
         </MonoLabel>
       </button>
@@ -286,10 +283,7 @@ export function HeroActionBar({
                 )}
               >
                 {action.icon}
-                <MonoLabel
-                  as="span"
-                  className="max-w-full whitespace-normal wrap-anywhere text-inherit"
-                >
+                <MonoLabel as="span" className="text-inherit">
                   {action.label}
                 </MonoLabel>
               </button>

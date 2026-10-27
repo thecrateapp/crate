@@ -227,6 +227,31 @@ describe("HeroActionBar", () => {
     expect(button).toBeDisabled();
   });
 
+  it("spaces mobile secondary captions evenly without breaking words", () => {
+    render(
+      <HeroActionBar
+        primaryActions={[{ key: "play", label: "Play" }]}
+        secondaryActions={[{ key: "setlist", label: "Setlist" }]}
+        menu={{
+          actions: [{ key: "share", label: "Share", onSelect: vi.fn() }],
+        }}
+        moreLabel="More"
+      />,
+    );
+    for (const label of ["Setlist", "More"]) {
+      const text = screen.getByText(label);
+      expect(text).toHaveClass("crate-mono-label");
+      expect(text).not.toHaveClass("wrap-anywhere");
+      expect(text).not.toHaveClass("max-w-full");
+    }
+    const setlist = screen.getByRole("button", { name: "Setlist" });
+    expect(setlist).toHaveClass("min-w-11", "px-0", "md:min-w-14");
+    expect(setlist.parentElement).toHaveClass(
+      "grid-cols-[repeat(5,auto)]",
+      "justify-between",
+    );
+  });
+
   it("exposes labelled action groups only when labels are provided", () => {
     const { rerender } = render(
       <HeroActionBar
