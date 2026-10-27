@@ -134,6 +134,7 @@ func (w *wizard) basics(ctx context.Context) error {
 		w.cfg = install.FromEnvFile(w.cfg, w.existing)
 		ui.Success(w.out, "Found an existing installation. Its settings are prefilled and its secrets are kept.")
 	}
+	w.cfg.ImageTag = install.UpgradeImageTag(w.cfg.ImageTag, w.opts.Version)
 	if w.cfg, err = install.WithOverrides(w.cfg, os.Getenv); err != nil {
 		return err
 	}

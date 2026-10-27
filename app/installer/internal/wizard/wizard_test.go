@@ -185,3 +185,40 @@ func TestTurningSoulseekOffRemovesItsProfile(t *testing.T) {
 		t.Fatal("its variables must be cleared")
 	}
 }
+
+func TestInstallPinsTheImagesOfItsRelease(t *testing.T) {
+	cases := []struct {
+		name, version, existing, override, want string
+	}{
+		{name: "new install", version: "v3.1.0", want: "v3.1.0"},
+		{name: "development build", version: "dev", want: "latest"},
+		{name: "upgrade from latest", version: "v3.1.0", existing: "latest", want: "v3.1.0"},
+		{name: "upgrade from an older release", version: "v3.1.0", existing: "v3.0.0", want: "v3.1.0"},
+		{name: "older installer", version: "v3.0.0", existing: "v3.1.0", want: "v3.1.0"},
+		{name: "custom tag", version: "v3.1.0", existing: "2734413f2a1b", want: "2734413f2a1b"},
+		{name: "environment override", version: "v3.1.0", existing: "v3.0.0", override: "latest", want: "latest"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			w, out, _ := newTestWizard(t, Options{Version: tc.version, InstallDir: dir, Yes: true, SkipStart: true})
+			if tc.existing != "" {
+				cfg := install.Defaults(dir)
+				cfg.ImageTag = tc.existing
+				if err := install.Apply(w.manifest, cfg, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Setenv("CRATE_IMAGE_TAG", tc.override)
+
+			if err := w.execute(context.Background()); err != nil {
+				t.Fatalf("%v\n%s", err, out.String())
+			}
+
+			values, _ := envfile.Read(install.EnvPath(dir))
+			if got, _ := values.Get("CRATE_IMAGE_TAG"); got != tc.want {
+				t.Fatalf("CRATE_IMAGE_TAG = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

@@ -320,3 +320,34 @@ func TestAFreshSecretPageShowsNoStatus(t *testing.T) {
 		t.Fatal("nothing was checked yet, so no status may show")
 	}
 }
+
+func TestTheCopilotInstallsTheImagesOfItsRelease(t *testing.T) {
+	cases := []struct{ name, version, existing, want string }{
+		{name: "new install", version: "v3.1.0", want: "v3.1.0"},
+		{name: "development build", version: "dev", want: "latest"},
+		{name: "older release", version: "v3.1.0", existing: "v3.0.0", want: "v3.1.0"},
+		{name: "custom tag", version: "v3.1.0", existing: "edge", want: "edge"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, session, err := NewServer(tc.version, Deps{Run: fakeRunner{}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			if tc.existing != "" {
+				cfg := install.Defaults(dir)
+				cfg.ImageTag = tc.existing
+				if err := install.Apply(session.manifest, cfg, nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := session.use(context.Background(), dir); err != nil {
+				t.Fatal(err)
+			}
+			if session.cfg.ImageTag != tc.want {
+				t.Fatalf("image tag %q, want %q", session.cfg.ImageTag, tc.want)
+			}
+		})
+	}
+}

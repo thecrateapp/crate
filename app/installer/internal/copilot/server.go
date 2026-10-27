@@ -32,6 +32,7 @@ func NewServer(version string, deps Deps) (*mcp.Server, *Session, error) {
 		return nil, nil, err
 	}
 	session := NewSession(m, deps)
+	session.version = version
 	server := mcp.NewServer(&mcp.Implementation{Name: "crate-installer", Title: "Crate installer", Version: version}, &mcp.ServerOptions{Instructions: Instructions})
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	mcp.AddTool(server, &mcp.Tool{Name: "crate_status", Description: "Where the installation stands: machine checks, settings (never secret values), integrations, start progress and the next steps to take. Call it first and whenever unsure.", Annotations: readOnly}, session.toolStatus)

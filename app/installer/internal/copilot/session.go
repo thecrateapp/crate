@@ -33,6 +33,7 @@ type Session struct {
 	mu       sync.Mutex
 	deps     Deps
 	manifest *manifest.Manifest
+	version  string
 
 	dir      string
 	cfg      install.Config
@@ -103,6 +104,7 @@ func (s *Session) use(ctx context.Context, dir string) error {
 	if existing != nil {
 		cfg = install.FromEnvFile(cfg, existing)
 	}
+	cfg.ImageTag = install.UpgradeImageTag(cfg.ImageTag, s.version)
 	s.dir, s.cfg, s.existing = path, cfg, existing
 	s.checks = map[string]validate.Result{}
 	s.adminChosen, s.applied = false, existing != nil

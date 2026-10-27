@@ -7,6 +7,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -95,6 +96,45 @@ func Defaults(installDir string) Config {
 		PGID:         "1000",
 		DockerGID:    "988",
 	}
+}
+
+var releaseVersion = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
+
+// UpgradeImageTag is the CRATE_IMAGE_TAG an installer of version writes over
+// current. A release installer pins its own release on a new install and
+// moves an install on latest or on an older release to it. A newer release,
+// any other value and every development build keep current.
+func UpgradeImageTag(current, version string) string {
+	if current == "" {
+		current = "latest"
+	}
+	release, ok := parseRelease(version)
+	if !ok {
+		return current
+	}
+	if current == "latest" {
+		return version
+	}
+	if installed, ok := parseRelease(current); ok && slices.Compare(installed, release) < 0 {
+		return version
+	}
+	return current
+}
+
+func parseRelease(version string) ([]int, bool) {
+	match := releaseVersion.FindStringSubmatch(version)
+	if match == nil {
+		return nil, false
+	}
+	parts := make([]int, 0, 3)
+	for _, part := range match[1:] {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, false
+		}
+		parts = append(parts, n)
+	}
+	return parts, true
 }
 
 var hostnamePattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
