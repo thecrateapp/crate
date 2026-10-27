@@ -480,4 +480,4 @@ The `crate-cli` Rust CLI computes a 20-dimensional feature vector per track usin
 
 ## License
 
-Private project. Not licensed for redistribution.
+Crate is free software, released under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
