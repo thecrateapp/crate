@@ -1,4 +1,4 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import snapshot from "../../../../tests/admin-e2e/fixtures/stack-snapshot.json";
@@ -206,6 +206,7 @@ describe("Stack typographic controls", () => {
     });
     expect(wrapper).toHaveAttribute("aria-disabled", "true");
     expect(wrapper).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(document, { key: "Tab" });
     wrapper.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Restart");
     expect(api).not.toHaveBeenCalledWith(expect.anything(), "POST");

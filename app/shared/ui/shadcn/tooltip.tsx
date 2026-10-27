@@ -29,7 +29,7 @@ function Tooltip({
   );
 }
 
-let keyboardInteraction = false;
+let pointerInteraction = false;
 let trackingInteraction = false;
 
 function trackInteraction() {
@@ -39,7 +39,7 @@ function trackInteraction() {
     "keydown",
     (event) => {
       if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-        keyboardInteraction = true;
+        pointerInteraction = false;
       }
     },
     true,
@@ -47,7 +47,7 @@ function trackInteraction() {
   document.addEventListener(
     "pointerdown",
     () => {
-      keyboardInteraction = false;
+      pointerInteraction = true;
     },
     true,
   );
@@ -63,7 +63,7 @@ function TooltipTrigger({
       data-slot="tooltip-trigger"
       onFocus={(event) => {
         onFocus?.(event);
-        if (!keyboardInteraction) event.preventDefault();
+        if (pointerInteraction) event.preventDefault();
       }}
       {...props}
     />

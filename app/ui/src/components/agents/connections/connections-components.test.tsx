@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -223,6 +229,7 @@ describe("PermissionPicker", () => {
     expect(screen.queryByText("curation.shows.read")).not.toBeInTheDocument();
     const scope = screen.getByRole("checkbox", { name: "Read upcoming shows" });
     expect(scope).not.toHaveAttribute("title");
+    fireEvent.keyDown(document, { key: "Tab" });
     scope.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "curation.shows.read",

@@ -1168,6 +1168,7 @@ it("exposes a method's configured model through the shared keyboard tooltip", as
   if (!(cost instanceof HTMLElement))
     throw new Error("Configured model tooltip trigger is missing");
   expect(cost).not.toHaveAttribute("title");
+  fireEvent.keyDown(document, { key: "Tab" });
   cost.focus();
   expect(await screen.findByRole("tooltip")).toHaveTextContent(MODEL);
 });

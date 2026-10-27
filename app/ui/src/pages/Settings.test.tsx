@@ -279,6 +279,7 @@ describe("Settings", () => {
     expect(time).toHaveAttribute("datetime", timestamp);
     expect(time).not.toHaveAttribute("title");
     if (!time) throw new Error("Audit timestamp is missing");
+    fireEvent.keyDown(document, { key: "Tab" });
     time.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       new Date(timestamp).toLocaleString(),

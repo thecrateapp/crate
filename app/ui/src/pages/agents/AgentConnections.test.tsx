@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -622,6 +622,7 @@ describe("AgentConnections", () => {
     const sheet = await openConnection(user);
     const permission = within(sheet).getByText("Inspect library health");
     expect(permission).not.toHaveAttribute("title");
+    fireEvent.keyDown(document, { key: "Tab" });
     permission.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "library.health.read",
