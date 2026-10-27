@@ -1,4 +1,9 @@
-import { emulateCoarsePointer, expect, test } from "./fixtures";
+import {
+  emulateCoarsePointer,
+  expectCoarseTarget,
+  expect,
+  test,
+} from "./fixtures";
 import fixture from "./fixtures/system-health-1ac.json";
 
 for (const width of [1440, 768, 390])
@@ -59,16 +64,8 @@ for (const width of [1440, 768, 390])
       await refresh.click();
       await expect.poll(() => queries.length).toBeGreaterThan(count);
       await emulateCoarsePointer(page);
-      const coarse = await page.evaluate(
-        () => matchMedia("(pointer: coarse)").matches,
-      );
       for (const target of await main.locator("button").all()) {
-        const box = await target.boundingBox();
-        const minimum =
-          (await target.getAttribute("role")) === "radio" && !coarse ? 32 : 44;
-        expect(Math.min(box!.height, box!.width)).toBeGreaterThanOrEqual(
-          minimum,
-        );
+        await expectCoarseTarget(target);
       }
       await expect(
         main.getByRole("meter", { name: /Transcode slots/i }),

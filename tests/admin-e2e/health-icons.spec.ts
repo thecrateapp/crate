@@ -1,4 +1,9 @@
-import { emulateCoarsePointer, expect, test } from "./fixtures";
+import {
+  emulateCoarsePointer,
+  expectCoarseTarget,
+  expect,
+  test,
+} from "./fixtures";
 import fixture from "./fixtures/health-1ad.json";
 for (const width of [1440, 768, 390])
   test.describe(`Library Health built ${width}`, () => {
@@ -75,18 +80,10 @@ for (const width of [1440, 768, 390])
           ),
       ).toEqual([8, 8]);
       await emulateCoarsePointer(page);
-      const coarse = await page.evaluate(
-        () => matchMedia("(pointer: coarse)").matches,
-      );
       for (const c of await main
         .locator("button:visible,a:visible,summary:visible")
         .all()) {
-        const box = await c.boundingBox(),
-          pill = await c.getAttribute("aria-pressed");
-        // Transformed layout can report 43.999992 px for a 44 px target.
-        expect(
-          Number(Math.min(box!.width, box!.height).toFixed(2)),
-        ).toBeGreaterThanOrEqual(pill !== null && !coarse ? 32 : 44);
+        await expectCoarseTarget(c);
       }
 
       const link = region.getByRole("link", {

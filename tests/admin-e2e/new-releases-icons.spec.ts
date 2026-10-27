@@ -1,4 +1,9 @@
-import { emulateCoarsePointer, expect, test } from "./fixtures";
+import {
+  emulateCoarsePointer,
+  expectCoarseTarget,
+  expect,
+  test,
+} from "./fixtures";
 import fixture from "./fixtures/new-releases-1aj.json";
 for (const width of [1440, 768, 390]) {
   test.describe(`New Releases Admin ${width}`, () => {
@@ -158,9 +163,7 @@ for (const width of [1440, 768, 390]) {
         ).toBe(8);
       await emulateCoarsePointer(page);
       for (const control of await main.locator("button,input").all())
-        expect(
-          Number((await control.boundingBox())!.height.toFixed(2)),
-        ).toBeGreaterThanOrEqual(44);
+        await expectCoarseTarget(control);
       expect(
         await main
           .getByRole("heading", { level: 1 })

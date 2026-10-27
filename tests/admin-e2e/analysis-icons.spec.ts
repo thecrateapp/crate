@@ -1,4 +1,9 @@
-import { emulateCoarsePointer, expect, test } from "./fixtures";
+import {
+  emulateCoarsePointer,
+  expectCoarseTarget,
+  expect,
+  test,
+} from "./fixtures";
 import snapshot from "./fixtures/ops-snapshot.json";
 import analysis from "./fixtures/analysis-status.json";
 for (const width of [1440, 768, 390]) {
@@ -119,8 +124,7 @@ for (const width of [1440, 768, 390]) {
       expect(new Set(fields)).toEqual(new Set([8]));
       await emulateCoarsePointer(page);
       for (const action of await main.getByRole("button").all()) {
-        const box = await action.boundingBox();
-        expect(Math.min(box!.height, box!.width)).toBeGreaterThanOrEqual(44);
+        await expectCoarseTarget(action);
       }
     });
   });

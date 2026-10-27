@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { expect, test as base, type Page, type Route } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type Locator,
+  type Page,
+  type Route,
+} from "@playwright/test";
 
 const fixtureDir = join(__dirname, "fixtures");
 
@@ -341,6 +347,34 @@ export async function emulateCoarsePointer(page: Page): Promise<void> {
   await expect
     .poll(() => page.evaluate(() => matchMedia("(pointer: coarse)").matches))
     .toBe(true);
+}
+
+export async function coarseTargetSize(control: Locator) {
+  return control.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const size = { width: bounds.width, height: bounds.height };
+    if (!element.matches(".crate-form-chip, .crate-touch-target")) return size;
+    const after = getComputedStyle(element, "::after");
+    if (
+      after.content === "none" ||
+      after.content === "normal" ||
+      (after.pointerEvents === "none" &&
+        !element.matches(':disabled, [aria-disabled="true"]'))
+    )
+      return size;
+    return {
+      width: Math.max(size.width, parseFloat(after.width) || 0),
+      height: Math.max(size.height, parseFloat(after.height) || 0),
+    };
+  });
+}
+
+export async function expectCoarseTarget(control: Locator): Promise<void> {
+  const size = await coarseTargetSize(control);
+  // Transformed layout can report 43.999992 px for a 44 px target.
+  expect(
+    Number(Math.min(size.width, size.height).toFixed(2)),
+  ).toBeGreaterThanOrEqual(44);
 }
 
 export { expect };
