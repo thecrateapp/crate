@@ -41,7 +41,9 @@ it("opens an accessible crop dialog with labelled zoom and closes on Escape", as
   expect(
     await screen.findByRole("dialog", { name: "Crop image" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("slider", { name: "Zoom" })).toHaveValue("1");
+  const zoom = screen.getByRole("slider", { name: "Zoom" });
+  expect(zoom).toHaveValue("1");
+  expect(zoom.closest(".crate-form-field")).toHaveClass("px-5");
   expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   await user.keyboard("{Escape}");
   await waitFor(() =>

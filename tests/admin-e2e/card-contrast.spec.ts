@@ -198,6 +198,16 @@ test("separates the crop modal with a quiet hairline without uploading", async (
         ),
       )
       .toBe(true);
+    const zoom = modal.getByRole("slider", { name: "Zoom", exact: true });
+    const [titleBox, zoomBox, modalBox] = await Promise.all([
+      title.boundingBox(),
+      zoom.boundingBox(),
+      modal.boundingBox(),
+    ]);
+    expect(Math.abs(zoomBox!.x - titleBox!.x)).toBeLessThanOrEqual(1);
+    expect(modalBox!.x + modalBox!.width - (zoomBox!.x + zoomBox!.width)).toBe(
+      zoomBox!.x - modalBox!.x,
+    );
     await captureSurface(page, modal, info, "admin-image-crop-modal");
     await expectQuietHairline(modal);
   } finally {
