@@ -168,7 +168,9 @@ def rebuild_instance_listening(
 
 
 def instance_listening_days_dedup_key(days: list[str]) -> str:
-    digest = hashlib.sha1(",".join(sorted(days)).encode()).hexdigest()
+    digest = hashlib.sha1(
+        ",".join(sorted(days)).encode(), usedforsecurity=False
+    ).hexdigest()
     return f"instance-listening-days:{digest}"
 
 
