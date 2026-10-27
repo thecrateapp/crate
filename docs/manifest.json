@@ -180,6 +180,22 @@
     "order": 110
   },
   {
+    "sourcePath": "docs/technical/upgrade-v2-to-v3.md",
+    "route": "/operations/upgrade-v2-to-v3",
+    "section": "operations",
+    "title": "Upgrade from 2.7 to 3.0",
+    "summary": "Upgrade a self-hosted Crate 2.7.x instance to 3.0.0, with the installer or the image-first deploy, and move the agent pilots.",
+    "keywords": [
+      "upgrade",
+      "v3",
+      "migration",
+      "installer",
+      "deploy",
+      "rollback"
+    ],
+    "order": 115
+  },
+  {
     "sourcePath": "docs/technical/operations.md",
     "route": "/operations/operations",
     "section": "operations",

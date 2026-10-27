@@ -168,6 +168,9 @@ keep `latest`. `CRATE_IMAGE_TAG=<tag> crate install` sets the tag explicitly.
 To use a specific release of the installer, set `CRATE_INSTALLER_VERSION` to
 its tag when running `install.sh`.
 
+Upgrading a 2.7 installation to 3.0 has extra steps; follow
+[Upgrade from 2.7 to 3.0](upgrade-v2-to-v3.md).
+
 Before an update, copy the existing `.env` and take a PostgreSQL backup. After
 the update, repeat the verification commands above. If a database migration has
 run, do not assume an image rollback is safe; use a forward fix or restore a

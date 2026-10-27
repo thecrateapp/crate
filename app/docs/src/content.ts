@@ -226,6 +226,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/crate-operator.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/upgrade-v2-to-v3.md": () =>
+    import("../../../docs/technical/upgrade-v2-to-v3.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/operations.md": () =>
     import("../../../docs/technical/operations.md?raw").then(
       (module) => module.default,

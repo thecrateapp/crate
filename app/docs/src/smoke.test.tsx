@@ -66,6 +66,24 @@ describe("docs app", () => {
     ).toBeTruthy();
   });
 
+  it("publishes the 2.7 to 3.0 upgrade guide", async () => {
+    window.history.pushState(null, "", "/operations/upgrade-v2-to-v3");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Upgrade from 2.7 to 3.0",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Upgrade a home install" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Move the agent pilots" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Roll back" })).toBeTruthy();
+  });
+
   it("publishes independent operator delivery and human callback boundaries", async () => {
     window.history.pushState(null, "", "/operations/independent-operator");
     render(<App />);
