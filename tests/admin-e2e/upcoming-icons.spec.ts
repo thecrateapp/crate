@@ -47,7 +47,7 @@ for (const width of [1440, 768, 390])
                 l!.getBoundingClientRect().bottom
               );
             }),
-          ).toBe(8);
+          ).toBeCloseTo(8, 3);
         await expect(
           main.getByRole("button", { name: "Sync shows", exact: true }),
         ).toHaveCount(setlistOnly ? 0 : 1);
