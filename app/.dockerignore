@@ -15,7 +15,7 @@ coverage/
 # Frontend apps and shared web packages are not needed in the backend image.
 ui/
 listen/
-site/
+web/
 reference/
 docs/
 shared/
