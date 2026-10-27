@@ -101,6 +101,10 @@ body::after {
 }
 
 .nav .links a {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   opacity: 0;
   animation: fade-in 0.5s var(--ease-out) both;
   animation-delay: calc(80ms + var(--i, 0) * 60ms);
@@ -207,11 +211,12 @@ body::after {
   padding: 14px 0;
   color: var(--fg);
   text-decoration: none;
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: clamp(2.2rem, 11vw, 3.2rem);
-  letter-spacing: -0.04em;
-  line-height: 1;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: clamp(1.2rem, 6vw, 1.6rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
   animation: menu-in 0.7s var(--spring-snappy) both;
   animation-delay: calc(60ms + var(--i, 0) * 50ms);
 }
