@@ -222,9 +222,9 @@ export function Contributions() {
                   <HairlineRow
                     key={item.id}
                     truncate={false}
-                    className="items-stretch px-4 py-3.5"
+                    className="@container items-stretch px-4 py-3.5"
                   >
-                    <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1.45fr)_minmax(12rem,0.85fr)_minmax(13rem,1fr)] md:items-center md:gap-5">
+                    <div className="grid min-w-0 gap-3 @3xl:grid-cols-[minmax(0,1.45fr)_minmax(12rem,0.85fr)_minmax(13rem,1fr)] @3xl:items-center @3xl:gap-5">
                       <div className="flex min-w-0 items-center gap-3">
                         <MediaCover
                           src={coverUrl}
@@ -266,7 +266,7 @@ export function Contributions() {
                         </div>
                       </div>
 
-                      <div className="flex min-w-0 items-center gap-3 pl-[4.25rem] md:pl-0">
+                      <div className="flex min-w-0 items-center gap-3 pl-[4.25rem] @3xl:pl-0">
                         <Avatar
                           src={item.user_avatar}
                           name={displayName}
@@ -290,8 +290,8 @@ export function Contributions() {
                         </div>
                       </div>
 
-                      <div className="grid min-w-0 gap-1 pl-[4.25rem] md:justify-items-end md:pl-0">
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:justify-end">
+                      <div className="grid min-w-0 gap-1 pl-[4.25rem] @3xl:justify-items-end @3xl:pl-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 @3xl:justify-end">
                           <StatusDot tone={status.tone} label={status.label} />
                           <MonoLabel as="span">
                             {activityAt ? timeAgo(activityAt) : "Unknown time"}
