@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
         ("app/ui/Dockerfile", "crate-admin"),
         ("app/listen/Dockerfile", "crate-listen"),
         ("app/cast-receiver/Dockerfile", "crate-cast-receiver"),
-        ("app/site/Dockerfile", "crate-site"),
         ("app/docs/Dockerfile", "crate-docs"),
     ],
 )
@@ -38,7 +37,6 @@ def test_image_builds_pass_sentry_token_as_a_buildkit_secret() -> None:
         "build-ui",
         "build-listen",
         "build-cast-receiver",
-        "build-site",
         "build-docs",
     ):
         build_step = next(
@@ -52,6 +50,21 @@ def test_image_builds_pass_sentry_token_as_a_buildkit_secret() -> None:
         )
 
 
+def test_public_site_image_builds_app_web_without_sentry() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/build-images.yml").read_text())
+    build_step = next(
+        step
+        for step in workflow["jobs"]["build-site"]["steps"]
+        if step.get("id") == "build"
+    )
+    dockerfile = (ROOT / "app/web/Dockerfile").read_text()
+
+    assert build_step["with"]["file"] == "./app/web/Dockerfile"
+    assert "secrets" not in build_step["with"]
+    assert "build-args" not in build_step["with"]
+    assert "SENTRY" not in dockerfile
+
+
 def test_frontend_validation_build_does_not_upload_decoy_source_maps() -> None:
     workflow = (ROOT / ".github/workflows/test-frontend.yml").read_text()
 
@@ -62,7 +75,7 @@ def test_frontend_validation_build_does_not_upload_decoy_source_maps() -> None:
 def test_auxiliary_frontends_are_validated_before_image_builds() -> None:
     workflow = (ROOT / ".github/workflows/test-frontend.yml").read_text()
 
-    for app in ("site", "docs"):
+    for app in ("web", "docs"):
         assert f"npm ci --prefix app/{app}" in workflow
         assert f"npm test --prefix app/{app}" in workflow
         assert f"npm run build --prefix app/{app}" in workflow

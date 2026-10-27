@@ -117,7 +117,7 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         repository="crate-site",
         environment="CRATE_SITE_IMAGE",
         services=("crate-site",),
-        patterns=("app/site/**", "app/shared/**", "install.sh"),
+        patterns=("app/web/**", "app/shared/**", "install.sh"),
     ),
     "docs": ImageSpec(
         repository="crate-docs",

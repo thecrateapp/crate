@@ -73,7 +73,7 @@ services:
     image: ${CRATE_SITE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-site:${CRATE_IMAGE_TAG:-latest}}
     build:
       context: .
-      dockerfile: app/site/Dockerfile
+      dockerfile: app/web/Dockerfile
     container_name: crate-site
     restart: unless-stopped
     healthcheck:

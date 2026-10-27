@@ -400,24 +400,17 @@ jobs:
             type=sha,prefix=,format=long
 
       # NOTE: site build context is the repo root (matches the docs job)
-      # so the Dockerfile's COPY app/site/... resolves cleanly.
+      # so the Dockerfile's COPY app/web/... and install.sh resolve cleanly.
       - uses: docker/build-push-action@v7
         id: build
         with:
           context: .
-          file: ./app/site/Dockerfile
+          file: ./app/web/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=site
           cache-to: type=gha,scope=site,mode=max
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
-          build-args: |
-            VITE_SENTRY_DSN=${{ vars.SENTRY_SITE_DSN }}
-            VITE_SENTRY_ENVIRONMENT=production
-            VITE_SENTRY_RELEASE=crate-${{ github.sha }}
-            VITE_SENTRY_TRACES_SAMPLE_RATE=${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
 
   build-agent:
     needs: changes
