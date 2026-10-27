@@ -18,6 +18,8 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Existing1AZ SleepTimer presentation extracted from controller; typed timer preset choices, no added control.",
   "app/listen/src/pages/LibraryCollectionSortDropdown.tsx:Select:selected.value":
     "One shared collection Sort form adapter takes the typed artist/album/liked choice arrays; Sort uses Select by Diego's1AQ amendment, reconciled1AY.",
+  "app/ui/src/components/agents/connections/TelegramApprovers.tsx:select:selected":
+    "Choices are the service connections without a Telegram approver, read from the agent connections API.",
   "app/ui/src/components/ai-models/ActivityPanel.tsx:AdminSelect:actionId":
     "Feature options are the action definitions supplied by the AI snapshot API.",
   'app/ui/src/components/ai-models/FeatureModelSheet.tsx:AdminSelect:selectedProfile ? selectedProfile.profile.id : ""':
