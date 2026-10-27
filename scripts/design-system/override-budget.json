@@ -34,7 +34,7 @@
     "background": 3,
     "border": 2,
     "height": 10,
-    "margin": 7,
+    "margin": 6,
     "padding": 14,
     "radius": 6,
     "shadow": 1,
@@ -63,7 +63,7 @@
   },
   "CrateLogo": {
     "height": 8,
-    "margin": 2
+    "margin": 1
   },
   "DialogContent": {
     "height": 7,
@@ -94,15 +94,15 @@
   },
   "FollowHeartButton": {
     "background": 1,
-    "height": 3,
+    "height": 2,
     "padding": 1,
-    "radius": 4,
+    "radius": 3,
     "textColor": 1
   },
   "FormField": {
     "border": 2,
     "margin": 2,
-    "padding": 2
+    "padding": 3
   },
   "GenrePill": {
     "background": 3,
@@ -164,10 +164,10 @@
   "MonoLabel": {
     "background": 2,
     "border": 2,
-    "margin": 46,
+    "margin": 45,
     "padding": 11,
     "radius": 2,
-    "textColor": 26,
+    "textColor": 28,
     "typography": 1
   },
   "OAuthButtons": {

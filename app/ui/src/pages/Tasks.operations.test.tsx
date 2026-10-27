@@ -220,7 +220,7 @@ describe("Tasks operational controls", () => {
       name: "Resource governor",
     });
     expect(
-      screen.getByText("No worker sample is available yet."),
+      await screen.findByText("No worker sample is available yet."),
     ).toBeVisible();
 
     const gate = screen.getByRole("group", { name: "DB-heavy gate" });
