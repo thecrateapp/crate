@@ -242,7 +242,9 @@ export function MobileNavigationView({
       className="listen-mobile-nav-item"
     >
       {item.icon}
-      <span>{item.label}</span>
+      <MonoLabel as="span" className="text-inherit">
+        {item.label}
+      </MonoLabel>
     </VtNavLink>
   );
   return (
@@ -269,7 +271,9 @@ export function MobileNavigationView({
           onClick={() => setOpen(true)}
         >
           <Collection size={CRATE_ICON_SIZE.navMobile} />
-          <span>{collectionLabel}</span>
+          <MonoLabel as="span" className="text-inherit">
+            {collectionLabel}
+          </MonoLabel>
         </button>
         {items.slice(2).map(link)}
       </nav>

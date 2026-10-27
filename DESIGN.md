@@ -866,8 +866,8 @@ Inventory from the 2026-10-25 audit. Fix within reviewed scopes; do not copy the
     `data-crate-motion="off"` selector that never matches.
 - Listen hardcodes player offsets (`pb-[94px]`, `md:bottom-[92px]`, `pt-[92px]`) instead of the
   clearance variables.
-- Listen uses ad-hoc uppercase labels instead of `MonoLabel` in the full-screen player tabs, the
-  jam room and the mobile nav. Mobile nav labels (10px, not uppercase) differ from the sidebar.
+- Listen uses ad-hoc uppercase labels instead of `MonoLabel` in the full-screen player tabs and
+  the jam room.
 - Listen-only product recipes (`.stats-*`, `.jam-*`, `.home-*`, `.radio-*`) live in the shared
   `recipes.css`.
 

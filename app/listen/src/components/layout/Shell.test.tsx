@@ -140,6 +140,11 @@ describe("Shell", () => {
     expect(dockBackdrop).toBeInTheDocument();
     expect(dockBackdrop).not.toHaveClass("listen-glass-panel");
     expect(nav).toHaveClass("bg-transparent");
+    const labels = nav.querySelectorAll(".listen-mobile-nav-item > span");
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) {
+      expect(label).toHaveClass("crate-mono-label", "uppercase");
+    }
   });
 
   it("opens a mobile Collection sheet with all collection sections", () => {
