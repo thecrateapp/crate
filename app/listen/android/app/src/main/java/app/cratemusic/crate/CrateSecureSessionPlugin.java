@@ -57,7 +57,8 @@ public class CrateSecureSessionPlugin extends Plugin {
         try {
             String encrypted = preferences().getString(key, null);
             JSObject result = new JSObject();
-            result.put("value", encrypted == null ? null : decrypt(encrypted));
+            // TEST_GAP: org.json is an android.jar stub in JVM unit tests; the JS bridge test and devices cover this.
+            result.put("value", encrypted == null ? JSONObject.NULL : decrypt(encrypted));
             call.resolve(result);
         } catch (Exception error) {
             call.reject("Secure session storage is unavailable");

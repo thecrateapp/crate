@@ -84,7 +84,7 @@ export async function getSecureSessionValue(
     if (runtime === "tauri") {
       return await tauriInvoke()<string | null>("secure_session_get", { key });
     }
-    return (await plugin.get({ key })).value;
+    return (await plugin.get({ key })).value ?? null;
   } catch (error) {
     throw unavailable(error);
   }
