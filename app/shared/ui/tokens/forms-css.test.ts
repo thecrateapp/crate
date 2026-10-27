@@ -31,29 +31,50 @@ describe("Shared form recipes", () => {
     );
   });
 
-  it.each([".crate-form-control", ".crate-form-chip"])(
-    "gives coarse-pointer %s a 44px target",
-    (selector) => {
-      const coarse =
-        css.match(
-          /@media\s*\(pointer:\s*coarse\)\s*\{(?<rules>[\s\S]*?)\n\}/g,
-        ) ?? [];
-      expect(
-        coarse.some((media) => {
-          try {
-            const declarations = rule(selector, media);
-            return (
-              /(?:min-)?height:\s*44px/.test(declarations) &&
-              (selector !== ".crate-form-chip" ||
-                /min-width:\s*44px/.test(declarations))
-            );
-          } catch {
-            return false;
-          }
-        }),
-      ).toBe(true);
-    },
-  );
+  const coarseRules = (selector: string) =>
+    (
+      css.match(/@media\s*\(pointer:\s*coarse\)\s*\{(?<rules>[\s\S]*?)\n\}/g) ??
+      []
+    ).flatMap((media) => {
+      try {
+        return [rule(selector, media)];
+      } catch {
+        return [];
+      }
+    });
+
+  it("gives coarse-pointer .crate-form-control a 44px target", () => {
+    expect(
+      coarseRules(".crate-form-control").some((declarations) =>
+        /(?:min-)?height:\s*44px/.test(declarations),
+      ),
+    ).toBe(true);
+  });
+
+  it("gives coarse-pointer chips an invisible 44px target without growing them", () => {
+    expect(
+      coarseRules(".crate-form-chip::after").some(
+        (declarations) =>
+          /height:\s*44px/.test(declarations) &&
+          /width:\s*max\(100%,\s*44px\)/.test(declarations),
+      ),
+    ).toBe(true);
+    expect(
+      coarseRules(".crate-form-chip").some((declarations) =>
+        /(?:min-)?height:\s*44px/.test(declarations),
+      ),
+    ).toBe(false);
+  });
+
+  it("gives shared touch targets an invisible 44px coarse hit area", () => {
+    expect(
+      coarseRules(".crate-touch-target::after").some(
+        (declarations) =>
+          /height:\s*max\(100%,\s*44px\)/.test(declarations) &&
+          /width:\s*max\(100%,\s*44px\)/.test(declarations),
+      ),
+    ).toBe(true);
+  });
 
   it("keeps the focus border on the high accent without shadows or a danger border", () => {
     const focus = rule(".crate-form-control:focus-visible");

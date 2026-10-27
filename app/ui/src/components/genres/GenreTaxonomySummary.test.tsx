@@ -78,7 +78,7 @@ describe("GenreTaxonomySummary", () => {
     expect(
       within(sharedParent).getByRole("button", { name: "emo" }),
     ).toBeInTheDocument();
-    expect(relatedPill).toHaveClass("genre-pill", "pointer-coarse:min-h-11");
+    expect(relatedPill).toHaveClass("genre-pill", "crate-touch-target");
     expect(relatedPill).not.toHaveAttribute("title");
     expect(
       within(

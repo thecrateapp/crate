@@ -4008,8 +4008,28 @@ label
     margin-inline: 13px;
   }
   .crate-form-chip {
-    min-width: 44px;
-    min-height: 44px;
+    position: relative;
+  }
+  .crate-form-chip::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+  .crate-touch-target {
+    position: relative;
+  }
+  .crate-touch-target::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -4022,8 +4042,17 @@ label
   gap: 24px;
   max-width: 100%;
   overflow-x: auto;
+  scrollbar-width: none;
   padding: 4px 4px 0;
   border-bottom: 1px solid var(--border-subtle);
+}
+.crate-tabs-list::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 480px) {
+  .crate-tabs-list {
+    gap: 16px;
+  }
 }
 .crate-tabs-indicator {
   position: absolute;

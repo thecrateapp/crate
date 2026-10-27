@@ -142,8 +142,10 @@ describe("New Releases text presentation with real data hook and handlers", () =
         expect(button).toHaveAttribute("data-size", "icon-lg");
       else if (button.closest('[data-slot="action-group"]'))
         expect(button).toHaveAttribute("data-size", "icon-lg");
-      else if (button.getAttribute("data-slot") === "chip")
-        expect(button).toHaveClass("[@media(pointer:coarse)]:min-h-11");
+      else if (button.getAttribute("data-slot") === "chip") {
+        expect(button).toHaveClass("crate-form-chip");
+        expect(button).not.toHaveClass("[@media(pointer:coarse)]:min-h-11");
+      }
       else expect(button).not.toHaveClass("min-h-11");
     expect(mockApi).toHaveBeenCalledTimes(1);
     expect(SampleStream.instances).toHaveLength(1);

@@ -29,7 +29,7 @@ export const FilterChip = memo(function FilterChip({
       data-state={pressed ? "active" : "inactive"}
       data-tone={tone}
       className={cn(
-        "crate-form-chip inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border px-3 py-1 font-mono font-normal text-filter-chip tracking-chip [@media(pointer:coarse)]:min-h-11 disabled:cursor-not-allowed disabled:opacity-[var(--disabled-opacity)]",
+        "crate-form-chip inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border px-3 py-1 font-mono font-normal text-filter-chip tracking-chip disabled:cursor-not-allowed disabled:opacity-[var(--disabled-opacity)]",
         !pressed && tone && BADGE_TONE_CLASS[tone],
         className,
       )}

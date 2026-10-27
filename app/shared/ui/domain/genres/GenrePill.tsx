@@ -57,7 +57,7 @@ export function GenrePill({
   if (item.source) titleParts.push(item.source);
   const title = titleParts.join(" · ");
   const pillClassName =
-    "genre-pill inline-flex min-h-8 min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1 font-mono text-filter-chip font-normal tracking-chip pointer-coarse:min-h-11";
+    "genre-pill inline-flex min-h-8 min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1 font-mono text-filter-chip font-normal tracking-chip";
 
   if (onRemove) {
     return (
@@ -75,7 +75,7 @@ export function GenrePill({
               type="button"
               onClick={onClick}
               data-slot="chip"
-              className="inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left pointer-coarse:min-h-11"
+              className="crate-touch-target inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left"
             >
               {content}
             </button>
@@ -87,7 +87,7 @@ export function GenrePill({
             aria-label={removeLabel ?? `Remove ${item.name}`}
             onClick={onRemove}
             data-slot="chip"
-            className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-text-primary/10 hover:text-text-primary crate-touch-target"
           >
             <X size={CRATE_ICON_SIZE.micro} />
           </button>
@@ -103,7 +103,11 @@ export function GenrePill({
           type="button"
           onClick={onClick}
           data-slot="chip"
-          className={cn(pillClassName, "transition-colors", className)}
+          className={cn(
+            pillClassName,
+            "crate-touch-target transition-colors",
+            className,
+          )}
         >
           {content}
         </button>

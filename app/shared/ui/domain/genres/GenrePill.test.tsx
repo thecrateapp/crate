@@ -41,11 +41,10 @@ describe("GenrePill", () => {
       name: "Remove Hardcore punk",
     });
     expect(removeButton.closest(".genre-pill")).toHaveClass("rounded-full");
-    expect(removeButton).toHaveClass(
-      "min-h-8",
-      "min-w-8",
+    expect(removeButton).toHaveClass("min-h-8", "min-w-8", "crate-touch-target");
+    expect(removeButton).not.toHaveClass("pointer-coarse:min-h-11");
+    expect(removeButton.closest(".genre-pill")).not.toHaveClass(
       "pointer-coarse:min-h-11",
-      "pointer-coarse:min-w-11",
     );
   });
 
@@ -84,7 +83,7 @@ describe("GenrePill", () => {
     expect(button).toHaveClass(
       "genre-pill",
       "min-h-8",
-      "pointer-coarse:min-h-11",
+      "crate-touch-target",
     );
   });
 
@@ -157,7 +156,7 @@ describe("GenrePill", () => {
     expect(selectButton.querySelector("button")).toBeNull();
     expect(removeButton.querySelector("button")).toBeNull();
     expect(selectButton).not.toHaveAttribute("aria-pressed");
-    expect(selectButton).toHaveClass("min-h-8", "pointer-coarse:min-h-11");
+    expect(selectButton).toHaveClass("min-h-8", "crate-touch-target");
 
     fireEvent.click(selectButton);
     expect(onClick).toHaveBeenCalledTimes(1);
