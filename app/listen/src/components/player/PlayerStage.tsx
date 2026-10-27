@@ -12,7 +12,7 @@ export function PlayerStage({
   return (
     <div
       data-slot="player-stage"
-      className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ containerType: "size" }}
     >
       <div

@@ -23,7 +23,7 @@ describe("ArtistHeroPresentation", () => {
       ).not.toHaveClass("uppercase");
       expect(
         screen.getByRole("heading", { name: "Mixed Case Artist" }),
-      ).toHaveClass("font-display");
+      ).toHaveClass("font-display", "-ml-[0.035em]");
       expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
     },
   );

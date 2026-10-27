@@ -70,14 +70,14 @@ export function FullscreenPlayerPlayerTab({
           player.resolvedArtist?.globalArtistUid,
         )}
       />
-      <div className="mx-auto mt-4 w-full max-w-[360px]">
-        <PlayerMixIndicator mix={player.mix ?? null} />
+      <div className="relative mx-auto mt-4 w-full max-w-[360px]">
         <PlayerProgressLeaf
           onSeek={actions.seekWithFeedback}
           disabled={state.jamQueueLocked}
           remaining
           showTimes
         />
+        <PlayerMixIndicator mix={player.mix ?? null} />
       </div>
       <FullscreenPlayerControls
         state={state}

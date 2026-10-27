@@ -30,7 +30,10 @@ function presentation(state: EngineMixState | null = mixing, isPlaying = true) {
 describe("actual player mix presentation", () => {
   it("does not invent a mode when native telemetry is unavailable", () => {
     renderWithListenProviders(<PlayerMixIndicator mix={presentation(null)} />);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    const status = screen.getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    expect(status).not.toHaveAttribute("data-mix-mode");
+    expect(status).toHaveClass("min-h-4");
   });
 
   it("uses the same blue token for real Crossfade and the existing one-pixel ring", () => {
@@ -104,7 +107,7 @@ describe("actual player mix presentation", () => {
     );
     expect(screen.getByRole("status")).toBeInTheDocument();
     rerender(<PlayerMixIndicator mix={null} />);
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("rejects a stale edge while allowing either deck during handoff", () => {

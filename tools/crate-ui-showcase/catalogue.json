@@ -65,7 +65,7 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "ae227ee09af662d574acfc0d022b8bf6ae462187da8f2d6b72370820d9449c73",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "33b76726053546b8e2872c9c45b5eb8ff760f393d832f80d13e2d3f6899ea5c4",
+        "app/shared/ui/tokens/recipes.css": "b9de3c19379c345eb187bcba68bda0e13babb8939d553795c0aefec5eb0c2279",
         "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
@@ -74,7 +74,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "3131334f88e1f879f7817b1cddfe1a4ca46a8d08d30c75ff7fbb91cabd403735",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "9ad164f16be5dc3e1a6fdeb6f66b68f0d7a01a9e278ac0dcece59dc42d14ecde"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "cd3aebcf9b271b104830330acc502a70dd6734891a23707299b44ad8280cd79d"
       },
       "category": "Foundations"
     },
@@ -194,9 +194,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/FilterChip.tsx": "eff73b75e83767f3db4738fba6898ba6cc0bf5ed5e507bed380a57d249cf8ffb",
+        "app/shared/ui/primitives/FilterChip.tsx": "86c5dba3f2b120a9af83955107334b2884e74ebe1d54a2f68061310aa14cc017",
         "tools/crate-ui-showcase/stories/FilterChip.stories.tsx": "c27b8cf5ccdeeafbc218e88247963798407ad4a26320e8e33ef894e2d00a62b7",
-        "tools/crate-ui-showcase/docs/FilterChip.mdx": "4b85d2bc04c6890e92be2e20dafcda2c33229fb2e09bf98b35dc1847645ee51f"
+        "tools/crate-ui-showcase/docs/FilterChip.mdx": "1c7c603e3111d81256a62f4945a5cb87774fd7dcab397092d3b0f33fec5b555c"
       },
       "category": "Forms"
     },
@@ -234,9 +234,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/genres/GenrePill.tsx": "d60755fc50378dea66d09012d980a797fbf1d3b8a6f8e621cd8caf678546d4e7",
+        "app/shared/ui/domain/genres/GenrePill.tsx": "14157d29ac4772da51d757916af4de54f776adc0f6623282ac655cef295f0838",
         "tools/crate-ui-showcase/stories/GenrePill.stories.tsx": "5e225db11fee150b12772c13ae3490154bab0f8e0bf23e0d51c40d7edb1a606e",
-        "tools/crate-ui-showcase/docs/GenrePill.mdx": "f5c1fd53628ff2edf6a0395e682af9bb3142672c7a2f7bd7ec9d698e7fd35d3b"
+        "tools/crate-ui-showcase/docs/GenrePill.mdx": "528768e56ede4fdda422bed72b8febfcee9902fc4fc8da98fb8f61259edde7a3"
       },
       "category": "Data Display"
     },
@@ -436,9 +436,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "bfbeb0831757e922fa0c87d88dcdbb01310ff893814b5ec525a18e932599166a",
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "65f7642cad4b5289449a83cbc779ed42a24c558d1351ca2a80e016c0c9cce503",
         "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx": "9d3925e7cc7a6ea92ed2d26c469a3c935c5f9ce65047ed13bd56dcadb544b144",
-        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "87db821e2356d4965597a660100eac1331404881bf18f63be23d631304e012d9"
+        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "e71cf478bb0009fe06eb56c2aa628b7af34eb792d79f65b73560925c49d91410"
       },
       "category": "Data Display"
     },
@@ -1850,9 +1850,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/shadcn/tooltip.tsx": "555205d4263bd3f9a5a43b12728c4f96c474778deb805d9d9c2fadda99657bc6",
+        "app/shared/ui/shadcn/tooltip.tsx": "0de57d086e4d183d349d47fd1924d9827b0438dbc77857f44a0c0ebbbde91083",
         "tools/crate-ui-showcase/stories/Tooltip.stories.tsx": "42dba3e82806dd355f96ccbffa8af8b47c2c55692201a217bbb64245398de2a3",
-        "tools/crate-ui-showcase/docs/Tooltip.mdx": "f48a409b5345c86e185705cfcb907585d5164d6485b77022e12abf7dc27c0f8a"
+        "tools/crate-ui-showcase/docs/Tooltip.mdx": "1ae3f22539cd0173bdc1cd314ea7ffdf36a4b0390cb95ec505bf32bcf2a1590d"
       },
       "category": "Overlays"
     },

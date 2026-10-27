@@ -38,7 +38,7 @@ export function ArtistHeroPresentation({
       <h1
         data-testid="hero-result-artist-name"
         className={cn(
-          "mt-1 max-w-[16ch] text-balance font-display font-black leading-[0.96] tracking-display text-text-primary",
+          "-ml-[0.035em] mt-1 max-w-[16ch] text-balance font-display font-black leading-[0.96] tracking-display text-text-primary",
           mobile
             ? "text-4xl min-[390px]:text-5xl"
             : "text-[52px] lg:text-[56px]",

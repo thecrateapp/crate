@@ -271,7 +271,7 @@ describe("FullscreenPlayer", () => {
   // Rendering states
   // ════════════════════════════════════════════════════════════════════
   describe("rendering states", () => {
-    it("shows only the actual native technique above progress and sends the same tone to the disc", async () => {
+    it("shows only the actual native technique on the time row and sends the same tone to the disc", async () => {
       const track = makeTrack();
       renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
         playerActions: {
@@ -299,8 +299,9 @@ describe("FullscreenPlayer", () => {
       expect(indicator).toHaveTextContent("Beatmatch");
       expect(
         indicator.compareDocumentPosition(screen.getByTestId("seek-bar")) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+          Node.DOCUMENT_POSITION_PRECEDING,
       ).toBeTruthy();
+      expect(indicator).toHaveClass("absolute", "top-0", "inset-x-12");
       expect(
         JSON.parse(
           screen.getByTestId("spinning-disc").getAttribute("data-props")!,

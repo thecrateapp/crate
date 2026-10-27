@@ -254,7 +254,7 @@ export function EqualizerPanelView({
           <div
             {...control}
             role="group"
-            className="flex max-h-40 flex-wrap gap-2 overflow-y-auto sm:max-h-none"
+            className="flex flex-wrap gap-2"
           >
             {EQ_PRESET_LABEL_ENTRIES.map(([name, key]) => (
               <FilterChip
