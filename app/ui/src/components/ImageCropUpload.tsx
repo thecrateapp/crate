@@ -159,7 +159,7 @@ export function ImageCropUpload({
               />
             ) : null}
           </div>
-          <FormField label="Zoom">
+          <FormField label="Zoom" className="px-5 pb-4">
             <Slider
               min={1}
               max={3}
