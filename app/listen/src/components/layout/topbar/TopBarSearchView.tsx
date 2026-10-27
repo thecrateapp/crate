@@ -220,6 +220,7 @@ function TopBarSearchContainer({
         <Button
           ref={triggerRef}
           variant="ghost"
+          className="crate-focus-inset"
           aria-label={t("search.label")}
           aria-expanded={searchOpen}
           hidden={searchOpen}
@@ -234,6 +235,7 @@ function TopBarSearchContainer({
         <div hidden={!searchOpen}>
           <SearchInput
             ref={inputRef}
+            className="crate-focus-inset"
             value={query}
             label={t("search.label")}
             placeholder={t("search.placeholder")}

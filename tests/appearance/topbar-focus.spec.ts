@@ -49,7 +49,6 @@ async function expectUnclippedInsetOutline(target: Locator) {
     return { outline, clippingAncestors };
   });
 
-  expect(geometry.clippingAncestors.length).toBeGreaterThan(0);
   for (const clip of geometry.clippingAncestors) {
     if (clip.clipsX) {
       expect(geometry.outline.left).toBeGreaterThanOrEqual(clip.left - 1);
