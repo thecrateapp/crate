@@ -330,6 +330,29 @@ describe("PlaylistCard row", () => {
     expect(api).toHaveBeenCalledWith("/api/playlists/9");
   });
 
+  it("shows the playlist artwork in the menu header", async () => {
+    renderWithListenProviders(
+      <PlaylistCard
+        variant="row"
+        playlistId={9}
+        name="Night Drive"
+        trackCount={12}
+        href="/playlist/9"
+        coverDataUrl="data:image/png;base64,AAAA"
+      />,
+    );
+
+    expect(
+      document.querySelectorAll('[data-slot="playlist-artwork"]'),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await screen.findByRole("menu");
+
+    expect(
+      document.querySelectorAll('[data-slot="playlist-artwork"]'),
+    ).toHaveLength(2);
+  });
+
   it("keeps only Play inline and moves shuffle, follow and extra actions to the menu", async () => {
     const onEdit = vi.fn();
     renderWithListenProviders(

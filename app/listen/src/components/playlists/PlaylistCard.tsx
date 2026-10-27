@@ -289,11 +289,35 @@ function PlaylistTileArtwork({
   );
 }
 
+function usePlaylistMenuArtwork({
+  name,
+  coverDataUrl,
+  tracks,
+  crateManaged,
+}: Pick<
+  PlaylistCardProps,
+  "name" | "coverDataUrl" | "tracks" | "crateManaged"
+>) {
+  return useMemo(
+    () => (
+      <PlaylistArtwork
+        name={name}
+        coverDataUrl={coverDataUrl}
+        tracks={tracks}
+        showCrateMark={crateManaged}
+        className="size-full"
+      />
+    ),
+    [coverDataUrl, crateManaged, name, tracks],
+  );
+}
+
 function PlaylistTile(props: PlaylistCardProps) {
   const { name, description, meta, badge, layout = "rail" } = props;
   const base = usePlaylistCardBase(props);
   const { t, offlineState, offlineMeta } = base;
   const overlay = useCardOverlay(props, base);
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId: props.playlistId,
@@ -307,7 +331,12 @@ function PlaylistTile(props: PlaylistCardProps) {
       onShuffle: props.onShuffle,
       onStartRadio: props.onStartRadio,
     },
-    { title: name, subtitle: description || meta, detail: badge },
+    {
+      title: name,
+      subtitle: description || meta,
+      detail: badge,
+      artwork: menuArtwork,
+    },
   );
 
   return (
@@ -341,6 +370,7 @@ function PlaylistFeatured(props: PlaylistCardProps) {
   const { name, summary, meta, artworkOnly = false } = props;
   const base = usePlaylistCardBase(props);
   const overlay = useCardOverlay(props, base);
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId: props.playlistId,
@@ -355,6 +385,7 @@ function PlaylistFeatured(props: PlaylistCardProps) {
       title: name,
       subtitle: summary ?? meta,
       detail: summary ? meta : undefined,
+      artwork: menuArtwork,
     },
   );
 
@@ -451,6 +482,7 @@ function PlaylistRow(props: PlaylistCardProps) {
   const subtitleText = ownerLabel
     ? `${contextText} · ${ownerLabel}`
     : contextText;
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId,
@@ -464,7 +496,12 @@ function PlaylistRow(props: PlaylistCardProps) {
       extraEntries,
       ...playHandlers,
     },
-    { title: name, subtitle: subtitleText, detail: description },
+    {
+      title: name,
+      subtitle: subtitleText,
+      detail: description,
+      artwork: menuArtwork,
+    },
   );
 
   return (

@@ -11,6 +11,7 @@ export interface ContextMenuMediaHeader {
   imageOnError?: () => void;
   imageShape?: "square" | "circle";
   fallbackIcon?: CrateIcon;
+  artwork?: ReactNode;
 }
 
 export type ContextMenuHeader = ContextMenuMediaHeader;

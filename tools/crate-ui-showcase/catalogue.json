@@ -456,9 +456,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/actions/ContextMenu.tsx": "eec4b624b5b585b4808a1e47abbccffb0fb89160725fc602a28ebf3c63deb018",
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "a63424d23931a04c4b895106efebaf70795df1ca505a5776c489abe54465f083",
         "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "070e1c69d1e0ff827748ef30f93c9a58d8546b8e5c0a4ee5ef6cb36997fd3379",
-        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "952dd627e14d0af7cd5bc97fe76e0aa79e70469d21b70357af87a571a9ad47ab"
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "a3bda4651cda00bb522ae8485dd1c5f3ce154dadcaf84ac9ea53648e4b2edb4c"
       },
       "category": "Actions"
     },

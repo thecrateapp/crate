@@ -272,7 +272,9 @@ function ContextMenuMediaHeaderView({
           imageShape,
         )}
       >
-        {hasImage && renderMediaImage ? (
+        {header.artwork ? (
+          header.artwork
+        ) : hasImage && renderMediaImage ? (
           renderMediaImage({
             src: header.imageUrl || "",
             alt: header.imageAlt ?? header.title,
@@ -310,7 +312,11 @@ function ContextMenuMediaHeaderView({
             className="text-text-primary/35"
           />
         ) : null}
-        {hasImage && renderMediaImage && imageFailed && FallbackIcon ? (
+        {!header.artwork &&
+        hasImage &&
+        renderMediaImage &&
+        imageFailed &&
+        FallbackIcon ? (
           <FallbackIcon
             size={CRATE_ICON_SIZE.xl}
             className="absolute text-text-primary/35"

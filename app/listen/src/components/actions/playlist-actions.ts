@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -383,11 +383,12 @@ export interface PlaylistActionMenuHeader {
   title: string;
   subtitle?: string;
   detail?: string;
+  artwork?: ReactNode;
 }
 
 export function usePlaylistActionMenu(
   input: PlaylistItemMenuData,
-  { title, subtitle, detail }: PlaylistActionMenuHeader,
+  { title, subtitle, detail, artwork }: PlaylistActionMenuHeader,
 ): EntityActionMenu {
   const context = usePlaylistMenuContext(input.playlistId);
   const latest = useRef({ input, context });
@@ -408,8 +409,9 @@ export function usePlaylistActionMenu(
       detail,
       imageShape: "square",
       fallbackIcon: Sparkles,
+      artwork,
     }),
-    [detail, subtitle, title],
+    [artwork, detail, subtitle, title],
   );
 
   return useListenEntityMenu(getActions, header);

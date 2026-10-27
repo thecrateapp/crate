@@ -227,6 +227,26 @@ describe("ContextMenu", () => {
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
   });
 
+  it("renders consumer artwork in the header slot instead of the image or icon", () => {
+    render(
+      <ContextMenu
+        header={{
+          ...header,
+          imageUrl: "/cover.jpg",
+          artwork: <span data-testid="header-artwork" />,
+        }}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    expect(screen.getByTestId("header-artwork")).toBeInTheDocument();
+    expect(document.querySelector('img[src="/cover.jpg"]')).toBeNull();
+  });
+
   it("delegates media rendering when a consumer supplies an image pipeline", () => {
     const renderMediaImage = vi.fn((props: ContextMenuMediaImageProps) => (
       <span data-testid="managed-media-image" data-source={props.src} />
