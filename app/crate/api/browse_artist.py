@@ -1883,12 +1883,12 @@ def api_cached_shows(
                     {"id": artist_ref.get("id"), "slug": artist_ref.get("slug")}
                 )
             lineup_artists.insert(0, primary)
-        for artist in lineup_artists:
+        for lineup_artist in lineup_artists:
             health = setlist_health.get(
-                " ".join(str(artist.get("name") or "").split()).casefold(),
+                " ".join(str(lineup_artist.get("name") or "").split()).casefold(),
                 {"status": "missing", "song_count": 0},
             )
-            artist.update(
+            lineup_artist.update(
                 {
                     "probable_setlist_status": health["status"],
                     "probable_setlist_generated_at": health.get("generated_at"),
