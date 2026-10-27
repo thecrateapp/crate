@@ -1,4 +1,10 @@
-import type { ComponentPropsWithoutRef, ReactNode, RefObject } from "react";
+import {
+  useState,
+  type ComponentPropsWithoutRef,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { cn } from "@crate/ui/lib/cn";
 import {
   PLAYER_MIX_COLORS,
@@ -16,6 +22,7 @@ export function SpinningDiscFrame({
   control,
   surfaceProps,
   mixTone,
+  mixBpm,
 }: {
   className?: string;
   disabled?: boolean;
@@ -24,11 +31,16 @@ export function SpinningDiscFrame({
   artwork: ReactNode;
   control: ReactNode;
   mixTone?: PlayerMixTone;
+  mixBpm?: number | null;
   surfaceProps?: Omit<
     ComponentPropsWithoutRef<"div">,
     "children" | "className"
   >;
 }) {
+  const [ringTone, setRingTone] = useState(mixTone);
+  if (mixTone && mixTone !== ringTone) setRingTone(mixTone);
+  const beatSeconds =
+    mixBpm != null && mixBpm >= 40 && mixBpm <= 240 ? 60 / mixBpm : undefined;
   return (
     <div
       className={cn(
@@ -55,10 +67,21 @@ export function SpinningDiscFrame({
         <div
           className="spinning-disc-overlay pointer-events-none absolute inset-[2%] rounded-full"
           data-mix-tone={mixTone}
-          style={
-            mixTone ? { borderColor: PLAYER_MIX_COLORS[mixTone] } : undefined
-          }
-        />
+        >
+          <span
+            className="spinning-disc-mix-ring absolute -inset-px rounded-full"
+            data-active={mixTone ? "" : undefined}
+            data-beat={mixTone && beatSeconds ? "" : undefined}
+            style={
+              {
+                "--mix-ring-color": ringTone
+                  ? PLAYER_MIX_COLORS[ringTone]
+                  : undefined,
+                "--mix-ring-beat": beatSeconds ? `${beatSeconds}s` : undefined,
+              } as CSSProperties
+            }
+          />
+        </div>
         {control}
       </div>
     </div>

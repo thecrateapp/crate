@@ -160,6 +160,12 @@ unchanged. See the four Feedback skeleton entries and LoadingState for actual co
 
 Search loading is an immediate section state: `fullWidth` fills its available panel content width. CatalogSearch names a single requested entity type; global/mixed searches say Finding your music... in the active locale. The 200ms route mark keeps its separate fixed geometry.
 
+The Smart Mix disc ring (`spinning-disc-mix-ring`) lights only during an actual Crossfade or
+Beatmatch. Its opacity follows the shared `--listen-crossfade-progress` (in over the first quarter,
+out over the last) and it keeps its last tone while fading. A soft glow pulses once per beat of the
+outgoing track's BPM; without a usable tempo it holds steady. Reduced motion shows the ring with a
+plain fade and no pulse.
+
 The Stats explorer recipe (`stats-explorer-*`) is a hand-built Listen instrument: an overview
 strip with a draggable window, a detail chart whose scale column sizes to its longest localized
 label, and an "In this stretch" panel that moves below the chart in containers under 50rem. Its

@@ -53,9 +53,11 @@ describe("actual player mix presentation", () => {
     expect(status).toHaveTextContent("Crossfade");
     expect(status.style.color).toBe("var(--state-info)");
     const ring = container.querySelector<HTMLElement>(
-      ".spinning-disc-overlay",
+      ".spinning-disc-mix-ring",
     )!;
-    expect(ring.style.borderColor).toBe(status.style.color);
+    expect(ring.style.getPropertyValue("--mix-ring-color")).toBe(
+      status.style.color,
+    );
     expect(container.querySelectorAll(".spinning-disc-overlay")).toHaveLength(
       1,
     );

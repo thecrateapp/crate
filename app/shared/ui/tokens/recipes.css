@@ -329,6 +329,63 @@
     color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
+.spinning-disc-mix-ring {
+  border: 1px solid var(--mix-ring-color, transparent);
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+}
+
+.spinning-disc-mix-ring::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 16px 1px
+    color-mix(in srgb, var(--mix-ring-color, transparent) 45%, transparent);
+  opacity: 0.45;
+}
+
+.spinning-disc-mix-ring[data-active] {
+  opacity: min(
+    1,
+    calc(var(--listen-crossfade-progress, 0) * 4),
+    calc((1 - var(--listen-crossfade-progress, 0)) * 4)
+  );
+  transition-duration: 200ms;
+}
+
+.spinning-disc-mix-ring[data-beat]::after {
+  animation: spinning-disc-mix-pulse var(--mix-ring-beat) ease-out infinite;
+}
+
+@keyframes spinning-disc-mix-pulse {
+  0% {
+    opacity: 0.85;
+  }
+  70%,
+  100% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning-disc-mix-ring[data-active] {
+    opacity: 1;
+  }
+
+  .spinning-disc-mix-ring[data-beat]::after {
+    animation: none;
+  }
+}
+
+[data-crate-motion="reduced"] .spinning-disc-mix-ring[data-active] {
+  opacity: 1;
+}
+
+[data-crate-motion="reduced"] .spinning-disc-mix-ring[data-beat]::after {
+  animation: none;
+}
+
 .spinning-disc-placeholder {
   background: var(--surface-placeholder);
 }

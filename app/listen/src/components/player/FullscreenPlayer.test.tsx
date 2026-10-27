@@ -272,7 +272,7 @@ describe("FullscreenPlayer", () => {
   // ════════════════════════════════════════════════════════════════════
   describe("rendering states", () => {
     it("shows only the actual native technique on the time row and sends the same tone to the disc", async () => {
-      const track = makeTrack();
+      const track = makeTrack({ bpm: 126 });
       renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
         playerActions: {
           currentTrack: track,
@@ -307,6 +307,11 @@ describe("FullscreenPlayer", () => {
           screen.getByTestId("spinning-disc").getAttribute("data-props")!,
         ).mixTone,
       ).toBe("beatmatch");
+      expect(
+        JSON.parse(
+          screen.getByTestId("spinning-disc").getAttribute("data-props")!,
+        ).mixBpm,
+      ).toBe(126);
     });
 
     it("renders nothing when open is false", () => {

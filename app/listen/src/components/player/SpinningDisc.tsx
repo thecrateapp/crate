@@ -35,6 +35,7 @@ interface SpinningDiscProps {
   onTogglePlay: () => void;
   disabled?: boolean;
   mixTone?: PlayerMixTone;
+  mixBpm?: number | null;
 }
 
 export function SpinningDisc({
@@ -55,6 +56,7 @@ export function SpinningDisc({
   onTogglePlay,
   disabled = false,
   mixTone,
+  mixBpm,
 }: SpinningDiscProps) {
   const seekTimerRef = useRef<number | null>(null);
   const lastSeekFlushAtRef = useRef(0);
@@ -283,6 +285,7 @@ export function SpinningDisc({
       disabled={disabled}
       jogEnabled={jogEnabled && Boolean(onSeek)}
       mixTone={isPlaying && !isBuffering && !disabled ? mixTone : undefined}
+      mixBpm={mixBpm}
       rotorRef={rotorRef}
       surfaceProps={{
         onPointerDown: handlePointerDown,

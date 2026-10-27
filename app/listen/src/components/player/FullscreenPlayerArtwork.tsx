@@ -37,6 +37,7 @@ export function FullscreenPlayerArtwork({
           isBuffering={state.isBuffering}
           isPlaying={state.isPlaying}
           mixTone={player.mix?.ringTone}
+          mixBpm={crossfadeTransition?.outgoing.bpm ?? currentTrack.bpm}
           disabled={state.jamQueueLocked}
           jogEnabled
           jogSeekMode={player.spinningDiscJogSeekMode}
