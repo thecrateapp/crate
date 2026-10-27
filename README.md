@@ -209,8 +209,10 @@ curl -fsSL https://cratemusic.app/install.sh | bash
 The script downloads `crate`, a step-by-step installer, checks its checksum and
 runs it. The wizard checks Docker, memory, disk and ports, then asks for the music
 library, access mode and admin password, shows a review, starts Crate and waits
-until it answers. Run `crate install` again at any time to change the
-installation; it keeps your secrets and manual edits. `crate configure` sets up
+until it answers. A release installer pins the images of its own release
+(`CRATE_IMAGE_TAG=v3.0.0` for installer `v3.0.0`). Run `crate install` again at
+any time to change the installation; it keeps your secrets and manual edits, and
+a newer installer moves the images to its release. `crate configure` sets up
 integrations such as Last.fm, Soulseek or Crate Agent (the Telegram assistant),
 checking each key with its provider, and `crate doctor` checks the whole
 installation. `crate mcp` lets an

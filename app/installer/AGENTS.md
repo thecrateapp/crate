@@ -24,6 +24,12 @@ for linux/darwin × amd64/arm64.
   the embedded copies are stale.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
+- `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git
+  tag `build-installer.yml` injects as `main.version`) writes its own version on a new install
+  and over `latest` or an older release; it never downgrades and keeps any other value.
+  `crate configure` and `crate doctor` never change it. The `tag-images` job in that workflow
+  gives every image of the tagged commit's release manifest the version tag before the
+  installer release is published.
 - Never print a secret. `.env` is written with mode 0600. Validation calls go straight to the
   provider, never through Crate.
 - Privileged steps are `install.Command` values: the wizard shows them, asks once and then runs

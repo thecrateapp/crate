@@ -156,6 +156,15 @@ new in this release:
 crate install --dir /opt/crate
 ```
 
+A release installer writes its own version as `CRATE_IMAGE_TAG`, so installer
+`v3.1.0` runs the `v3.1.0` images. Every release tag adds that version tag to
+the images of the tagged commit. On an existing installation the installer
+moves `CRATE_IMAGE_TAG` forward only when it is `latest` or an older release
+(`vX.Y.Z`); a newer release is never downgraded, and any other value, such as
+a commit SHA, is kept. Development and pre-release builds of the installer
+keep `latest`. `CRATE_IMAGE_TAG=<tag> crate install` sets the tag explicitly.
+`crate configure` never changes it.
+
 To use a specific release of the installer, set `CRATE_INSTALLER_VERSION` to
 its tag when running `install.sh`.
 
