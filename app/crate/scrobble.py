@@ -360,15 +360,17 @@ def listenbrainz_scrobble(
             headers={"Authorization": f"Token {token}"},
             timeout=10,
         )
-        if resp.status_code == 200:
-            log.debug("ListenBrainz scrobble OK: %s - %s", artist, track)
-            return True
-        log.warning(
-            "ListenBrainz scrobble failed (%d): %s", resp.status_code, resp.text[:200]
-        )
-    except Exception:
-        log.warning("ListenBrainz scrobble error", exc_info=True)
-    return False
+    except requests.RequestException as exc:
+        log.warning("ListenBrainz submit transport error: %s", type(exc).__name__)
+        return ScrobbleResult(RETRYABLE, f"transport {type(exc).__name__}")
+    if resp.status_code == 200:
+        return ScrobbleResult(ACCEPTED)
+    if resp.status_code == 429 or resp.status_code >= 500:
+        result = ScrobbleResult(RETRYABLE, f"http {resp.status_code}")
+    else:
+        result = ScrobbleResult(FAILED, f"http {resp.status_code}")
+    log.warning("ListenBrainz submit %s: %s", result.outcome, result.detail)
+    return result
 
 
 def listenbrainz_now_playing(
@@ -402,17 +404,9 @@ def listenbrainz_now_playing(
             headers={"Authorization": f"Token {token}"},
             timeout=10,
         )
-    except requests.RequestException as exc:
-        log.warning("ListenBrainz submit transport error: %s", type(exc).__name__)
-        return ScrobbleResult(RETRYABLE, f"transport {type(exc).__name__}")
-    if resp.status_code == 200:
-        return ScrobbleResult(ACCEPTED)
-    if resp.status_code == 429 or resp.status_code >= 500:
-        result = ScrobbleResult(RETRYABLE, f"http {resp.status_code}")
-    else:
-        result = ScrobbleResult(FAILED, f"http {resp.status_code}")
-    log.warning("ListenBrainz submit %s: %s", result.outcome, result.detail)
-    return result
+        return resp.status_code == 200
+    except Exception:
+        return False
 
 
 # ── Dispatcher ──────────────────────────────────────────────────

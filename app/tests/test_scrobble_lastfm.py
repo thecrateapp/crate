@@ -463,6 +463,74 @@ def test_lastfm_scrobble_treats_a_timeout_as_retryable(monkeypatch):
     assert result.outcome == "retryable"
 
 
+def _listenbrainz_post(monkeypatch, *, status_code=200, exc=None):
+    class Response:
+        def __init__(self):
+            self.status_code = status_code
+
+    def fake_post(url, *, json, headers, timeout):
+        if exc is not None:
+            raise exc
+        return Response()
+
+    monkeypatch.setattr("crate.scrobble.requests.post", fake_post)
+
+
+@pytest.mark.parametrize(
+    ("status_code", "outcome", "detail"),
+    [
+        (200, "accepted", ""),
+        (429, "retryable", "http 429"),
+        (503, "retryable", "http 503"),
+        (401, "failed", "http 401"),
+    ],
+)
+def test_listenbrainz_scrobble_classifies_the_provider_answer(
+    monkeypatch, status_code, outcome, detail
+):
+    from crate.scrobble import listenbrainz_scrobble
+
+    _listenbrainz_post(monkeypatch, status_code=status_code)
+
+    result = listenbrainz_scrobble(
+        token="lb-token", artist="Viva Belgrado", track="Vals de los Ciegos"
+    )
+
+    assert result.outcome == outcome
+    assert result.detail == detail
+
+
+def test_listenbrainz_scrobble_treats_a_timeout_as_retryable(monkeypatch):
+    import requests
+
+    from crate.scrobble import listenbrainz_scrobble
+
+    _listenbrainz_post(monkeypatch, exc=requests.Timeout("slow"))
+
+    result = listenbrainz_scrobble(
+        token="lb-token", artist="Viva Belgrado", track="Vals de los Ciegos"
+    )
+
+    assert result.outcome == "retryable"
+    assert result.detail == "transport Timeout"
+
+
+@pytest.mark.parametrize(("status_code", "expected"), [(200, True), (503, False)])
+def test_listenbrainz_now_playing_reports_success_as_a_bool(
+    monkeypatch, status_code, expected
+):
+    from crate.scrobble import listenbrainz_now_playing
+
+    _listenbrainz_post(monkeypatch, status_code=status_code)
+
+    assert (
+        listenbrainz_now_playing(
+            token="lb-token", artist="Viva Belgrado", track="Vals de los Ciegos"
+        )
+        is expected
+    )
+
+
 @pytest.mark.parametrize(
     ("played", "duration", "completed", "eligible"),
     [
