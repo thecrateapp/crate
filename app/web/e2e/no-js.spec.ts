@@ -11,7 +11,13 @@ const REVEALED = [
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
-  for (const path of ["/", "/listen", "/architecture", "/developers"]) {
+  for (const path of [
+    "/",
+    "/listen",
+    "/architecture",
+    "/developers",
+    "/install",
+  ]) {
     test(`${path} shows its copy without waiting for motion`, async ({
       page,
     }) => {

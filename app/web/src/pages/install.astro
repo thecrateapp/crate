@@ -1,0 +1,825 @@
+---
+import Chapter from "../components/Chapter.astro";
+import InstallCommand from "../components/InstallCommand.astro";
+import CodeBlock from "../components/developers/CodeBlock.astro";
+import AgentMap from "../components/install/AgentMap.astro";
+import WizardTerminal from "../components/install/WizardTerminal.astro";
+import { QUICKSTART, install } from "../content/install/en";
+import { SCREENS } from "../content/install/screens";
+import Base from "../layouts/Base.astro";
+
+const { flow, wizard, agent, after, reference, video } = install;
+const pad = (value: number) => String(value).padStart(2, "0");
+---
+
+<Base title={install.meta.title} description={install.meta.description}>
+  <div class="install">
+    <header class="hero" data-reveal>
+      <div class="hero-copy">
+        <p class="eyebrow" data-enter>{install.eyebrow}</p>
+        <h1 class="display" data-split style="--d:120ms;--step:55ms">{install.title}</h1>
+        <p class="lede" data-enter style="--d:380ms">{install.lede}</p>
+        <div class="get" data-enter style="--d:480ms">
+          <InstallCommand />
+          <ul class="reqs" aria-label="Requirements">
+            {install.requirements.map((item) => <li>{item}</li>)}
+          </ul>
+          <p class="note">{install.requirementsNote}</p>
+        </div>
+      </div>
+
+      <figure class="watch" data-enter style="--d:300ms" data-watch data-play-label="Play the install recording" data-pause-label="Pause the install recording">
+        <header class="viz-bar">
+          <p class="viz-label"><b>{video.label}</b> {video.meta}</p>
+          <p class="viz-label">0:26</p>
+        </header>
+        <div class="frame" data-chapter data-active>
+          <video
+            controls
+            muted
+            loop
+            playsinline
+            disablepictureinpicture
+            preload="none"
+            poster="/install/install.webp"
+            width="960"
+            height="1012"
+            aria-label={video.caption}
+          >
+            <source src="/install/install.mp4" type="video/mp4" />
+            <source src="/install/install.webm" type="video/webm" />
+          </video>
+          <button type="button" class="toggle" data-toggle data-state="play" aria-label="Play the install recording" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path class="icon-play" d="M8 5v14l11-7z"></path>
+              <path class="icon-pause" d="M7 5h4v14H7zM13 5h4v14h-4z"></path>
+            </svg>
+          </button>
+        </div>
+        <figcaption class="viz-label">{video.caption}</figcaption>
+      </figure>
+    </header>
+
+    <Chapter index={1} title={flow.title} id="how">
+      <Fragment slot="lede"><p>{flow.lede}</p></Fragment>
+      <ol class="flow" data-reveal>
+        {
+          flow.steps.map((step, index) => (
+            <li style={`--i:${index}`}>
+              <span class="flow-node" aria-hidden="true" />
+              <p class="eyebrow">
+                <b>{pad(index + 1)}</b> / {pad(flow.steps.length)}
+              </p>
+              <h3>{step.title}</h3>
+              <p class="flow-body">{step.body}</p>
+              {index === flow.steps.length - 1 && (
+                <dl class="open">
+                  {flow.open.map(([label, value]) => (
+                    <div>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          ))
+        }
+      </ol>
+    </Chapter>
+
+    <Chapter index={2} title={wizard.title} id="wizard">
+      <Fragment slot="lede"><p>{wizard.lede}</p></Fragment>
+      <ol class="steps" data-wizard>
+        {
+          wizard.steps.map((step, index) => (
+            <li class="step" id={`step-${index + 1}`} data-step>
+              <div class="step-copy" data-reveal>
+                <span class="node" aria-hidden="true" />
+                <p class="eyebrow" data-enter>
+                  <b>{pad(index + 1)}</b> / 07
+                </p>
+                <h3 data-enter style="--d:60ms">{step.title}</h3>
+                <p class="tag" data-enter style="--d:120ms">{step.label}</p>
+                <p class="step-body" data-enter style="--d:160ms">{step.body}</p>
+              </div>
+              <WizardTerminal
+                screen={SCREENS[index]!}
+                step={index + 1}
+                label={SCREENS[index]!.source === "source" ? wizard.fromSource : wizard.recorded}
+              />
+            </li>
+          ))
+        }
+      </ol>
+    </Chapter>
+
+    <Chapter index={3} title={agent.title} id="ai">
+      <Fragment slot="lede"><p>{agent.lede}</p></Fragment>
+      <div class="ai">
+        <div class="ai-copy">
+          <ul class="ai-features" data-reveal>
+            {
+              agent.features.map((feature, index) => (
+                <li style={`--i:${index}`}>
+                  <h3>{feature.title}</h3>
+                  <p>{feature.body}</p>
+                </li>
+              ))
+            }
+          </ul>
+          <div class="ai-code">
+            <CodeBlock label="Get the installer" code={agent.get} />
+            <CodeBlock label="Connect Claude Code" code={agent.connect} />
+            <CodeBlock label="Then ask" code={agent.ask} />
+          </div>
+        </div>
+        <div class="ai-visual">
+          <AgentMap />
+        </div>
+      </div>
+    </Chapter>
+
+    <Chapter index={4} title={after.title} id="after">
+      <Fragment slot="lede"><p>{after.lede}</p></Fragment>
+      <dl class="cmds" data-reveal>
+        {
+          after.commands.map((item, index) => (
+            <div style={`--i:${index}`}>
+              <dt>
+                <code>
+                  <span aria-hidden="true">$ </span>
+                  {item.command}
+                </code>
+              </dt>
+              <dd>
+                {item.body}
+                {item.link && (
+                  <a class="cmd-link" href={item.link.href}>
+                    {item.link.label} <span aria-hidden="true">&rarr;</span>
+                  </a>
+                )}
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+      <div class="unattended">
+        <CodeBlock label="Unattended install" code={after.unattended} />
+        <dl class="flags" data-reveal>
+          {
+            after.flags.map(([flag, body]) => (
+              <div>
+                <dt>{flag}</dt>
+                <dd>{body}</dd>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+    </Chapter>
+
+    <nav class="explore reference" data-reveal aria-label={reference.title}>
+      <a href={QUICKSTART} style="--i:0">
+        <span class="label">{reference.title}</span>
+        <span class="meta">{reference.link} <span class="arrow">&rarr;</span></span>
+      </a>
+      <p class="reference-body">{reference.body}</p>
+    </nav>
+  </div>
+</Base>
+
+<script>
+  import { mountOnPage } from "../scripts/motion/page";
+  import { reducedMotion } from "../scripts/motion/env";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initWizardRail } from "../scripts/install/wizard";
+  import { canAutoplay, createScreencast } from "../scripts/screencast/player";
+
+  function initWatch() {
+    const root = document.querySelector<HTMLElement>("[data-watch]");
+    const video = root?.querySelector("video");
+    const toggle = root?.querySelector<HTMLButtonElement>("[data-toggle]");
+    if (!root || !video || !toggle) return () => {};
+    video.controls = false;
+    toggle.hidden = false;
+    return createScreencast(root, {
+      autoplay: canAutoplay(reducedMotion()),
+      labels: { play: root.dataset.playLabel ?? "", pause: root.dataset.pauseLabel ?? "" },
+    });
+  }
+
+  mountOnPage(".install", () => {
+    const rail = document.querySelector<HTMLElement>("[data-wizard]");
+    const cleanups = [initTextMotion(), initWatch(), rail ? initWizardRail(rail) : () => {}];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style>
+  .install {
+    padding-bottom: 6vh;
+  }
+
+  .hero {
+    position: relative;
+    z-index: 5;
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 56px clamp(32px, 5vw, 88px);
+    align-items: center;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 20vh clamp(20px, 6vw, 96px) 6vh;
+  }
+
+  .hero-copy {
+    display: grid;
+    gap: 28px;
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .hero .display {
+    font-size: clamp(3rem, 6vw, 6.4rem);
+    max-width: 10ch;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 30ch;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.3rem, 2vw, 1.9rem);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--fg-2);
+  }
+
+  .get {
+    display: grid;
+    gap: 16px;
+    justify-items: start;
+    max-width: 100%;
+    margin-top: 8px;
+  }
+
+  .reqs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 0;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+
+  .reqs li + li::before {
+    content: "·";
+    margin: 0 12px;
+    color: var(--cyan-hi);
+  }
+
+  .note {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg-2);
+  }
+
+  .watch {
+    position: relative;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .watch .viz-bar {
+    padding-bottom: 14px;
+  }
+
+  .watch .frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 960 / 1012;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: #0a0a0f;
+    overflow: hidden;
+    box-shadow: 0 40px 120px -60px rgba(6, 182, 212, 0.35);
+  }
+
+  .watch .frame::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(103, 232, 249, 0.06);
+    background: linear-gradient(180deg, transparent 70%, rgba(10, 10, 15, 0.55));
+  }
+
+  .watch video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .watch figcaption {
+    margin-top: 14px;
+    text-transform: none;
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+  }
+
+  .toggle {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(103, 232, 249, 0.4);
+    background: rgba(13, 14, 20, 0.72);
+    color: var(--cyan-hi);
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+  }
+
+  .toggle[hidden] {
+    display: none;
+  }
+
+  .toggle svg {
+    width: 40%;
+    height: 40%;
+    fill: currentColor;
+  }
+
+  .toggle[data-state="play"] {
+    inset: 0;
+    margin: auto;
+    width: 76px;
+    height: 76px;
+    box-shadow: 0 0 0 8px rgba(6, 182, 212, 0.06);
+  }
+
+  .toggle[data-state="play"] .icon-pause,
+  .toggle[data-state="pause"] .icon-play {
+    display: none;
+  }
+
+  .toggle[data-state="pause"] {
+    inset: auto 14px 14px auto;
+    width: 44px;
+    height: 44px;
+    opacity: 0;
+  }
+
+  .frame:hover .toggle[data-state="pause"],
+  .toggle[data-state="pause"]:focus-visible {
+    opacity: 1;
+  }
+
+  .flow {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px clamp(24px, 4vw, 64px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .flow::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(103, 232, 249, 0.5), var(--line) 40%, var(--line));
+    transform-origin: left;
+  }
+
+  :global(html.js) .flow::before {
+    transform: scaleX(0);
+  }
+
+  .flow:global(.is-in)::before {
+    transform: scaleX(1);
+    transition: transform 1.2s var(--ease-out);
+  }
+
+  .flow li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding-top: 34px;
+  }
+
+  :global(html.js) .flow li {
+    opacity: 0;
+  }
+
+  .flow:global(.is-in) li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(200ms + var(--i) * 110ms);
+  }
+
+  .flow-node {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1px solid rgba(241, 245, 249, 0.45);
+    background: var(--bg);
+  }
+
+  .flow li:last-child .flow-node {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.12), 0 0 14px rgba(103, 232, 249, 0.6);
+  }
+
+  .flow h3,
+  .step h3,
+  .ai-features h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 2vw, 1.9rem);
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    color: var(--fg);
+  }
+
+  .flow-body,
+  .step-body,
+  .ai-features p {
+    margin: 0;
+    max-width: 42ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.06rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .open {
+    display: grid;
+    margin: 6px 0 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .open div {
+    display: grid;
+    grid-template-columns: 9ch 1fr;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .open dt {
+    color: var(--fg-3);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 10.5px;
+    line-height: 1.7;
+  }
+
+  .open dd {
+    margin: 0;
+    color: var(--cyan-hi);
+  }
+
+  .steps {
+    --rail-x: 4px;
+    position: relative;
+    display: grid;
+    gap: clamp(72px, 12vh, 140px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps::before,
+  .steps::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    bottom: 0;
+    left: var(--rail-x);
+    width: 1px;
+    background: var(--line);
+  }
+
+  .steps::after {
+    background: linear-gradient(180deg, rgba(103, 232, 249, 0.1), var(--cyan-hi));
+    transform-origin: top;
+    transform: scaleY(0);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.5);
+  }
+
+  .steps:global(.is-live)::after {
+    transform: scaleY(var(--p, 0));
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    gap: 32px clamp(28px, 4vw, 64px);
+    align-items: start;
+  }
+
+  .step-copy {
+    position: sticky;
+    top: 16vh;
+    display: grid;
+    gap: 14px;
+    justify-items: start;
+    padding-left: 40px;
+  }
+
+  .node {
+    position: absolute;
+    top: 3px;
+    left: calc(var(--rail-x) - 4px);
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1px solid rgba(241, 245, 249, 0.45);
+    background: var(--bg);
+    transition:
+      background-color 0.35s var(--ease-snap),
+      border-color 0.35s var(--ease-snap),
+      box-shadow 0.35s var(--ease-snap),
+      transform 0.5s var(--spring-snappy);
+  }
+
+  .step:global(.is-done) .node {
+    background: rgba(241, 245, 249, 0.55);
+    border-color: transparent;
+  }
+
+  .step:global(.is-active) .node {
+    background: var(--cyan-hi);
+    border-color: var(--cyan-hi);
+    box-shadow: 0 0 0 5px rgba(103, 232, 249, 0.12), 0 0 16px rgba(103, 232, 249, 0.7);
+    transform: scale(1.15);
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 6px 12px 6px 10px;
+    border: 1px solid rgba(103, 232, 249, 0.28);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .tag::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px var(--cyan-hi);
+  }
+
+  .ai {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px clamp(28px, 5vw, 88px);
+    align-items: start;
+  }
+
+  .ai-features {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ai-features li {
+    display: grid;
+    gap: 10px;
+    padding: 24px 0 26px;
+    border-top: 1px solid var(--line);
+  }
+
+  :global(html.js) .ai-features li {
+    opacity: 0;
+  }
+
+  .ai-features:global(.is-in) li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i) * 80ms);
+  }
+
+  .ai-code {
+    display: grid;
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  .ai-code :global(pre) {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .ai-visual {
+    position: sticky;
+    top: 14vh;
+  }
+
+  .cmds {
+    margin: 0;
+    display: grid;
+  }
+
+  .cmds > div {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 10px clamp(24px, 5vw, 80px);
+    align-items: baseline;
+    padding: 22px 0 24px;
+    border-top: 1px solid var(--line);
+  }
+
+  :global(html.js) .cmds > div {
+    opacity: 0;
+  }
+
+  .cmds:global(.is-in) > div {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i) * 60ms);
+  }
+
+  .cmds dt code {
+    font-family: var(--mono);
+    font-size: clamp(13px, 1.15vw, 15px);
+    color: var(--fg);
+  }
+
+  .cmds dt code span {
+    color: var(--cyan-hi);
+    opacity: 0.7;
+  }
+
+  .cmds dd {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.06rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .cmd-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-left: 6px;
+    color: var(--cyan-hi);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .cmd-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .unattended {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 32px clamp(24px, 5vw, 80px);
+    align-items: start;
+    margin-top: 6vh;
+  }
+
+  .flags {
+    display: grid;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .flags div {
+    display: grid;
+    grid-template-columns: 13ch 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .flags dt {
+    color: var(--fg);
+  }
+
+  .flags dd {
+    margin: 0;
+    color: var(--fg-2);
+  }
+
+  .reference {
+    padding-top: 14vh;
+  }
+
+  .reference-body {
+    margin: 18px 0 0;
+    max-width: 52ch;
+    color: var(--fg-2);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 1100px) {
+    .hero {
+      grid-template-columns: 1fr;
+      padding-top: 18vh;
+    }
+    .watch {
+      max-width: 640px;
+    }
+    .ai {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ai-visual {
+      position: static;
+      max-width: 640px;
+    }
+    .step {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .step-copy {
+      position: static;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .flow {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .flow::before {
+      top: 0;
+      bottom: 0;
+      left: 4px;
+      right: auto;
+      width: 1px;
+      height: auto;
+      background: var(--line);
+    }
+    .flow li {
+      padding: 0 0 36px 36px;
+    }
+    .reqs {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+    .reqs li + li::before {
+      margin: 0 8px;
+    }
+    .cmds > div,
+    .unattended {
+      grid-template-columns: 1fr;
+    }
+    .steps::before,
+    .steps::after,
+    .node {
+      display: none;
+    }
+    .step-copy {
+      padding-left: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow:global(.is-in) li,
+    .ai-features:global(.is-in) li,
+    .cmds:global(.is-in) > div {
+      animation: fade-in 0.3s linear both;
+    }
+    .flow:global(.is-in)::before {
+      transition: none;
+    }
+    .node {
+      transition: none;
+    }
+  }
+</style>

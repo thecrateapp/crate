@@ -1,0 +1,316 @@
+---
+import type { WizardScreen } from "../../content/install/screens";
+import { parseScreen } from "../../lib/terminal-screen";
+
+interface Props {
+  screen: WizardScreen;
+  step: number;
+  label: string;
+}
+
+const { screen, step, label } = Astro.props;
+const { lines, cols } = parseScreen(screen.text, screen.marks);
+const prompt = lines.findIndex((line) => line.kind === "prompt");
+const typed = prompt >= 0 ? lines[prompt]!.segs[1]!.text : "";
+const number = String(step).padStart(2, "0");
+const rows = lines.map((line, index) => ({
+  cls: ["ln", `k-${line.kind}`, { focus: line.focus, cursor: line.cursor, ctx: line.context }],
+  index,
+  end: "\n",
+  hidden: line.context || line.kind === "rule" || line.kind === "gap" || undefined,
+  segs:
+    line.kind === "prompt"
+      ? [
+          { cls: "s-text", text: line.segs[0]!.text },
+          { cls: "typed", text: typed, style: `--n:${typed.length}` },
+          { cls: "caret", text: "", hidden: true },
+        ]
+      : line.segs.map((seg) => ({
+          cls: seg.style === "dot" ? `s-dot t-${seg.tone}` : `s-${seg.style}`,
+          text: seg.text,
+          hidden: seg.style === "dot" || seg.style === "bar" || undefined,
+        })),
+}));
+---
+
+<figure class="wterm" data-reveal data-source={screen.source} style={`--cols:${cols};--t0:${prompt >= 0 ? 1100 : 160}ms`}>
+  <header class="viz-bar">
+    <p class="viz-label"><b>{number}</b> {label}</p>
+    <p class="viz-label">Step {step} of 7</p>
+  </header>
+  <div class="window">
+    <p class="chrome viz-label"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><span>you@homeserver</span></p>
+    <pre class="screen"><code>{rows.map((row) => <span class:list={row.cls} style={`--i:${row.index}`} aria-hidden={row.hidden}>{row.segs.map((seg) => <span class={seg.cls} style={"style" in seg ? seg.style : undefined} aria-hidden={"hidden" in seg ? seg.hidden : undefined}>{seg.text}</span>)}{row.end}</span>)}</code></pre>
+  </div>
+</figure>
+
+<style>
+  .wterm {
+    --ok: #22c55e;
+    --term-bg: #0b0c11;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .viz-bar {
+    padding-bottom: 14px;
+  }
+
+  .window {
+    position: relative;
+    container-type: inline-size;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(6, 182, 212, 0.05), transparent 60%),
+      var(--term-bg);
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(10, 10, 15, 0.6),
+      0 30px 80px -40px rgba(6, 182, 212, 0.18);
+  }
+
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .chrome i {
+    width: 9px;
+    height: 9px;
+    border: 1px solid rgba(241, 245, 249, 0.25);
+    border-radius: 50%;
+  }
+
+  .chrome span {
+    margin-left: 10px;
+    text-transform: none;
+    letter-spacing: 0.06em;
+  }
+
+  .screen {
+    margin: 0;
+    padding: 20px 22px 24px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: clamp(9.5px, calc((100cqi - 46px) / (var(--cols) * 0.6)), 13px);
+    line-height: 1.62;
+    color: var(--fg);
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  .screen code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .ln {
+    position: relative;
+    display: block;
+    min-height: 1.62em;
+    white-space: pre;
+  }
+
+  .ctx {
+    opacity: 0.38;
+  }
+
+  .s-text {
+    color: var(--fg);
+  }
+
+  .s-muted,
+  .s-key {
+    color: var(--fg-2);
+  }
+
+  .s-faint {
+    color: var(--fg-3);
+  }
+
+  .s-title {
+    font-weight: 700;
+    color: var(--fg);
+  }
+
+  .s-accent {
+    color: var(--cyan-hi);
+  }
+
+  .s-strong {
+    font-weight: 700;
+    color: var(--cyan-hi);
+    text-shadow: 0 0 18px rgba(103, 232, 249, 0.35);
+  }
+
+  .k-rule .s-faint {
+    color: transparent;
+    background: linear-gradient(transparent calc(50% - 0.5px), rgba(241, 245, 249, 0.16) calc(50% - 0.5px), rgba(241, 245, 249, 0.16) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  }
+
+  .k-counter .s-muted {
+    letter-spacing: 0.02em;
+  }
+
+  .k-gap .s-faint {
+    color: rgba(241, 245, 249, 0.3);
+  }
+
+  .s-bar {
+    color: transparent;
+  }
+
+  .s-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0.3ch;
+    width: 2px;
+    background: var(--cyan);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.55);
+  }
+
+  .cursor::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 1.4ch;
+    width: min(64ch, 100%);
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(103, 232, 249, 0.1), rgba(103, 232, 249, 0.02) 60%, transparent);
+    border-radius: 2px;
+  }
+
+  .s-dot {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .t-ok {
+    color: var(--ok);
+  }
+
+  .t-warn {
+    color: var(--amber);
+  }
+
+  .t-fail {
+    color: #ef4444;
+  }
+
+  .t-info {
+    color: var(--cyan-hi);
+  }
+
+  .s-button,
+  .s-button-on {
+    border-radius: 2px;
+  }
+
+  .s-button {
+    color: var(--fg-2);
+    background: #1f2227;
+  }
+
+  .s-button-on {
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--cyan);
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.45);
+  }
+
+  .typed {
+    display: inline-block;
+    vertical-align: bottom;
+    overflow: hidden;
+  }
+
+  .caret {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.15em;
+    margin-left: 1px;
+    vertical-align: -0.2em;
+    background: var(--cyan-hi);
+    opacity: 0;
+  }
+
+  :global(html.js) .wterm .ln {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  :global(html.js) .wterm:global(.is-in) .ln {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.45s var(--ease-out),
+      transform 0.6s var(--ease-out);
+    transition-delay: calc(var(--t0) + var(--i) * 26ms);
+  }
+
+  :global(html.js) .wterm:global(.is-in) .ln.ctx {
+    opacity: 0.38;
+  }
+
+  :global(html.js) .wterm:global(.is-in) .k-prompt {
+    transition-delay: 0ms;
+  }
+
+  :global(html.js) .wterm:global(.is-in) .typed {
+    animation: type 0.8s steps(var(--n)) 0.25s both;
+  }
+
+  :global(html.js) .wterm:global(.is-in) .caret {
+    animation: caret 1.1s steps(1) 0s 1 both;
+  }
+
+  @keyframes type {
+    from {
+      width: 0;
+    }
+    to {
+      width: calc(var(--n) * 1ch);
+    }
+  }
+
+  @keyframes caret {
+    0%,
+    40%,
+    80% {
+      opacity: 1;
+    }
+    20%,
+    60%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .screen {
+      padding: 16px;
+      font-size: 10px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .wterm .ln,
+    :global(html.js) .wterm:global(.is-in) .ln {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    :global(html.js) .wterm .ln.ctx {
+      opacity: 0.38;
+    }
+    :global(html.js) .wterm:global(.is-in) .typed,
+    :global(html.js) .wterm:global(.is-in) .caret {
+      animation: none;
+    }
+  }
+</style>

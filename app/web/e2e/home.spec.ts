@@ -52,7 +52,11 @@ test.describe("hero", () => {
     await page.goto("/");
     const first = page.locator(".nav .links a").first();
     await expect(first).toHaveAttribute("href", "/why");
-    await expect(first).toHaveClass(/is-accent/);
+    await expect(first).not.toHaveClass(/is-accent/);
+    await expect(page.locator(".nav .links a.is-accent")).toHaveAttribute(
+      "href",
+      "/install",
+    );
   });
 
   test("shows the static mark when WebGL2 is unavailable", async ({ page }) => {

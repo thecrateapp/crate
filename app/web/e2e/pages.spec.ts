@@ -6,6 +6,7 @@ const PAGES = [
   "/admin",
   "/architecture",
   "/developers",
+  "/install",
   "/why",
 ];
 const VIEWPORTS = [

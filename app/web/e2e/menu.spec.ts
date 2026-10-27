@@ -24,6 +24,7 @@ test.describe("mobile menu", () => {
       "Admin",
       "Architecture",
       "Developers",
+      "Install",
       "Docs",
       "GitHub",
     ])

@@ -4,6 +4,7 @@ export const en = {
   "nav.admin": "Admin",
   "nav.architecture": "Architecture",
   "nav.developers": "Developers",
+  "nav.install": "Install",
   "nav.docs": "Docs",
   "nav.github": "GitHub",
   "nav.menu": "Menu",
@@ -34,7 +35,7 @@ export const en = {
   "get.requirements":
     "Linux or macOS, x86_64 or arm64, with Docker. 8 GB RAM recommended.",
   "get.clients": "Apps",
-  "get.docs": "Read the install guide",
+  "get.docs": "See how the installer works",
   "get.ios":
     "On iPhone, open your server in Safari and add it to the Home Screen.",
   "inside.title": "Inside Crate",
