@@ -32,6 +32,8 @@ const UNUSED_EXPORT_ALLOWLIST: Record<string, string> = {
     "Shared account menu; listen renders its own TopBarUserMenu.",
   "lib/color-contrast":
     "Pure contrast helpers used to verify the fixed identity's accessible colours.",
+  "lib/input-modality":
+    "Keyboard or touch tracking shared by tooltips and modal focus.",
   "lib/use-sheet-drag": "Drag engine shared by AppModal and MobileActionSheet.",
   "primitives/Spinner": "Phase 1 base loading primitive.",
   "primitives/StarRating":

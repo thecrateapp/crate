@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, type RefObject } from "react";
 import { acquireBodyScrollLock } from "./body-scroll-lock";
+import { touchWithoutKeyboard, trackInputModality } from "./input-modality";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -110,6 +111,7 @@ export function useModalFocus({
       doc.activeElement instanceof HTMLElement && doc.activeElement !== doc.body
         ? doc.activeElement
         : null;
+    trackInputModality();
     const releaseIsolation = isolate ? isolateBackground(panel) : undefined;
     const releaseScrollLock = isolate ? acquireBodyScrollLock(doc) : undefined;
     const frame = window.requestAnimationFrame(() => {
@@ -119,6 +121,10 @@ export function useModalFocus({
         panel.contains(doc.activeElement)
       )
         return;
+      if (touchWithoutKeyboard()) {
+        panel.focus({ focusVisible: false } as FocusOptions);
+        return;
+      }
       (focusableElements(panel)[0] ?? panel).focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
@@ -160,7 +166,11 @@ export function useModalFocus({
         !target.closest('[hidden], [inert], [aria-hidden="true"]') &&
         (!remaining || remaining === panel || remaining.contains(target))
       )
-        target.focus();
+        target.focus(
+          touchWithoutKeyboard()
+            ? ({ focusVisible: false } as FocusOptions)
+            : undefined,
+        );
     };
   }, [active, containFocus, isolate, panelRef]);
 }

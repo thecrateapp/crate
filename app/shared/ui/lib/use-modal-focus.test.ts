@@ -1,7 +1,7 @@
 import { createElement, useRef, useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppModal } from "../primitives/AppModal";
 import { useModalFocus } from "./use-modal-focus";
 
@@ -58,6 +58,100 @@ function SpecializedSurface() {
 }
 
 describe("shared modal focus lifecycle", () => {
+  it("returns focus to the launcher without a visible ring on a touch-only screen", async () => {
+    vi.resetModules();
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(hover: none)",
+    }));
+    try {
+      const { useModalFocus: freshModalFocus } = await import(
+        "./use-modal-focus"
+      );
+      function Launcher() {
+        const [open, setOpen] = useState(false);
+        const panelRef = useRef<HTMLDivElement>(null);
+        freshModalFocus({ active: open, panelRef });
+        return createElement(
+          "div",
+          null,
+          createElement(
+            "button",
+            { onClick: () => setOpen(true) },
+            "Open fullscreen player",
+          ),
+          open
+            ? createElement(
+                "div",
+                {
+                  ref: panelRef,
+                  role: "dialog",
+                  "aria-label": "Player",
+                  "data-app-modal-panel": "true",
+                  tabIndex: -1,
+                },
+                createElement(
+                  "button",
+                  { onClick: () => setOpen(false) },
+                  "Close player",
+                ),
+              )
+            : null,
+        );
+      }
+      render(createElement(Launcher));
+      const launcher = screen.getByRole("button", {
+        name: "Open fullscreen player",
+      });
+      const focus = vi.spyOn(launcher, "focus");
+      launcher.focus();
+      fireEvent.click(launcher);
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: "Player" })).toHaveFocus(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Close player" }));
+      await waitFor(() => expect(launcher).toHaveFocus());
+      expect(focus).toHaveBeenLastCalledWith({ focusVisible: false });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("focuses the dialog itself on a touch-only screen without a keyboard", async () => {
+    vi.resetModules();
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(hover: none)",
+    }));
+    try {
+      const { useModalFocus: freshModalFocus } = await import(
+        "./use-modal-focus"
+      );
+      function TouchSheet() {
+        const panelRef = useRef<HTMLDivElement>(null);
+        freshModalFocus({ active: true, panelRef });
+        return createElement(
+          "div",
+          {
+            ref: panelRef,
+            role: "dialog",
+            "aria-label": "Player",
+            "data-app-modal-panel": "true",
+            tabIndex: -1,
+          },
+          createElement("button", null, "Close player"),
+        );
+      }
+      render(createElement(TouchSheet));
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: "Player" })).toHaveFocus(),
+      );
+      expect(
+        screen.getByRole("button", { name: "Close player" }),
+      ).not.toHaveFocus();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("isolates a specialized workspace, wraps Tab and restores its launcher", async () => {
     const user = userEvent.setup();
     render(createElement(SpecializedSurface));

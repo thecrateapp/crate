@@ -2,6 +2,10 @@ import * as React from "react";
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
+import {
+  focusFollowsPointer,
+  trackInputModality,
+} from "@crate/ui/lib/input-modality";
 
 function TooltipProvider({
   delayDuration = 400,
@@ -29,41 +33,17 @@ function Tooltip({
   );
 }
 
-let pointerInteraction = false;
-let trackingInteraction = false;
-
-function trackInteraction() {
-  if (trackingInteraction || typeof document === "undefined") return;
-  trackingInteraction = true;
-  document.addEventListener(
-    "keydown",
-    (event) => {
-      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
-        pointerInteraction = false;
-      }
-    },
-    true,
-  );
-  document.addEventListener(
-    "pointerdown",
-    () => {
-      pointerInteraction = true;
-    },
-    true,
-  );
-}
-
 function TooltipTrigger({
   onFocus,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  React.useEffect(trackInteraction, []);
+  React.useEffect(trackInputModality, []);
   return (
     <TooltipPrimitive.Trigger
       data-slot="tooltip-trigger"
       onFocus={(event) => {
         onFocus?.(event);
-        if (pointerInteraction) event.preventDefault();
+        if (focusFollowsPointer()) event.preventDefault();
       }}
       {...props}
     />

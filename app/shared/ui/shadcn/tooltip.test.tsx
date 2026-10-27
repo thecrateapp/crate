@@ -66,6 +66,33 @@ it("stays closed when a dialog moves focus onto it after a click", async () => {
   expect(screen.queryByRole("tooltip")).toBeNull();
 });
 
+it("stays closed on a touch-only screen until the keyboard is used", async () => {
+  vi.resetModules();
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === "(hover: none)",
+  }));
+  try {
+    const { TooltipHint: FreshTooltipHint } = await import("./tooltip");
+    render(
+      <FreshTooltipHint content="Close the player">
+        <button>Close</button>
+      </FreshTooltipHint>,
+    );
+    const button = screen.getByRole("button", { name: "Close" });
+    act(() => button.focus());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => button.blur());
+    fireEvent.keyDown(document, { key: "Tab" });
+    act(() => button.focus());
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Close the player",
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it("adds no wrapper or tab stop without content", () => {
   const { container } = render(
     <TooltipHint>
