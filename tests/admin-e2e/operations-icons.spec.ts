@@ -147,6 +147,11 @@ for (const width of [1440, 768, 390, 320]) {
       ).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(restart).toBeFocused();
+      let freshSnapshots = 0;
+      page.on("response", (response) => {
+        if (response.url().includes("/api/admin/stack-snapshot?fresh=1"))
+          freshSnapshots += 1;
+      });
       await restart.click();
       await dialog
         .getByRole("button", { name: "Restart", exact: true })
@@ -170,6 +175,7 @@ for (const width of [1440, 768, 390, 320]) {
             ).length,
         )
         .toBe(1);
+      await expect.poll(() => freshSnapshots).toBe(2);
       await main
         .getByRole("button", { name: "Start service scanner", exact: true })
         .click();
