@@ -347,7 +347,7 @@ The system is **flat**. The canvas is the page.
 | Ruled section | `InstrumentPanel`: `border-t border-border-quiet` plus a MonoLabel header, with no fill. The first section under a tab uses `ruled={false}`. |
 | Object card   | `Card`: `rounded-panel border-border-quiet bg-surface-object`, no shadow, no blur                                                            |
 | Overlay       | `crate-overlay-panel`/`-surface`: popover surface, quiet border, 14px radius, `--menu-shadow`                                                |
-| Chrome        | Solid `bg-app-surface` (Admin) or `bg-surface-chrome` after scroll (Listen); transparent at the top of hero routes                           |
+| Chrome        | Solid `bg-app-surface` (Admin) or `bg-surface-chrome` after scroll (Listen); transparent at the top of hero routes; Listen docks are frosted |
 
 Rules:
 
@@ -359,8 +359,11 @@ Rules:
   card disappears.
 - **Only overlays cast shadows**: popover, menu, dialog, sheet and toast. Panels, cards and covers
   have none. Artwork in the player stage uses `--shadow-player-artwork`.
-- **No glass.** No `backdrop-blur`, no blur in overlays, no grain textures. The only exception is
-  `InfoBadge surface="overlay"` over artwork.
+- **No glass.** No `backdrop-blur`, no blur in overlays, no grain textures. The exceptions are
+  `InfoBadge surface="overlay"` over artwork, and Listen's floating player chrome: the desktop
+  player bar (`listen-player-shell`) and the mobile dock slab (`listen-mobile-dock-glass`) are
+  frosted `--surface-chrome` with `backdrop-filter: blur(24px)` (`blur(18px) saturate(1.18)` at
+  ≤480px). That frost is neutral: no accent tint, gradient or glow.
 - Labels over artwork use the `--artwork-*-shadow` text halos, never a box.
 - SVG instrument strokes come from the ladder 1, 1.25, 1.5, 1.75, 2 and 2.25, with
   `vector-effect="non-scaling-stroke"`. Dash patterns are `2 4`, `3 5`, `2 6`, `3 4`, `4 5` and
@@ -718,9 +721,10 @@ Both apps share the identity. Their shells differ by job.
     hero routes and becomes `bg-surface-chrome` after 96px of scroll.
   - Content is `max-w-content px-6 py-6`.
   - The player is a floating dock inset 12px, `rounded-panel`, 82px tall (104px on coarse
-    pointers).
+    pointers), on frosted chrome (`listen-player-shell`).
 - **Mobile**
-  - One `rounded-panel` dock slab holds the mini-player (66px) above the 76px tab bar.
+  - One frosted `rounded-panel` dock slab (`listen-mobile-dock-glass`) holds the mini-player
+    (66px) above the 76px tab bar.
   - Safe areas, keyboard and clearances come from `listen-shell-metrics.css` (`--listen-safe-*`,
     `--listen-*-clearance`). Never hardcode player offsets.
 - **Product moments**
