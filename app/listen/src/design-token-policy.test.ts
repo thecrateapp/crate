@@ -17,7 +17,6 @@ const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "components/cards/TrackRowPlaybackControl.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
   "components/home/HomeListeningHistory.tsx": { "tracking-[-0.035em]": 1 },
   "components/player/SpectrumPlayButton.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
-  "components/player/bar/PlayerBarFrame.tsx": { "rounded-t-[2rem]": 1 },
   "components/playlists/EditorialPlaylistArtwork.tsx": {
     "rounded-[3px]": 1,
     "tracking-[-0.09em]": 1,

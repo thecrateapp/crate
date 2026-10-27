@@ -54,9 +54,7 @@ export function PlayerBarFrame({
         data-slot="player-chrome"
         className={cn(
           "pointer-events-none absolute inset-0 z-0",
-          isDesktop
-            ? "listen-player-shell rounded-panel"
-            : "rounded-t-[2rem] rounded-b-none border border-border-subtle",
+          isDesktop && "listen-player-shell rounded-panel",
         )}
       />
       <div

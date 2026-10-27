@@ -744,6 +744,18 @@ it("uses the shared reviewable frosted player frame", () => {
   expect(chrome?.className).not.toMatch(/accent|glow|gradient|backdrop-blur/);
 });
 
+it("leaves the mobile dock shape to the shell slab, with no divider", () => {
+  useIsDesktopMock.mockReturnValue(false);
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: createMockTrack() },
+  });
+  const chrome = screen
+    .getByTestId("player-bar-frame")
+    .querySelector('[data-slot="player-chrome"]');
+  expect(chrome).toBeInTheDocument();
+  expect(chrome?.className).not.toMatch(/\bborder\b|rounded/);
+});
+
 it("does not offer a blind like before the initial collection read succeeds", () => {
   likesReadState.hasLoaded = false;
   likeTrackMock.mockClear();

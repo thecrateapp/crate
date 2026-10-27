@@ -724,7 +724,8 @@ Both apps share the identity. Their shells differ by job.
     pointers), on frosted chrome (`listen-player-shell`).
 - **Mobile**
   - One frosted `rounded-panel` dock slab (`listen-mobile-dock-glass`) holds the mini-player
-    (66px) above the 76px tab bar.
+    (66px) above the 76px tab bar. The slab alone owns the shape: the mini-player draws no border
+    or radius of its own and there is no divider between player and tabs.
   - Safe areas, keyboard and clearances come from `listen-shell-metrics.css` (`--listen-safe-*`,
     `--listen-*-clearance`). Never hardcode player offsets.
 - **Product moments**
