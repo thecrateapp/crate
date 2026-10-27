@@ -10,6 +10,12 @@ sources:
   - docs/releases/v3.0.0.md
   - install.sh
   - app/installer/cmd/crate/main.go
+  - app/installer/internal/install/config.go
+  - .github/workflows/build-images.yml
+  - .github/workflows/build-installer.yml
+  - .github/workflows/build-desktop.yml
+  - .github/workflows/build-android.yml
+  - app/crate/api/capabilities.py
   - docker-compose.yaml
   - docker-compose.home.yaml
   - deploy/operator/compose.operator.yaml
@@ -133,22 +139,44 @@ how to run the same upgrade through `crate mcp`.
 
 Compare `.env` with `.env.example` of the release:
 
-| Variable                                                                         | Action                                                                                                                                                            |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                                         | Delete. Crate no longer reads them.                                                                                                                               |
-| `LISTEN_APPEARANCE_SETTINGS_ENABLED`                                             | Delete. The themes it gated are retired, and the Listen build no longer takes it. Remove it from GitHub Actions variables if you build your own images.           |
-| `TIDARR_PASSWORD`, `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED`                        | Delete. Nothing read them.                                                                                                                                        |
-| `CRATE_HERMES_MCP_URL`, `CRATE_HERMES_MCP_HOST`                                  | Rename to `CRATE_AGENT_MCP_URL` and `CRATE_AGENT_MCP_HOST`.                                                                                                       |
-| `CRATE_HERMES_IMAGE`                                                             | Delete. It pointed at the upstream engine image. Leave `CRATE_AGENT_IMAGE` empty to use `ghcr.io/thecrateapp/crate-agent` of the release.                         |
-| `TZ`                                                                             | Set it explicitly, for example `TZ=Europe/Madrid`. With `TZ` unset, the agent containers now default to `UTC` instead of `Europe/Madrid`.                         |
-| `CRATE_AGENT_PROVIDER`, `CRATE_AGENT_MODEL`, `CRATE_AGENT_BASE_URL`              | Optional. Model for Crate Agent and Crate Operator; `make agent-init` and `make agent-model` set them.                                                            |
-| `CRATE_MCP_ENABLED`, `CRATE_MCP_ACTIONS_ENABLED`, `CRATE_MCP_ALLOWED_HOSTS`      | Optional, default `false`/empty. Crate Agent needs `CRATE_MCP_ENABLED=true` and its MCP host allowed; Crate Operator also needs `CRATE_MCP_ACTIONS_ENABLED=true`. |
-| `CRATE_OPERATOR_ROOT`, `CRATE_OPERATOR_PRINCIPAL_IDS`, `CRATE_AGENT_INSTANCE_ID` | Crate Operator only; `make agent-init AGENT_PROFILE=operator` sets them.                                                                                          |
+| Variable                                                                                                                                     | Action                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`                                                                                                     | Delete. Crate no longer reads them.                                                                                                                                    |
+| `LISTEN_APPEARANCE_SETTINGS_ENABLED`                                                                                                         | Delete. The themes it gated are retired, and the Listen build no longer takes it. Remove it from GitHub Actions variables if you build your own images.                |
+| `TIDARR_PASSWORD`, `NATIVE_OAUTH_LEGACY_REDIRECT_ENABLED`                                                                                    | Delete. Nothing read them.                                                                                                                                             |
+| `CRATE_HERMES_MCP_URL`, `CRATE_HERMES_MCP_HOST`                                                                                              | Rename to `CRATE_AGENT_MCP_URL` and `CRATE_AGENT_MCP_HOST`.                                                                                                            |
+| `CRATE_HERMES_IMAGE`                                                                                                                         | Delete. It pointed at the upstream engine image. Leave `CRATE_AGENT_IMAGE` empty to use `ghcr.io/thecrateapp/crate-agent` of the release.                              |
+| `TZ`                                                                                                                                         | Set it explicitly, for example `TZ=Europe/Madrid`. With `TZ` unset, the agent containers now default to `UTC` instead of `Europe/Madrid`.                              |
+| `CRATE_AGENT_PROVIDER`, `CRATE_AGENT_MODEL`, `CRATE_AGENT_BASE_URL`                                                                          | Optional. Model for Crate Agent and Crate Operator; `make agent-init` and `make agent-model` set them.                                                                 |
+| `CRATE_MCP_ENABLED`, `CRATE_MCP_ACTIONS_ENABLED`, `CRATE_MCP_ALLOWED_HOSTS`                                                                  | Optional, default `false`/empty. Crate Agent needs `CRATE_MCP_ENABLED=true` and its MCP host allowed; Crate Operator also needs `CRATE_MCP_ACTIONS_ENABLED=true`.      |
+| `CRATE_OPERATOR_ROOT`, `CRATE_OPERATOR_PRINCIPAL_IDS`, `CRATE_AGENT_INSTANCE_ID`                                                             | Crate Operator only; `make agent-init AGENT_PROFILE=operator` sets them.                                                                                               |
+| `SENTRY_SITE_DSN`                                                                                                                            | Delete from build configuration. The marketing site no longer uses it; preserve the other apps' Sentry settings.                                                       |
+| `CRATE_SMART_MIX_ENABLED`, `CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`, `CRATE_ANDROID_BEATMATCH_ENABLED`, `CRATE_ANDROID_BASS_HANDOFF_ENABLED` | Move from any compose override to `.env`, preserving their current values, then remove the duplicate override entries. Both compose profiles pass them to `crate-api`. |
+| `GEMINI_API_KEY`, `AUDIOMUSE_GEMINI_API_KEY`, `LLM_PROVIDER`                                                                                 | Keep. These integrations are still used.                                                                                                                               |
 
 On a checkout, `make deploy` copies the `.env` of the server, not your local one: edit it on
 the server.
 
+Remove any remaining `TELEGRAM_*` values for the retired built-in bot. The agent pilots have
+their own setup and secrets. Rename only the documented `CRATE_HERMES_*` variables; the
+engine's internal `HERMES_*` settings are a separate contract.
+
+The Smart Mix flags remain opt-in and depend on each preceding flag. The optional
+`android_long_beatmatch` server capability follows the existing beatmatch flag; do not add
+a new environment variable. Updated Android clients can request phrase-aligned `dj-blend`
+transitions when supported, while older clients and servers retain the existing behaviour.
+Android also configures Infinite Playback background continuation when crossfade is off.
+Genre radio now splits compound tags into canonical stations and uses genre artwork with
+an album fallback. These changes need no manual data migration beyond startup migrations.
+
 ### Deploy a checkout
+
+For the release maintainer, the order is: merge into `main`, wait for **Build & Push Docker
+Images** to publish the complete manifest for that merge SHA, then create the annotated
+`v3.0.0` tag on the same commit. The manifest includes immutable digests for every service;
+unchanged images can reuse an existing digest. The installer's `tag-images` job reads that
+manifest and gives its images the version tag before publishing installer assets. Tagging
+before the manifest is ready fails the release workflow.
 
 Deploy the commit that `v3.0.0` points at. `VERSION` must be a full SHA reachable from
 `origin/main`, and `DEPLOY_ID` names the recovery set:
@@ -170,6 +198,8 @@ takes its own rollback snapshot, but that one is not a database restore point.
 ### Move the agent pilots
 
 Skip this section if step 3 of [Before you start](#before-you-start) found nothing.
+Only migrate the Crate pilot containers listed here; leave unrelated Hermes installations
+alone. Back up their state and secrets before moving them.
 
 **Crate Agent (`crate-hermes-agent`).** The compose service no longer exists, so stop the
 container directly and move its state (use the `DATA_DIR` value from `.env`):
@@ -242,12 +272,20 @@ Run these checks on either profile.
 
    ```bash
    docker exec crate-postgres psql -U "$CRATE_POSTGRES_USER" -d "$CRATE_POSTGRES_DB" -Atc \
-     "SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid"
+     "WITH wanted(name) AS (
+        VALUES ('idx_user_track_daily_day'), ('idx_user_entity_firsts_key')
+      )
+      SELECT wanted.name, COALESCE(idx.indisvalid, false) AS valid
+      FROM wanted
+      LEFT JOIN pg_index idx
+        ON idx.indexrelid = to_regclass('public.' || wanted.name)
+      WHERE idx.indisvalid IS DISTINCT FROM true"
    ```
 
-   Rebuild any index it lists with `REINDEX INDEX CONCURRENTLY <name>`. Alembic does not
-   rerun an applied revision. Without a valid `idx_user_track_daily_day`, stats range requests
-   scan the whole table.
+   This detects absent as well as invalid indexes. Rebuild an existing invalid index with
+   `REINDEX INDEX CONCURRENTLY <name>`; recreate a missing index from migration 135's exact
+   definition. Alembic does not rerun an applied revision. Without a valid
+   `idx_user_track_daily_day`, stats range requests scan the whole table.
 
 4. **The instance rollups backfill is queued once.** When listening history exists but the new
    rollups miss its earliest day, `crate-api` queues `backfill_instance_listening_rollups` on
@@ -275,6 +313,12 @@ Run these checks on either profile.
 
 6. **Clients work.** Sign in to Admin and Listen. iOS needs 16.4 or later; iOS 15 devices stay
    on the last 2.x build.
+
+7. **Release downloads exist.** After the tag workflows finish, check the `v3.0.0` release
+   contains the four Linux/macOS installer binaries and `crate-checksums.txt`, the stable
+   Desktop aliases listed in the release notes, and `crate.apk` alongside the versioned
+   Android APK and App Bundle. Test their download links; a green PR build alone does not
+   publish these release assets.
 
 [Operations](operations.md) lists the remaining runtime checks: projector catch-up, worker
 queues and SSE.
