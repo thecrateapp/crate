@@ -878,6 +878,83 @@ describe("android native engine flags", () => {
       expect(continuationTokenMock).not.toHaveBeenCalled();
     });
 
+    it("keeps native refill for an infinite queue even without crossfade", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_radio",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+      const descriptor = {
+        kind: "shaped_radio" as const,
+        sessionId: "radio-1",
+      };
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+        continuation: { ...context, descriptor },
+      });
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_radio", refill: true }),
+        ),
+      );
+      expect(nativePlaybackMock.setContinuation).not.toHaveBeenCalledWith({
+        token: "",
+      });
+    });
+
+    it("reconfigures native continuation when crossfade is switched on", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      nativePlaybackMock.setCrossfadeMs.mockResolvedValue(state);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_queue",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+        continuation: context,
+      });
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith({
+          token: "",
+        }),
+      );
+
+      await engine.setCrossfadeMs(6000);
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+          expect.objectContaining({ token: "crv_queue", refill: false }),
+        ),
+      );
+    });
+
     it("asks native to refill when the queue has a continuation descriptor", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
       nativePlaybackMock.getState.mockResolvedValue(state);

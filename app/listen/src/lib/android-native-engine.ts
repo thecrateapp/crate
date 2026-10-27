@@ -443,7 +443,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
     try {
       if (
         !context ||
-        !this.queueMixRequested ||
+        (!this.queueMixRequested && context.descriptor === null) ||
         (typeof navigator !== "undefined" && navigator.onLine === false)
       ) {
         await nativePlayback.setContinuation({ token: "" });
@@ -572,11 +572,15 @@ export class AndroidNativeEngine implements PlaybackEngine {
 
   async setCrossfadeMs(crossfadeMs: number): Promise<EngineState> {
     await this.ensureReady();
-    this.queueMixRequested = crossfadeMs > 0;
+    const mixRequested = crossfadeMs > 0;
+    const mixChanged = mixRequested !== this.queueMixRequested;
+    this.queueMixRequested = mixRequested;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(crossfadeMs);
-    return nativePlayback.setCrossfadeMs({
+    const state = await nativePlayback.setCrossfadeMs({
       crossfadeMs: this.appliedCrossfadeMs,
     });
+    if (mixChanged) void this.configureContinuation();
+    return state;
   }
 
   async setVolume(volume: number): Promise<EngineState> {
