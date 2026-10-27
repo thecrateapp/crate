@@ -162,6 +162,11 @@ unchanged. See the four Feedback skeleton entries and LoadingState for actual co
 
 Search loading is an immediate section state: `fullWidth` fills its available panel content width. CatalogSearch names a single requested entity type; global/mixed searches say Finding your music... in the active locale. The 200ms route mark keeps its separate fixed geometry.
 
+Glass recipes declare only the standard `backdrop-filter`; the build adds the `-webkit-` prefix
+where targets need it. A hand-written prefix next to the standard property made the minifier keep
+only the prefixed form, which Chromium (and Android WebView) ignores, so the blur disappeared in
+production.
+
 The Smart Mix disc ring (`spinning-disc-mix-ring`) lights only during an actual Crossfade or
 Beatmatch. Its opacity follows the shared `--listen-crossfade-progress` (in over the first quarter,
 out over the last) and it keeps its last tone while fading. A soft glow pulses once per beat of the

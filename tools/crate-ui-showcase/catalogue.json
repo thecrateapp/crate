@@ -65,7 +65,7 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "ae227ee09af662d574acfc0d022b8bf6ae462187da8f2d6b72370820d9449c73",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "27dd80afaf7aca4660d4a7b07f86b0dddcaaa6bd70567bf228df8b8f94235fea",
+        "app/shared/ui/tokens/recipes.css": "5da97571b74dc425e594705f70ef144dc1aa7058f8295dd63ba5c557c4905164",
         "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
@@ -74,7 +74,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "3131334f88e1f879f7817b1cddfe1a4ca46a8d08d30c75ff7fbb91cabd403735",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "c22d55d4371cf5954580e7455b77dfebb261cd324414924a516cdc4882fd5646"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "d9326242bc03bff97271030491be6cb3f8f4de44d9d704f9520eed2d6236853b"
       },
       "category": "Foundations"
     },
@@ -316,9 +316,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/composites/ConfirmDialog.tsx": "00188ba4ffaafa0f632b21b1b79053e83e035b49b070bc018268b063516bf38f",
+        "app/shared/ui/composites/ConfirmDialog.tsx": "81cafd9567109558e1ef71443217354d26623311eb7de3c9e8c5e7b7590dc6a1",
         "tools/crate-ui-showcase/stories/ConfirmDialog.stories.tsx": "b6c520f1c0b1bf48218632b58ba0505b2c3839646cf4051ffc88d18f5d4250de",
-        "tools/crate-ui-showcase/docs/ConfirmDialog.mdx": "82134df7cb6cf97c34eb085c18e851270501f257717a38caa5a7ceb5094f90e9"
+        "tools/crate-ui-showcase/docs/ConfirmDialog.mdx": "890a18bbbbe07e26d05b97edf348a55b27db810eca955ea75465789d5a04ec02"
       },
       "category": "Overlays"
     },
@@ -456,9 +456,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/actions/ContextMenu.tsx": "b29de2c516acdd8ad6ee4a3f14d86b45df9ea564f1c6e4ce19caa9d0b1aef9f5",
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "eec4b624b5b585b4808a1e47abbccffb0fb89160725fc602a28ebf3c63deb018",
         "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "070e1c69d1e0ff827748ef30f93c9a58d8546b8e5c0a4ee5ef6cb36997fd3379",
-        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "8d3f4f487550104db271812ab60eae0ef57ca18c049910785b25a3c40b4f0c46"
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "952dd627e14d0af7cd5bc97fe76e0aa79e70469d21b70357af87a571a9ad47ab"
       },
       "category": "Actions"
     },
@@ -716,9 +716,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/HeroActionBar.tsx": "853ba09860047914f3e934629b45624c2d8220050465f2cf3ed528e95aee34bd",
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "fc4c5b94428fde13b09911de7346c5a76b766eb5de37e58a23cffa574f4f4cbb",
         "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
-        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "4fce857586091bdbb8a4d88eddfe9f9ab91dda1469a86db900278bd4d801b930"
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "2aa834213445371f5a639331c508dc0292a0ff61f52841ab5004972ee12ddb3b"
       },
       "category": "Actions"
     },
