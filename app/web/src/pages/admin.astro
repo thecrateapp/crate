@@ -1,5 +1,6 @@
 ---
 import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
@@ -39,6 +40,7 @@ const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
     <PageHeader eyebrow={admin.eyebrow} title={admin.title} lede={admin.lede}>
       <ChapterToc items={chapters} />
     </PageHeader>
+    <ChapterRail items={chapters} />
 
     {
       chapters.map((chapter) => {

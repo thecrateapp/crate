@@ -9,15 +9,17 @@ const { eyebrow, title, lede } = Astro.props;
 ---
 
 <header class="page-header" data-reveal>
-  <p class="eyebrow" data-enter>{eyebrow}</p>
-  <h1 class="display" data-split style="--d:120ms;--step:55ms">{title}</h1>
-  {
-    lede && (
-      <p class="lede" data-enter style="--d:420ms">
-        {lede}
-      </p>
-    )
-  }
+  <div class="intro">
+    <p class="eyebrow" data-enter>{eyebrow}</p>
+    <h1 class="display" data-split style="--d:120ms;--step:55ms">{title}</h1>
+    {
+      lede && (
+        <p class="lede" data-enter style="--d:420ms">
+          {lede}
+        </p>
+      )
+    }
+  </div>
   <slot />
 </header>
 
@@ -26,10 +28,22 @@ const { eyebrow, title, lede } = Astro.props;
     position: relative;
     z-index: 5;
     display: grid;
-    gap: 28px;
+    gap: 6vh clamp(32px, 5vw, 96px);
     max-width: 1320px;
     margin: 0 auto;
     padding: 22vh clamp(20px, 6vw, 96px) 10vh;
+  }
+
+  .intro {
+    display: grid;
+    gap: 28px;
+  }
+
+  @media (min-width: 1000px) {
+    .page-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+    }
   }
 
   .display {

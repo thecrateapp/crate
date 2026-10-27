@@ -1,5 +1,6 @@
 ---
 import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
@@ -30,6 +31,7 @@ const custom = new Set(["Play", "Smart Mix", "Discover", "Yours", "Together", "E
     <PageHeader eyebrow={listen.eyebrow} title={listen.title} lede={listen.lede}>
       <ChapterToc items={chapters} />
     </PageHeader>
+    <ChapterRail items={chapters} />
 
     {
       chapters.map((chapter) => (

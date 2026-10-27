@@ -1,5 +1,6 @@
 ---
 import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import PageHeader from "../components/PageHeader.astro";
@@ -29,6 +30,7 @@ const sections = Object.fromEntries(
     <PageHeader eyebrow={page.eyebrow} title={page.title} lede={page.lede}>
       <ChapterToc items={order.map((key) => sections[key])} />
     </PageHeader>
+    <ChapterRail items={order.map((key) => sections[key])} />
 
     <Chapter index={sections.map.index} title={sections.map.title}>
       <Fragment slot="lede">{sections.map.lede.map((paragraph) => <p>{paragraph}</p>)}</Fragment>

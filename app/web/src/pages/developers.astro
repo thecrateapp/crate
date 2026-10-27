@@ -1,5 +1,6 @@
 ---
 import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
 import ChapterToc from "../components/ChapterToc.astro";
 import FeatureList from "../components/FeatureList.astro";
 import InstallCommand from "../components/InstallCommand.astro";
@@ -28,6 +29,7 @@ const chapters = developers.chapters.map((chapter, index) => ({
     <PageHeader eyebrow={developers.eyebrow} title={developers.title} lede={developers.lede}>
       <ChapterToc items={chapters} />
     </PageHeader>
+    <ChapterRail items={chapters} />
 
     {
       chapters.map((chapter) => (
