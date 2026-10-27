@@ -63,25 +63,8 @@
   line-height: 14px;
   letter-spacing: 0.08em;
 }
-.listen-mobile-nav-item::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 25%;
-  right: 25%;
-  height: 2px;
-  background: var(--accent-action-hi);
-  transform: scaleX(0);
-  transition: transform 200ms var(--ease-snap);
-}
 .listen-mobile-nav-item:is([aria-current="page"], [data-active="true"]) {
   color: var(--accent-action-hi);
-}
-.listen-mobile-nav-item:is(
-    [aria-current="page"],
-    [data-active="true"]
-  )::before {
-  transform: scaleX(1);
 }
 .listen-route-enter {
   animation: listen-route-enter 350ms var(--ease-out-expo) both;
@@ -103,8 +86,7 @@
   .listen-route-enter {
     animation: none;
   }
-  .listen-nav-item::before,
-  .listen-mobile-nav-item::before {
+  .listen-nav-item::before {
     transition: none;
   }
 }
