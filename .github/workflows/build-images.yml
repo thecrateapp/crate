@@ -466,7 +466,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+          # The image only copies files onto a multi-arch base, so arm64 needs no emulation.
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=agent
           cache-to: type=gha,scope=agent,mode=max
 

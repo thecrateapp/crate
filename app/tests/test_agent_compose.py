@@ -65,6 +65,9 @@ def test_agent_image_bakes_runtime_and_release_context():
     assert '--revision "$GITHUB_SHA"' in script
     build = next(step for step in job["steps"] if step.get("id") == "build")
     assert build["with"]["file"] == "./deploy/hermes/Dockerfile"
+    assert build["with"]["platforms"] == "linux/amd64,linux/arm64"
+    dockerfile = (ROOT / "deploy/hermes/Dockerfile").read_text().splitlines()
+    assert not [line for line in dockerfile if line.startswith("RUN")]
     assert "build-agent" in workflow["jobs"]["promote-release"]["needs"]
 
 
