@@ -14,7 +14,6 @@ import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
   Play,
-  Shuffle,
   Sparkles,
   type LucideIcon,
 } from "@crate/ui/icons";
@@ -22,7 +21,6 @@ import {
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import { EntityCard, type EntityCardOverlay } from "@crate/ui/domain/entity";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { action } from "@/components/actions/shared";
@@ -395,77 +393,18 @@ function PlaylistFeatured(props: PlaylistCardProps) {
   );
 }
 
-function PlaylistRowActions({
+function PlaylistRowPlay({
   onPlay,
-  onShuffle,
-  playingMode,
-  canFollow,
-  isFollowed,
-  togglingFollow,
-  onToggleFollow,
-  extraActions,
+  loading,
 }: {
-  onPlay?: () => void;
-  onShuffle?: () => void;
-  playingMode: "play" | "shuffle" | null;
-  canFollow: boolean;
-  isFollowed: boolean;
-  togglingFollow: boolean;
-  onToggleFollow: () => void;
-  extraActions?: PlaylistCardExtraAction[];
+  onPlay: () => void;
+  loading: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <>
-      {onPlay ? (
-        <IconButton
-          label={t("player.play")}
-          onClick={onPlay}
-          loading={playingMode === "play"}
-        >
-          <Play
-            size={CRATE_ICON_SIZE.sm}
-            fill="currentColor"
-            className="ml-0.5"
-          />
-        </IconButton>
-      ) : null}
-      {onShuffle ? (
-        <IconButton
-          label={t("player.shuffle")}
-          onClick={onShuffle}
-          loading={playingMode === "shuffle"}
-        >
-          <Shuffle size={CRATE_ICON_SIZE.sm} />
-        </IconButton>
-      ) : null}
-      {canFollow ? (
-        <FollowHeartButton
-          following={isFollowed}
-          loading={togglingFollow}
-          label={t("common.follow")}
-          labelActive={t("common.following")}
-          title={t(isFollowed ? "common.following" : "common.follow")}
-          iconSize={CRATE_ICON_SIZE.sm}
-          className="size-10 shrink-0 rounded-full"
-          onClick={onToggleFollow}
-        />
-      ) : null}
-      {extraActions?.map((item) => {
-        const Icon = item.icon;
-        return (
-          <IconButton
-            key={item.key}
-            label={item.title}
-            tone={item.tone}
-            loading={item.loading}
-            onClick={() => void item.onClick()}
-          >
-            <Icon size={CRATE_ICON_SIZE.sm} />
-          </IconButton>
-        );
-      })}
-    </>
+    <IconButton label={t("player.play")} onClick={onPlay} loading={loading}>
+      <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" className="ml-0.5" />
+    </IconButton>
   );
 }
 
@@ -560,18 +499,12 @@ function PlaylistRow(props: PlaylistCardProps) {
         />
       }
       trailing={
-        <PlaylistRowActions
-          onPlay={detailEndpoint ? () => void loadAndPlay("play") : undefined}
-          onShuffle={
-            detailEndpoint ? () => void loadAndPlay("shuffle") : undefined
-          }
-          playingMode={playingMode}
-          canFollow={base.canFollow}
-          isFollowed={Boolean(props.isFollowed)}
-          togglingFollow={base.togglingFollow}
-          onToggleFollow={() => void base.runToggleFollow()}
-          extraActions={extraActions}
-        />
+        detailEndpoint ? (
+          <PlaylistRowPlay
+            onPlay={() => void loadAndPlay("play")}
+            loading={playingMode === "play"}
+          />
+        ) : null
       }
       onOpen={base.handleOpen}
       href={base.href}

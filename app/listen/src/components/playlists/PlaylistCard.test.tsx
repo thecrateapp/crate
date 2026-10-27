@@ -330,7 +330,7 @@ describe("PlaylistCard row", () => {
     expect(api).toHaveBeenCalledWith("/api/playlists/9");
   });
 
-  it("appends extra actions to the inline controls and the menu", async () => {
+  it("keeps only Play inline and moves shuffle, follow and extra actions to the menu", async () => {
     const onEdit = vi.fn();
     renderWithListenProviders(
       <PlaylistCard
@@ -339,7 +339,9 @@ describe("PlaylistCard row", () => {
         name="Night Drive"
         trackCount={12}
         href="/playlist/9"
+        detailEndpoint="/api/playlists/9"
         badge="Smart"
+        onToggleFollow={vi.fn()}
         extraActions={[
           { key: "edit", icon: Pencil, title: "Edit", onClick: onEdit },
         ]}
@@ -347,11 +349,15 @@ describe("PlaylistCard row", () => {
     );
 
     expect(screen.getByText("Smart")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(onEdit).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+    for (const name of ["Shuffle", "Edit", "Follow", "Following"])
+      expect(screen.queryByRole("button", { name })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    expect(onEdit).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByRole("menuitem", { name: /Shuffle/ }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledOnce();
   });
 });
