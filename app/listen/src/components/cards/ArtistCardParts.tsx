@@ -267,7 +267,7 @@ export function ArtistCardArtwork({
           aria-hidden="true"
           data-testid="artist-artwork-placeholder"
           data-placeholder-style="flat-disc"
-          className="crate-artist-initials grid size-full place-items-center rounded-full bg-accent-action/16"
+          className="crate-artist-initials grid size-full place-items-center rounded-full bg-surface-placeholder"
         >
           <span className="crate-media-initials">{monogram}</span>
         </div>

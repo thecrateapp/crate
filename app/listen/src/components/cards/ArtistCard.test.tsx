@@ -446,7 +446,8 @@ describe("ArtistCard", () => {
     expect(placeholder).toHaveAttribute("aria-hidden", "true");
     expect(placeholder).toHaveAttribute("data-placeholder-style", "flat-disc");
     expect(placeholder).toHaveTextContent("PW");
-    expect(placeholder).toHaveClass("rounded-full");
+    expect(placeholder).toHaveClass("rounded-full", "bg-surface-placeholder");
+    expect(placeholder.className).not.toMatch(/accent/);
     expect(placeholder.childElementCount).toBe(1);
     expect(placeholder.className).not.toMatch(
       /gradient|border|shadow|backdrop/,

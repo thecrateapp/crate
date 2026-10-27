@@ -4536,7 +4536,7 @@ label
 }
 .crate-media-cover {
   position: relative;
-  background: color-mix(in srgb, var(--accent-action) 16%, transparent);
+  background: var(--surface-placeholder);
   box-shadow: none;
 }
 .crate-media-cover::after,

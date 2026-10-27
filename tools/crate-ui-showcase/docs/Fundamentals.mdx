@@ -95,6 +95,9 @@ Track rows narrower than 480px (phones) drop the duration column and keep Like a
 touching 44px controls, so the title gets about 180px instead of 97px on a 392px screen. Duration
 stays visible in the player and from 480px upwards, as in Tidal, Spotify and Apple Music.
 
+Artwork that has not loaded yet waits on `--surface-placeholder`, the same dark neutral as the
+loading skeletons, never on an accent tint; this covers MediaCover frames and Listen artist initials.
+
 Diego amendment: standalone track/album/artist covers have a48px minimum in every density;
 white18px glyph (24px visual slot) and active ring40px remain smaller than the artwork. Person avatars and
 internal collage tiles retain their separate roles. Legacy raw frames must adopt this minimum.

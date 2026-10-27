@@ -65,7 +65,7 @@
         "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
         "app/shared/ui/tokens/product.css": "ae227ee09af662d574acfc0d022b8bf6ae462187da8f2d6b72370820d9449c73",
         "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
-        "app/shared/ui/tokens/recipes.css": "ee75e6d600d917fae4bb5934451fbdd988be2ebcf383dd05cd69a81794f85429",
+        "app/shared/ui/tokens/recipes.css": "f8bcc13503fc5353d4ed6502370c95407ff40abbd1198801d205bb97d873ccf1",
         "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
         "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
         "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
@@ -74,7 +74,7 @@
         "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
         "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
         "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "3131334f88e1f879f7817b1cddfe1a4ca46a8d08d30c75ff7fbb91cabd403735",
-        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "0dcca938c832d48c28c5c28b23f83f42c9a92f6cbdc3838e69321d90f62e7644"
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "9093c2c34fa14b5feb03617f62a4dd7d1ce8244c174a35059a67d5bfc56b4d3c"
       },
       "category": "Foundations"
     },
@@ -838,7 +838,7 @@
       "fingerprints": {
         "app/shared/ui/domain/media/MediaCover.tsx": "7c0e60fcbb0f0a3826f0ccbbf245a1e7712093c323c9d989c9739e73c78c9492",
         "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "06775dc68a8e18501c05252c2ad3bb6d2ecbf13f3e3aa276c0ff84226ce23da6",
-        "tools/crate-ui-showcase/docs/MediaCover.mdx": "a0eb5d9c86dd9cff172ea855997e11543bfeb8e8cb7d7333f44713d14655e9d4"
+        "tools/crate-ui-showcase/docs/MediaCover.mdx": "11a581c3a0e0c2e3daa1478810a88755ff7dad52e433e79586f5ccf41dcb277d"
       },
       "category": "Media"
     },
