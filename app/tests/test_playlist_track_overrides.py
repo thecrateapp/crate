@@ -322,11 +322,19 @@ def test_regeneration_matches_global_overrides_across_local_mapping(
         target_count=3,
     )
     rows = get_playlist_tracks(playlist_id)
+    persisted = snapshot_system_playlist(playlist_id)
     expected = [(str(first["entity_uid"]), None, "generated", False)]
     if override != "exclusion":
         expected.append((None, global_uid, source, locked))
     if mapping != "same":
         expected.append((str(local["entity_uid"]), mapped_uid, "generated", False))
+    assert [
+        (row["track_uid"], row["global_track_uid"], row["source"], row["locked"])
+        for row in persisted["tracks"]
+    ] == expected
+    resolved_expected = list(expected)
+    if mapping == "same" and override != "exclusion":
+        resolved_expected[1] = (str(local["entity_uid"]), global_uid, source, locked)
     assert [
         (
             row["track_entity_uid"],
@@ -335,14 +343,25 @@ def test_regeneration_matches_global_overrides_across_local_mapping(
             row["locked"],
         )
         for row in rows
-    ] == expected
+    ] == resolved_expected
     assert [row["position"] for row in rows] == list(range(1, len(expected) + 1))
     assert count == len(expected)
-    assert snapshot_system_playlist(playlist_id)["exclusions"] == before_exclusions
+    assert persisted["exclusions"] == before_exclusions
     if override != "exclusion":
-        assert rows[1]["track_id"] is None
-        assert rows[1]["track_storage_id"] is None
-        assert rows[1]["track_path"] is None
+        stored_override = persisted["tracks"][1]
+        assert stored_override["track_id"] is None
+        assert stored_override["storage_id"] is None
+        assert stored_override["path"] is None
+        if mapping == "same":
+            assert rows[1]["track_id"] == local["id"]
+            assert rows[1]["track_storage_id"] == (
+                str(local["storage_id"]) if local.get("storage_id") else None
+            )
+            assert rows[1]["track_path"] == local["path"]
+        else:
+            assert rows[1]["track_id"] is None
+            assert rows[1]["track_storage_id"] is None
+            assert rows[1]["track_path"] is None
 
 
 @pytest.mark.parametrize("strong_identity", ["entity_uid", "storage_id"])
