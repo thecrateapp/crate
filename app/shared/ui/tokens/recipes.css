@@ -4644,6 +4644,15 @@ label
 
 /* Metadata follows the row's actual container, including narrow desktop queue/recommendation rows.
    Reserve room for rank, 48px cover and readable identity before revealing fixed columns. */
+@container crate-track (max-width: 479px) {
+  .crate-track-metadata {
+    grid-template-columns: 44px 44px;
+    column-gap: 0;
+  }
+  .crate-track-metadata .crate-track-duration {
+    display: none;
+  }
+}
 @container crate-track (min-width: 640px) {
   .crate-track-metadata {
     grid-template-columns: 9.5rem 3.5rem 44px 44px;
