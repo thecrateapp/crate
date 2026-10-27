@@ -15,7 +15,6 @@ on:
       - "app/listen-desktop/**"
       - "app/cast-receiver/**"
       - "app/docs/**"
-      - "app/site/**"
   push:
     branches: [main]
     paths:
@@ -29,7 +28,6 @@ on:
       - "app/listen-desktop/**"
       - "app/cast-receiver/**"
       - "app/docs/**"
-      - "app/site/**"
 
 permissions:
   contents: read
@@ -51,6 +49,6 @@ jobs:
       - uses: millionco/react-doctor@013f7373f91a3b9e68bd1dc7d4d354f4b041b117 # v2
         with:
           directory: "."
-          project: "app/shared/ui,app/ui,app/listen,app/listen-desktop,app/cast-receiver,app/docs,app/site"
+          project: "app/shared/ui,app/ui,app/listen,app/listen-desktop,app/cast-receiver,app/docs"
           scope: changed
           commit-status: "false"
