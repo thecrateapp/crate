@@ -47,7 +47,7 @@ minutes come from `played_seconds`, and completions and skips are separate metri
 Rule: anything that writes `user_play_events` must call `mark_listening_day_dirty` in the same
 transaction, or the projections drift until the next full rebuild.
 
-## Instance rollups (migration `109`)
+## Instance rollups (migration `135`)
 
 `instance_track_daily` is `user_track_daily` summed across users per user-local day, with
 `listener_count`; `instance_entity_firsts` keeps the first day anyone played an artist, album or
