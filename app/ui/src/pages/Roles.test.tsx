@@ -54,6 +54,27 @@ describe("Roles", () => {
     expect(mockApi).toHaveBeenCalledWith("/api/auth/roles");
   });
 
+  it("uses singular labels for counts of one", async () => {
+    mockApi.mockResolvedValue({
+      capabilities: ["roles.view"],
+      roles: [
+        {
+          slug: "observer",
+          name: "Observer",
+          capabilities: ["roles.view"],
+          system: true,
+        },
+      ],
+    });
+
+    render(<Roles />);
+
+    expect(await screen.findByText("1 role")).toBeInTheDocument();
+    expect(screen.getByText("1 grant")).toBeInTheDocument();
+    expect(screen.getAllByText("1 capability")).toHaveLength(2);
+    expect(screen.queryByText(/^1 (?:roles|grants|capabilities)$/)).toBeNull();
+  });
+
   it("compares grants per role in the capability matrix", async () => {
     mockApi.mockResolvedValue({
       capabilities: ["library.view", "library.metadata.write", "users.view"],
