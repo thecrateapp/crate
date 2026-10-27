@@ -591,6 +591,7 @@ export const GOVERNED_TASKS = [
   "process_new_content",
   "quality_check",
   "rebuild_library",
+  "refresh_collection_insights",
   "rehydrate_portable_metadata",
   "repair",
   "repair_artwork_variants",
