@@ -1,0 +1,130 @@
+---
+import type { Feature } from "../lib/chapters";
+import StatusBadge from "./StatusBadge.astro";
+
+interface Props {
+  items: Feature[];
+  locale?: string;
+}
+
+const { items, locale = "en" } = Astro.props;
+---
+
+<ul class="features" data-reveal>
+  {
+    items.map((item, index) => (
+      <li style={`--i:${index}`}>
+        <h3>
+          {item.title}
+          {item.status && <StatusBadge kind={item.status} locale={locale} />}
+        </h3>
+        <p>
+          {item.body}
+          {item.link && (
+            <a class="feature-link" href={item.link.href}>
+              {item.link.label} <span aria-hidden="true">&rarr;</span>
+            </a>
+          )}
+        </p>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .feature-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-left: 6px;
+    color: var(--cyan-hi);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .feature-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .features {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 12px clamp(24px, 5vw, 80px);
+    padding: 26px 0 30px;
+  }
+
+  :global(:where(html.js)) li {
+    opacity: 0;
+  }
+
+  li::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--line);
+    transform-origin: left;
+  }
+
+  :global(:where(html.js)) li::before {
+    transform: scaleX(0);
+  }
+
+  .is-in li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  .is-in li::before {
+    transform: scaleX(1);
+    transition: transform 0.9s var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--fg);
+  }
+
+  p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 760px) {
+    li {
+      grid-template-columns: 1fr;
+      padding: 22px 0 24px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in li {
+      animation: fade-in 0.3s linear both;
+    }
+    .is-in li::before {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,279 @@
+---
+import { ACTORS, APPROVAL_FLOW, APPROVED, FLOW_DONE, NO_APPROVAL_TOOL, PLAN_REF } from "../../content/admin/mcp";
+
+const label = `How an agent changes the library: ${APPROVAL_FLOW.map((step) => step.title).join(", then ")}. ${NO_APPROVAL_TOOL}`;
+---
+
+<figure class="flow" data-viz="approval" data-reveal data-approved={APPROVED} aria-label={label}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>MCP</b> example change</p>
+    <p class="viz-label flow-status" data-flow-status>{FLOW_DONE}</p>
+  </header>
+
+  <ol class="rail" data-enter style="--p:1;--d:80ms">
+    {
+      APPROVAL_FLOW.map((step, index) => {
+        const gate = step.actor === "person";
+        return (
+          <li class:list={["step", { gate }]} data-flow-step={step.id} data-actor={step.actor} data-status={step.status} data-state="done">
+            <span class="dot" aria-hidden="true" />
+            <span class="viz-label actor">
+              <b>{String(index + 1).padStart(2, "0")}</b> {ACTORS[step.actor]}
+            </span>
+            <h4>{step.title}</h4>
+            <code>{step.code}</code>
+            <p>{step.body}</p>
+            {gate && (
+              <p class="stamp">
+                {APPROVED}
+                <span>{PLAN_REF}</span>
+              </p>
+            )}
+          </li>
+        );
+      })
+    }
+  </ol>
+
+  <p class="claim" data-enter style="--d:160ms">{NO_APPROVAL_TOOL}</p>
+</figure>
+
+<style>
+  .flow {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .flow-status {
+    color: var(--cyan-hi);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .flow-status:global(.is-waiting) {
+    color: var(--amber);
+  }
+
+  .rail {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 20px;
+    margin: 6vh 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rail::before,
+  .rail::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    right: calc((100% - 100px) / 6);
+    height: 1px;
+    background: var(--line);
+  }
+
+  .rail::after {
+    background: var(--cyan-hi);
+    transform: scaleX(var(--p));
+    transform-origin: left;
+    transition: transform 0.45s var(--ease-out);
+  }
+
+  .step {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding-top: 32px;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .step[data-state="pending"] {
+    opacity: 0.32;
+  }
+
+  .dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    width: 13px;
+    height: 13px;
+    border: 1px solid rgba(241, 245, 249, 0.4);
+    border-radius: 50%;
+    background: var(--bg);
+    transition:
+      background-color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      transform 0.5s var(--spring-snappy),
+      box-shadow 0.3s var(--ease-snap);
+  }
+
+  .step[data-state="done"] > .dot {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .step[data-state="active"] > .dot {
+    border-color: var(--cyan-hi);
+    transform: scale(1.35);
+    box-shadow: 0 0 0 6px rgba(6, 182, 212, 0.14);
+  }
+
+  .actor {
+    letter-spacing: 0.12em;
+  }
+
+  .step[data-actor="person"] .actor {
+    color: var(--fg);
+  }
+
+  h4 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.35rem, 2vw, 1.85rem);
+    line-height: 1;
+    letter-spacing: -0.035em;
+  }
+
+  code {
+    justify-self: start;
+    max-width: 100%;
+    padding: 2px 8px;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--cyan-hi);
+    overflow-wrap: anywhere;
+  }
+
+  .gate code {
+    border-style: dashed;
+    border-color: rgba(241, 245, 249, 0.3);
+    color: var(--fg-2);
+  }
+
+  .step p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  .gate::after {
+    content: "";
+    position: absolute;
+    inset: 22px -10px -14px;
+    border: 1px dashed rgba(241, 245, 249, 0.22);
+    border-radius: 14px;
+    pointer-events: none;
+    transition: border-color 0.3s var(--ease-snap);
+  }
+
+  .gate[data-state="active"]::after {
+    border-color: rgba(251, 191, 36, 0.55);
+  }
+
+  .flow:global(.is-live):not(:global(.is-approved)) .gate[data-state="active"] > .dot {
+    border-color: var(--amber);
+    background: var(--bg);
+    box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.14);
+    animation: wait 1.6s var(--ease-in-out) infinite;
+  }
+
+  .step p.stamp {
+    display: grid;
+    gap: 2px;
+    justify-self: start;
+    margin-top: 4px;
+    padding: 6px 10px;
+    border: 1px solid var(--cyan-hi);
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.4;
+    color: var(--cyan-hi);
+    transform: rotate(-2deg);
+    transition:
+      opacity 0.3s var(--ease-snap),
+      transform 0.55s var(--spring-snappy);
+  }
+
+  .stamp span {
+    text-transform: none;
+    letter-spacing: 0.02em;
+    color: var(--fg-2);
+  }
+
+  .flow:global(.is-live):not(:global(.is-approved)) .stamp {
+    opacity: 0;
+    transform: rotate(-2deg) scale(1.25);
+  }
+
+  .claim {
+    margin: 9vh 0 0;
+    max-width: 22ch;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2rem, 4.6vw, 4.4rem);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+    color: var(--fg);
+  }
+
+  @keyframes wait {
+    50% {
+      box-shadow: 0 0 0 10px rgba(251, 191, 36, 0.04);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .rail {
+      grid-template-columns: 1fr;
+      gap: 30px;
+      padding-left: 30px;
+    }
+    .rail::before,
+    .rail::after {
+      top: 0;
+      bottom: 0;
+      left: 6px;
+      right: auto;
+      width: 1px;
+      height: auto;
+      transform: scaleY(var(--p));
+      transform-origin: top;
+    }
+    .rail::before {
+      transform: none;
+    }
+    .step {
+      padding-top: 0;
+    }
+    .dot {
+      left: -30px;
+      top: 2px;
+    }
+    .gate::after {
+      inset: -12px -12px -14px -14px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail::after,
+    .step,
+    .dot,
+    .stamp {
+      transition: none;
+    }
+  }
+</style>

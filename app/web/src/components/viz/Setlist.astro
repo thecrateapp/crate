@@ -1,0 +1,198 @@
+---
+import { SETLIST } from "../../content/listen/viz";
+
+const owned = SETLIST.tracks.filter((track) => track.owned).length;
+---
+
+<figure class="ticket" data-reveal aria-label={`Probable setlist for ${SETLIST.artist}, ${owned} of ${SETLIST.tracks.length} tracks in your library`}>
+  <div class="ticket-head">
+    <p class="viz-label"><b>Upcoming show</b> Ticketmaster · Last.fm</p>
+    <p class="ticket-artist" data-enter style="--d:100ms">{SETLIST.artist}</p>
+    <p class="ticket-meta viz-label" data-enter style="--d:180ms">
+      <span>{SETLIST.date}</span><span>{SETLIST.venue}</span>
+    </p>
+  </div>
+  <div class="ticket-body">
+    <p class="viz-label"><b>Probable setlist</b> {SETLIST.source}</p>
+    <ol>
+      {
+        SETLIST.tracks.map((track, index) => (
+          <li class:list={{ missing: !track.owned }} style={`--i:${index}`}>
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <span class="t">{track.title}</span>
+            <span class="s">{track.owned ? "in library" : "missing"}</span>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="ticket-foot">
+      <span class="play" aria-hidden="true"></span>
+      <span><b>{owned} of {SETLIST.tracks.length}</b> playable from your library</span>
+    </p>
+  </div>
+</figure>
+
+<style>
+  .ticket {
+    --notch: 14px;
+    position: relative;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #0d0e14;
+    mask:
+      radial-gradient(circle var(--notch) at 0 var(--cut), #0000 98%, #000) 0 0 / 51% 100% no-repeat,
+      radial-gradient(circle var(--notch) at 100% var(--cut), #0000 98%, #000) 100% 0 / 51% 100% no-repeat;
+    --cut: 198px;
+  }
+
+  .ticket-head {
+    display: grid;
+    gap: 14px;
+    height: var(--cut);
+    padding: 28px 30px 0;
+    border-bottom: 1px dashed rgba(241, 245, 249, 0.18);
+  }
+
+  .ticket-artist {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.6rem, 5vw, 4.4rem);
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+  }
+
+  .ticket-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    color: var(--fg);
+  }
+
+  .ticket-body {
+    padding: 26px 30px 28px;
+  }
+
+  ol {
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: 3ch minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: baseline;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.06);
+    font-size: 15px;
+  }
+
+  :global(:where(html.js)) li {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) .is-in li {
+    animation: row-in 0.6s var(--spring-snappy) both;
+    animation-delay: calc(300ms + var(--i) * 55ms);
+  }
+
+  @keyframes row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .n,
+  .s {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .s {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--cyan-hi);
+  }
+
+  .s::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .missing .t {
+    color: var(--fg-3);
+  }
+
+  .missing .s {
+    color: var(--fg-3);
+  }
+
+  .missing .s::before {
+    background: transparent;
+    border: 1px solid currentColor;
+  }
+
+  .ticket-foot {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 22px 0 0;
+    font-size: 14px;
+    color: var(--fg-2);
+  }
+
+  .ticket-foot b {
+    font-weight: 500;
+    color: var(--fg);
+  }
+
+  .play {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--cyan);
+  }
+
+  .play::before {
+    content: "";
+    margin-left: 3px;
+    border-left: 11px solid var(--bg);
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+  }
+
+  @media (max-width: 760px) {
+    .ticket {
+      --cut: 176px;
+    }
+    .ticket-head,
+    .ticket-body {
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .is-in li {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>

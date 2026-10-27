@@ -1,0 +1,125 @@
+---
+import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
+import ChapterToc from "../components/ChapterToc.astro";
+import FeatureList from "../components/FeatureList.astro";
+import Gallery from "../components/Gallery.astro";
+import PageHeader from "../components/PageHeader.astro";
+import PathsDive from "../components/listen/PathsDive.astro";
+import RadioDive from "../components/listen/RadioDive.astro";
+import SmartMix from "../components/listen/SmartMix.astro";
+import Devices from "../components/viz/Devices.astro";
+import EqViz from "../components/viz/EqViz.astro";
+import Federation from "../components/viz/Federation.astro";
+import Heatmap from "../components/viz/Heatmap.astro";
+import MoodMap from "../components/viz/MoodMap.astro";
+import Setlist from "../components/viz/Setlist.astro";
+import VizSplit from "../components/viz/VizSplit.astro";
+import { listen } from "../content/listen/en";
+import Base from "../layouts/Base.astro";
+import { chapterId } from "../lib/chapters";
+
+const chapters = listen.chapters.map((chapter, index) => ({
+  ...chapter,
+  index: index + 1,
+  id: chapter.id ?? chapterId(index + 1, chapter.title),
+}));
+const custom = new Set(["Play", "Smart Mix", "Discover", "Yours", "Together", "Everywhere", "Live"]);
+---
+
+<Base title={listen.meta.title} description={listen.meta.description}>
+  <div class="listen">
+    <PageHeader eyebrow={listen.eyebrow} title={listen.title} lede={listen.lede}>
+      <ChapterToc items={chapters} />
+    </PageHeader>
+    <ChapterRail items={chapters} />
+
+    <Gallery app="listen" />
+
+    {
+      chapters.map((chapter) => (
+        <Chapter index={chapter.index} id={chapter.id} title={chapter.title} status={chapter.status}>
+          <Fragment slot="lede">
+            {chapter.lede.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </Fragment>
+
+          {chapter.title === "Play" && chapter.features && (
+            <>
+              <FeatureList items={chapter.features.slice(0, 1)} />
+              <div class="viz-band gap">
+                <EqViz />
+              </div>
+              <FeatureList items={chapter.features.slice(1)} />
+            </>
+          )}
+
+          {chapter.smartMix && <SmartMix content={chapter.smartMix} />}
+
+          {chapter.title === "Discover" && chapter.features && (
+            <VizSplit side="right">
+              <FeatureList items={chapter.features} />
+              <MoodMap slot="visual" />
+            </VizSplit>
+          )}
+
+          {chapter.title === "Yours" && chapter.features && (
+            <>
+              <div class="viz-band">
+                <Heatmap />
+              </div>
+              <FeatureList items={chapter.features} />
+            </>
+          )}
+
+          {chapter.title === "Together" && chapter.features && (
+            <VizSplit side="left">
+              <FeatureList items={chapter.features} />
+              <Federation slot="visual" />
+            </VizSplit>
+          )}
+
+          {chapter.title === "Everywhere" && chapter.features && (
+            <>
+              <div class="viz-band">
+                <Devices />
+              </div>
+              <FeatureList items={chapter.features} />
+            </>
+          )}
+
+          {chapter.title === "Live" && chapter.features && (
+            <VizSplit side="left" sticky={false}>
+              <FeatureList items={chapter.features} />
+              <Setlist slot="visual" />
+            </VizSplit>
+          )}
+
+          {!custom.has(chapter.title) && chapter.features && <FeatureList items={chapter.features} />}
+          {chapter.dive?.name === "radio" && <RadioDive steps={chapter.dive.steps} />}
+          {chapter.dive?.name === "paths" && <PathsDive steps={chapter.dive.steps} />}
+        </Chapter>
+      ))
+    }
+  </div>
+</Base>
+
+<script>
+  import { initCounters } from "../scripts/architecture/counters";
+  import { initListenDives } from "../scripts/listen";
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initViz } from "../scripts/viz";
+
+  mountOnPage(".listen", () => {
+    const cleanups = [initTextMotion(), initListenDives(), initViz(), initCounters()];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style>
+  .listen {
+    padding-bottom: 12vh;
+  }
+</style>

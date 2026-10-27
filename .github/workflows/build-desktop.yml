@@ -256,6 +256,9 @@ jobs:
       - name: Test desktop version resolver
         run: npm run --workspace=app/listen-desktop test:version
 
+      - name: Test stable artifact names
+        run: npm run --workspace=app/listen-desktop test:stable-names
+
       - name: Test Linux glibc compatibility verifier
         if: runner.os == 'Linux'
         run: npm run --workspace=app/listen-desktop test:glibc
@@ -853,6 +856,10 @@ jobs:
           path: desktop-artifacts/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Add stable artifact names
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node app/listen-desktop/scripts/stable-artifact-names.mjs desktop-artifacts "$CRATE_DESKTOP_VERSION"
 
       - name: Attach desktop artifacts to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')

@@ -1,0 +1,435 @@
+---
+import { MIX } from "../../content/listen/viz";
+import { t } from "../../i18n";
+import type { Step } from "../../lib/chapters";
+import { mixReadout } from "../../scripts/viz/inside-math";
+import { incoming, LANES, LENGTH, lows, outgoing, PLAN, spans, toX, TRIM, VIEW } from "../../scripts/viz/inside-mix";
+
+interface Props {
+  stages: Step[];
+  locale?: string;
+}
+
+const { stages, locale = "en" } = Astro.props;
+const a = outgoing();
+const b = incoming(1);
+const low = lows();
+const ranges = spans();
+const readout = mixReadout(PLAN, LENGTH / 2, 1, MIX.b.looseOffsetMs, TRIM);
+const mid = toX(LENGTH / 2);
+const x0 = toX(0);
+const xPre = toX(-PLAN.prerollS);
+const xEnd = toX(LENGTH);
+const pct = (y: number) => `${((y / VIEW.height) * 100).toFixed(2)}%`;
+const top = LANES.aWave.top;
+const bottom = LANES.lows.bottom;
+const controls = ["inside.mix.ctl.smartMix", "inside.mix.ctl.beatmatch", "inside.mix.ctl.bass"] as const;
+const swapStage = 2;
+---
+
+<div class="mx" data-viz="inside-mix" aria-hidden="true">
+  <div class="mx-controls">
+    {
+      controls.map((key) => (
+        <span class="switch">
+          <i />
+          {t(key, locale)}
+        </span>
+      ))
+    }
+    <span class="mx-max">
+      {t("inside.mix.ctl.max", locale)} <b>{MIX.planner.maxTransitionMs / 1000} s</b>
+    </span>
+  </div>
+
+  <div class="mx-axis">
+    {
+      stages.map((stage, index) => (
+        <span
+          class:list={["mx-span", { "is-on": index === swapStage }]}
+          data-mx-stage={index}
+          style={`left:${(ranges[index]!.from * 100).toFixed(2)}%;width:${((ranges[index]!.to - ranges[index]!.from) * 100).toFixed(2)}%`}
+        >
+          <span><b>{String(index + 1).padStart(2, "0")}</b>{stage.title}</span>
+        </span>
+      ))
+    }
+  </div>
+
+  <div class="mx-stage">
+    <svg viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} preserveAspectRatio="none">
+      <defs>
+        <clipPath id="inside-mix-clip">
+          <rect data-mx-clip x="0" y="0" width={VIEW.width} height={VIEW.height} />
+        </clipPath>
+      </defs>
+      <rect class="zone pre" x={xPre} y={top} width={x0 - xPre} height={bottom - top} />
+      <rect class="zone mix" x={x0} y={top} width={xEnd - x0} height={bottom - top} />
+      <line class="swap" x1={mid} x2={mid} y1={top} y2={bottom} />
+      <line class="base" x1="0" x2={VIEW.width} y1={LANES.lows.bottom} y2={LANES.lows.bottom} />
+
+      <path class="wave dim" d={a.wave} />
+      <path class="tick a" d={a.ticks.beat} />
+      <path class="tick a down" d={a.ticks.down} />
+      <path class="tick b" d={b.ticks.beat} data-mx="b-beat" />
+      <path class="tick b down" d={b.ticks.down} data-mx="b-down" />
+      <path class="wave muted" d={b.muted} data-mx="b-muted" />
+      <path class="wave dim" d={b.wave} data-mx="b-dim" />
+      <path class="lows-line a dim" d={low.aLine} />
+      <path class="lows-line b dim" d={low.bLine} />
+
+      <g clip-path="url(#inside-mix-clip)">
+        <path class="wave lit a" d={a.wave} />
+        <path class="wave lit b" d={b.wave} data-mx="b-lit" />
+        <path class="lows-fill a" d={low.a} />
+        <path class="lows-fill b" d={low.b} />
+        <path class="lows a" d={low.aLine} />
+        <path class="lows b" d={low.bLine} />
+      </g>
+      <line class="head" data-mx-head x1={mid} x2={mid} y1={top - 6} y2={bottom} />
+    </svg>
+    <span class="tag a" style={`top:${pct(LANES.aWave.top)}`}>A · {MIX.a.bpm} BPM · {MIX.a.key}</span>
+    <span class="tag b" style={`top:${pct(LANES.bWave.bottom)}`}>B · {MIX.b.bpm} BPM · {MIX.b.key}</span>
+    <span class="tag lows" style={`top:${pct(LANES.bWave.bottom)}`}>
+      {t("inside.mix.lows", locale, { hz: String(MIX.bass.shelfHz) })}
+    </span>
+  </div>
+
+  <dl class="mx-readout">
+    <div>
+      <dt class="viz-label">{t("inside.mix.ro.phase", locale)}</dt>
+      <dd data-ro="phase">{readout.phase}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">{t("inside.mix.ro.tempo", locale)}</dt>
+      <dd data-ro="tempo">{readout.tempo}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">{t("inside.mix.ro.gain", locale)}</dt>
+      <dd><span data-ro="gainA">{readout.gainA}</span><i>/</i><span data-ro="gainB">{readout.gainB}</span><small>dB</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">{t("inside.mix.ro.lows", locale)}</dt>
+      <dd data-ro="lows">{readout.lows}</dd>
+    </div>
+  </dl>
+</div>
+
+<style>
+  .mx {
+    display: grid;
+    gap: 14px;
+  }
+
+  .mx-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+  }
+
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .switch i {
+    position: relative;
+    width: 22px;
+    height: 12px;
+    border: 1px solid rgba(103, 232, 249, 0.55);
+    border-radius: 999px;
+  }
+
+  .switch i::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 12px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.7);
+  }
+
+  .mx-max {
+    margin-left: auto;
+    color: var(--fg-3);
+  }
+
+  .mx-max b {
+    margin-left: 6px;
+    font-weight: 400;
+    color: var(--fg);
+  }
+
+  .mx-axis {
+    position: relative;
+    height: 18px;
+    margin-top: 6px;
+  }
+
+  .mx-span {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-top: 1px solid rgba(241, 245, 249, 0.14);
+    transition: border-color 0.35s var(--ease-snap);
+  }
+
+  .mx-span > span {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--fg-3);
+    transition: color 0.35s var(--ease-snap);
+  }
+
+  .mx-span > span b {
+    margin-right: 6px;
+    font-weight: 400;
+  }
+
+  .mx-span[data-mx-stage="3"] > span {
+    left: auto;
+    right: 0;
+  }
+
+  .mx-span.is-on {
+    border-color: var(--cyan-hi);
+  }
+
+  .mx-span.is-on > span {
+    color: var(--cyan-hi);
+  }
+
+  .mx-stage {
+    position: relative;
+    height: clamp(220px, 23vw, 300px);
+  }
+
+  .mx-stage svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .zone.pre {
+    fill: rgba(241, 245, 249, 0.02);
+  }
+
+  .zone.mix {
+    fill: rgba(6, 182, 212, 0.045);
+  }
+
+  .swap {
+    stroke: rgba(103, 232, 249, 0.45);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .base {
+    stroke: var(--line);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .wave.dim {
+    fill: rgba(241, 245, 249, 0.08);
+  }
+
+  .wave.lit.a {
+    fill: rgba(241, 245, 249, 0.72);
+  }
+
+  .wave.lit.b {
+    fill: var(--cyan-hi);
+  }
+
+  .wave.muted {
+    fill: none;
+    stroke: rgba(103, 232, 249, 0.3);
+    stroke-width: 0.75;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tick {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.3);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tick.b {
+    stroke: rgba(103, 232, 249, 0.5);
+  }
+
+  .tick.down {
+    stroke-width: 1.75;
+  }
+
+  .tick.b.down {
+    stroke: var(--cyan-hi);
+  }
+
+  .lows-line {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.14);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .lows {
+    fill: none;
+    stroke-width: 1.25;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .lows.a {
+    stroke: rgba(241, 245, 249, 0.7);
+  }
+
+  .lows.b {
+    stroke: var(--cyan-hi);
+  }
+
+  .lows-fill.a {
+    fill: rgba(241, 245, 249, 0.035);
+  }
+
+  .lows-fill.b {
+    fill: rgba(103, 232, 249, 0.08);
+  }
+
+  .head {
+    stroke: var(--fg);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+  }
+
+  .mx:global(.is-running) .head {
+    opacity: 1;
+  }
+
+  .tag {
+    position: absolute;
+    left: 0;
+    transform: translateY(-100%);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+    pointer-events: none;
+  }
+
+  .tag.b {
+    transform: translateY(4px);
+    color: var(--cyan-hi);
+  }
+
+  .tag.lows {
+    left: auto;
+    right: 0;
+    transform: translateY(4px);
+    color: var(--fg-3);
+  }
+
+  .mx-readout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.5fr) minmax(0, 0.7fr);
+    gap: 0;
+    margin: 4px 0 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .mx-readout div {
+    display: grid;
+    gap: 6px;
+    padding: 12px 12px 0 0;
+  }
+
+  .mx-readout div + div {
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+  }
+
+  .mx-readout .viz-label {
+    font-size: 9.5px;
+  }
+
+  .mx-readout dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.05rem, 1.4vw, 1.35rem);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
+
+  .mx-readout dd[data-ro="tempo"],
+  .mx-readout dd[data-ro="lows"] {
+    color: var(--cyan-hi);
+  }
+
+  .mx-readout i {
+    margin: 0 4px;
+    font-style: normal;
+    color: var(--fg-3);
+  }
+
+  .mx-readout small {
+    margin-left: 4px;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 760px) {
+    .mx-max {
+      margin-left: 0;
+    }
+    .mx-stage {
+      height: 200px;
+    }
+    .mx-span > span {
+      font-size: 8.5px;
+    }
+    .mx-span:not(.is-on) > span {
+      opacity: 0;
+    }
+    .mx-readout {
+      grid-template-columns: 1fr 1fr;
+    }
+    .mx-readout div:nth-child(3) {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .mx-readout div:nth-child(n + 3) {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+  }
+</style>

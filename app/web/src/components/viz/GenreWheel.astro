@@ -1,0 +1,448 @@
+---
+import { EQ_WALK, GENRES, RELATION_TYPES, TAXONOMY_RELEASE } from "../../content/admin/viz";
+import { EQ_BANDS, EQ_PRESETS } from "../../content/listen/viz";
+import { buildTaxonomy, radialLayout, resolveEq } from "../../scripts/viz/taxonomy-math";
+
+const graph = buildTaxonomy(GENRES);
+const layout = radialLayout(graph);
+const C = 380;
+const RADII = [0, 132, 212, 256];
+const at = (radius: number, angle: number) => ({
+  x: C + Math.cos(angle - Math.PI / 2) * radius,
+  y: C + Math.sin(angle - Math.PI / 2) * radius,
+});
+const f = (value: number) => value.toFixed(1);
+
+const nodes = graph.slugs.map((slug) => {
+  const node = layout.get(slug)!;
+  const radius = RADII[node.ring]!;
+  const point = at(radius, node.angle);
+  const eq = resolveEq(graph, slug)!;
+  const degrees = (node.angle * 180) / Math.PI - 90;
+  const flip = node.angle > Math.PI;
+  return { slug, ring: node.ring, ...point, eq, degrees, flip, radius, angle: node.angle };
+});
+const bySlug = new Map(nodes.map((node) => [node.slug, node]));
+
+const parentEdges = nodes
+  .filter((node) => graph.parents.get(node.slug)?.length)
+  .map((node) => {
+    const parent = bySlug.get(graph.parents.get(node.slug)![0]!)!;
+    const mid = (parent.radius + node.radius) / 2;
+    const c1 = at(mid, parent.angle);
+    const c2 = at(mid, node.angle);
+    return {
+      slug: node.slug,
+      d: `M${f(parent.x)} ${f(parent.y)} C${f(c1.x)} ${f(c1.y)} ${f(c2.x)} ${f(c2.y)} ${f(node.x)} ${f(node.y)}`,
+    };
+  });
+
+const relatedPairs = new Set<string>();
+for (const [slug, others] of graph.related)
+  for (const other of others) if (bySlug.has(slug) && bySlug.has(other)) relatedPairs.add([slug, other].sort().join("|"));
+const relatedEdges = [...relatedPairs].map((pair) => {
+  const [a, b] = pair.split("|").map((slug) => bySlug.get(slug)!);
+  const cx = C + ((a!.x + b!.x) / 2 - C) * 0.18;
+  const cy = C + ((a!.y + b!.y) / 2 - C) * 0.18;
+  return { pair, d: `M${f(a!.x)} ${f(a!.y)} Q${f(cx)} ${f(cy)} ${f(b!.x)} ${f(b!.y)}` };
+});
+
+const first = bySlug.get(EQ_WALK[0]!)!;
+const firstGains = EQ_PRESETS[first.eq.preset]!;
+const sign = (gain: number) => (gain > 0 ? `+${gain}` : gain < 0 ? `−${Math.abs(gain)}` : "0");
+const label = (slug: string) => slug.replace(/-/g, " ");
+---
+
+<figure class="wheel" data-viz="genres" data-reveal aria-label={`Genre taxonomy: ${GENRES.length} seeded genres in ${graph.top.length} families. A genre without its own EQ inherits the preset of its nearest ancestor.`}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Taxonomy</b> {TAXONOMY_RELEASE.id} {TAXONOMY_RELEASE.version} · ed25519</p>
+    <p class="viz-label">{TAXONOMY_RELEASE.digest.slice(0, 19)}…</p>
+  </header>
+
+  <div class="wheel-body">
+    <div class="wheel-stage">
+      <svg class="wheel-svg" viewBox="0 0 760 760" aria-hidden="true">
+        <circle class="orbit" cx={C} cy={C} r={RADII[1]} />
+        <circle class="orbit" cx={C} cy={C} r={RADII[2]} />
+        <g class="related">{relatedEdges.map((edge) => <path d={edge.d} data-pair={edge.pair} />)}</g>
+        <g class="parents">{parentEdges.map((edge) => <path d={edge.d} data-edge={edge.slug} />)}</g>
+        <g class="nodes">
+          {
+            nodes.map((node) => (
+              <g
+                class:list={["node", `ring-${node.ring}`, { preset: node.eq.source === "direct" }]}
+                data-genre={node.slug}
+                data-path={node.eq.path.join(" ")}
+                data-preset={node.eq.preset}
+                data-from={node.eq.from}
+                transform={`translate(${f(node.x)} ${f(node.y)})`}
+              >
+                <circle r={node.ring === 1 ? 5.5 : 3.5} />
+                <text
+                  transform={`rotate(${f(node.flip ? node.degrees + 180 : node.degrees)})`}
+                  x={(node.flip ? -1 : 1) * (node.ring === 1 ? -12 : 10)}
+                  text-anchor={node.flip === (node.ring === 1) ? "start" : "end"}
+                  dy="0.35em"
+                >
+                  {label(node.slug)}
+                </text>
+              </g>
+            ))
+          }
+        </g>
+        <text class="centre" x={C} y={C + 4} text-anchor="middle">{GENRES.length}</text>
+        <text class="centre-sub" x={C} y={C + 24} text-anchor="middle">genres</text>
+      </svg>
+    </div>
+
+    <div class="wheel-panel">
+      <p class="viz-label"><b>Genre EQ</b> inherited from the nearest preset</p>
+      <p class="walk" aria-live="polite">
+        <span class="walk-path" data-walk-path>
+          {first.eq.path.map((slug, index) => (index ? `→ ${label(slug)}` : label(slug))).join(" ")}
+        </span>
+        <b data-walk-preset>{first.eq.preset.replace(/_/g, " ")}</b>
+        <span class="viz-label" data-walk-source>inherited from {label(first.eq.from)}</span>
+      </p>
+      <ol class="mini-eq" aria-hidden="true">
+        {
+          EQ_BANDS.map((band, index) => (
+            <li style={`--g:${firstGains[index]}`}>
+              <i data-walk-bar />
+              <b data-walk-gain>{sign(firstGains[index]!)}</b>
+              <span>{band}</span>
+            </li>
+          ))
+        }
+      </ol>
+      <div class="walk-chips" role="group" aria-label="Genres without their own EQ">
+        {
+          EQ_WALK.map((slug, index) => {
+            const node = bySlug.get(slug)!;
+            return (
+              <button
+                type="button"
+                data-walk={slug}
+                data-path={node.eq.path.join(" ")}
+                data-preset={node.eq.preset}
+                data-from={node.eq.from}
+                aria-pressed={index === 0 ? "true" : "false"}
+              >
+                {label(slug)}
+              </button>
+            );
+          })
+        }
+      </div>
+      <dl class="legend">
+        <div><dt>Families</dt><dd>{graph.top.length}</dd></div>
+        <div><dt>Parent links</dt><dd>{parentEdges.length}</dd></div>
+        <div><dt>Related links</dt><dd>{relatedEdges.length}</dd></div>
+        <div><dt>Relation types</dt><dd>{RELATION_TYPES.length}</dd></div>
+      </dl>
+      <p class="viz-label types">{RELATION_TYPES.join(" · ")}</p>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .wheel {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .wheel-body {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    gap: clamp(24px, 4vw, 64px);
+    align-items: center;
+    margin-top: 12px;
+  }
+
+  .wheel-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 82vh;
+    margin: 0 auto;
+  }
+
+  .wheel-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .orbit {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.05);
+  }
+
+  .related path {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.06);
+    stroke-width: 1;
+    transition:
+      stroke 0.4s var(--ease-snap),
+      stroke-width 0.4s var(--ease-snap);
+  }
+
+  .related path:global(.is-on) {
+    stroke: rgba(103, 232, 249, 0.32);
+  }
+
+  .parents path {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.18);
+    stroke-width: 1;
+    transition:
+      stroke 0.35s var(--ease-snap),
+      stroke-width 0.35s var(--ease-snap);
+  }
+
+  .parents path:global(.is-on) {
+    stroke: var(--cyan-hi);
+    stroke-width: 2.25;
+  }
+
+  .node circle {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.45);
+    stroke-width: 1.25;
+    transition:
+      fill 0.3s var(--ease-snap),
+      stroke 0.3s var(--ease-snap),
+      r 0.4s var(--spring-snappy);
+  }
+
+  .node.preset circle {
+    fill: rgba(241, 245, 249, 0.55);
+    stroke: none;
+  }
+
+  .node text {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    fill: var(--fg-3);
+    transition: fill 0.3s var(--ease-snap);
+  }
+
+  .node.ring-1 text {
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    fill: var(--fg-2);
+  }
+
+  .node:global(.is-path) circle {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+  }
+
+  .node:global(.is-path) text,
+  .node:global(.is-from) text {
+    fill: var(--fg);
+  }
+
+  .node:global(.is-from) circle {
+    fill: var(--cyan-hi);
+    stroke: var(--cyan-hi);
+  }
+
+  .node:global(.is-start) circle {
+    r: 6;
+  }
+
+  .centre {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 40px;
+    letter-spacing: -0.04em;
+    fill: var(--fg);
+  }
+
+  .centre-sub {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    fill: var(--fg-3);
+  }
+
+  .wheel-panel {
+    display: grid;
+    gap: 22px;
+    align-content: center;
+  }
+
+  .walk {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .walk-path {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+  }
+
+  .walk b {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.2rem, 4vw, 3.6rem);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+    color: var(--cyan-hi);
+  }
+
+  .mini-eq {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    text-align: center;
+  }
+
+  .mini-eq li {
+    display: grid;
+    gap: 6px;
+  }
+
+  .mini-eq i {
+    position: relative;
+    height: 96px;
+    border-radius: 2px;
+    background: linear-gradient(transparent calc(50% - 0.5px), rgba(241, 245, 249, 0.18) calc(50% - 0.5px), rgba(241, 245, 249, 0.18) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  }
+
+  .mini-eq i::after {
+    content: "";
+    position: absolute;
+    left: 25%;
+    right: 25%;
+    top: 50%;
+    height: 50%;
+    border-radius: 2px;
+    background: linear-gradient(var(--cyan-hi), rgba(6, 182, 212, 0.25));
+    transform-origin: top;
+    transform: scaleY(calc(var(--g) / -12));
+  }
+
+  .mini-eq b {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mini-eq span {
+    font-size: 9px;
+    color: var(--fg-3);
+  }
+
+  .walk-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .walk-chips button {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      background-color 0.3s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .walk-chips button:hover {
+    color: var(--fg);
+    border-color: rgba(103, 232, 249, 0.4);
+  }
+
+  .walk-chips button:active {
+    transform: scale(0.95);
+  }
+
+  .walk-chips button[aria-pressed="true"] {
+    color: var(--bg);
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .legend div {
+    display: grid;
+    gap: 6px;
+  }
+
+  .legend dt {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .legend dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .types {
+    text-transform: none;
+    letter-spacing: 0.06em;
+  }
+
+  @media (max-width: 1000px) {
+    .wheel-body {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .node:not(.ring-1) text {
+      display: none;
+    }
+    .node.ring-1 text {
+      font-size: 16px;
+    }
+    .legend {
+      grid-template-columns: 1fr 1fr;
+    }
+    .mini-eq i {
+      height: 72px;
+    }
+  }
+</style>

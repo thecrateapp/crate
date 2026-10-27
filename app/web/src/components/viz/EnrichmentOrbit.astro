@@ -1,0 +1,373 @@
+---
+import { ENRICHMENT } from "../../content/admin/viz";
+import { schedulePool } from "../../scripts/viz/pool-math";
+
+const DURATIONS: Record<string, number> = {
+  lastfm: 1,
+  spotify: 0.7,
+  musicbrainz: 1.8,
+  setlist: 1.2,
+  fanart: 0.9,
+  discogs: 1.4,
+};
+const C = 300;
+const point = (radius: number, index: number, count: number, offset = -Math.PI / 2) => {
+  const angle = offset + (index / count) * Math.PI * 2;
+  return { x: C + Math.cos(angle) * radius, y: C + Math.sin(angle) * radius, angle };
+};
+const inner = ENRICHMENT.artist.map((source, index) => ({ ...source, ...point(150, index, ENRICHMENT.artist.length) }));
+const outer = ENRICHMENT.more.map((source, index) => ({
+  ...source,
+  ...point(252, index, ENRICHMENT.more.length, -Math.PI / 2 + Math.PI / ENRICHMENT.more.length),
+}));
+const slots = schedulePool(
+  ENRICHMENT.artist.map((source) => ({ id: source.id, duration: DURATIONS[source.id]! })),
+  ENRICHMENT.parallelism,
+);
+const span = Math.max(...slots.map((slot) => slot.end));
+const pct = (value: number) => `${((value / 600) * 100).toFixed(2)}%`;
+const ttl = (days: number) => (days === 1 ? "1 day" : `${days} days`);
+---
+
+<figure class="orbit" data-viz="enrichment" data-reveal data-span={span} aria-label={`Artist enrichment: ${ENRICHMENT.artist.length} sources fetched ${ENRICHMENT.parallelism} at a time, each cached for its own lifetime, then ${ENRICHMENT.more.length} more sources per album and track`}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Enrichment</b> {ENRICHMENT.artist.length + ENRICHMENT.more.length} sources</p>
+    <p class="viz-label">{ENRICHMENT.parallelism} at a time · cached per source</p>
+  </header>
+
+  <div class="orbit-stage">
+    <svg class="orbit-svg" viewBox="0 0 600 600" aria-hidden="true">
+      <circle class="ring" cx={C} cy={C} r="150" />
+      <circle class="ring outer" cx={C} cy={C} r="252" />
+      {outer.map((source, index) => <line class="link far" data-far={index} x1={source.x} y1={source.y} x2={C} y2={C} pathLength="1" />)}
+      {inner.map((source) => <line class="link near" data-link={source.id} x1={source.x} y1={source.y} x2={C} y2={C} pathLength="1" />)}
+      {inner.map((source) => <circle class="packet" data-packet={source.id} r="3.5" cx={source.x} cy={source.y} />)}
+      {inner.map((source) => <circle class="node near is-done" data-node={source.id} cx={source.x} cy={source.y} r="7" />)}
+      {outer.map((source, index) => <circle class="node far is-done" data-far-node={index} cx={source.x} cy={source.y} r="5" />)}
+      <circle class="core-halo" cx={C} cy={C} r="46" />
+      <circle class="core" cx={C} cy={C} r="30" />
+    </svg>
+    <p class="core-label" style="left:50%;top:50%"><b>Slowdive</b><span>artist</span></p>
+    {
+      inner.map((source) => (
+        <p class="src near" style={`left:${pct(source.x)};top:${pct(source.y)}`} data-side={source.x < C - 10 ? "left" : source.x > C + 10 ? "right" : "mid"}>
+          <b>{source.label}</b>
+          <span>cache {ttl(source.ttlDays)}</span>
+        </p>
+      ))
+    }
+    {
+      outer.map((source) => (
+        <p class="src far" style={`left:${pct(source.x)};top:${pct(source.y)}`} data-side={source.x < C - 10 ? "left" : source.x > C + 10 ? "right" : "mid"}>
+          <b>{source.label}</b>
+          <span>{source.role}</span>
+        </p>
+      ))
+    }
+  </div>
+
+  <ul class="more">
+    {ENRICHMENT.more.map((source) => <li><b>{source.label}</b> {source.role}</li>)}
+  </ul>
+
+  <div class="pool" aria-hidden="true">
+    <p class="viz-label pool-title"><b>Thread pool</b> artist sources</p>
+    {
+      Array.from({ length: ENRICHMENT.parallelism }, (_, worker) => (
+        <div class="lane">
+          <span class="lane-name">worker {worker + 1}</span>
+          <div class="lane-track">
+            {slots
+              .filter((slot) => slot.worker === worker)
+              .map((slot) => (
+                <span
+                  class="job is-done"
+                  data-job={slot.id}
+                  data-start={slot.start}
+                  data-end={slot.end}
+                  style={`left:${(slot.start / span) * 100}%;width:calc(${((slot.end - slot.start) / span) * 100}% - 4px)`}
+                >
+                  {ENRICHMENT.artist.find((source) => source.id === slot.id)?.label}
+                </span>
+              ))}
+            <i class="head" data-pool-head />
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</figure>
+
+<style>
+  .orbit {
+    margin: 0;
+  }
+
+  .orbit-stage {
+    position: relative;
+    width: min(640px, 100% - 180px);
+    aspect-ratio: 1;
+    max-height: 64vh;
+    margin: 18px auto 0;
+  }
+
+  .orbit-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .ring {
+    fill: none;
+    stroke: var(--line);
+  }
+
+  .ring.outer {
+    stroke-dasharray: 2 6;
+  }
+
+  .link {
+    stroke-width: 1.25;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.6s var(--ease-out);
+  }
+
+  .link.near {
+    stroke: rgba(103, 232, 249, 0.5);
+  }
+
+  .link.far {
+    stroke: rgba(241, 245, 249, 0.16);
+  }
+
+  .orbit:global(.is-running) .link {
+    stroke-dashoffset: 1;
+  }
+
+  .orbit:global(.is-running) .link:global(.is-on) {
+    stroke-dashoffset: 0;
+  }
+
+  .packet {
+    fill: var(--cyan-hi);
+    opacity: 0;
+  }
+
+  .node {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.4);
+    stroke-width: 1.25;
+    transition:
+      fill 0.35s var(--ease-snap),
+      stroke 0.35s var(--ease-snap);
+  }
+
+  .node:global(.is-active) {
+    stroke: var(--cyan-hi);
+  }
+
+  .node.near:global(.is-done) {
+    fill: var(--cyan-hi);
+    stroke: var(--cyan-hi);
+  }
+
+  .node.far:global(.is-done) {
+    fill: var(--fg-2);
+    stroke: var(--fg-2);
+  }
+
+  .core {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+  }
+
+  .core-halo {
+    fill: rgba(6, 182, 212, 0.1);
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .orbit:global(.is-pulse) .core-halo {
+    animation: halo 0.9s var(--ease-out);
+  }
+
+  @keyframes halo {
+    from {
+      transform: scale(0.7);
+      opacity: 1;
+    }
+    to {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+
+  .core-label,
+  .src {
+    position: absolute;
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 0 10px var(--bg);
+  }
+
+  .core-label {
+    justify-items: center;
+    transform: translate(-50%, -50%);
+  }
+
+  .core-label b {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+  }
+
+  .core-label span,
+  .src span {
+    color: var(--fg-3);
+  }
+
+  .src b {
+    font-weight: 400;
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .src.far b {
+    color: var(--fg-2);
+  }
+
+  .src[data-side="right"] {
+    transform: translate(16px, -50%);
+  }
+
+  .src[data-side="left"] {
+    justify-items: end;
+    text-align: right;
+    transform: translate(calc(-100% - 16px), -50%);
+  }
+
+  .src[data-side="mid"] {
+    justify-items: center;
+    transform: translate(-50%, calc(-100% - 14px));
+  }
+
+  .pool {
+    display: grid;
+    gap: 8px;
+    margin-top: 26px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .pool-title {
+    margin-bottom: 4px;
+  }
+
+  .lane {
+    display: grid;
+    grid-template-columns: 10ch minmax(0, 1fr);
+    gap: 12px;
+    white-space: nowrap;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+    text-transform: uppercase;
+  }
+
+  .lane-track {
+    position: relative;
+    height: 22px;
+    border-radius: 4px;
+    background: rgba(241, 245, 249, 0.03);
+  }
+
+  .job {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    overflow: hidden;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    border-radius: 3px;
+    color: var(--fg-2);
+    font-size: 9.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.22) var(--fill, 100%), transparent var(--fill, 100%));
+  }
+
+  .job:global(.is-done) {
+    color: var(--fg);
+  }
+
+  .head {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    left: 0;
+    width: 1px;
+    background: var(--fg);
+    opacity: 0;
+  }
+
+  .orbit:global(.is-running) .head {
+    opacity: 0.6;
+  }
+
+  .more {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .orbit {
+      overflow-x: clip;
+    }
+    .orbit-stage {
+      width: 76%;
+    }
+    .src {
+      font-size: 9px;
+    }
+    .src span,
+    .src.far {
+      display: none;
+    }
+    .more {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .more li {
+      padding: 3px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--fg-3);
+    }
+    .more b {
+      font-weight: 400;
+      color: var(--fg-2);
+    }
+  }
+</style>

@@ -1,0 +1,97 @@
+---
+import type { DocLink } from "../../content/developers/en";
+
+interface Props {
+  items: DocLink[];
+}
+
+const { items } = Astro.props;
+---
+
+<ul class="doc-links" data-reveal>
+  {
+    items.map((item, index) => (
+      <li style={`--i:${index}`}>
+        <a href={item.href}>
+          <span class="label">{item.title}</span>
+          <span class="arrow" aria-hidden="true">
+            &rarr;
+          </span>
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .doc-links {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    border-top: 1px solid var(--line);
+    opacity: 0;
+  }
+
+  .is-in li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+
+  a {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 0;
+    color: var(--fg);
+    text-decoration: none;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 2.6vw, 2.4rem);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    transition: color 0.35s var(--ease-snap);
+  }
+
+  .label {
+    transition: transform 0.5s var(--ease-snap);
+  }
+
+  .arrow {
+    font-family: var(--sans);
+    font-size: 18px;
+    color: var(--cyan-hi);
+    transform: translateX(-10px);
+    opacity: 0;
+    transition:
+      transform 0.45s var(--ease-snap),
+      opacity 0.3s var(--ease-snap);
+  }
+
+  a:hover,
+  a:focus-visible {
+    color: var(--cyan-hi);
+  }
+
+  a:hover .label {
+    transform: translateX(12px);
+  }
+
+  a:hover .arrow,
+  a:focus-visible .arrow {
+    transform: none;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in li {
+      animation: fade-in 0.3s linear both;
+    }
+    a:hover .label {
+      transform: none;
+    }
+  }
+</style>

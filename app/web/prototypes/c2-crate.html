@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · C2 · Crate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse 45% 55% at 72% 55%, rgba(6, 182, 212, 0.1), transparent 70%);
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 280vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 680px;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+        padding: 0 clamp(20px, 5vw, 72px);
+      }
+
+      .text {
+        position: relative;
+        align-self: center;
+      }
+
+      .hero-copy,
+      .counter {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 22px;
+        will-change: opacity, transform;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(3rem, 6.4vw, 7.8rem);
+        max-width: 9.5ch;
+        text-wrap: wrap;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.25rem, 2vw, 2.2rem);
+      }
+
+      .counter {
+        position: absolute;
+        inset: 50% 0 auto;
+        transform: translateY(-50%);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .counter .number {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(4rem, 10vw, 12rem);
+        letter-spacing: -0.05em;
+        line-height: 0.85;
+        font-variant-numeric: tabular-nums;
+        color: var(--fg);
+      }
+
+      .counter .number span {
+        color: var(--fg-3);
+        font-weight: 500;
+        font-size: 0.32em;
+        letter-spacing: -0.02em;
+        margin-left: 0.2em;
+      }
+
+      .counter p:not(.eyebrow) {
+        margin: 0;
+        max-width: 26ch;
+        font-family: var(--display);
+        font-weight: 500;
+        font-size: clamp(1.3rem, 2vw, 2rem);
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+        color: var(--fg-2);
+      }
+
+      .bin {
+        position: relative;
+        perspective: 1200px;
+        perspective-origin: 50% -8%;
+        cursor: pointer;
+      }
+
+      .stack {
+        --s: clamp(220px, min(44vh, 30vw), 380px);
+        position: absolute;
+        left: 50%;
+        top: 74%;
+        transform-style: preserve-3d;
+        transform: rotateX(-10deg) rotateY(-26deg);
+      }
+
+      .record {
+        position: absolute;
+        left: calc(var(--s) / -2);
+        top: calc(var(--s) * -1);
+        width: var(--s);
+        height: var(--s);
+        transform-origin: 50% 100%;
+        transform-style: preserve-3d;
+        will-change: transform, opacity;
+      }
+
+      .record .face {
+        position: absolute;
+        inset: 0;
+        border-radius: 4px;
+        overflow: hidden;
+        background:
+          repeating-linear-gradient(45deg, rgba(6, 182, 212, 0.12) 0 2px, transparent 2px 10px),
+          #10131a;
+        box-shadow:
+          0 -1px 0 rgba(255, 255, 255, 0.08) inset,
+          0 30px 60px rgba(0, 0, 0, 0.55);
+      }
+
+      .record img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        filter: grayscale(var(--g, 1)) brightness(var(--b, 0.6));
+      }
+
+      .record .face::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: rgba(6, 182, 212, 0.45);
+        mix-blend-mode: color;
+        opacity: var(--tint, 1);
+      }
+
+      .record .edge {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 6px;
+        transform-origin: 50% 0;
+        transform: rotateX(90deg);
+        background: linear-gradient(90deg, #1a1d26, #2a2f3a, #1a1d26);
+      }
+
+      .now-label {
+        position: absolute;
+        right: 0;
+        bottom: 7vh;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        text-align: right;
+        line-height: 1.8;
+        font-variant-numeric: tabular-nums;
+        white-space: pre;
+      }
+
+      @media (max-width: 760px) {
+        .hero-sticky {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: minmax(0, 1fr) auto;
+          padding-bottom: 6vh;
+        }
+        .bin {
+          grid-row: 1;
+        }
+        .text {
+          grid-row: 2;
+        }
+        .stack {
+          --s: 46vw;
+          top: 78%;
+        }
+        .hero-copy .display {
+          font-size: 12vw;
+        }
+        .now-label {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="text">
+            <div class="hero-copy"></div>
+            <div class="counter" aria-hidden="true">
+              <p class="eyebrow"><b>Library</b> / albums</p>
+              <div class="number"><output id="count">0001</output><span>/ 4,400</span></div>
+              <p>Every album with its artwork, tags, lyrics and a sound you can search by.</p>
+            </div>
+          </div>
+          <div class="bin" aria-hidden="true">
+            <div class="stack"></div>
+            <div class="now-label"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">C2 · Crate</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        reducedMotion,
+      } from "./hero.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      mountSections(document.querySelector("main"));
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 200);
+
+      const { gsap, ScrollTrigger } = window;
+      let coverCount = 0;
+      try {
+        coverCount = (await fetch("covers/manifest.json").then((r) => r.json())).count;
+      } catch {
+        coverCount = 0;
+      }
+
+      const POOL = 12;
+      const stack = document.querySelector(".stack");
+      const bin = document.querySelector(".bin");
+      const nowLabel = document.querySelector(".now-label");
+      const counter = document.querySelector(".counter");
+      const countOutput = document.getElementById("count");
+      const FORMATS = ["FLAC 16/44.1", "FLAC 24/96", "FLAC 24/48", "MP3 320"];
+      const nodes = Array.from({ length: POOL }, () => {
+        const node = document.createElement("div");
+        node.className = "record";
+        node.innerHTML = `<div class="edge"></div><div class="face">${coverCount ? `<img alt="" decoding="async" draggable="false" />` : ""}</div>`;
+        node.dataset.k = "";
+        stack.appendChild(node);
+        return node;
+      });
+
+      const coverFor = (k) => (coverCount ? (((k % coverCount) + coverCount) % coverCount) + 1 : 0);
+      const state = { pos: 0, auto: 0, scroll: 0, intro: 0 };
+      let shownFront = null;
+
+      function layout() {
+        const s = nodes[0].offsetWidth;
+        const gap = s * 0.12;
+        const base = Math.floor(state.pos) - 1;
+        nodes.forEach((node, i) => {
+          const k = base + ((((i - base) % POOL) + POOL) % POOL);
+          if (node.dataset.k !== String(k)) {
+            node.dataset.k = String(k);
+            const img = node.querySelector("img");
+            if (img) img.src = `covers/${coverFor(k)}.jpg`;
+          }
+          const d = k - state.pos;
+          const style = node.style;
+          if (d < 0) {
+            const t = Math.min(1, -d);
+            style.transform = `translate3d(0, ${t * s * 0.06}px, ${t * s * 0.35}px) rotateX(${-t * 96}deg)`;
+            style.opacity = String(Math.max(0, 1 - t * 1.25));
+            style.setProperty("--tint", "0");
+            style.setProperty("--g", "0");
+            style.setProperty("--b", "1");
+          } else {
+            const entry = (1 - state.intro) * 400;
+            style.transform = `translate3d(0, ${-d * 2}px, ${-d * gap - entry}px) rotateX(${Math.min(d, 1) * 4}deg)`;
+            const fadeBack = Math.min(1, Math.max(0, POOL - 2 - d));
+            style.opacity = String(fadeBack * Math.min(1, state.intro * 1.5));
+            const front = Math.max(0, 1 - d);
+            style.setProperty("--tint", String(Math.min(1, 0.35 + d * 0.25) * (1 - front)));
+            style.setProperty("--g", String(1 - front));
+            style.setProperty("--b", String(1 - Math.min(0.55, d * 0.09) - (1 - front) * 0.2));
+          }
+          style.zIndex = String(1000 - Math.round(d * 10));
+        });
+
+        const front = Math.round(state.pos);
+        if (front !== shownFront) {
+          shownFront = front;
+          const n = coverFor(front);
+          const year = 1968 + ((((front * 37) % 57) + 57) % 57);
+          const tracks = 6 + ((((front * 7) % 10) + 10) % 10);
+          scrambleText(
+            nowLabel,
+            `Album ${String(n).padStart(4, "0")} · ${year}\n${tracks} tracks · ${FORMATS[((front % 4) + 4) % 4]}`,
+            420,
+          );
+          countOutput.textContent = String(Math.max(1, front + 1)).padStart(4, "0");
+        }
+      }
+
+      if (reducedMotion) {
+        state.intro = 1;
+        layout();
+      } else {
+        gsap.to(state, { intro: 1, duration: 1.4, ease: "power3.out" });
+        let hovered = false;
+        bin.addEventListener("pointerenter", () => (hovered = true));
+        bin.addEventListener("pointerleave", () => (hovered = false));
+        bin.addEventListener("click", () => (state.auto += 1));
+        setInterval(() => {
+          if (!hovered && !document.hidden && state.scroll === 0) state.auto += 1;
+        }, 2200);
+
+        gsap.ticker.add(() => {
+          const target = state.auto + state.scroll * 14;
+          state.pos += (target - state.pos) * 0.085;
+          if (Math.abs(target - state.pos) < 0.0005) state.pos = target;
+          layout();
+        });
+
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            state.scroll = Math.min(1, progress / 0.8);
+            const copyFade = Math.min(1, progress / 0.12);
+            gsap.set(copy, { opacity: 1 - copyFade, y: -copyFade * 40 });
+            const counterIn = Math.min(1, Math.max(0, (progress - 0.1) / 0.1));
+            const out = Math.max(0, (progress - 0.86) / 0.14);
+            gsap.set(counter, { opacity: counterIn * (1 - out) });
+            gsap.set(bin, { opacity: 1 - out, y: -out * 60 });
+          },
+        });
+
+        gsap.fromTo(
+          "[data-frame]",
+          { scale: 0.86, opacity: 0, y: 60 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+          },
+        );
+      }
+    </script>
+  </body>
+</html>

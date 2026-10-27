@@ -1,0 +1,31 @@
+---
+import { t } from "../i18n";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const links = [
+  { href: "/listen", label: t("nav.listen", locale), meta: t("explore.listen", locale) },
+  { href: "/admin", label: t("nav.admin", locale), meta: t("explore.admin", locale) },
+  { href: "/architecture", label: t("nav.architecture", locale), meta: t("explore.architecture", locale) },
+  { href: "/developers", label: t("nav.developers", locale), meta: t("explore.developers", locale) },
+];
+---
+
+<nav class="explore" data-reveal aria-label={t("explore.label", locale)}>
+  {
+    links.map((link, index) => (
+      <a href={link.href} style={`--i:${index}`}>
+        <span class="label">{link.label}</span>
+        <span class="meta">
+          {link.meta}
+          <span class="arrow" aria-hidden="true">
+            &rarr;
+          </span>
+        </span>
+      </a>
+    ))
+  }
+</nav>

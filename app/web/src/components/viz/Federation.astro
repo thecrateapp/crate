@@ -1,0 +1,455 @@
+---
+import { FEDERATION } from "../../content/listen/viz";
+
+const nodes = {
+  north: { x: 96, y: 150 },
+  basement: { x: 300, y: 112 },
+  club: { x: 504, y: 150 },
+  yours: { x: 300, y: 320 },
+  listener: { x: 300, y: 530 },
+};
+const peers = FEDERATION.peers.map((peer) => ({ ...peer, ...nodes[peer.id as keyof typeof nodes] }));
+const pct = (value: number) => `${(value / 600) * 100}%`;
+---
+
+<figure class="fed" data-viz="federation" data-reveal data-phase="descriptor" aria-label="Federation: a peer's signed descriptor is approved, then playback is relayed through your node">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Federation</b> node to node</p>
+    <p class="viz-label">Ed25519 · approved pairing</p>
+  </header>
+  <div class="fed-stage">
+    <svg class="fed-svg" viewBox="0 0 600 600" aria-hidden="true">
+      <g class="fed-edges">
+        {
+          peers.map((peer) => (
+            <line
+              class:list={["edge", peer.id === "club" ? "edge-club" : "edge-ok"]}
+              x1={peer.x}
+              y1={peer.y}
+              x2={nodes.yours.x}
+              y2={nodes.yours.y}
+              pathLength="1"
+            />
+          ))
+        }
+        <line class="edge edge-club-lit" x1={nodes.club.x} y1={nodes.club.y} x2={nodes.yours.x} y2={nodes.yours.y} pathLength="1" />
+        <line class="edge edge-relay" x1={nodes.yours.x} y1={nodes.yours.y} x2={nodes.listener.x} y2={nodes.listener.y} />
+        <line class="edge edge-never" x1={nodes.club.x} y1={nodes.club.y} x2={nodes.listener.x} y2={nodes.listener.y} />
+        <g class="never-mark" transform={`translate(${(nodes.club.x + nodes.listener.x) / 2} ${(nodes.club.y + nodes.listener.y) / 2})`}>
+          <path d="M-5 -5 L5 5 M5 -5 L-5 5" />
+        </g>
+      </g>
+      {
+        peers.map((peer) => (
+          <g class:list={["node peer", `node-${peer.id}`]} data-node={peer.id} data-x={peer.x} data-y={peer.y} transform={`translate(${peer.x} ${peer.y})`}>
+            <circle class="ring" r="15" />
+            <circle class="core" r="5" />
+          </g>
+        ))
+      }
+      <g class="node yours" data-node="yours" data-x={nodes.yours.x} data-y={nodes.yours.y} transform={`translate(${nodes.yours.x} ${nodes.yours.y})`}>
+        <circle class="halo" r="34" />
+        <circle class="ring" r="24" />
+        <circle class="core" r="9" />
+        <path class="check" d="M30 -22 l6 6 l12 -14" pathLength="1" />
+      </g>
+      <g class="node listener" data-node="listener" data-x={nodes.listener.x} data-y={nodes.listener.y} transform={`translate(${nodes.listener.x} ${nodes.listener.y})`}>
+        <rect class="phone" x="-13" y="-22" width="26" height="44" rx="5" />
+        <path class="bars" d="M-6 6 v-8 M-2 6 v-14 M2 6 v-10 M6 6 v-5" />
+      </g>
+      <g class="packet descriptor" data-packet="descriptor" style="opacity:0">
+        <rect x="-16" y="-8" width="32" height="16" rx="3" />
+        <path d="M-8 -2 h16 M-8 2 h10" />
+      </g>
+      <g class="packet delta" data-packet="delta" style="opacity:0"><circle r="3" /></g>
+      <g class="packet delta" data-packet="delta" style="opacity:0"><circle r="3" /></g>
+      <g class="packet track" data-packet="track" style="opacity:0">
+        <rect x="-30" y="-10" width="60" height="20" rx="10" />
+        <text y="3.5" text-anchor="middle" data-packet-label>stream</text>
+      </g>
+    </svg>
+    {
+      peers.map((peer) => (
+        <p class="fed-label peer-label" style={`left:${pct(peer.x)};top:${pct(peer.y)}`}>
+          <b>{peer.label}</b>
+          <span>{peer.key}</span>
+        </p>
+      ))
+    }
+    <p class="fed-label yours-label" style={`left:${pct(nodes.yours.x)};top:${pct(nodes.yours.y)}`}>
+      <b>{FEDERATION.yours.label}</b>
+      <span>{FEDERATION.yours.key}</span>
+    </p>
+    <p class="fed-label listener-label" style={`left:${pct(nodes.listener.x)};top:${pct(nodes.listener.y)}`}>
+      <b>your listener</b>
+      <span>never sees the peer URL</span>
+    </p>
+    <p class="fed-chip" style={`left:${pct((nodes.club.x + nodes.yours.x) / 2)};top:${pct((nodes.club.y + nodes.yours.y) / 2)}`}>
+      <span class="pending">pending</span><span class="approved">approved</span>
+    </p>
+    <p class="fed-grant" style={`left:${pct((nodes.club.x + nodes.yours.x) / 2)};top:${pct((nodes.club.y + nodes.yours.y) / 2)}`}>
+      grant · stream
+    </p>
+  </div>
+  <ol class="fed-steps">
+    {
+      FEDERATION.steps.map((step, index) => (
+        <li data-fed-step>
+          <span class="viz-label"><b>{String(index + 1).padStart(2, "0")}</b> {step.title}</span>
+          <p>{step.body}</p>
+        </li>
+      ))
+    }
+  </ol>
+</figure>
+
+<style>
+  .fed {
+    margin: 0;
+  }
+
+  .fed-stage {
+    position: relative;
+    width: 100%;
+    max-width: 620px;
+    aspect-ratio: 1;
+    max-height: 62vh;
+    margin: 14px auto 0;
+  }
+
+  .fed-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .edge {
+    fill: none;
+    stroke-width: 1.25;
+  }
+
+  .edge-ok {
+    stroke: rgba(103, 232, 249, 0.38);
+  }
+
+  .edge-club {
+    stroke: rgba(251, 191, 36, 0.55);
+    stroke-dasharray: 0.012 0.018;
+  }
+
+  .edge-club-lit {
+    stroke: var(--cyan-hi);
+    stroke-width: 1.75;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.9s var(--ease-out);
+  }
+
+  .edge-relay {
+    stroke: rgba(241, 245, 249, 0.3);
+  }
+
+  .edge-never {
+    stroke: rgba(241, 245, 249, 0.12);
+    stroke-dasharray: 2 6;
+  }
+
+  .never-mark path {
+    stroke: rgba(241, 245, 249, 0.45);
+    stroke-width: 1.25;
+  }
+
+  .node .ring {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.25);
+  }
+
+  .peer .core {
+    fill: var(--fg);
+  }
+
+  .node-club .core {
+    fill: var(--amber);
+    transition: fill 0.4s var(--ease-snap);
+  }
+
+  .yours .core {
+    fill: var(--cyan-hi);
+  }
+
+  .yours .ring {
+    stroke: rgba(103, 232, 249, 0.6);
+  }
+
+  .yours .halo {
+    fill: rgba(6, 182, 212, 0.12);
+    stroke: none;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.6);
+    opacity: 0;
+  }
+
+  .check {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.45s var(--ease-out);
+  }
+
+  .listener .phone {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.5);
+    stroke-width: 1.25;
+  }
+
+  .listener .bars {
+    stroke: rgba(241, 245, 249, 0.35);
+    stroke-width: 2;
+    stroke-linecap: round;
+    transition: stroke 0.3s var(--ease-snap);
+  }
+
+  .packet {
+    transition: opacity 0.25s linear;
+  }
+
+  .packet.descriptor rect {
+    fill: var(--bg);
+    stroke: var(--fg);
+  }
+
+  .packet.descriptor path {
+    stroke: var(--fg-2);
+  }
+
+  .packet.delta circle {
+    fill: rgba(241, 245, 249, 0.55);
+  }
+
+  .packet.track rect {
+    fill: var(--cyan-hi);
+  }
+
+  .packet.track text {
+    fill: var(--bg);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .fed:not([data-phase="descriptor"]) .check {
+    stroke-dashoffset: 0;
+  }
+
+  .fed[data-phase="signed"] .yours .halo {
+    animation: halo 1s var(--ease-out) both;
+  }
+
+  .fed:is([data-phase="approved"], [data-phase="grant"], [data-phase="relay"], [data-phase="done"]) .edge-club-lit {
+    stroke-dashoffset: 0;
+  }
+
+  .fed:is([data-phase="approved"], [data-phase="grant"], [data-phase="relay"], [data-phase="done"]) .node-club .core {
+    fill: var(--fg);
+  }
+
+  .fed:is([data-phase="relay"], [data-phase="done"]) .listener .bars {
+    stroke: var(--cyan-hi);
+  }
+
+  .fed[data-phase="done"] .listener .phone {
+    stroke: var(--cyan-hi);
+  }
+
+  @keyframes halo {
+    0% {
+      opacity: 0.9;
+      transform: scale(0.6);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(2.4);
+    }
+  }
+
+  .fed-label {
+    position: absolute;
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    text-align: center;
+    transform: translate(-50%, calc(-100% - 24px));
+    text-shadow: 0 0 10px var(--bg);
+    pointer-events: none;
+  }
+
+  .fed-label b {
+    font-weight: 400;
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .fed-label span {
+    color: var(--fg-3);
+  }
+
+  .yours-label {
+    text-align: left;
+    transform: translate(40px, -50%);
+  }
+
+  .yours-label b {
+    color: var(--cyan-hi);
+  }
+
+  .listener-label {
+    transform: translate(-100%, -50%) translateX(-28px);
+    text-align: right;
+  }
+
+  .fed-chip,
+  .fed-grant {
+    position: absolute;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .fed-chip {
+    display: grid;
+    transform: translate(-30%, -150%);
+  }
+
+  .fed-chip span {
+    grid-area: 1 / 1;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--bg);
+    transition:
+      opacity 0.35s var(--ease-snap),
+      transform 0.5s var(--spring-snappy);
+  }
+
+  .fed-chip .pending {
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    color: var(--amber);
+  }
+
+  .fed-chip .approved {
+    border: 1px solid rgba(103, 232, 249, 0.5);
+    color: var(--cyan-hi);
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  .fed:is([data-phase="approved"], [data-phase="grant"], [data-phase="relay"], [data-phase="done"]) .fed-chip .pending {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  .fed:is([data-phase="approved"], [data-phase="grant"], [data-phase="relay"], [data-phase="done"]) .fed-chip .approved {
+    opacity: 1;
+    transform: none;
+  }
+
+  .fed-grant {
+    color: var(--fg-2);
+    transform: translate(-10%, 90%);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .fed:is([data-phase="grant"], [data-phase="relay"], [data-phase="done"]) .fed-grant {
+    opacity: 1;
+  }
+
+  .fed-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    margin: 30px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fed-steps li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding-top: 14px;
+    opacity: 0.4;
+    transition: opacity 0.45s var(--ease-snap);
+  }
+
+  .fed-steps li::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .fed-steps li::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: var(--cyan-hi);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.6s var(--ease-out);
+  }
+
+  .fed-steps li:global(.is-active),
+  .fed-steps li:global(.is-done) {
+    opacity: 1;
+  }
+
+  .fed-steps li:global(.is-active)::after,
+  .fed-steps li:global(.is-done)::after {
+    transform: scaleX(1);
+  }
+
+  .fed-steps p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 760px) {
+    .fed-steps {
+      grid-template-columns: 1fr 1fr;
+    }
+    .fed-label {
+      font-size: 9px;
+    }
+    .fed-label span {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fed-steps li {
+      opacity: 1;
+    }
+  }
+</style>

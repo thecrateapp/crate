@@ -1,0 +1,148 @@
+---
+interface Props {
+  items: { id: string; index: number; title: string }[];
+}
+
+const { items } = Astro.props;
+const number = (index: number) => String(index).padStart(2, "0");
+---
+
+<nav class="toc-rail" data-toc-rail aria-hidden="true">
+  <ol>
+    {
+      items.map((item) => (
+        <li>
+          <a href={`#${item.id}`} tabindex="-1">
+            <b>{number(item.index)}</b>
+            <span>{item.title}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+<script>
+  import { createScrollspy } from "../scripts/toc/scrollspy";
+
+  let disposers: (() => void)[] = [];
+
+  document.addEventListener("astro:page-load", () => {
+    disposers.forEach((dispose) => dispose());
+    const rail = document.querySelector<HTMLElement>("[data-toc-rail]");
+    disposers = rail ? [createScrollspy(rail)] : [];
+  });
+</script>
+
+<style>
+  .toc-rail {
+    position: fixed;
+    top: 50%;
+    left: clamp(16px, 2vw, 32px);
+    z-index: 20;
+    display: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-8px, -50%);
+    transition:
+      opacity 300ms ease,
+      transform 300ms ease,
+      visibility 0s linear 300ms;
+  }
+
+  .toc-rail[data-visible] {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
+    transition:
+      opacity 300ms ease,
+      transform 300ms ease;
+  }
+
+  .toc-rail ol {
+    display: grid;
+    gap: 2px;
+    margin: 0 0 0 -14px;
+    padding: 10px 14px;
+    list-style: none;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    transition:
+      background 200ms ease,
+      border-color 200ms ease;
+  }
+
+  .toc-rail a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    text-decoration: none;
+    transition: color 200ms ease;
+  }
+
+  .toc-rail b {
+    font-weight: 400;
+  }
+
+  .toc-rail b::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 1px;
+    margin-right: 8px;
+    vertical-align: middle;
+    background: currentColor;
+    transition: width 200ms ease;
+  }
+
+  .toc-rail span {
+    opacity: 0;
+    transition: opacity 200ms ease;
+    white-space: nowrap;
+  }
+
+  .toc-rail a:hover,
+  .toc-rail a[data-current] {
+    color: var(--fg);
+  }
+
+  .toc-rail a[data-current] b {
+    color: var(--cyan-hi);
+  }
+
+  .toc-rail a[data-current] b::before {
+    width: 22px;
+  }
+
+  .toc-rail:hover span {
+    opacity: 1;
+  }
+
+  .toc-rail:hover ol {
+    background: rgba(10, 10, 15, 0.82);
+    border-color: var(--line);
+    backdrop-filter: blur(14px);
+  }
+
+  @media (min-width: 1280px) {
+    .toc-rail {
+      display: block;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toc-rail,
+    .toc-rail[data-visible],
+    .toc-rail a,
+    .toc-rail b::before,
+    .toc-rail span {
+      transition: none;
+    }
+  }
+</style>

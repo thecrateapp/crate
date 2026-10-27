@@ -1,0 +1,54 @@
+---
+import { t } from "../i18n";
+
+interface Props {
+  items: { id: string; index: number; title: string }[];
+  locale?: string;
+}
+
+const { items, locale = "en" } = Astro.props;
+const number = (index: number) => String(index).padStart(2, "0");
+---
+
+<nav class="toc" aria-label={t("page.chapters", locale)} data-toc data-enter style="--d:520ms">
+  <ol>
+    {
+      items.map((item) => (
+        <li>
+          <a class="u-link" href={`#${item.id}`}>
+            <b>{number(item.index)}</b> {item.title}
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+<style>
+  .toc ol {
+    display: grid;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toc a {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  @media (pointer: coarse) {
+    .toc ol {
+      row-gap: 30px;
+    }
+  }
+
+  .toc b {
+    margin-right: 6px;
+    font-weight: 400;
+    color: var(--cyan-hi);
+  }
+</style>

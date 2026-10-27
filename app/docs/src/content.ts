@@ -263,29 +263,76 @@ export interface DocEntry extends ManifestDoc {
   load: MarkdownLoader;
 }
 
+export interface DocMeta {
+  verified?: string;
+  audience: string[];
+}
+
 export interface LoadedDoc {
   markdown: string;
   headings: DocHeading[];
+  meta: DocMeta;
 }
 
-function stripFrontmatter(markdown: string): string {
-  if (!markdown.startsWith("---\n")) return markdown;
-  const end = markdown.indexOf("\n---\n", 4);
-  return end === -1 ? markdown : markdown.slice(end + 5).trimStart();
+export function splitFrontmatter(source: string): {
+  frontmatter: string;
+  markdown: string;
+} {
+  if (!source.startsWith("---\n")) return { frontmatter: "", markdown: source };
+  const end = source.indexOf("\n---\n", 4);
+  if (end === -1) return { frontmatter: "", markdown: source };
+  return {
+    frontmatter: source.slice(4, end),
+    markdown: source.slice(end + 5).trimStart(),
+  };
 }
 
-function extractHeadings(markdown: string): DocHeading[] {
+export function parseDocMeta(frontmatter: string): DocMeta {
+  const field = (name: string) =>
+    new RegExp(`^${name}:[ \\t]*(.*)$`, "m").exec(frontmatter)?.[1]?.trim();
+  const audience = field("audience") ?? "";
+  return {
+    verified: field("verified") || undefined,
+    audience: audience
+      .replace(/^\[|\]$/g, "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  };
+}
+
+export function headingText(raw: string): string {
+  return raw
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/\s+#+\s*$/, "")
+    .trim();
+}
+
+export function extractHeadings(markdown: string): DocHeading[] {
   const headings: DocHeading[] = [];
   const seen = new Map<string, number>();
+  let fence: string | null = null;
 
   for (const line of markdown.split("\n")) {
+    const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch?.[1]) {
+      const marker = fenceMatch[1];
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+
     const match = /^(#{2,4})\s+(.+)$/.exec(line.trim());
     if (!match) continue;
     const hashes = match[1];
     const rawText = match[2];
     if (!hashes || !rawText) continue;
 
-    const text = rawText.trim();
+    const text = headingText(rawText);
     const baseId = slugify(text);
     const duplicate = seen.get(baseId) ?? 0;
     seen.set(baseId, duplicate + 1);
@@ -368,6 +415,23 @@ export const sectionMeta: Record<
   },
 };
 
+export function filterDocs(query: string): Record<DocSection, DocEntry[]> {
+  const term = query.trim().toLowerCase();
+  if (!term) return docsBySection;
+
+  return sections.reduce(
+    (result, section) => {
+      result[section] = docsBySection[section].filter((doc) =>
+        `${doc.title} ${doc.summary} ${doc.keywords.join(" ")}`
+          .toLowerCase()
+          .includes(term),
+      );
+      return result;
+    },
+    {} as Record<DocSection, DocEntry[]>,
+  );
+}
+
 const loadedDocs = new Map<string, Promise<LoadedDoc>>();
 
 export function loadDoc(doc: DocEntry): Promise<LoadedDoc> {
@@ -375,8 +439,12 @@ export function loadDoc(doc: DocEntry): Promise<LoadedDoc> {
   if (existing) return existing;
 
   const pending = doc.load().then((source) => {
-    const markdown = stripFrontmatter(source);
-    return { markdown, headings: extractHeadings(markdown) };
+    const { frontmatter, markdown } = splitFrontmatter(source);
+    return {
+      markdown,
+      headings: extractHeadings(markdown),
+      meta: parseDocMeta(frontmatter),
+    };
   });
   loadedDocs.set(doc.id, pending);
   return pending;

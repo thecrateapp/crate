@@ -19,6 +19,7 @@
     "build:http-resource-probe": "vite build --config scripts/http-resource-probe/vite.config.ts",
     "test:glibc": "node --test scripts/verify-linux-glibc.node-test.mjs",
     "test:version": "node --test scripts/desktop-version.node-test.mjs",
+    "test:stable-names": "node --test scripts/stable-artifact-names.node-test.mjs",
     "test": "vitest run --config vite.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

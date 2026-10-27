@@ -1,0 +1,109 @@
+---
+import type { Story } from "../../content/architecture/en";
+import { chapterId } from "../../lib/chapters";
+
+interface Props {
+  index: number;
+  total: number;
+  story: Story;
+}
+
+const { index, total, story } = Astro.props;
+const id = `story-${chapterId(index, story.title)}`;
+---
+
+<article class="story" id={id} aria-labelledby={`${id}-title`} data-reveal>
+  <header>
+    <p class="eyebrow" data-enter><b>{String(index).padStart(2, "0")}</b> / {String(total).padStart(2, "0")}</p>
+    <h3 id={`${id}-title`} data-split style="--d:60ms;--step:28ms">{story.title}</h3>
+  </header>
+  <div class="story-body" data-enter style="--d:160ms">
+    {story.body.map((paragraph) => <p>{paragraph}</p>)}
+    <ul class="facts">
+      {story.facts.map((fact) => <li>{fact}</li>)}
+    </ul>
+  </div>
+  {
+    Astro.slots.has("visual") && (
+      <div class="story-visual">
+        <slot name="visual" />
+      </div>
+    )
+  }
+</article>
+
+<style>
+  .story {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 20px clamp(24px, 5vw, 80px);
+    padding: 7vh 0;
+    border-top: 1px solid var(--line);
+  }
+
+  header {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+  }
+
+  h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.7rem, 2.7vw, 2.6rem);
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  .story-body {
+    display: grid;
+    gap: 1.1em;
+    align-content: start;
+  }
+
+  .story-body p {
+    margin: 0;
+    max-width: 62ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.75;
+    color: var(--fg-2);
+  }
+
+  .story-body p:first-child {
+    color: var(--fg);
+  }
+
+  .story-visual {
+    grid-column: 1 / -1;
+    margin-top: 4vh;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0.4em 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .facts li {
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--cyan-hi);
+  }
+
+  @media (max-width: 760px) {
+    .story {
+      grid-template-columns: 1fr;
+      padding: 5vh 0;
+    }
+  }
+</style>

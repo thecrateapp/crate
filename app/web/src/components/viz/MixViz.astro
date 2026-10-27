@@ -1,0 +1,352 @@
+---
+import { MIX } from "../../content/listen/viz";
+import type { Step } from "../../lib/chapters";
+
+interface Props {
+  stages: Step[];
+}
+
+const { stages } = Astro.props;
+const seconds = ((MIX.beats * 60) / MIX.a.bpm).toFixed(1);
+const restore = MIX.tempoRestoreMs / 1000;
+---
+
+<figure
+  class="mix"
+  data-viz="mix"
+  aria-label={`Smart Mix beatmatch: track B pre-rolls muted at ${MIX.a.bpm} BPM and locks to the beat grid of track A, blends over ${MIX.beats} beats with equal-power curves, swaps the lows at the midpoint, then eases back to its own ${MIX.b.bpm} BPM over ${restore} seconds.`}
+>
+  <div class="mix-scroll">
+    <div class="mix-pin" data-reveal>
+      <header class="viz-bar" data-enter>
+        <p class="viz-label"><b>Smart Mix</b> Beatmatch + Bass swap · Android</p>
+        <p class="viz-label">
+          {MIX.a.bpm} → {MIX.b.bpm} BPM · {MIX.a.key} → {MIX.b.key} · {MIX.beats} beats · {seconds} s
+        </p>
+      </header>
+      <div class="mix-stage">
+        <svg class="mix-svg" aria-hidden="true"></svg>
+      </div>
+      <div class="mix-readout viz-label">
+        <p>Phase <output data-phase>cued</output></p>
+        <p>B tempo <output data-tempo>{MIX.b.bpm.toFixed(1)}</output></p>
+        <div class="meter">
+          <span>Gain A</span><i><b data-gain-bar="a"></b></i><output data-gain="a">1.00</output>
+        </div>
+        <div class="meter">
+          <span>Gain B</span><i><b data-gain-bar="b"></b></i><output data-gain="b">0.00</output>
+        </div>
+        <p>Lows <output data-lows>A</output></p>
+      </div>
+      <ol class="mix-stages">
+        {
+          stages.map((stage, index) => (
+            <li data-stage={index}>
+              <p class="viz-label">
+                <b>{String(index + 1).padStart(2, "0")}</b> {stage.title}
+              </p>
+              <p class="body">{stage.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .mix {
+    margin: 0;
+  }
+
+  .mix-pin {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+
+  :global(:where(html.js)) .mix-scroll {
+    height: 290vh;
+  }
+
+  :global(:where(html.js)) .mix-pin {
+    position: sticky;
+    top: max(9vh, 76px);
+  }
+
+  .mix-stage {
+    position: relative;
+    height: clamp(380px, 52vh, 468px);
+    margin-top: 22px;
+  }
+
+  .mix-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .mix-svg :global(.zone-pre) {
+    fill: rgba(241, 245, 249, 0.025);
+  }
+
+  .mix-svg :global(.zone-mix) {
+    fill: rgba(6, 182, 212, 0.05);
+  }
+
+  .mix-svg :global(.bracket) {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.3);
+    stroke-width: 1;
+  }
+
+  .mix-svg :global(.base) {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .mix-svg :global(.ref) {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+  }
+
+  .mix-svg :global(.wave.dim) {
+    fill: rgba(241, 245, 249, 0.1);
+  }
+
+  .mix-svg :global(.wave.lit.a) {
+    fill: rgba(241, 245, 249, 0.82);
+  }
+
+  .mix-svg :global(.wave.lit.b) {
+    fill: var(--cyan-hi);
+  }
+
+  .mix-svg :global(.wave.muted) {
+    fill: none;
+    stroke: rgba(103, 232, 249, 0.28);
+    stroke-width: 0.75;
+  }
+
+  .mix-svg :global(.tick) {
+    stroke: rgba(241, 245, 249, 0.28);
+    stroke-width: 1.25;
+  }
+
+  .mix-svg :global(.tick.b) {
+    stroke: rgba(103, 232, 249, 0.36);
+  }
+
+  .mix-svg :global(.tick.hit) {
+    stroke: var(--cyan-hi);
+  }
+
+  .mix-svg :global(.tick.down) {
+    stroke-width: 2;
+  }
+
+  .mix-svg :global(.line) {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
+  .mix-svg :global(.line.dim) {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1.25;
+    stroke-dasharray: 3 4;
+  }
+
+  .mix-svg :global(.line.a) {
+    stroke: var(--fg);
+  }
+
+  .mix-svg :global(.line.b) {
+    stroke: var(--cyan-hi);
+  }
+
+  .mix-svg :global(.area.a) {
+    fill: rgba(241, 245, 249, 0.08);
+  }
+
+  .mix-svg :global(.area.b) {
+    fill: rgba(103, 232, 249, 0.14);
+  }
+
+  .mix-svg :global(.mark) {
+    fill: var(--bg);
+    stroke: var(--fg);
+    stroke-width: 1.25;
+  }
+
+  .mix-svg :global(.text) {
+    fill: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+  }
+
+  .mix-svg :global(.text.hi) {
+    fill: var(--cyan-hi);
+  }
+
+  .mix-svg :global(.head) {
+    stroke: var(--fg);
+    stroke-width: 1;
+  }
+
+  .mix-svg :global(.dot) {
+    fill: var(--bg);
+    stroke-width: 2;
+  }
+
+  .mix-svg :global(.dot.a) {
+    stroke: var(--fg);
+  }
+
+  .mix-svg :global(.dot.b) {
+    stroke: var(--cyan-hi);
+  }
+
+  .mix-readout {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 14px 36px;
+    align-items: center;
+    margin-top: 18px;
+  }
+
+  .mix-readout p {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .mix-readout output {
+    margin-left: 10px;
+    color: var(--fg);
+  }
+
+  .meter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 4ch;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .meter i {
+    height: 2px;
+    background: var(--line);
+  }
+
+  .meter b {
+    display: block;
+    height: 100%;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(0);
+  }
+
+  .meter output {
+    margin: 0;
+    text-align: right;
+  }
+
+  .mix-stages {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0 clamp(18px, 2.6vw, 36px);
+    margin: 22px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mix-stages li {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    transition:
+      opacity 0.35s var(--ease-snap),
+      border-color 0.35s var(--ease-snap);
+  }
+
+  .mix:global(.is-running) .mix-stages li {
+    opacity: 0.38;
+  }
+
+  .mix:global(.is-running) .mix-stages li:global(.is-on) {
+    opacity: 1;
+    border-color: var(--cyan-hi);
+  }
+
+  .mix-stages .body {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 1000px) {
+    .mix-readout {
+      grid-template-columns: auto auto auto;
+    }
+    .meter {
+      grid-column: span 3;
+    }
+  }
+
+  @media (max-width: 760px) {
+    :global(:where(html.js)) .mix-pin {
+      top: 64px;
+    }
+    .mix-stage {
+      height: 400px;
+      margin-top: 16px;
+    }
+    .mix-svg :global(.text) {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+    }
+    .mix-readout {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 20px;
+    }
+    .meter {
+      grid-column: span 2;
+    }
+    .mix-stages {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .mix:global(.is-running) .mix-stages li {
+      display: none;
+    }
+    .mix:global(.is-running) .mix-stages li:global(.is-on) {
+      display: grid;
+    }
+  }
+
+  @media (max-height: 820px) and (min-width: 761px) {
+    .mix-stage {
+      height: 380px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .mix-scroll {
+      height: auto;
+    }
+    :global(:where(html.js)) .mix-pin {
+      position: static;
+    }
+  }
+</style>

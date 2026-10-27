@@ -1,0 +1,229 @@
+---
+import { STATS } from "../../content/listen/viz";
+import { generateHeatmap, NIGHT_HOURS, normalise, summarise } from "../../scripts/viz/heatmap-math";
+
+const heatmap = summarise(normalise(generateHeatmap().cells, STATS.hours * 60));
+const max = Math.max(...heatmap.cells.flat());
+const days = ["M", "T", "W", "T", "F", "S", "S"];
+const longDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const peak = heatmap.peak!;
+const peakLabel = `${longDays[peak.weekday]} ${String(peak.hour).padStart(2, "0")}:00`;
+const nightPercent = Math.round(heatmap.night_share * 100);
+const readout = `Peak ${peakLabel} · ${max.toLocaleString("en-US")} min`;
+---
+
+<figure class="heat" data-viz="heatmap" data-reveal aria-label={`Listening heatmap, seven days by twenty-four hours. Busiest hour: ${peakLabel}.`}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Stats</b> {STATS.period.toLowerCase()} · synthetic listener</p>
+    <p class="viz-label">when you listen</p>
+  </header>
+
+  <dl class="heat-counters">
+    <div data-enter style="--d:80ms">
+      <dt class="viz-label">Hours listened</dt>
+      <dd data-count data-value={STATS.hours}>{STATS.hours.toLocaleString("en-US")}</dd>
+    </div>
+    <div data-enter style="--d:160ms">
+      <dt class="viz-label">Artists</dt>
+      <dd data-count data-value={STATS.artists}>{STATS.artists}</dd>
+    </div>
+    <div data-enter style="--d:240ms">
+      <dt class="viz-label">Top genre</dt>
+      <dd class="genre" data-scramble={STATS.topGenre}>{STATS.topGenre}</dd>
+    </div>
+  </dl>
+
+  <div class="heat-board" aria-hidden="true">
+    <div class="heat-night" style={`--from:${NIGHT_HOURS[2]};--to:${NIGHT_HOURS[NIGHT_HOURS.length - 1]! + 1}`}>
+      <span class="viz-label">night 22–05 · {nightPercent}%</span>
+    </div>
+    <div class="heat-night late" style="--from:22;--to:24"></div>
+    <div class="heat-grid">
+      {
+        heatmap.cells.map((row, day) => (
+          <>
+            <span class="heat-day">{days[day]}</span>
+            {row.map((minutes, hour) => (
+              <i
+                class:list={{ peak: day === peak.weekday && hour === peak.hour }}
+                data-m={minutes}
+                data-d={day}
+                data-h={hour}
+                style={`--l:${(minutes / max).toFixed(3)};--c:${hour};--r:${day}`}
+              />
+            ))}
+          </>
+        ))
+      }
+    </div>
+    <div class="heat-hours">
+      <span></span>
+      {Array.from({ length: 24 }, (_, hour) => <span>{hour % 6 === 0 ? String(hour).padStart(2, "0") : ""}</span>)}
+    </div>
+  </div>
+  <p class="viz-label heat-readout" data-heat-readout>{readout}</p>
+</figure>
+
+<style>
+  .heat {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .heat-counters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px clamp(24px, 4vw, 64px);
+    margin: 7vh 0 8vh;
+  }
+
+  .heat-counters div {
+    display: grid;
+    gap: 14px;
+  }
+
+  .heat-counters dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(3.2rem, 8.4vw, 8.4rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .heat-counters dd.genre {
+    font-size: clamp(2.2rem, 5.4vw, 5.4rem);
+    color: var(--cyan-hi);
+    line-height: 1.3;
+    letter-spacing: -0.035em;
+    white-space: nowrap;
+  }
+
+  .heat-board {
+    position: relative;
+    --label: 28px;
+  }
+
+  .heat-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--label) repeat(24, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .heat-day {
+    align-self: center;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-3);
+  }
+
+  .heat-grid i {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: rgba(103, 232, 249, calc(0.05 + var(--l) * 0.95));
+    box-shadow: 0 0 calc(var(--l) * var(--l) * 18px) rgba(6, 182, 212, calc(var(--l) * 0.5));
+    transition: transform 0.4s var(--spring-snappy);
+  }
+
+  :global(:where(html.js)) .heat-grid i {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+
+  :global(:where(html.js)) .is-in .heat-grid i {
+    animation: heat-in 0.7s var(--spring-snappy) both;
+    animation-delay: calc(200ms + (var(--c) + var(--r) * 2.5) * 22ms);
+  }
+
+  .heat-grid i:hover {
+    transform: scale(1.35);
+    position: relative;
+    z-index: 1;
+  }
+
+  .heat-grid i.peak {
+    outline: 1px solid var(--fg);
+    outline-offset: 2px;
+  }
+
+  @keyframes heat-in {
+    from {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .heat-night {
+    position: absolute;
+    top: -34px;
+    bottom: -8px;
+    left: calc(var(--label) + 4px + (100% - var(--label) - 4px) * var(--from) / 24);
+    width: calc((100% - var(--label) - 4px) * (var(--to) - var(--from)) / 24);
+    border-top: 1px solid rgba(241, 245, 249, 0.18);
+    background: rgba(241, 245, 249, 0.025);
+  }
+
+  .heat-night span {
+    position: absolute;
+    top: -24px;
+    left: 0;
+    white-space: nowrap;
+  }
+
+  .heat-hours {
+    display: grid;
+    grid-template-columns: var(--label) repeat(24, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-3);
+  }
+
+  .heat-readout {
+    margin-top: 22px;
+    min-height: 1.4em;
+    color: var(--fg-2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .heat-grid i,
+    :global(:where(html.js)) .is-in .heat-grid i {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .heat-counters {
+      grid-template-columns: 1fr 1fr;
+      margin: 5vh 0 7vh;
+    }
+    .heat-counters div:last-child {
+      grid-column: 1 / -1;
+    }
+    .heat-board {
+      --label: 14px;
+    }
+    .heat-grid,
+    .heat-hours {
+      gap: 2px;
+    }
+    .heat-grid i {
+      border-radius: 1.5px;
+    }
+    .heat-day,
+    .heat-hours {
+      font-size: 9px;
+    }
+  }
+</style>

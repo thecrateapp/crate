@@ -1,0 +1,191 @@
+---
+import { CACHE_KEYS, DURABLE_WRITES, REDIS } from "../../content/architecture/viz";
+
+const cells = Array.from({ length: 40 }, (_, index) => index);
+---
+
+<figure class="redis" data-viz="redis" data-reveal aria-label="Two Redis instances: a cache that evicts keys under memory pressure, and a durable instance that appends every write to disk and never evicts">
+  <div class="pane" data-pane="cache">
+    <p class="viz-label"><b>{REDIS.cache.service}</b> cache</p>
+    <p class="flags">--maxmemory {REDIS.cache.maxmemory} --maxmemory-policy {REDIS.cache.policy}</p>
+    <ol class="cells" aria-hidden="true">
+      {cells.map((index) => <li class:list={{ on: index < 31, ttl: index % 3 !== 1 }} />)}
+    </ol>
+    <p class="meter"><i><b data-cache-fill style="--v:0.78"></b></i><span data-cache-text>78% of {REDIS.cache.maxmemory}</span></p>
+    <p class="legend"><span class="k ttl"></span>key with a TTL, can be evicted <span class="k"></span>no TTL, kept</p>
+    <ul class="log" data-cache-log>
+      <li>evict {CACHE_KEYS[0]}</li>
+      <li>set {CACHE_KEYS[1]} EX 300</li>
+      <li>evict {CACHE_KEYS[2]}</li>
+    </ul>
+  </div>
+  <div class="pane" data-pane="durable">
+    <p class="viz-label"><b>{REDIS.durable.service}</b> broker · streams · leases</p>
+    <p class="flags">--appendonly yes --appendfsync {REDIS.durable.fsync} --maxmemory-policy {REDIS.durable.policy}</p>
+    <ol class="aof" data-aof aria-hidden="true">
+      {DURABLE_WRITES.map((write) => <li>{write}</li>)}
+    </ol>
+    <p class="meter"><i><b class="sync" data-fsync></b></i><span>fsync every second · never evicts</span></p>
+  </div>
+  <script type="application/json" data-redis-data set:html={JSON.stringify({ keys: CACHE_KEYS, writes: DURABLE_WRITES })} />
+</figure>
+
+<style>
+  .redis {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .pane {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    min-width: 0;
+    padding: 22px clamp(16px, 2.5vw, 32px) 8px 0;
+  }
+
+  .pane + .pane {
+    padding-left: clamp(16px, 2.5vw, 32px);
+    border-left: 1px solid var(--line);
+  }
+
+  .flags {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--fg-2);
+  }
+
+  .cells {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 4px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cells li {
+    aspect-ratio: 1.6;
+    border-radius: 2px;
+    background: rgba(241, 245, 249, 0.05);
+    transition:
+      background-color 0.35s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .cells li.on,
+  .cells li:global(.on) {
+    background: rgba(103, 232, 249, 0.55);
+  }
+
+  .cells li.on:not(.ttl),
+  .cells li:global(.on):not(.ttl) {
+    background: rgba(241, 245, 249, 0.45);
+  }
+
+  .cells li:global(.out) {
+    background: rgba(251, 191, 36, 0.7);
+    transform: scale(0.6);
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+
+  .legend .k {
+    width: 10px;
+    height: 6px;
+    border-radius: 2px;
+    background: rgba(241, 245, 249, 0.45);
+  }
+
+  .legend .k.ttl {
+    background: rgba(103, 232, 249, 0.55);
+  }
+
+  .legend .k:not(.ttl) {
+    margin-left: 10px;
+  }
+
+  .meter {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-3);
+  }
+
+  .meter i {
+    position: relative;
+    height: 3px;
+    overflow: hidden;
+    background: var(--line);
+  }
+
+  .meter b {
+    position: absolute;
+    inset: 0;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(var(--v, 1));
+  }
+
+  .meter b.sync {
+    background: rgba(103, 232, 249, 0.6);
+  }
+
+  .log,
+  .aof {
+    display: grid;
+    gap: 4px;
+    min-height: 118px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-3);
+  }
+
+  .log li,
+  .aof li {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .log li:first-child,
+  .aof li:last-child {
+    color: var(--fg);
+  }
+
+  .log li:global(.evict) {
+    color: var(--amber);
+  }
+
+  @media (max-width: 760px) {
+    .redis {
+      grid-template-columns: 1fr;
+    }
+    .pane + .pane {
+      padding-left: 0;
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+  }
+</style>

@@ -1,0 +1,200 @@
+---
+import { t } from "../../i18n";
+import type { Step } from "../../lib/chapters";
+import DeepDive from "./DeepDive.astro";
+
+interface Props {
+  steps: Step[];
+  locale?: string;
+}
+
+const { steps, locale = "en" } = Astro.props;
+const weights = [
+  ["sound", 0.34],
+  ["artists", 0.22],
+  ["genre", 0.16],
+  ["bpm", 0.09],
+  ["energy", 0.08],
+  ["camelot", 0.05],
+  ["era", 0.03],
+] as const;
+---
+
+<DeepDive name="radio" steps={steps} seedLabel={t("radio.seed", locale).toUpperCase()}>
+  <p class="mono-panel radio-seed" data-fade>
+    <b>01</b> / {t("radio.seedReadout", locale)}
+  </p>
+  <ol class="mono-panel radio-weights">
+    <li class="title" data-fade>{t("radio.weights", locale)}</li>
+    {
+      weights.map(([id, value]) => (
+        <li data-fade style={`--w:${value / 0.34}`}>
+          <span>{t(`radio.weight.${id}`, locale)}</span>
+          <i />
+          <b>{value.toFixed(2)}</b>
+        </li>
+      ))
+    }
+  </ol>
+  <ol class="mono-panel radio-queue">
+    <li class="title radio-queue-title" data-fade>{t("radio.queue", locale)}</li>
+    {
+      Array.from({ length: 5 }, (_, index) => (
+        <li data-fade>
+          <b>{String(index + 1).padStart(2, "0")}</b>
+          <span class="score" />
+          <span class="bpm" />
+          <span class="key" />
+        </li>
+      ))
+    }
+  </ol>
+  <p class="mono-panel radio-like" data-fade>{t("radio.like", locale)}</p>
+</DeepDive>
+
+<style>
+  .radio-seed {
+    top: 96px;
+    left: 4%;
+  }
+
+  .radio-weights {
+    top: 96px;
+    right: 4%;
+    width: 230px;
+    display: grid;
+    gap: 7px;
+  }
+
+  .radio-weights li:not(.title) {
+    display: grid;
+    grid-template-columns: 70px 1fr 34px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .radio-weights i {
+    position: relative;
+    height: 2px;
+    background: var(--line);
+  }
+
+  .radio-weights i::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(calc(var(--w) * var(--fill, 1)));
+  }
+
+  .title {
+    color: var(--fg-3);
+    margin-bottom: 4px;
+  }
+
+  .radio-queue {
+    right: 4%;
+    bottom: 12%;
+    width: 230px;
+    display: grid;
+    gap: 7px;
+  }
+
+  .radio-queue li:not(.title) {
+    display: grid;
+    grid-template-columns: 24px 40px 1fr 30px;
+    gap: 10px;
+    transition: color 0.4s var(--ease-snap);
+  }
+
+  .radio-queue li.is-liked {
+    color: var(--fg);
+  }
+
+  .radio-queue li.is-liked .key {
+    color: var(--cyan-hi);
+  }
+
+  .radio-like {
+    left: 4%;
+    bottom: 12%;
+    color: var(--cyan-hi);
+  }
+
+  :global([data-dive="radio"] .link) {
+    stroke: var(--cyan-hi);
+    stroke-width: 0.75;
+    stroke-dasharray: 1;
+    opacity: 0;
+  }
+
+  :global([data-dive="radio"] .neighbour) {
+    fill: var(--cyan-hi);
+    opacity: 0;
+  }
+
+  :global([data-dive="radio"] .pick) {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.25;
+    opacity: 0;
+  }
+
+  :global([data-dive="radio"] .seed) {
+    fill: none;
+    stroke: var(--fg);
+    stroke-width: 1;
+    opacity: 0;
+  }
+
+  :global([data-dive="radio"] .pick-label),
+  :global([data-dive="radio"] .seed-label) {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    fill: var(--cyan-hi);
+    opacity: 0;
+  }
+
+  :global([data-dive="radio"] .seed-label) {
+    fill: var(--fg);
+  }
+
+  @media (max-width: 760px) {
+    .radio-seed {
+      top: 78px;
+      left: 0;
+    }
+    .radio-like {
+      top: 98px;
+      left: 0;
+      bottom: auto;
+      font-size: 9.5px;
+    }
+    .radio-weights,
+    .radio-queue {
+      top: auto;
+      bottom: 0;
+      gap: 3px;
+      font-size: 9px;
+    }
+    .radio-weights {
+      right: 0;
+      width: 158px;
+    }
+    .radio-weights li:not(.title) {
+      grid-template-columns: 52px 1fr 28px;
+      gap: 6px;
+    }
+    .radio-queue {
+      left: 0;
+      right: auto;
+      width: 168px;
+    }
+    .radio-queue li:not(.title) {
+      grid-template-columns: 18px 30px 1fr 24px;
+      gap: 6px;
+    }
+  }
+</style>

@@ -1,0 +1,103 @@
+---
+import type { ScaleFigure } from "../../content/architecture/en";
+import { formatCount } from "../../lib/counter";
+
+interface Props {
+  figures: ScaleFigure[];
+  note: string;
+}
+
+const { figures, note } = Astro.props;
+---
+
+<div class="scale" data-reveal>
+  <dl>
+    {
+      figures.map((figure, index) => (
+        <div class="figure" style={`--i:${index}`}>
+          <dt>{figure.label}</dt>
+          <dd>
+            {figure.approx && <span class="approx">~</span>}
+            <span data-count data-value={figure.value} data-compact={figure.approx ? "" : undefined}>
+              {formatCount(figure.value, figure.approx)}
+            </span>
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+  <p class="note">{note}</p>
+</div>
+
+<style>
+  dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 clamp(24px, 4vw, 56px);
+    margin: 0;
+  }
+
+  .figure {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+    padding: 28px 0 36px;
+    border-top: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .figure {
+    opacity: 0;
+  }
+
+  .is-in .figure {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  dt {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(3rem, 6.5vw, 6.5rem);
+    letter-spacing: -0.045em;
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .approx {
+    margin-right: 0.08em;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 0.4em;
+    vertical-align: 0.6em;
+    color: var(--cyan-hi);
+  }
+
+  .note {
+    margin: 2vh 0 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 760px) {
+    dl {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in .figure {
+      animation: fade-in 0.3s linear both;
+    }
+  }
+</style>

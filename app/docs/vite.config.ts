@@ -58,7 +58,7 @@ export default defineConfig({
     environment: "jsdom",
     server: {
       deps: {
-        inline: ["lucide-react", "react-markdown", "react-router"],
+        inline: ["react-markdown", "react-router"],
       },
     },
   },

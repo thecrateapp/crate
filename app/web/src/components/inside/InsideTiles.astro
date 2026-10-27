@@ -1,0 +1,796 @@
+---
+import { HEALTH_CHECKS } from "../../content/admin/viz";
+import { listen } from "../../content/listen/en";
+import { EQ_BANDS, EQ_CYCLE, EQ_GAIN_MAX, EQ_PRESETS, STATS } from "../../content/listen/viz";
+import { t } from "../../i18n";
+import { chapterId } from "../../lib/chapters";
+import { mulberry32 } from "../../scripts/field/sources";
+import { radioPicks } from "../../scripts/listen/scene";
+import { bandPoints, formatGain, smoothPath } from "../../scripts/viz/eq-math";
+import { generateHeatmap, normalise, summarise } from "../../scripts/viz/heatmap-math";
+import { nearestPoints } from "../../scripts/viz/inside-math";
+import { FIELD, HEAT, NEIGHBOURS, PICKS, radioSeeds, soundPoints } from "../../scripts/viz/inside-tiles";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const listenId = (title: string) => {
+  const index = listen.chapters.findIndex((chapter) => chapter.title === title);
+  return listen.chapters[index]?.id ?? chapterId(index + 1, title);
+};
+const f = (value: number) => value.toFixed(2);
+
+const eqFirst = EQ_CYCLE[0]!;
+const eqGains = EQ_PRESETS[eqFirst]!;
+const eqPath = smoothPath(bandPoints(eqGains, 0, 240, 0, 120, EQ_GAIN_MAX));
+const bandX = (index: number) => ((index + 0.5) / EQ_BANDS.length) * 100;
+
+const points = soundPoints();
+const seed = points[radioSeeds(points)[0]!]!;
+const near = nearestPoints(points, seed, NEIGHBOURS + 1).slice(1);
+const picks = radioPicks(PICKS, mulberry32(1));
+
+const heat = summarise(normalise(generateHeatmap().cells, STATS.hours * 60));
+const heatMax = Math.max(...heat.cells.flat());
+const days = ["M", "T", "W", "T", "F", "S", "S"];
+const peak = heat.peak!;
+
+const tiles = [
+  {
+    id: "eq",
+    href: `/listen#${listenId("Play")}`,
+    title: t("inside.eq", locale),
+    lead: t("inside.eq.lead", locale),
+    body: t("inside.eq.body", locale, { bands: String(EQ_BANDS.length), max: String(EQ_GAIN_MAX) }),
+  },
+  {
+    id: "radio",
+    href: `/listen#${listenId("Radio")}`,
+    title: t("inside.radio", locale),
+    lead: t("inside.radio.lead", locale),
+    body: t("inside.radio.body", locale),
+  },
+  {
+    id: "heatmap",
+    href: `/listen#${listenId("Yours")}`,
+    title: t("inside.heatmap", locale),
+    lead: t("inside.heatmap.lead", locale),
+    body: t("inside.heatmap.body", locale),
+  },
+  {
+    id: "health",
+    href: `/admin#${chapterId(1, "Health")}`,
+    title: t("inside.health", locale),
+    lead: t("inside.health.lead", locale),
+    body: t("inside.health.body", locale),
+  },
+];
+---
+
+<ul class="tiles" data-viz="inside">
+  {
+    tiles.map((tile, index) => (
+      <li style={`--i:${index}`} data-tile={tile.id}>
+        <a href={tile.href}>
+          <span class="viz-label">
+            <b>{String(index + 1).padStart(2, "0")}</b> {tile.title}
+          </span>
+          <span class="lead">{tile.lead}</span>
+          <span class="art" aria-hidden="true">
+            {tile.id === "eq" && (
+              <span class="eq">
+                <span class="eq-pill" data-eq-name>
+                  {eqFirst.replace(/_/g, " ")}
+                </span>
+                <span class="eq-gains">
+                  {eqGains.map((gain) => (
+                    <b data-eq-gain>{formatGain(gain)}</b>
+                  ))}
+                </span>
+                <span class="eq-plot">
+                  <svg viewBox="0 0 240 120" preserveAspectRatio="none">
+                    <line class="zero" x1="0" x2="240" y1="60" y2="60" />
+                    {EQ_BANDS.map((_, i) => (
+                      <line class="track" x1={bandX(i) * 2.4} x2={bandX(i) * 2.4} y1="0" y2="120" />
+                    ))}
+                    <path class="glow" d={eqPath} data-eq-path />
+                    <path class="curve" d={eqPath} data-eq-path />
+                  </svg>
+                  {eqGains.map((gain, i) => (
+                    <span class="band" style={`left:${f(bandX(i))}%;transform:translateY(${f((-gain / EQ_GAIN_MAX) * 50)}%)`} data-eq-band>
+                      <i />
+                    </span>
+                  ))}
+                </span>
+                <span class="eq-freqs">
+                  {EQ_BANDS.map((band) => (
+                    <span>{band}</span>
+                  ))}
+                </span>
+              </span>
+            )}
+            {tile.id === "radio" && (
+              <span class="radio">
+                <svg class="field" viewBox={`0 0 ${FIELD.width} ${FIELD.height}`}>
+                  <g class="dots">
+                    {points.map((point, i) => (
+                      <circle cx={f(point.x)} cy={f(point.y)} r="1.7" data-dot={i} class:list={{ near: near.includes(i) }} />
+                    ))}
+                  </g>
+                  <g class="links">
+                    {near.map((i, n) => (
+                      <line
+                        x1={f(seed.x)}
+                        y1={f(seed.y)}
+                        x2={f(points[i]!.x)}
+                        y2={f(points[i]!.y)}
+                        pathLength="1"
+                        style={`--n:${n}`}
+                        data-link
+                      />
+                    ))}
+                  </g>
+                  <g class="target" style={`transform:translate(${f(seed.x)}px, ${f(seed.y)}px)`} data-target>
+                    <circle class="orbit" r="22" />
+                    <circle class="orbit" r="40" />
+                    <circle class="ring" r="5" />
+                    <circle class="core" r="1.6" />
+                  </g>
+                </svg>
+                <span class="up-next">
+                  <span class="up-head">{t("inside.radio.next", locale)}</span>
+                  {picks.map((pick, i) => (
+                    <span class="pick" style={`--n:${i}`} data-pick>
+                      <b>{String(i + 1).padStart(2, "0")}</b>
+                      <i class="bar"><i style={`transform:scaleX(${pick.score})`} data-pick-bar /></i>
+                      <span data-pick-score>{pick.score.toFixed(2)}</span>
+                      <span class="meta" data-pick-meta>
+                        {pick.bpm} BPM · {pick.key}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </span>
+            )}
+            {tile.id === "heatmap" && (
+              <span class="heat">
+                <span class="days">
+                  {days.map((day) => (
+                    <span>{day}</span>
+                  ))}
+                </span>
+                <svg class="cells" viewBox={`0 0 ${HEAT.width} ${HEAT.height}`}>
+                  {heat.cells.map((row, weekday) =>
+                    row.map((minutes, hour) => (
+                      <rect
+                        x={hour * HEAT.pitch}
+                        y={weekday * HEAT.row}
+                        width={HEAT.cell}
+                        height={HEAT.tall}
+                        rx="1.5"
+                        style={`fill-opacity:${(0.05 + (minutes / heatMax) * 0.85).toFixed(3)}`}
+                        class:list={{ peak: weekday === peak.weekday && hour === peak.hour }}
+                      />
+                    )),
+                  )}
+                  <g class="sweep" data-sweep>
+                    <rect x="-1" y="-3" width={HEAT.pitch} height={HEAT.height + 6} />
+                    <line x1="-1" x2="-1" y1="-3" y2={HEAT.height + 3} />
+                  </g>
+                </svg>
+                <span class="hours">
+                  {[0, 6, 12, 18].map((hour) => (
+                    <span style={`--h:${hour}`}>{String(hour).padStart(2, "0")}</span>
+                  ))}
+                </span>
+              </span>
+            )}
+            {tile.id === "health" && (
+              <span class="scan">
+                <span class="meter">
+                  {HEALTH_CHECKS.map((check) => (
+                    <i class:list={{ confirm: check.confirm }} data-meter />
+                  ))}
+                </span>
+                <span class="scan-window">
+                  <span class="scan-rows" data-scan-rows>
+                    {HEALTH_CHECKS.map((check, i) => (
+                      <span class="row" data-row={i}>
+                        <b>{String(i + 1).padStart(2, "0")}</b>
+                        <span class="name">{check.label}</span>
+                        <em class:list={["chip", { confirm: check.confirm }]}>
+                          {check.confirm ? t("inside.health.confirm", locale) : t("inside.health.auto", locale)}
+                        </em>
+                      </span>
+                    ))}
+                  </span>
+                </span>
+              </span>
+            )}
+          </span>
+          <span class="tile-body">
+            {tile.body} <span aria-hidden="true">&rarr;</span>
+          </span>
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tiles > li {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+  }
+
+  .tiles > li + li {
+    border-left: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .tiles > li {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) :global(.is-in) .tiles > li {
+    opacity: 1;
+    animation: enter-up 0.7s var(--spring-snappy) backwards;
+    animation-delay: calc(160ms + var(--i) * 90ms);
+  }
+
+  .tiles a {
+    --pad: clamp(16px, 1.8vw, 26px);
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    gap: 16px;
+    padding: 24px var(--pad) 26px;
+    color: var(--fg);
+    text-decoration: none;
+    transition: background-color 0.4s var(--ease-snap);
+  }
+
+  .tiles > li:first-child a {
+    padding-left: 0;
+  }
+
+  .tiles > li:last-child a {
+    padding-right: 0;
+  }
+
+  .tiles > li:first-child .art {
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .tiles > li:last-child .art {
+    margin-right: 0;
+    padding-right: 0;
+  }
+
+  .tiles a:hover {
+    background: rgba(6, 182, 212, 0.035);
+  }
+
+  .tiles a:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: -2px;
+  }
+
+  .lead {
+    max-width: 16ch;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.4rem, 1.85vw, 1.8rem);
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  .art {
+    position: relative;
+    display: block;
+    min-height: 196px;
+    margin: 4px calc(-1 * var(--pad)) 0;
+    padding: 14px var(--pad);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background:
+      linear-gradient(90deg, rgba(241, 245, 249, 0.03) 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(rgba(241, 245, 249, 0.03) 1px, transparent 1px) 0 0 / 24px 24px;
+  }
+
+  .tile-body {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--fg-2);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .tiles a:hover .tile-body {
+    color: var(--fg);
+  }
+
+  .eq {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+    height: 100%;
+    min-height: 168px;
+  }
+
+  .eq-pill {
+    position: absolute;
+    top: 12px;
+    right: var(--pad);
+    padding: 2px 10px;
+    border: 1px solid var(--cyan-hi);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: var(--cyan-hi);
+    background: rgba(10, 10, 15, 0.8);
+  }
+
+  .eq-gains,
+  .eq-freqs {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    font-family: var(--mono);
+    text-align: center;
+  }
+
+  .eq-gains {
+    padding-top: 26px;
+  }
+
+  .eq-gains b {
+    font-weight: 400;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
+
+  .eq-freqs span {
+    font-size: 8.5px;
+    color: var(--fg-3);
+  }
+
+  .eq-plot {
+    position: relative;
+    display: block;
+    min-height: 92px;
+  }
+
+  .eq-plot svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .zero {
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-dasharray: 2 4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .track {
+    stroke: rgba(241, 245, 249, 0.1);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .curve {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .glow {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 9;
+    stroke-opacity: 0.14;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    will-change: transform;
+  }
+
+  .band i {
+    position: absolute;
+    top: 50%;
+    left: -4px;
+    width: 8px;
+    height: 8px;
+    margin-top: -4px;
+    border: 1px solid var(--cyan-hi);
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow: 0 0 10px rgba(103, 232, 249, 0.55);
+  }
+
+  .radio {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    min-height: 168px;
+  }
+
+  .field {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .dots circle {
+    fill: rgba(241, 245, 249, 0.34);
+    transition:
+      fill 0.4s var(--ease-snap),
+      r 0.4s var(--spring-snappy);
+  }
+
+  .dots circle.near,
+  .dots circle:global(.is-near) {
+    fill: var(--cyan-hi);
+    r: 2.6;
+  }
+
+  .radio:global(.is-live) .dots circle.near:not(.is-near) {
+    fill: rgba(241, 245, 249, 0.34);
+    r: 1.7;
+  }
+
+  .links line {
+    stroke: rgba(103, 232, 249, 0.55);
+    stroke-width: 0.75;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+  }
+
+  .radio:global(.is-live) .links line {
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0s;
+  }
+
+  .radio:global(.is-linked) .links line {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.5s var(--ease-out);
+    transition-delay: calc(var(--n) * 90ms);
+  }
+
+  .target {
+    transition: transform 0.9s var(--ease-in-out);
+  }
+
+  .orbit {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.08);
+    stroke-width: 0.75;
+  }
+
+  .ring {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1;
+  }
+
+  .core {
+    fill: var(--cyan-hi);
+  }
+
+  .up-next {
+    display: grid;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .up-head {
+    padding-bottom: 6px;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .pick {
+    display: grid;
+    grid-template-columns: 2.4ch minmax(0, 1fr) 4ch auto;
+    gap: 10px;
+    align-items: center;
+    height: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--fg-2);
+    transition: opacity 0.35s var(--ease-snap);
+  }
+
+  .pick b {
+    font-weight: 400;
+    color: var(--fg-3);
+  }
+
+  .bar {
+    position: relative;
+    display: block;
+    height: 1px;
+    background: rgba(241, 245, 249, 0.12);
+  }
+
+  .bar i {
+    position: absolute;
+    inset: 0;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transition: transform 0.6s var(--ease-out);
+  }
+
+  .pick [data-pick-score] {
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .meta {
+    color: var(--fg-3);
+  }
+
+  .radio:global(.is-live) .pick {
+    opacity: 0.3;
+  }
+
+  .radio:global(.is-linked) .pick {
+    opacity: 1;
+    transition-delay: calc(300ms + var(--n) * 110ms);
+  }
+
+  .heat {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 8px 6px;
+    align-content: center;
+    min-height: 168px;
+  }
+
+  .days {
+    display: grid;
+    grid-template-rows: repeat(7, minmax(0, 1fr));
+    align-items: center;
+    padding-bottom: 1.5%;
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--fg-3);
+  }
+
+  .cells {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .cells rect {
+    fill: var(--cyan-hi);
+  }
+
+  .cells rect.peak {
+    stroke: var(--fg);
+    stroke-width: 1;
+  }
+
+  .sweep {
+    opacity: 0;
+    transition: transform 0.24s var(--ease-snap);
+  }
+
+  .sweep rect {
+    fill: rgba(103, 232, 249, 0.1);
+  }
+
+  .sweep line {
+    stroke: var(--cyan-hi);
+    stroke-width: 1;
+  }
+
+  .heat:global(.is-live) .sweep {
+    opacity: 1;
+  }
+
+  .hours {
+    position: relative;
+    grid-column: 2;
+    display: block;
+    height: 10px;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    color: var(--fg-3);
+  }
+
+  .hours span {
+    position: absolute;
+    left: calc(var(--h) / 24 * 100%);
+  }
+
+  .scan {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+    height: 100%;
+    min-height: 168px;
+  }
+
+  .meter {
+    display: grid;
+    grid-template-columns: repeat(17, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .meter i {
+    height: 2px;
+    border-radius: 1px;
+    background: var(--cyan-hi);
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .meter i.confirm {
+    background: var(--amber);
+  }
+
+  .scan:global(.is-live) .meter i {
+    background: rgba(241, 245, 249, 0.12);
+  }
+
+  .scan:global(.is-live) .meter i:global(.is-done) {
+    background: var(--cyan-hi);
+  }
+
+  .scan:global(.is-live) .meter i.confirm:global(.is-done) {
+    background: var(--amber);
+  }
+
+  .scan-window {
+    position: relative;
+    display: block;
+    height: 140px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 78%, transparent);
+  }
+
+  .scan-rows {
+    --row: 28px;
+    display: grid;
+    transform: translateY(calc(var(--off, 0) * -1 * var(--row)));
+    transition: transform 0.45s var(--ease-snap);
+  }
+
+  .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.2ch minmax(0, 1fr) auto;
+    gap: 2px 10px;
+    align-items: center;
+    height: var(--row);
+    border-bottom: 1px solid var(--line);
+    font-size: 11.5px;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .row b {
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 9px;
+    color: var(--fg-3);
+  }
+
+  .row .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg);
+  }
+
+  .chip {
+    padding: 0 6px;
+    border: 1px solid rgba(103, 232, 249, 0.5);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    line-height: 14px;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .chip.confirm {
+    border-color: rgba(251, 191, 36, 0.55);
+    color: var(--amber);
+  }
+
+  .scan:global(.is-live) .row {
+    opacity: 0.45;
+  }
+
+  .scan:global(.is-live) .row:global(.is-done) {
+    opacity: 1;
+  }
+
+  .scan:global(.is-live) .row:global(.is-now)::before {
+    content: "";
+    position: absolute;
+    inset: 0 calc(-1 * var(--pad)) 0 -10px;
+    border-left: 1px solid var(--cyan-hi);
+    background: linear-gradient(90deg, rgba(103, 232, 249, 0.1), transparent 70%);
+  }
+
+  @media (max-width: 1100px) {
+    .tiles {
+      grid-template-columns: 1fr 1fr;
+    }
+    .tiles > li:nth-child(3) {
+      border-left: 0;
+    }
+    .tiles > li:nth-child(n + 3) {
+      border-top: 1px solid var(--line);
+    }
+    .tiles > li:nth-child(2) a {
+      padding-right: 0;
+    }
+    .tiles > li:nth-child(2) .art {
+      margin-right: 0;
+      padding-right: 0;
+    }
+    .tiles > li:nth-child(3) a {
+      padding-left: 0;
+    }
+    .tiles > li:nth-child(3) .art {
+      margin-left: 0;
+      padding-left: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .tiles {
+      grid-template-columns: 1fr;
+    }
+    .tiles > li + li {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+    .tiles a {
+      --pad: 0px;
+      padding-top: 28px;
+      padding-bottom: 30px;
+    }
+    .art {
+      background-size: 20px 20px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) :global(.is-in) .tiles > li {
+      animation: none;
+    }
+  }
+</style>
