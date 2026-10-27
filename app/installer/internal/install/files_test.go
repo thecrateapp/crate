@@ -1,11 +1,13 @@
 package install
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/thecrateapp/crate/app/installer/internal/assets"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 )
 
@@ -42,6 +44,24 @@ func TestApplyWritesAWorkingInstallation(t *testing.T) {
 	acme, _ := os.Stat(filepath.Join(cfg.DataDir, "traefik", "acme.json"))
 	if acme.Mode().Perm() != 0o600 {
 		t.Errorf("acme.json mode %v, want 0600", acme.Mode().Perm())
+	}
+}
+
+func TestApplyWritesTheReadplaneProxyConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	if err := Apply(loadManifest(t), Defaults(dir), nil); err != nil {
+		t.Fatal(err)
+	}
+	want, err := assets.Read(assets.FederationRoutes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "deploy", "traefik", "federation-readplane.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("the installed readplane proxy configuration differs from the embedded asset")
 	}
 }
 

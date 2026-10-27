@@ -29,6 +29,11 @@ func TestBuildEnvGeneratesEverySecret(t *testing.T) {
 			t.Errorf("%s was not generated", g.Env)
 		}
 	}
+	for _, key := range []string{"REDIS_PASSWORD", "CRATE_READPLANE_SERVICE_TOKEN"} {
+		if value, ok := values.Get(key); !ok || value == "" {
+			t.Errorf("required readplane secret %s was not generated", key)
+		}
+	}
 	postgres, _ := values.Get("CRATE_POSTGRES_PASSWORD")
 	superuser, _ := values.Get("POSTGRES_SUPERUSER_PASSWORD")
 	if postgres != superuser {
