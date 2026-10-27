@@ -14,6 +14,7 @@ import { acquireBodyScrollLock } from "@crate/ui/lib/body-scroll-lock";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 
 import { isMotionBlocked } from "../../../lib/motion-availability";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export const DIGGING_CHAPTER_MS = 5200;
 
@@ -50,7 +51,7 @@ export function DiggingStory({
     const previousFocus = document.activeElement;
     const releaseScroll = acquireBodyScrollLock(document);
     const root = rootRef.current;
-    root?.focus();
+    focusWithModality(root);
     return () => {
       releaseScroll();
       if (
@@ -59,7 +60,7 @@ export function DiggingStory({
         (root?.contains(document.activeElement) ||
           document.activeElement === document.body)
       )
-        previousFocus.focus();
+        focusWithModality(previousFocus);
     };
   }, [count > 0]);
 

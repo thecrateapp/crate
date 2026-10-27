@@ -30,4 +30,27 @@ describe("input modality", () => {
     expect(modality.focusFollowsPointer()).toBe(true);
     expect(modality.touchWithoutKeyboard()).toBe(false);
   });
+
+  it("moves focus without a ring after touch and keeps the browser's choice for keyboard", async () => {
+    const modality = await freshModality(true);
+    const target = document.createElement("button");
+    document.body.append(target);
+    const focus = vi.spyOn(target, "focus");
+
+    modality.focusWithModality(target, { preventScroll: true });
+    expect(focus).toHaveBeenLastCalledWith({
+      preventScroll: true,
+      focusVisible: false,
+    });
+
+    fireEvent.keyDown(document, { key: "Tab" });
+    modality.focusWithModality(target, { preventScroll: true });
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    target.remove();
+  });
+
+  it("ignores a missing element", async () => {
+    const modality = await freshModality(true);
+    expect(() => modality.focusWithModality(null)).not.toThrow();
+  });
 });

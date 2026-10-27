@@ -1,5 +1,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { isMotionBlocked } from "@crate/ui/lib/motion-gate";
+import {
+  focusWithModality,
+  trackInputModality,
+} from "@crate/ui/lib/input-modality";
 
 /** Focus the new page identity once it has settled; leave tab/filter navigation alone. */
 export function RouteContent({
@@ -18,6 +22,7 @@ export function RouteContent({
       : pathname;
   const previous = useRef(pageIdentity);
   useEffect(() => {
+    trackInputModality();
     if (previous.current === pageIdentity) return;
     previous.current = pageIdentity;
     const node = root.current;
@@ -29,7 +34,7 @@ export function RouteContent({
       const heading = node.querySelector<HTMLHeadingElement>("h1");
       if (!heading) return;
       if (!heading.hasAttribute("tabindex")) heading.tabIndex = -1;
-      heading.focus({ preventScroll: true });
+      focusWithModality(heading, { preventScroll: true });
       observer.disconnect();
     };
     const observer = new MutationObserver(finish);

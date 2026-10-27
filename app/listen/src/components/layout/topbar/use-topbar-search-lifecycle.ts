@@ -9,6 +9,7 @@ import {
 import type { SetStateAction } from "react";
 
 import type { TopBarSearchItem } from "./topbar-search-model";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export function useTopBarSearchLifecycle({
   searchOpen,
@@ -164,7 +165,7 @@ export function useTopBarSearchLifecycle({
     setExpanded(false);
     setActiveIdx(-1);
     inputRef.current?.blur();
-    requestAnimationFrame(() => triggerRef.current?.focus());
+    requestAnimationFrame(() => focusWithModality(triggerRef.current));
   }, [
     setActiveIdx,
     setCompletedQuery,

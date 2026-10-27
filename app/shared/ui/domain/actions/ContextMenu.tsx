@@ -36,6 +36,7 @@ import type {
   ContextMenuProps,
   DesktopMenuEnvironment,
 } from "./types";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export type {
   ContextMenuEntry,
@@ -149,7 +150,7 @@ function getMenuItems(container: HTMLElement | null): HTMLElement[] {
 }
 
 function focusMenuItem(item: HTMLElement | undefined) {
-  item?.focus({ preventScroll: true });
+  focusWithModality(item, { preventScroll: true });
 }
 
 function focusFirstMenuItem(container: HTMLElement | null) {
@@ -221,7 +222,7 @@ function useMenuFocusManagement(
         previous !== document.body &&
         document.contains(previous)
       ) {
-        previous.focus({ preventScroll: true });
+        focusWithModality(previous, { preventScroll: true });
       }
     };
   }, [active, mode]);

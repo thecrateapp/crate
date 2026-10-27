@@ -18,6 +18,7 @@ import {
   type PlaybackTargetPanelProps,
 } from "./PlaybackTargetPanel";
 import { PlaybackTargetPopover } from "./PlaybackTargetPopover";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 type PickerProps = Omit<
   PlaybackTargetPanelProps,
@@ -54,7 +55,7 @@ export function PlaybackTargetPicker({
   const close = useCallback(() => {
     setOpen(false);
     onOverlayChange?.(false);
-    trigger.current?.focus({ preventScroll: true });
+    focusWithModality(trigger.current, { preventScroll: true });
   }, [onOverlayChange]);
   const updatePosition = useCallback(() => {
     const rect = trigger.current?.getBoundingClientRect();
@@ -96,13 +97,13 @@ export function PlaybackTargetPicker({
       (document.activeElement === popover.current ||
         !popover.current.contains(document.activeElement))
     ) {
-      (
+      focusWithModality(
         popover.current.querySelector<HTMLElement>(
           '[role="menuitemradio"][aria-checked="true"]:not(:disabled)',
         ) ??
-        popover.current.querySelector<HTMLElement>("button:not(:disabled)") ??
-        popover.current
-      ).focus();
+          popover.current.querySelector<HTMLElement>("button:not(:disabled)") ??
+          popover.current,
+      );
     }
   }, [
     open,

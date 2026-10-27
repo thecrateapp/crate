@@ -15,6 +15,7 @@ import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useTranslation } from "react-i18next";
 import { useVolumeInteraction } from "./use-volume-interaction";
 import { PlayerVolumeSlider } from "./PlayerVolumeSlider";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 interface PlayerVolumeControlProps {
   volume: number;
@@ -90,7 +91,7 @@ export function PlayerVolumeControl({
     closeOnPointerDownOutside: false,
     onDismiss: () => {
       closeVolume();
-      volumeButtonRef.current?.focus({ preventScroll: true });
+      focusWithModality(volumeButtonRef.current, { preventScroll: true });
     },
   });
 

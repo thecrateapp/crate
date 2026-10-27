@@ -60,4 +60,32 @@ describe("route identity focus", () => {
     await act(async () => {});
     expect(screen.getByRole("heading")).toHaveFocus();
   });
+
+  it("focuses the new heading without a ring on a touch screen", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(hover: none)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    const { rerender } = render(
+      <RouteContent pathname="/artists/a">
+        <h1>Artist</h1>
+      </RouteContent>,
+    );
+    rerender(
+      <RouteContent pathname="/artists/b">
+        <h1>Other artist</h1>
+      </RouteContent>,
+    );
+    act(() => vi.advanceTimersByTime(350));
+    expect(screen.getByRole("heading")).toHaveFocus();
+    expect(focus).toHaveBeenLastCalledWith({
+      preventScroll: true,
+      focusVisible: false,
+    });
+    focus.mockRestore();
+    vi.unstubAllGlobals();
+  });
 });

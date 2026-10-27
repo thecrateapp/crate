@@ -21,6 +21,7 @@ import {
   CRATE_ICON_SIZE,
   PanelLeftOpen,
 } from "@crate/ui/icons";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export interface ListenNavItem {
   to: string;
@@ -88,7 +89,7 @@ export function SidebarNavigationView({
     refs: [trigger, popover],
     onDismiss: () => {
       setOpen(false);
-      trigger.current?.focus();
+      focusWithModality(trigger.current);
     },
   });
   useLayoutEffect(() => {
@@ -122,9 +123,10 @@ export function SidebarNavigationView({
   }, [open, expanded]);
   useEffect(() => {
     if (open && !expanded)
-      popover.current
-        ?.querySelector<HTMLAnchorElement>("a[href]")
-        ?.focus({ preventScroll: true });
+      focusWithModality(
+        popover.current?.querySelector<HTMLAnchorElement>("a[href]"),
+        { preventScroll: true },
+      );
   }, [open, expanded]);
   return (
     <>

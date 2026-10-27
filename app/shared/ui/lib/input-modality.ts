@@ -40,3 +40,16 @@ export function touchWithoutKeyboard(): boolean {
 export function focusFollowsPointer(): boolean {
   return pointerInteraction || touchWithoutKeyboard();
 }
+
+export function focusWithModality(
+  element: HTMLElement | null | undefined,
+  options?: FocusOptions,
+): void {
+  if (!element) return;
+  trackInputModality();
+  element.focus(
+    focusFollowsPointer()
+      ? ({ ...options, focusVisible: false } as FocusOptions)
+      : options,
+  );
+}

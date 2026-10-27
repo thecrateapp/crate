@@ -8,6 +8,7 @@ import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export type ConfirmDialogTone = "default" | "danger";
 
@@ -136,7 +137,7 @@ function OpenConfirmDialog({
               resolvedInitialFocus === "cancel" || !confirmed
                 ? cancelButtonRef.current
                 : confirmButtonRef.current;
-            target?.focus();
+            focusWithModality(target);
           }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -147,7 +148,7 @@ function OpenConfirmDialog({
               contentRef.current?.contains(active);
             const previous = previousFocusRef.current;
             if (shouldRestore && previous && document.contains(previous))
-              previous.focus();
+              focusWithModality(previous);
           }}
           onEscapeKeyDown={(event) => {
             event.preventDefault();
