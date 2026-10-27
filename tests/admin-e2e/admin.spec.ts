@@ -99,10 +99,7 @@ test("runs a schedule now from Settings with its catalog label", async ({
     status: "queued",
   });
   await openAdminPage("/settings");
-  await page
-    .getByRole("button", { name: /Schedules/ })
-    .first()
-    .click();
+  await page.getByRole("tab", { name: "Schedules", exact: true }).click();
 
   await page
     .getByRole("button", { name: "Run Duplicate Track Cleanup now" })
@@ -122,8 +119,18 @@ test("shows catalog labels on the tasks page", async ({
 }) => {
   await openAdminPage("/tasks");
 
-  await expect(page.getByText("Artist Enrichment").first()).toBeVisible();
-  await expect(page.getByText("enrich_artists", { exact: true })).toHaveCount(
+  const desk = page.getByRole("tabpanel", {
+    name: "Active & queued",
+    exact: true,
+  });
+  await expect(desk.getByText("Artist Enrichment").first()).toBeVisible();
+  await expect(desk.getByText("enrich_artists", { exact: true })).toHaveCount(
     0,
   );
+  await expect(
+    page.getByRole("button", {
+      name: "Open Artist Enrichment task details · running",
+      exact: true,
+    }),
+  ).toBeVisible();
 });

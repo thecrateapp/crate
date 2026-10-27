@@ -28,8 +28,13 @@ async function expectUsableMeter(meter: Locator) {
   expect(geometry.rightOverflow).toBeLessThanOrEqual(0.5);
   await expect(
     meter
-      .locator("..")
-      .getByText("Active playback worker capacity", { exact: true }),
+      .locator("xpath=ancestor::section[1]")
+      .getByText(
+        "Active transcode slots and variants waiting for preparation.",
+        {
+          exact: true,
+        },
+      ),
   ).toBeVisible();
 }
 
@@ -47,15 +52,15 @@ for (const viewport of [
     }) => {
       await prepareAdminCapture(page);
       if (viewport.name === "mobile") {
-        await page.goto("/system");
+        await page.goto("/playback");
         await expect(
           page.getByRole("button", { name: "Open navigation" }),
         ).toBeVisible();
       } else {
-        await openAdminPage("/system");
+        await openAdminPage("/playback");
       }
       const meter = page.getByRole("meter", {
-        name: "Transcode Slots",
+        name: "Transcode slots",
         exact: true,
       });
       await meter.scrollIntoViewIfNeeded();

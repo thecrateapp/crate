@@ -36,12 +36,14 @@ for (const viewport of [
         await page.emulateMedia({ reducedMotion: "reduce" });
         await openAdminPage("/");
         await page
-          .getByRole("button", { name: "Show diagnostics", exact: true })
+          .getByRole("button", { name: "Maintenance", exact: true })
           .click();
-        const trigger = page.getByRole("button", {
-          name: operation.trigger,
-          exact: true,
-        });
+        const trigger = page
+          .getByRole("dialog", { name: "Library maintenance", exact: true })
+          .getByRole("button", {
+            name: operation.trigger,
+            exact: true,
+          });
         await trigger.click();
         const dialog = page.getByRole("alertdialog", {
           name: operation.title,

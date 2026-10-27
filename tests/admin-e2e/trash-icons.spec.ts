@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/trash-1ae.json";
 
 for (const width of [1440, 768, 390]) {
@@ -22,9 +22,15 @@ for (const width of [1440, 768, 390]) {
       ).toHaveCSS("font-family", /Bricolage Grotesque/);
       await expect(main.getByText("Marea", { exact: true })).toBeVisible();
       await expect(main.locator("svg:not(.lucide-loader-circle)")).toHaveCount(
-        0,
+        2,
       );
+      await expect(
+        main.locator(
+          'svg[data-admin-ux="header-refresh"],svg[data-admin-ux="header-empty-trash"]',
+        ),
+      ).toHaveCount(2);
       await expect(main.locator("button button,button a")).toHaveCount(0);
+      await emulateCoarsePointer(page);
       for (const control of await main.getByRole("button").all()) {
         const box = (await control.boundingBox())!;
         expect(

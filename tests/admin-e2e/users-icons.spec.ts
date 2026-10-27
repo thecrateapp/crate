@@ -42,7 +42,7 @@ for (const width of [1440, 768, 390])
         );
         expect(
           await dialog.evaluate((el) => el.getBoundingClientRect().width),
-        ).toBeGreaterThan(width * 0.9);
+        ).toBeGreaterThanOrEqual(Math.min(width * 0.9, 1280));
         if (reader) {
           await expect(
             dialog.getByRole("button", { name: "Save roles", exact: true }),
@@ -58,7 +58,8 @@ for (const width of [1440, 768, 390])
         await expect(dialog).toHaveCount(0);
         await expect(page).toHaveURL(/\/users\?node=sample$/);
         const table = page.getByRole("table", { name: "Users", exact: true });
-        await expect(table.getByRole("row")).toHaveCount(5);
+        const header = width >= 1024 ? 1 : 0;
+        await expect(table.getByRole("row")).toHaveCount(4 + header);
         await expect(
           table
             .getByRole("row", { name: /Celia Norte/ })
@@ -75,7 +76,7 @@ for (const width of [1440, 768, 390])
         await page
           .getByRole("textbox", { name: "Search users", exact: true })
           .fill("bandcamp");
-        await expect(table.getByRole("row")).toHaveCount(2);
+        await expect(table.getByRole("row")).toHaveCount(1 + header);
         await table
           .getByRole("row", { name: /Ada Costa/ })
           .getByRole("button", { name: "Inspect", exact: true })

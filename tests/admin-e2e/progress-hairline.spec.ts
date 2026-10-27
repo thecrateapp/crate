@@ -89,11 +89,9 @@ for (const viewport of [
       } else {
         await openAdminPage("/tasks");
       }
-      const panel = page.locator("section").filter({
-        has: page.getByRole("heading", {
-          name: "Running and queued",
-          exact: true,
-        }),
+      const panel = page.getByRole("tabpanel", {
+        name: "Active & queued",
+        exact: true,
       });
       const bars = panel.getByRole("progressbar", {
         name: "Task progress",

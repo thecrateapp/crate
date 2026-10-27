@@ -27,18 +27,24 @@ for (const width of [1440, 768, 390])
           }),
         ).toBeVisible();
         await expect(
-          main.getByText("Librarian", { exact: true }),
-        ).toBeVisible();
-        await expect(main.getByText("Observer", { exact: true })).toBeVisible();
-        await expect(
-          main.getByText("3 capabilities", { exact: true }),
+          main.getByRole("heading", { name: "Librarian", exact: true }),
         ).toBeVisible();
         await expect(
-          main.getByText("2 capabilities", { exact: true }),
+          main.getByRole("heading", { name: "Observer", exact: true }),
         ).toBeVisible();
         await expect(
-          main.getByText("library.view", { exact: true }),
-        ).toHaveCount(3);
+          main
+            .getByRole("article")
+            .filter({ has: page.getByRole("heading", { name: "Librarian" }) }),
+        ).toContainText("3 grants");
+        await expect(
+          main
+            .getByRole("article")
+            .filter({ has: page.getByRole("heading", { name: "Observer" }) }),
+        ).toContainText("2 grants");
+        await expect(
+          main.getByRole("row", { name: "library.view Yes Yes", exact: true }),
+        ).toBeVisible();
         await expect(main.locator("svg")).toHaveCount(0);
         await expect(main.getByRole("button")).toHaveCount(0);
         await expect(main.getByRole("textbox")).toHaveCount(0);

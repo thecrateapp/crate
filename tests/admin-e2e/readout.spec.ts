@@ -24,10 +24,18 @@ test("announces committed genre EQ changes without writing to the API", async ({
   await prepareAdminCapture(page);
   adminApi.respondTo("/api/genres/taxonomy/tree", {
     top_level_slugs: ["hardcore"],
+    core_taxonomy: {
+      taxonomy_id: "crate-core",
+      version: "1.0.0",
+      digest: "sha256:fixture",
+      signature_valid: true,
+      key_id: null,
+    },
     nodes: [
       {
         slug: "hardcore",
         name: "Hardcore",
+        origin: "core",
         description: "Urgent guitars and direct rhythms.",
         musicbrainz_mbid: null,
         wikidata_url: null,
@@ -49,19 +57,14 @@ test("announces committed genre EQ changes without writing to the API", async ({
     ],
   });
   await openAdminPage("/genres");
-  await page.getByRole("button", { name: "Tree view", exact: true }).click();
-  await page
-    .getByRole("button")
-    .filter({
-      has: page.getByText("Hardcore", { exact: true }),
-    })
-    .click();
+  const genre = page
+    .getByRole("region", { name: "Genre taxonomy tree", exact: true })
+    .getByRole("button", { name: "Hardcore 12", exact: true });
+  await genre.click();
+  await expect(genre).toHaveAttribute("aria-pressed", "true");
 
   const editor = page
-    .getByRole("heading", {
-      name: "Equalizer preset Hardcore",
-      exact: true,
-    })
+    .getByText("10-band curve · Hardcore", { exact: true })
     .locator("../../..");
   await expect(editor).toBeVisible();
   const status = editor.getByRole("status");

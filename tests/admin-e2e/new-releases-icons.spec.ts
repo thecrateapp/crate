@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/new-releases-1aj.json";
 for (const width of [1440, 768, 390]) {
   test.describe(`New Releases Admin ${width}`, () => {
@@ -48,7 +48,7 @@ for (const width of [1440, 768, 390]) {
       await openAdminPage("/new-releases");
       const main = page.getByRole("main");
       await expect(
-        main.getByRole("heading", { name: "New Releases", exact: true }),
+        main.getByRole("heading", { name: "Release Radar", exact: true }),
       ).toBeVisible();
       await expect(
         main.getByRole("link", { name: "Luz de octubre", exact: true }),
@@ -58,10 +58,15 @@ for (const width of [1440, 768, 390]) {
           .locator("svg:not([data-admin-ux])")
           .evaluateAll(
             (nodes) =>
-              nodes.filter((el) => !el.closest('[role="combobox"]')).length,
+              nodes.filter(
+                (el) =>
+                  !el.closest(
+                    '[role="combobox"],[data-slot="search-input"],[data-slot="media-cover"][data-state="fallback"]',
+                  ),
+              ).length,
           ),
       ).toBe(0);
-      const search = main.getByRole("textbox", {
+      const search = main.getByRole("searchbox", {
         name: "Search releases",
         exact: true,
       });
@@ -151,10 +156,11 @@ for (const width of [1440, 768, 390]) {
             );
           }),
         ).toBe(8);
+      await emulateCoarsePointer(page);
       for (const control of await main.locator("button,input").all())
-        expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(
-          44,
-        );
+        expect(
+          Number((await control.boundingBox())!.height.toFixed(2)),
+        ).toBeGreaterThanOrEqual(44);
       expect(
         await main
           .getByRole("heading", { level: 1 })

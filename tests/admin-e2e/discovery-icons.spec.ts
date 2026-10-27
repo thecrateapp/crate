@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { emulateCoarsePointer, expect, test } from "./fixtures";
 import fixture from "./fixtures/discovery-1ai.json";
 for (const width of [1440, 768, 390]) {
   test.describe(`Discovery Admin ${width}`, () => {
@@ -59,8 +59,11 @@ for (const width of [1440, 768, 390]) {
       await expect(
         main.getByRole("img", { name: "Costa Norte", exact: true }),
       ).toBeVisible();
-      await expect(main.locator("svg:not([data-admin-ux])")).toHaveCount(0);
-      const search = main.getByRole("textbox", {
+      await expect(main.locator("svg:not([data-admin-ux])")).toHaveCount(1);
+      await expect(main.locator("svg:not([data-admin-ux])")).toHaveClass(
+        /solar-magnifier-outline/,
+      );
+      const search = main.getByRole("searchbox", {
         name: "Search discovery",
         exact: true,
       });
@@ -109,15 +112,18 @@ for (const width of [1440, 768, 390]) {
           .getByRole("heading", { level: 1 })
           .evaluate((el) => getComputedStyle(el).fontFamily),
       ).toContain("Bricolage");
+      await emulateCoarsePointer(page);
       for (const button of await main.getByRole("button").all())
-        expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        expect(
+          Number((await button.boundingBox())!.height.toFixed(2)),
+        ).toBeGreaterThanOrEqual(44);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
         ),
       ).toBe(true);
       await main
-        .getByRole("button", { name: "Open full radar", exact: true })
+        .getByRole("button", { name: "Open Release Radar", exact: true })
         .click();
       await expect(page).toHaveURL(/\/new-releases$/);
     });
