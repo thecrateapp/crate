@@ -1108,11 +1108,14 @@ function EditorSection({
                   <div className="min-w-0 space-y-2">
                     <FormField
                       id={`translation-${key}`}
-                      label="Translation"
+                      label={
+                        <>
+                          Translation <span className="sr-only">for {key}</span>
+                        </>
+                      }
                       className="min-w-0"
                     >
                       <Textarea
-                        aria-label={`Translation for ${key}`}
                         value={value}
                         onChange={(event) =>
                           onDraftChange(key, event.target.value)

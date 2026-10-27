@@ -593,6 +593,12 @@ it("preserves other dirty translations and edits typed while a key is saving", a
   await user.click(await screen.findByRole("button", { name: "Review es" }));
   const play = await screen.findByLabelText("Translation for player.play");
   const collection = screen.getByLabelText("Translation for nav.collection");
+  expect(
+    screen.getByRole("textbox", { name: "Translation for player.play" }),
+  ).toBe(play);
+  expect(
+    screen.getByRole("textbox", { name: "Translation for nav.collection" }),
+  ).toBe(collection);
   await user.clear(collection);
   await user.type(collection, "Mi biblioteca");
   await user.clear(play);
