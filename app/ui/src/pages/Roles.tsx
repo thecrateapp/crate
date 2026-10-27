@@ -30,6 +30,10 @@ function capabilityGroup(capability: string) {
   return capability.split(".")[0] || "other";
 }
 
+function countLabel(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function groupCapabilities(capabilities: string[]) {
   const groups = new Map<string, string[]>();
   for (const capability of capabilities) {
@@ -109,8 +113,16 @@ export function Roles() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <InfoBadge>{roles.length} roles</InfoBadge>
-                <InfoBadge>{capabilities.length} capabilities</InfoBadge>
+                <InfoBadge>
+                  {countLabel(roles.length, "role", "roles")}
+                </InfoBadge>
+                <InfoBadge>
+                  {countLabel(
+                    capabilities.length,
+                    "capability",
+                    "capabilities",
+                  )}
+                </InfoBadge>
               </div>
             </div>
 
@@ -131,7 +143,11 @@ export function Roles() {
                         </MonoLabel>
                       </div>
                       <InfoBadge className="shrink-0">
-                        {role.capabilities.length} grants
+                        {countLabel(
+                          role.capabilities.length,
+                          "grant",
+                          "grants",
+                        )}
                       </InfoBadge>
                     </div>
                     <p className="mt-3 text-xs text-text-muted">
@@ -175,7 +191,13 @@ export function Roles() {
                         >
                           {group}
                         </MonoLabel>
-                        <InfoBadge>{grouped.length} capabilities</InfoBadge>
+                        <InfoBadge>
+                          {countLabel(
+                            grouped.length,
+                            "capability",
+                            "capabilities",
+                          )}
+                        </InfoBadge>
                       </div>
                       <div className="max-w-full overflow-x-auto rounded-md border border-border-quiet">
                         <table className="w-full min-w-[42rem] border-collapse text-left text-sm">
