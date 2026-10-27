@@ -572,6 +572,56 @@ const statsDashboard = {
   ],
 };
 
+const statsRange = {
+  start: statsDay(29),
+  end: statsDay(0),
+  available: true,
+  hidden_reason: null,
+  top_artists: [
+    {
+      artist_name: "High Vis",
+      artist_id: 7,
+      artist_slug: "high-vis",
+      minutes: 720,
+      plays: 204,
+      share: 0.21,
+    },
+  ],
+  top_albums: statsDashboard.top_albums.items.map((album) => ({
+    album: album.album,
+    artist: album.artist,
+    plays: album.play_count,
+    album_id: album.album_id,
+    minutes: album.minutes_listened,
+  })),
+  top_tracks: statsDashboard.top_tracks.items.map((track) => ({
+    track_id: track.track_id,
+    track_path: track.track_path,
+    title: track.title,
+    artist: track.artist,
+    artist_id: track.artist_id,
+    artist_slug: track.artist_slug,
+    album: track.album,
+    album_id: track.album_id,
+    album_slug: track.album_slug,
+    format: "FLAC",
+    duration: 198,
+    plays: track.play_count,
+    minutes: track.minutes_listened,
+  })),
+  discoveries: [
+    {
+      artist_name: "High Vis",
+      artist_id: 7,
+      artist_slug: "high-vis",
+      first_day: "2026-08-20",
+      minutes: 120,
+    },
+  ],
+};
+
+const smartEqGains = [2, 1, 0, -1, 0, 1, 2, 1, 0, -1];
+
 function userPlaylist(id: number, overrides: Record<string, unknown>) {
   return {
     id,
@@ -618,6 +668,7 @@ function responseFor(pathname: string): unknown {
   }
   if (pathname === "/api/me/home/discovery") return homeDiscovery;
   if (pathname === "/api/me/stats/dashboard") return statsDashboard;
+  if (pathname === "/api/me/stats/range") return statsRange;
   if (pathname === "/api/me/stats/today") {
     return { day: "2026-09-12", timezone: "UTC", minutes: 38, plays: 9 };
   }
@@ -722,7 +773,7 @@ function responseFor(pathname: string): unknown {
       trackEntityUid: null,
       albumId: 71,
       albumEntityUid: null,
-      gains: [2, 1, 0, -1, 0, 1, 2, 1, 0, -1],
+      gains: smartEqGains,
       source: "genre_taxonomy_preset",
       label: "Hardcore",
       reasoning: "Inherited from Rock",
@@ -734,6 +785,24 @@ function responseFor(pathname: string): unknown {
       inheritedFrom: { slug: "rock", name: "Rock" },
     };
   }
+  if (pathname === "/api/tracks/1/eq/curves") {
+    return [
+      {
+        source: "genre_taxonomy_preset",
+        gains: smartEqGains,
+        label: "Hardcore",
+        reasoning: "",
+        genre: { slug: "hardcore", name: "Hardcore", canonical: true },
+      },
+      {
+        source: "flat",
+        gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        label: "",
+        reasoning: "",
+        genre: null,
+      },
+    ];
+  }
   if (pathname === "/api/me/now-playing") return {};
   if (pathname === "/api/me/play-events") return {};
   if (pathname === "/api/bandcamp/links/artist/by-entity/artist-high-vis") {
@@ -743,6 +812,9 @@ function responseFor(pathname: string): unknown {
   if (pathname === "/api/catalog/genres/hardcore") return genreDetail;
   if (pathname.startsWith("/api/artist-slugs/high-vis/page")) {
     return artistPage;
+  }
+  if (pathname === "/api/artist-slugs/high-vis") {
+    return { ...artistPage.artist, is_v2: true, bio: artistPage.info.bio };
   }
   if (pathname === "/api/me/upcoming") {
     return {

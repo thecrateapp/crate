@@ -30,12 +30,14 @@ test("renders the Smart EQ curve and source chain", async ({
       .click();
   }
   await page.getByRole("button", { name: "Equalizer", exact: true }).click();
-  await expect(
-    page.locator('[data-source="genre_taxonomy_preset"][aria-current="true"]'),
-  ).toBeVisible();
-  await expect(page.getByText("from Rock", { exact: true })).toBeVisible();
+  const readout = page.locator(
+    '[data-source="genre_taxonomy_preset"][aria-current="true"]',
+  );
+  await expect(readout).toBeVisible();
   await expect(page.getByRole("slider", { name: / Hz$/ })).toHaveCount(10);
   await expectStablePage(page, "equalizer-smart-default-dark");
+  await readout.hover();
+  await expect(page.getByRole("tooltip")).toContainText("from Rock");
 });
 
 test("renders the complete artist hero and follow controls", async ({
@@ -137,8 +139,14 @@ test("renders the Stats signal page", async ({ openListenPage, page }) => {
     "30 days of signal",
   );
   await expect(
-    page.getByRole("group", { name: /of listening across 30 bars/ }),
+    page.getByRole("group", {
+      name: "Listening in the selected stretch",
+      exact: true,
+    }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "In this stretch", exact: true }),
+  ).toContainText("30 days");
   await expectStablePage(page, "stats-default-dark");
 });
 

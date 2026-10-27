@@ -110,7 +110,9 @@ test("shows pending direct uploads without inventing byte progress and queues th
     releaseResponse();
     if (uploads.length > 0) await finished;
   }
-  await expect(page.getByText("Upload queued", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Upload received", { exact: true }),
+  ).toBeVisible();
   const toaster = page.locator(".crate-toaster[data-sonner-toaster]");
   const toast = toaster.locator(".crate-toast[data-sonner-toast]");
   await expect(toaster).toHaveAttribute("data-x-position", "center");
@@ -120,7 +122,7 @@ test("shows pending direct uploads without inventing byte progress and queues th
   await expect(toast).not.toHaveAttribute("data-rich-colors", "true");
   await expect(toast).toHaveAttribute("data-styled", "false");
   await expect(toast.locator(".crate-toast-title")).toHaveText(
-    "Upload queued. Crate is importing your music in the background.",
+    "Upload received. We’re adding your music to the library.",
   );
   await expect(toast.locator(".crate-toast-title")).toHaveCSS(
     "font-size",
@@ -139,7 +141,7 @@ test("shows pending direct uploads without inventing byte progress and queues th
     page.viewportSize()!.width,
   );
   if (info.project.name === "mobile") {
-    const dock = page.locator(".listen-mobile-dock-glass");
+    const dock = page.locator(".listen-mobile-dock-surface");
     await expect(dock).toBeVisible();
     const dockBounds = await dock.boundingBox();
     expect(dockBounds).not.toBeNull();
@@ -158,9 +160,10 @@ test("shows pending direct uploads without inventing byte progress and queues th
     await expect(toast).toHaveScreenshot(toastName);
   }
   await expect(
-    page.getByText("Task `visual-upload` is processing 2 files.", {
-      exact: true,
-    }),
+    page.getByText(
+      "2 files are being added to your library. You can keep browsing.",
+      { exact: true },
+    ),
   ).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(clear).toHaveCount(0);
