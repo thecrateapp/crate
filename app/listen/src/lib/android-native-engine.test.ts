@@ -259,6 +259,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
 
     await vi.waitFor(() =>
@@ -445,6 +446,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     await vi.waitFor(() =>
       expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
@@ -546,6 +548,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     await engine.loadQueue(queue);
     expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
@@ -582,6 +585,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     const engine = new nativeEngineModule.AndroidNativeEngine();
     await engine.loadQueue({
@@ -782,6 +786,7 @@ describe("android native engine flags", () => {
       preferredDurationMs: 12000,
       allowBeatmatch: false,
       allowBassHandoff: false,
+      allowLongBeatmatch: false,
       delivery: "balanced",
       descriptor: null,
     };
@@ -823,6 +828,7 @@ describe("android native engine flags", () => {
           preferredDurationMs: 12000,
           allowBeatmatch: false,
           allowBassHandoff: false,
+          allowLongBeatmatch: false,
           delivery: "balanced",
           refill: false,
         }),
@@ -841,6 +847,7 @@ describe("android native engine flags", () => {
         androidNativeCrossfade: true,
         androidBeatmatch: true,
         androidBassHandoff: true,
+        androidLongBeatmatch: false,
       };
 
       expect(continuationWithModes(undefined, capabilities)).toBeNull();
@@ -849,12 +856,14 @@ describe("android native engine flags", () => {
           ...capabilities,
           androidBeatmatch: false,
           androidBassHandoff: false,
+          androidLongBeatmatch: false,
         }),
       ).toBeNull();
       expect(continuationWithModes(context, capabilities)).toEqual({
         ...context,
         allowBeatmatch: true,
         allowBassHandoff: true,
+        allowLongBeatmatch: false,
       });
     });
 

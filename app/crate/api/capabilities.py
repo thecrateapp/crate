@@ -45,6 +45,7 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
             android_bass_handoff=bass_handoff,
+            android_long_beatmatch=beatmatch,
         ),
         vdj=VDJCapabilities(
             available=vdj_available,

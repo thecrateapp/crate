@@ -91,7 +91,28 @@ describe("AuthenticatedApp", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
       plannerVersion: "smart-mix-v2",
+    });
+  });
+
+  it("reads the long beatmatch capability a newer server advertises", async () => {
+    apiMock.mockResolvedValue({
+      smart_mix: {
+        available: true,
+        planner_version: "smart-mix-v2",
+        android_native_crossfade: true,
+        android_beatmatch: true,
+        android_long_beatmatch: true,
+      },
+    });
+
+    render(<AuthenticatedApp />);
+
+    await waitFor(() => {
+      expect(setSmartMixCapabilities).toHaveBeenCalledWith(
+        expect.objectContaining({ androidLongBeatmatch: true }),
+      );
     });
   });
 });

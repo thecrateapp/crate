@@ -361,6 +361,14 @@ public class NativeMixLifecycleTest {
     }
 
     private static NativeTransitionPlan beatmatchPlan(float tempoRatio, boolean bassHandoff) {
+        return beatmatchPlan(tempoRatio, bassHandoff, "equal-power");
+    }
+
+    private static NativeTransitionPlan beatmatchPlan(
+        float tempoRatio,
+        boolean bassHandoff,
+        String curve
+    ) {
         try {
             JSONObject json = new JSONObject();
             json.put("plannerVersion", 2);
@@ -375,7 +383,7 @@ public class NativeMixLifecycleTest {
             json.put("handoffProgress", 0.5);
             json.put("outgoingGainDb", 0.0);
             json.put("incomingGainDb", 0.0);
-            json.put("curve", "equal-power");
+            json.put("curve", curve);
             json.put("bassHandoff", bassHandoff ? "balanced" : "none");
             json.put("confidence", 0.9);
             return NativeTransitionPlan.fromJson(json, "one", "two", 4000L);
@@ -521,6 +529,51 @@ public class NativeMixLifecycleTest {
         assertFalse(state.bassHandoff);
         assertTrue(Float.isNaN(deckA.bassHandoffAt));
         assertTrue(Float.isNaN(deckB.bassHandoffAt));
+    }
+
+    @Test
+    public void anEngagedDjBlendBeatmatchShapesBothDecks() {
+        NativeTransitionPlan blend = beatmatchPlan(1.04f, true, "dj-blend");
+        controller.prepareStandbyAt(blend.prepareIncomingCueMs(), 0L);
+        deckA.positionMs = 167500L;
+        assertTrue(controller.beginPreroll(blend));
+        rebuffer();
+        controller.scheduleHeldStart();
+        deckA.positionMs = blend.outgoingCueMs;
+        deckB.positionMs = blend.startIncomingCueMs();
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
+
+        assertTrue(controller.beginTransition(blend.withTiming(
+            blend.outgoingCueMs, blend.startIncomingCueMs(), blend.durationMs
+        )));
+
+        assertTrue(controller.isBeatmatching());
+        assertTrue(deckA.djBlend);
+        assertTrue(deckB.djBlend);
+    }
+
+    @Test
+    public void anEqualPowerBeatmatchKeepsTheClassicCurve() {
+        NativeTransitionPlan noBlend = beatmatchPlan(1.04f, true);
+        controller.prepareStandbyAt(noBlend.prepareIncomingCueMs(), 0L);
+        deckA.positionMs = 167500L;
+        assertTrue(controller.beginPreroll(noBlend));
+        rebuffer();
+        controller.scheduleHeldStart();
+        deckA.positionMs = noBlend.outgoingCueMs;
+        deckB.positionMs = noBlend.startIncomingCueMs();
+        controller.measurePhase();
+        controller.measurePhase();
+        controller.measurePhase();
+
+        assertTrue(controller.beginTransition(noBlend.withTiming(
+            noBlend.outgoingCueMs, noBlend.startIncomingCueMs(), noBlend.durationMs
+        )));
+
+        assertFalse(deckA.djBlend);
+        assertFalse(deckB.djBlend);
     }
 
     @Test

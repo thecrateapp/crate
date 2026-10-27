@@ -87,6 +87,7 @@ type CrateNativePlaybackPlugin = {
           preferredDurationMs: number;
           allowBeatmatch: boolean;
           allowBassHandoff: boolean;
+          allowLongBeatmatch: boolean;
           delivery: string;
           refill: boolean;
         },
@@ -175,7 +176,8 @@ export function continuationWithModes(
   if (
     !context ||
     (context.allowBeatmatch === capabilities.androidBeatmatch &&
-      context.allowBassHandoff === capabilities.androidBassHandoff)
+      context.allowBassHandoff === capabilities.androidBassHandoff &&
+      context.allowLongBeatmatch === capabilities.androidLongBeatmatch)
   ) {
     return null;
   }
@@ -183,6 +185,7 @@ export function continuationWithModes(
     ...context,
     allowBeatmatch: capabilities.androidBeatmatch,
     allowBassHandoff: capabilities.androidBassHandoff,
+    allowLongBeatmatch: capabilities.androidLongBeatmatch,
   };
 }
 
@@ -456,6 +459,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
         preferredDurationMs: context.preferredDurationMs,
         allowBeatmatch: context.allowBeatmatch,
         allowBassHandoff: context.allowBassHandoff,
+        allowLongBeatmatch: context.allowLongBeatmatch,
         delivery: context.delivery,
         refill: context.descriptor !== null,
       });

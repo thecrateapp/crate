@@ -324,6 +324,7 @@ export async function toStartupEngineQueueSnapshot(
           preferredDurationMs: options.crossfadeMs,
           allowBeatmatch: planInput.capabilities.androidBeatmatch,
           allowBassHandoff: planInput.capabilities.androidBassHandoff,
+          allowLongBeatmatch: planInput.capabilities.androidLongBeatmatch,
           delivery: getEffectivePlaybackDeliveryPolicy(),
           descriptor: continuationDescriptor(options.playSource, {
             shuffle: options.shuffle,
@@ -343,6 +344,7 @@ function sameCapabilities(
     left.androidNativeCrossfade === right.androidNativeCrossfade &&
     left.androidBeatmatch === right.androidBeatmatch &&
     left.androidBassHandoff === right.androidBassHandoff &&
+    left.androidLongBeatmatch === right.androidLongBeatmatch &&
     left.plannerVersion === right.plannerVersion
   );
 }

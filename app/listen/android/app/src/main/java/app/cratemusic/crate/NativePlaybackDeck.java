@@ -29,11 +29,21 @@ interface NativePlaybackDeck {
 
     void releaseHold();
 
-    void startEnvelope(
+    default void startEnvelope(
         NativeMixAudioProcessor.Role role,
         long durationMs,
         float stagingGainDb,
         float bassHandoffAt
+    ) {
+        startEnvelope(role, durationMs, stagingGainDb, bassHandoffAt, false);
+    }
+
+    void startEnvelope(
+        NativeMixAudioProcessor.Role role,
+        long durationMs,
+        float stagingGainDb,
+        float bassHandoffAt,
+        boolean djBlend
     );
 
     void clearEnvelope();

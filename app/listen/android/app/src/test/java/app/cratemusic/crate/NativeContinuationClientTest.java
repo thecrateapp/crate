@@ -65,6 +65,35 @@ public class NativeContinuationClientTest {
         assertEquals(12_000L, context.getLong("preferredDurationMs"));
         assertFalse(context.getBoolean("allowBeatmatch"));
         assertFalse(context.has("allowBassHandoff"));
+        assertFalse(context.has("allowLongBeatmatch"));
+    }
+
+    @Test
+    public void continuationsAskForLongPhraseMixesOnlyWhenTheServerOffersThem() throws Exception {
+        NativeContinuationClient.Config offered = NativeContinuationClient.Config.fromJson(
+            new JSONObject(
+                "{\"token\":\"crv_x\",\"allowBeatmatch\":true,\"allowLongBeatmatch\":true}"
+            )
+        );
+        NativeContinuationClient.Config notOffered = NativeContinuationClient.Config.fromJson(
+            new JSONObject("{\"token\":\"crv_x\",\"allowBeatmatch\":true}")
+        );
+        NativeContinuationClient.Config withoutBeatmatch = NativeContinuationClient.Config.fromJson(
+            new JSONObject(
+                "{\"token\":\"crv_x\",\"allowBeatmatch\":false,\"allowLongBeatmatch\":true}"
+            )
+        );
+
+        assertTrue(contextFor(offered).getBoolean("allowLongBeatmatch"));
+        assertFalse(contextFor(notOffered).has("allowLongBeatmatch"));
+        assertFalse(contextFor(withoutBeatmatch).has("allowLongBeatmatch"));
+    }
+
+    private JSONObject contextFor(NativeContinuationClient.Config config) throws Exception {
+        return NativeContinuationClient.requestBody(config, tracks, 0, 4)
+            .getJSONArray("edges")
+            .getJSONObject(0)
+            .getJSONObject("context");
     }
 
     @Test

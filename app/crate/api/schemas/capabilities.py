@@ -7,6 +7,7 @@ class SmartMixCapabilities(BaseModel):
     android_native_crossfade: bool
     android_beatmatch: bool
     android_bass_handoff: bool
+    android_long_beatmatch: bool
 
 
 class VDJCapabilities(BaseModel):

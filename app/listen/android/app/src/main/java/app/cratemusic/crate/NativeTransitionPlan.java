@@ -10,6 +10,7 @@ final class NativeTransitionPlan {
     static final int SUPPORTED_PLANNER_VERSION = 2;
     static final float MIN_TEMPO_RATIO = 0.94f;
     static final float MAX_TEMPO_RATIO = 1.06f;
+    static final String DJ_BLEND_CURVE = "dj-blend";
 
     enum Mode {
         GAPLESS,
@@ -147,7 +148,7 @@ final class NativeTransitionPlan {
             payload.optDouble("incomingGainDb", 0.0)
         );
         String curve = payload.optString("curve", "equal-power");
-        if (!"equal-power".equals(curve)) {
+        if (!"equal-power".equals(curve) && !DJ_BLEND_CURVE.equals(curve)) {
             throw new IllegalArgumentException(
                 "Unsupported transition curve: " + curve
             );
@@ -189,6 +190,10 @@ final class NativeTransitionPlan {
 
     boolean isBeatmatch() {
         return mode == Mode.BEATMATCH;
+    }
+
+    boolean isDjBlend() {
+        return DJ_BLEND_CURVE.equals(curve);
     }
 
     long startIncomingCueMs() {

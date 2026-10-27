@@ -2,6 +2,7 @@ package app.cratemusic.crate;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -26,6 +27,28 @@ public class NativeTransitionPlanTest {
         assertEquals(4200L, plan.durationMs);
         assertEquals(0.5f, plan.handoffProgress, 0.0001f);
         assertEquals("equal-power", plan.curve);
+    }
+
+    @Test
+    public void parsesTheDjBlendCurve() throws Exception {
+        JSONObject json = planJson("outgoing", "incoming");
+        json.put("curve", "dj-blend");
+
+        NativeTransitionPlan plan = NativeTransitionPlan.fromJson(json, "outgoing", "incoming", 3000);
+
+        assertEquals("dj-blend", plan.curve);
+        assertTrue(plan.isDjBlend());
+    }
+
+    @Test
+    public void rejectsAnUnknownCurve() throws Exception {
+        JSONObject json = planJson("outgoing", "incoming");
+        json.put("curve", "linear");
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> NativeTransitionPlan.fromJson(json, "outgoing", "incoming", 3000)
+        );
     }
 
     @Test

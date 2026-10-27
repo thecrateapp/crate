@@ -367,6 +367,7 @@ def _transition_context(payload: TransitionContextRequest) -> TransitionContext:
         allow_beatmatch=payload.allow_beatmatch,
         allow_tempo_adjustment=payload.allow_tempo_adjustment,
         allow_bass_handoff=_bass_handoff_allowed(payload),
+        allow_long_beatmatch=payload.allow_long_beatmatch,
     )
 
 
@@ -380,6 +381,8 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
         context["allowBassHandoff"] = True
     else:
         context.pop("allowBassHandoff", None)
+    if not payload.allow_long_beatmatch:
+        context.pop("allowLongBeatmatch", None)
     return context
 
 

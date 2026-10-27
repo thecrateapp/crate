@@ -146,6 +146,7 @@ class TransitionContextRequest(SmartMixRequestModel):
     allow_beatmatch: bool = Field(alias="allowBeatmatch")
     allow_tempo_adjustment: bool = Field(alias="allowTempoAdjustment")
     allow_bass_handoff: bool = Field(default=False, alias="allowBassHandoff")
+    allow_long_beatmatch: bool = Field(default=False, alias="allowLongBeatmatch")
 
 
 class TransitionEdgeRequest(SmartMixRequestModel):
@@ -180,7 +181,7 @@ class TransitionPlanResponse(SmartMixApiModel):
     )
     outgoing_gain_db: float = Field(alias="outgoingGainDb")
     incoming_gain_db: float = Field(alias="incomingGainDb")
-    curve: Literal["equal-power"]
+    curve: Literal["equal-power", "dj-blend"]
     bass_handoff: Literal["none", "balanced"] = Field(alias="bassHandoff")
     confidence: float = Field(ge=0.0, le=1.0)
     fallback_reason: (

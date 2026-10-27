@@ -246,6 +246,29 @@ def test_requests_without_bass_handoff_keep_their_plan_cache_key() -> None:
     )
 
 
+def test_long_beatmatch_splits_the_plan_cache_only_when_requested() -> None:
+    from crate.api import smart_mix
+    from crate.api.schemas.smart_mix import TransitionEdgeRequest
+
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    legacy = TransitionEdgeRequest.model_validate(edge)
+    explicit_off = TransitionEdgeRequest.model_validate(
+        {**edge, "context": {**edge["context"], "allowLongBeatmatch": False}}
+    )
+    long_mix = TransitionEdgeRequest.model_validate(
+        {**edge, "context": {**edge["context"], "allowLongBeatmatch": True}}
+    )
+
+    assert smart_mix._cache_context(legacy.context) == edge["context"]
+    assert smart_mix._plan_cache_key(legacy, None, None) == smart_mix._plan_cache_key(
+        explicit_off, None, None
+    )
+    assert smart_mix._plan_cache_key(long_mix, None, None) != smart_mix._plan_cache_key(
+        legacy, None, None
+    )
+    assert smart_mix._transition_context(long_mix.context).allow_long_beatmatch
+
+
 def test_planner_rule_changes_split_the_plan_cache(monkeypatch) -> None:
     from dataclasses import replace
 

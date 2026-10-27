@@ -159,14 +159,21 @@ def plan_transition(
 
     if fallback_reason is None:
         tempo_ratio = round(_cue_tempo_ratio(outgoing, incoming), 6)
-        window = _fit_window(
-            outgoing,
-            incoming,
-            requested_ms,
-            tempo_ratio,
-            policy,
-            snap_to_beats=True,
+        window = (
+            _long_beatmatch_window(outgoing, incoming, tempo_ratio, policy)
+            if context.allow_long_beatmatch
+            else None
         )
+        curve = "dj-blend" if window is not None else "equal-power"
+        if window is None:
+            window = _fit_window(
+                outgoing,
+                incoming,
+                requested_ms,
+                tempo_ratio,
+                policy,
+                snap_to_beats=True,
+            )
         if window.fits and window.duration_ms < _minimum_beatmatch_ms(outgoing, policy):
             fallback_reason = TransitionFallbackReason.INSUFFICIENT_WINDOW
         elif window.fits:
@@ -189,6 +196,7 @@ def plan_transition(
                 outgoing_gain_db=outgoing_gain_db,
                 incoming_gain_db=incoming_gain_db,
                 bass_handoff="balanced" if context.allow_bass_handoff else "none",
+                curve=curve,
                 policy=policy,
             )
 
@@ -278,6 +286,7 @@ def _base_plan(
     outgoing_gain_db: float = 0.0,
     incoming_gain_db: float = 0.0,
     bass_handoff: str = "none",
+    curve: str = "equal-power",
     fallback_reason: TransitionFallbackReason | None = None,
 ) -> TransitionPlan:
     return TransitionPlan(
@@ -293,7 +302,7 @@ def _base_plan(
         handoff_progress=0.5,
         outgoing_gain_db=round(outgoing_gain_db, 4),
         incoming_gain_db=round(incoming_gain_db, 4),
-        curve="equal-power",
+        curve=curve,
         bass_handoff=bass_handoff,
         confidence=_round_score(confidence),
         fallback_reason=fallback_reason,
@@ -480,6 +489,41 @@ def _tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> floa
         return 1.0
     normalized_incoming = _normalized_tempo(float(outgoing_bpm), float(incoming_bpm))
     return float(outgoing_bpm) / normalized_incoming
+
+
+def _long_beatmatch_window(
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    tempo_ratio: float,
+    policy: PlannerPolicy,
+) -> _TransitionWindow | None:
+    bpm = _outro_beat(outgoing)[0]
+    if not bpm:
+        return None
+    stabilities = (outgoing.tempo_stability, incoming.tempo_stability)
+    if any(
+        stability is None or stability < policy.minimum_long_beatmatch_stability
+        for stability in stabilities
+    ):
+        return None
+    beats_per_bar = outgoing.time_signature or 4
+    for bars in policy.long_beatmatch_phrase_bars:
+        phrase_ms = math.floor(bars * beats_per_bar * 60_000.0 / bpm)
+        if phrase_ms > policy.maximum_long_beatmatch_ms:
+            continue
+        if phrase_ms <= policy.maximum_transition_ms:
+            return None
+        window = _fit_window(
+            outgoing,
+            incoming,
+            phrase_ms,
+            tempo_ratio,
+            policy,
+            snap_to_beats=True,
+        )
+        if window.fits and window.duration_ms >= phrase_ms:
+            return window
+    return None
 
 
 def _minimum_beatmatch_ms(outgoing: TrackMixProfile, policy: PlannerPolicy) -> int:

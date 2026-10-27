@@ -21,6 +21,7 @@ const ENABLED = {
   androidNativeCrossfade: true,
   androidBeatmatch: true,
   androidBassHandoff: false,
+  androidLongBeatmatch: false,
   plannerVersion: "smart-mix-v2",
 };
 const DISABLED = {
@@ -28,6 +29,7 @@ const DISABLED = {
   androidNativeCrossfade: false,
   androidBeatmatch: false,
   androidBassHandoff: false,
+  androidLongBeatmatch: false,
   plannerVersion: null,
 };
 

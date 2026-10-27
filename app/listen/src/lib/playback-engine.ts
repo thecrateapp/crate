@@ -56,7 +56,7 @@ export interface EngineTransitionPlan {
   handoffProgress: number;
   outgoingGainDb: number;
   incomingGainDb: number;
-  curve: "equal-power";
+  curve: "equal-power" | "dj-blend";
   bassHandoff: "none" | "balanced";
   confidence: number;
   fallbackReason?: string;
@@ -75,6 +75,7 @@ export interface EngineContinuationContext {
   preferredDurationMs: number;
   allowBeatmatch: boolean;
   allowBassHandoff: boolean;
+  allowLongBeatmatch: boolean;
   delivery: string;
   descriptor: EngineContinuationDescriptor | null;
 }
