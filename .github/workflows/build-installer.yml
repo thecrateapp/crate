@@ -167,4 +167,5 @@ jobs:
       - name: Attach the installer to the GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: installer-artifacts/*

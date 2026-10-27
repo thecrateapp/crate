@@ -865,4 +865,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: desktop-artifacts/*
