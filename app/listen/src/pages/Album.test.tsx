@@ -693,7 +693,7 @@ describe("Album page", () => {
     const secondary = screen.getByRole("button", {
       name: "Album Radio",
     }).parentElement!;
-    expect(secondary).toHaveClass("grid");
+    expect(secondary).toHaveClass("flex", "flex-wrap");
 
     const radio = within(secondary).getByRole("button", {
       name: "Album Radio",

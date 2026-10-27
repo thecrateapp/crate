@@ -380,3 +380,20 @@ it("uses MonoLabel for secondary captions without changing primary action text",
     "uppercase",
   );
 });
+
+it("wraps secondary captions only between whole words", () => {
+  render(
+    <HeroActionBar
+      moreLabel="More"
+      menu={{ actions: [{ key: "share", label: "Share", onSelect: vi.fn() }] }}
+      secondaryActions={[{ key: "setlist", label: "Setlist" }]}
+    />,
+  );
+  for (const caption of [
+    screen.getByText("Setlist"),
+    screen.getByText("More"),
+  ]) {
+    expect(caption).toHaveClass("break-normal");
+    expect(caption).not.toHaveClass("wrap-anywhere");
+  }
+});

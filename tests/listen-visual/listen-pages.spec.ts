@@ -47,6 +47,23 @@ test("renders the complete artist hero and follow controls", async ({
   await openListenPage("/artists/high-vis");
   await expect(page.getByRole("heading", { name: "High Vis" })).toBeVisible();
   await expect(page.getByText("Top Tracks")).toBeVisible();
+  const captionLines = await page
+    .getByRole("group", { name: "Secondary artist actions", exact: true })
+    .locator("button .crate-mono-label")
+    .evaluateAll((labels) =>
+      labels.map((label) => {
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        const tops = new Set(
+          Array.from(range.getClientRects(), (rect) => Math.round(rect.top)),
+        );
+        return { text: label.textContent, lines: tops.size };
+      }),
+    );
+  expect(captionLines.length).toBeGreaterThan(0);
+  for (const caption of captionLines)
+    if (!caption.text?.includes(" "))
+      expect(caption).toMatchObject({ lines: 1 });
   await expectStablePage(page, "artist-default-dark");
 });
 

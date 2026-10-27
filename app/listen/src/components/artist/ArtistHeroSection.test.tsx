@@ -423,7 +423,8 @@ describe("ArtistHeroSection", () => {
     ).toHaveTextContent("Shuffle");
 
     const secondary = heroActionGroup(1);
-    expect(secondary).toHaveClass("grid", "grid-cols-5");
+    expect(secondary).toHaveClass("flex", "flex-wrap");
+    expect(secondary).not.toHaveClass("grid-cols-5");
 
     const radio = within(secondary).getByRole("button", {
       name: "Artist Radio",

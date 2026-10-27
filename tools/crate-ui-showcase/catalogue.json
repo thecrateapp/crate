@@ -716,9 +716,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/domain/hero/HeroActionBar.tsx": "853ba09860047914f3e934629b45624c2d8220050465f2cf3ed528e95aee34bd",
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "8db8930bf4a072c20bac88226a361210089a6aa8124d6e43396eaf9ee7224630",
         "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
-        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "4fce857586091bdbb8a4d88eddfe9f9ab91dda1469a86db900278bd4d801b930"
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "7513dce4922977fbe98c7ba81f9854ffea3e9a4731be637ca4daaf0f81b6f9f3"
       },
       "category": "Actions"
     },

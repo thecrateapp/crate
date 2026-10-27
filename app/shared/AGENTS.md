@@ -173,8 +173,8 @@ PageHeaderLayout, also used by the Admin compatibility adapter. Keep Back outsid
 container width determines action wrapping/placement. SectionHeader is the content/rail role,
 not an InstrumentPanel caption. PageHero preserves its four roles and compact-title option;
 height="content" is the shared contract for content-sized CrateHero, without per-caller min-height
-repairs. HeroActionBar preserves playback/menu semantics and bounds long labels within its
-available width. Preserve existing native Album/safe-area composition until its owning phase.
+repairs. HeroActionBar preserves playback/menu semantics; its secondary row wraps whole actions and
+captions break only between words, never inside one. Preserve existing native Album/safe-area composition until its owning phase.
 
 ## Image and identity — local 1AV
 

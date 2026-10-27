@@ -33,7 +33,7 @@ export const HERO_SECONDARY_ACTION_ACTIVE_CLASS =
 
 const SECONDARY_GROUP_CLASS: Record<HeroSecondaryLayout, string> = {
   fixed:
-    "empty:hidden min-w-0 max-w-full grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
+    "empty:hidden min-w-0 max-w-full flex flex-wrap items-start gap-x-4 gap-y-2 md:ml-auto md:items-center md:gap-4",
   fill: "empty:hidden min-w-0 max-w-full grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
 };
 
@@ -159,7 +159,7 @@ function HeroActionMenuControl({
         <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
         <MonoLabel
           as="span"
-          className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+          className="max-w-full whitespace-normal break-normal text-inherit"
         >
           {moreLabel}
         </MonoLabel>
@@ -288,7 +288,7 @@ export function HeroActionBar({
                 {action.icon}
                 <MonoLabel
                   as="span"
-                  className="max-w-full whitespace-normal wrap-anywhere text-inherit"
+                  className="max-w-full whitespace-normal break-normal text-inherit"
                 >
                   {action.label}
                 </MonoLabel>
