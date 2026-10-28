@@ -730,6 +730,8 @@ cmd_recovery_snapshot() {
       chown "$BACKUP_UID:$BACKUP_GID" /backup/redis-durable.tar.gz
       chmod 600 /backup/redis-durable.tar.gz
     '
+  log "Restarting ${redis_service}; the pinned deploy needs it while writers stay quiesced"
+  dc start "$redis_service"
 
   {
     printf 'deploy_id=%s\n' "$DEPLOY_ID"
