@@ -32,6 +32,29 @@ describe("global keyboard focus CSS", () => {
     expect(css).toMatch(/\.genre-pill\s*>\s*button:focus-visible/);
   });
 
+  it("never rings script-only focus targets that WebKit refocuses on window activation", async () => {
+    const compiler = await compile(interactive());
+    const css = compiler.build([]);
+    const rule = css.match(
+      /:is\(([^)]*)\)\[tabindex=["']?-1["']?\]:focus-visible\s*\{([^}]*)\}/,
+    );
+
+    expect(rule).not.toBeNull();
+    const targets = rule![1].split(",").map((target) => target.trim());
+    expect(targets).toEqual(
+      expect.arrayContaining([
+        "h1",
+        "h2",
+        "main",
+        '[role="dialog"]',
+        '[role="alertdialog"]',
+      ]),
+    );
+    expect(targets).not.toContain("button");
+    expect(targets).not.toContain("a");
+    expect(rule![2]).toMatch(/outline:\s*none;/);
+  });
+
   it("uses canvas text on the selected accent background", async () => {
     const compiler = await compile(interactive());
     const css = compiler.build([]);
