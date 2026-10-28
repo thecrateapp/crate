@@ -60,7 +60,34 @@ func (s Stack) Up(ctx context.Context, w io.Writer) error {
 		up = append(up, "--scale", "crate-infra-relay=0")
 	}
 	name, args := s.Command(up...)
-	return s.Run.Stream(ctx, w, s.Dir, name, args...)
+	err := s.Run.Stream(ctx, w, s.Dir, name, args...)
+	if err == nil {
+		return nil
+	}
+	started := s.startCreated(ctx, w)
+	if len(started) == 0 {
+		return err
+	}
+	return fmt.Errorf("%w; started the services compose left created: %s", err, strings.Join(started, ", "))
+}
+
+// startCreated starts the containers a failed up recreated but never started,
+// so a partial failure does not take the stack down.
+func (s Stack) startCreated(ctx context.Context, w io.Writer) []string {
+	name, args := s.Command("ps", "--all", "--status", "created", "--format", "{{.Service}}")
+	out, err := s.Run.Output(ctx, name, args...)
+	if err != nil {
+		return nil
+	}
+	services := strings.Fields(out)
+	if len(services) == 0 {
+		return nil
+	}
+	name, args = s.Command(append([]string{"start"}, services...)...)
+	if s.Run.Stream(ctx, w, s.Dir, name, args...) != nil {
+		return nil
+	}
+	return services
 }
 
 // Restart restarts the services of a compose profile.

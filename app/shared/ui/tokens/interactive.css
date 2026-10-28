@@ -100,6 +100,20 @@
   outline-color: transparent;
 }
 
+:is(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    main,
+    [role="dialog"],
+    [role="alertdialog"]
+  )[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
 ::selection {
   background: var(--accent-action);
   color: var(--surface-canvas);

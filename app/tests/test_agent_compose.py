@@ -171,7 +171,9 @@ def test_provenance_docker_filter_allows_only_container_listing_and_image_inspec
     overlay = yaml.safe_load(
         (ROOT / "deploy/operator/compose.operator.yaml").read_text()
     )
-    config = overlay["configs"]["crate-provenance-docker"]["content"]
+    source = overlay["configs"]["crate-provenance-docker"]["file"]
+    assert source == "./deploy/operator/provenance-docker.haproxy.cfg"
+    config = (ROOT / source).read_text()
     assert overlay["services"]["crate-provenance-docker"]["configs"] == [
         {
             "source": "crate-provenance-docker",
@@ -207,3 +209,17 @@ def test_provenance_docker_filter_allows_only_container_listing_and_image_inspec
     ):
         assert not re.search(pattern, path), path
     assert "server docker /var/run/docker.sock" in config
+
+
+def test_read_only_services_take_configs_from_files():
+    overlay = yaml.safe_load(
+        (ROOT / "deploy/operator/compose.operator.yaml").read_text()
+    )
+    configs = overlay.get("configs", {})
+    for name, service in overlay["services"].items():
+        if not service.get("read_only"):
+            continue
+        for entry in service.get("configs", []):
+            source = entry["source"] if isinstance(entry, dict) else entry
+            assert set(configs[source]) == {"file"}, (name, source)
+            assert (ROOT / configs[source]["file"]).is_file(), (name, source)

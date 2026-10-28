@@ -144,6 +144,8 @@ const CHECK_LABELS: Record<string, string> = {
   missing_cover: "Missing Covers",
   duplicate_tracks: "Duplicate Tracks",
   shadow_quality_tracks: "Lower Quality Copies",
+  edition_overlap: "Overlapping Editions",
+  album_split_folders: "Split Album Folders",
 };
 
 const CHECK_DESCRIPTIONS: Record<string, string> = {
@@ -168,6 +170,10 @@ const CHECK_DESCRIPTIONS: Record<string, string> = {
     "The same track appears more than once inside an album; the automatic cleanup skipped these",
   shadow_quality_tracks:
     "Lower quality copies of tracks that already exist in a better format",
+  edition_overlap:
+    "Two editions of the same release share most of their tracks; keep, quarantine or dismiss each one",
+  album_split_folders:
+    "An album has tracks stored outside its own folder; run the artist layout fix to consolidate them",
 };
 
 const SCOPE_TONES: Record<string, string> = {

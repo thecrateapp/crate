@@ -21,6 +21,7 @@ const (
 	AgentRuntime     = "runtime.py"
 	OperatorOverlay  = "compose.operator.yaml"
 	OperatorExample  = "config.operator.example.json"
+	ProvenanceProxy  = "provenance-docker.haproxy.cfg"
 )
 
 // Sources maps each embedded file to its path from the repository root.
@@ -33,6 +34,7 @@ var Sources = map[string]string{
 	AgentRuntime:     "deploy/hermes/runtime.py",
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
+	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
 }
 
 // Deployed maps the embedded files written into the install folder to
@@ -45,6 +47,7 @@ var Deployed = map[string]string{
 	AgentRuntime:     "deploy/hermes/runtime.py",
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
+	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
 }
 
 func Read(name string) ([]byte, error) {

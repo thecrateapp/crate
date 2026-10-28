@@ -14,6 +14,7 @@ const { isCastSessionActiveMock } = vi.hoisted(() => ({
 
 vi.mock("@/contexts/player-utils", () => ({
   getStreamUrl: (track: Track) => `/stream/${track.id}`,
+  canonicalMediaUrl: (url: string) => url.replace(/[?&]media_ticket=[^&]*/, ""),
 }));
 
 vi.mock("@/lib/gapless-player", () => ({
@@ -114,6 +115,59 @@ describe("usePlayerEngineCallbacks", () => {
 
     expect(options.commitIsBuffering).not.toHaveBeenCalled();
     expect(options.scheduleStallProtection).not.toHaveBeenCalled();
+  });
+
+  it("recovers a current-track stream error loaded with a media ticket", async () => {
+    const options = createOptions();
+    options.engineTrackMapRef.current = new Map([
+      ["/stream/a?media_ticket=expired", [TRACK_A]],
+      ["/stream/b?media_ticket=expired", [TRACK_B]],
+    ]);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onError?.(
+      "/stream/a?media_ticket=expired",
+      "MEDIA_ERR_NETWORK",
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(options.beginSoftInterruption).toHaveBeenCalledWith("stream");
+    consoleError.mockRestore();
+  });
+
+  it("ignores stream errors from a ticketed preload track", async () => {
+    const options = createOptions();
+    options.engineTrackMapRef.current = new Map([
+      ["/stream/a?media_ticket=fresh", [TRACK_A]],
+      ["/stream/b?media_ticket=expired", [TRACK_B]],
+    ]);
+    const consoleWarn = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onError?.(
+      "/stream/b?media_ticket=expired",
+      "MEDIA_ERR_NETWORK",
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(options.beginSoftInterruption).not.toHaveBeenCalled();
+    consoleWarn.mockRestore();
+  });
+
+  it("matches the current track by canonical URL when the engine map misses", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onBuffering?.("/stream/a?media_ticket=fresh");
+
+    expect(options.scheduleStallProtection).toHaveBeenCalledTimes(1);
   });
 
   it("arms stall protection without showing buffering while current audio is still playing", () => {

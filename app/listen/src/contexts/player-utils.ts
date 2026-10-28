@@ -205,7 +205,9 @@ function sanitizeTrackForPersistence(track: Track): Track {
   };
 }
 
-function canonicalMediaUrl(url: string | null | undefined): string | undefined {
+export function canonicalMediaUrl(
+  url: string | null | undefined,
+): string | undefined {
   if (!url) return undefined;
   try {
     const parsed = new URL(url, "https://crate.local");
@@ -268,7 +270,7 @@ export function getOfflineStreamUrl(
 ): string | null {
   if (!track.entityUid && !track.path) return null;
   return getOfflineNativePlaybackUrl(
-    track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
+    track.entityUid ? { entityUid: track.entityUid } : (track.path ?? null),
     undefined,
     options,
   );

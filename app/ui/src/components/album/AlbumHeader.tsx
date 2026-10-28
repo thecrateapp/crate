@@ -1,7 +1,14 @@
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Bot, Download, AlignLeft, Save, Share2 } from "@crate/ui/icons";
+import {
+  Bot,
+  Download,
+  AlignLeft,
+  Save,
+  Share2,
+  Shield,
+} from "@crate/ui/icons";
 import { PageHero } from "@crate/ui/domain/hero";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import {
@@ -20,10 +27,12 @@ import {
 } from "@/components/genres/GenrePill";
 import { ImageCropUpload } from "@/components/ImageCropUpload";
 import { api } from "@/lib/api";
+import { useHealthDiagnosis } from "@/hooks/use-health-diagnosis";
 import {
   albumActionApiPath,
   albumArtworkApiPath,
   albumCoverApiUrl,
+  albumManagementApiPath,
   artistBackgroundApiUrl,
   artistPagePath,
 } from "@/lib/library-routes";
@@ -70,6 +79,7 @@ interface AlbumHeaderProps {
   canEditArtwork?: boolean;
   canEnrich?: boolean;
   canQueueMetadata?: boolean;
+  canDiagnose?: boolean;
   children?: React.ReactNode;
 }
 
@@ -115,8 +125,16 @@ export function AlbumHeader({
   canEditArtwork = isAdmin,
   canEnrich = isAdmin,
   canQueueMetadata = isAdmin,
+  canDiagnose = isAdmin,
   children,
 }: AlbumHeaderProps) {
+  const { diagnose, diagnosing } = useHealthDiagnosis({
+    endpoint: albumManagementApiPath(
+      { albumId, albumEntityUid },
+      "health-recheck",
+    ),
+    reviewPath: `${artistPagePath({ artistId, artistSlug, artistName: artist })}?repair=1`,
+  });
   const [coverCacheBust, setCoverCacheBust] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [metadataAction, setMetadataAction] =
@@ -196,7 +214,7 @@ export function AlbumHeader({
         const response = await api<{ task_id: string }>(
           "/api/manage/sync-lyrics",
           "POST",
-          { ...albumReference, limit: 500 },
+          { ...albumReference, refresh_mode: "due", limit: 500 },
         );
         onMetadataTaskQueued?.(action, response.task_id);
         toast.success("Lyrics sync queued");
@@ -376,6 +394,16 @@ export function AlbumHeader({
                   />
                 </ActionButton>
               </>
+            ) : null}
+            {canDiagnose ? (
+              <ActionButton
+                label="Diagnose"
+                tooltip="Run health checks for this album's artist"
+                onClick={() => void diagnose()}
+                loading={diagnosing}
+              >
+                <Shield data-admin-ux="album-diagnose" aria-hidden="true" />
+              </ActionButton>
             ) : null}
             {children}
           </ActionGroup>

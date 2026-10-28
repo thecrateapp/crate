@@ -19,6 +19,7 @@ import {
   ListMusic,
   Pencil,
   RefreshCw,
+  Shield,
   Toolbox,
   Tag,
   Trash2,
@@ -82,6 +83,8 @@ interface ArtistHeroSectionProps {
   onAnalyze: () => void;
   onEditMetadata?: () => void;
   onRepair: () => void;
+  onDiagnose?: () => void;
+  diagnosing?: boolean;
   metadataAction?: "lyrics" | "portable" | "export" | null;
   corePlaylistCreating?: boolean;
   onCreateCorePlaylist?: () => void;
@@ -135,6 +138,8 @@ export function ArtistHeroSection({
   onAnalyze,
   onEditMetadata,
   onRepair,
+  onDiagnose,
+  diagnosing = false,
   metadataAction = null,
   corePlaylistCreating = false,
   onCreateCorePlaylist,
@@ -225,6 +230,16 @@ export function ArtistHeroSection({
           onClick={onRepair}
         >
           <Toolbox data-admin-ux="artist-repair" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+      {canRepair && onDiagnose ? (
+        <ActionButton
+          label="Diagnose"
+          tooltip="Run health checks for this artist"
+          onClick={onDiagnose}
+          loading={diagnosing}
+        >
+          <Shield data-admin-ux="artist-diagnose" aria-hidden="true" />
         </ActionButton>
       ) : null}
       {canMerge && onMerge ? (

@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 
 from crate.agent_access import AgentPrincipal
 from crate.agent_diagnostics import DiagnosticError
-from crate.agent_operation_catalog import operation_grant, public_operation_result
+from crate.agent_operation_catalog import (
+    operation_grant,
+    plan_ttl_minutes,
+    public_operation_result,
+)
 from crate.db.repositories import agent_requests as requests
 from crate.db.repositories.agent_plans import (
     _document,
@@ -147,9 +151,10 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
         current.execute(
             text("""INSERT INTO agent_repair_plans
             (id,principal_id,version,operation,document,execution_data,mandatory_approval,approval_required,
-             policy_revision,required_grants,authorization_context,state)
+             policy_revision,required_grants,authorization_context,state,expires_at)
             VALUES (:id,:principal,:version,:operation,CAST(:document AS jsonb),CAST(:execution AS jsonb),
-             :mandatory,:approval,:policy,:grants,CAST(:context AS jsonb),:state)"""),
+             :mandatory,:approval,:policy,:grants,CAST(:context AS jsonb),:state,
+             NOW() + make_interval(mins => :ttl_minutes))"""),
             {
                 "id": plan_id,
                 "principal": job["principal_id"],
@@ -163,6 +168,7 @@ def publish_plan(task_id: str, compiled: dict, *, session=None) -> dict:
                 "grants": job["required_grants"],
                 "context": json.dumps(job["authorization_context"]),
                 "state": "awaiting_approval" if approval else "ready",
+                "ttl_minutes": plan_ttl_minutes(document["operation"]),
             },
         )
         result = {

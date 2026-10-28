@@ -921,6 +921,20 @@ def scale_args(settings: dict) -> list:
     return args
 
 
+def start_created(args, runner=run) -> list:
+    """The operator overlay recreates crate-api and the workers; a failed up must
+    not leave them created but stopped."""
+    listed = runner(
+        compose_argv(args, "operator")
+        + ["ps", "-a", "--status", "created", "--format", "{{.Name}}"],
+        check=False,
+    )
+    names = (getattr(listed, "stdout", "") or "").split()
+    if names:
+        runner(["docker", "start", *names], check=False, timeout=300)
+    return names
+
+
 def start(args, settings, runner=run) -> list:
     profile = PROFILES[args.profile]
     other = PROFILES["agent" if args.profile == "operator" else "operator"]
@@ -938,7 +952,18 @@ def start(args, settings, runner=run) -> list:
             "--no-deps",
             profile.container,
         ]
-    runner(argv, capture=False, timeout=900)
+    try:
+        runner(argv, capture=False, timeout=900)
+    except SetupError as error:
+        if args.profile != "operator":
+            raise
+        restarted = start_created(args, runner)
+        detail = (
+            f"; started the services it left created: {', '.join(restarted)}"
+            if restarted
+            else ""
+        )
+        raise SetupError(f"{error}{detail}") from None
     deadline = time.monotonic() + 90
     while not container_running(profile.container, runner):
         if time.monotonic() > deadline:
@@ -1376,7 +1401,16 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=("init", "check", "model", "auth", "smoke", "scale-args", "revoke"),
+        choices=(
+            "init",
+            "check",
+            "up",
+            "model",
+            "auth",
+            "smoke",
+            "scale-args",
+            "revoke",
+        ),
     )
     parser.add_argument("--profile", choices=tuple(PROFILES), default="agent")
     parser.add_argument("--env-file", type=Path, default=REPO / ".env")
@@ -1429,6 +1463,9 @@ def main(argv=None) -> int:
             return 0
         if args.command == "revoke":
             print("\n".join(revoke(args, settings)))
+            return 0
+        if args.command == "up":
+            print("\n".join(start(args, settings)))
             return 0
         if args.command == "model":
             print("\n".join(model_command(args, settings, prompter)))

@@ -62,7 +62,7 @@ def observe(supervisor, now, **kwargs):
 
 def messages(state):
     return [
-        item["message"]
+        item["message"].rsplit("\nref ", 1)[0]
         for item in sorted(
             state.snapshot()["outbox"].values(), key=lambda item: item["created_at"]
         )
@@ -115,13 +115,18 @@ def test_health_rule_opens_escalates_and_resolves_with_breach_detail(state):
     observe(supervisor, BASE + 360, health={"score": 90, "breaches": []})
     observe(supervisor, BASE + 480, health={"score": 100, "breaches": []})
     sent = messages(state)
-    assert [message.split("] ")[1].split(";")[0] for message in sent] == [
-        "lab/instance/health-score opened",
-        "lab/instance/health-score escalated",
-        "lab/instance/health-score resolved",
+    assert [message.split("\n")[0] for message in sent] == [
+        "Crate WARNING · Instance: health score 70 (limit 70)",
+        "Crate CRITICAL · Instance: health score 40 (limit 40)",
+        "Crate RESOLVED · Instance: health score back to 100",
     ]
-    assert "severity=critical" in sent[1]
-    assert '"detail": [{"name": "RAM usage"' in sent[0]
+    assert sent[0].split("\n")[1:] == [
+        "Since 08:02 UTC",
+        "RAM usage 97",
+        "lab/instance/health-score · rev 1",
+    ]
+    assert sent[2].split("\n")[1] == "Lasted 6 min"
+    assert "{" not in "".join(sent)
     assert state.snapshot()["incidents"]["lab/instance/health-score"]["state"] == (
         "resolved"
     )
@@ -151,7 +156,8 @@ def test_health_reopen_within_cooldown_is_deferred_until_cooldown(state):
     assert len(messages(state)) == 2
     observe(supervisor, resolved_at + 1800, health={"score": 60, "breaches": []})
     sent = messages(state)
-    assert len(sent) == 3 and "health-score opened" in sent[-1]
+    assert len(sent) == 3
+    assert sent[-1].startswith("Crate WARNING · Instance: health score 60")
     assert "deferred" not in state.snapshot()["incidents"][incident["key"]]
 
 
@@ -181,7 +187,7 @@ def test_failed_tasks_baseline_then_immediate_alert_then_rate_limited_digest(sta
     )
     sent = messages(state)
     assert len(sent) == 1
-    assert sent[0].split("] ")[1].startswith("lab/tasks/failed-tasks new;")
+    assert sent[0].startswith("lab/tasks/failed-tasks new;")
     payload = json.loads(sent[0].split("new; ", 1)[1])
     assert payload["group"] == "enrich_artist" and payload["count"] == 1
     assert payload["latest"][0]["id"] == "new-1"
@@ -354,7 +360,7 @@ def test_alert_rules_consume_the_real_observability_summary(state, monkeypatch):
     coverage = supervisor.status(later.timestamp())["coverage"]
     assert all(coverage[name]["valid"] for name in coverage)
     sent = " ".join(messages(state))
-    assert "lab/instance/health-score opened; severity=critical" in sent
+    assert "Crate CRITICAL · Instance: health score 40 (limit 40)" in sent
     assert "lab/tasks/failed-tasks new;" in sent and '"f-1"' in sent
     assert "lab/library/new-releases new;" in sent and '"album": "B"' in sent
 
@@ -369,6 +375,10 @@ def test_alert_rules_consume_the_real_observability_summary(state, monkeypatch):
         {"kind": "high", "field": ("x",), "group_field": ("type",)},
         {"kind": "high", "field": ("x",), "cooldown_seconds": 86401},
         {"kind": "high", "field": ("x",), "cooldown_seconds": 1.5},
+        {"kind": "high", "field": ("x",), "notify_after_seconds": -1},
+        {"kind": "high", "field": ("x",), "notify_after_seconds": 86401},
+        {"kind": "high", "field": ("x",), "notify_after_seconds": 1.5},
+        {"kind": "high", "field": ("x",), "notify_after_seconds": True},
     ],
 )
 def test_alert_rule_shapes_are_closed(overrides):
@@ -380,3 +390,84 @@ def test_alert_rule_shapes_are_closed(overrides):
             source_path=("data", "sources", "failed_tasks"),
             **overrides,
         )
+
+
+def observe_release(supervisor, now, available):
+    source = (
+        {
+            "source": "host_verified_release",
+            "availability": "available",
+            "observed_at": iso(now),
+            "coverage": "partial",
+            "data": {"release_sha": "a" * 40},
+        }
+        if available
+        else {"source": "host_verified_release", "availability": "unavailable"}
+    )
+    supervisor.observe(
+        {
+            supervisor.rules[0].request_key: {
+                "data": {"sources": {"release_manifest": source}}
+            }
+        },
+        now,
+    )
+
+
+def test_notification_delay_defaults_by_rule_kind():
+    rules = example_rules()
+    assert rules["release-evidence"].notify_delay == 300
+    assert rules["health-score"].notify_delay == 0
+    assert rules["pending"].notify_delay == 0
+    custom = Rule(
+        id="x",
+        subsystem="version",
+        tool="get_instance_inventory",
+        source_path=("data",),
+        notify_after_seconds=0,
+    )
+    assert custom.notify_delay == 0
+
+
+def test_brief_availability_gap_after_restart_stays_silent(state):
+    supervisor = Supervisor(state, "lab", [example_rules()["release-evidence"]])
+    for step in range(5):
+        observe_release(supervisor, BASE + step * 30, available=False)
+    incident = state.snapshot()["incidents"]["lab/version/release-evidence"]
+    assert incident["severity"] == "critical" and incident["deferred"] == "opened"
+    observe_release(supervisor, BASE + 150, available=True)
+    observe_release(supervisor, BASE + 180, available=True)
+    incident = state.snapshot()["incidents"]["lab/version/release-evidence"]
+    assert incident["state"] == "resolved" and "deferred" not in incident
+    assert not messages(state)
+    kinds = [event["kind"] for event in state.events()["events"]]
+    assert kinds.count("incident_opened") == 1
+    assert kinds.count("incident_escalated") == 1
+    assert kinds.count("incident_resolved") == 1
+
+
+def test_sustained_availability_gap_notifies_once_with_readable_text(state):
+    supervisor = Supervisor(state, "lab", [example_rules()["release-evidence"]])
+    for step in range(11):
+        observe_release(supervisor, BASE + step * 30, available=False)
+    assert not messages(state)
+    observe_release(supervisor, BASE + 330, available=False)
+    sent = messages(state)
+    assert sent == [
+        "Crate CRITICAL · Version: release evidence unavailable\n"
+        "Since 08:00 UTC (5 min)\n"
+        "lab/version/release-evidence · rev 2"
+    ]
+    observe_release(supervisor, BASE + 420, available=True)
+    observe_release(supervisor, BASE + 450, available=True)
+    sent = messages(state)
+    assert sent[1:] == [
+        "Crate RESOLVED · Version: release evidence available again\n"
+        "Lasted 7 min\n"
+        "lab/version/release-evidence · rev 3"
+    ]
+    raw = [item["message"] for item in state.snapshot()["outbox"].values()]
+    assert all(
+        message.endswith("\nref " + item_id)
+        for message, item_id in zip(raw, state.snapshot()["outbox"])
+    )

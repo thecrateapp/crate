@@ -1022,6 +1022,7 @@ export function Album() {
         canEditArtwork={canEditMetadata}
         canEnrich={canEditMetadata && !data.is_pre_release}
         canQueueMetadata={canEditMetadata && !data.is_pre_release}
+        canDiagnose={hasCapability("library.repair.run")}
         onAnalysisComplete={() => {
           const endpoint = artistActionApiPath(
             {

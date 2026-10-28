@@ -818,10 +818,8 @@ agent-up: _agent-profile ## Start Crate Agent or Crate Operator after checking p
 	@$(AGENT_SETUP) check $(AGENT_ARGS) || { echo "$(RED)Fix the items above (make agent-init sets them up)$(NC)"; exit 1; }
 ifeq ($(AGENT_PROFILE),operator)
 	@echo "$(YELLOW)Crate Operator recreates crate-api and the workers with the operator overlay$(NC)"
-	@$(AGENT_DC) up -d $$($(AGENT_SETUP) scale-args $(AGENT_ARGS))
-else
-	@$(AGENT_DC) up -d --no-deps $(AGENT_SERVICES)
 endif
+	@$(AGENT_SETUP) up $(AGENT_ARGS)
 	@echo "$(GREEN)$(AGENT_NAME) is starting. Follow it with make agent-logs$(NC)"
 
 .PHONY: agent-down

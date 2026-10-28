@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from crate.db.tx import read_scope, transaction_scope
+from crate.db.tx import optional_scope, read_scope, transaction_scope
+from crate.lyrics_cache_policy import clean_lyrics, should_replace_lyrics
 
 
 _SPACE_RE = re.compile(r"\s+")
@@ -181,4 +183,125 @@ def store_lyrics(
     return _payload_from_row(row)
 
 
-__all__ = ["get_cached_lyrics", "lyrics_key", "store_lyrics"]
+_ROW_COLUMNS = "provider, synced_lyrics, plain_lyrics, found, updated_at"
+
+
+def merge_lyrics(
+    artist: str,
+    title: str,
+    *,
+    synced_lyrics: str | None = None,
+    plain_lyrics: str | None = None,
+    provider: str = "lrclib",
+    track_id: int | None = None,
+    track_entity_uid: str | None = None,
+    source_json: dict[str, Any] | None = None,
+    found: bool | None = None,
+    session: Session | None = None,
+) -> dict[str, Any]:
+    artist_clean = str(artist or "").strip()
+    title_clean = str(title or "").strip()
+    artist_key = lyrics_key(artist_clean)
+    title_key = lyrics_key(title_clean)
+    if not artist_key or not title_key:
+        raise ValueError("artist and title are required")
+
+    synced_value = clean_lyrics(synced_lyrics)
+    plain_value = clean_lyrics(plain_lyrics)
+    has_lyrics = bool(synced_value or plain_value)
+    params = {
+        "provider": provider,
+        "artist_key": artist_key,
+        "title_key": title_key,
+        "artist": artist_clean,
+        "title": title_clean,
+        "track_id": track_id,
+        "track_entity_uid": track_entity_uid,
+        "synced_lyrics": synced_value,
+        "plain_lyrics": plain_value,
+        "found": has_lyrics if found is None else bool(found) and has_lyrics,
+        "source_json": json.dumps(source_json or {}, default=str),
+    }
+    candidate = {"syncedLyrics": synced_value, "plainLyrics": plain_value}
+
+    def _impl(current: Session) -> dict[str, Any]:
+        inserted = (
+            current.execute(
+                text(
+                    f"""
+                INSERT INTO track_lyrics (
+                    provider, artist_key, title_key, artist, title,
+                    track_id, track_entity_uid, synced_lyrics, plain_lyrics,
+                    found, source_json, updated_at
+                )
+                VALUES (
+                    :provider, :artist_key, :title_key, :artist, :title,
+                    :track_id, CAST(:track_entity_uid AS uuid), :synced_lyrics, :plain_lyrics,
+                    :found, CAST(:source_json AS jsonb), NOW()
+                )
+                ON CONFLICT (provider, artist_key, title_key) DO NOTHING
+                RETURNING {_ROW_COLUMNS}
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
+        if inserted:
+            return _payload_from_row(inserted)
+
+        existing = (
+            current.execute(
+                text(
+                    f"""
+                SELECT {_ROW_COLUMNS}
+                FROM track_lyrics
+                WHERE provider = :provider
+                  AND artist_key = :artist_key
+                  AND title_key = :title_key
+                FOR UPDATE
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .one()
+        )
+
+        if should_replace_lyrics(_payload_from_row(existing), candidate):
+            statement = f"""
+                UPDATE track_lyrics SET
+                    artist = :artist,
+                    title = :title,
+                    track_id = COALESCE(:track_id, track_id),
+                    track_entity_uid = COALESCE(CAST(:track_entity_uid AS uuid), track_entity_uid),
+                    synced_lyrics = :synced_lyrics,
+                    plain_lyrics = :plain_lyrics,
+                    found = :found,
+                    source_json = CAST(:source_json AS jsonb),
+                    updated_at = NOW()
+                WHERE provider = :provider
+                  AND artist_key = :artist_key
+                  AND title_key = :title_key
+                RETURNING {_ROW_COLUMNS}
+                """
+        else:
+            statement = f"""
+                UPDATE track_lyrics SET
+                    track_id = COALESCE(track_id, :track_id),
+                    track_entity_uid = COALESCE(track_entity_uid, CAST(:track_entity_uid AS uuid)),
+                    updated_at = NOW()
+                WHERE provider = :provider
+                  AND artist_key = :artist_key
+                  AND title_key = :title_key
+                RETURNING {_ROW_COLUMNS}
+                """
+        row = current.execute(text(statement), params).mappings().one()
+        return _payload_from_row(row)
+
+    with optional_scope(session) as current:
+        return _impl(current)
+
+
+__all__ = ["get_cached_lyrics", "lyrics_key", "merge_lyrics", "store_lyrics"]

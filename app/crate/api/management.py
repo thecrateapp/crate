@@ -621,7 +621,13 @@ def recheck_artist_health(request: Request, name: str):
     _require_repair_operator(request)
     params = {
         "artists": [name],
-        "check_types": ["artist_layout_fix", "duplicate_albums", "duplicate_tracks"],
+        "check_types": [
+            "album_split_folders",
+            "artist_layout_fix",
+            "duplicate_albums",
+            "duplicate_tracks",
+            "edition_overlap",
+        ],
     }
     dedup_key = f"health-recheck:{name}"
     task_id = create_task_dedup("health_check", params, dedup_key=dedup_key)
@@ -761,6 +767,32 @@ def recheck_artist_health_by_entity_uid(request: Request, artist_entity_uid: str
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return recheck_artist_health(request, artist_name)
+
+
+@router.post(
+    "/albums/{album_id}/health-recheck",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Re-run the health checks of an album's artist in the worker",
+)
+def recheck_album_health_by_id(request: Request, album_id: int):
+    album = get_library_album_by_id(album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    return recheck_artist_health(request, album["artist"])
+
+
+@router.post(
+    "/albums/by-entity/{album_entity_uid}/health-recheck",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Re-run the health checks of an album's artist in the worker by entity UID",
+)
+def recheck_album_health_by_entity_uid(request: Request, album_entity_uid: str):
+    album = get_library_album_by_entity_uid(album_entity_uid)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    return recheck_artist_health(request, album["artist"])
 
 
 @router.post(

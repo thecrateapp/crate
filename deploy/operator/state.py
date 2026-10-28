@@ -170,7 +170,7 @@ def enqueue(data, message, now, *, incident=None):
     logical_id = uuid.uuid4().hex
     data["outbox"][logical_id] = {
         "id": logical_id,
-        "message": f"[Crate alert {logical_id}] {message}"[:3500],
+        "message": f"{message[:3450]}\nref {logical_id}",
         "incident": incident,
         "state": "pending",
         "created_at": now,

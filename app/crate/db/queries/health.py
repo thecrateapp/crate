@@ -177,6 +177,77 @@ def get_duplicate_albums(artist_name: str | None = None) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def get_album_title_sets(artist_name: str | None = None) -> list[dict]:
+    """Albums with their track titles, for comparing editions of one release."""
+    artist_filter = artist_name.strip() if artist_name and artist_name.strip() else None
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT la.id, la.artist, la.name,
+                           COALESCE(
+                               array_agg(lt.title) FILTER (
+                                   WHERE NULLIF(BTRIM(lt.title), '') IS NOT NULL
+                               ),
+                               ARRAY[]::text[]
+                           ) AS titles
+                    FROM library_albums la
+                    LEFT JOIN library_tracks lt ON lt.album_id = la.id
+                    WHERE la.quarantined_at IS NULL
+                      AND (:artist_name IS NULL OR LOWER(la.artist) = LOWER(:artist_name))
+                    GROUP BY la.id
+                    ORDER BY la.artist, la.id
+                    """
+                ),
+                {"artist_name": artist_filter},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(r) for r in rows]
+
+
+def get_split_album_folders(artist_name: str | None = None) -> list[dict]:
+    """Albums with tracks stored outside their own folder."""
+    artist_filter = artist_name.strip() if artist_name and artist_name.strip() else None
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    WITH placed AS (
+                        SELECT la.id AS album_id, la.artist, la.name AS album,
+                               la.path AS album_path,
+                               regexp_replace(lt.path, '/[^/]+$', '') AS folder
+                        FROM library_albums la
+                        JOIN library_tracks lt ON lt.album_id = la.id
+                        WHERE la.quarantined_at IS NULL
+                          AND (:artist_name IS NULL OR LOWER(la.artist) = LOWER(:artist_name))
+                    )
+                    SELECT album_id, artist, album, album_path,
+                           array_agg(DISTINCT folder ORDER BY folder) AS folders,
+                           COUNT(*) FILTER (
+                               WHERE folder <> album_path
+                                 AND folder NOT LIKE album_path || '/%'
+                           ) AS foreign_track_count
+                    FROM placed
+                    GROUP BY album_id, artist, album, album_path
+                    HAVING COUNT(*) FILTER (
+                        WHERE folder <> album_path
+                          AND folder NOT LIKE album_path || '/%'
+                    ) > 0
+                    ORDER BY artist, album
+                    """
+                ),
+                {"artist_name": artist_filter},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(r) for r in rows]
+
+
 def get_all_track_paths() -> set[str]:
     with read_scope() as session:
         rows = session.execute(text("SELECT path FROM library_tracks")).mappings().all()

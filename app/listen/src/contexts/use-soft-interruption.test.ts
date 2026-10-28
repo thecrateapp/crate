@@ -481,6 +481,63 @@ describe("useSoftInterruption", () => {
     expect(gaplessPlayer.fadeInAndPlay).toHaveBeenCalled();
   });
 
+  it("reloads the web deck with fresh stream credentials after a stream error", async () => {
+    const recoverCurrentTrack = vi.fn(async () => true);
+    const onPlaybackRecovered = vi.fn();
+    serverUp();
+    const refs = createRefs({ recoverCurrentTrack, onPlaybackRecovered });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+
+    expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+    expect(onPlaybackRecovered).toHaveBeenCalledWith(0);
+  });
+
+  it("retries the web reload when fresh stream credentials cannot be resolved", async () => {
+    const recoverCurrentTrack = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
+    serverUp();
+    const refs = createRefs({ recoverCurrentTrack });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+
+    expect(recoverCurrentTrack).toHaveBeenCalledTimes(2);
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+  });
+
+  it("resumes the buffered web deck after an offline interruption", async () => {
+    const recoverCurrentTrack = vi.fn(async () => true);
+    serverUp();
+    const refs = createRefs({ recoverCurrentTrack });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("offline");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+
+    expect(gaplessPlayer.fadeInAndPlay).toHaveBeenCalled();
+    expect(recoverCurrentTrack).not.toHaveBeenCalled();
+  });
+
   describe("with the Android native player", () => {
     beforeEach(() => {
       mockUseNativePlayer.mockReturnValue(true);

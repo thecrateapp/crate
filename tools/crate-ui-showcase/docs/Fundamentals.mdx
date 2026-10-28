@@ -148,6 +148,11 @@ Native keyboard focus stays visible; truncated `link-inset` anchors retain an in
 and static underline on focus. This concerns link feedback; tab indicators and player transport
 keep their independent interaction contracts. See the live Foundations/Links story.
 
+Script-only focus targets never draw a ring: headings, `main` and dialog containers with
+`tabindex="-1"` receive focus for screen readers after navigation or when a modal opens, but they
+are not operable controls. WebKit re-applies `:focus-visible` to them when the window is
+reactivated, so the rule is unconditional rather than tied to the input modality.
+
 Linked StatNumber captions use the same high-accent foreground on hover and keyboard focus,
 with no beam or background. This behavior belongs to StatNumber itself. The numeral and unit
 keep their roles, and readonly metric captions remain subtle gray. See StatNumber/Linked.

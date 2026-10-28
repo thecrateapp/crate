@@ -152,8 +152,9 @@ def test_actual_sdk_direct_mutation_cannot_omit_server_provenance(
             # Read policy remains available during deployment drift.
             assert not (await client.call_tool("get_confirmation_policy", {})).is_error
 
+    presented = scalar("SELECT count(*) FROM agent_telegram_confirmations")
     asyncio.run(run())
-    assert scalar("SELECT count(*) FROM agent_telegram_confirmations") == 0
+    assert scalar("SELECT count(*) FROM agent_telegram_confirmations") == presented
 
 
 def test_database_readiness_is_real_bounded_read(command_world):

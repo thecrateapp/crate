@@ -257,11 +257,32 @@ def test_deploy_recreates_running_agent_or_operator_on_the_release_image(
     ] == recreated
 
 
-def test_deploy_ships_the_operator_overlay_with_the_compose_files() -> None:
+def _agent_tooling(deploy: str) -> list[str]:
+    block = deploy[deploy.index("AGENT_TOOLING=(") :]
+    return block[len("AGENT_TOOLING=(") : block.index(")")].split()
+
+
+def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     deploy = (ROOT / "scripts/deploy.sh").read_text()
-    assert "deploy/operator/compose.operator.yaml" in deploy
+    tooling = _agent_tooling(deploy)
+
+    assert set(tooling) == {
+        "Makefile",
+        "scripts/agent_setup.py",
+        "deploy/operator/compose.operator.yaml",
+        "deploy/operator/config.operator.example.json",
+        "deploy/operator/provenance-docker.haproxy.cfg",
+    }
+    for file in tooling:
+        assert (ROOT / file).is_file(), file
+    payload = deploy[
+        deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
+    ]
+    assert payload.count('for file in "${AGENT_TOOLING[@]}"; do') == 2
     sync = deploy[deploy.index("sync_config() {") :]
-    assert sync.index("compose.operator.yaml") < sync.index("deploy-remote.sh")
+    assert sync.index('for file in "${AGENT_TOOLING[@]}"; do') < sync.index(
+        "deploy-remote.sh"
+    )
 
 
 def _make_dry_run(target: str, *variables: str) -> str:
@@ -627,6 +648,22 @@ def test_remote_recovery_snapshot_captures_database_and_durable_redis() -> None:
     assert "recovery_complete" in script
     assert 'log "Stopping any quiesce service missed by Compose"' in snapshot_body
     assert 'docker stop --time 45 "$service"' in snapshot_body
+
+
+def test_recovery_snapshot_leaves_redis_running_for_the_pinned_deploy() -> None:
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    snapshot_body = script[
+        script.index("cmd_recovery_snapshot() {") : script.index("cmd_config() {")
+    ]
+    stop = snapshot_body.index('dc stop --timeout 30 "$redis_service"')
+    capture = snapshot_body.index("tar -C /data -czf /backup/redis-durable.tar.gz .")
+    restart = snapshot_body.index('dc start "$redis_service"')
+
+    assert stop < capture < restart < snapshot_body.index("recovery_complete")
+    prerequisites = script[
+        script.index("for service in crate-postgres crate-redis; do") :
+    ]
+    assert "is not running" in prerequisites
 
 
 def test_remote_backup_preserves_a_sealed_recovery_set() -> None:

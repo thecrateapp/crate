@@ -58,6 +58,7 @@ function props() {
     onWritePortableMetadata: vi.fn(),
     onExportRichMetadata: vi.fn(),
     onRepair: vi.fn(),
+    onDiagnose: vi.fn(),
     onMerge: vi.fn(),
     onDelete: vi.fn(),
   };
@@ -87,6 +88,7 @@ describe("ArtistHeroSection", () => {
       ["Metadata", model.onWritePortableMetadata],
       ["Export", model.onExportRichMetadata],
       ["Repair (2)", model.onRepair],
+      ["Diagnose", model.onDiagnose],
       ["Merge Alias", model.onMerge],
       ["Delete", model.onDelete],
     ] as const) {

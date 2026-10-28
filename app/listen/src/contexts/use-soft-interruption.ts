@@ -349,6 +349,16 @@ export function useSoftInterruption({
           }
           onPlaybackRecovered?.(recoveryFailuresRef.current);
           cancelSoftInterruptionRef.current();
+        } else if (
+          softInterruptionReasonRef.current === "stream" &&
+          recoverCurrentTrack
+        ) {
+          if (!(await recoverCurrentTrack())) {
+            recoveryFailuresRef.current += 1;
+            scheduleRecoveryCheck();
+            return;
+          }
+          onPlaybackRecovered?.(recoveryFailuresRef.current);
         } else {
           await gpFadeInAndPlay(SOFT_PAUSE_FADE_MS);
         }

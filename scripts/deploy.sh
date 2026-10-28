@@ -186,6 +186,14 @@ resolve_remote_release_settings() {
   export DEPLOY_IMAGE_TAG DEPLOY_IMAGE_OWNER DEPLOY_IMAGE_REGISTRY
 }
 
+AGENT_TOOLING=(
+  Makefile
+  scripts/agent_setup.py
+  deploy/operator/compose.operator.yaml
+  deploy/operator/config.operator.example.json
+  deploy/operator/provenance-docker.haproxy.cfg
+)
+
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
   mkdir -p "$TMP_DIR/deploy/traefik" "$TMP_DIR/deploy/hermes"
@@ -198,10 +206,13 @@ prepare_payload() {
     if [[ -d "$ROOT_DIR/deploy/hermes" ]]; then
       cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
     fi
-    if [[ -f "$ROOT_DIR/deploy/operator/compose.operator.yaml" ]]; then
-      mkdir -p "$TMP_DIR/deploy/operator"
-      cp "$ROOT_DIR/deploy/operator/compose.operator.yaml" "$TMP_DIR/deploy/operator/"
-    fi
+    local file
+    for file in "${AGENT_TOOLING[@]}"; do
+      if [[ -f "$ROOT_DIR/$file" ]]; then
+        mkdir -p "$TMP_DIR/$(dirname "$file")"
+        cp "$ROOT_DIR/$file" "$TMP_DIR/$file"
+      fi
+    done
   else
     git -C "$ROOT_DIR" archive "$DEPLOY_REF" docker-compose.yaml docker-compose.project.yaml \
       deploy/traefik/federation-readplane.yml \
@@ -209,10 +220,12 @@ prepare_payload() {
     if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:deploy/hermes" 2>/dev/null; then
       git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
     fi
-    if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:deploy/operator/compose.operator.yaml" 2>/dev/null; then
-      git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/operator/compose.operator.yaml \
-        | tar -x -C "$TMP_DIR"
-    fi
+    local file
+    for file in "${AGENT_TOOLING[@]}"; do
+      if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:${file}" 2>/dev/null; then
+        git -C "$ROOT_DIR" archive "$DEPLOY_REF" "$file" | tar -x -C "$TMP_DIR"
+      fi
+    done
   fi
 
   scp "$REMOTE:$SERVER_PATH/.env" "$TMP_DIR/.env"
@@ -326,11 +339,13 @@ sync_config() {
   if [[ -f "$TMP_DIR/deploy/hermes/activate_context.py" ]]; then
     scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
-  if [[ -f "$TMP_DIR/deploy/operator/compose.operator.yaml" ]]; then
-    ssh_remote "mkdir -p '$SERVER_PATH/deploy/operator'"
-    scp "$TMP_DIR/deploy/operator/compose.operator.yaml" \
-      "$REMOTE:$SERVER_PATH/deploy/operator/compose.operator.yaml"
-  fi
+  local file
+  for file in "${AGENT_TOOLING[@]}"; do
+    if [[ -f "$TMP_DIR/$file" ]]; then
+      ssh_remote "mkdir -p '$SERVER_PATH/$(dirname "$file")'"
+      scp "$TMP_DIR/$file" "$REMOTE:$SERVER_PATH/$file"
+    fi
+  done
   scp "$TMP_DIR/agent-context.tar.gz" "$REMOTE:$SERVER_PATH/.deploy/agent-context.candidate.tar.gz"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
 

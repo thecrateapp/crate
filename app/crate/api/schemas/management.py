@@ -1,7 +1,7 @@
 """Schema models for management and admin operations."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -304,6 +304,7 @@ class LyricsSyncRequest(BaseModel):
     track_id: int | None = Field(default=None, ge=1)
     track_entity_uid: str | None = None
     force: bool = False
+    refresh_mode: Literal["missing", "due", "upgrade"] = "missing"
     limit: int = Field(default=500, ge=1, le=5000)
     delay_seconds: float = Field(default=0.2, ge=0, le=10)
 

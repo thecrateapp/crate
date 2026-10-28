@@ -39,9 +39,14 @@ decision; disabling/demoting the account or removing its required capabilities d
 
 1. Prepare the bounded operation using its existing MCP tool. Inspect the returned
    job until preparation completes, then read its complete immutable `get_plan`.
-2. Call `request_plan_confirmation` with the exact `plan_id`, `plan_version` and
-   `apply_after_approval: true` when the requested human decision should also admit
-   the operation. This call only creates presentation bookkeeping.
+2. When a library operation job publishes an approval-required plan, the worker
+   requests its native confirmation with `apply_after_approval: true` for principals
+   with an active human binding, so the buttons arrive without another model turn.
+   Otherwise, or for other plans, call `request_plan_confirmation` with the exact
+   `plan_id`, `plan_version` and `apply_after_approval: true` when the human decision
+   should also admit the operation; the same call returns an existing confirmation.
+   This only creates presentation bookkeeping. An expired plan fails with
+   `PLAN_STALE` and must be prepared again.
 3. The native presenter sends the entire exact plan as plain JSON pages, including
    every target, change, cost/impact, precondition, version/hash, policy and expiry.
    `Next` presents the next page. The backend permits `Approve` only after all
@@ -134,7 +139,9 @@ a timestamp within 60 seconds, a fresh 32-character hex nonce and a body at most
 16 KiB. Native callback identity comes only from PTB `Update` and `CallbackQuery`.
 The backend persists consumed Telegram update and query IDs across restarts.
 
-Confirmation validity is the earlier of plan expiry or 15 minutes. Each plan has
+Plans expire after 15 minutes, or 60 minutes for the read-only `health_check` and
+`quality_check` inspections. Confirmation validity is the earlier of plan expiry or
+that same window from the request. Each plan has
 one immutable confirmation, originating credential and apply choice. The full
 presentation is bounded to 180,000 UTF-8 bytes, split on character boundaries into
 pages of at most 3,200 bytes. Oversized plans must be narrowed before confirmation.

@@ -2512,6 +2512,7 @@ class TestHealthAPI:
             {
                 "album_entity_uid": album_uid,
                 "force": False,
+                "refresh_mode": "missing",
                 "limit": 1,
                 "delay_seconds": 0.2,
             },
@@ -2803,9 +2804,11 @@ class TestHealthAPI:
         assert task_type == "health_check"
         assert params["artists"] == ["Birds In Row"]
         assert set(params["check_types"]) == {
+            "album_split_folders",
             "artist_layout_fix",
             "duplicate_albums",
             "duplicate_tracks",
+            "edition_overlap",
         }
 
     def test_artist_health_recheck_reports_an_already_queued_check(self, test_app):

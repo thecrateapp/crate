@@ -66,7 +66,7 @@ Each module ends with an explicit `__all__` listing its public names.
    introduce the same revision number, preserve the released migration and renumber the unshipped
    branch migration after the current head.
 
-Performance (library_tracks ~48K rows, hot HTTP paths):
+Performance (library_tracks ~138K rows, hot HTTP paths):
 
 - No `COUNT`/`SUM`/`AVG` over `library_tracks` per request; precompute into stats/snapshot tables.
 - Batch lookups with `WHERE id = ANY(:ids)`; never loop single-row queries (N+1).
