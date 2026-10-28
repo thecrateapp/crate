@@ -7,11 +7,21 @@ from crate.db.queries.paths import get_music_path_row, list_music_path_rows
 from crate.db.repositories.paths import delete_music_path as _delete_music_path
 
 
-def get_music_path(path_id: int, user_id: int) -> dict | None:
+def get_music_path(
+    path_id: int, user_id: int, *, for_regeneration: bool = False
+) -> dict | None:
     row = get_music_path_row(path_id, user_id)
     if not row:
         return None
-    return serialize_music_path_row(dict(row), include_tracks=True)
+    payload = serialize_music_path_row(dict(row), include_tracks=True)
+    if for_regeneration:
+        metadata = row.get("generation_metadata") or {}
+        waypoints = metadata.get("requested_waypoints", row["waypoints"]) or []
+        payload["_requested_waypoints"] = [
+            {"type": waypoint["type"], "value": waypoint["value"]}
+            for waypoint in waypoints
+        ]
+    return payload
 
 
 def list_music_paths(user_id: int) -> list[dict]:

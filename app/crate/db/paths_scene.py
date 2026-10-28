@@ -871,6 +871,13 @@ def prepare_scene_path(
         dest_type=dest_type,
         tracks=tracks,
         candidates_by_genre=candidates,
+        validation_context={
+            "artist_similarity_graph": artist_similarity_graph,
+            "shared_members_graph": shared_members_graph,
+            "origin_genre_slug": route[0],
+            "destination_genre_slug": route[-1],
+            "max_repeat_per_artist": _MAX_REPEAT_PER_ARTIST,
+        },
     )
 
 
@@ -951,6 +958,11 @@ def _prepare_artist_scene_path(
         dest_type="artist",
         tracks=tracks,
         candidates_by_genre=candidates,
+        validation_context={
+            "artist_similarity_graph": artist_similarity_graph,
+            "shared_members_graph": shared_members_graph,
+            "max_repeat_per_artist": _MAX_REPEAT_PER_ARTIST,
+        },
     )
 
 

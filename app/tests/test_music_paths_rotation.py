@@ -298,15 +298,19 @@ def test_regeneration_forwards_saved_tracks_without_creating_listens(monkeypatch
     }
     plans, writes = [], []
     monkeypatch.setattr(
-        service, "get_music_path", lambda path_id, user_id: deepcopy(path)
+        service, "get_music_path", lambda path_id, user_id, **kwargs: deepcopy(path)
     )
     monkeypatch.setattr(
         service,
         "build_music_path_plan",
-        lambda *args, **kwargs: plans.append(kwargs) or {"tracks": replacement},
+        lambda *args, **kwargs: (
+            plans.append(kwargs) or {"tracks": replacement, "resolved_waypoints": []}
+        ),
     )
     monkeypatch.setattr(
-        service, "update_music_path_tracks", lambda *args: writes.append(args) or True
+        service,
+        "update_music_path_tracks",
+        lambda *args, **kwargs: writes.append(args) or True,
     )
 
     result = service.regenerate_music_path(3, 1)

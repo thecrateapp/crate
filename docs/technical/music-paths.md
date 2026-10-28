@@ -149,9 +149,9 @@ latency. Full acoustic planning and end-to-end HTTP latency remain release
 checks. Sanitized measurements and environments are in
 [`music-paths-evaluation.json`](../../app/tests/fixtures/recommendations/music-paths-evaluation.json).
 
-The [checkpoint 3.3 listening review](../../app/tests/fixtures/recommendations/music-paths-review.md)
-contains the controlled A/B/C/D lists. Approval is pending, especially for the
-strong punk-to-japanoise transition.
+The historical [checkpoint 3.3 comparison](../../app/tests/fixtures/recommendations/music-paths-review.md)
+retains the controlled A/B/C/D evidence, including the rejected punk-to-Japanoise
+shortcut. Its revised replacement is documented below.
 
 ## Revised bridge checkpoint
 
@@ -177,10 +177,44 @@ single probes: 2.979/2.605 s for the genre routes and 4.710 s for the 100-track
 reverse journey. They establish neither a p95 nor musical approval. The
 Propagandhi → New Order boundary remains highlighted for listening review.
 
+## Checkpoint 3.4: validation and persisted generation reports
+
+Generation validates endpoint identities, ordered waypoint resolution, available
+tracks, song families, progress and the requested count. Flexible acoustic
+anchors use the actual reserved IDs; canonical genre references are retained
+from routing, so aliases do not require another taxonomy lookup. Waypoints remain
+ordered guides rather than mandatory visits to a recording.
+
+The additive response fields are `is_partial`, `generated_step_count` and
+`warnings` (structured codes with relevant positions/counts). Revision 140 stores
+these generation results in `music_paths.generation_metadata` without changing
+HTTP statuses, the requested `step_count`, or saved track IDs/order. Legacy paths
+receive a cheap structural/count report.
+
+Requested waypoint references are preserved internally as type/value pairs,
+including unresolved guides. Regeneration retries them and updates tracks,
+reports and resolved guides in the same owner-scoped write. The internal
+regeneration descriptor is absent from public responses. Ordinary GET/replay
+does not replan or read listening history.
+
+Saved reads calculate current `playable` in the existing track JSON query using
+the library playability rules. Missing or withdrawn tracks remain in the saved
+sequence with `playable: false`. This current availability does not rewrite the
+persisted generation report.
+
+Optional AI proposals, including cached proposals, reuse deterministic
+eligibility checks: blocked versions, genre membership, duplicate families,
+anchors, neighbors and the scene artist cap. The latter is not imposed on the
+acoustic builder's softer repetition policy. A substitution cannot worsen audio
+or cultural connections to either neighbor or the destination and requires a
+strict musical improvement. The same novelty tiers as checkpoint 3.3 prevent
+small gains from undoing listening-history rotation. Existing musical graphs
+remain ephemeral validation context; they add no queries or persisted payload.
+Errors, obsolete context and proposals without an improvement retain the
+deterministic result.
+
 ## Remaining checkpoints
 
-- 3.4: shared deterministic validation and safe optional AI refinements, with
-  additive warnings for partial paths.
 - 3.5: explicit finite `path` playback source and warning presentation in Listen.
 
 PR3 is stacked on PR2 (#301). Evaluate representative journeys and review partial

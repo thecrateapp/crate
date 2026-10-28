@@ -28,14 +28,16 @@ def test_services_plan_with_owner_before_persistence(monkeypatch, operation):
     monkeypatch.setattr(
         service, "build_music_path_plan", lambda *a, **k: plans.append(k) or plan
     )
-    monkeypatch.setattr(service, "get_music_path", lambda *a: path.copy())
+    monkeypatch.setattr(service, "get_music_path", lambda *a, **k: path.copy())
     monkeypatch.setattr(
         service,
         "create_music_path_record",
         lambda **k: writes.append(k) or {"id": 7, "created_at": "today"},
     )
     monkeypatch.setattr(
-        service, "update_music_path_tracks", lambda *a: writes.append(a) or True
+        service,
+        "update_music_path_tracks",
+        lambda *a, **kwargs: writes.append(a) or True,
     )
     if operation == "create":
         from crate.db.paths_service_writes import create_music_path

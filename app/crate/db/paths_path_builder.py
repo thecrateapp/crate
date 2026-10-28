@@ -91,6 +91,7 @@ def compute_path(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     selection_seed: str | None = None,
+    diagnostics: dict | None = None,
 ) -> list[dict]:
     """Compute a music path through bliss vector space."""
     sim_graph = _load_artist_similarity_graph()
@@ -144,6 +145,7 @@ def compute_path(
             "entity_uid": entity_uid,
             "title": track["title"],
             "artist": track["artist"],
+            "album_artist": track.get("album_artist"),
             "artist_entity_uid": track.get("artist_entity_uid"),
             "album": track.get("album"),
             "album_id": track.get("album_id"),
@@ -179,6 +181,13 @@ def compute_path(
         previous_track_ids=previous_track_ids,
         selection_seed=selection_seed,
     )
+    if diagnostics is not None:
+        diagnostics.update(
+            {
+                "origin_track_id": first["id"] if first else None,
+                "destination_track_id": last["id"] if last else None,
+            }
+        )
     if first:
         path_tracks.append(make_entry(first, 0, 0.0))
         last_actual_vec = (

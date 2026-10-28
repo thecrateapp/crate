@@ -161,7 +161,7 @@ def find_anchor_track_row(
                 current.execute(
                     text(
                         f"""
-                    SELECT t.id, t.entity_uid, t.title, t.artist, a.name AS album,
+                    SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -230,7 +230,7 @@ def find_anchor_track_row(
             current.execute(
                 text(
                     f"""
-                SELECT t.id, t.entity_uid, t.title, t.artist, a.name AS album,
+                SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                        t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
                        t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -263,7 +263,7 @@ def find_anchor_track_row(
                 current.execute(
                     text(
                         f"""
-                    SELECT t.id, t.entity_uid, t.title, t.artist, a.name AS album,
+                    SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -302,6 +302,7 @@ def find_candidate_rows(
     use_track_artist: bool = False,
 ) -> list[dict]:
     artist_column = "t.artist" if use_track_artist else "a.artist"
+    album_artist_column = "a.artist AS album_artist," if use_track_artist else ""
     probe_vector = to_pgvector_literal(target)
     probe_array = list(target)
 
@@ -323,6 +324,7 @@ def find_candidate_rows(
                 text(
                     f"""
                 SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
+                       {album_artist_column}
                        a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
                        t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -353,6 +355,7 @@ def find_candidate_rows(
                     text(
                         f"""
                     SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
+                       {album_artist_column}
                            a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,

@@ -31,6 +31,7 @@ def _track(
     artist: str,
     genre_slug: str,
     year: int = 2000,
+    bpm: float = 100.0,
 ) -> dict:
     return {
         "id": track_id,
@@ -40,6 +41,7 @@ def _track(
         "genre_slug": genre_slug,
         "year": year,
         "duration": 180,
+        "bpm": bpm,
         "artist_country": "US",
         "artist_area": None,
         "artist_formed": None,
@@ -187,7 +189,7 @@ def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
 
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
-        _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock"),
+        _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock", bpm=180.0),
         _track(
             3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
         ),
@@ -239,7 +241,7 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
 
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
-        _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock"),
+        _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock", bpm=180.0),
         _track(
             3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
         ),

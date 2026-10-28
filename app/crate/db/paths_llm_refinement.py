@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pydantic import BaseModel, Field
 from crate.genre_taxonomy import slugify_genre
+from crate.music_path_validation import can_replace_path_track
 
 _MIN_REPLACEMENT_CONFIDENCE = 0.55
 _MAX_ALTERNATIVES = 80
@@ -57,6 +58,11 @@ def _apply_replacements(
     tracks: list[dict],
     alternatives: list[dict],
     replacements: list[MusicPathReplacement],
+    *,
+    recent_song_keys=None,
+    previous_song_keys=None,
+    previous_track_ids=None,
+    validation_context=None,
 ) -> list[dict]:
     if not replacements:
         return tracks
@@ -110,6 +116,17 @@ def _apply_replacements(
         }:
             continue
 
+        if not can_replace_path_track(
+            output,
+            target_index,
+            candidate,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            validation_context=validation_context,
+        ):
+            continue
+
         old_id = _track_id(output[target_index])
         output[target_index] = dict(candidate)
         if old_id is not None:
@@ -160,6 +177,10 @@ def refine_music_path_with_llm(
     tracks: list[dict],
     candidates_by_genre: Mapping[str, list[dict]],
     actor_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    validation_context: dict | None = None,
 ) -> list[dict]:
     """Compatibility entry point; the service owns AI execution and caching."""
     from crate.music_paths_refinement import (
@@ -174,6 +195,10 @@ def refine_music_path_with_llm(
         tracks=tracks,
         candidates_by_genre=candidates_by_genre,
         actor_id=actor_id,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        validation_context=validation_context,
     )
 
 
