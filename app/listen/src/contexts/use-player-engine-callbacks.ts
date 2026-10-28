@@ -8,7 +8,7 @@ import {
 
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { PLAYER_TRACK_FINISHED_EVENT } from "@/contexts/player-events";
-import { getStreamUrl } from "@/contexts/player-utils";
+import { canonicalMediaUrl, getStreamUrl } from "@/contexts/player-utils";
 import {
   getCurrentTrackDuration as gpGetCurrentTrackDuration,
   isCurrentTrackFullyBuffered,
@@ -115,6 +115,17 @@ export function usePlayerEngineCallbacks({
   setCrossfadeTransition,
 }: UsePlayerEngineCallbacksParams) {
   const playbackRequestStartedAtRef = useRef<number | null>(null);
+  const isCurrentEnginePath = (path: string | undefined): boolean => {
+    const currentTrack = currentTrackRef.current;
+    if (!path || !currentTrack) return true;
+    const engineTracks = engineTrackMapRef.current.get(path);
+    if (engineTracks) {
+      return engineTracks.some((track) => track.id === currentTrack.id);
+    }
+    return (
+      canonicalMediaUrl(path) === canonicalMediaUrl(getStreamUrl(currentTrack))
+    );
+  };
   callbacksRef.current = {
     onTimeUpdate: (positionMs, trackIndex) => {
       if (isCastSessionActive()) return;
@@ -271,9 +282,7 @@ export function usePlayerEngineCallbacks({
     },
     onError: (path, err) => {
       if (isCastSessionActive()) return;
-      const currentTrack = currentTrackRef.current;
-      const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
-      if (currentPath && path && path !== currentPath) {
+      if (!isCurrentEnginePath(path)) {
         console.warn(
           "[gapless] preload error ignored (non-current track):",
           path,
@@ -303,9 +312,7 @@ export function usePlayerEngineCallbacks({
     },
     onBuffering: (path) => {
       if (isCastSessionActive()) return;
-      const currentTrack = currentTrackRef.current;
-      const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
-      if (path && currentPath && path !== currentPath) return;
+      if (!isCurrentEnginePath(path)) return;
       if (isCurrentTrackFullyBuffered()) return;
       if (bufferingIntentRef.current || !isPlayingRef.current) {
         commitIsBuffering(true);
