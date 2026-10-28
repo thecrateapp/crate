@@ -8,7 +8,7 @@ import type { PathDetail } from "./paths-model";
 export function PathTrackList({ path }: { path: PathDetail }) {
   const rows = useMemo(() => path.tracks.map(toTrackRowData), [path.tracks]);
   const playSource = useMemo<PlaySource>(
-    () => ({ type: "playlist", name: path.name, id: path.id }),
+    () => ({ type: "queue", name: path.name, href: `/paths/${path.id}` }),
     [path.id, path.name],
   );
 

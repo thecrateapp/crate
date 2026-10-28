@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   androidNativeEngine,
@@ -37,7 +37,9 @@ type Options = Pick<
 
 export function usePlaybackRefillRuntime(options: Options) {
   const latest = useRef(options);
-  latest.current = options;
+  useLayoutEffect(() => {
+    latest.current = options;
+  }, [options]);
   const state = useRef({
     generation: 0,
     inFlight: null as AbortController | null,
@@ -207,9 +209,11 @@ export function usePlaybackRefillRuntime(options: Options) {
       if (runtime.inFlight === controller) runtime.inFlight = null;
     }
   }, [schedule, supported]);
-  runRef.current = () => {
-    void run();
-  };
+  useLayoutEffect(() => {
+    runRef.current = () => {
+      void run();
+    };
+  }, [run]);
 
   const continueInfinitePlayback = useCallback(() => {
     if (

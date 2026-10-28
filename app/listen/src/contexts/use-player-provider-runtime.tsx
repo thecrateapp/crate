@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -154,11 +155,13 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     connectEnabled,
     runtime: runtimeState,
   });
-  refillCallbacksRef.current = {
-    recover: recoverAtEnd,
-    cancel: resetPlaybackIntelligence,
-    resume: resumePlaybackIntelligence,
-  };
+  useLayoutEffect(() => {
+    refillCallbacksRef.current = {
+      recover: recoverAtEnd,
+      cancel: resetPlaybackIntelligence,
+      resume: resumePlaybackIntelligence,
+    };
+  }, [recoverAtEnd, resetPlaybackIntelligence, resumePlaybackIntelligence]);
   // NOTE: no gpSetShuffle effect. Shuffle is handled in React by reordering
   // the queue in toggleShuffle(); the engine always plays sequentially.
   //

@@ -516,6 +516,7 @@ def test_full_api_lifespan_preserves_runtime_and_carries_audit_trace(
         "_queue_artwork_variant_backfill",
         "_queue_artwork_manifest_permission_repair",
         "_queue_stats_dashboard_backfill",
+        "_queue_instance_listening_backfill",
         "_queue_artist_top_track_ranking_backfill",
     ):
         startup[name] = Mock()

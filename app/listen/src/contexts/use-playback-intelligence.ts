@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
 import {
   type PlaybackIntelligenceOptions,
@@ -51,13 +51,13 @@ export function usePlaybackIntelligence({
     ],
   );
 
-  {
+  useLayoutEffect(() => {
     localCurrentIndexRef.current = currentIndex;
     localPlaySourceRef.current = playSource;
     localQueueRef.current = queue;
     recentlyPlayedRef.current = recentlyPlayed;
     actionsRef.current = actions;
-  }
+  }, [currentIndex, playSource, queue, recentlyPlayed, actions]);
 
   const {
     continueInfinitePlayback,

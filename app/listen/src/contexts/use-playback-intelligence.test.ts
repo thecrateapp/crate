@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { createElement, Suspense, type ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { PlaySource, Track } from "./player-types";
 vi.mock("@/lib/radio", () => ({ fetchInfiniteContinuation: vi.fn() }));
@@ -101,4 +102,74 @@ it("uses committed state refs even before the next React render catches up", asy
     [replacementTrack],
     expect.any(AbortSignal),
   );
+});
+
+it("appends an in-flight batch using only committed actions during a suspended render", async () => {
+  let resolve!: (
+    batch: Awaited<ReturnType<typeof fetchContinuationBatch>>,
+  ) => void;
+  vi.mocked(fetchContinuationBatch).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const opts = options();
+  const pendingActions = options().actions;
+  const never = new Promise<void>(() => {});
+  const { rerender } = renderHook(
+    ({ actions, suspended }) => {
+      const runtime = usePlaybackIntelligence({ ...opts, actions });
+      if (suspended) throw never;
+      return runtime;
+    },
+    {
+      initialProps: { actions: opts.actions, suspended: false },
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(Suspense, { fallback: null }, children),
+    },
+  );
+  await act(async () => {
+    rerender({ actions: pendingActions, suspended: true });
+  });
+  await act(async () => {
+    resolve({ tracks: [next], status: "ok", batchIndex: 0, revision: 1 });
+  });
+
+  expect(opts.actions.appendTracks).toHaveBeenCalledOnce();
+  expect(pendingActions.appendTracks).not.toHaveBeenCalled();
+});
+
+it("keeps an in-flight batch eligible when a repeat change has not committed", async () => {
+  let resolve!: (
+    batch: Awaited<ReturnType<typeof fetchContinuationBatch>>,
+  ) => void;
+  vi.mocked(fetchContinuationBatch).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const opts = options();
+  const never = new Promise<void>(() => {});
+  const { rerender } = renderHook(
+    ({ repeat, suspended }: { repeat: "off" | "one"; suspended: boolean }) => {
+      const runtime = usePlaybackIntelligence({ ...opts, repeat });
+      if (suspended) throw never;
+      return runtime;
+    },
+    {
+      initialProps: { repeat: "off" as "off" | "one", suspended: false },
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(Suspense, { fallback: null }, children),
+    },
+  );
+  await act(async () => {
+    rerender({ repeat: "one", suspended: true });
+  });
+  await act(async () => {
+    resolve({ tracks: [next], status: "ok", batchIndex: 0, revision: 1 });
+  });
+
+  expect(opts.actions.appendTracks).toHaveBeenCalledOnce();
 });

@@ -93,6 +93,7 @@ export function usePlayerTransportControls({
     }
     gpPause();
   }, [
+    cancelQueuePreparation,
     resetPlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
@@ -129,6 +130,7 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePendingQueue,
     resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
@@ -228,6 +230,7 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePendingQueue,
     resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,

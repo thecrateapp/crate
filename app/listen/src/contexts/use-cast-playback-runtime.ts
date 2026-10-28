@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type Dispatch,
@@ -45,13 +46,15 @@ export function useCastPlaybackRuntime({
     onResume,
     onPause,
   });
-  callbacks.current = {
-    queueRef,
-    onQueueEnded,
-    onDisconnect,
-    onResume,
-    onPause,
-  };
+  useLayoutEffect(() => {
+    callbacks.current = {
+      queueRef,
+      onQueueEnded,
+      onDisconnect,
+      onResume,
+      onPause,
+    };
+  }, [queueRef, onQueueEnded, onDisconnect, onResume, onPause]);
   const wasActive = useRef(false);
   const wasPlaying = useRef(false);
   const [active, setActive] = useState(isCastSessionActive);

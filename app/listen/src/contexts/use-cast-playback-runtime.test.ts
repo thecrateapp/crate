@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { createElement, Suspense, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CastPlaybackState } from "@/lib/cast-sender";
@@ -98,6 +99,54 @@ describe("useCastPlaybackRuntime", () => {
 
     expect(result.current).toBe(false);
     expect(commitCurrentTime).not.toHaveBeenCalled();
+  });
+
+  it("keeps the committed disconnect callback during a suspended render", async () => {
+    let listener!: (state: CastPlaybackState) => void;
+    subscribeMock.mockImplementation((nextListener) => {
+      listener = nextListener;
+      return vi.fn();
+    });
+    const committedDisconnect = vi.fn();
+    const pendingDisconnect = vi.fn();
+    const never = new Promise<void>(() => {});
+    const opts = {
+      onDisconnect: committedDisconnect,
+      commitCurrentTime: vi.fn(),
+      commitCurrentIndex: vi.fn(),
+      commitDuration: vi.fn(),
+      commitIsBuffering: vi.fn(),
+      commitIsPlaying: vi.fn(),
+      setVolumeState: vi.fn(),
+    };
+    const { rerender } = renderHook(
+      ({ onDisconnect, suspended }) => {
+        const runtime = useCastPlaybackRuntime({ ...opts, onDisconnect });
+        if (suspended) throw never;
+        return runtime;
+      },
+      {
+        initialProps: { onDisconnect: committedDisconnect, suspended: false },
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(Suspense, { fallback: null }, children),
+      },
+    );
+    const snapshot = {
+      active: true,
+      currentTime: 20,
+      duration: 100,
+      isBuffering: false,
+      isPlaying: true,
+    };
+    act(() => listener(snapshot));
+
+    await act(async () => {
+      rerender({ onDisconnect: pendingDisconnect, suspended: true });
+    });
+    act(() => listener({ ...snapshot, active: false }));
+
+    expect(committedDisconnect).toHaveBeenCalledOnce();
+    expect(pendingDisconnect).not.toHaveBeenCalled();
   });
 });
 
